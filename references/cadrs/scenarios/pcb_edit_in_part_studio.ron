@@ -1,0 +1,99 @@
+// docs/PCB_IN_PART_STUDIO.md P3: a derived board's layout edited in the Part Studio. The
+// mains-sensor enclosure with its board derived onto Board location (`board derive`), the tube
+// and end plate see-through. The board's outline centre (15.5, 19.5) is on (0, 0, 12): J4 (Live
+// in, layout (14, 3.5)) is at (−1.5, −16, 13.6), the Live pin at (0, 8).
+// 01 Edit layout (the feature's menu): the bar "Layout of AC sensor (PCB Studio 1)"
+//    with Open in PCB Studio and Done, the Layout's tool strip and layers button, the layout on
+//    the board's top face, the models as they are.
+// 02 J4 pressed and dragged toward the Live pin: its wire stub moves with the pointer in 3D
+//    (a ghost), the layout's J4 with it; nothing is rebuilt yet.
+// 03 let go over the Live pin: one undo step "Move J4" in the PCB Studio, the derived board
+//    rebuilt with J4 there (layout (15.5, 27.5)), the pin through its hole.
+// 04 Ctrl+Z from the Part Studio: J4 back where it was. (Then pressed beside its origin and
+//    dragged 5 mm: it moves 5 mm, not to the pointer; undone.)
+// 05 X over J3, then a click on U2's pin 3 (ending on a pad of its net ends the route): a
+//    track routed on the board (LOAD, two segments: a straight run and a 45° one), one step.
+// 06 the zone tool: its dialog's OK (GND), four corners clicked between J1 and C1, taking in
+//    C1's GND pad (the last a double-click); it fills as it is added: 52 mm² of copper.
+// 07 Done: the bar and the strip gone, the board as 3D model again.
+// (`board check J4` puts J4's place where `ExpectText` reads it: after 01, 03 and 04;
+// `board count` the tracks and zones after 05 and 06.)
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("board setup"),
+        Wait(10),
+        Custom("board derive"),
+        Wait(10),
+        Custom("board transparent Tube, End plate, Plug"),
+        Custom("view -40 55 0 0 12 0.06"),
+        Wait(30),
+        RightClick(ui("feature-derived-1")),
+        WaitFor("feature-context-menu"),
+        Click(ui("feature-board-edit")),
+        WaitFor("board-edit-bar"),
+        MoveTo(1420, 780),
+        Wait(10),
+        Screenshot("01-editing"),
+        Custom("board check J4"),
+        ExpectText("board-check", "J4 at 14.00, 3.50 top"),
+        Press(xyz(-1.5, -16, 13.6)),
+        Hover(xyz(-1, -4, 13.6)),
+        Hover(xyz(0, 8, 13.6)),
+        Wait(5),
+        Screenshot("02-dragging"),
+        Release,
+        Wait(20),
+        MoveTo(1420, 780),
+        Wait(10),
+        Screenshot("03-dropped"),
+        Custom("board check J4"),
+        ExpectText("board-check", "J4 at 15.50, 27.50 top"),
+        Key("Ctrl+Z"),
+        Wait(20),
+        Screenshot("04-undone"),
+        Custom("board check J4"),
+        ExpectText("board-check", "J4 at 14.00, 3.50 top"),
+        // Pressed 0.5 mm beside its origin and dragged 5 mm along x: it moves 5 mm (it keeps
+        // its place under the pointer), then Ctrl+Z.
+        Press(xyz(-1.0, -16, 13.6)),
+        Hover(xyz(1.0, -16, 13.6)),
+        Hover(xyz(4.0, -16, 13.6)),
+        Wait(5),
+        Release,
+        Wait(20),
+        Custom("board check J4"),
+        ExpectText("board-check", "J4 at 19.00, 3.50 top"),
+        Key("Ctrl+Z"),
+        Wait(20),
+        // A track from J3 (LOAD) to U2's pin 3 (LOAD), routed on the board in the view.
+        Hover(xyz(6.5, -16, 13.6)),
+        Key("X"),
+        Wait(3),
+        Click(xyz(3.135, -11.475, 13.6)),
+        Wait(20),
+        MoveTo(1420, 780),
+        Wait(5),
+        Screenshot("05-routed"),
+        Custom("board count"),
+        ExpectText("board-check", "tracks 2,"),
+        // A zone between J1 and C1, its corners clicked on the board (filled as it is added).
+        Click(ui("pcb-zone")),
+        Wait(3),
+        Click(xyz(-9.5, -7.5, 13.6)),
+        Click(xyz(-1.5, -7.5, 13.6)),
+        Click(xyz(-1.5, -0.5, 13.6)),
+        DoubleClick(xyz(-9.5, -0.5, 13.6)),
+        Wait(10),
+        Wait(20),
+        MoveTo(1420, 780),
+        Wait(5),
+        Screenshot("06-zone"),
+        Custom("board count"),
+        ExpectText("board-check", "zones 1 (filled 1, 52 mm²)"),
+        Click(ui("board-edit-done")),
+        Wait(10),
+        Screenshot("07-done"),
+    ],
+)

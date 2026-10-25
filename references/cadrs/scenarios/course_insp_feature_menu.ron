@@ -1,0 +1,89 @@
+// P3D.1 (IR5.5, X6): the feature context menu's items, on the Control Arm's fully defined
+// Sketch 1 on Top (`control-arm-sketch`) and a circle sketched on Front (Sketch 2).
+// 01 right-click Sketch 1: the menu in the course's order (`ex1-step2.png`): Rename, Edit…,
+//    "Edit healthy moment of Sketch 1…" (disabled until Repair, P3D.4), Copy sketch, Show
+//    dimensions | Add selection to folder… | Hide, Show all sketches | Section view… (disabled)
+//    | Suppress, Dynamic suppression ▸ | Add comment (disabled: collaboration) | Zoom to
+//    selection | Show dependencies… | Roll to here | Edit sketch appearance… | Delete.
+// 02 Dynamic suppression ▸: Suppress by variable… (IR5.5, see
+//    `course_insp_suppress_by_variable`) and Suppress by configuration… (disabled:
+//    configurations are out of scope).
+// 03 Show dimensions, seen from the top: Sketch 1's dimensions drawn although it isn't being
+//    edited.
+// 04 the menu again: the item now reads "Hide dimensions".
+// 05 Hide on both sketches: nothing shown (each row's eye too).
+// 06 Show all sketches: both back, in one undo step.
+// 07 Zoom to selection on Sketch 2: the view fitted to its circle.
+// 08 Copy sketch on Sketch 1: "Sketch 1 copied. Paste it into a sketch with Ctrl+V."
+// 09 a new sketch on Right, Ctrl+V: Sketch 1's geometry, constraints and dimensions pasted in
+//    (selected), as one undo step.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("control-arm-sketch"),
+        Custom("sketch front circle 0 60 12"),
+        Key("P"),
+        Key("Shift+7"),
+        Key("F"),
+        RightClick(ui("feature-sketch-1")),
+        WaitFor("feature-context-menu"),
+        Hover(ui("feature-rename")),
+        Wait(3),
+        Screenshot("01-menu"),
+        Hover(ui("feature-dynamic-suppression")),
+        Wait(10),
+        Screenshot("02-dynamic-suppression"),
+        Click(ui("feature-show-dimensions")),
+        Key("Shift+5"),
+        Key("F"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-show-dimensions"),
+        RightClick(ui("feature-sketch-1")),
+        WaitFor("feature-context-menu"),
+        Hover(ui("feature-hide-dimensions")),
+        Wait(3),
+        Screenshot("04-hide-dimensions-item"),
+        Click(ui("feature-hide-dimensions")),
+        RightClick(ui("feature-sketch-1")),
+        WaitFor("feature-context-menu"),
+        Click(ui("feature-hide")),
+        RightClick(ui("feature-sketch-2")),
+        WaitFor("feature-context-menu"),
+        Click(ui("feature-hide")),
+        Key("Shift+7"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("05-both-hidden"),
+        RightClick(ui("feature-sketch-2")),
+        WaitFor("feature-context-menu"),
+        Click(ui("feature-show-all-sketches")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("06-show-all"),
+        RightClick(ui("feature-sketch-2")),
+        WaitFor("feature-context-menu"),
+        Click(ui("feature-zoom-to")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("07-zoom-to-selection"),
+        RightClick(ui("feature-sketch-1")),
+        WaitFor("feature-context-menu"),
+        Click(ui("feature-copy-sketch")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("08-copied"),
+        Click(ui("sketch")),
+        WaitFor("sketch-dialog"),
+        Click(ui("feature-right")),
+        Key("N"),
+        MoveTo(900, 500),
+        Wait(3),
+        Key("Ctrl+V"),
+        Key("F"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("09-pasted"),
+    ],
+)

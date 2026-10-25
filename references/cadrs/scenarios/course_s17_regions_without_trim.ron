@@ -1,0 +1,49 @@
+// T4 / S17.2: "Trimming isn't needed to form regions; overlapping geometry already makes
+// regions." An 80 x 50 rectangle and a Ø40 circle centred on its left side overlap, untrimmed
+// (on the left, so the rectangle's 50, right of it, stays clear of the circle).
+// Every piece is a region of its own: clicking inside the overlap selects just the half-disc
+// inside the rectangle (light orange, "Area: 628.319 mm²" at the bottom right); clicking the part of the circle
+// outside the rectangle selects that region instead; Shift adds the rectangle's remaining part
+// (together 4000 mm²).
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Click(ui("sketch")),
+        WaitFor("sketch-dialog"),
+        Click(ui("feature-top")),
+        Key("N"),
+        Key("G"),
+        ClickWorld(-40, -25),
+        ClickWorld(40, 25),
+        Type("80"),
+        Key("Enter"),
+        Type("50"),
+        Key("Enter"),
+        Key("Escape"),
+        Key("C"),
+        ClickWorld(-40, 0),
+        ClickWorld(-60, 0),
+        Type("40"),
+        Key("Enter"),
+        Key("Escape"),
+        MoveTo(1400, 850),
+        Wait(3),
+        Screenshot("01-overlapping-untrimmed"),
+        Click(world(-32, 3)),
+        MoveTo(1400, 850),
+        Wait(3),
+        Screenshot("02-overlap-region-selected-area"),
+        Click(world(-32, 3)),
+        Click(world(-52, 3)),
+        MoveTo(1400, 850),
+        Wait(3),
+        Screenshot("03-outer-circle-region-area"),
+        KeyDown("Shift"),
+        Click(world(20, 10)),
+        KeyUp("Shift"),
+        MoveTo(1400, 850),
+        Wait(3),
+        Screenshot("04-two-regions-selected-area"),
+    ],
+)

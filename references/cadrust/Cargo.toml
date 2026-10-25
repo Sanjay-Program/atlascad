@@ -1,0 +1,12 @@
+[workspace]
+resolver = "2"
+members = ["crates/cadrust-core", "crates/cadrust-cli", "crates/cadrust-wasm", "crates/cadrust-addin", "addins/sdk", "addins/gear-generator"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Taewook Kang"]
+
+[profile.release]
+opt-level = 3

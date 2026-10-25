@@ -1,0 +1,80 @@
+// P3F.5 (`intro-to-assemblies.md` A1.7 Loads, A1.8 Simulation, A6.3 Simulation connection, X16):
+// a simulation of an assembly. The stand-in (`fixture simulation_halves`,
+// `cadrs_core::samples::simulation::halves_document`): the gap list's 100 × 10 × 10 mm beam as
+// two 50 mm halves (Steel - A36) in Part Studio "Halves"; in "Beam Assembly", Half 1 <1> is
+// fixed and Fastened 1 joins Half 2 <1> to it at x = 50 with Simulation connection checked.
+// 01 the assembly: Instances, Items, Loads (0), Mate Features.
+// 02 Fastened 1 opened: Simulation connection checked (A6.3).
+// 03 the Simulation panel: Materials of both halves; + Fixed on Half 1's end x = 0.
+// 04 + Force on Half 2's end x = 100: 100 N along −Z.
+// 05 the Loads list in the panel and the Instances list's Loads (2) with its rows (A1.7).
+// 06 Mesh Coarse, Solve: one von Mises map over both halves, continuous across the bonded
+//    joint; the largest displacement ≈ 0.200 mm, as the solid beam's.
+// 07 the probe at mid-span (the joint) on the top face: ≈ 30 MPa.
+// 08 Simulation connection unchecked in Fastened 1: Solve says Half 2 <1> is free to move.
+Scenario(
+    start: Some("document"),
+    steps: [
+        Custom("fixture simulation_halves"),
+        WaitFor("mate-row-1"),
+        Custom("view 40 25 50 5 5 0.12"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("01-assembly"),
+        DoubleClick(ui("mate-row-1")),
+        WaitFor("mate-dialog"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("02-simulation-connection"),
+        Click(ui("mate-dialog-cancel")),
+        Click(ui("panel-simulation")),
+        WaitFor("simulation-panel"),
+        Click(ui("sim-add-fixed")),
+        WaitFor("sim-load-dialog"),
+        Custom("view -40 25 50 5 5 0.12"),
+        Click(xyz(0, 5, 5)),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-fixed-half-1"),
+        Click(ui("sim-load-dialog-accept")),
+        Custom("view 40 25 50 5 5 0.12"),
+        Click(ui("sim-add-force")),
+        WaitFor("sim-load-dialog"),
+        Click(xyz(100, 5, 5)),
+        Click(ui("sim-load-direction")),
+        Click(ui("sim-load-direction-option-3")),
+        Click(ui("sim-load-flip-checkbox")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("04-force-half-2"),
+        Click(ui("sim-load-dialog-accept")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("05-loads"),
+        Click(ui("sim-mesh")),
+        Click(ui("sim-mesh-option-0")),
+        Click(ui("sim-solve")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("06-von-mises"),
+        ExpectText("sim-max-displacement-value", "0.2"),
+        Hover(xyz(50, 5, 7.5)),
+        Wait(10),
+        Screenshot("07-probe-joint"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Click(ui("simulation-panel-close")),
+        Wait(5),
+        DoubleClick(ui("mate-row-1")),
+        WaitFor("mate-dialog"),
+        Click(ui("mate-simulation-checkbox")),
+        Click(ui("mate-dialog-accept")),
+        Click(ui("panel-simulation")),
+        WaitFor("simulation-panel"),
+        Click(ui("sim-solve")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("08-unconnected-error"),
+        ExpectText("sim-error", "free to move"),
+    ],
+)

@@ -1,0 +1,1725 @@
+{
+  "schema_version": 1,
+  "tasks": [
+    {
+      "id": "task.engineering.control-plane",
+      "title": "Build the persistent engineering control plane",
+      "rationale": "Project state lived in prose documents and an agent transcript. Nothing detected a new repository, a moved HEAD or a changed file, and nothing could answer 'what is integrated and what is proven' from the filesystem. This cycle creates typed manifests, a Rust scanner/validator, idempotent task generation and an evidence report.",
+      "priority": "integration_blocker",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "Manifests exist for repositories, modules, agents, interfaces, capabilities, dependencies, tasks and quality, and validate cross-references.",
+        "A workspace scan observes Git state, file digests and Cargo packages without modifying any source repository.",
+        "A changed file is reported with its path; a missing declared repository and a HEAD past the verified commit are reported.",
+        "Running an unchanged scan twice produces no changes and no duplicate tasks.",
+        "Task ids are derived from the observed value, and cycle detection names only the tasks in the cycle.",
+        "A report is generated from the manifests with counts that match the files."
+      ],
+      "inputs": [
+        "repo.cad-contract",
+        "repo.cad-kernel-truck"
+      ],
+      "outputs": [
+        "crates/cad-engineering",
+        "engineering/manifest/repositories.json",
+        "engineering/reports/latest-integration-report.md"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "Cargo.toml",
+        "engineering/",
+        "crates/cad-engineering/"
+      ],
+      "required_tests": [
+        "cargo test -p cad-engineering",
+        "zentrion-eng validate",
+        "zentrion-eng scan --write twice"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-engineering",
+        "engineering/quality/builds.json#b-cad-engineering",
+        "zentrion-eng validate: 0 errors, 4 warnings (unrecorded dependency licences)",
+        "two consecutive scans: 0 changes, backlog SHA-256 unchanged"
+      ],
+      "rollback": "The cycle adds one workspace member and a new engineering/ tree. Removing the member and the directories restores the prior state; no source repository was modified.",
+      "source": "curated",
+      "trigger_digest": null
+    },
+    {
+      "id": "task.integration.cli",
+      "title": "Connect the contract and the truck adapter to a real consumer",
+      "rationale": "The contract and the adapter had no consumer other than their own tests, so 'integrated' was a claim about files rather than about use. A headless CLI now converts units, writes a versioned document header, builds geometry through the adapter, tessellates, and writes a binary STL that an independent parser reads back correctly.",
+      "priority": "interface_compatibility",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "A unit-aware request produces a document header whose units and tolerance match the request.",
+        "Volumes are analytic: a 10x10x5 mm box is 500 mm3 and a documented union fixture is 1120 mm3.",
+        "The mesh crossing the boundary is watertight and consistently oriented.",
+        "The written STL is valid binary STL and round-trips through an independent parser.",
+        "No capability is advertised that a test does not exercise."
+      ],
+      "inputs": [
+        "module.cad-contract",
+        "module.cad-kernel-truck"
+      ],
+      "outputs": [
+        "crates/cad-cli"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "crates/cad-cli",
+        "crates/cad-kernel-truck/src/lib.rs"
+      ],
+      "required_tests": [
+        "cargo test -p cad-cli",
+        "cargo test -p cad-kernel-truck"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-cli (8 passed)",
+        "engineering/quality/tests.json#t-cad-kernel-truck (14 passed)",
+        "independent binary-STL parse: box 12 triangles, 500.0000 mm3, 0 open edges; union 82 triangles, 1120.0037 mm3, 0 open edges",
+        "engineering/quality/benchmarks.json#bm-cli-box"
+      ],
+      "rollback": "Removing crates/cad-cli from the workspace members and deleting the directory restores the previous state; the adapter change is independent and documented in ADR-0005.",
+      "source": "curated",
+      "trigger_digest": null
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-engineering.002e70d3",
+      "title": "repo.cad-engineering: 9 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 9 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-engineering"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ src/diff.rs",
+        "~ src/fingerprint.rs",
+        "~ src/main.rs",
+        "~ src/manifest.rs",
+        "~ src/model.rs",
+        "~ src/report.rs",
+        "~ src/scan.rs",
+        "~ src/tasks.rs",
+        "~ tests/pipeline.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "evidence": [
+        "Changes are the control plane itself: 9 files, reviewed, clippy clean, 28 tests pass.",
+        "engineering/quality/tests.json",
+        "engineering/quality/builds.json"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "002e70d3b7f70b76"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-engineering.5acdf222",
+      "title": "repo.cad-engineering: 1 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 1 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "cancelled",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-engineering"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ src/scan.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "evidence": [
+        "Superseded by task.scan.files-modified.repo-cad-engineering.002e70d3, which describes the later state of the same repository. Cancelled rather than closed as verified because the tree it described no longer exists."
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "5acdf2228c809843"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-kernel-truck.83372448",
+      "title": "repo.cad-kernel-truck: 1 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 1 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-kernel-truck"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ src/lib.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "evidence": [
+        "The change is the tessellation weld/orientation repair; reviewed and covered by tessellation_is_a_closed_outward_manifold (14 tests pass).",
+        "engineering/quality/tests.json",
+        "engineering/quality/builds.json"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "83372448f20798a2"
+    },
+    {
+      "id": "task.scan.package-added.repo-cad-contract.31907b61",
+      "title": "repo.cad-contract: 1 Cargo package(s) added",
+      "rationale": "Observed by the workspace scanner: 1 Cargo package(s) added. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-contract"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "+ cad-cli@0.1.0"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "evidence": [
+        "Workspace-wide package inventory gained cad-cli; cargo metadata is evaluated per workspace member, so the same fact appears for each member (identical digest).",
+        "engineering/quality/tests.json",
+        "engineering/quality/builds.json"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "31907b61e624afad"
+    },
+    {
+      "id": "task.scan.package-added.repo-cad-engineering.31907b61",
+      "title": "repo.cad-engineering: 1 Cargo package(s) added",
+      "rationale": "Observed by the workspace scanner: 1 Cargo package(s) added. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-engineering"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "+ cad-cli@0.1.0"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "evidence": [
+        "Workspace-wide package inventory gained cad-cli; see the identical digest on the cad-contract task.",
+        "engineering/quality/tests.json",
+        "engineering/quality/builds.json"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "31907b61e624afad"
+    },
+    {
+      "id": "task.scan.package-added.repo-cad-kernel-truck.31907b61",
+      "title": "repo.cad-kernel-truck: 1 Cargo package(s) added",
+      "rationale": "Observed by the workspace scanner: 1 Cargo package(s) added. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-kernel-truck"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "+ cad-cli@0.1.0"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "evidence": [
+        "Workspace-wide package inventory gained cad-cli; see the identical digest on the cad-contract task.",
+        "engineering/quality/tests.json",
+        "engineering/quality/builds.json"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "31907b61e624afad"
+    },
+    {
+      "id": "task.scan.package-added.repo-cadrs.272e2000",
+      "title": "repo.cadrs: 21 Cargo package(s) added",
+      "rationale": "Observed by the workspace scanner: 21 Cargo package(s) added. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "cancelled",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cadrs"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "+ cadrs@0.1.5",
+        "+ cadrs_app@0.1.5",
+        "+ cadrs_core@0.1.5",
+        "+ cadrs_drawing@0.1.5",
+        "+ cadrs_easyeda@0.1.5",
+        "+ cadrs_eda@0.1.5",
+        "+ cadrs_fea@0.1.5",
+        "+ cadrs_harness@0.1.5",
+        "+ cadrs_idf@0.1.5",
+        "+ cadrs_kernel@0.1.5",
+        "+ cadrs_kicad@0.1.5",
+        "+ cadrs_libgen@0.1.5",
+        "+ cadrs_mcp@0.1.5",
+        "+ cadrs_onshape@0.1.5",
+        "+ cadrs_pcb@0.1.5",
+        "+ cadrs_render@0.1.5",
+        "+ cadrs_router@0.1.5",
+        "+ cadrs_router_kernels@0.1.5",
+        "+ cadrs_sheetmetal@0.1.5",
+        "+ cadrs_sketch@0.1.5",
+        "+ cadrs_ui@0.1.5"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 1,
+      "last_error": "Scanner defect (toolchain pinning + working directory), fixed 2026-10-22. The repository itself did not change.",
+      "evidence": [
+        "Not a repository change: the scanner previously ran cargo with the repository as its working directory, so rustup tried to download a pinned toolchain, timed out after 20 s and recorded an empty package list. Fixed by invoking cargo from the workspace root; regression test a_pinned_toolchain_does_not_break_package_discovery."
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "272e2000e1e6ca93"
+    },
+    {
+      "id": "task.scan.package-added.repo-hagane.220b7d73",
+      "title": "repo.hagane: 1 Cargo package(s) added",
+      "rationale": "Observed by the workspace scanner: 1 Cargo package(s) added. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "cancelled",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.hagane"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "+ hagane@0.1.0"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 1,
+      "last_error": "Scanner defect (toolchain pinning + working directory), fixed 2026-10-22. The repository itself did not change.",
+      "evidence": [
+        "Not a repository change: the scanner previously ran cargo with the repository as its working directory, so rustup tried to download a pinned toolchain, timed out after 20 s and recorded an empty package list. Fixed by invoking cargo from the workspace root; regression test a_pinned_toolchain_does_not_break_package_discovery."
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "220b7d7323d446e4"
+    },
+    {
+      "id": "task.scan.package-added.repo-monstertruck.9e68bf10",
+      "title": "repo.monstertruck: 19 Cargo package(s) added",
+      "rationale": "Observed by the workspace scanner: 19 Cargo package(s) added. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "cancelled",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.monstertruck"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "+ example-pages-generator@0.1.0",
+        "+ monstertruck-assembly@0.4.1",
+        "+ monstertruck-core@0.4.1",
+        "+ monstertruck-derive@0.4.1",
+        "+ monstertruck-fillet@0.4.1",
+        "+ monstertruck-geometry@0.4.1",
+        "+ monstertruck-gpu@0.4.1",
+        "+ monstertruck-healing@0.4.1",
+        "+ monstertruck-io@0.4.1",
+        "+ monstertruck-mesh@0.4.1",
+        "+ monstertruck-meshing@0.4.1",
+        "+ monstertruck-modeling@0.4.1",
+        "+ monstertruck-render@0.4.1",
+        "+ monstertruck-solid@0.4.1",
+        "+ monstertruck-step@0.4.1",
+        "+ monstertruck-topology@0.4.1",
+        "+ monstertruck-traits@0.4.1",
+        "+ monstertruck-wasm@0.4.1",
+        "+ monstertruck@0.4.1"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 1,
+      "last_error": "Scanner defect (toolchain pinning + working directory), fixed 2026-10-22. The repository itself did not change.",
+      "evidence": [
+        "Not a repository change: the scanner previously ran cargo with the repository as its working directory, so rustup tried to download a pinned toolchain, timed out after 20 s and recorded an empty package list. Fixed by invoking cargo from the workspace root; regression test a_pinned_toolchain_does_not_break_package_discovery."
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "9e68bf1055090162"
+    },
+    {
+      "id": "task.scan.repo-discovered.repo-cad-cli.21ff4fe9",
+      "title": "repo.cad-cli: `crates/cad-cli` was not observed in the previous scan",
+      "rationale": "Observed by the workspace scanner: `crates/cad-cli` was not observed in the previous scan. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "integration_blocker",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the licence is read and recorded before any code is used",
+        "capabilities and duplicates are compared against existing modules",
+        "a repository entry is added with a stable id and evidence references",
+        "no source is copied or merged during onboarding"
+      ],
+      "inputs": [
+        "repo.cad-cli"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "declared in manifests: yes"
+      ],
+      "required_tests": [
+        "isolated build of the new repository",
+        "isolated test run of the new repository"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "evidence": [
+        "The new checkout is registered with a licence, module, capability, interfaces, dependencies and a passing test suite.",
+        "engineering/quality/tests.json",
+        "engineering/quality/builds.json"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "21ff4fe992bf0927"
+    },
+    {
+      "id": "task.adapter.cancellation",
+      "title": "Implement cancellation and deadlines in the truck adapter",
+      "rationale": "KernelError::Cancelled and Timeout exist in the contract but nothing sets them. Without them a UI cannot abandon a long boolean and an agent runtime cannot enforce a budget.",
+      "priority": "interface_compatibility",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "Every kernel entry point accepts a deadline and a cancellation token.",
+        "Exceeding the deadline returns Timeout and leaves the kernel state usable.",
+        "A test cancels a long operation and then performs a successful operation on the same instance."
+      ],
+      "inputs": [
+        "module.cad-kernel-truck"
+      ],
+      "outputs": [
+        "crates/cad-kernel-truck/src/lib.rs"
+      ],
+      "depends_on": [],
+      "blocks": [
+        "task.engineering.agent-runtime"
+      ],
+      "expected_changes": [
+        "crates/cad-kernel-truck/src/lib.rs"
+      ],
+      "required_tests": [
+        "cargo test -p cad-kernel-truck"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "evidence": [
+        "crates/cad-kernel-truck/src/lib.rs: Budget, CancellationToken, Deadline and the _with_budget twins on every operation",
+        "engineering/quality/tests.json#t-cad-kernel-truck (an_expired_deadline_returns_timeout_and_leaves_the_kernel_usable, every_budgeted_entry_point_enforces_the_deadline, a_cancelled_token_stops_the_operation_and_can_be_reset, cancelling_a_running_operation_is_observed_and_the_instance_survives, the_trait_path_never_reports_cancellation)"
+      ],
+      "rollback": "The API change is additive if the existing methods delegate with an unlimited deadline.",
+      "source": "curated",
+      "trigger_digest": null
+    },
+    {
+      "id": "task.corpus.booleans",
+      "title": "Build an analytic boolean correctness corpus",
+      "rationale": "The difference defect and the third-union panic were both found by accident. A fixture set with analytic volumes turns them into a regression gate and gives an honest per-kernel reliability comparison instead of README claims.",
+      "priority": "required_feature",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "Fixtures cover coplanar cut, piercing cut, contained void, tangent contact, near-degenerate sliver, thin wall, coordinates near 1e6 mm, and a non-axis-aligned box.",
+        "Each fixture asserts analytic volume and area with a stated tolerance.",
+        "A table prints pass/fail per kernel and exits non-zero if a previously passing case regresses.",
+        "Boolean difference is recorded as unsupported until it passes, not silently skipped."
+      ],
+      "inputs": [
+        "module.cad-kernel-truck",
+        "module.kernel.truck"
+      ],
+      "outputs": [
+        "engineering/quality/benchmarks.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "crates/cad-kernel-truck/examples/corpus.rs"
+      ],
+      "required_tests": [
+        "cargo test -p cad-kernel-truck",
+        "the corpus binary exits non-zero on a wrong volume"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "evidence": [
+        "crates/cad-kernel-truck/src/corpus.rs: 10 analytic fixtures, each with a stated volume and area tolerance",
+        "crates/cad-kernel-truck/examples/corpus.rs: the table, exiting non-zero on a regression",
+        "engineering/quality/tests.json#t-cad-kernel-truck-corpus (8 ok, 2 known-failure, 0 regressions, exit code 0)",
+        "Measured table: box_control, non_axis_aligned_box, union_partial_overlap, intersection_thin_wall and intersection_near_degenerate_sliver pass; union_tangent_contact and intersection_large_coordinates are recorded known failures; the three difference fixtures are recorded unsupported, not skipped."
+      ],
+      "rollback": "The corpus is additive; deleting the example removes it.",
+      "source": "curated",
+      "trigger_digest": null
+    },
+    {
+      "id": "task.engineering.agent-runtime",
+      "title": "Design and implement the CadAgent runtime",
+      "rationale": "The brief requires pluggable agents, but no trait, registry, permission check, lifecycle enforcement or scheduling exists. Registering an agent before that would be a claim without an implementation.",
+      "priority": "required_feature",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "A versioned CadAgent contract exists with metadata, capabilities, schemas, context, budgets and structured errors.",
+        "A registry enforces the discovered-to-registered-to-ready lifecycle and refuses to activate an agent whose contract tests have not passed.",
+        "Permissions are capability-based; filesystem, network and shell access are denied unless declared, and shell/secrets require an owner decision.",
+        "Contract tests cover an incompatible agent being rejected."
+      ],
+      "inputs": [
+        "module.cad-contract"
+      ],
+      "outputs": [
+        "crates/cad-agent-runtime"
+      ],
+      "depends_on": [
+        "task.adapter.cancellation"
+      ],
+      "blocks": [],
+      "expected_changes": [
+        "crates/cad-agent-api",
+        "crates/cad-agent-runtime"
+      ],
+      "required_tests": [
+        "cargo test -p cad-agent-runtime"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "evidence": [
+        "crates/cad-agent-api/src/agent.rs, contract.rs, permission.rs, error.rs: the versioned contract",
+        "crates/cad-agent-runtime/src/registry.rs: the lifecycle, grants, budgets and quarantine",
+        "crates/cad-agent-runtime/src/schema.rs: the strict JSON Schema subset checker",
+        "engineering/quality/tests.json#t-cad-agent-api (13 passed)",
+        "engineering/quality/tests.json#t-cad-agent-runtime (16 passed)"
+      ],
+      "rollback": "New crates only; removing them from workspace members restores the previous state.",
+      "source": "curated",
+      "trigger_digest": null
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-kernel-truck.9294a9ed",
+      "title": "repo.cad-kernel-truck: 3 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 3 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-kernel-truck"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "+ examples/corpus.rs",
+        "+ src/corpus.rs",
+        "~ src/lib.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "The change is the cancellation and deadline work plus the analytic corpus: crates/cad-kernel-truck/src/lib.rs, src/corpus.rs and examples/corpus.rs.",
+        "Reviewed by diff; covered by engineering/quality/tests.json#t-cad-kernel-truck (26 passed) and #t-cad-kernel-truck-corpus."
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "9294a9ed44ce6953"
+    },
+    {
+      "id": "task.scan.repo-discovered.repo-unregistered-crates-cad-agent-api.3e72c4c9",
+      "title": "repo.unregistered.crates-cad-agent-api: `crates/cad-agent-api` was not observed in the previous scan",
+      "rationale": "Observed by the workspace scanner: `crates/cad-agent-api` was not observed in the previous scan. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "integration_blocker",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the licence is read and recorded before any code is used",
+        "capabilities and duplicates are compared against existing modules",
+        "a repository entry is added with a stable id and evidence references",
+        "no source is copied or merged during onboarding"
+      ],
+      "inputs": [
+        "repo.unregistered.crates-cad-agent-api"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "declared in manifests: no"
+      ],
+      "required_tests": [
+        "isolated build of the new repository",
+        "isolated test run of the new repository"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "The checkout is registered as repo.cad-agent-api with a licence, a module, a capability, an interface, dependencies and a passing test suite.",
+        "engineering/quality/tests.json#t-cad-agent-api (13 passed, 0 failed)"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "3e72c4c9efc60c9d"
+    },
+    {
+      "id": "task.scan.repo-discovered.repo-unregistered-crates-cad-agent-runtime.a4755adf",
+      "title": "repo.unregistered.crates-cad-agent-runtime: `crates/cad-agent-runtime` was not observed in the previous scan",
+      "rationale": "Observed by the workspace scanner: `crates/cad-agent-runtime` was not observed in the previous scan. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "integration_blocker",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the licence is read and recorded before any code is used",
+        "capabilities and duplicates are compared against existing modules",
+        "a repository entry is added with a stable id and evidence references",
+        "no source is copied or merged during onboarding"
+      ],
+      "inputs": [
+        "repo.unregistered.crates-cad-agent-runtime"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "declared in manifests: no"
+      ],
+      "required_tests": [
+        "isolated build of the new repository",
+        "isolated test run of the new repository"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "The checkout is registered as repo.cad-agent-runtime with a licence, a module, a capability, an interface, dependencies and a passing test suite.",
+        "engineering/quality/tests.json#t-cad-agent-runtime (16 passed, 0 failed)"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "a4755adf08bcbb49"
+    },
+    {
+      "id": "task.scan.package-added.repo-cad-cli.c879a09f",
+      "title": "repo.cad-cli: 2 Cargo package(s) added",
+      "rationale": "Observed by the workspace scanner: 2 Cargo package(s) added. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-cli"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "+ cad-agent-api@0.1.0",
+        "+ cad-agent-runtime@0.1.0"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "cargo metadata is evaluated per workspace member, so the same two new packages appear for each member with an identical digest.",
+        "The packages are registered: crates/cad-agent-api and crates/cad-agent-runtime.",
+        "engineering/quality/tests.json#t-cad-agent-api and #t-cad-agent-runtime"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "c879a09f545c8809"
+    },
+    {
+      "id": "task.scan.package-added.repo-cad-contract.c879a09f",
+      "title": "repo.cad-contract: 2 Cargo package(s) added",
+      "rationale": "Observed by the workspace scanner: 2 Cargo package(s) added. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-contract"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "+ cad-agent-api@0.1.0",
+        "+ cad-agent-runtime@0.1.0"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "cargo metadata is evaluated per workspace member, so the same two new packages appear for each member with an identical digest.",
+        "The packages are registered: crates/cad-agent-api and crates/cad-agent-runtime.",
+        "engineering/quality/tests.json#t-cad-agent-api and #t-cad-agent-runtime"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "c879a09f545c8809"
+    },
+    {
+      "id": "task.scan.package-added.repo-cad-engineering.c879a09f",
+      "title": "repo.cad-engineering: 2 Cargo package(s) added",
+      "rationale": "Observed by the workspace scanner: 2 Cargo package(s) added. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-engineering"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "+ cad-agent-api@0.1.0",
+        "+ cad-agent-runtime@0.1.0"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "cargo metadata is evaluated per workspace member, so the same two new packages appear for each member with an identical digest.",
+        "The packages are registered: crates/cad-agent-api and crates/cad-agent-runtime.",
+        "engineering/quality/tests.json#t-cad-agent-api and #t-cad-agent-runtime"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "c879a09f545c8809"
+    },
+    {
+      "id": "task.scan.package-added.repo-cad-kernel-truck.c879a09f",
+      "title": "repo.cad-kernel-truck: 2 Cargo package(s) added",
+      "rationale": "Observed by the workspace scanner: 2 Cargo package(s) added. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-kernel-truck"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "+ cad-agent-api@0.1.0",
+        "+ cad-agent-runtime@0.1.0"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "cargo metadata is evaluated per workspace member, so the same two new packages appear for each member with an identical digest.",
+        "The packages are registered: crates/cad-agent-api and crates/cad-agent-runtime.",
+        "engineering/quality/tests.json#t-cad-agent-api and #t-cad-agent-runtime"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "c879a09f545c8809"
+    },
+    {
+      "id": "task.agent.geometry-ops",
+      "title": "Implement the geometry-ops agent and run it through the registry",
+      "rationale": "The agent runtime existed but nothing exercised it: there was a trait, a registry, a schema checker and a permission model, and no agent a caller could run. The first real agent also has to prove that the runtime's guarantees hold for an agent that does actual work, rather than only for the registry's own test doubles.",
+      "priority": "required_feature",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "An agent implements the CadAgent trait and is registrable, activatable and runnable in the registry.",
+        "The runtime's schema enforcement refuses a hostile input before the agent sees it.",
+        "The agent's effective grant decides whether its file-reading operation runs; without the grant it is refused and every other operation still works.",
+        "A call cancelled by the caller returns Cancelled, and the agent is usable for the next call.",
+        "A call that outlives its wall-clock budget returns Timeout.",
+        "The output and call budgets are enforced by the registry, not by the agent.",
+        "Every reply satisfies the contract's declared output schema."
+      ],
+      "inputs": [
+        "module.cad-agent-api",
+        "module.cad-agent-runtime",
+        "module.cad-kernel-truck"
+      ],
+      "outputs": [
+        "crates/cad-agent-geometry"
+      ],
+      "depends_on": [
+        "task.engineering.agent-runtime",
+        "task.adapter.cancellation"
+      ],
+      "blocks": [],
+      "expected_changes": [
+        "crates/cad-agent-geometry/src/lib.rs",
+        "crates/cad-agent-geometry/tests/integration.rs",
+        "crates/cad-agent-runtime/src/schema.rs"
+      ],
+      "required_tests": [
+        "cargo test -p cad-agent-geometry"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-agent-geometry (10 unit + 12 integration passed, 0 failed)",
+        "engineering/quality/tests.json#t-cad-agent-runtime (16 passed: the upper-bound keywords maxItems, maximum and maxLength were added for this agent's contract)",
+        "crates/cad-agent-geometry/tests/integration.rs: a_geometry_workflow_runs_through_the_registry, a_boolean_produces_the_analytic_volume, the_declared_schema_is_enforced_by_the_registry, the_read_workspace_grant_decides_the_file_operation, a_traversing_profile_name_is_refused, an_agent_whose_contract_tests_failed_never_runs, a_cancelled_call_is_reported_as_cancelled_and_the_agent_survives, a_cancellation_observed_mid_flight_stops_the_call, an_expired_deadline_is_a_timeout, the_output_budget_is_enforced_by_the_registry, the_call_budget_is_enforced_by_the_registry, every_reply_satisfies_the_declared_output_schema"
+      ],
+      "rollback": "Remove crates/cad-agent-geometry from the workspace members and the repository, module, capability, interface, dependency and agent entries from the manifests. The only other change is three added schema keywords in cad-agent-runtime, which are additive and independently tested.",
+      "source": "curated",
+      "trigger_digest": null
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-kernel-truck.eac0462d",
+      "title": "repo.cad-kernel-truck: 3 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 3 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-kernel-truck"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ examples/corpus.rs",
+        "~ src/corpus.rs",
+        "~ src/lib.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "The change is the analytic correctness corpus and the formatting pass over it.",
+        "engineering/quality/tests.json#t-cad-kernel-truck-corpus (8 ok, 2 known-failure, 0 regressions)"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "eac0462d30913154"
+    },
+    {
+      "id": "task.scan.package-added.repo-cad-cli.782cb1a1",
+      "title": "repo.cad-cli: 1 Cargo package(s) added",
+      "rationale": "Observed by the workspace scanner: 1 Cargo package(s) added. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-cli"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "+ cad-agent-geometry@0.1.0"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "cargo metadata is evaluated per workspace member, so the same new package appears for each member with an identical digest. The package is registered in the manifests.",
+        "engineering/quality/tests.json#t-cad-agent-api, #t-cad-agent-runtime and #t-cad-agent-geometry"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "782cb1a1176a64d7"
+    },
+    {
+      "id": "task.scan.package-added.repo-cad-contract.782cb1a1",
+      "title": "repo.cad-contract: 1 Cargo package(s) added",
+      "rationale": "Observed by the workspace scanner: 1 Cargo package(s) added. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-contract"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "+ cad-agent-geometry@0.1.0"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "cargo metadata is evaluated per workspace member, so the same new package appears for each member with an identical digest. The package is registered in the manifests.",
+        "engineering/quality/tests.json#t-cad-agent-api, #t-cad-agent-runtime and #t-cad-agent-geometry"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "782cb1a1176a64d7"
+    },
+    {
+      "id": "task.scan.package-added.repo-cad-engineering.782cb1a1",
+      "title": "repo.cad-engineering: 1 Cargo package(s) added",
+      "rationale": "Observed by the workspace scanner: 1 Cargo package(s) added. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-engineering"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "+ cad-agent-geometry@0.1.0"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "cargo metadata is evaluated per workspace member, so the same new package appears for each member with an identical digest. The package is registered in the manifests.",
+        "engineering/quality/tests.json#t-cad-agent-api, #t-cad-agent-runtime and #t-cad-agent-geometry"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "782cb1a1176a64d7"
+    },
+    {
+      "id": "task.scan.package-added.repo-cad-kernel-truck.782cb1a1",
+      "title": "repo.cad-kernel-truck: 1 Cargo package(s) added",
+      "rationale": "Observed by the workspace scanner: 1 Cargo package(s) added. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-kernel-truck"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "+ cad-agent-geometry@0.1.0"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "cargo metadata is evaluated per workspace member, so the same new package appears for each member with an identical digest. The package is registered in the manifests.",
+        "engineering/quality/tests.json#t-cad-agent-api, #t-cad-agent-runtime and #t-cad-agent-geometry"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "782cb1a1176a64d7"
+    },
+    {
+      "id": "task.scan.repo-discovered.repo-cad-agent-api.3e72c4c9",
+      "title": "repo.cad-agent-api: `crates/cad-agent-api` was not observed in the previous scan",
+      "rationale": "Observed by the workspace scanner: `crates/cad-agent-api` was not observed in the previous scan. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "integration_blocker",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the licence is read and recorded before any code is used",
+        "capabilities and duplicates are compared against existing modules",
+        "a repository entry is added with a stable id and evidence references",
+        "no source is copied or merged during onboarding"
+      ],
+      "inputs": [
+        "repo.cad-agent-api"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "declared in manifests: yes"
+      ],
+      "required_tests": [
+        "isolated build of the new repository",
+        "isolated test run of the new repository"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "The checkout is registered as repo.cad-agent-api with a licence, a module, a capability, an interface, dependencies and a passing test suite.",
+        "engineering/quality/tests.json#t-cad-agent-api (13 passed, 0 failed)"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "3e72c4c9efc60c9d"
+    },
+    {
+      "id": "task.scan.repo-discovered.repo-cad-agent-geometry.9aad7d1c",
+      "title": "repo.cad-agent-geometry: `crates/cad-agent-geometry` was not observed in the previous scan",
+      "rationale": "Observed by the workspace scanner: `crates/cad-agent-geometry` was not observed in the previous scan. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "integration_blocker",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the licence is read and recorded before any code is used",
+        "capabilities and duplicates are compared against existing modules",
+        "a repository entry is added with a stable id and evidence references",
+        "no source is copied or merged during onboarding"
+      ],
+      "inputs": [
+        "repo.cad-agent-geometry"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "declared in manifests: yes"
+      ],
+      "required_tests": [
+        "isolated build of the new repository",
+        "isolated test run of the new repository"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "The checkout is registered as repo.cad-agent-geometry with a licence, a module, a capability, interfaces, dependencies and a passing test suite.",
+        "engineering/quality/tests.json#t-cad-agent-geometry (22 passed, 0 failed)"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "9aad7d1c8c50246b"
+    },
+    {
+      "id": "task.scan.repo-discovered.repo-cad-agent-runtime.a4755adf",
+      "title": "repo.cad-agent-runtime: `crates/cad-agent-runtime` was not observed in the previous scan",
+      "rationale": "Observed by the workspace scanner: `crates/cad-agent-runtime` was not observed in the previous scan. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "integration_blocker",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the licence is read and recorded before any code is used",
+        "capabilities and duplicates are compared against existing modules",
+        "a repository entry is added with a stable id and evidence references",
+        "no source is copied or merged during onboarding"
+      ],
+      "inputs": [
+        "repo.cad-agent-runtime"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "declared in manifests: yes"
+      ],
+      "required_tests": [
+        "isolated build of the new repository",
+        "isolated test run of the new repository"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "The checkout is registered as repo.cad-agent-runtime with a licence, a module, a capability, an interface, dependencies and a passing test suite.",
+        "engineering/quality/tests.json#t-cad-agent-runtime (16 passed, 0 failed)"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "a4755adf08bcbb49"
+    },
+    {
+      "id": "task.scan.repo-missing.repo-unregistered-crates-cad-agent-api.1fb36428",
+      "title": "repo.unregistered.crates-cad-agent-api: `crates/cad-agent-api` disappeared from the scan",
+      "rationale": "Observed by the workspace scanner: `crates/cad-agent-api` disappeared from the scan. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "broken_build",
+      "risk": "high",
+      "status": "cancelled",
+      "acceptance_criteria": [
+        "the declared path is restored, or the entry is retired with a recorded reason",
+        "no other manifest still references the missing repository"
+      ],
+      "inputs": [
+        "repo.unregistered.crates-cad-agent-api"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "it existed during the previous scan"
+      ],
+      "required_tests": [
+        "run the affected repositories' build commands"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "Superseded by the registration of the same checkout as repo.cad-agent-api. The placeholder id existed only while the repository was unregistered."
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "1fb36428e3fab785"
+    },
+    {
+      "id": "task.scan.repo-missing.repo-unregistered-crates-cad-agent-runtime.4bd80b1e",
+      "title": "repo.unregistered.crates-cad-agent-runtime: `crates/cad-agent-runtime` disappeared from the scan",
+      "rationale": "Observed by the workspace scanner: `crates/cad-agent-runtime` disappeared from the scan. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "broken_build",
+      "risk": "high",
+      "status": "cancelled",
+      "acceptance_criteria": [
+        "the declared path is restored, or the entry is retired with a recorded reason",
+        "no other manifest still references the missing repository"
+      ],
+      "inputs": [
+        "repo.unregistered.crates-cad-agent-runtime"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "it existed during the previous scan"
+      ],
+      "required_tests": [
+        "run the affected repositories' build commands"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "Superseded by the registration of the same checkout as repo.cad-agent-runtime. The placeholder id existed only while the repository was unregistered."
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "4bd80b1e1bef8971"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-agent-geometry.181ff8c6",
+      "title": "repo.cad-agent-geometry: 1 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 1 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-agent-geometry"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ src/lib.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "The change is the agent's own defence-in-depth bounds: height and chord tolerance are now checked by the agent itself, not only by the runtime's schema enforcement, so a caller that uses the agent directly gets the same limits.",
+        "engineering/quality/tests.json#t-cad-agent-geometry (24 passed, 0 failed): the_agent_enforces_its_own_bounds_without_the_runtime and the_schema_bounds_match_the_agents_own_bounds"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "181ff8c6bc826a94"
+    },
+    {
+      "id": "task.license.craftlibs",
+      "title": "Record and vendor the craft-libs dependency",
+      "rationale": "CADCraft depends on craft-ui and craft-docpath from github.com/storytold/craft-libs pinned by revision. The licence has never been read, registry advisory feeds do not cover it, and reproducibility depends on two commits staying reachable. This is the highest-ranked security item because it is an unclassified component inside the shipping binary.",
+      "priority": "security",
+      "risk": "high",
+      "status": "verified",
+      "acceptance_criteria": [
+        "The craft-libs LICENCE is read and recorded in docs/license-inventory.md and engineering/manifest/repositories.json.",
+        "The two pinned revisions are vendored (or mirrored) so a release build does not need GitHub.",
+        "The repository entry moves from licence status unrecorded to approved or restricted with a reason."
+      ],
+      "inputs": [
+        "repo.cadcraft"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json",
+        "docs/license-inventory.md"
+      ],
+      "depends_on": [],
+      "blocks": [
+        "task.release.notice-bundle"
+      ],
+      "expected_changes": [
+        "engineering/manifest/repositories.json"
+      ],
+      "required_tests": [
+        "cargo build -p cadcraft-engine still succeeds after vendoring"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "Licence read and recorded: both pinned checkouts declare MIT OR Apache-2.0 with LICENSE-MIT and LICENSE-APACHE present; all nine crates use license.workspace = true; the five vendored PDF-backend crates and bundled data assets carry permissive licences (CC0-1.0 / BSD-2-Clause style); no copyleft anywhere in either tree.",
+        "engineering/manifest/repositories.json#repo.craft-libs (status approved)",
+        "engineering/manifest/dependencies.json (ext.craft-docpath, ext.craft-ui now MIT OR Apache-2.0, path_patch)",
+        "apps/cadcraft/vendor/craft-libs-docpath/PROVENANCE.md",
+        "apps/cadcraft/vendor/craft-libs-ui/PROVENANCE.md",
+        "apps/cadcraft/Cargo.toml (both dependencies now path_patch to vendor/)",
+        "apps/cadcraft/Cargo.lock (source fields removed = vendored)",
+        "cargo metadata resolves both at source: None (path dependencies)",
+        "craft-docpath standalone: cargo test --ignore-rust-version passes 12 unit + 1 doc test (--ignore-rust-version only because the crate declares rust-version 1.95 while this host has rustc 1.94.0; the declaration is preserved unchanged)"
+      ],
+      "rollback": "Vendoring adds a directory and a [patch] section; reverting the manifest and deleting the vendored directory restores the previous state.",
+      "source": "curated",
+      "trigger_digest": null
+    },
+    {
+      "id": "task.scan.files-modified.repo-cadcraft.d6a03b25",
+      "title": "repo.cadcraft: 36 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 36 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cadcraft"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ Cargo.lock",
+        "~ Cargo.toml",
+        "+ vendor/craft-libs-docpath/Cargo.toml",
+        "+ vendor/craft-libs-docpath/LICENSE-APACHE",
+        "+ vendor/craft-libs-docpath/LICENSE-MIT",
+        "+ vendor/craft-libs-docpath/NOTICE",
+        "+ vendor/craft-libs-docpath/PROVENANCE.md",
+        "+ vendor/craft-libs-docpath/src/lib.rs",
+        "+ vendor/craft-libs-docpath/tests/docpath.rs",
+        "+ vendor/craft-libs-ui/Cargo.toml",
+        "+ vendor/craft-libs-ui/LICENSE-APACHE",
+        "+ vendor/craft-libs-ui/LICENSE-MIT",
+        "+ vendor/craft-libs-ui/NOTICE",
+        "+ vendor/craft-libs-ui/PROVENANCE.md",
+        "+ vendor/craft-libs-ui/README.md",
+        "+ vendor/craft-libs-ui/src/buttons/mod.rs",
+        "+ vendor/craft-libs-ui/src/buttons/tests.rs",
+        "+ vendor/craft-libs-ui/src/docking/mod.rs",
+        "+ vendor/craft-libs-ui/src/docking/model.rs",
+        "+ vendor/craft-libs-ui/src/docking/surface.rs",
+        "+ vendor/craft-libs-ui/src/docking/targets.rs",
+        "+ vendor/craft-libs-ui/src/docking/tests.rs",
+        "+ vendor/craft-libs-ui/src/icons/mod.rs",
+        "+ vendor/craft-libs-ui/src/icons/tests.rs",
+        "+ vendor/craft-libs-ui/src/layout/geometry.rs",
+        "+ vendor/craft-libs-ui/src/layout/mod.rs",
+        "+ vendor/craft-libs-ui/src/layout/resize.rs",
+        "+ vendor/craft-libs-ui/src/layout/tests.rs",
+        "+ vendor/craft-libs-ui/src/layout/toolbar.rs",
+        "+ vendor/craft-libs-ui/src/lib.rs",
+        "+ vendor/craft-libs-ui/src/tabs/mod.rs",
+        "+ vendor/craft-libs-ui/src/tabs/tests.rs",
+        "+ vendor/craft-libs-ui/src/theme/mod.rs",
+        "+ vendor/craft-libs-ui/tests/docking_workflows.rs",
+        "+ vendor/craft-libs-ui/tests/visual/fixtures.rs",
+        "+ vendor/craft-libs-ui/tests/visual_regression.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "Intentional vendoring change: two git dependencies replaced with path dependencies to apps/cadcraft/vendor/ (craft-libs-docpath at rev 82a24b00…, craft-libs-ui at rev 5c874d51…); sources copied byte-identical with PROVENANCE.md and sha256 manifests; Cargo.toml and Cargo.lock updated.",
+        "apps/cadcraft/Cargo.toml, apps/cadcraft/Cargo.lock, apps/cadcraft/vendor/",
+        "engineering/manifest/dependencies.json (ext.craft-docpath, ext.craft-ui now path_patch, MIT OR Apache-2.0)"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "d6a03b25bc2bd55e"
+    },
+    {
+      "id": "task.scan.package-added.repo-cadcraft.d9a75e4e",
+      "title": "repo.cadcraft: 2 Cargo package(s) added",
+      "rationale": "Observed by the workspace scanner: 2 Cargo package(s) added. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cadcraft"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "+ craft-docpath@0.1.0",
+        "+ craft-ui@0.1.0"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "cargo metadata resolves craft-docpath 0.1.0 and craft-ui 0.1.0 as path dependencies (source: None) at apps/cadcraft/vendor/."
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "d9a75e4e4105d1ca"
+    },
+    {
+      "id": "task.scan.working-tree-dirty.repo-cadcraft.5348c746",
+      "title": "repo.cadcraft: 3 uncommitted path(s) appeared",
+      "rationale": "Observed by the workspace scanner: 3 uncommitted path(s) appeared. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "integration_blocker",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the uncommitted diff is reviewed and attributed to a known task",
+        "it is committed, or handed back to its author; nothing is discarded",
+        "the scan reports a clean tree afterwards"
+      ],
+      "inputs": [
+        "repo.cadcraft"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "uncommitted work is never discarded, reset or stashed by this tooling",
+        "review the diff, decide whether it is intended, then commit or hand it back"
+      ],
+      "required_tests": [
+        "build and test the affected repository before committing",
+        "check that no generated or build artifact was captured by the fingerprint"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "The 3 uncommitted paths are the intentional, reviewed vendoring change (Cargo.toml, Cargo.lock, vendor/). Left uncommitted per policy (no commits without explicit request); ready for owner review/commit."
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "5348c74631803a1f"
+    },
+    {
+      "id": "task.document.persistence-hardening",
+      "title": "Make native project saves recoverable and persist CLI history",
+      "rationale": "The existing `.zcad` workflow overwrote destinations directly, accepted malformed payload relationships, and lost undo/redo history when CLI commands ran in separate processes.",
+      "priority": "integration_blocker",
+      "risk": "high",
+      "status": "verified",
+      "acceptance_criteria": [
+        "Project files are written through a synced sibling temporary file and atomically replaced; invalid saves leave an existing file byte-identical.",
+        "Loading validates document schema, revision, tolerance, project size, parameter values, unique entity IDs, parameter references, feature references and history snapshots.",
+        "Undo/redo snapshots persist across serialization; older schema-1 files with no history fields still load.",
+        "Separate CLI invocations create, edit, undo, redo, reopen and export a project; the final STL volume matches the edited dimensions.",
+        "Workspace formatting, clippy with warnings denied and all platform workspace tests pass.",
+        "Unknown fields at the project header and tolerance levels are rejected rather than discarded."
+      ],
+      "inputs": [
+        "module.cad-document",
+        "module.cad-cli",
+        "module.cad-contract"
+      ],
+      "outputs": [
+        "crates/cad-document/src/lib.rs",
+        "crates/cad-cli/tests/project_workflow.rs",
+        "engineering/quality/tests.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "crates/cad-document/src/lib.rs",
+        "crates/cad-cli/tests/project_workflow.rs"
+      ],
+      "required_tests": [
+        "cargo test --offline -p cad-document -p cad-cli -j 2",
+        "cargo test --offline --workspace -j 2",
+        "cargo clippy --offline --workspace --all-targets -j 2 -- -D warnings",
+        "cargo fmt --all --check"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-document",
+        "engineering/quality/tests.json#t-cad-cli",
+        "engineering/quality/tests.json#t-platform-workspace-20261023",
+        "engineering/quality/builds.json#b-platform-workspace-20261023",
+        "crates/cad-document/src/lib.rs::tests::load_refuses_an_oversized_file_before_reading_it"
+      ],
+      "rollback": "Revert the source changes and return to schema 1 files without serialized history. The reader defaults missing undo/redo fields, so prior files remain loadable.",
+      "source": "curated",
+      "trigger_digest": null
+    },
+    {
+      "id": "task.scan.repo-discovered.repo-cad-document.0359d3b2",
+      "title": "repo.cad-document: `crates/cad-document` was not observed in the previous scan",
+      "rationale": "Observed by the workspace scanner: `crates/cad-document` was not observed in the previous scan. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "integration_blocker",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the licence is read and recorded before any code is used",
+        "capabilities and duplicates are compared against existing modules",
+        "a repository entry is added with a stable id and evidence references",
+        "no source is copied or merged during onboarding"
+      ],
+      "inputs": [
+        "repo.cad-document"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "declared in manifests: yes"
+      ],
+      "required_tests": [
+        "isolated build of the new repository",
+        "isolated test run of the new repository"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "Repository registered as repo.cad-document, with MIT OR Apache-2.0 workspace license and project interface.",
+        "engineering/quality/tests.json#t-cad-document (16 tests passed)"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "0359d3b2fd027ba0"
+    },
+    {
+      "id": "task.scan.repo-discovered.repo-unregistered-crates-cad-entitlements.78524cbb",
+      "title": "repo.unregistered.crates-cad-entitlements: `crates/cad-entitlements` was not observed in the previous scan",
+      "rationale": "Observed by the workspace scanner: `crates/cad-entitlements` was not observed in the previous scan. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "integration_blocker",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the licence is read and recorded before any code is used",
+        "capabilities and duplicates are compared against existing modules",
+        "a repository entry is added with a stable id and evidence references",
+        "no source is copied or merged during onboarding"
+      ],
+      "inputs": [
+        "repo.unregistered.crates-cad-entitlements"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "declared in manifests: no"
+      ],
+      "required_tests": [
+        "isolated build of the new repository",
+        "isolated test run of the new repository"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "Checkout registered as repo.cad-entitlements with its module, tested local policy capability, license and limitations.",
+        "engineering/quality/tests.json#t-cad-entitlements (10 tests passed as part of the workspace suite)"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "78524cbbb74bf587"
+    }
+  ]
+}

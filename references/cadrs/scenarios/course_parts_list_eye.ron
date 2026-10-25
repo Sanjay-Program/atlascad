@@ -1,0 +1,33 @@
+// The eye on a part's row in the Parts list: it shows while the row is hovered, and a click
+// hides or shows the part (an undoable step).
+// 01 Part 1's row hovered: its open eye.
+// 02 the eye clicked: Part 1 is hidden (greyed row, crossed eye, gone from the view).
+// 03 the pointer away: the crossed eye stays on the hidden part's row.
+// 04 the crossed eye clicked: Part 1 is back.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("sketch top rect 0 0 40 40"),
+        Custom("sketch top rect 60 0 100 40"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        Click(ui("feature-sketch-1")),
+        Click(ui("feature-sketch-2")),
+        Key("Enter"),
+        Key("F"),
+        Hover(ui("part-row-part-1")),
+        Wait(3),
+        Screenshot("01-row-hovered"),
+        Click(ui("part-row-part-1-visibility")),
+        Wait(3),
+        Screenshot("02-hidden"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-away"),
+        Click(ui("part-row-part-1-visibility")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("04-shown"),
+    ],
+)

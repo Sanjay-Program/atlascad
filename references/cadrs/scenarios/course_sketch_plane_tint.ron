@@ -1,0 +1,40 @@
+// While a sketch is edited, the part faces on its plane get a faint white tint: where the
+// sketch lies, and which faces, edges and points it can draw from.
+// 01 two 40 x 40 blocks 50 tall and a 30 tall one; a sketch on the first block's top face: both
+//    50 tall blocks' tops are tinted, the lower one's isn't.
+// 02 accepted: no tint.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("sketch top rect 0 0 40 40"),
+        Custom("sketch top rect 60 0 100 40"),
+        Custom("sketch top rect 120 0 160 40"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        Click(ui("feature-sketch-1")),
+        Click(ui("feature-sketch-2")),
+        Click(ui("extrude-depth-field")),
+        Key("Ctrl+A"),
+        Type("50"),
+        Key("Enter"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        Click(ui("feature-sketch-3")),
+        Click(ui("extrude-depth-field")),
+        Key("Ctrl+A"),
+        Type("30"),
+        Key("Enter"),
+        Key("F"),
+        Click(ui("sketch")),
+        WaitFor("sketch-dialog"),
+        Click(xyz(20, 20, 50)),
+        MoveTo(1420, 900),
+        Wait(5),
+        Screenshot("01-sketch-on-top-face"),
+        Click(ui("sketch-dialog-accept")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("02-accepted"),
+    ],
+)

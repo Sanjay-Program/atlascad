@@ -1,0 +1,28 @@
+[package]
+name = "cad-cli"
+description = "A headless proof of the contract: unit-aware extrusion and union through the truck adapter, written as binary STL."
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+cad-contract.workspace = true
+cad-kernel-truck.workspace = true
+cad-document.workspace = true
+cad-io.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "cad_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "atlas"
+path = "src/main.rs"

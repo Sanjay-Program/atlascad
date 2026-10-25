@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "units": "mm",
+  "parameters": {
+    "plate": "80",
+    "t": "8",
+    "pipe_r": "3"
+  },
+  "timeline": [
+    {
+      "type": "Box",
+      "id": "plate",
+      "size": [
+        "plate",
+        "plate",
+        "t"
+      ],
+      "at": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "type": "Hole",
+      "id": "cb",
+      "body": "plate",
+      "at": [
+        20,
+        20,
+        "t"
+      ],
+      "diameter": 6,
+      "depth": 20,
+      "kind": "counterbore",
+      "head_diameter": 11,
+      "head_depth": 3
+    },
+    {
+      "type": "Hole",
+      "id": "cs",
+      "body": "plate",
+      "at": [
+        60,
+        20,
+        "t"
+      ],
+      "diameter": 6,
+      "depth": 20,
+      "kind": "countersink",
+      "head_diameter": 12,
+      "head_angle": 90
+    },
+    {
+      "type": "Cylinder",
+      "id": "peg",
+      "radius": 4,
+      "height": 12,
+      "at": [
+        40,
+        55,
+        "t"
+      ]
+    },
+    {
+      "type": "CircularPattern",
+      "id": "pegs",
+      "body": "peg",
+      "count": 6,
+      "angle": 360,
+      "center": [
+        40,
+        40
+      ],
+      "join": "plate"
+    },
+    {
+      "type": "Sketch",
+      "id": "pipe_profile",
+      "plane": "YZ",
+      "offset": 0,
+      "entities": [
+        {
+          "type": "Circle",
+          "cx": -20,
+          "cy": 30,
+          "r": "pipe_r"
+        }
+      ]
+    },
+    {
+      "type": "Sketch",
+      "id": "pipe_path",
+      "plane": "XZ",
+      "offset": 20,
+      "entities": [
+        {
+          "type": "Line",
+          "x0": 0,
+          "y0": 30,
+          "x1": 60,
+          "y1": 30
+        },
+        {
+          "type": "Arc",
+          "x0": 60,
+          "y0": 30,
+          "xm": 67.07,
+          "ym": 32.93,
+          "x1": 70,
+          "y1": 40
+        },
+        {
+          "type": "Line",
+          "x0": 70,
+          "y0": 40,
+          "x1": 70,
+          "y1": 70
+        }
+      ]
+    },
+    {
+      "type": "Sweep",
+      "id": "pipe",
+      "sketch": "pipe_profile",
+      "path": "pipe_path",
+      "op": "NewBody"
+    },
+    {
+      "type": "Sketch",
+      "id": "loft_a",
+      "plane": "XY",
+      "offset": 40,
+      "entities": [
+        {
+          "type": "Rect",
+          "x": 90,
+          "y": 0,
+          "w": 30,
+          "h": 30
+        }
+      ]
+    },
+    {
+      "type": "Sketch",
+      "id": "loft_b",
+      "plane": "XY",
+      "offset": 80,
+      "entities": [
+        {
+          "type": "Circle",
+          "cx": 105,
+          "cy": 15,
+          "r": 8
+        }
+      ]
+    },
+    {
+      "type": "Loft",
+      "id": "funnel",
+      "sketches": [
+        "loft_a",
+        "loft_b"
+      ],
+      "op": "NewBody"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+[package]
+name = "cad-io"
+description = "Validated mesh interchange: binary STL writing and reading shared by every product surface."
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+cad-contract.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

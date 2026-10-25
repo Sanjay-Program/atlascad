@@ -1,0 +1,31 @@
+// M1: Create ▾ › Document… › name it › Create opens the document with Part Studio 1 and
+// Assembly 1; back to documents shows it in the list. Then Create ▾ › Folder….
+Scenario(
+    start: Some("landing"),
+    steps: [
+        Click(ui("create")),
+        WaitFor("new-document"),
+        Click(ui("new-document")),
+        WaitFor("new-document-dialog"),
+        Screenshot("01-new-document-dialog"),
+        Type("Bracket"),
+        Screenshot("02-name-typed"),
+        Click(ui("new-document-create")),
+        WaitFor("document-loading"),
+        ScreenshotNow("03-loading"),
+        Screenshot("04-document-open"),
+        Click(ui("back-to-documents")),
+        WaitFor("doc-row-0"),
+        Screenshot("05-back-to-documents"),
+        WaitFor("recent-name-0"),
+        Screenshot("06-last-opened"),
+        Click(ui("create")),
+        WaitFor("new-folder"),
+        Click(ui("new-folder")),
+        WaitFor("new-folder-dialog"),
+        Screenshot("07-new-folder-dialog"),
+        Type("Fixtures"),
+        Key("Enter"),
+        Screenshot("08-folder-created"),
+    ],
+)

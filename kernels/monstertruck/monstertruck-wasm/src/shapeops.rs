@@ -1,0 +1,30 @@
+use crate::{IntoWasm, Solid, wasm_bindgen};
+use monstertruck_solid as shapeops;
+
+const SHAPEOPS_TOLERANCE: f64 = 0.05;
+
+/// and operator
+#[wasm_bindgen]
+pub fn and(solid0: &Solid, solid1: &Solid, tol: Option<f64>) -> Option<Solid> {
+    let tol = tol.unwrap_or(SHAPEOPS_TOLERANCE);
+    shapeops::and(solid0, solid1, tol)
+        .ok()
+        .map(IntoWasm::into_wasm)
+}
+
+/// or operator
+#[wasm_bindgen]
+pub fn or(solid0: &Solid, solid1: &Solid, tol: Option<f64>) -> Option<Solid> {
+    let tol = tol.unwrap_or(SHAPEOPS_TOLERANCE);
+    shapeops::or(solid0, solid1, tol)
+        .ok()
+        .map(IntoWasm::into_wasm)
+}
+
+/// not operator
+#[wasm_bindgen]
+pub fn not(solid: &Solid) -> Solid {
+    let mut solid = solid.clone();
+    solid.not();
+    solid
+}

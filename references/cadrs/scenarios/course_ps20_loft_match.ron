@@ -1,0 +1,79 @@
+// P3.10 / PS20.4, PS20.1: Loft Match tangent and Match curvature from a face, on a Ø40 × 40
+// cylinder with a Ø20 circle on Plane 1, 90 above Top (the continuity asserted in the kernel's
+// `loft_match_tangent`: Loft 2's side leaves Loft 1's cap with the same normal; the feature
+// list's `loft_match_tangent_from_a_face`).
+// 01 PS20.4 the Loft from the cylinder's top face to the circle, Start profile condition Match
+//    tangent (magnitude 1): the side leaves the face straight up, continuing the cylinder's
+//    wall without a crease.
+// 02 Start condition None: the loft leaves at the cone's angle, a crease at the joint.
+// 03 Match curvature: G2, as the cylinder's wall is straight up the joint (curvature zero
+//    along it), the side stays straighter for longer.
+// 04 Match tangent with Start magnitude 2: it keeps the cylinder's direction longer.
+// 05 PS20.1 accepted with Add: one part, the loft joined to the cylinder along its top face.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("sketch top circle 0 0 20"),
+        Key("P"),
+        Key("Shift+7"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        Click(xyz(0, 0, 0)),
+        Click(ui("extrude-depth-field")),
+        Key("Ctrl+A"),
+        Type("40"),
+        Key("Enter"),
+        Click(ui("plane")),
+        WaitFor("plane-dialog"),
+        Click(ui("feature-top")),
+        Click(ui("plane-offset-field")),
+        Key("Ctrl+A"),
+        Type("90"),
+        Key("Enter"),
+        Click(ui("feature-plane-1")),
+        Click(ui("sketch")),
+        WaitFor("sketch-dialog"),
+        Key("C"),
+        ClickWorld(0, 0),
+        ClickWorld(10, 0),
+        Key("Escape"),
+        Key("Escape"),
+        Click(ui("sketch-dialog-accept")),
+        Key("Shift+7"),
+        Key("F"),
+        Click(ui("loft")),
+        WaitFor("loft-dialog"),
+        Click(xyz(5, -5, 40)),
+        Click(xyz(3, 3, 90)),
+        Click(ui("loft-start-condition")),
+        Click(ui("loft-start-condition-option-3")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("01-match-tangent-from-the-cylinder"),
+        Click(ui("loft-start-condition")),
+        Click(ui("loft-start-condition-option-0")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("02-none-crease"),
+        Click(ui("loft-start-condition")),
+        Click(ui("loft-start-condition-option-4")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-match-curvature"),
+        Click(ui("loft-start-condition")),
+        Click(ui("loft-start-condition-option-3")),
+        Click(ui("loft-start-magnitude-field")),
+        Key("Ctrl+A"),
+        Type("2"),
+        Key("Tab"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("04-match-tangent-magnitude-2"),
+        Click(ui("loft-operation-1")),
+        Click(ui("loft-dialog-accept")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("05-accepted-add-one-part"),
+    ],
+)

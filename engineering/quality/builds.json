@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "records": [
+    {
+      "id": "b-cadcraft-color",
+      "target": "repo.cadcraft",
+      "command": "cargo build -p cadcraft-color",
+      "outcome": "success",
+      "duration_ms": 16140,
+      "peak_rss_kb": null,
+      "recorded_at": "2026-10-21",
+      "host": "i3-1125G4, 4C/8T, 7.4 GB RAM, rustc 1.94.0",
+      "notes": "Measured in the audit session (docs/repository-audit.md section 7)."
+    },
+    {
+      "id": "b-cadcraft-geom",
+      "target": "repo.cadcraft",
+      "command": "cargo build -p cadcraft-geom",
+      "outcome": "success",
+      "duration_ms": 4490,
+      "peak_rss_kb": null,
+      "recorded_at": "2026-10-21",
+      "host": "i3-1125G4, 4C/8T, 7.4 GB RAM, rustc 1.94.0",
+      "notes": "Measured in the audit session."
+    },
+    {
+      "id": "b-solidcraft-derive",
+      "target": "repo.solidcraft",
+      "command": "CARGO_BUILD_JOBS=2 cargo build -p solidcraft-derive",
+      "outcome": "success",
+      "duration_ms": 24910,
+      "peak_rss_kb": null,
+      "recorded_at": "2026-10-21",
+      "host": "i3-1125G4, 4C/8T, 7.4 GB RAM, rustc 1.94.0",
+      "notes": "Measured in the audit session."
+    },
+    {
+      "id": "b-solidcraft-kernel",
+      "target": "repo.solidcraft",
+      "command": "CARGO_BUILD_JOBS=2 cargo build -p solidcraft-kernel",
+      "outcome": "success",
+      "duration_ms": 502000,
+      "peak_rss_kb": 2555608,
+      "recorded_at": "2026-10-21",
+      "host": "i3-1125G4, 4C/8T, 7.4 GB RAM, rustc 1.94.0",
+      "notes": "8 min 22 s wall, 257,175 major page faults. The reason workspace-wide builds are forbidden on this host."
+    },
+    {
+      "id": "b-cad-contract",
+      "target": "repo.cad-contract",
+      "command": "cargo test --release -p cad-contract",
+      "outcome": "success",
+      "duration_ms": 690,
+      "peak_rss_kb": 136080,
+      "recorded_at": "2026-10-22",
+      "host": "i3-1125G4, 4C/8T, 7.4 GB RAM, rustc 1.94.0",
+      "notes": "Cold build of this package after `cargo clean -p cad-contract`; dependencies were cached."
+    },
+    {
+      "id": "b-cad-engineering",
+      "target": "repo.cad-engineering",
+      "command": "cargo test -p cad-engineering",
+      "outcome": "success",
+      "duration_ms": 10270,
+      "peak_rss_kb": 384568,
+      "recorded_at": "2026-10-22",
+      "host": "i3-1125G4, 4C/8T, 7.4 GB RAM, rustc 1.94.0",
+      "notes": "Cold build plus 27 tests after `cargo clean -p cad-engineering`, measured with /usr/bin/time."
+    },
+    {
+      "id": "b-cad-cli",
+      "target": "repo.cad-cli",
+      "command": "cargo build -p cad-cli",
+      "outcome": "success",
+      "duration_ms": 680,
+      "peak_rss_kb": 243224,
+      "recorded_at": "2026-10-22",
+      "host": "i3-1125G4, 4C/8T, 7.4 GB RAM, rustc 1.94.0",
+      "notes": "Cold build of this package after cargo clean -p cad-cli; its dependencies were already built."
+    },
+    {
+      "id": "b-cad-engineering-build",
+      "target": "repo.cad-engineering",
+      "command": "cargo build -p cad-engineering",
+      "outcome": "success",
+      "duration_ms": 3460,
+      "peak_rss_kb": 386064,
+      "recorded_at": "2026-10-22",
+      "host": "i3-1125G4, 4C/8T, 7.4 GB RAM, rustc 1.94.0",
+      "notes": "Cold build of the library and zentrion-eng binary after cargo clean -p cad-engineering."
+    },
+    {
+      "id": "b-workspace",
+      "target": "workspace",
+      "command": "cargo build --workspace --all-targets -j 2",
+      "outcome": "success",
+      "duration_ms": 3747,
+      "peak_rss_kb": null,
+      "recorded_at": "2026-10-22",
+      "host": "i3-1125G4, 8 vCPU, 7.4 GB RAM, rustc 1.94.0, cargo 1.94.0",
+      "notes": "Whole platform workspace, all targets, two jobs. The workspace is seven crates: cad-contract, cad-kernel-truck, cad-engineering, cad-cli, cad-agent-api, cad-agent-runtime and cad-agent-geometry. The matching `cargo test --workspace` run passed 170 tests (169 unit and integration plus 1 doc test) in 2.43 s; the per-crate counts are recorded individually in tests.json so they are not summed twice."
+    },
+    {
+      "id": "b-cad-agent-geometry",
+      "target": "repo.cad-agent-geometry",
+      "command": "cargo build -p cad-agent-geometry",
+      "outcome": "success",
+      "duration_ms": 500,
+      "peak_rss_kb": null,
+      "recorded_at": "2026-10-22",
+      "host": "i3-1125G4, 8 vCPU, 7.4 GB RAM, rustc 1.94.0, cargo 1.94.0",
+      "notes": "New crate. Depends on cad-agent-api, cad-contract and cad-kernel-truck; cad-agent-runtime is a dev-dependency only, so the agent does not depend on the host that runs it."
+    },
+    {
+      "id": "b-platform-workspace-20261023",
+      "target": "workspace",
+      "command": "cargo build --offline --workspace --all-targets -j 2",
+      "outcome": "success",
+      "duration_ms": 370,
+      "peak_rss_kb": null,
+      "recorded_at": "2026-10-23",
+      "host": "Linux x86_64, rustc 1.94.0, cargo 1.94.0; memory telemetry not collected",
+      "notes": "Warm all-target platform workspace build after persistence changes. Does not cover the separate CADCraft, SolidCraft or kernel checkouts."
+    },
+    {
+      "id": "b-platform-workspace-20261025",
+      "target": "repo.platform",
+      "command": "cargo test --offline --workspace -j 2",
+      "outcome": "success",
+      "duration_ms": 10570,
+      "peak_rss_kb": 326740,
+      "recorded_at": "2026-10-25",
+      "host": "i3-1125G4, 4C/8T, 7.4 GB RAM, Fedora 43, rustc 1.94.0",
+      "notes": "Warm test profile, 11 packages. /usr/bin/time WALL=10.57 s, MAXRSS=326,740 KB. Includes cad-io (6 tests) and cad-studio (9 tests)."
+    },
+    {
+      "id": "b-platform-workspace-20261025-final",
+      "command": "cargo build --offline --workspace --all-targets -j 2",
+      "outcome": "success",
+      "duration_ms": 85,
+      "peak_rss_kb": 39964,
+      "recorded_at": "2026-10-25",
+      "notes": "Warm no-op build after fmt, clippy -D warnings and the 226-test run: 0.085 s wall, 39 MB peak RSS. Proves the final tree still builds all targets; it is not a cold-build timing.",
+      "target": "repo.platform",
+      "host": "i3-1125G4, 4C/8T, 7.4 GB RAM, Fedora 43, rustc 1.94.0"
+    }
+  ]
+}

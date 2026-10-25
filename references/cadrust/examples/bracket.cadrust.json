@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "name": "bracket",
+  "units": "mm",
+  "parameters": {
+    "chamfer": "1",
+    "depth": "40",
+    "fillet_r": "6",
+    "hole_d": "6.5",
+    "thickness": "6",
+    "wall": "30",
+    "width": "60"
+  },
+  "timeline": [
+    {
+      "type": "Sketch",
+      "id": "base_sk",
+      "plane": "XY",
+      "offset": 0.0,
+      "entities": [
+        {
+          "type": "Rect",
+          "x": 0.0,
+          "y": 0.0,
+          "w": "width",
+          "h": "depth"
+        },
+        {
+          "type": "Circle",
+          "cx": "width * 0.25",
+          "cy": "depth / 2",
+          "r": "hole_d / 2"
+        },
+        {
+          "type": "Circle",
+          "cx": "width * 0.75",
+          "cy": "depth / 2",
+          "r": "hole_d / 2"
+        }
+      ]
+    },
+    {
+      "type": "Extrude",
+      "id": "base",
+      "sketch": "base_sk",
+      "distance": "thickness",
+      "op": "NewBody",
+      "target": null
+    },
+    {
+      "type": "Fillet",
+      "id": "round_corners",
+      "body": "base",
+      "radius": "fillet_r",
+      "edges": "vertical"
+    },
+    {
+      "type": "Sketch",
+      "id": "wall_sk",
+      "plane": "XZ",
+      "offset": "-depth",
+      "entities": [
+        {
+          "type": "Rect",
+          "x": "fillet_r",
+          "y": 0.0,
+          "w": "width - 2 * fillet_r",
+          "h": "wall"
+        }
+      ]
+    },
+    {
+      "type": "Extrude",
+      "id": "wall",
+      "sketch": "wall_sk",
+      "distance": "thickness",
+      "op": "Join",
+      "target": "base"
+    },
+    {
+      "type": "Chamfer",
+      "id": "wall_top",
+      "body": "base",
+      "distance": "chamfer",
+      "edges": "top"
+    },
+    {
+      "type": "Cylinder",
+      "id": "boss",
+      "radius": "8",
+      "height": "thickness + 6",
+      "at": [
+        "width / 2",
+        "depth / 2 - 4",
+        0.0
+      ],
+      "op": "NewBody"
+    },
+    {
+      "type": "Combine",
+      "id": "join_boss",
+      "target": "base",
+      "tool": "boss",
+      "op": "Join"
+    },
+    {
+      "type": "Cylinder",
+      "id": "boss_hole",
+      "radius": "3",
+      "height": "40",
+      "at": [
+        "width / 2",
+        "depth / 2 - 4",
+        -1.0
+      ],
+      "op": "NewBody"
+    },
+    {
+      "type": "Combine",
+      "id": "cut_boss",
+      "target": "base",
+      "tool": "boss_hole",
+      "op": "Cut"
+    }
+  ]
+}

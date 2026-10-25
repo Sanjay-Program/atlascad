@@ -1,0 +1,40 @@
+// The box select in a Part Studio (cadrs_ui::selection_box, as in the assembly): with no dialog
+// open and no sketch edited, a drag from empty space draws a box; left to right a window (blue:
+// the parts wholly inside), right to left a crossing (dashed yellow: every part it touches).
+// What it will select is highlighted while it is dragged. The mains-sensor enclosure.
+// 01 a window over the bottom of the tube: blue (the plug and its pins, inside the tube, are
+//    wholly inside it).
+// 02 let go: the plug and the pins are selected (in the Parts list); the tube and the end plate,
+//    only partly inside, are not.
+// 03 a crossing from the right over the tube's edge and the end plate: dashed yellow, both
+//    highlighted.
+// 04 let go: the tube and the end plate are selected.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("board setup"),
+        Wait(10),
+        Custom("view -40 55 0 0 6 0.12"),
+        Wait(20),
+        Press(at(640, 300)),
+        MoveTo(900, 500),
+        MoveTo(1180, 760),
+        WaitFor("asm-box-select"),
+        Wait(5),
+        Screenshot("01-window"),
+        Release,
+        Wait(5),
+        MoveTo(1000, 900),
+        Screenshot("02-window-selected"),
+        Press(at(1300, 300)),
+        MoveTo(1200, 500),
+        MoveTo(1100, 700),
+        Wait(5),
+        Screenshot("03-crossing"),
+        Release,
+        Wait(5),
+        MoveTo(1000, 900),
+        Screenshot("04-crossing-selected"),
+    ],
+)

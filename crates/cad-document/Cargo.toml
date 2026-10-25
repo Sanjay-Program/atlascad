@@ -1,0 +1,17 @@
+[package]
+name = "cad-document"
+description = "Local parametric project: rectangle sketch, extrude feature, parameters, undo, versioned save/load."
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+cad-contract.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

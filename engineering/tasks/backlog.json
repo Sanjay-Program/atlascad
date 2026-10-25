@@ -1,0 +1,1411 @@
+{
+  "schema_version": 1,
+  "tasks": [
+    {
+      "id": "task.adoption.cadcraft-units",
+      "title": "Adopt contract units and entity IDs in CADCraft",
+      "rationale": "CADCraft stores units in an INSUNITS header variable and identifies entities with Handle(u64). The contract already provides Unit with exact conversions and EntityId, which is the same u64 with validation. Unit mistakes are the most expensive class of CAD bug.",
+      "priority": "interface_compatibility",
+      "risk": "medium",
+      "status": "proposed",
+      "acceptance_criteria": [
+        "Unit and INSUNITS mapping round-trip through the DXF reader/writer for millimetre and inch drawings.",
+        "EntityId is introduced for new code and Handle converts to it losslessly; no persisted file changes meaning.",
+        "Existing CADCraft tests still pass."
+      ],
+      "inputs": [
+        "module.cad-contract",
+        "module.cadcraft.doc",
+        "module.cadcraft.dxf"
+      ],
+      "outputs": [
+        "apps/cadcraft/crates/doc"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "apps/cadcraft/crates/doc/src/handle.rs"
+      ],
+      "required_tests": [
+        "cargo test -p cadcraft-doc",
+        "cargo test -p cadcraft-dxf"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "docs/architecture.md section 5"
+      ],
+      "rollback": "EntityId is a type alias over u64 at first, so reverting is a type change with no data migration.",
+      "source": "curated",
+      "trigger_digest": null
+    },
+    {
+      "id": "task.advisory.scan",
+      "title": "Install and wire cargo-audit and cargo-deny",
+      "rationale": "Neither cargo-audit, cargo-deny nor cargo-license is installed on this host, so the advisory state of roughly 1,085 resolved packages across the two applications is unknown. A review cannot report a clean bill of health it never measured.",
+      "priority": "security",
+      "risk": "high",
+      "status": "blocked",
+      "acceptance_criteria": [
+        "cargo-audit and cargo-deny are available and their versions recorded.",
+        "deny.toml exists for CADCraft, matching SolidCraft's existing policy.",
+        "cargo deny check advisories bans licenses sources runs for both applications and its output is recorded.",
+        "A CI guard fails when opencascade* or cadrum enters a shipping dependency graph."
+      ],
+      "inputs": [
+        "repo.cadcraft",
+        "repo.solidcraft"
+      ],
+      "outputs": [
+        "engineering/quality/security.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "apps/cadcraft/deny.toml",
+        "engineering/quality/security.json"
+      ],
+      "required_tests": [
+        "cargo deny check on both applications"
+      ],
+      "attempts": 1,
+      "last_error": "Blocked by the toolchain: cargo-audit, cargo-deny and cargo-license are not installed on this host, and installing global tooling is outside the authorized scope of a coding session.",
+      "evidence": [
+        "docs/security-review.md S-1"
+      ],
+      "rollback": "Removing deny.toml and the CI step restores the previous state; no application code is touched.",
+      "source": "curated",
+      "trigger_digest": null
+    },
+    {
+      "id": "task.contract.solidcraft-adoption",
+      "title": "Implement cad_contract::Kernel for solidcraft-kernel behind a feature flag",
+      "rationale": "This is the milestone that turns a contract into an integration: the production kernel would implement the shared trait without changing behaviour, and a test would prove the contract describes the kernel actually shipped.",
+      "priority": "interface_compatibility",
+      "risk": "medium",
+      "status": "proposed",
+      "acceptance_criteria": [
+        "cad-contract is an optional dependency of apps/solidcraft/crates/kernel, feature off by default.",
+        "Kernel is implemented by delegating to the existing Body API; KernelError maps onto the contract taxonomy.",
+        "A test builds a box both ways and compares volume from the contract path with the kernel's own answer.",
+        "No existing public signature changes; the existing test suite passes unchanged."
+      ],
+      "inputs": [
+        "module.cad-contract",
+        "module.solidcraft.kernel"
+      ],
+      "outputs": [
+        "apps/solidcraft/crates/kernel/Cargo.toml"
+      ],
+      "depends_on": [
+        "task.quality.solidcraft-tests"
+      ],
+      "blocks": [],
+      "expected_changes": [
+        "apps/solidcraft/crates/kernel/src/contract_adapter.rs"
+      ],
+      "required_tests": [
+        "cargo test -p solidcraft-kernel --features cad-contract"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "docs/architecture.md section 5",
+        "docs/roadmap.md M1"
+      ],
+      "rollback": "Delete the adapter module and the optional dependency; the feature is off by default, so no released behaviour depends on it.",
+      "source": "curated",
+      "trigger_digest": null
+    },
+    {
+      "id": "task.decision.occt-licence",
+      "title": "Decide the OpenCASCADE licence path (owner gate G1)",
+      "rationale": "opencascade-rs is LGPL-2.1 and cadrum statically links LGPL-2.1 OCCT behind an MIT wrapper. Neither is in a shipping graph today, but the decision determines whether OCCT is ever usable and what the CI guard must forbid.",
+      "priority": "security",
+      "risk": "critical",
+      "status": "blocked",
+      "acceptance_criteria": [
+        "An owner decision is recorded as an ADR: exclude OCCT, dynamic-link it with relink rights, or relicense the product.",
+        "engineering/manifest/repositories.json and docs/license-inventory.md reflect the decision.",
+        "If exclusion is chosen, a CI guard proves opencascade* and cadrum cannot enter a shipping graph."
+      ],
+      "inputs": [
+        "repo.opencascade-rs",
+        "repo.cadrum"
+      ],
+      "outputs": [
+        "docs/architecture-decisions/0003-no-lgpl-in-shipping-binary.md"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "docs/architecture-decisions/"
+      ],
+      "required_tests": [],
+      "attempts": 0,
+      "last_error": "Requires an owner decision (G1 in docs/roadmap.md); an engineering session must not choose a distribution licence on the owner's behalf.",
+      "evidence": [
+        "docs/license-inventory.md section 4"
+      ],
+      "rollback": "No code change; the ADR can be superseded by a later ADR.",
+      "source": "curated",
+      "trigger_digest": null
+    },
+    {
+      "id": "task.io.import-budgets",
+      "title": "Add import budgets and cancellation to SolidCraft IO",
+      "rationale": "Untrusted CAD files are the primary attack surface, and SolidCraft's IO lacks the size, entity and zip-entry caps that CADCraft already has. A 3MF import can exhaust memory or disk without a bound today.",
+      "priority": "security",
+      "risk": "high",
+      "status": "proposed",
+      "acceptance_criteria": [
+        "Maximum file size, entity count, triangle count, zip entry count and uncompressed size are enforced and configurable.",
+        "An import can be cancelled and returns a structured error rather than hanging.",
+        "A test feeds a zip-bomb-shaped 3MF and a truncated STEP file and asserts a clean error."
+      ],
+      "inputs": [
+        "module.solidcraft.io"
+      ],
+      "outputs": [
+        "apps/solidcraft/crates/io"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "apps/solidcraft/crates/io/src/lib.rs"
+      ],
+      "required_tests": [
+        "cargo test -p solidcraft-io"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "docs/security-review.md S-3"
+      ],
+      "rollback": "Budgets are additive checks; raising a limit or removing the check restores prior behaviour.",
+      "source": "curated",
+      "trigger_digest": null
+    },
+    {
+      "id": "task.mcp.loopback-audit",
+      "title": "Audit the MCP loopback control port",
+      "rationale": "CADCraft's MCP backend talks to the app over a loopback control port that any local process can reach. The security review flagged this as unaudited, and MCP is the second attack surface after file parsing.",
+      "priority": "security",
+      "risk": "medium",
+      "status": "proposed",
+      "acceptance_criteria": [
+        "The port binds only to 127.0.0.1 and rejects non-loopback peers.",
+        "Requests are authenticated or validated so another local process cannot drive the editor.",
+        "Malformed and hostile requests are tested and rejected without affecting the document."
+      ],
+      "inputs": [
+        "module.cadcraft.mcp"
+      ],
+      "outputs": [
+        "docs/security-review.md"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "apps/cadcraft/crates/mcp"
+      ],
+      "required_tests": [
+        "an integration test that sends a malformed request and asserts a clean refusal"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "docs/security-review.md S-4"
+      ],
+      "rollback": "Document the finding and revert any binding change; the default remains loopback.",
+      "source": "curated",
+      "trigger_digest": null
+    },
+    {
+      "id": "task.quality.solidcraft-tests",
+      "title": "Run the SolidCraft kernel test suite on a larger machine",
+      "rationale": "5,884 tests exist and not one was executed here; a single crate took 8 min 22 s and 2.56 GB RSS against a 7.4 GB host with swap largely consumed. Until they run, every SolidCraft capability claim remains advertised, not verified.",
+      "priority": "integration_blocker",
+      "risk": "high",
+      "status": "blocked",
+      "acceptance_criteria": [
+        "cargo test -p solidcraft-kernel completes on a machine with at least 16 GB RAM.",
+        "Pass, fail and ignored counts are recorded in engineering/quality/tests.json.",
+        "Any failure is triaged into a task with a reproduction, not ignored."
+      ],
+      "inputs": [
+        "repo.solidcraft"
+      ],
+      "outputs": [
+        "engineering/quality/tests.json"
+      ],
+      "depends_on": [],
+      "blocks": [
+        "task.contract.solidcraft-adoption"
+      ],
+      "expected_changes": [],
+      "required_tests": [
+        "cargo test -p solidcraft-kernel"
+      ],
+      "attempts": 1,
+      "last_error": "Host memory: one crate build peaked at 2.56 GB RSS with only ~1.3 GB available at audit time; the test suite is larger than the build.",
+      "evidence": [
+        "docs/build-and-test.md section 4"
+      ],
+      "rollback": "No changes are made by running tests.",
+      "source": "curated",
+      "trigger_digest": null
+    },
+    {
+      "id": "task.release.notice-bundle",
+      "title": "Generate one combined third-party notice bundle",
+      "rationale": "Each application ships its own notice material, but a combined distribution has no aggregated bundle. Apache-2.0 section 4(d) obligations must be met per distributed artifact, not per repository.",
+      "priority": "security",
+      "risk": "medium",
+      "status": "proposed",
+      "acceptance_criteria": [
+        "A generated bundle lists name, version, licence and repository for every resolved dependency of both applications.",
+        "It includes both NOTICE files and the SolidCraft vendor patch notes.",
+        "Regeneration is a single documented command and the output is reviewed for GPL/LGPL entries."
+      ],
+      "inputs": [
+        "repo.cadcraft",
+        "repo.solidcraft"
+      ],
+      "outputs": [
+        "engineering/reports"
+      ],
+      "depends_on": [
+        "task.license.craftlibs"
+      ],
+      "blocks": [],
+      "expected_changes": [
+        "docs/license-inventory.md"
+      ],
+      "required_tests": [
+        "the generator fails when a dependency has no licence field"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "docs/license-inventory.md section 3"
+      ],
+      "rollback": "The bundle is generated output; deleting it changes nothing else.",
+      "source": "curated",
+      "trigger_digest": null
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-agent-api.21bae687",
+      "title": "repo.cad-agent-api: 1 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 1 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-agent-api"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ Cargo.toml"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "21bae68750bad6c9"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-agent-geometry.ef9ee2f2",
+      "title": "repo.cad-agent-geometry: 2 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 2 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-agent-geometry"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ Cargo.toml",
+        "~ tests/integration.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "ef9ee2f2f090d451"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-agent-runtime.ceadb347",
+      "title": "repo.cad-agent-runtime: 1 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 1 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-agent-runtime"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ Cargo.toml"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "ceadb347574d1dd6"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-cli.7e15d190",
+      "title": "repo.cad-cli: 4 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 4 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-cli"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ Cargo.toml",
+        "~ src/lib.rs",
+        "~ src/main.rs",
+        "~ tests/project_workflow.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "7e15d190f6e6ed6b"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-cli.937c6904",
+      "title": "repo.cad-cli: 5 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 5 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-cli"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ Cargo.toml",
+        "~ src/lib.rs",
+        "~ src/main.rs",
+        "~ tests/end_to_end.rs",
+        "+ tests/project_workflow.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "937c6904cff0b8cb"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-contract.3364b835",
+      "title": "repo.cad-contract: 2 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 2 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-contract"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ Cargo.toml",
+        "~ src/lib.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "3364b835c9c6593d"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-contract.e01cacea",
+      "title": "repo.cad-contract: 2 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 2 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-contract"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ src/document.rs",
+        "~ src/tol.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "e01cacea990fc7d7"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-document.1ef5200f",
+      "title": "repo.cad-document: 1 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 1 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-document"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ src/lib.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "1ef5200fc2286203"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-document.f68b670a",
+      "title": "repo.cad-document: 2 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 2 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-document"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ Cargo.toml",
+        "~ src/lib.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "f68b670aee93c9ab"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-engineering.3d2a1ddd",
+      "title": "repo.cad-engineering: 1 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 1 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-engineering"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ src/report.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "3d2a1ddd941b90db"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-engineering.8905091c",
+      "title": "repo.cad-engineering: 5 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 5 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-engineering"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ Cargo.toml",
+        "~ src/lib.rs",
+        "~ src/main.rs",
+        "~ src/model.rs",
+        "~ src/report.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "8905091c4da83f2f"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-engineering.ba95549a",
+      "title": "repo.cad-engineering: 2 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 2 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-engineering"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ src/scan.rs",
+        "~ tests/pipeline.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "ba95549a289cb190"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-entitlements.8967e263",
+      "title": "repo.cad-entitlements: 1 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 1 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-entitlements"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ Cargo.toml"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "8967e263177e0f13"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-kernel-truck.45698718",
+      "title": "repo.cad-kernel-truck: 1 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 1 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-kernel-truck"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ Cargo.toml"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "45698718e62007fe"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-studio.638dc9db",
+      "title": "repo.cad-studio: 1 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 1 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-studio"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ src/main.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "638dc9dbb30fd5e9"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-studio.8d2a4821",
+      "title": "repo.cad-studio: 1 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 1 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-studio"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ src/lib.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "8d2a4821345c1aab"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-studio.e4595ed8",
+      "title": "repo.cad-studio: 2 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 2 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-studio"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ src/lib.rs",
+        "~ tests/http_api.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "e4595ed80481e573"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cadcraft.120ac9e4",
+      "title": "repo.cadcraft: 6 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 6 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cadcraft"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ ROADMAP.md",
+        "~ crates/constraints/src/dof.rs",
+        "~ crates/constraints/tests/dof.rs",
+        "~ docs/gaps.md",
+        "~ docs/localization-parity.md",
+        "~ docs/localization.md"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "120ac9e482036ba6"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cadcraft.a09cdde8",
+      "title": "repo.cadcraft: 9 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 9 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cadcraft"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ Cargo.lock",
+        "~ Cargo.toml",
+        "~ apps/cadcraft/src/control_server.rs",
+        "~ crates/doc/Cargo.toml",
+        "~ crates/doc/src/entity.rs",
+        "~ crates/doc/src/header.rs",
+        "~ crates/doc/src/tests.rs",
+        "~ crates/dxf/src/lib.rs",
+        "~ crates/io/src/tests.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "a09cdde8e6c3ee41"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cadrs.046b5b9a",
+      "title": "repo.cadrs: 1 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 1 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cadrs"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "- docs/PCB_IN_PART_STUDIO.md"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "046b5b9a948b4cdb"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cadrum.069d10be",
+      "title": "repo.cadrum: 2 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 2 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cadrum"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "- steps/colored_box.step",
+        "- steps/multicolor_solvespace.step"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "069d10be090b6d0f"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cadrust.fc34d654",
+      "title": "repo.cadrust: 1 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 1 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cadrust"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ doc/cylinder_modeling.mp4"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "fc34d65401c93baf"
+    },
+    {
+      "id": "task.scan.files-modified.repo-solidcraft.32c3258a",
+      "title": "repo.solidcraft: 7 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 7 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.solidcraft"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ Cargo.lock",
+        "+ crates/io/src/budgets.rs",
+        "~ crates/io/src/lib.rs",
+        "~ crates/io/src/threemf.rs",
+        "~ crates/kernel/Cargo.toml",
+        "+ crates/kernel/src/contract_adapter.rs",
+        "~ crates/kernel/src/lib.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "32c3258ae6f7c630"
+    },
+    {
+      "id": "task.scan.files-modified.repo-solidcraft.5e946367",
+      "title": "repo.solidcraft: 4 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 4 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.solidcraft"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ docs/screenshots/demo-0.8.gif",
+        "~ docs/screenshots/demo-0.8.mp4",
+        "~ docs/screenshots/rover-build.gif",
+        "~ docs/screenshots/rover-build.mp4"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "5e9463676bab562e"
+    },
+    {
+      "id": "task.scan.repo-discovered.repo-cad-io.5f5109b7",
+      "title": "repo.cad-io: `crates/cad-io` was not observed in the previous scan",
+      "rationale": "Observed by the workspace scanner: `crates/cad-io` was not observed in the previous scan. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "integration_blocker",
+      "risk": "medium",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the licence is read and recorded before any code is used",
+        "capabilities and duplicates are compared against existing modules",
+        "a repository entry is added with a stable id and evidence references",
+        "no source is copied or merged during onboarding"
+      ],
+      "inputs": [
+        "repo.cad-io"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "declared in manifests: yes"
+      ],
+      "required_tests": [
+        "isolated build of the new repository",
+        "isolated test run of the new repository"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "5f5109b7f5d4d5b7"
+    },
+    {
+      "id": "task.scan.repo-discovered.repo-cad-studio.87b6c2b6",
+      "title": "repo.cad-studio: `crates/cad-studio` was not observed in the previous scan",
+      "rationale": "Observed by the workspace scanner: `crates/cad-studio` was not observed in the previous scan. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "integration_blocker",
+      "risk": "medium",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the licence is read and recorded before any code is used",
+        "capabilities and duplicates are compared against existing modules",
+        "a repository entry is added with a stable id and evidence references",
+        "no source is copied or merged during onboarding"
+      ],
+      "inputs": [
+        "repo.cad-studio"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "declared in manifests: yes"
+      ],
+      "required_tests": [
+        "isolated build of the new repository",
+        "isolated test run of the new repository"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "87b6c2b6a9b0b6e5"
+    },
+    {
+      "id": "task.scan.repo-missing.repo-opencadstudio.8e460d74",
+      "title": "repo.opencadstudio: `references/opencadstudio` disappeared from the scan",
+      "rationale": "Observed by the workspace scanner: `references/opencadstudio` disappeared from the scan. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "broken_build",
+      "risk": "high",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the declared path is restored, or the entry is retired with a recorded reason",
+        "no other manifest still references the missing repository"
+      ],
+      "inputs": [
+        "repo.opencadstudio"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "it existed during the previous scan"
+      ],
+      "required_tests": [
+        "run the affected repositories' build commands"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "8e460d740d58ec82"
+    },
+    {
+      "id": "task.scan.working-tree-dirty.repo-solidcraft.f4311c36",
+      "title": "repo.solidcraft: 7 uncommitted path(s) appeared",
+      "rationale": "Observed by the workspace scanner: 7 uncommitted path(s) appeared. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "integration_blocker",
+      "risk": "medium",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the uncommitted diff is reviewed and attributed to a known task",
+        "it is committed, or handed back to its author; nothing is discarded",
+        "the scan reports a clean tree afterwards"
+      ],
+      "inputs": [
+        "repo.solidcraft"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "uncommitted work is never discarded, reset or stashed by this tooling",
+        "review the diff, decide whether it is intended, then commit or hand it back"
+      ],
+      "required_tests": [
+        "build and test the affected repository before committing",
+        "check that no generated or build artifact was captured by the fingerprint"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "f4311c36f846c7ac"
+    },
+    {
+      "id": "task.versioncontrol.workspace",
+      "title": "Put the workspace root under version control",
+      "rationale": "No Git repository exists at the workspace root, so the contract crates, manifests, docs and reports have no history and no recovery path. That is a data-loss risk, and it means every evidence record is unattributable to a revision.",
+      "priority": "security",
+      "risk": "high",
+      "status": "proposed",
+      "acceptance_criteria": [
+        "A repository exists at the workspace root with nested checkouts ignored, or the owner explicitly declines and the reason is recorded.",
+        "target/, engineering/state/ and the 39 MB reference archive are either ignored or committed deliberately.",
+        "The first commit contains the manifests, docs and crates, and the scanner's state is reproducible from it."
+      ],
+      "inputs": [
+        "repo.cad-contract",
+        "repo.cad-kernel-truck",
+        "repo.cad-engineering"
+      ],
+      "outputs": [
+        ".gitignore"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        ".gitignore"
+      ],
+      "required_tests": [
+        "atlas-eng scan --write produces the same fingerprint after checkout"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "engineering/state/scan.json will show `no Git metadata` for platform crates"
+      ],
+      "rollback": "Initializing a repository is additive; deleting .git would undo it. Do not run it without the owner's agreement, because nested repositories would become embedded without a .gitignore policy.",
+      "source": "curated",
+      "trigger_digest": null
+    },
+    {
+      "id": "task.wasm.spike",
+      "title": "Time-box a WebAssembly feasibility spike",
+      "rationale": "The product plan includes web access, but wasm32-unknown-unknown is not installed and no WASM build has been attempted. A size and startup measurement is the honest prerequisite to any browser claim.",
+      "priority": "performance",
+      "risk": "low",
+      "status": "blocked",
+      "acceptance_criteria": [
+        "wasm32-unknown-unknown and wasm-pack are installed and their versions recorded.",
+        "cad-contract builds for wasm and its artifact size is recorded.",
+        "The truck adapter is attempted and the result (success, size, or the exact failure) is recorded.",
+        "No browser application is promised."
+      ],
+      "inputs": [
+        "module.cad-contract",
+        "module.cad-kernel-truck"
+      ],
+      "outputs": [
+        "engineering/quality/benchmarks.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [],
+      "required_tests": [
+        "cargo build --target wasm32-unknown-unknown -p cad-contract"
+      ],
+      "attempts": 1,
+      "last_error": "Blocked: the wasm32-unknown-unknown target and wasm-pack are not installed on this host.",
+      "evidence": [
+        "docs/build-and-test.md section 1"
+      ],
+      "rollback": "Installing a Rust target is reversible with rustup target remove.",
+      "source": "curated",
+      "trigger_digest": null
+    }
+  ]
+}

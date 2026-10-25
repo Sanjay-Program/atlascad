@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "units": "mm",
+  "parameters": { "w": "50", "h": "30", "t": "10", "boss_r": "6" },
+  "timeline": [
+    { "type": "Sketch", "id": "outline", "plane": "XY",
+      "entities": [
+        { "type": "Line", "x0": 0, "y0": 0, "x1": 48, "y1": 1 },
+        { "type": "Line", "x0": 48, "y0": 1, "x1": 49, "y1": 31 },
+        { "type": "Line", "x0": 49, "y0": 31, "x1": 1, "y1": 29 },
+        { "type": "Line", "x0": 1, "y0": 29, "x1": 0, "y1": 0 }
+      ],
+      "constraints": [
+        { "type": "Coincident", "a": { "e": 0, "p": "end" }, "b": { "e": 1, "p": "start" } },
+        { "type": "Coincident", "a": { "e": 1, "p": "end" }, "b": { "e": 2, "p": "start" } },
+        { "type": "Coincident", "a": { "e": 2, "p": "end" }, "b": { "e": 3, "p": "start" } },
+        { "type": "Coincident", "a": { "e": 3, "p": "end" }, "b": { "e": 0, "p": "start" } },
+        { "type": "Horizontal", "e": 0 }, { "type": "Horizontal", "e": 2 },
+        { "type": "Vertical", "e": 1 }, { "type": "Vertical", "e": 3 },
+        { "type": "FixPoint", "a": { "e": 0, "p": "start" }, "x": 0, "y": 0 },
+        { "type": "Distance", "a": { "e": 0, "p": "start" }, "b": { "e": 0, "p": "end" }, "value": "w" },
+        { "type": "Distance", "a": { "e": 1, "p": "start" }, "b": { "e": 1, "p": "end" }, "value": "h" }
+      ] },
+    { "type": "Extrude", "id": "block", "sketch": "outline", "distance": "t", "op": "NewBody" },
+    { "type": "Sketch", "id": "top_sk", "plane": { "face": { "body": "block", "point": [25, 15, 10] } },
+      "entities": [ { "type": "Circle", "cx": 0, "cy": 0, "r": "boss_r" } ] },
+    { "type": "Extrude", "id": "boss", "sketch": "top_sk", "distance": 8, "op": "Join", "target": "block" },
+    { "type": "Sketch", "id": "side_sk", "plane": { "face": { "body": "block", "point": [50, 15, 5] } },
+      "entities": [ { "type": "Rect", "x": -8, "y": -3, "w": 16, "h": 6 } ] },
+    { "type": "Extrude", "id": "slot", "sketch": "side_sk", "distance": -12, "op": "Cut", "target": "block" },
+    { "type": "Fillet", "id": "soft", "body": "block", "radius": 3, "edges": { "pick": [[25, 0, 10]] } },
+    { "type": "Appearance", "id": "paint", "body": "block", "color": "#4a90d9" }
+  ]
+}

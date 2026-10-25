@@ -1,0 +1,24 @@
+[package]
+name = "cad-agent-geometry"
+description = "The geometry-ops CadAgent: contract kernel operations (extrude, boolean, tessellate, measure) behind the agent runtime's lifecycle, schema, permission and budget enforcement."
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+cad-agent-api.workspace = true
+cad-contract.workspace = true
+cad-kernel-truck.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+# The runtime is a *host* of this agent, not a dependency of it: the agent must be usable by any
+# host, and a host must be able to use an agent without the agent knowing. The dependency exists
+# only in the tests, where the agent is exercised through a real registry.
+cad-agent-runtime.workspace = true
+
+[lints]
+workspace = true

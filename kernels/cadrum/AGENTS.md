@@ -1,0 +1,12 @@
+# Policy
+
+- Prioritize reducing functions, structures, traits, and dependencies (cargo add and cargo:rustc-link-lib= in build.rs) over increasing them
+- Prioritize requiring minimal effort over misleading the user when deciding between them
+- Prioritize STEP file specification over OCCT specification when in doubt
+
+# Agent
+
+- For implementation instructions, run tests to verify after implementation
+- run "cargo fmt" to all new changes.
+- Remove comments that the code already says and keep a comment within two lines.
+- For documents, open each paragraph with a short sentence that states the claim, then support it in the following sentences. e.g. "Boolean operations use disjunctive normal form for normalization, efficiency and lazy evaluation." followed by how.

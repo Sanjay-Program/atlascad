@@ -1,0 +1,748 @@
+![Hagane: an exact B-rep through-bore part rendered by the Rust kernel in WebAssembly](docs/demo.gif)
+
+# Hagane
+
+**A pure Rust CAD kernel.**
+
+Hagane is an independent, open-source CAD kernel built around analytic geometry
+and boundary representations. The long-term goal is broad CAD functionality
+comparable to Open CASCADE Technology. This is an early, working foundation,
+not an OCCT binding, source translation, or general-purpose replacement.
+No OCCT source was used. Original code is licensed **MIT OR Apache-2.0**.
+
+The GIF above records this repository's actual WASM/WebGL demo. The hole is a
+trimmed B-rep solid: planar caps have inner circular wires and share exact
+circle edges with an inward-facing cylindrical wall. Tessellation happens
+**after** solid construction and validation; there is no mesh Boolean.
+
+The standing [development goal](GOAL.md) is a complete end-to-end CAD workflow;
+its acceptance criteria and implementation order guide ongoing development.
+See the [roadmap](docs/roadmap.md) for current milestones and limitations.
+
+[Editable multi-component prism workflows](docs/prism-workflow.md) connect
+exact stock and actual STEP import to difference/intersection/union nodes,
+explicit component selection, incremental prefix reuse, Undo/Redo and per-part
+STEP export. Empty and disconnected results remain explicit; general compound
+and 3D operations remain unsupported.
+
+[Holed-tool prism Booleans](docs/prism-region-booleans.md) now classify
+material regions in both operands, returning exact difference, intersection and
+union components including retained central islands. The finite line/quarter-arc,
+same-axis/same-cap-interval domain keeps contact overlays and general 3D Boolean
+operations unsupported. Earlier no-tool-holes APIs retain their restrictions.
+
+[Exact line/arc prism Booleans](docs/prism-arc-line-booleans.md) now return
+all difference, intersection and union components when circular-arc tools cross
+line/arc stock boundaries. Analytic circle/circle roots extend the actual B-rep
+arrangement; the same-axis, same-cap-interval domain rejects contact overlays
+and general curved 3D Booleans.
+
+[Exact curved prismatic partition](docs/prism-convex-partition.md) now computes
+difference and intersection with a convex polygonal tool across actual cylindrical
+sidewalls. Analytic boundary arrangements produce all closed B-rep components,
+including disconnected and empty results, with bounded STEP export. The initial
+domain uses a common extrusion axis and cap interval; general 3D curved Booleans,
+contacts and tangent/vertex crossings remain unsupported.
+
+[Editable curved-stock blind pockets](docs/workflow-normal-blind.md) now connect
+rounded boxes and line/arc extrusions to incremental machining histories,
+depth/entry editing, Undo/Redo and exact STEP downloads. Disjoint through bores
+may precede blind pockets; later through bores and blind plane-cut histories
+remain unsupported.
+
+[Continued blind machining](docs/normal-prism-blind-continue.md) adds new flat-bottom
+pockets to an existing native or STEP-imported part while preserving its original
+B-rep boundaries. The browser can reuse the accepted kept STEP as the next source.
+This scoped operation supports at most 16 total projection-disjoint openings;
+general intersections and subsequent plane cuts remain planned. Import-based
+workflow nodes remain planned; curved-stock creation histories now support blind nodes.
+
+
+
+[Rational roof-circle paths](docs/nurbs-graph-rational-roof-circle.md) now compose
+degree-two rational UV quarters into degree-eight curves on an actual NURBS
+roof, with checked rational pcurves and bounded display. This creates a path
+on unchanged stock. The separate [circular graph bore](docs/nurbs-graph-circular-hole.md)
+constructs a closed B-rep with rational circular cap trims and four inward
+walls, plus checked mass/inertia and bounded chordal display. It supports one
+strictly contained source-XY through bore, checked Euclidean point classification
+and dedicated exact AP214 STEP export;
+circular-bore STEP import and general curved Booleans remain planned.
+
+The dedicated [editable graph workflow](docs/graph-workflow.md) connects this
+stock, UV selection, rigid placement and optional circular bore to reproducible
+documents, incremental rebuilding, browser Undo/Redo, autosave, point queries
+and exact STEP downloads. It remains a scoped linear modeling history.
+
+[Planar edge chamfer](docs/edge-chamfer.md) creates actual retained and removed
+solids for one isolated equal-setback edge of a convex planar solid, with a
+Web demo and exact STEP export. [Multiple planar chamfers](docs/edge-chamfer-multi.md)
+add resolved unequal adjacent intersections and final trimmed bevel faces.
+[Contact-capable chamfers](docs/edge-chamfer-contact.md) additionally support
+resolved vertex contacts and all twelve equal-setback box edges.
+[Parallel box-edge fillets](docs/edge-fillet.md) round one to four edges of
+one axis family with exact circular arcs and cylindrical faces, an actual
+Web demo and bounded-analytic STEP export. Curved/general chamfers and fillets
+remain planned. A dedicated [bounded analytic STEP reader](docs/step-bounded-import.md)
+now imports checked line/arc normal extrusions, including these fillets,
+with actual shared geometry and pcurves, including disjoint rectangular and
+circular-arc through openings; general STEP remains unsupported.
+
+[Normal circular prism bores](docs/arc-line-prism-bore.md) cut through rounded
+line/arc stock, returning both retained and removed analytic solids.
+Sequential disjoint openings are supported; contacting and oblique cuts reject.
+The [rounded-stock editing workflow](docs/workflow-rounded.md) now connects
+these operations to the existing document history, incremental rebuilding,
+Undo/Redo, local restoration and exact STEP downloads.
+[Editable line/arc profiles](docs/workflow-arc-line.md) now additionally support
+custom normal stock with signed quarter arcs, noncentered XY coordinates,
+initial openings and subsequent through bores in that same history.
+[Axial-plane prism partition](docs/arc-line-prism-split.md) additionally creates
+both actual closed sides of a transverse line/arc-stock cut, preserving source
+subarcs and uncut openings. The [editable plane-cut workflow](docs/workflow-plane-split.md)
+now keeps either side in the existing document history, followed by additional
+normal bores and cuts, with prefix reuse, Undo/Redo and accepted-model exports.
+[Partitions across openings](docs/arc-line-prism-split-components.md) now return
+every actual closed component and material-interval section. Editable histories
+also accept these cuts when the selected side contains exactly one component.
+[Normal-prism continuation](docs/workflow-plain-continuation.md) now keeps
+through bores and cuts usable after a retained child has only straight stock
+boundaries; public normal-prism APIs explicitly select the extrusion axis.
+[Box and polygon cut histories](docs/workflow-planar-cuts.md) now also connect
+normal stock, cuts and through bores, including hole-crossing cuts and explicit
+cache invalidation when the exact bore construction domain changes.
+[Scale-aware display](docs/viewer-scale.md) fits small and large parts using
+the actual mesh extent, with relative zoom and unchanged CAD/STEP coordinates.
+[Normal-prism blind bores](docs/normal-prism-blind-bore.md) add an exact flat
+floor and four inward cylinder walls while preserving certified curved or
+all-line source stock, with native/WASM inspection and analytic STEP export.
+[Single-cavity STEP re-import](docs/normal-prism-blind-step.md) now verifies
+the actual pocket and restored source stock without replacing imported geometry.
+Repeated blind machining remains unsupported.
+[Multiple disjoint blind pockets](docs/normal-prism-blind-bores.md) can now be
+specified together on certified normal stock, with individual removed solids,
+exact retained floors and per-body STEP exports. Sources already containing
+blind floors remain unsupported. [Multiple-pocket STEP re-import](docs/normal-prism-blind-bores-step.md)
+verifies up to 16 disjoint cavities against the actual restored source and
+a strict construction witness, preserving imported geometry.
+
+[Rectangular NURBS restriction](docs/nurbs-surface-trim.md) now retains an exact
+selected UV rectangle with rational B-rep edges, shared corners and bounded
+display. The `web/surface-trim.html` demo edits its limits using Rust/WASM.
+[Rectangular UV openings](docs/nurbs-surface-hole.md) additionally retain exact
+inner wires and boundary-conforming display in `web/surface-hole.html`.
+[Material-only NURBS display](docs/nurbs-surface-material.md) evaluates and
+subdivides only retained cells; the same page demonstrates an exact opening
+excluding a singular point of the source surface.
+[Straight UV surface edges](docs/nurbs-surface-edge.md) now retain exact
+diagonal rational curves and same-parameter pcurves, with an editable
+`web/surface-edge.html` demo. General trimmed faces and arbitrary NURBS solids
+remain unsupported. [Convex UV surface wires](docs/nurbs-surface-wire.md)
+now connect lifted edges with shared closing vertices.
+[Convex UV polygon faces](docs/nurbs-polygon-face.md) retain those boundaries as
+open faces and provide [bounded high-degree rational interior display](docs/nurbs-polygon-bezier.md)
+including [C1 multi-span rational surfaces](docs/nurbs-polygon-multispan.md).
+[Crease-aware display](docs/nurbs-polygon-crease.md) additionally splits C0 knots
+and retains one-sided normals through a dedicated API.
+The [editable polygon face demo](docs/nurbs-polygon-demo.md) now exposes single,
+C1 and C0 modes in `web/surface-polygon.html`, with native/WASM parity and
+rejected-edit recovery.
+[Rectangular inner wires](docs/nurbs-polygon-holes.md) now retain openings inside
+convex rational boundaries, with shared topology and editable browser display.
+[Closed polynomial NURBS graph solids](docs/nurbs-graph-solid.md) now retain a
+curved roof, planar walls and base as six NURBS faces with shared exact edges.
+Their scoped API checks closure, exact volume and conforming bounded display;
+`web/graph-solid.html` edits the dimensions and roof control offset. General
+NURBS solid operations remain unsupported.
+[Rigid placement](docs/nurbs-graph-placement.md) also translates and rotates
+these solids, with invariant volume, checked world precision and conservative
+control-hull bounds after placement. The same browser demo edits placement.
+[Exact rectangular solid restriction](docs/nurbs-graph-trim.md) now retains
+roof subdomains with exact curved upper edges and matching ruled walls,
+closed shared topology and bounded display on every face. The browser edits
+source UV limits; this is a scoped graph-solid operation.
+[Source-axis plane partition](docs/nurbs-graph-split.md) also returns both
+closed results and an exact curved-boundary section, with checked opposite
+cut faces and conserved volume. `web/graph-split.html` selects either side.
+[Rectangular through openings](docs/nurbs-graph-hole.md) now connect inner
+roof/base wires to four cavity walls in a closed genus-one NURBS solid.
+`web/graph-hole.html` edits an actual opening with stable analytic volume
+and boundary-conforming display; general curved Booleans remain unsupported.
+[Scoped graph-solid point queries](docs/nurbs-graph-classification.md) distinguish
+material, the through-opening void and Euclidean boundary bands directly from
+retained NURBS faces. Unresolved tolerance thresholds return explicit errors.
+[Source-vertical sections](docs/nurbs-graph-section.md) return physical-height
+material intervals, cap crossing points and outward normals for this family,
+including empty opening lines and explicit wall-contact rejection.
+[Scoped NURBS STEP export](docs/nurbs-graph-step.md) writes these polynomial
+graph solids with original spline bases, shared topology and both pcurve uses
+per edge. The browser downloads the accepted model in explicit mm units.
+[Strict graph STEP import](docs/nurbs-graph-step-import.md) reads full, unplaced
+six-face graph solids from actual spline geometry and shared references, with
+mm/metre conversion and no snapping. A separate [holed graph importer](docs/nurbs-graph-holed-step-import.md)
+retains one rectangular through opening with sixteen vertices, twenty-four edges
+and ten faces. Restricted and placed imports remain unsupported; rejected browser
+loads preserve the accepted model. An [exact surface prefilter](docs/nurbs-graph-holed-step-import-performance.md)
+reduces rejected coefficient-candidate work before full B-rep validation.
+A [common typed graph import API](docs/nurbs-graph-step-auto-import.md) selects
+plain or single-opening recognition once and provides shared inspection,
+section, display and export methods.
+[Uniform-density graph mass properties](docs/nurbs-graph-mass-properties.md)
+compute volume and world centroid from retained polynomial geometry, including
+source trims, rigid placement and rectangular openings, without mesh integration.
+[Centroidal graph inertia](docs/nurbs-graph-inertia.md) additionally evaluates the
+full world-axis tensor at uniform unit density, with explicit numerical failures.
+[Affine-UV roof sections](docs/nurbs-graph-roof-section.md) produce exact degree-four
+NURBS intersection curves along diagonal source paths, retaining global parameters
+and material spans around a rectangular opening.
+[Closed convex polygon graph solids](docs/nurbs-graph-polygon.md) additionally
+retain oblique 3–16-corner boundaries as actual closed B-reps with ruled NURBS
+walls, volume/centroid and conforming bounded display. `web/graph-polygon.html`
+edits the CCW polygon on restricted or placed sources; openings and general
+curved Booleans remain unsupported.
+[Source-vertical oblique graph partitions](docs/nurbs-graph-polygon-split.md)
+now split rectangular or convex graph stock into two closed solids, with
+exact shared cut geometry and conserved volume. `web/graph-plane-split.html`
+edits the directed UV line and selects either retained side.
+
+[Planar/cylindrical STEP export](docs/step-export.md) now writes exact closed
+B-rep geometry with shared topology, periodic seam pcurves and mm units, from
+native Rust or the editable browser. Cylinders, tubes and through/blind bore
+workflows are supported; arcs, ellipses and general curved export remain
+unsupported. [STEP import](docs/step-import.md) reads one convex planar solid,
+a certified polygon prism with polygon openings and separated normal through
+and blind bores (including opposing cuts with a resolved web), or a complete
+cylinder/concentric tube with checked periodic seam pcurves, preserving topology
+and converting SI mm/m to mm. The `web/step.html` page imports, inspects and re-exports the validated
+solid. Oblique/intersecting bores, partial arcs, other curved solids, uncertified
+nonconvex imports and assemblies remain unsupported.
+
+The [editable modeling workflow](docs/editable-workflow.md) now lets you change
+box/bore dimensions, create rounded stock with disjoint normal through holes,
+or extrude an editable polygon profile with inner openings
+and an optional skew direction with disjoint Z-axis through/blind bores,
+add/select/remove multiple mixed through/blind cuts (top or bottom entry),
+including opposing holes separated by a resolved web,
+inspect measured side/floor/hole-pair diagnostics, correct rejected
+edits and save/load a versioned operation document in the browser. Incremental
+B-rep sessions reuse unchanged history prefixes and display which operations
+were rebuilt. Browser Undo/Redo restores validated editing history, including
+imports and added/removed bores. Valid models autosave locally and are
+revalidated on reload, with explicit recovery and conflicting-tab protection. Open
+`web/workflow.html` after the normal WASM build. This is a scoped exact workflow,
+not a general parametric CAD system.
+
+[Planar subject / convex tool Booleans](docs/planar-convex-booleans.md) now
+support scoped difference/intersection with concave or polygon-holed subjects,
+including a second cut that preserves an existing through opening. A dedicated
+`web/planar-boolean.html` demo shows actual B-rep results and explicit contact
+failures. The original single-result APIs still reject disconnected outputs;
+curved inputs and independent cavity shells remain unsupported;
+this API is not yet an editable document node.
+[Multi-component plane partitions](docs/solid-split-components.md) now return
+independently closed solids when a planar cut separates the stock into pieces;
+choose the partition mode in the same browser demo.
+
+[Multi-component planar Booleans](docs/component-booleans.md) now return every
+closed result of scoped difference/intersection with a convex tool, including
+through-slot subtraction into two parts and common regions of concave stock.
+The same browser page displays part counts, exact volumes and rejected contacts.
+These APIs are not yet editable document nodes or general curved Booleans.
+
+Checked [rigid placement and coordinate frames](docs/frames.md) preserve exact
+B-rep geometry and support polygon extrusion in arbitrary planes.
+[Coordinate precision checks](docs/coordinate-precision.md) reject rounded-away
+curved endpoints and unresolved display requests; meshing reserves a coordinate
+allowance and closed mesh volume remains stable under large translation. The browser
+also includes a rotated four-bore part generated by this Rust operation.
+
+[JSON binary64 preservation](docs/json-float-roundtrip.md) fixes one-ULP
+coordinate changes during model parsing and verifies reproducible native/WASM
+STEP output from trigonometric polygon inputs.
+
+[Polygon graph STEP export](docs/nurbs-graph-polygon-step.md) now preserves
+actual rational curves/surfaces, annular bounds and shared topology. The Web
+demos download STEP from the last accepted model. A separate
+[strict polygon importer](docs/nurbs-graph-polygon-step-import.md) now retains
+unplaced full-source-UV 3–16-corner plain polygon B-reps, including actual
+rational weights and verified affine pcurve representations. Hole, placed and
+trimmed polygon imports remain unsupported.
+
+[Polygon graph point classification](docs/nurbs-graph-polygon-classification.md)
+now checks actual retained faces against a Euclidean tolerance band, including
+convex through openings. The browser demos show world-point queries and markers.
+Guarded footprint separation resolves deep opening and far outer queries before
+subdivision, while retaining the actual boundary-distance checks near walls.
+
+[Polygon graph centroidal inertia](docs/nurbs-graph-polygon-inertia.md) computes
+the full world tensor from positive material integrals, including convex
+openings. The browser displays uniform-density results in mm⁵.
+
+[Convex polygon through openings](docs/nurbs-graph-polygon-hole.md) now retain
+closed NURBS B-reps with annular caps, positive volume integration and an editable
+Web demo. This remains a scoped operation; general curved Booleans are incomplete.
+
+[Multiple convex polygon openings](docs/nurbs-graph-polygon-multi-hole.md) now
+support 1–4 separated through openings in a closed NURBS graph B-rep, with
+checked volume, centroid, inertia and an editable browser demo. The new family's
+[STEP export](docs/nurbs-graph-polygon-multi-hole-step.md) retains all cap loops,
+rational weights and shared topology, with downloads from the accepted model.
+[Point classification](docs/nurbs-graph-polygon-multi-hole-classification.md)
+checks the actual retained material and every opening through a Euclidean band.
+STEP import remains unsupported.
+
+## Quick start
+
+Install [Rust with rustup](https://rustup.rs/), then:
+
+```sh
+git clone https://github.com/rsasaki0109/Hagane.git
+cd Hagane
+cargo test --locked
+cargo run --locked --example part
+```
+
+`rust-toolchain.toml` pins Rust 1.99.0, rustfmt, clippy, and the
+`wasm32-unknown-unknown` target. The `part` example emits the demo mesh and exact
+solid volume as JSON. Pass `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `9`, `10`, `11`, `12`, `13`, `14`, `15`, `16`, `17`, `18`, `19`, or `20` to select four bores, a concave
+polygon extrusion, a hollow tube, a rigidly placed four-bore part, a
+rounded line/arc extrusion, a concave arc-notch plate with a rounded hole,
+a cap face subdivision, a curved cap/cylinder-wall subdivision, a cut across two holes, repeated crossings of annular cap arcs, periodic bore subdivision, independent planar face sewing, a closed solid plane partition, convex solid intersection, convex operand subtraction, convex operand union, face-contact box fusion, coplanar face merging, independently parameterized tilted face merging, or shared straight edge simplification:
+
+```sh
+cargo run --locked --example part -- 1
+cargo run --locked --example part -- 2
+cargo run --locked --example part -- 3
+cargo run --locked --example part -- 4
+cargo run --locked --example placement
+cargo run --locked --example part -- 5
+cargo run --locked --example rounded
+cargo run --locked --example region
+cargo run --locked --example part -- 6
+cargo run --locked --example intersections
+cargo run --locked --example face_clipping
+cargo run --locked --example face_split
+cargo run --locked --example part -- 7
+cargo run --locked --example arc_face_split
+cargo run --locked --example skew_face_subdivision -- 0.4375 0
+cargo run --locked --example oblique_boundary -- 0.13 0
+cargo run --locked --example harmonic_face_intersections -- 0 0 14 0
+cargo run --locked --example curved_classification -- 6 26 -3 0
+cargo run --locked --example ellipse_planar -- 14 0
+cargo run --locked --example half_ellipse_planar -- 1 0 0
+cargo run --locked --example ellipse_segment_planar -- 1.5707963267948966 0 20 0
+cargo run --locked --example ellipse_annulus_planar -- 6 0
+cargo run --locked --example ellipse_eccentric_planar -- 6 4 0
+cargo run --locked --example ellipse_multi_hole_planar -- 9 2 0
+cargo run --locked --example part -- 8
+cargo run --locked --example cut_graph
+cargo run --locked --example part -- 9
+cargo run --locked --example repeated_arc_split
+cargo run --locked --example part -- 10
+cargo run --locked --example periodic_face_split
+cargo run --locked --example part -- 11
+cargo run --locked --example sewing
+cargo run --locked --example classification -- -10 0 0
+cargo run --locked --example curved_classification -- 0 0 0 0
+cargo run --locked --example curved_classification -- 5 34 19 0
+cargo run --locked --example extrusion_intersections -- 0 14 0
+cargo run --locked --example circular_face_intersections -- 0 0 14 0
+cargo run --locked --example part -- 12
+cargo run --locked --example solid_split -- -2
+cargo run --locked --example part -- 13
+cargo run --locked --example convex_intersection -- -2
+cargo run --locked --example part -- 14
+cargo run --locked --example convex_difference -- -2
+cargo run --locked --example part -- 15
+cargo run --locked --example convex_union -- -2
+cargo run --locked --example part -- 16
+cargo run --locked --example box_contact -- -2
+cargo run --locked --example part -- 17
+cargo run --locked --example face_merge -- -2
+cargo run --locked --example part -- 18
+cargo run --locked --example reframed_merge -- -2
+cargo run --locked --example part -- 19
+cargo run --locked --example edge_simplify -- -2
+cargo run --locked --example part -- 20
+```
+
+Use the local kernel as a dependency during development:
+
+```toml
+[dependencies]
+hagane = { path = "../Hagane" }
+```
+
+The package is named `hagane`; it has not been published to crates.io.
+
+## Minimal example
+
+```rust
+use hagane::{BoxSpec, CylinderSpec, Point3, Vec3, Tolerance,
+             subtract_through_cylinder};
+
+fn main() -> hagane::Result<()> {
+    let tolerance = Tolerance::new(1e-8)?; // all lengths are mm here
+    let block = BoxSpec {
+        min: Point3::new(-40.0, -30.0, -12.0),
+        size: Vec3::new(80.0, 60.0, 24.0),
+    };
+    let tool = CylinderSpec {
+        base: Point3::new(0.0, 0.0, -20.0),
+        radius: 14.0,
+        height: 40.0,
+    };
+    let part = subtract_through_cylinder(block, tool, tolerance)?;
+    part.validate(tolerance)?;
+    let exact_volume = part.volume()?;
+    let display_mesh = part.tessellate(0.05, tolerance)?;
+    assert!((exact_volume - (80.0 * 60.0 * 24.0
+        - std::f64::consts::PI * 14.0 * 14.0 * 24.0)).abs() < 1e-8);
+    println!("{} display triangles", display_mesh.triangles.len());
+    Ok(())
+}
+```
+
+## Polygon extrusion and multiple bores
+
+```rust
+use hagane::{PolygonProfile, Point3, Vec3, Tolerance, extrude_polygon};
+
+let profile = PolygonProfile {
+    origin: Point3::new(0.0, 0.0, 0.0),
+    outer: vec![[0.0, 0.0], [12.0, 0.0], [12.0, 4.0],
+                [4.0, 4.0], [4.0, 10.0], [0.0, 10.0]],
+    holes: vec![],
+};
+let part = extrude_polygon(&profile, Vec3::new(3.0, -5.0, 7.0),
+                           Tolerance::default())?;
+assert!((part.volume()? - 72.0 * 7.0).abs() < 1e-8);
+
+```
+
+Use `subtract_through_cylinders(block, &[tool_a, tool_b], tolerance)` for multiple
+bores, and `make_tube(TubeSpec { base, outer_radius, inner_radius, height }, tolerance)`
+for a coaxial hollow cylinder. All produce exact shared-edge B-rep solids.
+
+## Web demo
+
+Python 3 serves static files; Node and npm are only needed for the optional
+tests/recording tools. The browser requires WebAssembly and WebGL.
+
+```sh
+./scripts/build-web.sh
+python3 -m http.server 8000 --directory web
+```
+
+Open port 8000 in your local browser. Drag to orbit; scroll to zoom. The radius
+slider reruns the **Rust B-rep operation** in WASM. Select single/four bores,
+a concave polygon extrusion with a polygon hole, a hollow tube, or a rotated
+four-bore part, a rounded line/arc extrusion, or a concave arc-notch plate with
+a rounded hole, a split planar cap, a split curved cap, a cut across two polygon holes, repeated crossings of an annular cap, a periodic bore split, sewn independent planar patches, the positive half of a plane-cut solid, intersecting convex solids, a subtracted rectangular through-hole, the union of overlapping solids, exact face-contact box fusion, merged coplanar faces, tilted faces with independent UV frames, or simplified shared straight boundaries. Framed/skew arc extrusion and
+[skew circular face subdivision](docs/skew-face-subdivision.md), and
+[oblique plane wall sections](docs/oblique-boundary.md) are also available.
+The contact-study page includes an actual [planar ellipse cap](docs/ellipse-planar.md).
+The split preset moves its cut offset
+while preserving the fixed bore and volume; enable tessellation to see the seam.
+The corner/notch radius controls exact geometry. The polygon
+preset has a fixed profile, so its radius slider is disabled. Toggle the display mesh or
+auto rotation. Arrow keys orbit and `+` / `-` zoom when the canvas is focused.
+The **Classify** link opens an exact planar-solid point query. Move X/Y/Z or
+select material, hole, notch and boundary probes; Rust returns inside/outside/boundary.
+The renderer uses WebGL directly, with no CDN assets or JavaScript CAD library.
+The generated `web/hagane.wasm` is ignored and rebuilt from source.
+
+Optional browser regression tests and GIF recording:
+
+```sh
+npm ci
+npx playwright install chromium   # or use an installed /usr/bin/chromium
+npm test
+npm run capture                 # also requires ffmpeg
+```
+
+`HAGANE_CHROMIUM` selects an existing browser executable. The capture command
+starts its own static server and records actual rendered frames. It does not
+fabricate the demo image.
+
+## Implemented
+
+- `f64` points/vectors, right-handed rigid transforms, explicit linear tolerance.
+- Structured length/angular/relative policy and filtered exact 2D orientation,
+  segment intersection, and inside/boundary/outside polygon classification.
+- Lines, XY and framed circles; arbitrary orthonormal planes and Z/framed cylinders.
+- Exact circular translation surfaces for [skew line/arc extrusion](docs/skew-arc-extrusion.md), including evaluation, UV, normals, volume and bounded display meshes.
+- [Line/skew-wall intersections](docs/extrusion-intersections.md), with original line parameters, bounded normal spans, tangency and generator overlap.
+- [Trimmed circular face intersections](docs/circular-face-intersections.md), including partial-wall selection, oriented normals and original shared-edge provenance.
+- Checked rigid B-rep placement, inverse/composed frames and exact placed bounds.
+- Standalone clamped positive-weight NURBS curves: checked knots/degrees/weights,
+  homogeneous de Boor evaluation, analytic first derivatives and knot-side limits;
+  shape-preserving knot insertion, rational Bezier spans and [bounded adaptive
+  curve display](docs/nurbs-refinement.md).
+- Standalone tensor-product NURBS surfaces: checked rectangular control nets,
+  analytic U/V partials, oriented regular-point normals and uniform display grids;
+  [shape-preserving tensor refinement, exact isocurves and oriented rectangular
+  boundaries](docs/nurbs-surface-refinement.md).
+- [Rectangular open NURBS B-rep faces](docs/nurbs-face.md) retain exact rational
+  surfaces/edges, shared corner vertices and same-parameter oriented coedges.
+  Boundary validation is structural; generic NURBS solid operations remain unsupported.
+- [Bounded rational surface display](docs/nurbs-surface-tessellation.md) with
+  per-cell Bernstein bounds, [exact Bezier extraction](docs/nurbs-surface-extraction.md)
+  and conforming multi-span grids, including [C0 crease normals](docs/nurbs-surface-crease.md);
+  arbitrary trimmed meshing remains unsupported.
+- Checked line/plane intersection and tolerance-based parallel/coincident classification;
+  horizontal-plane/bounded-Z-cylinder intersections.
+- Typed plane/plane intersections with shared-parameter UV curves; line/framed-cylinder
+  hits with original line parameters, UV, tangency and bounded generator intervals.
+- Transverse line clipping against planar B-rep trims, including concavity,
+  circular/arc boundaries and holes; planar-face intersection segments with
+  normalized pcurves and boundary-event provenance.
+- Scoped planar line/arc face subdivision, shared boundary/rim updates,
+  rectangular cylinder-wall refinement, multi-interval cut graphs through bounded
+  hole edges (including two crossings on one arc), periodic full-circle rim
+  refinement, analytic hole ownership and preserved
+  closed-solid geometry. [Skew wall subdivision](docs/skew-face-subdivision.md)
+  preserves translated circle geometry and shared generators.
+- [Oblique boundary subdivision](docs/oblique-boundary.md) with exact ellipse
+  section edges, harmonic wall pcurves, analytic volume and conforming meshes.
+  Transverse planes must stay strictly between complete bounded circular rims;
+  [solid classification](docs/harmonic-classification.md) supports the resulting
+  harmonic height bands.
+- [Full-ellipse planar trims](docs/ellipse-planar.md), with shared ellipse-angle
+  pcurves, analytic line/face queries, solid classification, area/volume and
+  conforming display meshes. One two-half-arc ellipse wire is supported;
+  [Diameter-closed half ellipses](docs/half-ellipse-planar.md) also support exact
+  line/arc clipping, solid classification and conforming meshes.
+  [Minor arcs closed by chords](docs/ellipse-segment-planar.md) extend this to
+  resolved sweeps in `(0, pi]`. [Concentric homothetic ellipse holes](docs/ellipse-annulus-planar.md)
+  support annular caps, two material intervals, classification and conforming meshes.
+  [Offset homothetic ellipse holes](docs/ellipse-eccentric-planar.md) preserve
+  displaced roots and the correct oblique-cut volume.
+  [Multiple disjoint homothetic holes](docs/ellipse-multi-hole-planar.md) support
+  up to sixteen holes and ordered material intervals. Other mixed loops,
+  general capped partitions remain unsupported. Unequal-axis ellipse holes now
+  have a [conservative certified domain](docs/tilted-bore.md).
+- [Harmonic circular face line queries](docs/harmonic-face-intersections.md):
+  analytic height clipping, bounded generator overlaps, certified shared ellipse
+  contacts and browser selection of faces above/below an oblique section.
+- [Solid point classification](docs/classification.md) for planar polygon/circle
+  and bounded-arc trims, rectangular or harmonic-band normal/skew circular walls,
+  Euclidean boundary bands and two checked independent rays. [Cylinder/tube/bore queries](docs/curved-classification.md),
+  [rounded/notched queries](docs/arc-classification.md), and
+  [skew plate queries](docs/skew-classification.md) are available in the browser model selector.
+- [Shared straight edge simplification](docs/edge-simplify.md), removing exact
+  degree-two collinear knots while preserving features, holes and shared pcurves.
+- [Coplanar face merging](docs/face-merge.md), removing shared internal boundaries
+  while preserving planar holes, geometry, original boundary edges and checked
+  pcurves across independent UV frames using exact plane-support identity.
+- [Axis-aligned box Booleans](docs/box-booleans.md), including identical/coplanar
+  operands and full/partial face contact, with regularized empty results.
+- [Convex operand union](docs/convex-union.md), combining overlapping or strictly
+  contained planar convex operands into one closed, potentially nonconvex solid.
+- [Convex operand subtraction](docs/convex-difference.md), sewn into one
+  connected boundary, with nonconvex/through-hole results and typed empty output.
+- [Convex solid intersection](docs/convex-intersection.md), with checked planar
+  convex operands, typed empty results and exact closed B-rep construction.
+- [Solid plane partition](docs/solid-split.md) for transverse planar straight-edge
+  B-reps, returning two closed parts and exact section faces.
+- Exact [planar patch sewing](docs/sewing.md), shared straight boundaries and
+  conforming collinear subdivisions, with closed manifold validation.
+- Vertices, shared curve edges, oriented coedges with exact pcurves, wires,
+  oriented faces, shells, and solids, including periodic cylinder seams.
+- Exact axis-aligned boxes, Z cylinders, and hollow tubes with annular caps.
+- Positive-Z rectangle/disk extrusion and straight-line XY polygon extrusion,
+  including concave profiles, multiple polygon holes, skew vectors and either Z direction;
+  frame-based polygon extrusion also accepts arbitrary planes and world-space directions.
+- Restricted box-minus-through-cylinders difference, including off-center and
+  multiple disjoint holes, with contact/overlap/nesting rejection.
+- Simple convex/concave line/arc region extrusion with sharp joins, signed arcs,
+  multiple curved/polygon holes and either winding; exact bounded arcs and
+  rectangular partial-cylinder walls.
+- Simple planar polygon and circular trim containment/separation predicates.
+- Structural/geometry validation, connected manifold shells, analytic volume,
+  exact bounds for supported solids, and face-indexed display tessellation.
+- The same Rust library on native and WASM targets; interactive browser demo.
+
+Analytic [intersection APIs](docs/intersections.md) return typed results and
+parameters for further face splitting. [Planar face clipping](docs/face-intersections.md)
+now returns exact-trim interior intervals and finite intersection segments. Run
+`cargo run --locked --example intersections` for the native JSON fixture; the
+same fixture is exported in WASM. Run `cargo run --locked --example face_clipping`
+for the trim-clipping fixture. [Scoped face subdivision](docs/face-split.md) now splits line/arc faces and
+updates planar neighbors, bounded rims and rectangular cylinder or skew
+circular translation walls. [Oblique plane subdivision](docs/oblique-boundary.md)
+adds exact ellipse section boundaries within its bounded transverse domain.
+[Generator subdivision](docs/skew-face-subdivision.md)
+preserves exact shared skew boundaries. Planar clipping tangencies, vertex cuts, overlapping boundaries and coplanar overlays
+remain explicitly unsupported.
+
+## NURBS curves
+
+The geometry layer also has immutable `NurbsCurve` objects with degrees 1..16,
+nonuniform clamped knots and positive weights. For a rational quadratic circle:
+
+```rust
+use hagane::{NurbsCurve, Point3};
+let curve = NurbsCurve::new(2,
+    vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+    vec![Point3::new(1.0, 0.0, 0.0), Point3::new(1.0, 1.0, 0.0),
+         Point3::new(0.0, 1.0, 0.0)],
+    vec![1.0, std::f64::consts::FRAC_1_SQRT_2, 1.0])?;
+let point = curve.evaluate(0.5)?;
+let tangent = curve.derivative(0.5)?;
+let refined = curve.insert_knot(0.5, 2)?;
+let polyline = refined.tessellate_bounded(0.001, 16_384)?;
+```
+
+`cargo run --locked --example nurbs` emits evaluated points and derivatives.
+`cargo run --locked --example nurbs_refinement` emits an adaptive polyline with
+original parameters and per-segment chord-error bounds.
+The solid demo links to a separate **NURBS curves** page with weight, parameter
+and display-error controls. [Curve documentation](docs/nurbs.md) explains knot-side
+semantics, numerical limits and the actual WASM demo. These curves are now
+used by [rectangular open NURBS B-rep faces](docs/nurbs-face.md); general
+solid integration, intersections and arbitrary trimming remain future work.
+
+## NURBS surfaces
+
+`NurbsSurface::new([degree_u, degree_v], [knots_u, knots_v], [count_u, count_v],
+points, weights)` accepts an immutable U-major rectangular control net.
+`evaluate(u,v)`, `partials(u,v)` and `normal(u,v)` provide checked point,
+analytic derivatives and oriented unit normals. Singular tangent planes fail
+explicitly; C0 knot lines require an explicit side in each parameter direction.
+`insert_knot(axis, parameter, times)` preserves the rational surface,
+`isocurve(axis, parameter)` returns an exact section with the other axis
+parameter, and `boundary_edges()` supplies four oriented curves and same-parameter
+UV maps. [NurbsFace](docs/nurbs-face.md) retains them using existing vertices,
+edges, coedges and faces; cross-face shared edges and sewing remain future work.
+
+Run `cargo run --locked --example nurbs_surface_bounded` for bounded display JSON,
+or `cargo run --locked --example nurbs_face` for an exact quarter-cylinder open
+B-rep. The **Surfaces** page offers height, weight, U/V, normal-marker and surface
+error controls, with four boundary curves and selected sections. Its triangles
+now use per-cell Bernstein bounds on the retained open face. **Insert knots ·
+preserve shape** switches to a genuine 4-by-4, four-span source;
+`cargo run --locked --example nurbs_surface_multispan` runs that fixture natively.
+**C0 ridge · split normals** shows an exact degree-1 rational roof with separate
+left/right analytic normals. `cargo run --locked --example nurbs_surface_crease`
+runs that fixture; mesh metadata separates shading vertices from shared UV geometry nodes. The
+legacy uniform `sample_grid` and `nurbs_surface` fixture remain uncertified.
+These are **open rectangular faces, not closed solids or arbitrary trims**.
+[Surface documentation](docs/nurbs-surface.md) and
+[bounded surface display](docs/nurbs-surface-tessellation.md) explain the input
+contracts, mathematical bounds, numerical guards and limits.
+
+## Explicit limits
+
+The difference API accepts immutable **primitive specifications**, not arbitrary
+`Solid` operands. The box axes are global X/Y/Z; the cylinder axis is global Z.
+Each cutter must strictly overhang both caps by more than the linear tolerance.
+Its circle must stay inside all four sides with clearance greater than that
+tolerance. Multiple bores must also clear each other by more than that tolerance;
+overlapping, nested, tangent or near-tangent bores return `Unsupported`. An empty
+cutter list returns the unchanged box. Tangent, near-tangent, partially penetrating,
+disjoint-from-the-box, side-cutting, or cap-coincident cutters return `Unsupported`. Negative/nonfinite/too-small
+dimensions return `InvalidInput`. No fallback silently substitutes a mesh.
+
+Primitive lengths must exceed **10 × linear tolerance**. Use one consistent
+unit throughout; the demo uses mm. The default tolerance is `1e-8` length units.
+Small parts require a correspondingly smaller explicit tolerance. At very large
+coordinate offsets, IEEE-754 spacing can exceed the tolerance; construction
+then fails validation rather than accepting inconsistent geometry.
+
+Current planar trims support straight-line polygons and disks with disjoint
+polygonal/circular inner wires, or simple line/arc outer and inner wires.
+Cylindrical trims support full periodic and bounded angular rectangles.
+`extrude_polygon` takes a `PolygonProfile` in an XY plane and a vector with
+`abs(direction.z) > 10 × tolerance`. It accepts either winding, but rejects
+self-intersections, redundant/near-collinear corners, repeated closing points,
+nested/touching holes, and extrusion within the profile plane. Limits are
+4,096 total profile corners, 256 polygon holes, or 256 independent cylinder
+cutters. Tube walls must exceed 10 tolerances. Mixed line/arc regions accept
+2..1,024 segments per ring, at most 256 holes and 4,096 total segments. Their
+[supported domain](docs/mixed-profiles.md) includes positive XY extrusion and
+[framed extrusion](docs/framed-arc-extrusion.md) with either sign and exact skew
+translation surfaces. Nested holes and unresolved cusps are rejected. Line intersections
+and solid classification with rectangular skew walls are supported; general
+curved modeling operations remain unsupported. Arbitrary
+curved trims, scale/shear/reflection transforms, and general CSG are not implemented.
+Rigid placement and arbitrary-plane polygon extrusion are documented in
+[frames](docs/frames.md); the restricted Boolean constructor and cylinder/plane
+intersection still require their axis-aligned inputs. Topology is intentionally inspectable; callers who
+mutate it must call `validate` before using geometry results. Validation checks
+the supported trim domains, connectivity, endpoint/pcurve consistency, winding,
+vertex links, and volume. It is not a general self-intersection or shape-repair
+engine for arbitrary imported B-reps.
+
+Tessellation approximates circles with a conservative sagitta bound. The exact
+B-rep and analytic volume remain independent of display tolerance. Segment
+counts are capped at 65,536, with 4,096 total trim samples per mixed planar
+face. Unresolved/intersecting sampled trims and finer requests return
+`Tessellation`; coarse sampling may require a smaller chord error. Mesh vertices
+are split at face boundaries for normals; equal positions still form a closed
+oriented mesh. Broad numerical robustness and industrial tolerancing remain
+ongoing work. [Exact planar predicates and the tolerance policy](docs/tolerances.md)
+now protect orientation/crossing/containment decisions; distance calculations,
+3D predicates and general intersections are not certified exact.
+
+## Validation
+
+```sh
+cargo fmt --all -- --check
+cargo clippy --all-targets --locked -- -D warnings
+cargo test --locked
+./scripts/build-web.sh
+node scripts/test-wasm.mjs
+```
+
+Tests cover analytic dimensions/volumes/bounds, offset holes, shell and mesh
+closure/orientation, sagitta error and volume convergence, contact/near-contact,
+small dimensions, malformed topology, nonfinite inputs, multiple-hole overlap,
+concave/hollow/skew/reversed extrusions, annular tubes, unsupported operations,
+and WASM generation/error recovery with native geometry parity for all twenty-three solid presets. Mixed-profile tests verify exact rounded/capsule volume,
+partial bounds, shared arcs and walls, sharp/concave regions, curved holes,
+either winding, analytic point classification, closed mesh seams, coarse-trim
+rejection, and rejected inputs. Rigid-placement tests check analytic volume, transformed
+geometry/normals, exact tilted bounds, unchanged topology/pcurves, inverse
+round trips, preserved sagitta bounds, and rejected loss of coordinate precision.
+NURBS tests cover analytic quarter circles/lines, independent basis/Bezier
+formulas, nonuniform knots, C0 one-sided limits, weight-scale invariance, range
+errors and 16 native/WASM curve cases. Surface tests add bilinear/rational
+patches, exact quarter-cylinder geometry, partials in both axes, crease-side
+normals, singularities, sampling checks, and six native/WASM grid/derivative
+cases. Browser tests cover solids, curves and surfaces. CI runs formatting, Clippy, native tests,
+WASM build/runtime checks, and browser interactions. Numerical tests also cover
+10,000 independent integer orientation fixtures, 3,399 exact BigInt/WASM
+orientation comparisons, 204 segment cases, and explicit angle/relative policies.
+
+See [design and invariants](docs/design.md), [roadmap](docs/roadmap.md), and
+[references and dependency licenses](docs/references.md).
+
+[Unequal-axis ellipse holes and tilted through bores](docs/tilted-bore.md) now provide
+a certified extension, with an interactive closed-solid preset and cap queries.
+[Supporting-line separation and parallel tilted bores](docs/ellipse-separation.md)
+accept additional disjoint ellipse layouts and provide a two-bore solid demo.
+
+[Independently tilted bores](docs/divergent-tilted-bores.md) use full-height
+analytic separation certificates and provide a nonparallel two-bore web preset.
+
+[Independent bore azimuths](docs/oriented-bores.md) now preserve rotated ellipse
+cap wires and exact cylindrical walls in a further interactive solid preset.
+
+[Flat-bottom blind bores](docs/blind-bore.md) now support restricted exact
+top-entry box differences, independent depths and real retained B-rep floors.
+
+[Six-face blind bores](docs/box-face-blind-bore.md) extend exact blind cuts to
+either end of every box axis, with a side-entry browser preset and explicit
+world-coordinate mouth centers.
+
+## Planar and cylindrical STEP export
+
+[Exact STEP export](docs/step-export.md) preserves lines, full circles, planes,
+rectangular full cylindrical faces, shared oriented topology and explicit mm
+units in one validated AP214 solid. Native/WASM byte parity and browser downloads
+cover through/blind cuts; periodic seam edges carry both parameter curves.
+An optional independent reader verifies cylinders/tubes, rigid placement,
+retained floors, bounds and analytically bounded mesh volumes. General curved
+export and assemblies remain unsupported. Convex planar import is described
+[in the importer documentation](docs/step-import.md).

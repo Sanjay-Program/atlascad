@@ -1,0 +1,5 @@
+{
+  "schema_version": 1,
+  "note": "Registry of document and data migrations for the platform's persistent formats. Empty: no product data format has shipped yet, so there is nothing to migrate. Entries appear here before the migration is implemented, not after.",
+  "migrations": []
+}

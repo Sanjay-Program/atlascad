@@ -1,0 +1,52 @@
+// Sheet metal model, a collision (P3I.2, SM1.5, X6): an L-shaped block converted with the top's
+// two inner edges bent: flat, both walls fold into the notch onto each other, so the feature
+// fails with "Collision in sheet metal flat pattern" (red title and feature, the reason under
+// the fields and as the feature's tooltip) and the block isn't consumed; picking only one of the
+// two edges clears it. The Sheet metal table and flat view panel, opened on the failed model,
+// shows the colliding flat (X6).
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("sketch top poly 0 0 60 0 60 30 30 30 30 60 0 60"),
+        Key("Shift+7"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        Click(xyz(15, 15, 0)),
+        Click(ui("extrude-depth-field")),
+        Key("Ctrl+A"),
+        Type("40"),
+        Key("Enter"),
+        Key("F"),
+        Click(ui("sheet-metal-model")),
+        WaitFor("sheet-metal-model-dialog"),
+        Click(xyz(15, 15, 40)),
+        Click(ui("sm-bends-field")),
+        Click(xyz(45, 30, 40)),
+        Click(xyz(30, 45, 40)),
+        Click(ui("sm-parts-field")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("01-collision"),
+        Click(ui("sheet-metal-model-dialog-accept")),
+        Hover(ui("feature-sheet-metal-model-1")),
+        Wait(40),
+        Screenshot("02-red-feature-tooltip"),
+        // X6: the flat view shows where the collision is (the failed model keeps its context).
+        Click(ui("panel-sheet-metal")),
+        WaitFor("smt-panel"),
+        MoveTo(700, 900),
+        Wait(3),
+        Screenshot("02b-flat-view-collision"),
+        Click(ui("panel-sheet-metal")),
+        Wait(10),
+        DoubleClick(ui("feature-sheet-metal-model-1")),
+        WaitFor("sheet-metal-model-dialog"),
+        Click(ui("sm-bends-field")),
+        Click(xyz(30, 45, 40)),
+        Click(ui("sm-parts-field")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-one-edge-no-collision"),
+    ],
+)

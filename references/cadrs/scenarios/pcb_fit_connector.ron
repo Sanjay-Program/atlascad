@@ -1,0 +1,129 @@
+// docs/PCB_IN_PART_STUDIO.md P4: fitting the mains-sensor board into its enclosure while its
+// layout is edited in the Part Studio. The board derived onto Board location (`board derive`),
+// the tube, end plate and plug see-through. Board coordinates: its outline centre (15.5, 19.5)
+// is on (0, 0, 12), so a layout point (x, y) is at (x − 15.5, y − 19.5) in the Part Studio.
+// 01 Edit layout: the parts around within the components' heights outlined in cyan on the board
+//    (the tube's walls, the end plate's opening, the plug), the three pins' axes marked;
+//    the bar's Parts around and Snap on.
+// 02 J4 (Live in, at (−1.5, −16)) dragged toward the Live pin (0, 8): within reach its pad
+//    snaps onto the pin's axis (the orange mark), off the 0.5 mm grid; its model (a ghost)
+//    there; the room to what is around it along ±x and ±y in orange, with values.
+// 03 let go: J4 on the pin exactly (layout (15.5, 27.5)).
+// 04 Align on: the prompt "pick a face, edge or pin of a component".
+// 05 seen square to the board (N): J5's wire end picked (a flat end: its middle); the prompt
+//    asks for the target.
+// 06 the Neutral pin's axis mark picked: J5 moves onto it exactly (layout (15.5, 11.5)), one
+//    undo step "Align J5".
+// 07 Keep-outs: keep-out areas on the layout where the parts around stand over the board.
+// 08 C1 moved 8 mm toward the tube's wall by Move by: its room that way 9.00 mm (was 17).
+// 09 then 0.5 mm from the tube's far wall: Move by 21.875 along y (its room that way 22.375),
+//    grabbed again: its room that way 0.50 mm.
+// 10 Done; Derived 1's warning: PS1 HLK-PM01 runs into the end plate, the plug and the pins (by
+//    their names in the Parts list).
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("board setup"),
+        Wait(10),
+        Custom("board derive"),
+        Wait(10),
+        Custom("board transparent Tube, End plate, Plug"),
+        Custom("view -40 55 0 0 12 0.06"),
+        Wait(30),
+        RightClick(ui("feature-derived-1")),
+        WaitFor("feature-context-menu"),
+        Click(ui("feature-board-edit")),
+        WaitFor("board-edit-bar"),
+        MoveTo(1420, 780),
+        Wait(10),
+        Screenshot("01-parts-around"),
+        Press(xyz(-1.5, -16, 13.6)),
+        Hover(xyz(-1, -4, 13.6)),
+        Hover(xyz(0.4, 7.6, 13.6)),
+        Wait(5),
+        Screenshot("02-snapped"),
+        // On the pin (r 1.5 shadow at (0, 8)) inside the 40 × 40 tube: 18.5 either side, 10.5
+        // up to the wall, 26.5 down to it.
+        ExpectText("board-gap-px", "18.50 mm"),
+        ExpectText("board-gap-nx", "18.50 mm"),
+        ExpectText("board-gap-py", "10.50 mm"),
+        ExpectText("board-gap-ny", "26.50 mm"),
+        Release,
+        Wait(20),
+        MoveTo(1420, 780),
+        Wait(10),
+        Screenshot("03-on-the-pin"),
+        Custom("board check J4"),
+        ExpectText("board-check", "J4 at 15.50, 27.50 top"),
+        Click(ui("board-fit-align")),
+        WaitFor("board-fit-status"),
+        MoveTo(1420, 780),
+        Wait(3),
+        Screenshot("04-align"),
+        Key("N"),
+        Wait(30),
+        Click(xyz(-10.5, -16, 17.6)),
+        Wait(3),
+        Screenshot("05-align-from"),
+        Click(xyz(0, -8, 13.62)),
+        Wait(20),
+        MoveTo(1420, 780),
+        Wait(5),
+        Screenshot("06-aligned"),
+        Custom("board check J5"),
+        ExpectText("board-check", "J5 at 15.50, 11.50 top"),
+        Click(ui("board-fit-keepouts")),
+        Wait(20),
+        Screenshot("07-keepouts"),
+        // C1 moved 8 mm toward the tube's wall: picked from above (over PS1 on the bottom),
+        // Move by −8 along x (its room that way was 17), then grabbed with Snap off to read the
+        // room: 9.00 mm.
+        Click(xyz(-2.0, -3.0, 13.6)),
+        Key("Shift+M"),
+        WaitFor("eda-moveby-dialog"),
+        Click(ui("eda-moveby-x")),
+        Key("Ctrl+A"),
+        Type("-8"),
+        Click(ui("eda-moveby-ok")),
+        Wait(20),
+        Custom("board check C1"),
+        ExpectText("board-check", "C1 at 5.50, 16.50 top"),
+        Click(ui("board-fit-snap")),
+        Press(xyz(-10.0, -3.0, 13.6)),
+        Hover(xyz(-10.0, -2.9, 13.6)),
+        Hover(xyz(-10.0, -3.0, 13.6)),
+        Wait(5),
+        Screenshot("08-fitted"),
+        ExpectText("board-gap-nx", "9.00 mm"),
+        ExpectText("board-gap-py", "22.38 mm"),
+        Release,
+        Wait(10),
+        // Then 0.5 mm from the tube's far wall: Move by 21.875 along y (its room that way was
+        // 22.375), grabbed again to read it: 0.50 mm (its edge on the board's, which is 0.5 mm
+        // from the wall).
+        Key("Shift+M"),
+        WaitFor("eda-moveby-dialog"),
+        Click(ui("eda-moveby-y")),
+        Key("Ctrl+A"),
+        Type("21.875"),
+        Click(ui("eda-moveby-ok")),
+        Wait(20),
+        Custom("board check C1"),
+        ExpectText("board-check", "C1 at 5.50, 38.3"),
+        Press(xyz(-10.0, 18.88, 13.6)),
+        Hover(xyz(-10.0, 18.78, 13.6)),
+        Hover(xyz(-10.0, 18.88, 13.6)),
+        Wait(5),
+        Screenshot("09-half-a-millimetre"),
+        ExpectText("board-gap-py", "0.50 mm"),
+        Release,
+        Wait(10),
+        Click(ui("board-edit-done")),
+        Wait(10),
+        Hover(ui("feature-derived-1")),
+        Wait(40),
+        Screenshot("10-warning"),
+        ExpectText("tooltip", "PS1 HLK-PM01 runs into End plate"),
+    ],
+)

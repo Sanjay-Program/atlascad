@@ -1,0 +1,38 @@
+// docs/PCB_IN_PART_STUDIO.md: grab to edit. The mains-sensor enclosure's board derived and
+// shown as its layout (no Edit layout first): J4 (layout (14, 3.5), at (−1.5, −16, 13.6)) pressed
+// and dragged to the Live pin (0, 8) moves it, the edit started by the press.
+// 01 the board as its layout; 02 J4 dragging (the edit bar up); 03 dropped: J4 at (15.5, 27.5);
+// 04 a press on the board away from its copper starts nothing (the bar stays down after Done).
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("board setup"),
+        Wait(10),
+        Custom("board derive"),
+        Wait(10),
+        Custom("board layout"),
+        Custom("board transparent Tube, End plate, Plug"),
+        Custom("view -40 55 0 0 12 0.06"),
+        Wait(30),
+        MoveTo(1420, 780),
+        Screenshot("01-layout"),
+        Press(xyz(-1.5, -16, 13.6)),
+        Hover(xyz(-1, -4, 13.6)),
+        Hover(xyz(0, 8, 13.6)),
+        Wait(5),
+        Screenshot("02-dragging"),
+        Release,
+        Wait(20),
+        MoveTo(1420, 780),
+        Wait(10),
+        Screenshot("03-dropped"),
+        Custom("board check J4"),
+        ExpectText("board-check", "J4 at 15.50, 27.50 top"),
+        Custom("board done"),
+        Wait(5),
+        ClickAt(1300, 300),
+        Wait(5),
+        Screenshot("04-empty-press"),
+    ],
+)

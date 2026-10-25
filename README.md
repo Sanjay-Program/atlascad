@@ -1,0 +1,128 @@
+# AtlasCAD
+
+AtlasCAD is a Rust CAD engineering workspace. It brings together a small, headless platform layer, a Truck-backed geometry adapter, engineering and agent APIs, and separately maintained CAD applications and kernel projects used for integration work and comparison.
+
+The root Rust workspace is the actively developed integration surface. The application and reference directories retain their own project layouts and licenses. Their presence here does not mean that every feature in those projects is integrated into the root platform.
+
+## What is here
+
+| Path | Purpose |
+| --- | --- |
+| `crates/cad-contract` | Shared units, IDs, tolerances, capabilities, errors, mesh and document-header types, and the kernel trait. |
+| `crates/cad-kernel-truck` | Adapter implementing the shared kernel contract with Truck geometry crates. |
+| `crates/cad-document` | Document and revision primitives. |
+| `crates/cad-cli` | Headless command-line client for exercising the document and geometry path and exporting STL. |
+| `crates/cad-io` | Validated binary STL reading and writing shared by the CLI and the application. |
+| `crates/cad-studio` | Atlas Studio: the local-first CAD application, its HTTP API, and its browser workspace (WebGL viewport, feature tree, parameters, command palette). |
+| `crates/cad-agent-api`, `cad-agent-runtime`, `cad-agent-geometry` | Agent contracts, permission-aware runtime, and a geometry agent. |
+| `crates/cad-engineering` | Repository inventory, validation, scan, task, and report tooling. |
+| `crates/cad-entitlements` | Entitlement primitives. |
+| `apps/cadcraft` | CADCraft 2D drafting application source checkout. |
+| `apps/solidcraft` | SolidCraft 3D parametric CAD application source checkout, including the patched Truck crates used by the root workspace. |
+| `kernels/` | Geometry kernel source checkouts used for evaluation and comparison. |
+| `references/` | Additional CAD and visualization source checkouts used as references. |
+| `docs/` | Architecture decisions, integration and license audits, research, measured baselines, and roadmap. |
+| `engineering/` | Machine-readable project inventory, task registry, quality evidence, and generated reports. |
+
+The root workspace excludes `apps`, `kernels`, and `references` from Cargo workspace discovery. Those projects have independent manifests and dependency graphs.
+
+The source checkouts were consolidated into this repository as a snapshot. Their original Git metadata is not included; the upstream URLs and exact source revisions used for this import are recorded in [`docs/integration/source-snapshot.md`](docs/integration/source-snapshot.md). Their in-tree license and attribution files remain with the source.
+
+The project owner reports that development began about a year before the work was first placed under Git. Git history starts with the consolidated import commit dated 2026-10-24, so it records when this snapshot entered Git, not the day-by-day development timeline. No dated intermediate snapshots were available to represent that earlier work as separate commits.
+
+## Current platform status
+
+The root platform has a versioned shared contract, a Truck adapter, a headless consumer, an engineering control plane, a small agent platform, and a working local CAD application. The root-workspace test gate passes 227 tests across eleven packages on the recorded machine; startup, request latency, and export timings are in [`docs/performance-baseline.md`](docs/performance-baseline.md).
+
+Stage A of the CAD roadmap is **partially implemented**. `cad-studio` supports rectangle, circle, and regular-polygon sketches; a single extrusion feature; parameter editing with dependency-aware re-evaluation; undo/redo; save, reopen, and binary STL export. It does **not** yet provide sketch constraints, multiple features, booleans, revolve, assemblies, drawings, STL import, or native neutral-format (STEP/IGES/DXF) interchange. Those remain planned work in [`docs/roadmap.md`](docs/roadmap.md).
+
+The CADCraft and SolidCraft desktop applications are not wired to the shared contract. The root adapter advertises only the capabilities its tests exercise. Known kernel limitations and measured behavior are documented in `docs/kernel-comparison.md` and `docs/performance-baseline.md`.
+
+## Requirements
+
+- Rust toolchain compatible with the workspace `rust-version` and edition in `Cargo.toml` (the recorded baseline used Rust 1.94).
+- A working C/C++ build toolchain may be needed by native dependencies.
+- Disk space for Cargo dependencies and build artifacts. Build output is written under `target/` and is ignored by Git.
+
+## Build and verify
+
+Run these from the repository root:
+
+```sh
+cargo fmt --all --check
+cargo clippy --offline --workspace --all-targets -j 2 -- -D warnings
+cargo test --offline --workspace -j 2
+cargo build --offline --workspace --all-targets -j 2
+```
+
+The offline commands require dependencies to have been fetched already. For a first build with network access, omit `--offline` or run `cargo fetch` first. The application workspaces are substantially larger than the root platform; their own build guidance is in each application's README and in `docs/build-and-test.md`.
+
+### CLI examples
+
+```sh
+cargo run -p cad-cli -- box --size 10,10,5 --out box.stl --header box.json
+cargo run -p cad-cli -- union --a 10,10,10 --b 4,4,10 --offset 8,8,0 --out union.stl
+```
+
+See `cargo run -p cad-cli -- --help` for the current command syntax. STL files and JSON headers produced by these examples are written to the current directory.
+
+### Atlas Studio (local CAD application)
+
+```sh
+cargo run -p cad-studio -- --new model.zcad
+# Open http://127.0.0.1:7519
+
+cargo run -p cad-studio -- --file model.zcad --port 7600
+```
+
+The server binds `127.0.0.1` only, rejects foreign `Host` and `Origin` headers, caps request bodies at 1 MiB, and makes no network calls or telemetry requests. Projects are plain JSON in the versioned `.zcad` format; binary STL export uses `cad-io` and is validated before it is written. Sketch profiles are millimetres and extrusion is limited to 0.1–10,000 mm.
+
+| Shortcut | Action |
+| --- | --- |
+| `Ctrl/Cmd+S` | Save |
+| `Ctrl/Cmd+Z` / `Shift+Ctrl/Cmd+Z` | Undo / redo |
+| `Ctrl/Cmd+K` | Command palette |
+| `F` | Frame model |
+| `E` | Focus the extrusion height |
+| `1` / `2` / `3` | Rectangle / circle / polygon sketch |
+| `G` | Toggle the grid |
+| `T` | Toggle theme |
+| `?` | Shortcut help |
+
+Mouse: drag to orbit, wheel to zoom, right-drag to pan, click a solid face to select and measure it.
+
+### Engineering tools
+
+```sh
+cargo run -p cad-engineering --bin atlas-eng -- validate
+cargo run -p cad-engineering --bin atlas-eng -- scan --write
+cargo run -p cad-engineering --bin atlas-eng -- report
+cargo run -p cad-engineering --bin atlas-eng -- tasks
+```
+
+Read `docs/engineering-control-plane.md` before editing the curated manifests or generated state. The scanner is designed to observe the workspace; it must not rewrite the curated manifest.
+
+## Design and project records
+
+- [`docs/architecture.md`](docs/architecture.md) describes the current architecture and integration boundaries.
+- [`docs/architecture-decisions/`](docs/architecture-decisions/) records decisions and their rationale.
+- [`docs/roadmap.md`](docs/roadmap.md) tracks proposed milestones and open decision gates.
+- [`docs/repository-audit.md`](docs/repository-audit.md) and [`docs/integration/repository-catalog.md`](docs/integration/repository-catalog.md) describe the inspected source checkouts.
+- [`docs/license-inventory.md`](docs/license-inventory.md) and [`docs/integration/license-audit.md`](docs/integration/license-audit.md) record license findings and constraints.
+- [`docs/build-and-test.md`](docs/build-and-test.md), [`docs/quality/`](docs/quality/), and `engineering/quality/` contain dated build, test, and benchmark evidence.
+- [`docs/research/`](docs/research/) contains the local competitor, feature, and user-needs research.
+- [`docs/business/commercial-readiness.md`](docs/business/commercial-readiness.md) records the market position, pricing hypothesis, and staged sellable-release plan; [`docs/business/packaging-and-deployment.md`](docs/business/packaging-and-deployment.md) records the measured SolidCraft build spike, the verified reference-part/STEP evidence, the packaging and signing blockers, and the ordered deployable gate. Neither is legal or financial advice.
+
+Research and measurement claims are scoped to the cited local records and their dates. A recorded result is not a guarantee for another machine or a later revision.
+
+## Source and licensing
+
+The root platform crates and AtlasCAD-authored project documentation are licensed for personal, non-commercial use under [`LICENSE`](LICENSE). Commercial use is available only under a separate written agreement; see [`COMMERCIAL-LICENSE.md`](COMMERCIAL-LICENSE.md). This license does not apply to the imported application, kernel, and reference directories; those retain their own licenses and notices. **Do not treat this whole tree as covered by one license.** Check the license file and notices in each component before copying, redistributing, or combining its code. Commercial use of the AtlasCAD original materials requires prior written permission from the rights holder.
+
+`OpenCADStudio-main.zip` is intentionally excluded. Its GPL-3.0 source archive is not part of this workspace's code. The archive must not be unpacked into, or copied into, this repository without a deliberate licensing decision.
+
+## Contributing
+
+Keep changes scoped to the project that owns the code. Preserve existing attribution, license files, and upstream notices in the application and reference checkouts. Record new measurements with the exact command, environment, and date; distinguish measured results from plans and unverified upstream claims. Do not add generated build output, credentials, or fabricated history to commits.
+
+Before proposing an integration change, run the relevant root-workspace checks and update the architecture, license, or quality records when the change affects them. The root workspace favors safe Rust, bounded geometry inputs, explicit kernel capabilities, and errors over silent fallback behavior.

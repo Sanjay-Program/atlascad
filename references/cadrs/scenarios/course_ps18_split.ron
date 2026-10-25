@@ -1,0 +1,59 @@
+// P3.7 / PS18.5: split a part temporarily, shell one piece, join them again. A 100 × 60 × 40
+// block; Plane 1 offset 20 from Top (halfway up). (The pieces' volumes are asserted in the
+// kernel's `split_by_plane_and_face` conformance case.)
+// 01 the Split dialog: Parts or surfaces to split "Part 1", Entity to split with "Plane 1":
+//    two parts in the Parts list.
+// 02 Shell only the upper piece, its top face removed, 3 mm: the lower piece stays solid.
+// 03 Boolean Union of the two pieces: one part again, a box with an open cavity in its upper
+//    half.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("sketch top rect 0 0 100 60"),
+        Key("Shift+7"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        Click(xyz(50, 30, 0)),
+        Click(ui("extrude-depth-field")),
+        Key("Ctrl+A"),
+        Type("40"),
+        Key("Enter"),
+        Click(ui("plane")),
+        WaitFor("plane-dialog"),
+        Click(ui("feature-top")),
+        Click(ui("plane-offset-field")),
+        Key("Ctrl+A"),
+        Type("20"),
+        Key("Enter"),
+        Key("F"),
+        Click(ui("split")),
+        WaitFor("split-dialog"),
+        Click(xyz(50, 30, 40)),
+        Click(ui("split-tool-field")),
+        Click(ui("feature-plane-1")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("01-split-by-plane-1"),
+        Click(ui("split-dialog-accept")),
+        Click(ui("shell")),
+        WaitFor("shell-dialog"),
+        Click(xyz(50, 30, 40)),
+        Click(ui("shell-thickness-field")),
+        Key("Ctrl+A"),
+        Type("3"),
+        Key("Tab"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("02-shell-upper-piece"),
+        Click(ui("shell-dialog-accept")),
+        Click(ui("part-row-part-1")),
+        Click(ui("part-row-part-2")),
+        Click(ui("boolean")),
+        WaitFor("boolean-dialog"),
+        Key("Enter"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-union-one-part"),
+    ],
+)

@@ -1,0 +1,34 @@
+/target
+*/target
+Cargo.lock
+# proptest failure seeds are NOT ignored: they are findings, not noise.
+# proptest writes them so "everyone who runs the test benefits from these
+# saved cases", and ignoring them means a real counterexample stays on one
+# machine, where it looks like flakiness to everyone else. That is exactly
+# what happened with nurbscurve concat_positive_test. monstertruck-private
+# tracks them already; this aligns.
+
+.bin/
+pkg/
+dist/
+wasm-pack.log
+node_modules/
+
+*.step
+*.stp
+*.vtp
+*.vtu
+*.obj
+*.json
+*.png
+*.jpg
+*.stl
+
+/.vscode
+/.DS_store
+
+# Sketch crate is deferred upstream-sync work; agents stage it here but
+# it does not ship in `monstertruck` releases yet. Keep it untracked so
+# wildcard `git add monstertruck-*/Cargo.toml` invocations don't sweep
+# its manifest in by accident.
+/monstertruck-sketch

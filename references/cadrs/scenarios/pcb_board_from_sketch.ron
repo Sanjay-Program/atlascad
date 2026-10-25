@@ -1,0 +1,83 @@
+// docs/PCB_IN_PART_STUDIO.md P5: a board's outline from a Part Studio sketch. The mains-sensor
+// enclosure (`board setup`) with "Board outline" (`board outline-sketch`): a sketch on "Board
+// plane", 4 mm above Top inside the tube, the tube's four inner edges used (Use) and offset 1 mm
+// in (Offset): a 38 × 38 square from (−19, −19), with a ⌀3.2 mounting hole at (−15, 15).
+// 01 the sketch's menu: Create PCB board….
+// 02 its dialog: the name, PCB Studio 1 (or a new one), 1.6 mm, bottom face on the sketch.
+// 03 Create: "Sensor board" in PCB Studio 1 and "Derived 1" in the Part Studio, the board on the
+//    sketch's plane (4 mm up), its origin on the sketch's, the hole through it: 38 × 38 × 1.6.
+// 04 the tube's right inner wall moved in to x 10 (`board outline-narrow`): the used edges, their
+//    offset and the board follow at once, 28 × 38.
+// 05 PCB Studio 1's Layout of the new board: the outline as the sketch has it; its Boards row
+//    has a link glyph.
+// 06 the outline tool there: a note that the outline follows Board outline in Enclosure (what
+//    is drawn now is a cut-out).
+// 07 back in the Part Studio, Derived 1's menu: Break outline link.
+// 08 Break outline link: the board keeps its outline (now the layout's to edit); the menu
+//    offers Link outline to a sketch again.
+// (`board size` puts the derived board's size where `ExpectText` reads it.)
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("board setup"),
+        Wait(10),
+        Custom("board outline-sketch"),
+        Custom("board transparent Tube, End plate, Plug"),
+        Custom("view -40 40 0 0 5 0.08"),
+        Wait(30),
+        RightClick(ui("feature-board-outline")),
+        WaitFor("feature-context-menu"),
+        Hover(ui("feature-create-board")),
+        Wait(10),
+        Screenshot("01-menu"),
+        Click(ui("feature-create-board")),
+        WaitFor("board-create-dialog"),
+        Click(ui("board-create-name")),
+        Key("Ctrl+A"),
+        Type("Sensor board"),
+        Wait(5),
+        Screenshot("02-dialog"),
+        Click(ui("board-create-ok")),
+        Wait(20),
+        MoveTo(1420, 780),
+        Wait(10),
+        Screenshot("03-created"),
+        Custom("board size"),
+        ExpectText("board-check", "board 38.00 × 38.00 × 1.60"),
+        Custom("board outline-narrow"),
+        Wait(20),
+        Screenshot("04-follows"),
+        Custom("board size"),
+        ExpectText("board-check", "board 28.00 × 38.00 × 1.60"),
+        Click(ui("tab-pcb-studio-1")),
+        WaitFor("pcb-tree"),
+        Click(ui("pcb-board-sensor-board")),
+        Wait(10),
+        Click(ui("eda-mode-layout")),
+        WaitFor("eda-layout-tools"),
+        Key("F"),
+        Wait(10),
+        WaitFor("pcb-board-sensor-board-link"),
+        Screenshot("05-layout"),
+        Click(ui("pcb-outline")),
+        Wait(5),
+        Screenshot("06-outline-note"),
+        Key("Escape"),
+        Click(ui("tab-enclosure")),
+        Wait(10),
+        RightClick(ui("feature-derived-1")),
+        WaitFor("feature-context-menu"),
+        Hover(ui("feature-board-unlink")),
+        Wait(10),
+        Screenshot("07-unlink-menu"),
+        Click(ui("feature-board-unlink")),
+        Wait(10),
+        RightClick(ui("feature-derived-1")),
+        WaitFor("feature-context-menu"),
+        Hover(ui("feature-board-link")),
+        Wait(10),
+        Screenshot("08-unlinked"),
+        Key("Escape"),
+    ],
+)

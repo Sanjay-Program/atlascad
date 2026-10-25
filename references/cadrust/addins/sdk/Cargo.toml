@@ -1,0 +1,10 @@
+[package]
+name = "cadrust-addin-sdk"
+description = "Tiny SDK for writing cadrust add-ins in Rust: memory ABI exports and a request/response helper"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde_json = "1"

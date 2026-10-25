@@ -1,0 +1,41 @@
+// The box select's rectangle (cadrs_ui::selection_box) in the PCB Studio's schematic, as the
+// sketch, the assembly and the Part Studio (`box_select_part_studio`) draw it: left to right a
+// window (a blue box: what is wholly inside), right to left a crossing (a dashed yellow box:
+// whatever it touches).
+// 01 the schematic (GS7: BT1, R1, D1 wired), a box dragged left to right over all but GND: blue,
+//    what it will select already highlighted.
+// 02 let go: what was wholly inside selected, the box gone.
+// 03 a box dragged right to left over R1 and the right wire: dashed yellow, they highlighted.
+// 04 let go: R1 and the wires it touched selected.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("pcb-studio"),
+        WaitFor("pcb-tree"),
+        Custom("eda-example gs07"),
+        WaitFor("eda-mode-bar"),
+        Click(ui("eda-mode-schematic")),
+        WaitFor("sch-erc"),
+        Custom("eda-zoom 70 60 260 145"),
+        Press(flat(85, 135)),
+        Hover(flat(150, 110)),
+        Hover(flat(225, 85)),
+        Wait(3),
+        Screenshot("01-schematic-window"),
+        WaitFor("sch-box-select"),
+        Release,
+        Wait(3),
+        MoveTo(1100, 900),
+        Screenshot("02-schematic-window-selected"),
+        Press(flat(235, 135)),
+        Hover(flat(215, 110)),
+        Hover(flat(198, 98)),
+        Wait(3),
+        Screenshot("03-schematic-crossing"),
+        Release,
+        Wait(3),
+        MoveTo(1100, 900),
+        Screenshot("04-schematic-crossing-selected"),
+    ],
+)

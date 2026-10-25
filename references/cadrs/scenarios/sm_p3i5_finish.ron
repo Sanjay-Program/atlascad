@@ -1,0 +1,57 @@
+// Finish sheet metal model (P3I.5, SM10, exercise E4): a bent plate; Finish sheet metal model 1 with
+// the part picked, the dialog warning that later features act on it as an ordinary solid and don't
+// show in the flat; accepted; then an R10 Fillet of a corner edge, an ordinary fillet of the solid
+// (not a corner break: the flat and table stay as they were; tested in
+// `cadrs_core/tests/sheetmetal_tools.rs`).
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("sketch top rect 0 0 100 60"),
+        Key("Shift+7"),
+        Click(ui("sheet-metal-model")),
+        WaitFor("sheet-metal-model-dialog"),
+        Click(ui("sheet-metal-model-operation-2")),
+        Click(xyz(50, 30, 0)),
+        Click(ui("sm-thickness-field")),
+        Key("Ctrl+A"),
+        Type("2"),
+        Key("Tab"),
+        Click(ui("sheet-metal-model-dialog-accept")),
+        Custom("sketch top chain 80 -15 80 75"),
+        Click(ui("sheet-metal-model-caret")),
+        Click(ui("sheet-metal-menu-bend")),
+        WaitFor("sheet-metal-bend-dialog"),
+        Click(xyz(80, 70, 0)),
+        Click(ui("sm-bend-alignment")),
+        Click(ui("sm-bend-alignment-option-3")),
+        Click(ui("sheet-metal-bend-dialog-accept")),
+        Click(ui("sheet-metal-model-caret")),
+        Click(ui("sheet-metal-menu-finish")),
+        WaitFor("sheet-metal-finish-dialog"),
+        Click(xyz(40, 30, 0)),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("01-finish-dialog-warning"),
+        Click(ui("sheet-metal-finish-dialog-accept")),
+        // Turned round to face the plate's (0, 60) corner, so its edge through the thickness (both
+        // its faces in view) takes the click.
+        Custom("view 210 30 5 55 0 0.04"),
+        Key("Shift+F"),
+        WaitFor("fillet-dialog"),
+        // A corner edge away from the origin (its glyph would take a click at (0, 0)).
+        Click(xyz(0, 60, 1)),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("02-fillet-edge-picked"),
+        Click(ui("fillet-size-field")),
+        Key("Ctrl+A"),
+        Type("10"),
+        Key("Tab"),
+        Click(ui("fillet-dialog-accept")),
+        Custom("view 210 30 40 40 0 0.11"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-fillet-after-finish"),
+    ],
+)

@@ -1,0 +1,53 @@
+// T2 / S13.7: "Driven (reference) dimensions show grey; driving ones show black. ... The
+// right-click menu toggles driving/driven." A 50 × 30 rectangle from its quick dimensions (both
+// driving, black). Right-click the 50 → "Change to driven dimension": it turns grey and no
+// longer holds the width; dragging the right edge changes the width and the grey value follows
+// (to about 72). Right-click it → "Change to driving dimension": black again, driving from the measured
+// value.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Click(ui("sketch")),
+        WaitFor("sketch-dialog"),
+        Click(ui("feature-top")),
+        Key("N"),
+        Key("G"),
+        ClickWorld(0.3, 0.3),
+        ClickWorld(47, 28),
+        Type("50"),
+        Key("Enter"),
+        Type("30"),
+        Key("Enter"),
+        Key("Escape"),
+        MoveTo(1400, 850),
+        Wait(3),
+        Screenshot("01-driving-dimensions"),
+        RightClick(world(25, -8.1)),
+        WaitFor("sketch-dimension-menu"),
+        Hover(ui("dimension-make-driven")),
+        Wait(3),
+        Screenshot("02-menu-change-to-driven"),
+        Click(ui("dimension-make-driven")),
+        MoveTo(1400, 850),
+        Wait(3),
+        Screenshot("03-driven-grey"),
+        Press(world(50, 15)),
+        Hover(world(60, 15)),
+        Hover(world(72, 15)),
+        Release,
+        Wait(3),
+        MoveTo(1400, 850),
+        Wait(3),
+        Screenshot("04-dragged-width-driven-follows"),
+        RightClick(world(36, -8.1)),
+        WaitFor("sketch-dimension-menu"),
+        Hover(ui("dimension-make-driving")),
+        Wait(3),
+        Screenshot("05-menu-change-to-driving"),
+        Click(ui("dimension-make-driving")),
+        MoveTo(1400, 850),
+        Wait(3),
+        Screenshot("06-driving-black-again"),
+    ],
+)

@@ -1,0 +1,71 @@
+// T5 / S20: Use (U). "Use projects edges, faces, silhouettes or other sketch entities into the
+// active sketch with a link to the source. The link is a constraint that can be deleted."
+// (`reference/onshape/t5/useexample1.png`: the hovered edge highlights and its projection is
+// previewed; the result is a black line.) A 50 × 30 box, 25 high (Part 1); a sketch on its top
+// face, looked at straight on. With U, hovering the top edge highlights it; clicking projects it:
+// a black (fixed) line with a light-blue link glyph.
+// Selecting the link glyph and pressing Delete removes the link: the line is ordinary (blue)
+// geometry again and can be dragged away. Hovering the face highlights all its edges; clicking
+// projects all four.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Click(ui("sketch")),
+        WaitFor("sketch-dialog"),
+        ClickAt(560, 575),
+        Key("N"),
+        Key("G"),
+        ClickWorld(0.45, 0.3),
+        MoveWorld(49.12, 33.17),
+        Wait(2),
+        ClickWorld(49.12, 33.17),
+        Type("50"),
+        Key("Enter"),
+        Type("30"),
+        Key("Enter"),
+        Key("Escape"),
+        Click(ui("sketch-dialog-accept")),
+        Key("Shift+7"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        ClickWorld(25, 15),
+        Key("Enter"),
+        Click(ui("sketch")),
+        WaitFor("sketch-dialog"),
+        Click(xyz(25, 15, 25)),
+        Key("N"),
+        MoveTo(1400, 850),
+        Wait(3),
+        Screenshot("01-sketch-on-the-top-face"),
+        Key("U"),
+        MoveWorld(25, 30),
+        Wait(3),
+        Screenshot("02-use-hover-edge-preview"),
+        ClickWorld(25, 30),
+        MoveTo(1400, 850),
+        Wait(3),
+        Screenshot("03-edge-projected-link-glyph"),
+        // S20.2: the link is a constraint: select its glyph, Delete.
+        Key("Escape"),
+        Click(at(1000, 435)),
+        Screenshot("04-link-glyph-selected"),
+        Key("Delete"),
+        MoveTo(1400, 850),
+        Wait(3),
+        Screenshot("05-link-deleted-free-line"),
+        Drag(world(25, 30), world(25, 40)),
+        MoveTo(1400, 850),
+        Wait(3),
+        Screenshot("06-free-line-dragged-away"),
+        Key("U"),
+        MoveWorld(25, 12),
+        Wait(3),
+        Screenshot("07-use-hover-face-all-edges"),
+        ClickWorld(25, 12),
+        MoveTo(1400, 850),
+        Wait(3),
+        Screenshot("08-face-projected"),
+        Key("Escape"),
+    ],
+)

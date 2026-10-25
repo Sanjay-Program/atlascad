@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "scans": [
+    {
+      "tool": "cargo-audit",
+      "outcome": "not_run",
+      "recorded_at": "2026-10-22",
+      "notes": "Not installed on this host; no advisory scan has been performed. Installing global tooling was outside this cycle's scope."
+    },
+    {
+      "tool": "cargo-deny",
+      "outcome": "not_run",
+      "recorded_at": "2026-10-22",
+      "notes": "Not installed. SolidCraft has a deny.toml; CADCraft does not."
+    },
+    {
+      "tool": "cargo-license",
+      "outcome": "not_run",
+      "recorded_at": "2026-10-22",
+      "notes": "Not installed. The licence inventory was produced from cargo metadata instead."
+    }
+  ],
+  "findings": [
+    {
+      "id": "S-1",
+      "title": "No advisory or dependency-policy scan is running",
+      "severity": "high",
+      "status": "blocked",
+      "evidence": [
+        "docs/security-review.md S-1",
+        "engineering/quality/security.json (scans not_run)"
+      ],
+      "action": "task.advisory.scan"
+    },
+    {
+      "id": "S-2",
+      "title": "LGPL OpenCASCADE is one cargo add away from the shipping binary",
+      "severity": "high",
+      "status": "needs_review",
+      "evidence": [
+        "docs/license-inventory.md section 4",
+        "engineering/manifest/dependencies.json (critical edges)"
+      ],
+      "action": "task.decision.occt-licence"
+    },
+    {
+      "id": "S-3",
+      "title": "Untrusted CAD files lack import budgets in SolidCraft IO",
+      "severity": "high",
+      "status": "proposed",
+      "evidence": [
+        "docs/security-review.md S-3",
+        "docs/security-review.md S-3: the adapter half (cancellation and deadlines) is closed by ADR-0006; the import budgets in SolidCraft IO are still open"
+      ],
+      "action": "task.io.import-budgets"
+    },
+    {
+      "id": "S-4",
+      "title": "MCP loopback control port and agent surface are unaudited",
+      "severity": "medium",
+      "status": "proposed",
+      "evidence": [
+        "docs/security-review.md S-4"
+      ],
+      "action": "task.mcp.loopback-audit"
+    },
+    {
+      "id": "S-5",
+      "title": "Vendored dependency and patched truck provenance needs release controls",
+      "severity": "medium",
+      "status": "proposed",
+      "evidence": [
+        "craft-libs licence now recorded: MIT OR Apache-2.0; both pinned revisions vendored into apps/cadcraft/vendor/ with PROVENANCE.md and sha256 manifests (no GitHub needed for release builds).",
+        "SolidCraft still vendors four patched truck crates plus two UI crates with [patch.crates-io]; the fork must be tracked deliberately.",
+        "The workspace still depends on apps/solidcraft/vendor/* by path; documented coupling that must not become a release packaging path without vendoring at a pinned revision."
+      ],
+      "action": "Vendor the patched SolidCraft truck crates at pinned revisions for release builds, and keep the craft-libs vendored copies pinned; revisit S-5 fully once both forks are pinned in-tree."
+    },
+    {
+      "id": "S-6",
+      "title": "Secret handling for future SaaS and AI features is convention, not a check",
+      "severity": "medium",
+      "status": "proposed",
+      "evidence": [
+        "docs/security-review.md S-6"
+      ],
+      "action": "Add a packaging check that greps build artifacts for key-like patterns before release."
+    },
+    {
+      "id": "S-7",
+      "title": "No structured log policy for project content",
+      "severity": "low",
+      "status": "proposed",
+      "evidence": [
+        "docs/security-review.md S-7"
+      ],
+      "action": "Define the log redaction policy before crash reporting ships."
+    },
+    {
+      "id": "S-8",
+      "title": "The agent runtime is in-process and unscheduled",
+      "severity": "medium",
+      "status": "proposed",
+      "evidence": [
+        "docs/security-review.md S-8",
+        "crates/cad-agent-runtime/src/registry.rs",
+        "crates/cad-agent-geometry/src/lib.rs"
+      ],
+      "action": "Isolate third-party agents in a separate process before any are loaded, and move agent execution off the UI thread. The first-party agent is reviewed with the repository and is not exposed to untrusted code."
+    }
+  ]
+}

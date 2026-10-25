@@ -1,0 +1,45 @@
+// T5 / S20: Use takes silhouette edges too ("When viewing a model normal to a sketch, any visible
+// boundary that isn't an edge is a silhouette edge"; `reference/onshape/t5/torus-face-select.png`,
+// `torus-face-selected.png`). A Ø20 cylinder lying along Y (a circle on Front, extruded 30).
+// Sketch 2 on Top: with U, hovering the cylinder's side highlights its two silhouettes seen along
+// the Top plane's normal and previews them in the plane; clicking uses both: two black lines,
+// 30 long and 20 apart, each with a link glyph. (Final re-audit: the pointer is on the side facing
+// the isometric view; the old point, (−7.07, −15, 37.07), lies on the view's own silhouette, where
+// the pick ray only grazes the finer phase 3 tessellation and missed the part.)
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Click(ui("sketch")),
+        WaitFor("sketch-dialog"),
+        Click(ui("feature-front")),
+        Key("N"),
+        Key("C"),
+        ClickWorld(0, 30),
+        ClickWorld(10, 30),
+        Type("20"),
+        Key("Enter"),
+        Key("Escape"),
+        Click(ui("sketch-dialog-accept")),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        Click(xyz(0, 0, 30)),
+        Click(ui("extrude-depth-field")),
+        Type("30"),
+        Key("Enter"),
+        Click(ui("sketch")),
+        WaitFor("sketch-dialog"),
+        Click(ui("feature-top")),
+        Key("Shift+7"),
+        Key("U"),
+        Hover(xyz(7.07, -15, 37.07)),
+        Wait(3),
+        Screenshot("01-hover-cylinder-silhouettes"),
+        Click(xyz(7.07, -15, 37.07)),
+        Key("Escape"),
+        Key("N"),
+        MoveTo(1400, 850),
+        Wait(3),
+        Screenshot("02-silhouettes-used"),
+    ],
+)

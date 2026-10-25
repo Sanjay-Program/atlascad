@@ -1,0 +1,59 @@
+Zentrion CAD Repository Inventory
+Workspace: /home/sanjay/Projects/zentron-cad
+Generated: Wed Oct 21 08:55:35 PM IST 2026
+
+======================================
+Path: /home/sanjay/Projects/zentron-cad/apps/cadcraft
+https://github.com/storytold/cadcraft.git
+0cf3bdea83ebbe02fb2e674b23f07de4acfa73da
+
+======================================
+Path: /home/sanjay/Projects/zentron-cad/apps/solidcraft
+https://github.com/tangency-labs/solidcraft.git
+775e5155bbff9a01acbd6da09da2dfe87be708dc
+
+======================================
+Path: /home/sanjay/Projects/zentron-cad/kernels/cadrum
+https://github.com/lzpel/cadrum.git
+c59916dbbf135c21c64d80f378b0674432df50bb
+
+======================================
+Path: /home/sanjay/Projects/zentron-cad/kernels/cascade-rs
+https://github.com/DonSqualo/cascade-rs.git
+c68c1d2c3c7ff24d9f0d21b926748273bb856842
+
+======================================
+Path: /home/sanjay/Projects/zentron-cad/kernels/hagane
+https://github.com/rsasaki0109/Hagane.git
+45e423c9c5f1eea33a5ca23e44abde2d63cdd95d
+
+======================================
+Path: /home/sanjay/Projects/zentron-cad/kernels/monstertruck
+https://github.com/virtualritz/monstertruck.git
+d2ad1ed7aa420b7f32cd2c1e3ad319b46d593652
+
+======================================
+Path: /home/sanjay/Projects/zentron-cad/kernels/opencascade-rs
+https://github.com/bschwind/opencascade-rs.git
+32758df23a137f4e7c786c618b0317fc3badb3b2
+
+======================================
+Path: /home/sanjay/Projects/zentron-cad/kernels/truck
+https://github.com/ricosjp/truck.git
+78d699b0792b39e27c2bf073b682986701644e91
+
+======================================
+Path: /home/sanjay/Projects/zentron-cad/references/bevy_pmetra
+https://github.com/nilaysavant/bevy_pmetra.git
+6933b23d75bd3168ab398bb288a40a6cd3f2c516
+
+======================================
+Path: /home/sanjay/Projects/zentron-cad/references/cadrs
+https://github.com/gswdh/cadrs.git
+74dd5771cfc3f3c2c75958d273aa032d92d1e1f2
+
+======================================
+Path: /home/sanjay/Projects/zentron-cad/references/cadrust
+https://github.com/mac999/cadrust.git
+519cb390fd1c2e3079dd520ac4899474565f6b98
+

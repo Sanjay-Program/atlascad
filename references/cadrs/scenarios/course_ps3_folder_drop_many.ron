@@ -1,0 +1,62 @@
+// P3.9 / PS3.2: dragging several selected features onto a folder's name, keeping the order of
+// operations (bracket stand-in, see course_ps3_folders).
+// 01 Fillet 1 and Fillet 2 in a new folder "Finishing"; Bosses open.
+// 02 Extrude 10 and Extrude 11 selected (Shift+click) and dragged together onto "Finishing"
+//    (from above it): the folder row outlined, the ghost reads "2 features".
+// 03 dropped: both join Finishing at its start, before the fillets ("Finishing (4)"), in
+//    history order.
+// 04 the two dragged back onto "Bosses" (from below it): 05 dropped: they join Bosses at its
+//    end, back where they were.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("bracket"),
+        Key("P"),
+        Key("Shift+7"),
+        Key("F"),
+        Click(ui_at("feature-default-geometry", 0.05, 0.5)),
+        Click(ui("feature-fillet-1")),
+        KeyDown("Shift"),
+        Click(ui("feature-fillet-2")),
+        KeyUp("Shift"),
+        RightClick(ui("feature-fillet-2")),
+        WaitFor("feature-context-menu"),
+        Click(ui("feature-add-to-folder")),
+        Key("Ctrl+A"),
+        Type("Finishing"),
+        Key("Enter"),
+        Click(ui_at("feature-folder-bosses", 0.06, 0.5)),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("01-finishing-and-bosses"),
+        Click(ui("feature-extrude-10")),
+        KeyDown("Shift"),
+        Click(ui("feature-extrude-11")),
+        KeyUp("Shift"),
+        Press(ui("feature-extrude-11")),
+        Wait(2),
+        Hover(ui_at("feature-extrude-11", 0.5, 1.5)),
+        Wait(2),
+        Hover(ui("feature-folder-finishing")),
+        Wait(5),
+        Screenshot("02-two-dragged-onto-finishing"),
+        Release,
+        Wait(5),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-joined-finishing-at-its-start"),
+        Press(ui("feature-extrude-11")),
+        Wait(2),
+        Hover(ui_at("feature-extrude-11", 0.5, -0.5)),
+        Wait(2),
+        Hover(ui("feature-folder-bosses")),
+        Wait(5),
+        Screenshot("04-two-dragged-onto-bosses"),
+        Release,
+        Wait(5),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("05-joined-bosses-at-its-end"),
+    ],
+)

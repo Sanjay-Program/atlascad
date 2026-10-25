@@ -1,0 +1,46 @@
+// Flange (P3I.4, SM3; `help/feature-tools/sheetmetalflange-dialog-01.png`, `-03.png`): a 60 × 40
+// plate (Sheet metal model, Thicken of a sketch region, 1 mm) gets a flange from the Sheet metal
+// model ▾: the empty dialog as Onshape's (Inner, Blind 25 mm, Bend angle 90 deg, Automatic
+// miter, Use model bend radius); the plate's east edge picked: a 25 mm wall bent up with the
+// distance arrow; Partial flange with a Second bound (10 mm each): Overall parameters and End
+// conditions, arrows at both ends; accepted.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("sketch top rect 0 0 60 40"),
+        Key("Shift+7"),
+        Click(ui("sheet-metal-model")),
+        WaitFor("sheet-metal-model-dialog"),
+        Click(ui("sheet-metal-model-operation-2")),
+        Click(xyz(30, 20, 0)),
+        Click(ui("sheet-metal-model-dialog-accept")),
+        Click(ui("sheet-metal-model-caret")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("01-sheet-metal-menu"),
+        Click(ui("sheet-metal-menu-flange")),
+        WaitFor("sheet-metal-flange-dialog"),
+        Custom("view 30 30 40 20 0 0.11"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("02-flange-dialog"),
+        Click(xyz(60, 20, 1)),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-flange-on-the-east-edge"),
+        Click(ui("smf-partial-checkbox")),
+        Click(ui("smf-bound-distance-field")),
+        Key("Ctrl+A"),
+        Type("10"),
+        Key("Tab"),
+        Click(ui("smf-second-bound-checkbox")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("04-partial-flange"),
+        Click(ui("sheet-metal-flange-dialog-accept")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("05-accepted"),
+    ],
+)

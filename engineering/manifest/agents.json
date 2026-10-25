@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "agents": [
+    {
+      "id": "agent.cad.geometry-ops",
+      "name": "Geometry operations agent",
+      "version": "0.1.0",
+      "purpose": "Expose contract kernel operations (extrude, booleans, tessellation) to an agent loop with budgets and cancellation.",
+      "runtime": "cad-agent-runtime 0.1.0, in-process registry",
+      "language": "rust",
+      "implemented": true,
+      "lifecycle": "ready",
+      "input_schema": "JSON Schema, object type, declared in crates/cad-agent-geometry/src/lib.rs#input_schema: op (enum), profile (array of [x,y], 3..4096 points), profile_file (1..128 chars), height_mm (0.001..100000), operation (union|intersection|difference), a|b|solid (integer >= 1), chord_tol_mm (0.0001..10).",
+      "output_schema": "JSON Schema, object type, declared in crates/cad-agent-geometry/src/lib.rs#output_schema: op, ok, solid, triangles, vertices, open_edges, volume_mm3, area_mm2, min, max. Measurements only, never geometry.",
+      "permissions": [
+        "read_workspace",
+        "geometry_kernel"
+      ],
+      "resources": "One kernel instance for the agent's lifetime, behind a mutex. Call budget 10,000; output cap 8 KiB; wall clock 30 s per call. Profile reads are capped at 1 MiB and 4096 points.",
+      "dependencies": [
+        "module.cad-agent-api",
+        "module.cad-contract",
+        "module.cad-kernel-truck"
+      ],
+      "interfaces": [
+        "iface.cad-agent.contract",
+        "iface.cad-contract.kernel"
+      ],
+      "health": "healthy",
+      "tests": "passing",
+      "registration": "active",
+      "compat": "agent contract v1",
+      "owner": "module.cad-agent-geometry",
+      "last_successful_run": "2026-10-22",
+      "limitations": [
+        "Boolean difference is refused: the truck adapter does not advertise it, so the agent reports it as unsupported rather than returning a wrong solid.",
+        "Solid handles are session handles and must never be persisted.",
+        "The reply carries measurements only, so a caller cannot obtain a mesh through the agent.",
+        "The workspace read is one JSON profile file; no other format is imported and no file is written.",
+        "Cancellation is cooperative: a single pathological boolean inside truck cannot be interrupted mid-call."
+      ],
+      "disable_procedure": "Remove crates/cad-agent-geometry from the workspace members and the repository, module and capability entries from the manifests. No other crate depends on it, so nothing else changes."
+    },
+    {
+      "id": "agent.cad.import-export",
+      "name": "Import/export agent",
+      "version": "0.0.0",
+      "purpose": "Convert CAD files inside a confined workspace with size and entity budgets.",
+      "runtime": "none",
+      "language": "rust",
+      "implemented": false,
+      "lifecycle": "discovered",
+      "input_schema": "none (the agent is not implemented)",
+      "output_schema": "none (the agent is not implemented)",
+      "permissions": [],
+      "resources": "not defined",
+      "dependencies": [
+        "module.solidcraft.io",
+        "module.cadcraft.io"
+      ],
+      "interfaces": [],
+      "health": "unknown",
+      "tests": "none",
+      "registration": "unregistered",
+      "compat": "not negotiated",
+      "owner": "module.solidcraft.io",
+      "last_successful_run": null,
+      "limitations": [
+        "The CadAgent contract and runtime now exist (crates/cad-agent-api, crates/cad-agent-runtime), so an import agent has a contract to declare and a host to run in. What is still missing is the agent itself and the import budgets in SolidCraft IO (security S-3)."
+      ],
+      "disable_procedure": "Nothing is registered; delete this entry if abandoned."
+    },
+    {
+      "id": "agent.cad.design-rule-check",
+      "name": "Design-rule check agent",
+      "version": "0.0.0",
+      "purpose": "Validate a document against a rule set (wall thickness, minimum radius, feature validity).",
+      "runtime": "none",
+      "language": "rust",
+      "implemented": false,
+      "lifecycle": "discovered",
+      "input_schema": "none (the agent is not implemented)",
+      "output_schema": "none (the agent is not implemented)",
+      "permissions": [],
+      "resources": "not defined",
+      "dependencies": [
+        "module.solidcraft.doc",
+        "module.cad-contract"
+      ],
+      "interfaces": [
+        "iface.cad-contract.document-header"
+      ],
+      "health": "unknown",
+      "tests": "none",
+      "registration": "unregistered",
+      "compat": "document schema v2 (planned)",
+      "owner": "module.solidcraft.doc",
+      "last_successful_run": null,
+      "limitations": [
+        "The CadAgent contract and runtime now exist, so a rule-check agent has a contract to declare and a host to run in. What is still missing is the agent and the persistent document payload (roadmap M7)."
+      ],
+      "disable_procedure": "Nothing is registered; delete this entry if abandoned."
+    },
+    {
+      "id": "agent.ai.nl-to-cad",
+      "name": "Natural-language to CAD agent",
+      "version": "0.0.0",
+      "purpose": "Translate a natural-language instruction into validated CAD commands.",
+      "runtime": "none",
+      "language": "rust",
+      "implemented": false,
+      "lifecycle": "discovered",
+      "input_schema": "none (the agent is not implemented)",
+      "output_schema": "none (the agent is not implemented)",
+      "permissions": [],
+      "resources": "not defined",
+      "dependencies": [
+        "module.solidcraft.engine",
+        "module.cadcraft.engine"
+      ],
+      "interfaces": [
+        "iface.solidcraft.mcp",
+        "iface.cadcraft.mcp"
+      ],
+      "health": "unknown",
+      "tests": "none",
+      "registration": "unregistered",
+      "compat": "command schemas are not versioned",
+      "owner": "module.solidcraft.engine",
+      "last_successful_run": null,
+      "limitations": [
+        "The CadAgent contract and runtime now exist, so a natural-language agent has a contract to declare and a host to run in. What is still missing is the agent, a model provider and a credential policy."
+      ],
+      "disable_procedure": "Nothing is registered; delete this entry if abandoned."
+    }
+  ]
+}

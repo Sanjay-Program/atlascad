@@ -1,0 +1,347 @@
+{
+  "schema_version": 1,
+  "dependencies": [
+    {
+      "from": "module.cad-kernel-truck",
+      "to": "module.cad-contract",
+      "kind": "internal_crate",
+      "version": "0.1.0",
+      "license": "MIT OR Apache-2.0",
+      "risk": "low",
+      "notes": "The adapter is the only consumer of the contract kernel trait today."
+    },
+    {
+      "from": "module.cad-kernel-truck",
+      "to": "ext.truck-modeling",
+      "kind": "registry",
+      "version": "0.6",
+      "license": "Apache-2.0",
+      "risk": "medium",
+      "notes": "Pinned to the same release SolidCraft ships, so measurements describe the shipped kernel."
+    },
+    {
+      "from": "module.cad-kernel-truck",
+      "to": "ext.truck-topology",
+      "kind": "registry",
+      "version": "0.6",
+      "license": "Apache-2.0",
+      "risk": "medium",
+      "notes": "B-rep topology."
+    },
+    {
+      "from": "module.cad-kernel-truck",
+      "to": "ext.truck-shapeops",
+      "kind": "path_patch",
+      "version": "0.4 (apps/solidcraft/vendor)",
+      "license": "Apache-2.0",
+      "risk": "high",
+      "notes": "Patched copy. The published crate fails every coplanar overlapping boolean; this path couples the crate to the SolidCraft checkout and must be vendored at a pinned revision for release."
+    },
+    {
+      "from": "module.cad-kernel-truck",
+      "to": "ext.truck-meshalgo",
+      "kind": "path_patch",
+      "version": "0.4 (apps/solidcraft/vendor)",
+      "license": "Apache-2.0",
+      "risk": "high",
+      "notes": "Patched copy, used with the patched geometry crate; the two must be patched together."
+    },
+    {
+      "from": "module.solidcraft.kernel",
+      "to": "ext.truck-modeling",
+      "kind": "kernel",
+      "version": "0.6",
+      "license": "Apache-2.0",
+      "risk": "medium",
+      "notes": "Production kernel path; no truck type appears in the crate's public API."
+    },
+    {
+      "from": "module.solidcraft.kernel",
+      "to": "ext.spade",
+      "kind": "registry",
+      "version": "2.15.1",
+      "license": "MIT OR Apache-2.0",
+      "risk": "medium",
+      "notes": "Cargo metadata on the resolved SolidCraft workspace reports MIT OR Apache-2.0 (verified 2026-10-23)."
+    },
+    {
+      "from": "module.solidcraft.kernel",
+      "to": "module.solidcraft.geom",
+      "kind": "internal_crate",
+      "version": "0.18.3",
+      "license": "MIT OR Apache-2.0",
+      "risk": "low",
+      "notes": "Internal geometry types."
+    },
+    {
+      "from": "module.solidcraft.io",
+      "to": "ext.truck-stepio",
+      "kind": "path_patch",
+      "version": "0.3 (apps/solidcraft/vendor)",
+      "license": "Apache-2.0",
+      "risk": "high",
+      "notes": "Patched STEP reader/writer."
+    },
+    {
+      "from": "module.solidcraft.io",
+      "to": "ext.zip",
+      "kind": "registry",
+      "version": "8.6.0 and 9.0.4",
+      "license": "MIT",
+      "risk": "high",
+      "notes": "Cargo metadata on the resolved SolidCraft workspace reports MIT for both resolved versions (verified 2026-10-23). 3MF zip-entry and uncompressed-size budgets are still missing (security S-3)."
+    },
+    {
+      "from": "module.cadcraft.dwg",
+      "to": "ext.acadrust",
+      "kind": "registry",
+      "version": "0.6.4",
+      "license": "MPL-2.0",
+      "risk": "medium",
+      "notes": "MPL-2.0 is file-level copyleft: it may be linked from proprietary code only while it stays unmodified. Modifying it obliges publishing those files."
+    },
+    {
+      "from": "module.cadcraft.engine",
+      "to": "ext.craft-docpath",
+      "kind": "path_patch",
+      "version": "vendored rev 82a24b00..., apps/cadcraft/vendor/craft-libs-docpath",
+      "license": "MIT OR Apache-2.0",
+      "risk": "low",
+      "notes": "Vendored path dependency (licence recorded: MIT OR Apache-2.0). Revision pinned; no network needed for release builds. This host cannot compile it (declares rust-version 1.95 > host 1.94.0), but that predates vendoring and is unrelated to it."
+    },
+    {
+      "from": "module.cadcraft.ui-egui",
+      "to": "ext.craft-ui",
+      "kind": "path_patch",
+      "version": "vendored rev 5c874d51..., apps/cadcraft/vendor/craft-libs-ui",
+      "license": "MIT OR Apache-2.0",
+      "risk": "medium",
+      "notes": "Vendored path dependency (licence recorded: MIT OR Apache-2.0). Own compile blocked by pre-existing egui/epaint unstable-feature incompatibility with this host; unrelated to vendoring."
+    },
+    {
+      "from": "module.cadcraft.ui-egui",
+      "to": "ext.egui",
+      "kind": "registry",
+      "version": "0.36",
+      "license": "MIT OR Apache-2.0",
+      "risk": "low",
+      "notes": "Shared with SolidCraft's UI, which is why a combined shell is feasible at all."
+    },
+    {
+      "from": "module.solidcraft.ui-egui",
+      "to": "ext.egui",
+      "kind": "registry",
+      "version": "0.36",
+      "license": "MIT OR Apache-2.0",
+      "risk": "low",
+      "notes": "Matches CADCraft's egui version."
+    },
+    {
+      "from": "module.solidcraft.render",
+      "to": "ext.wgpu",
+      "kind": "registry",
+      "version": "30",
+      "license": "MIT OR Apache-2.0",
+      "risk": "low",
+      "notes": "No rendering performance claim is made on integrated graphics."
+    },
+    {
+      "from": "module.cad-contract",
+      "to": "ext.serde",
+      "kind": "registry",
+      "version": "1",
+      "license": "MIT OR Apache-2.0",
+      "risk": "low",
+      "notes": "Serialisation for the versioned document header and manifest types."
+    },
+    {
+      "from": "module.cad-engineering",
+      "to": "ext.serde_json",
+      "kind": "registry",
+      "version": "1",
+      "license": "MIT OR Apache-2.0",
+      "risk": "low",
+      "notes": "Manifest and state serialisation."
+    },
+    {
+      "from": "workspace",
+      "to": "repo.opencascade-rs",
+      "kind": "system",
+      "version": "not linked",
+      "license": "LGPL-2.1",
+      "risk": "critical",
+      "notes": "Present in the workspace, deliberately absent from every shipping graph. A CI guard must fail if it ever appears (security S-2)."
+    },
+    {
+      "from": "workspace",
+      "to": "repo.cadrum",
+      "kind": "system",
+      "version": "not linked",
+      "license": "MIT wrapper + LGPL-2.1 OpenCASCADE",
+      "risk": "critical",
+      "notes": "Same exclusion as opencascade-rs."
+    },
+    {
+      "from": "module.cad-cli",
+      "to": "module.cad-contract",
+      "kind": "internal_crate",
+      "version": "0.1.0",
+      "license": "MIT OR Apache-2.0",
+      "risk": "low",
+      "notes": "Consumes the unit system, document header, tolerance and mesh types."
+    },
+    {
+      "from": "module.cad-cli",
+      "to": "module.cad-kernel-truck",
+      "kind": "internal_crate",
+      "version": "0.1.0",
+      "license": "MIT OR Apache-2.0",
+      "risk": "low",
+      "notes": "The first non-test consumer of the adapter; proves the contract is usable end to end."
+    },
+    {
+      "from": "module.cad-agent-api",
+      "to": "ext.serde",
+      "kind": "registry",
+      "version": "1",
+      "license": "MIT OR Apache-2.0",
+      "risk": "low",
+      "notes": "The contract is serialisable so a registry can store and reload agent declarations from disk."
+    },
+    {
+      "from": "module.cad-agent-runtime",
+      "to": "module.cad-agent-api",
+      "kind": "internal_crate",
+      "version": "0.1.0",
+      "license": "MIT OR Apache-2.0",
+      "risk": "low",
+      "notes": "The runtime enforces the contract; the contract knows nothing about the runtime, so the dependency points one way."
+    },
+    {
+      "from": "module.cad-agent-geometry",
+      "to": "module.cad-agent-api",
+      "kind": "internal_crate",
+      "version": "0.1.0",
+      "license": "MIT OR Apache-2.0",
+      "risk": "low",
+      "notes": "The agent implements the Agent trait and declares an AgentContract. It does not depend on the runtime, so any host can run it."
+    },
+    {
+      "from": "module.cad-agent-geometry",
+      "to": "module.cad-contract",
+      "kind": "internal_crate",
+      "version": "0.1.0",
+      "license": "MIT OR Apache-2.0",
+      "risk": "low",
+      "notes": "Kernel types, the error taxonomy and the default tolerance."
+    },
+    {
+      "from": "module.cad-agent-geometry",
+      "to": "module.cad-kernel-truck",
+      "kind": "internal_crate",
+      "version": "0.1.0",
+      "license": "MIT OR Apache-2.0",
+      "risk": "medium",
+      "notes": "The only geometry implementation the agent uses. The adapter is not Sync, so the agent holds it behind a mutex and serves one call at a time."
+    },
+    {
+      "from": "module.cad-document",
+      "to": "module.cad-contract",
+      "kind": "internal_crate",
+      "version": "0.1.0",
+      "license": "MIT OR Apache-2.0",
+      "risk": "low",
+      "notes": "Uses persistent document IDs, unit metadata, schema header, tolerances and the kernel trait; kernel IDs are never serialized."
+    },
+    {
+      "from": "module.cad-cli",
+      "to": "module.cad-document",
+      "kind": "internal_crate",
+      "version": "0.1.0",
+      "license": "MIT OR Apache-2.0",
+      "risk": "low",
+      "notes": "CLI project commands create, reopen, edit, undo/redo, evaluate and export native parametric projects."
+    },
+    {
+      "from": "module.cad-cli",
+      "to": "module.cad-io",
+      "kind": "internal_crate",
+      "version": "0.1.0",
+      "license": "LicenseRef-AtlasCAD-Personal-NonCommercial",
+      "risk": "low",
+      "notes": "The CLI keeps its public wrappers but the STL format has one implementation."
+    },
+    {
+      "from": "module.cad-io",
+      "to": "module.cad-contract",
+      "kind": "internal_crate",
+      "version": "0.1.0",
+      "license": "LicenseRef-AtlasCAD-Personal-NonCommercial",
+      "risk": "low",
+      "notes": "Mesh validation and the shared Mesh type."
+    },
+    {
+      "from": "module.cad-io",
+      "to": "ext.thiserror",
+      "kind": "registry",
+      "version": "2",
+      "license": "MIT OR Apache-2.0",
+      "risk": "low",
+      "notes": "Error derive only."
+    },
+    {
+      "from": "module.cad-studio",
+      "to": "module.cad-contract",
+      "kind": "internal_crate",
+      "version": "0.1.0",
+      "license": "LicenseRef-AtlasCAD-Personal-NonCommercial",
+      "risk": "low",
+      "notes": "Kernel info and units for the API payload."
+    },
+    {
+      "from": "module.cad-studio",
+      "to": "module.cad-document",
+      "kind": "internal_crate",
+      "version": "0.1.0",
+      "license": "LicenseRef-AtlasCAD-Personal-NonCommercial",
+      "risk": "medium",
+      "notes": "The project is the app state; schema changes are user-visible."
+    },
+    {
+      "from": "module.cad-studio",
+      "to": "module.cad-kernel-truck",
+      "kind": "internal_crate",
+      "version": "0.1.0",
+      "license": "LicenseRef-AtlasCAD-Personal-NonCommercial",
+      "risk": "medium",
+      "notes": "Each request evaluates through the adapter; boolean and fillet limits apply unchanged."
+    },
+    {
+      "from": "module.cad-studio",
+      "to": "module.cad-io",
+      "kind": "internal_crate",
+      "version": "0.1.0",
+      "license": "LicenseRef-AtlasCAD-Personal-NonCommercial",
+      "risk": "low",
+      "notes": "STL bytes are produced in-memory and returned by the HTTP response."
+    },
+    {
+      "from": "module.cad-studio",
+      "to": "ext.serde",
+      "kind": "registry",
+      "version": "1",
+      "license": "MIT OR Apache-2.0",
+      "risk": "low",
+      "notes": "API request/response derivation."
+    },
+    {
+      "from": "module.cad-studio",
+      "to": "ext.serde_json",
+      "kind": "registry",
+      "version": "1",
+      "license": "MIT OR Apache-2.0",
+      "risk": "low",
+      "notes": "JSON encoding; no YAML or other formats."
+    }
+  ]
+}

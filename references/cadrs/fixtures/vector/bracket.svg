@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="60mm" height="30mm" viewBox="0 0 60 30">
+  <!-- A 60 × 30 mm plate: rounded corners (arcs), two 3 mm holes (circles) and a free-form slot
+       (cubic Béziers), filled and outlined as a drawing program saves it. -->
+  <rect x="0" y="0" width="60" height="30" rx="4" fill="#3a6ea5" stroke="#000" stroke-width="0.3"/>
+  <circle cx="8" cy="15" r="3" fill="#fff"/>
+  <circle cx="52" cy="15" r="3" fill="#fff"/>
+  <path d="M18 18 C 24 6, 30 26, 36 12 C 38 8, 42 8, 42 14 C 42 22, 30 28, 24 24 C 20 22, 17 21, 18 18 Z" fill="#fff"/>
+</svg>

@@ -1,0 +1,21 @@
+[package]
+name = "monstertruck-step"
+version = "0.4.1"
+authors = [
+    "Yoshinori Tanimura <tanimura@ricos.co.jp>",
+    "Moritz Moeller <virtualritz@protonmail.com>",
+]
+edition = "2024"
+description = "Deprecated: STEP support moved into monstertruck-io behind the `step` feature"
+homepage = "https://github.com/virtualritz/monstertruck"
+repository = "https://github.com/virtualritz/monstertruck"
+readme = "README.md"
+keywords = ["truck", "graphics"]
+categories = ["graphics"]
+license = "Apache-2.0"
+
+# Nothing in this workspace depends on this crate any more -- it exists solely so
+# a `monstertruck-step = "0.3"` requirement already published against keeps
+# resolving and compiling. The implementation lives in monstertruck-io.
+[dependencies]
+monstertruck-io = { workspace = true, features = ["step"] }

@@ -1,0 +1,8 @@
+/target
+Cargo.lock
+.cargo/config.toml
+.vscode/launch.json
+exports/
+dist/
+.vercel
+.DS_Store

@@ -1,0 +1,177 @@
+//! `Solid::iter_history` population tests (#156).
+//!
+//! history は「派生系譜」: 結果に生き残った各 face を同種(face)の元 face に
+//! 対応付けた flat `[post_id, src_id]` 列。identity(pass-through) ∪ Modified を
+//! 含み、Generated(edge→face の新規面) は含まない。詳細は
+//! notes/20260603-history定義の明確化.md を参照。
+
+use cadrum::{DVec3, Edge, ProfileOrient, Solid};
+use std::collections::HashSet;
+use std::f64::consts::TAU;
+
+/// 一辺 `side` の閉じた正方形プロファイル（extrude 用）。
+fn square(side: f64) -> Vec<Edge> {
+	Edge::polygon(&[DVec3::new(0.0, 0.0, 0.0), DVec3::new(side, 0.0, 0.0), DVec3::new(side, side, 0.0), DVec3::new(0.0, side, 0.0)]).expect("square polygon")
+}
+
+/// 入力に face を持たない演算（プリミティブ / edge・grid ソースの builder）は
+/// history が空のまま（保持元 face が無いので by design）。
+#[test]
+fn test_no_face_source_ops_have_empty_history() {
+	assert_eq!(Solid::cube(DVec3::ZERO, DVec3::splat(1.0)).iter_history().count(), 0, "cube");
+	assert_eq!(Solid::sphere(1.0).iter_history().count(), 0, "sphere");
+
+	let extruded = Solid::extrude(&square(4.0), DVec3::Z * 3.0).expect("extrude");
+	assert_eq!(extruded.iter_history().count(), 0, "extrude");
+
+	let profile = [Edge::circle(1.0, DVec3::Z).expect("circle")];
+	let spine = [Edge::line(DVec3::ZERO, DVec3::Z * 5.0).expect("line")];
+	let swept = Solid::sweep(&profile, &spine, ProfileOrient::Fixed).expect("sweep");
+	assert_eq!(swept.iter_history().count(), 0, "sweep");
+
+	let lower = [Edge::circle(3.0, DVec3::Z).expect("circle")];
+	let upper = [Edge::circle(1.5, DVec3::Z).expect("circle").translate(DVec3::Z * 8.0)];
+	let lofted = Solid::loft(&[lower, upper], false).expect("loft");
+	assert_eq!(lofted.iter_history().count(), 0, "loft");
+
+	let bspline = Solid::bspline(16, 8, true, true, |i, j| {
+		let phi = TAU * i as f64 / 16.0;
+		let theta = TAU * j as f64 / 8.0;
+		let r = 3.0 + theta.cos();
+		DVec3::new(r * phi.cos(), r * phi.sin(), theta.sin())
+	})
+	.expect("bspline torus");
+	assert_eq!(bspline.iter_history().count(), 0, "bspline");
+}
+
+/// shell: cube の top を開けて内側 offset。残り 5 面はそのまま outer wall になり、
+/// 除去された top は開口の縁 (同じ平面の額縁) へ Modified される。inner wall は
+/// Generated なので出ない。
+#[test]
+fn test_shell_history_maps_retained_faces_and_rim() {
+	let cube = Solid::cube(DVec3::ZERO, DVec3::splat(10.0));
+	let original: HashSet<u64> = cube.iter_face().map(|f| f.id()).collect();
+	let top = cube.iter_face().last().expect("cube has faces");
+	let top_id = top.id();
+	let shelled = cube.shell(-1.0, [top]).expect("shell");
+
+	let hist: Vec<[u64; 2]> = shelled.iter_history().collect();
+	assert!(!hist.is_empty(), "shell must populate history");
+	for [_, src] in &hist {
+		assert!(original.contains(src), "src {src} is not an original cube face");
+	}
+	let srcs: HashSet<u64> = hist.iter().map(|[_, s]| *s).collect();
+	assert_eq!(srcs.len(), 6, "5 retained faces and the removed top should map; got {}", srcs.len());
+	let rim: Vec<u64> = hist.iter().filter(|[_, s]| *s == top_id).map(|[p, _]| *p).collect();
+	assert_eq!(rim.len(), 1, "the top maps to exactly the rim");
+	let rim = shelled.iter_face().find(|f| f.id() == rim[0]).expect("rim is a result face");
+	assert!((rim.area() - (100.0 - 64.0)).abs() < 1e-9, "rim is the 10x10 top minus the 8x8 opening: {}", rim.area());
+}
+
+/// fillet: cube の edge 1 本を fillet → その edge を共有する 2 面が Modified
+/// (post != src)。非影響の 4 面は identity (post == src) として現れ、全 6 面が
+/// src として登場する（= 無変更面の tshape 保持＝設計前提の検証）。
+#[test]
+fn test_fillet_history_modifies_adjacent_identity_elsewhere() {
+	let cube = Solid::cube(DVec3::ZERO, DVec3::splat(10.0));
+	let original: HashSet<u64> = cube.iter_face().map(|f| f.id()).collect();
+	let edge = cube.iter_edge().next().expect("cube has edges");
+	let edge_id = edge.id();
+	let adjacent: HashSet<u64> = cube.iter_face().filter(|f| f.iter_edge().any(|e| e.id() == edge_id)).map(|f| f.id()).collect();
+	assert_eq!(adjacent.len(), 2, "a cube edge borders exactly 2 faces");
+
+	let filleted = cube.fillet_edges(0.5, [edge]).expect("fillet");
+	let hist: Vec<[u64; 2]> = filleted.iter_history().collect();
+
+	for [_, src] in &hist {
+		assert!(original.contains(src), "src {src} is not an original cube face");
+	}
+	let srcs: HashSet<u64> = hist.iter().map(|[_, s]| *s).collect();
+	assert_eq!(srcs.len(), 6, "all 6 faces should appear as src (identity preserved); got {}", srcs.len());
+
+	let modified: HashSet<u64> = hist.iter().filter(|[p, s]| p != s).map(|[_, s]| *s).collect();
+	for id in &adjacent {
+		assert!(modified.contains(id), "adjacent face {id} must be Modified (post != src)");
+	}
+}
+
+/// chamfer: fillet と同形（edge を共有する 2 面が Modified、全 6 面が src 登場）。
+#[test]
+fn test_chamfer_history_modifies_adjacent_identity_elsewhere() {
+	let cube = Solid::cube(DVec3::ZERO, DVec3::splat(10.0));
+	let original: HashSet<u64> = cube.iter_face().map(|f| f.id()).collect();
+	let edge = cube.iter_edge().next().expect("cube has edges");
+	let edge_id = edge.id();
+	let adjacent: HashSet<u64> = cube.iter_face().filter(|f| f.iter_edge().any(|e| e.id() == edge_id)).map(|f| f.id()).collect();
+	assert_eq!(adjacent.len(), 2, "a cube edge borders exactly 2 faces");
+
+	let chamfered = cube.chamfer_edges(0.5, [edge]).expect("chamfer");
+	let hist: Vec<[u64; 2]> = chamfered.iter_history().collect();
+
+	for [_, src] in &hist {
+		assert!(original.contains(src), "src {src} is not an original cube face");
+	}
+	let srcs: HashSet<u64> = hist.iter().map(|[_, s]| *s).collect();
+	assert_eq!(srcs.len(), 6, "all 6 faces should appear as src (identity preserved); got {}", srcs.len());
+
+	let modified: HashSet<u64> = hist.iter().filter(|[p, s]| p != s).map(|[_, s]| *s).collect();
+	for id in &adjacent {
+		assert!(modified.contains(id), "adjacent face {id} must be Modified (post != src)");
+	}
+}
+
+/// color: fillet 後も Modified/identity 面が src 面の色を history 経由で引き継ぐ。面色を
+/// `colormap_mut` で直接置くのは、`Solid::color` がソリッド単位の色を塗るため。
+#[test]
+fn test_fillet_carries_face_color_via_history() {
+	let red = "#ff0000".parse::<cadrum::Color>().expect("valid hex");
+	let mut cube = Solid::cube(DVec3::ZERO, DVec3::splat(10.0));
+	let face_ids: Vec<u64> = cube.iter_face().map(|f| f.id()).collect();
+	cube.colormap_mut().extend(face_ids.into_iter().map(|id| (id, red)));
+
+	let edge = cube.iter_edge().next().expect("cube has edges");
+	let filleted = cube.fillet_edges(0.5, [edge]).expect("fillet");
+
+	let hist: Vec<[u64; 2]> = filleted.iter_history().collect();
+	assert!(!hist.is_empty(), "fillet must populate history");
+	for [post, _] in &hist {
+		assert!(filleted.colormap().contains_key(post), "face {post} should inherit color via history");
+	}
+}
+
+/// offset は全面でも一部の面でも、結果の全 face が history 経由で元の色を継ぐ。
+#[test]
+fn test_offset_carries_face_color_via_history() {
+	let red = "#ff0000".parse::<cadrum::Color>().expect("valid hex");
+	let mut cube = Solid::cube(DVec3::ZERO, DVec3::splat(10.0));
+	let face_ids: Vec<u64> = cube.iter_face().map(|f| f.id()).collect();
+	cube.colormap_mut().extend(face_ids.into_iter().map(|id| (id, red)));
+
+	let top = cube.iter_face().last().expect("cube has faces");
+	for (name, offset) in [("all faces", cube.offset(1.0, cube.iter_face()).expect("offset all")), ("top face", cube.offset(2.0, [top]).expect("offset top"))] {
+		let post: Vec<u64> = offset.iter_face().map(|f| f.id()).collect();
+		assert!(offset.iter_history().all(|[p, _]| post.contains(&p)), "{name}: history names a face outside the result");
+		assert!(post.iter().all(|id| offset.colormap().get(id) == Some(&red)), "{name}: every face should inherit red");
+	}
+}
+
+/// boolean が複数ピースに割れたとき、各ピースの history は自分の face だけを
+/// `post_id` に持つ（兄弟ピースの由来を主張しない）。
+#[test]
+fn test_split_boolean_pieces_own_disjoint_history() {
+	let block = Solid::cube(DVec3::ZERO, DVec3::splat(10.0));
+	let slab = Solid::cube(DVec3::new(-1.0, -1.0, 4.0), DVec3::new(11.0, 11.0, 6.0));
+	let pieces = (&block - &slab).build_vec().expect("cut splits the block");
+	assert_eq!(pieces.len(), 2, "the slab must cut the block in two");
+
+	let mut seen: HashSet<u64> = HashSet::new();
+	for piece in &pieces {
+		let faces: HashSet<u64> = piece.iter_face().map(|f| f.id()).collect();
+		let hist: Vec<[u64; 2]> = piece.iter_history().collect();
+		assert!(!hist.is_empty(), "a cut piece must keep its own history");
+		for [post, _] in &hist {
+			assert!(faces.contains(post), "post_id {post} is not a face of this piece");
+			assert!(seen.insert(*post), "post_id {post} claimed by more than one piece");
+		}
+	}
+}

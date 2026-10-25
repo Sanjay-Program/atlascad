@@ -1,0 +1,88 @@
+// P3.3 / PS5.1–PS5.5: the boolean options on two boxes. A = 100 × 60 × 40 at the origin;
+// B = (50..150) × (20..80), 25 deep, overlapping A by 50 · 40 · 25 = 50 000 (the closed forms are
+// asserted in `cadrs_core/tests/part_studio.rs`).
+// 01 Extrude 2 on B: its body overlaps Part 1, so Add is picked by itself; the Remove tab
+//    clicked: the preview is Part 1 with B cut away.
+// 02 accepted, and Mass and section properties with the part: 240 000 − 50 000 = 190 000 mm³.
+// 03 Extrude 2 edited to Intersect: only the overlap is kept, 50 000 mm³ (04).
+// 05 Extrude 2 back to New: two parts; both selected in the Parts list, the Boolean feature:
+//    Union of Part 1 and Part 2 (the tools, in order), highlighted in the view (P3.4).
+// 05b the Subtract tab: Tools, Targets and the Offset option (shown disabled: the kernel has no
+//    offset yet).
+// 06 accepted: one part, "Part 1" (the first tool's name), 240 000 + 150 000 − 50 000 = 340 000.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("sketch top rect 0 0 100 60"),
+        Key("Shift+7"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        Click(xyz(20, 20, 0)),
+        Click(ui("extrude-depth-field")),
+        Key("Ctrl+A"),
+        Type("40"),
+        Key("Enter"),
+        Custom("sketch top rect 50 20 150 80"),
+        Key("F"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        Click(xyz(130, 70, 0)),
+        Click(ui("extrude-operation-2")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("01-remove"),
+        Key("Enter"),
+        Click(ui("part-row-part-1")),
+        Click(ui("view-mass")),
+        WaitFor("mass-dialog"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("02-removed-volume-190000"),
+        Click(ui("mass-dialog-cancel")),
+        ClickAt(1420, 900),
+        Wait(3),
+        // Intersect.
+        DoubleClick(ui("feature-extrude-2")),
+        WaitFor("extrude-dialog"),
+        Click(ui("extrude-operation-3")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-intersect"),
+        Key("Enter"),
+        Click(ui("part-row-part-1")),
+        Click(ui("view-mass")),
+        WaitFor("mass-dialog"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("04-intersected-volume-50000"),
+        Click(ui("mass-dialog-cancel")),
+        ClickAt(1420, 900),
+        Wait(3),
+        // Two parts, then the Boolean feature.
+        DoubleClick(ui("feature-extrude-2")),
+        WaitFor("extrude-dialog"),
+        Click(ui("extrude-operation-0")),
+        Key("Enter"),
+        Click(ui("part-row-part-1")),
+        Click(ui("part-row-part-2")),
+        Click(ui("boolean")),
+        WaitFor("boolean-dialog"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("05-boolean-union-tools"),
+        // The Subtract tab: Tools, Targets and the Offset option (shown, not available yet).
+        Click(ui("boolean-operation-1")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("05b-boolean-subtract-targets-offset"),
+        Click(ui("boolean-operation-0")),
+        Key("Enter"),
+        Click(ui("part-row-part-1")),
+        Click(ui("view-mass")),
+        WaitFor("mass-dialog"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("06-union-one-part-340000"),
+    ],
+)

@@ -1,0 +1,44 @@
+// Double-clicking something in the Part Studio edits the feature that made it, as in Onshape,
+// and shows that feature in the feature list, opening its folder (bracket stand-in: Sketch 1 /
+// Extrude 1 the plate, the bosses in the closed "Bosses" folder, Fillet 1 on the plate's
+// corners; see course_insp_error_states).
+// 01 the bracket.
+// 02 a boss's side double-clicked: its extrude's dialog, the Bosses folder open and the
+//    extrude selected in it, the Part Studio rolled back to it.
+// 03 cancelled, then the plate's top double-clicked: Extrude 1's dialog.
+// 04 cancelled, then a rounded corner double-clicked: Fillet 1's dialog.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("bracket"),
+        Key("P"),
+        Key("Shift+7"),
+        Key("F"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("01-bracket"),
+        DoubleClick(at(1240, 540)),
+        WaitFor("extrude-dialog"),
+        WaitFor("feature-sketch-2"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("02-boss"),
+        Key("Escape"),
+        Wait(10),
+        DoubleClick(at(700, 600)),
+        WaitFor("extrude-dialog"),
+        ExpectText("extrude-dialog", "Extrude 1"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-plate"),
+        Key("Escape"),
+        Wait(10),
+        DoubleClick(at(1025, 835)),
+        WaitFor("fillet-dialog"),
+        ExpectText("fillet-dialog", "Fillet 1"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("04-fillet"),
+    ],
+)

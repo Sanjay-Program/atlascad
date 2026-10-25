@@ -1,0 +1,28 @@
+[package]
+name = "monstertruck-wasm"
+version = "0.4.1"
+authors = ["Yoshinori Tanimura <tanimura@ricos.co.jp>", "Moritz Moeller <virtualritz@protonmail.com>"]
+edition = "2024"
+description = "WebAssembly/JavaScript bindings"
+homepage = "https://github.com/virtualritz/monstertruck"
+repository = "https://github.com/virtualritz/monstertruck"
+license = "Apache-2.0"
+
+keywords = ["truck", "graphics"]
+categories = ["graphics"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+derive_more = { workspace = true }
+gloo = { workspace = true }
+js-sys = { workspace = true }
+serde_json = { workspace = true }
+wasm-bindgen = { workspace = true }
+
+monstertruck-meshing = { workspace = true }
+monstertruck-modeling = { workspace = true, features = ["fillet"] }
+monstertruck-solid = { workspace = true }
+monstertruck-io = { workspace = true, features = ["step"] }
+monstertruck-topology = { workspace = true }

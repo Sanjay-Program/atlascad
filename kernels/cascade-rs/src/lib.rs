@@ -1,0 +1,110 @@
+//! cascade-rs: Pure Rust CAD kernel
+//!
+//! Line-by-line port of OpenCASCADE Technology (OCCT).
+//! Source: https://github.com/Open-Cascade-SAS/OCCT
+
+// =============================================================================
+// OCCT Port Modules (new structure)
+// =============================================================================
+
+/// Precision constants for geometric comparisons.
+/// Port of: src/FoundationClasses/TKernel/Precision/
+pub mod precision;
+
+/// Geometric primitives (gp_Pnt, gp_Vec, gp_Dir, gp_Trsf, etc.).
+/// Port of: src/FoundationClasses/TKMath/gp/
+pub mod gp;
+
+/// Bounding box classes (Bnd_Box, Bnd_Sphere, Bnd_Range, etc.).
+/// Port of: src/FoundationClasses/TKMath/Bnd/
+pub mod bnd;
+
+/// Elementary Curve Library - parametric curve utilities.
+/// Port of: src/FoundationClasses/TKMath/ElCLib/
+// pub mod elclib; // WIP - needs API fixes
+
+/// Topological location (composite transformations).
+/// Port of: src/FoundationClasses/TKMath/TopLoc/
+pub mod toploc;
+
+// =============================================================================
+// Legacy Modules (to be migrated)
+// =============================================================================
+
+pub mod foundation;
+pub mod geom;
+pub mod primitive;
+pub mod boolean;
+pub mod brep;
+pub mod curve;
+pub mod surface;
+pub mod sweep;
+pub mod loft;
+pub mod modify;
+pub mod fillet;
+pub mod chamfer;
+pub mod draft;
+pub mod feature;
+pub mod heal;
+pub mod mesh;
+pub mod io;
+pub mod query;
+pub mod check;
+pub mod intersect;
+pub mod offset;
+pub mod local;
+pub mod approx;
+pub mod xde;
+pub mod construct;
+pub mod visualization;
+
+// Re-exports for convenience
+pub use foundation::{Standard_Boolean, Standard_Integer, Standard_Real, Standard_CString, Array1, List, Map, Set, TColStd_Array1, TColStd_List, TColStd_Map, TColStd_Set};
+pub use geom::{Pnt, Vec3, Dir};
+pub use brep::{Vertex, Edge, Wire, Face, Shell, Solid, Compound, CompSolid, Shape};
+pub use brep::topology;
+pub use curve::{Parabola, TrimmedCurve};
+pub use primitive::{make_box, make_sphere, make_cylinder, make_cone, make_torus, make_half_space, HalfSpace};
+pub use boolean::{fuse, cut, common, splitter, fuse_many, cut_many, common_many};
+pub use sweep::{make_revol, make_draft_prism, evolved, EvolveOptions};
+pub use loft::make_loft;
+pub use fillet::{make_fillet, make_fillet_variable, blend, RadiusLaw, InterpolationMethod};
+pub use chamfer::make_chamfer;
+pub use draft::{add_draft, taper};
+pub use feature::{make_hole, make_slot, make_rib, make_groove, circular_pattern, circular_pattern_fused};
+pub use heal::{sew_faces, fix_shape};
+pub use check::{check_valid, check_watertight, check_self_intersection, ShapeError};
+pub use intersect::{intersect_surfaces, Curve2D, intersect_curves_2d};
+pub use offset::{thick_solid, make_shell};
+pub use local::{split_face, split_edge, split_edge_at_point, remove_face};
+pub use approx::{approximate_curve, interpolate_curve, interpolate_surface, make_plate_surface};
+pub use query::{extrema_curve_curve, extrema_point_solid, project_point_to_curve, project_point_to_surface, project_curve_to_surface, bounding_box, mass_properties, MassProperties, moments_of_inertia, moments_of_inertia_at_com, InertiaMatrix, principal_axes, PrincipalAxes, classify_shape, ShapeClass};
+pub use io::{StepDimension, DimensionType, StepGeometricTolerance, write_step_with_pmi, write_step_with_attributes};
+pub use xde::{ShapeAttributes, set_shape_color, get_shape_color, set_shape_name, get_shape_name, set_shape_attributes, get_shape_attributes, set_shape_layer, get_shape_layer, set_shape_material, get_shape_material};
+pub use construct::{circle_tangent_to_3, Circle, GeomElement};
+pub use visualization::{DisplayMode, DisplayStyle, Viewer, RenderFace, RenderEdge};
+pub use foundation::{Matrix3x3, Matrix4x4, solve_linear_system_3x3, eigenvalues_3x3, VectorOps};
+
+/// Tolerance for geometric comparisons
+pub const TOLERANCE: f64 = 1e-6;
+
+/// Result type for cascade operations
+pub type Result<T> = std::result::Result<T, CascadeError>;
+
+#[derive(Debug, thiserror::Error)]
+pub enum CascadeError {
+    #[error("Invalid geometry: {0}")]
+    InvalidGeometry(String),
+    
+    #[error("Boolean operation failed: {0}")]
+    BooleanFailed(String),
+    
+    #[error("Topology error: {0}")]
+    TopologyError(String),
+    
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+    
+    #[error("Not implemented: {0}")]
+    NotImplemented(String),
+}

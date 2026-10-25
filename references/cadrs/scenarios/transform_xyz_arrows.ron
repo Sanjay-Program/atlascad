@@ -1,0 +1,45 @@
+// Translate by XYZ's arrows: one per world axis at the middle of the moved part.
+// 01 a 60 × 40 × 20 block, Transform on Translate by XYZ: red X, green Y and blue Z arrows at
+//    the middle of the block.
+// 02 the X arrow dragged: the block moves along X live, the X field follows.
+// 03 released, then the Z arrow dragged up: one undo step each.
+// 04 accepted.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("sketch top rect 0 0 60 40"),
+        Key("P"),
+        Key("Shift+7"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        Click(xyz(30, 20, 0)),
+        Click(ui("extrude-depth-field")),
+        Key("Ctrl+A"),
+        Type("20"),
+        Key("Enter"),
+        Key("F"),
+        Scroll(at(560, 700), -6.0),
+        Wait(20),
+        Click(ui("part-row-part-1")),
+        Click(ui("transform")),
+        WaitFor("transform-dialog"),
+        Click(ui("transform-type")),
+        Click(ui("transform-type-option-2")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("01-xyz-arrows"),
+        Drag(ui("transform-x-arrow"), ui_at("transform-x-arrow", 2.5, 0.5)),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("02-x-dragged"),
+        Drag(ui("transform-z-arrow"), ui_at("transform-z-arrow", 0.5, -1.0)),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-z-dragged"),
+        Click(ui("transform-dialog-accept")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("04-accepted"),
+    ],
+)

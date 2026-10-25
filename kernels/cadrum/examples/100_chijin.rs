@@ -1,0 +1,69 @@
+//! Build a chijin (hand drum from Amami Oshima) with colors, boolean ops, and SVG export.
+
+use cadrum::{Color, DVec3, Edge, Solid};
+use std::f64::consts::PI;
+
+/// Paint every face. A face colour outranks the solid colour, and boolean ops carry it
+/// via history, so it survives where `Solid::color` (the whole solid) would be overwritten.
+fn color_faces(mut solid: Solid, color: impl Into<Color>) -> Solid {
+	let c = color.into();
+	let ids: Vec<u64> = solid.iter_face().map(|f| f.id()).collect();
+	for id in ids {
+		solid.colormap_mut().insert(id, c);
+	}
+	solid
+}
+
+fn chijin() -> Result<Solid, cadrum::Error> {
+	// ── Body (cylinder): r=15, h=8, centered at origin (y=-4..+4) ────────
+	let cylinder = Solid::cylinder(15.0, DVec3::Y * 8.0).translate(DVec3::Y * -4.0).color("#999");
+
+	// ── Sheet: closed polygon in the XY plane (z=0), swept 360° around Y
+	// により面と縁を一体で生成する。Face::from_polygon + Face::revolve の置換版:
+	//   - Edge::polygon は最後の点 → 最初の点を自動補完して閉じる
+	//   - spine は Y 軸まわりの円。半径によらずプロファイルを Y 周りに純粋回転
+	//     させるだけなので任意の正の値で可
+	//   - ProfileOrient::Up(Y) でプロファイルの上方向を Y 固定 → 回転(revolve)と等価
+	let cross_section = Edge::polygon(&[DVec3::new(0.0, 5.0, 0.0), DVec3::new(15.0, 5.0, 0.0), DVec3::new(17.0, 3.0, 0.0), DVec3::new(15.0, 4.0, 0.0), DVec3::new(0.0, 4.0, 0.0)])?;
+	let sheet = color_faces(Solid::revolve(&cross_section, DVec3::ZERO, DVec3::Y, std::f64::consts::PI * 2.)?, "#fff");
+	let sheets = [sheet.clone().mirror(DVec3::ZERO, DVec3::Y), sheet];
+
+	// ── Lacing blocks: 2x1x8, rotated 60° around Y, placed at z=15 ──────
+	let block_proto = Solid::cube(DVec3::ZERO, DVec3::new(2.0, 1.0, 8.0)).translate(DVec3::new(-1.0, -0.5, -4.0)).rotate_y(-60.0_f64.to_radians()).translate(DVec3::Z * 15.0);
+
+	// ── Lacing holes: thin cylinders through each block ──────────────────
+	let hole_proto = Solid::cylinder(0.7, (DVec3::X * 10.0 + DVec3::Y * 30.0).normalize() * 30.0).translate(DVec3::new(-5.0, -15.0, 16.0));
+
+	// Distribute N blocks and holes evenly around Y, each block in a rainbow color
+	// N 個のブロックと穴を Y 軸周りに等間隔配置、各ブロックに虹色を割り当て
+	const N: usize = 20;
+	let angle = |i: usize| 2.0 * PI * (i as f64) / (N as f64);
+	let color = |i: usize| Color::from_hsv(i as f32 / N as f32, 1.0, 1.0);
+	let blocks: [Solid; N] = std::array::from_fn(|i| color_faces(block_proto.clone().rotate_y(-angle(i)), color(i)));
+	let holes: [Solid; N] = std::array::from_fn(|i| hole_proto.clone().rotate_y(-angle(i)));
+	// ── Assemble with boolean operations: union, subtract, union ─────────
+	let mut result: Solid = (&cylinder + &sheets[0] + &sheets[1]).build()?;
+	for i in 0..N {
+		result = (&result - &holes[i] + &blocks[i]).build()?;
+	}
+	Ok(result)
+}
+
+fn main() -> Result<(), cadrum::Error> {
+	let example_name = std::path::Path::new(file!()).file_stem().unwrap().to_str().unwrap();
+	let result = [chijin()?];
+
+	Solid::write_step(&result, &mut std::fs::File::create(format!("{example_name}.step")).unwrap())?;
+
+	let mesh = Solid::mesh(&result, Default::default())?;
+	let scene = mesh.scene(Default::default());
+	scene.write_svg(&mut std::fs::File::create(format!("{example_name}.svg")).unwrap())?;
+	scene.write_png([1280, 640], &mut std::fs::File::create(format!("{example_name}.png")).unwrap())?;
+	mesh.write_stl(&mut std::fs::File::create(format!("{example_name}.stl")).unwrap())?;
+	mesh.write_gltf_binary(&mut std::fs::File::create(format!("{example_name}.glb")).unwrap())?;
+	// This size 1280 x 640 is special because 100_chijin.png is used for github repository social media preview image.
+	// > we recommend a size of at least 640 by 320 pixels (1280 by 640 pixels for best display).　See https://docs.github.com/ja/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/customizing-your-repositorys-social-media-preview
+
+	println!("wrote {example_name}.step / {example_name}.svg / {example_name}.png");
+	Ok(())
+}

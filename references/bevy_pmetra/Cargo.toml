@@ -1,0 +1,51 @@
+[package]
+name = "bevy_pmetra"
+description = "Parametric Modelling for Bevy using Truck CAD kernel."
+version = "0.7.0"
+edition = "2021"
+authors = ["Nilay Savant"]
+categories = [
+    "bevy",
+    "parametric",
+    "CAD",
+    "procedural",
+    "mesh",
+    "3D",
+    "graphics",
+]
+exclude = ["assets/", ".github/"]
+keywords = [
+    "bevy",
+    "parametric",
+    "CAD",
+    "procedural",
+    "mesh",
+    "3D",
+    "gamedev",
+    "graphics",
+]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+
+[workspace]
+resolver = "2"
+members = ["crates/*", "pmetra_demo"]
+
+[dependencies]
+pmetra_internal = { path = "crates/pmetra_internal" }
+
+[dev-dependencies]
+bevy = "0.18"
+# TODO: Update to once published to crates.io
+smooth-bevy-cameras = { git = "https://github.com/nilaysavant/smooth-bevy-cameras", rev = "8998a69f2509b3b55d00e039043a58c5aba0e8c7" }
+bevy_egui = "0.39"
+bevy-inspector-egui = "0.36"
+
+
+# Enable high optimizations for dependencies (incl. Bevy), but not for our code:
+[profile.dev.package."*"]
+opt-level = 3
+
+# Enable a small amount of optimization in debug mode
+[profile.dev]
+opt-level = 1

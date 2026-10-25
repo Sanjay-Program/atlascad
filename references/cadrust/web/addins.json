@@ -1,0 +1,25 @@
+[
+  {
+    "kind": "wasm",
+    "url": "addins/gear-generator.wasm",
+    "manifest": null
+  },
+  {
+    "kind": "js",
+    "url": "addins/step-batch-export/main.js",
+    "manifest": {
+      "id": "step-batch-export",
+      "name": "STEP batch export",
+      "version": "0.1.0",
+      "description": "Downloads every body as its own STEP file",
+      "entry": "main.js",
+      "commands": [
+        {
+          "id": "export-all",
+          "label": "Export each body as STEP",
+          "params": []
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,63 @@
+// Wire editing in the schematic (`eda-example wire-editing`): a 4-pin connector whose pins run
+// left and down in nested Ls, and an upright wire with a level one teeing into it, a stub
+// past the tee.
+// 01 as drawn; the upright is cut at the tee (three wires there, a junction).
+// 02 the connector turned a quarter (R): each wire leaves its pin straight down, a pin pitch
+//    further than the next, then across to its upright: nested, none on top of another.
+// 03 the connector dragged left past the uprights: the wires now turn right, still nested,
+//    the old corners gone.
+// 04 a click below the tee picks that piece of the upright alone (orange), up to the tee.
+// 05 that piece dragged right: the level wire stretches to it and the stub above the tee
+//    comes along; nothing left behind.
+// 06 the level wire's free end dragged up and left: it goes there, square (an L).
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("pcb-studio"),
+        WaitFor("pcb-tree"),
+        Custom("eda-example wire-editing"),
+        WaitFor("eda-mode-bar"),
+        Click(ui("eda-mode-schematic")),
+        WaitFor("sch-erc"),
+        Custom("eda-zoom 20 60 120 115"),
+        MoveTo(1100, 900),
+        Wait(3),
+        Screenshot("01-as-drawn"),
+        Click(flat(101.6, 100.33)),
+        Key("R"),
+        Wait(3),
+        MoveTo(1100, 900),
+        Wait(3),
+        Screenshot("02-turned"),
+        Press(flat(102.87, 101.6)),
+        Hover(flat(88.0, 101.6)),
+        Hover(flat(72.39, 101.6)),
+        Release,
+        Wait(3),
+        MoveTo(1100, 900),
+        Wait(3),
+        Screenshot("03-dragged-left"),
+        Key("Escape"),
+        Click(flat(50.8, 85.0)),
+        MoveTo(1100, 900),
+        Wait(3),
+        Screenshot("04-piece-picked"),
+        Press(flat(50.8, 85.0)),
+        Hover(flat(53.34, 85.0)),
+        Hover(flat(55.88, 85.0)),
+        Release,
+        Wait(3),
+        MoveTo(1100, 900),
+        Wait(3),
+        Screenshot("05-piece-dragged"),
+        Press(flat(30.48, 101.6)),
+        Hover(flat(28.0, 96.0)),
+        Hover(flat(25.4, 91.44)),
+        Release,
+        Wait(3),
+        MoveTo(1100, 900),
+        Wait(3),
+        Screenshot("06-end-dragged"),
+    ],
+)

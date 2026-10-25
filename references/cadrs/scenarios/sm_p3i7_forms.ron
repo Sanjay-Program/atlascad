@@ -1,0 +1,34 @@
+// P3I.7 / SM16.3: forms and counterbores in a flat pattern drawing view
+// (`raw/help-drawing_flat_pattern_view.txt`: form outlines, form centermarks, the large diameter
+// of counterbore and countersink holes). A 120 × 80 plate, 1.5 mm, with two louvers (Form) and a
+// Ø6.6 hole counterbored Ø11. 01 the Part Studio; 02 Create drawing of flat pattern, the flat
+// placed at 1:1: the louvers' outlines, the hole and its Ø11 counterbore circle, a centermark at
+// each.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("flat-drawing forms"),
+        Key("F"),
+        MoveTo(1500, 960),
+        Wait(3),
+        Screenshot("01-formed-plate"),
+        RightClick(ui("part-row-formed-plate")),
+        Click(ui("part-flat-drawing")),
+        WaitFor("create-drawing-dialog"),
+        Click(ui("template-row-ANSI_A_MM.dwt")),
+        Click(ui("create-drawing-ok")),
+        Click(ui("insert-view-scale")),
+        Click(ui("insert-view-scale-option-0")),
+        MoveWorld(119, 140),
+        Wait(40),
+        MoveWorld(120, 140),
+        Wait(10),
+        ClickWorld(120, 140),
+        Key("Escape"),
+        ClickWorld(250, 200),
+        MoveTo(1500, 960),
+        Wait(5),
+        Screenshot("02-flat-with-forms-and-counterbore"),
+    ],
+)

@@ -1,0 +1,118 @@
+// P3C.3 / D2.6, D5.4, D6.5, D6.6, D6.8: one dimension's own format (the dimension palette),
+// re-attaching a dimension by its grip, and a virtual sharp, on the Ex1 flange stand-in
+// (`samples::ujoint`, inches) with Front and Right at 1:2 on an ANSI A sheet (sheet points are
+// `world(x, y)` in sheet mm; Front's origin at (66, 65.85), Right's at (180, 65.85)).
+// 01 D6.8: 2.600 (front) and 2.500 (right) placed with D; the 2.500 dimension selected: orange,
+//    its attachments blue, its grips, and the palette's flyout button beside its text.
+// 02 D6.6: the palette: prefix, suffix, symbols (Ø ± ° and ⌴ ⌵ ↧), tolerance, upper and lower
+//    values, precision, dual units.
+// 03 the Tolerance dropdown; 04 Symmetric with the upper value typed as .005 and Dual units
+//    ticked: the dimension reads 2.500±.005 with [63.50] (mm, the drawing's dual precision)
+//    over it (D2.6: the drawing's own setting stays off; the other dimension has no dual).
+// 05 deselected (a click on empty sheet): the palette closes, the override stays.
+// 06 D6.5: 2.600's right attachment grip dragged from the lug's inner face to its outer flat;
+//    07 dropped: the value updates to 3.300 (1.300 + 2.000, from the model); 08 Ctrl+Z: 2.600
+//    again.
+// 09 D5.4: Virtual sharp on the right lug's side and top edges: a mark where they would meet
+//    (the corner the 43° chamfer cuts off); 09b Drawing properties → Virtual sharps → Extension
+//    lines: the edges extended to the sharp instead; 10 selected and deleted with Delete.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("ujoint-flange"),
+        Click(ui("insert-tab")),
+        WaitFor("create-drawing"),
+        Click(ui("create-drawing")),
+        WaitFor("create-drawing-dialog"),
+        Click(ui("template-filter-1")),
+        Click(ui("template-row-ANSI_A_INCH.dwt")),
+        Click(ui("create-drawing-ok")),
+        WaitFor("insert-view-dialog"),
+        Click(ui("browser-part-1-1")),
+        Click(ui("insert-view-scale")),
+        Click(ui("insert-view-scale-option-1")),
+        MoveWorld(66, 97),
+        Wait(25),
+        ClickWorld(66, 97.6),
+        MoveWorld(180, 97),
+        Wait(25),
+        ClickWorld(180, 97.6),
+        Key("Escape"),
+        Key("D"),
+        ClickWorld(49.49, 95),
+        ClickWorld(82.51, 95),
+        MoveWorld(66, 88),
+        Wait(3),
+        ClickWorld(66, 88),
+        ClickWorld(164.125, 95),
+        ClickWorld(195.875, 95),
+        MoveWorld(180, 142),
+        Wait(3),
+        ClickWorld(180, 142),
+        Key("Escape"),
+        ClickWorld(180, 142),
+        MoveTo(1500, 960),
+        Wait(5),
+        Screenshot("01-dimension-selected"),
+        Click(ui("dimension-palette-button")),
+        WaitFor("dimension-palette"),
+        Screenshot("02-dimension-palette"),
+        Click(ui("dim-palette-tolerance")),
+        Screenshot("03-tolerance-dropdown"),
+        Click(ui("dim-palette-tolerance-option-1")),
+        Click(ui("dim-palette-upper")),
+        Key("Ctrl+A"),
+        Type(".005"),
+        Key("Enter"),
+        Click(ui("dim-palette-dual")),
+        MoveTo(1500, 960),
+        Wait(5),
+        Screenshot("04-tolerance-and-dual-units"),
+        // Deselect with a click on empty sheet, clear of the palette.
+        ClickWorld(20, 170),
+        MoveTo(1500, 960),
+        Wait(5),
+        Screenshot("05-deselected"),
+        // D6.5: re-attach 2.600's right end to the lug's outer flat (x = 2.000).
+        ClickWorld(66, 88),
+        Press(world(82.51, 88)),
+        MoveWorld(85, 88),
+        Wait(2),
+        MoveWorld(89, 88),
+        Wait(2),
+        MoveWorld(91.4, 88),
+        Wait(5),
+        Screenshot("06-grip-dragged"),
+        Release,
+        Wait(8),
+        MoveTo(1500, 960),
+        Wait(5),
+        Screenshot("07-reattached-value-updates"),
+        Key("Ctrl+Z"),
+        Screenshot("08-undone"),
+        // D5.4: a virtual sharp where the right lug's side and top would meet.
+        Key("Escape"),
+        Click(ui("drawing-virtual-sharp")),
+        ClickWorld(164.125, 112),
+        ClickWorld(175.24, 135.7),
+        Key("Escape"),
+        MoveTo(1500, 960),
+        Wait(5),
+        Screenshot("09-virtual-sharp"),
+        // D5.4: Drawing properties → Virtual sharps → Extension lines.
+        Click(ui("drawing-properties-toggle")),
+        Click(ui("drawing-props-tab-construction")),
+        Click(ui("drawing-prop-virtual_sharp")),
+        Click(ui("drawing-prop-virtual_sharp-option-1")),
+        MoveTo(1500, 960),
+        Wait(5),
+        Screenshot("09b-virtual-sharp-extension-lines"),
+        Click(ui("drawing-properties-toggle")),
+        ClickWorld(164.125, 135.7),
+        Key("Delete"),
+        MoveTo(1500, 960),
+        Wait(5),
+        Screenshot("10-virtual-sharp-deleted"),
+    ],
+)

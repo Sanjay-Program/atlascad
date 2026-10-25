@@ -1,0 +1,1040 @@
+use crate::*;
+use std::f64::consts::TAU;
+#[derive(Clone, Debug)]
+pub struct Vertex {
+    pub point: Point3,
+}
+#[derive(Clone, Debug)]
+pub struct Edge {
+    pub vertices: [usize; 2],
+    pub curve: Curve,
+}
+/// Evaluated at the SAME parameter as the owning 3D edge, including reversed uses.
+#[derive(Clone, Debug)]
+pub enum PCurve {
+    /// Rational UV geometry at the owning edge parameter; all control Z values are zero.
+    Nurbs(Box<NurbsCurve>),
+    /// Exact affine image of a circle in planar UV, sharing the 3D ellipse angle.
+    EllipseArc {
+        center: [f64; 2],
+        cosine: [f64; 2],
+        sine: [f64; 2],
+        sweep: f64,
+    },
+    /// u=t, v=offset + cosine*cos(t) + sine*sin(t), sharing ellipse angle.
+    HeightGraph {
+        offset: f64,
+        cosine: f64,
+        sine: f64,
+        sweep: f64,
+    },
+    Arc {
+        center: [f64; 2],
+        radius: f64,
+        start_angle: f64,
+        sweep: f64,
+    },
+    Affine {
+        origin: [f64; 2],
+        direction: [f64; 2],
+    },
+    Circle {
+        center: [f64; 2],
+        radius: f64,
+    },
+}
+impl PCurve {
+    pub fn nurbs(curve: NurbsCurve) -> Result<Self> {
+        if curve.control_points().iter().any(|p| p.z != 0.0) {
+            return Err(Error::InvalidInput(
+                "NURBS pcurve controls must have zero Z",
+            ));
+        }
+        Ok(Self::Nurbs(Box::new(curve)))
+    }
+    /// Checked UV evaluation at the owning edge parameter.
+    pub fn try_evaluate(&self, t: f64) -> Result<[f64; 2]> {
+        if !t.is_finite() {
+            return Err(Error::InvalidInput("pcurve parameter must be finite"));
+        }
+        if let Self::Nurbs(curve) = self {
+            if curve.control_points().iter().any(|p| p.z != 0.0) {
+                return Err(Error::InvalidInput(
+                    "NURBS pcurve controls must have zero Z",
+                ));
+            }
+            let point = curve.evaluate(t)?;
+            return Ok([point.x, point.y]);
+        }
+        let uv = self.evaluate(t);
+        if !uv.iter().all(|v| v.is_finite()) {
+            return Err(Error::InvalidInput(
+                "pcurve evaluation exceeds finite range",
+            ));
+        }
+        Ok(uv)
+    }
+    /// Compatibility evaluation; rational evaluation errors produce NaN UV values.
+    pub fn evaluate(&self, t: f64) -> [f64; 2] {
+        match *self {
+            Self::Nurbs(_) => self.try_evaluate(t).unwrap_or([f64::NAN; 2]),
+            Self::EllipseArc {
+                center,
+                cosine,
+                sine,
+                ..
+            } => std::array::from_fn(|i| center[i] + cosine[i] * t.cos() + sine[i] * t.sin()),
+            Self::HeightGraph {
+                offset,
+                cosine,
+                sine,
+                ..
+            } => [t, offset + cosine * t.cos() + sine * t.sin()],
+            Self::Affine { origin, direction } => {
+                [origin[0] + direction[0] * t, origin[1] + direction[1] * t]
+            }
+            Self::Arc {
+                center,
+                radius,
+                start_angle,
+                ..
+            } => [
+                center[0] + radius * (start_angle + t).cos(),
+                center[1] + radius * (start_angle + t).sin(),
+            ],
+            Self::Circle { center, radius } => {
+                [center[0] + radius * t.cos(), center[1] + radius * t.sin()]
+            }
+        }
+    }
+}
+#[derive(Clone, Debug)]
+pub struct Coedge {
+    pub edge: usize,
+    pub forward: bool,
+    pub pcurve: PCurve,
+}
+#[derive(Clone, Debug)]
+pub struct Wire {
+    pub coedges: Vec<Coedge>,
+}
+/// Wires follow the positive parameter-domain orientation: outer CCW, holes CW.
+/// Orientation reverses the complete face, including all its coedges.
+#[derive(Clone, Debug)]
+pub struct Face {
+    pub surface: Surface,
+    pub wires: Vec<Wire>,
+    pub orientation: i8,
+}
+#[derive(Clone, Debug)]
+pub struct Shell {
+    pub faces: Vec<Face>,
+}
+#[derive(Clone, Debug)]
+pub struct Solid {
+    pub vertices: Vec<Vertex>,
+    pub edges: Vec<Edge>,
+    pub shell: Shell,
+}
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Bounds {
+    pub min: Point3,
+    pub max: Point3,
+}
+impl Face {
+    pub(crate) fn cylinder_span(&self) -> Result<f64> {
+        let span = self.circular_span()?;
+        let bands = self.circular_bands()?;
+        let (_, _, height, _) = crate::circular_trims::surface_data(&self.surface)?;
+        if bands != [[0., 0., 0.], [height, 0., 0.]] {
+            return Err(Error::Unsupported(
+                "this operation requires rectangular circular trims, not height-graph bands",
+            ));
+        }
+        Ok(span)
+    }
+    pub(crate) fn circular_span(&self) -> Result<f64> {
+        if self.wires.len() != 1 || self.wires[0].coedges.len() != 4 {
+            return Err(Error::Unsupported(
+                "cylindrical trim requires a four-coedge rectangle",
+            ));
+        }
+        let PCurve::Affine { origin, .. } = self.wires[0].coedges[1].pcurve else {
+            return Err(Error::Unsupported("nonrectangular cylindrical trim"));
+        };
+        let span = origin[0];
+        if !span.is_finite() || span <= 0.0 || span > TAU {
+            return Err(Error::Unsupported(
+                "cylindrical angular span must be in (0, 2pi]",
+            ));
+        }
+        Ok(span)
+    }
+    // Precisely delimit the trim domains covered by this first kernel milestone.
+    fn validate_supported_trim(&self, tol: Tolerance) -> Result<()> {
+        if self
+            .wires
+            .iter()
+            .flat_map(|w| &w.coedges)
+            .any(|c| matches!(c.pcurve, PCurve::Nurbs(_)))
+        {
+            return Err(Error::Unsupported(
+                "rational pcurve trim analysis is not implemented",
+            ));
+        }
+        match self.surface {
+            Surface::Nurbs(_) => {
+                return Err(Error::Unsupported(
+                    "NURBS solid trim validation is not implemented",
+                ))
+            }
+            Surface::Plane { .. } => {
+                if crate::ellipse_planar::has_ellipse(self) {
+                    crate::ellipse_planar::ring(self, tol)?;
+                    return Ok(());
+                }
+                if self
+                    .wires
+                    .iter()
+                    .flat_map(|w| &w.coedges)
+                    .any(|c| matches!(c.pcurve, PCurve::Arc { .. }))
+                {
+                    let mut loops = Vec::new();
+                    for wire in &self.wires {
+                        let mut segments = Vec::new();
+                        for c in &wire.coedges {
+                            let segment = match c.pcurve {
+                                PCurve::Nurbs(_)
+                                | PCurve::HeightGraph { .. }
+                                | PCurve::EllipseArc { .. } => {
+                                    return Err(Error::Unsupported(
+                                        "height graphs are supported only on circular walls",
+                                    ))
+                                }
+                                PCurve::Affine { .. } => PlanarSegment::Line {
+                                    a: c.pcurve.evaluate(0.0),
+                                    b: c.pcurve.evaluate(1.0),
+                                },
+                                PCurve::Arc {
+                                    center,
+                                    radius,
+                                    start_angle,
+                                    sweep,
+                                } => PlanarSegment::Arc {
+                                    center,
+                                    radius,
+                                    start_angle,
+                                    sweep,
+                                },
+                                PCurve::Circle { center, radius } => {
+                                    let arcs = [
+                                        PlanarSegment::Arc {
+                                            center,
+                                            radius,
+                                            start_angle: 0.0,
+                                            sweep: std::f64::consts::PI,
+                                        },
+                                        PlanarSegment::Arc {
+                                            center,
+                                            radius,
+                                            start_angle: std::f64::consts::PI,
+                                            sweep: std::f64::consts::PI,
+                                        },
+                                    ];
+                                    if c.forward {
+                                        segments.extend(arcs);
+                                    } else {
+                                        segments.extend(
+                                            arcs.into_iter().rev().map(PlanarSegment::reversed),
+                                        );
+                                    }
+                                    continue;
+                                }
+                            };
+                            segments.push(if c.forward {
+                                segment
+                            } else {
+                                segment.reversed()
+                            });
+                        }
+                        loops.push(segments);
+                    }
+                    crate::mixed::validate_mixed_region_trim(&loops, tol)?;
+                    return Ok(());
+                }
+                use crate::planar::{validate_polygon_trim, validate_region, PlanarLoop};
+                let mut loops = Vec::new();
+                for w in &self.wires {
+                    if w.coedges.len() == 1 {
+                        let PCurve::Circle { center, radius } = w.coedges[0].pcurve else {
+                            return Err(Error::Unsupported(
+                                "one-edge planar wire must be circular",
+                            ));
+                        };
+                        if !radius.is_finite() || radius <= tol.linear {
+                            return Err(Error::InvalidTopology("invalid circular trim"));
+                        }
+                        loops.push(PlanarLoop::Circle { center, radius });
+                    } else {
+                        if w.coedges
+                            .iter()
+                            .any(|c| !matches!(c.pcurve, PCurve::Affine { .. }))
+                        {
+                            return Err(Error::Unsupported(
+                                "full-circle coedges cannot be combined with other planar trim segments",
+                            ));
+                        }
+                        let points: Vec<_> = w
+                            .coedges
+                            .iter()
+                            .map(|c| c.pcurve.evaluate(if c.forward { 0.0 } else { 1.0 }))
+                            .collect();
+                        validate_polygon_trim(&points, tol)?;
+                        loops.push(PlanarLoop::Polygon(points));
+                    }
+                }
+                validate_region(&loops[0], &loops[1..], tol)?;
+            }
+
+            Surface::Cylinder { .. }
+            | Surface::FramedCylinder { .. }
+            | Surface::ExtrudedCircle { .. } => {
+                crate::circular_trims::validate_face(self, tol)?;
+            }
+        }
+        Ok(())
+    }
+}
+impl Solid {
+    /// Copies exact geometry through a rigid transform. Shared indices, edge
+    /// parameters, pcurves and orientations are unchanged; both solids are checked.
+    pub fn transformed(&self, transform: Transform, tol: Tolerance) -> Result<Self> {
+        self.validate(tol)?;
+        let mut result = self.clone();
+        for v in &mut result.vertices {
+            v.point = transform.point(v.point);
+        }
+        for e in &mut result.edges {
+            e.curve = e.curve.transformed(transform)?;
+        }
+        for f in &mut result.shell.faces {
+            f.surface = f.surface.transformed(transform)?;
+        }
+        result.validate(tol)?;
+        let original_volume = self.volume()?;
+        if (result.volume()? - original_volume).abs() > original_volume * 1e-10 {
+            return Err(Error::InvalidInput(
+                "rigid placement loses volume at this coordinate magnitude",
+            ));
+        }
+        Ok(result)
+    }
+    pub fn validate(&self, tol: Tolerance) -> Result<()> {
+        if self
+            .edges
+            .iter()
+            .any(|e| matches!(e.curve, Curve::Nurbs(_)))
+            || self
+                .shell
+                .faces
+                .iter()
+                .any(|f| matches!(f.surface, Surface::Nurbs(_)))
+        {
+            return Err(Error::Unsupported(
+                "NURBS geometry requires a scoped NURBS topology API, not generic Solid validation",
+            ));
+        }
+        Tolerance::new(tol.linear)?;
+        if self.shell.faces.is_empty() || self.vertices.is_empty() {
+            return Err(Error::InvalidTopology("empty solid"));
+        }
+        if self.vertices.iter().any(|v| !v.point.finite()) {
+            return Err(Error::InvalidTopology("nonfinite vertex"));
+        }
+        for e in &self.edges {
+            if e.vertices.iter().any(|&i| i >= self.vertices.len()) {
+                return Err(Error::InvalidTopology("invalid vertex index"));
+            }
+            let [a, b] = e.curve.range();
+            // Compare curved endpoints before adding a large world origin.
+            // Two rounded world evaluations can otherwise agree off the curve.
+            for (vertex, parameter) in e.vertices.into_iter().zip([a, b]) {
+                let point = self.vertices[vertex].point;
+                let (cosine, sine) = (parameter.cos(), parameter.sin());
+                let error = match e.curve {
+                    Curve::Nurbs(_) => {
+                        return Err(Error::Unsupported(
+                            "NURBS solid edge validation is not implemented",
+                        ))
+                    }
+                    Curve::Circle { center, radius } => {
+                        (point - center) - Vec3::new(radius * cosine, radius * sine, 0.)
+                    }
+                    Curve::FramedCircle { frame, radius } | Curve::Arc { frame, radius, .. } => {
+                        frame.local_point(point) - Vec3::new(radius * cosine, radius * sine, 0.)
+                    }
+                    Curve::EllipseArc {
+                        center,
+                        cosine: u,
+                        sine: v,
+                        ..
+                    } => (point - center) - (u * cosine + v * sine),
+                    Curve::Line { .. } => point - e.curve.evaluate(parameter),
+                };
+                if !error.finite() || error.norm() > tol.linear {
+                    return Err(Error::InvalidTopology(
+                        "edge endpoints disagree with curve in local coordinates",
+                    ));
+                }
+            }
+            match e.curve {
+                Curve::EllipseArc {
+                    center,
+                    cosine,
+                    sine,
+                    sweep,
+                } => {
+                    if !center.finite()
+                        || !cosine.finite()
+                        || !sine.finite()
+                        || !sweep.is_finite()
+                        || sweep <= 0.
+                        || sweep > std::f64::consts::PI
+                        || cosine.norm() <= tol.linear
+                        || sine.norm() <= tol.linear
+                        || !cosine.norm().is_finite()
+                        || !sine.norm().is_finite()
+                        || cosine.normalized()?.cross(sine.normalized()?).norm() <= 1e-10
+                    {
+                        return Err(Error::InvalidTopology(
+                            "invalid or unresolved bounded ellipse",
+                        ));
+                    }
+                }
+                Curve::Line { a, b } if (a - b).norm() <= tol.linear => {
+                    return Err(Error::InvalidTopology("degenerate edge"))
+                }
+                Curve::Circle { radius, .. } | Curve::FramedCircle { radius, .. }
+                    if !radius.is_finite() || radius <= tol.linear =>
+                {
+                    return Err(Error::InvalidTopology("invalid circle"))
+                }
+                Curve::Arc { radius, sweep, .. }
+                    if !radius.is_finite()
+                        || radius <= tol.linear
+                        || !sweep.is_finite()
+                        || sweep <= 0.0
+                        || sweep > std::f64::consts::PI =>
+                {
+                    return Err(Error::InvalidTopology("invalid bounded arc"));
+                }
+                _ => {}
+            }
+        }
+        let mut uses = vec![Vec::new(); self.edges.len()];
+        let mut vertex_used = vec![false; self.vertices.len()];
+        for (fi, f) in self.shell.faces.iter().enumerate() {
+            if ![-1, 1].contains(&f.orientation) || f.wires.is_empty() {
+                return Err(Error::InvalidTopology(
+                    "invalid face orientation or empty boundary",
+                ));
+            }
+            match f.surface {
+                Surface::Nurbs(_) => {
+                    return Err(Error::Unsupported(
+                        "NURBS solid face validation is not implemented",
+                    ))
+                }
+                Surface::Plane { origin, u, v } => {
+                    if !origin.finite()
+                        || !crate::geometry::plane_basis_valid(
+                            u,
+                            v,
+                            GeometryTolerance::try_from(tol)?,
+                        )
+                    {
+                        return Err(Error::InvalidTopology("invalid plane basis"));
+                    }
+                }
+                Surface::ExtrudedCircle {
+                    frame,
+                    radius,
+                    height,
+                    drift,
+                } => {
+                    if !radius.is_finite()
+                        || radius <= tol.linear
+                        || !height.is_finite()
+                        || height <= tol.linear
+                        || drift.iter().any(|x| !x.is_finite())
+                        || !drift[0].hypot(drift[1]).is_finite()
+                        || !frame
+                            .point(Vec3::new(drift[0] * height, drift[1] * height, height))
+                            .finite()
+                    {
+                        return Err(Error::InvalidTopology("invalid circular extrusion surface"));
+                    }
+                }
+                Surface::FramedCylinder { radius, height, .. } => {
+                    if !radius.is_finite()
+                        || !height.is_finite()
+                        || radius <= tol.linear
+                        || height <= tol.linear
+                    {
+                        return Err(Error::InvalidTopology("invalid framed cylinder surface"));
+                    }
+                }
+                Surface::Cylinder {
+                    center,
+                    radius,
+                    height,
+                } => {
+                    if !center.finite()
+                        || !radius.is_finite()
+                        || !height.is_finite()
+                        || radius <= tol.linear
+                        || height <= tol.linear
+                    {
+                        return Err(Error::InvalidTopology("invalid cylinder surface"));
+                    }
+                }
+            }
+            for w in &f.wires {
+                if w.coedges.is_empty() {
+                    return Err(Error::InvalidTopology("empty wire"));
+                }
+                for (i, c) in w.coedges.iter().enumerate() {
+                    let e = self
+                        .edges
+                        .get(c.edge)
+                        .ok_or(Error::InvalidTopology("invalid edge index"))?;
+                    let next = &w.coedges[(i + 1) % w.coedges.len()];
+                    let ne = self
+                        .edges
+                        .get(next.edge)
+                        .ok_or(Error::InvalidTopology("invalid edge index"))?;
+                    let end = e.vertices[usize::from(c.forward)];
+                    let start = ne.vertices[usize::from(!next.forward)];
+                    if end != start {
+                        return Err(Error::InvalidTopology("wire is not topologically closed"));
+                    }
+                    match (&e.curve, &c.pcurve) {
+                        (
+                            Curve::EllipseArc {
+                                center,
+                                cosine,
+                                sine,
+                                sweep,
+                            },
+                            PCurve::EllipseArc {
+                                center: pc_center,
+                                cosine: pc_cosine,
+                                sine: pc_sine,
+                                sweep: pc_sweep,
+                            },
+                        ) => {
+                            let Surface::Plane { u, v, .. } = f.surface else {
+                                return Err(Error::Unsupported("ellipse pcurves require a plane"));
+                            };
+                            let mismatch =
+                                (*center - f.surface.evaluate(pc_center[0], pc_center[1])).norm()
+                                    + (*cosine - u * pc_cosine[0] - v * pc_cosine[1]).norm()
+                                    + (*sine - u * pc_sine[0] - v * pc_sine[1]).norm();
+                            if *sweep != *pc_sweep || !mismatch.is_finite() || mismatch > tol.linear
+                            {
+                                return Err(Error::InvalidTopology(
+                                    "ellipse and planar pcurve coefficients disagree",
+                                ));
+                            }
+                            let precision = 512.
+                                * f64::EPSILON
+                                * (center.norm()
+                                    + cosine.norm()
+                                    + sine.norm()
+                                    + f.surface.evaluate(pc_center[0], pc_center[1]).norm());
+                            if mismatch > precision {
+                                return Err(Error::Unsupported("ellipse/pcurve coefficients differ beyond checked arithmetic precision"));
+                            }
+                        }
+                        (_, PCurve::EllipseArc { .. }) => {
+                            return Err(Error::InvalidTopology(
+                                "ellipse pcurve requires an ellipse edge",
+                            ))
+                        }
+                        (Curve::EllipseArc { .. }, _)
+                            if matches!(f.surface, Surface::Plane { .. }) =>
+                        {
+                            return Err(Error::InvalidTopology(
+                                "planar ellipse edge requires an ellipse pcurve",
+                            ))
+                        }
+                        (Curve::Line { .. }, PCurve::Circle { .. } | PCurve::Arc { .. }) => {
+                            return Err(Error::InvalidTopology(
+                                "line edge cannot have a circular pcurve",
+                            ))
+                        }
+                        (
+                            Curve::Circle { .. } | Curve::FramedCircle { .. } | Curve::Arc { .. },
+                            PCurve::Affine { .. },
+                        ) if matches!(f.surface, Surface::Plane { .. }) => {
+                            return Err(Error::InvalidTopology(
+                                "planar circular edge requires a circular pcurve",
+                            ))
+                        }
+                        (
+                            Curve::Arc { sweep, .. },
+                            PCurve::Arc {
+                                sweep: pc_sweep, ..
+                            },
+                        ) if (sweep - pc_sweep).abs() > 1e-10 => {
+                            return Err(Error::InvalidTopology(
+                                "arc and pcurve angular spans disagree",
+                            ))
+                        }
+                        (Curve::Arc { .. }, PCurve::Circle { .. })
+                        | (Curve::Circle { .. } | Curve::FramedCircle { .. }, PCurve::Arc { .. }) => {
+                            return Err(Error::InvalidTopology(
+                                "bounded arcs and full-circle pcurves cannot be interchanged",
+                            ))
+                        }
+                        _ => {}
+                    }
+                    let range = e.curve.range();
+                    for k in 0..=8 {
+                        let t = range[0] + (range[1] - range[0]) * k as f64 / 8.0;
+                        let uv = c.pcurve.try_evaluate(t)?;
+                        if !uv.iter().all(|v| v.is_finite())
+                            || !tol
+                                .coincident(e.curve.evaluate(t), f.surface.evaluate(uv[0], uv[1]))
+                        {
+                            return Err(Error::InvalidTopology("pcurve disagrees with 3D edge"));
+                        }
+                    }
+                    let uv = c.pcurve.try_evaluate(range[usize::from(c.forward)])?;
+                    let nr = ne.curve.range();
+                    let nv = next.pcurve.try_evaluate(nr[usize::from(!next.forward)])?;
+                    if (uv[0] - nv[0]).hypot(uv[1] - nv[1]) > tol.linear {
+                        return Err(Error::InvalidTopology(
+                            "wire is not closed in surface parameters",
+                        ));
+                    }
+                    vertex_used[e.vertices[0]] = true;
+                    vertex_used[e.vertices[1]] = true;
+                    uses[c.edge].push((
+                        fi,
+                        if c.forward {
+                            f.orientation
+                        } else {
+                            -f.orientation
+                        },
+                    ));
+                }
+            }
+            if matches!(f.surface, Surface::Plane { .. }) {
+                for (i, w) in f.wires.iter().enumerate() {
+                    let a = try_wire_area(w)?;
+                    if !a.is_finite()
+                        || a.abs() <= tol.linear * tol.linear
+                        || (i == 0 && a < 0.0)
+                        || (i > 0 && a > 0.0)
+                    {
+                        return Err(Error::InvalidTopology(
+                            "invalid planar wire winding or area",
+                        ));
+                    }
+                }
+            }
+        }
+        for f in &self.shell.faces {
+            f.validate_supported_trim(tol)?;
+        }
+        if vertex_used.iter().any(|v| !*v)
+            || uses.iter().any(|u| u.len() != 2 || u[0].1 + u[1].1 != 0)
+        {
+            return Err(Error::InvalidTopology(
+                "shell is not closed, shared edges must have opposite orientations",
+            ));
+        }
+        // The link of every vertex must be one cycle. Edge endpoints are distinct
+        // link nodes even for closed circles; this also handles periodic seams.
+        for vertex in 0..self.vertices.len() {
+            let mut links = std::collections::BTreeMap::<usize, Vec<usize>>::new();
+            for f in &self.shell.faces {
+                for w in &f.wires {
+                    for i in 0..w.coedges.len() {
+                        let c = &w.coedges[i];
+                        let prev = &w.coedges[(i + w.coedges.len() - 1) % w.coedges.len()];
+                        let start = usize::from(!c.forward);
+                        let end = usize::from(prev.forward);
+                        if self.edges[c.edge].vertices[start] == vertex {
+                            let a = 2 * c.edge + start;
+                            let b = 2 * prev.edge + end;
+                            links.entry(a).or_default().push(b);
+                            links.entry(b).or_default().push(a);
+                        }
+                    }
+                }
+            }
+            if links.values().any(|adj| adj.len() != 2) {
+                return Err(Error::InvalidTopology("nonmanifold vertex link"));
+            }
+            let mut pending = vec![*links
+                .keys()
+                .next()
+                .ok_or(Error::InvalidTopology("unused vertex"))?];
+            let mut reached = std::collections::BTreeSet::new();
+            while let Some(node) = pending.pop() {
+                if reached.insert(node) {
+                    pending.extend(&links[&node]);
+                }
+            }
+            if reached.len() != links.len() {
+                return Err(Error::InvalidTopology("disconnected vertex link"));
+            }
+        }
+        let mut seen = vec![false; self.shell.faces.len()];
+        let mut pending = vec![0];
+        while let Some(i) = pending.pop() {
+            if seen[i] {
+                continue;
+            }
+            seen[i] = true;
+            for u in &uses {
+                if u[0].0 == i {
+                    pending.push(u[1].0);
+                }
+                if u[1].0 == i {
+                    pending.push(u[0].0);
+                }
+            }
+        }
+        if seen.iter().any(|s| !*s) {
+            return Err(Error::InvalidTopology("disconnected shell"));
+        }
+        if self.volume()? <= tol.linear.powi(3) {
+            return Err(Error::InvalidTopology("nonpositive volume"));
+        }
+        Ok(())
+    }
+    /// Divergence theorem, integrated analytically over the supported exact surfaces.
+    pub fn volume(&self) -> Result<f64> {
+        if self
+            .edges
+            .iter()
+            .any(|e| matches!(e.curve, Curve::Nurbs(_)))
+            || self
+                .shell
+                .faces
+                .iter()
+                .any(|f| matches!(f.surface, Surface::Nurbs(_)))
+        {
+            return Err(Error::Unsupported(
+                "NURBS solid volume integration is not implemented",
+            ));
+        }
+        let reference = self
+            .vertices
+            .first()
+            .ok_or(Error::InvalidTopology("empty solid"))?
+            .point;
+        let mut sum = 0.0;
+        for f in &self.shell.faces {
+            let term = if f
+                .wires
+                .iter()
+                .flat_map(|w| &w.coedges)
+                .any(|c| matches!(c.pcurve, PCurve::HeightGraph { .. }))
+            {
+                crate::circular_trims::volume_term(f, reference)?
+            } else {
+                match f.surface {
+                    Surface::Nurbs(_) => {
+                        return Err(Error::Unsupported(
+                            "NURBS solid volume integration is not implemented",
+                        ))
+                    }
+                    Surface::Plane { origin, u, v } => {
+                        (origin - reference).dot(u.cross(v))
+                            * f.wires
+                                .iter()
+                                .map(try_wire_area)
+                                .collect::<Result<Vec<_>>>()?
+                                .into_iter()
+                                .sum::<f64>()
+                            / 3.0
+                    }
+                    Surface::ExtrudedCircle {
+                        frame,
+                        radius,
+                        height,
+                        drift,
+                    } => {
+                        let span = f.cylinder_span()?;
+                        let delta = frame.local_point(reference) * (-1.);
+                        if span == TAU {
+                            TAU * radius * radius * height / 3.
+                        } else {
+                            radius * height / 3.
+                                * (radius * span
+                                    + (delta.x - drift[0] * delta.z) * span.sin()
+                                    + (delta.y - drift[1] * delta.z) * (1. - span.cos()))
+                        }
+                    }
+                    Surface::Cylinder { radius, height, .. }
+                    | Surface::FramedCylinder { radius, height, .. } => {
+                        let span = f.cylinder_span()?;
+                        if span == TAU {
+                            TAU * radius * radius * height / 3.0
+                        } else {
+                            let (center, u, v) = match f.surface {
+                                Surface::Cylinder { center, .. } => {
+                                    (center, Vec3::new(1.0, 0.0, 0.0), Vec3::new(0.0, 1.0, 0.0))
+                                }
+                                Surface::FramedCylinder { frame, .. } => {
+                                    (frame.origin(), frame.axes()[0], frame.axes()[1])
+                                }
+                                _ => unreachable!(),
+                            };
+                            let delta = center - reference;
+                            radius * height / 3.0
+                                * (radius * span
+                                    + delta.dot(u) * span.sin()
+                                    + delta.dot(v) * (1.0 - span.cos()))
+                        }
+                    }
+                }
+            };
+            sum += term * f.orientation as f64;
+        }
+        if !sum.is_finite() {
+            return Err(Error::InvalidInput("nonfinite volume"));
+        }
+        Ok(sum)
+    }
+    /// Analytic bounds for supported solids; raw rational geometry receives a
+    /// conservative control-hull enclosure, not exact rational extrema.
+    /// Bounds alone do not validate a solid or enable NURBS solid operations.
+    pub fn bounds(&self) -> Bounds {
+        let mut lo = Vec3::new(f64::INFINITY, f64::INFINITY, f64::INFINITY);
+        let mut hi = lo * (-1.0);
+        let mut add = |p: Point3| {
+            lo.x = lo.x.min(p.x);
+            lo.y = lo.y.min(p.y);
+            lo.z = lo.z.min(p.z);
+            hi.x = hi.x.max(p.x);
+            hi.y = hi.y.max(p.y);
+            hi.z = hi.z.max(p.z);
+        };
+        for v in &self.vertices {
+            add(v.point);
+        }
+        // Rational convex hulls supply conservative raw bounds only. Generic
+        // NURBS solids are explicitly rejected by validate/volume/tessellate.
+        for face in &self.shell.faces {
+            if let Surface::Nurbs(ref surface) = face.surface {
+                for point in surface.control_points() {
+                    add(*point);
+                }
+            }
+        }
+        for e in &self.edges {
+            let circle = match e.curve {
+                Curve::Nurbs(ref curve) => {
+                    for point in curve.control_points() {
+                        add(*point);
+                    }
+                    None
+                }
+                Curve::Circle { center, radius } => Some((
+                    center,
+                    Vec3::new(1.0, 0.0, 0.0),
+                    Vec3::new(0.0, 1.0, 0.0),
+                    radius,
+                )),
+                Curve::FramedCircle { frame, radius } => {
+                    Some((frame.origin(), frame.axes()[0], frame.axes()[1], radius))
+                }
+                Curve::Arc {
+                    frame,
+                    radius,
+                    sweep,
+                } => {
+                    for angle in [0.0, sweep] {
+                        add(frame.point(Vec3::new(
+                            radius * angle.cos(),
+                            radius * angle.sin(),
+                            0.0,
+                        )));
+                    }
+                    let [u, v, _] = frame.axes();
+                    for (a, b) in [(u.x, v.x), (u.y, v.y), (u.z, v.z)] {
+                        let angle = b.atan2(a).rem_euclid(TAU);
+                        for t in [angle, (angle + std::f64::consts::PI).rem_euclid(TAU)] {
+                            if t <= sweep {
+                                add(frame.point(Vec3::new(
+                                    radius * t.cos(),
+                                    radius * t.sin(),
+                                    0.0,
+                                )));
+                            }
+                        }
+                    }
+                    None
+                }
+                Curve::EllipseArc {
+                    center,
+                    cosine,
+                    sine,
+                    sweep,
+                } => {
+                    add(e.curve.evaluate(0.));
+                    add(e.curve.evaluate(sweep));
+                    for (a, b) in [(cosine.x, sine.x), (cosine.y, sine.y), (cosine.z, sine.z)] {
+                        let angle = b.atan2(a).rem_euclid(TAU);
+                        for t in [angle, (angle + std::f64::consts::PI).rem_euclid(TAU)] {
+                            if t <= sweep {
+                                add(center + cosine * t.cos() + sine * t.sin());
+                            }
+                        }
+                    }
+                    None
+                }
+                Curve::Line { .. } => None,
+            };
+            if let Some((center, u, v, radius)) = circle {
+                let extent = Vec3::new(u.x.hypot(v.x), u.y.hypot(v.y), u.z.hypot(v.z)) * radius;
+                add(center + extent);
+                add(center - extent);
+            }
+        }
+        Bounds { min: lo, max: hi }
+    }
+}
+pub(crate) fn try_wire_area(w: &Wire) -> Result<f64> {
+    if w.coedges
+        .iter()
+        .any(|c| matches!(c.pcurve, PCurve::Nurbs(_)))
+    {
+        return Err(Error::Unsupported(
+            "rational pcurve area is not implemented",
+        ));
+    }
+    let reference = w
+        .coedges
+        .first()
+        .map(|c| c.pcurve.evaluate(0.0))
+        .unwrap_or([0.0, 0.0]);
+    let area = w
+        .coedges
+        .iter()
+        .map(|c| {
+            let a = match c.pcurve {
+                PCurve::Nurbs(_) => {
+                    return Err(Error::Unsupported(
+                        "rational pcurve area is not implemented",
+                    ))
+                }
+                PCurve::EllipseArc {
+                    center,
+                    cosine,
+                    sine,
+                    sweep,
+                } => {
+                    let x = [center[0] - reference[0], center[1] - reference[1]];
+                    let cross = |a: [f64; 2], b: [f64; 2]| a[0] * b[1] - a[1] * b[0];
+                    0.5 * (cross(x, cosine) * (sweep.cos() - 1.)
+                        + cross(x, sine) * sweep.sin()
+                        + cross(cosine, sine) * sweep)
+                }
+                PCurve::HeightGraph {
+                    offset,
+                    cosine,
+                    sine,
+                    sweep,
+                } => {
+                    let y0 = offset + cosine;
+                    let y1 = offset + cosine * sweep.cos() + sine * sweep.sin();
+                    0.5 * (sweep * (y1 + reference[1])
+                        - reference[0] * (y1 - y0)
+                        - 2. * (offset * sweep + cosine * sweep.sin() + sine * (1. - sweep.cos())))
+                }
+                PCurve::Affine { origin, direction } => {
+                    0.5 * ((origin[0] - reference[0]) * direction[1]
+                        - (origin[1] - reference[1]) * direction[0])
+                }
+                PCurve::Arc {
+                    center,
+                    radius,
+                    start_angle,
+                    sweep,
+                } => {
+                    let end = start_angle + sweep;
+                    0.5 * (radius
+                        * ((center[0] - reference[0]) * (end.sin() - start_angle.sin())
+                            - (center[1] - reference[1]) * (end.cos() - start_angle.cos()))
+                        + radius * radius * sweep)
+                }
+                PCurve::Circle { radius, .. } => std::f64::consts::PI * radius * radius,
+            };
+            Ok(if c.forward { a } else { -a })
+        })
+        .sum::<Result<f64>>()?;
+    Ok(area)
+}
+
+#[cfg(test)]
+mod height_graph_tests {
+    use super::*;
+    #[test]
+    fn closed_height_graph_wire_area_matches_independent_integral() {
+        let sweep = 1.3;
+        let offset = 1.2;
+        let cosine = 0.2;
+        let sine = -0.3;
+        let top = 4.;
+        let graph = PCurve::HeightGraph {
+            offset,
+            cosine,
+            sine,
+            sweep,
+        };
+        let y0 = graph.evaluate(0.)[1];
+        let y1 = graph.evaluate(sweep)[1];
+        let wire = Wire {
+            coedges: vec![
+                Coedge {
+                    edge: 0,
+                    forward: true,
+                    pcurve: graph,
+                },
+                Coedge {
+                    edge: 1,
+                    forward: true,
+                    pcurve: PCurve::Affine {
+                        origin: [sweep, y1],
+                        direction: [0., top - y1],
+                    },
+                },
+                Coedge {
+                    edge: 2,
+                    forward: true,
+                    pcurve: PCurve::Affine {
+                        origin: [sweep, top],
+                        direction: [-sweep, 0.],
+                    },
+                },
+                Coedge {
+                    edge: 3,
+                    forward: true,
+                    pcurve: PCurve::Affine {
+                        origin: [0., top],
+                        direction: [0., y0 - top],
+                    },
+                },
+            ],
+        };
+        let expected =
+            top * sweep - (offset * sweep + cosine * sweep.sin() + sine * (1. - sweep.cos()));
+        assert!((try_wire_area(&wire).unwrap() - expected).abs() < 1e-12);
+    }
+}

@@ -1,0 +1,96 @@
+// P3.10 / PS5.5: the Boolean feature's Subtract Offset and its reorderable Tools, on a
+// 60 × 60 × 30 block and a 20 × 20 × 40 post standing in it (values asserted in
+// `cadrs_core/tests/part_studio_options.rs`: `boolean_offset_and_tool_order`; the kernel's
+// `offset_solids`). While the Boolean subtracts, its tools are ghosted (the post, kept) over the
+// orange targets, so the hole it cuts shows through it, and the Faces to offset are blue (P3.10
+// judge: tools and targets were one orange mass).
+// 01 Subtract (Tools the post, Targets the block), Keep tools, with Offset, Offset all and
+//    Distance 1 mm, seen from the top: the post grows 1 mm on every face before it cuts, so the
+//    hole is 22 × 22, a 1 mm gap (the white ring) all round the kept post.
+// 02 Offset all off, Faces to offset = the post's +X face only (blue), close up.
+// 03 the same from the top: the hole grows on that side only (21 × 20: the gap on +X alone).
+// 04 the Opposite direction: that face moves in instead (19 × 20: the block's edge runs under
+//    the ghosted post on +X, no gap anywhere).
+// 05 Union of the post and the block (in that order), tools used up: the result is the first
+//    tool, the post (Part 1 in the Parts list); the Tools' ↑↓ (Reorder items) shows the drag
+//    handles.
+// 06 the block dragged above the post: the union is now the block (Part 2).
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("sketch top rect 20 20 40 40"),
+        Key("P"),
+        Key("Shift+7"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        Click(xyz(30, 30, 0)),
+        Click(ui("extrude-depth-field")),
+        Key("Ctrl+A"),
+        Type("40"),
+        Key("Enter"),
+        Custom("sketch top rect 0 0 60 60"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        Click(xyz(10, 10, 0)),
+        Click(ui("extrude-operation-0")),
+        Click(ui("extrude-depth-field")),
+        Key("Ctrl+A"),
+        Type("30"),
+        Key("Enter"),
+        Key("F"),
+        Click(ui("boolean")),
+        WaitFor("boolean-dialog"),
+        Click(ui("boolean-operation-1")),
+        Click(xyz(40, 30, 35)),
+        Click(ui("boolean-targets-field")),
+        Click(xyz(60, 10, 15)),
+        Click(ui("boolean-keep-tools-checkbox")),
+        Click(ui("boolean-offset-checkbox")),
+        Click(ui("boolean-offset-distance-field")),
+        Key("Ctrl+A"),
+        Type("1"),
+        Click(ui("boolean-dialog-title")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Key("Shift+5"),
+        Scroll(xyz(30, 30, 40), 3),
+        Wait(20),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("01-subtract-offset-all-1mm-top"),
+        Click(ui("boolean-offset-all-checkbox")),
+        Key("Shift+7"),
+        Key("F"),
+        Scroll(xyz(30, 30, 40), 2),
+        Wait(20),
+        Click(xyz(40, 30, 35)),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("02-offset-one-face-blue"),
+        Key("Shift+5"),
+        Key("F"),
+        Scroll(xyz(30, 30, 40), 3),
+        Wait(20),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-offset-one-face-top"),
+        Click(ui("boolean-offset-flip")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("04-offset-one-face-inward-top"),
+        Key("Shift+7"),
+        Key("F"),
+        Click(ui("boolean-operation-0")),
+        Click(xyz(60, 10, 15)),
+        Click(ui("boolean-keep-tools-checkbox")),
+        Click(ui("boolean-tools-field-reorder")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("05-union-reorder-handles"),
+        Drag(ui("boolean-tools-field-item-1-handle"), ui("boolean-tools-field-item-0")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("06-post-first-union-is-part-2"),
+    ],
+)

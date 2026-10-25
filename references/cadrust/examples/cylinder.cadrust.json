@@ -1,0 +1,609 @@
+{
+  "version": 1,
+  "name": "cylinder",
+  "units": "mm",
+  "parameters": {
+    "bolt_d": "6",
+    "bore": "40",
+    "cap": "60",
+    "pitch": "44",
+    "rod_d": "bore * 0.4",
+    "stroke": "120",
+    "wall": "5"
+  },
+  "timeline": [
+    {
+      "type": "Sketch",
+      "id": "sketch1",
+      "plane": "XY",
+      "offset": 0.0,
+      "entities": [
+        {
+          "type": "Circle",
+          "cx": 0.0,
+          "cy": 0.0,
+          "r": 25.0
+        },
+        {
+          "type": "Circle",
+          "cx": 0.0,
+          "cy": 0.0,
+          "r": 20.0
+        }
+      ],
+      "constraints": [
+        {
+          "type": "Radius",
+          "e": 0,
+          "value": "bore/2 + wall"
+        },
+        {
+          "type": "Radius",
+          "e": 1,
+          "value": "bore/2"
+        },
+        {
+          "type": "FixPoint",
+          "a": {
+            "e": 0,
+            "p": "center"
+          },
+          "x": 0.0,
+          "y": 0.0
+        },
+        {
+          "type": "Coincident",
+          "a": {
+            "e": 0,
+            "p": "center"
+          },
+          "b": {
+            "e": 1,
+            "p": "center"
+          }
+        }
+      ]
+    },
+    {
+      "type": "Extrude",
+      "id": "extrude1",
+      "sketch": "sketch1",
+      "distance": "stroke",
+      "op": "NewBody",
+      "target": null
+    },
+    {
+      "type": "Sketch",
+      "id": "sketch2",
+      "plane": "XY",
+      "offset": 0.0,
+      "entities": [
+        {
+          "type": "Line",
+          "x0": -30.0,
+          "y0": -30.0,
+          "x1": 30.0,
+          "y1": -30.0
+        },
+        {
+          "type": "Line",
+          "x0": 30.0,
+          "y0": -30.0,
+          "x1": 30.0,
+          "y1": 30.0
+        },
+        {
+          "type": "Line",
+          "x0": 30.0,
+          "y0": 30.0,
+          "x1": -30.0,
+          "y1": 30.0
+        },
+        {
+          "type": "Line",
+          "x0": -30.0,
+          "y0": 30.0,
+          "x1": -30.0,
+          "y1": -30.0
+        },
+        {
+          "type": "Circle",
+          "cx": -22.0,
+          "cy": -22.0,
+          "r": 3.0
+        },
+        {
+          "type": "Circle",
+          "cx": 22.0,
+          "cy": -22.0,
+          "r": 3.0
+        },
+        {
+          "type": "Circle",
+          "cx": 22.0,
+          "cy": 22.0,
+          "r": 3.0
+        },
+        {
+          "type": "Circle",
+          "cx": -22.0,
+          "cy": 22.0,
+          "r": 3.0
+        }
+      ],
+      "constraints": [
+        {
+          "type": "Coincident",
+          "a": {
+            "e": 0,
+            "p": "end"
+          },
+          "b": {
+            "e": 1,
+            "p": "start"
+          }
+        },
+        {
+          "type": "Coincident",
+          "a": {
+            "e": 1,
+            "p": "end"
+          },
+          "b": {
+            "e": 2,
+            "p": "start"
+          }
+        },
+        {
+          "type": "Coincident",
+          "a": {
+            "e": 2,
+            "p": "end"
+          },
+          "b": {
+            "e": 3,
+            "p": "start"
+          }
+        },
+        {
+          "type": "Coincident",
+          "a": {
+            "e": 0,
+            "p": "start"
+          },
+          "b": {
+            "e": 3,
+            "p": "end"
+          }
+        },
+        {
+          "type": "Horizontal",
+          "e": 0
+        },
+        {
+          "type": "Vertical",
+          "e": 1
+        },
+        {
+          "type": "Horizontal",
+          "e": 2
+        },
+        {
+          "type": "Vertical",
+          "e": 3
+        },
+        {
+          "type": "Distance",
+          "a": {
+            "e": 0,
+            "p": "start"
+          },
+          "b": {
+            "e": 0,
+            "p": "end"
+          },
+          "value": "cap"
+        },
+        {
+          "type": "Distance",
+          "a": {
+            "e": 0,
+            "p": "end"
+          },
+          "b": {
+            "e": 1,
+            "p": "end"
+          },
+          "value": "cap"
+        },
+        {
+          "type": "FixPoint",
+          "a": {
+            "e": 0,
+            "p": "start"
+          },
+          "x": "-(cap)/2",
+          "y": "-(cap)/2"
+        },
+        {
+          "type": "Radius",
+          "e": 4,
+          "value": "bolt_d/2"
+        },
+        {
+          "type": "Equal",
+          "a": 4,
+          "b": 5
+        },
+        {
+          "type": "Equal",
+          "a": 4,
+          "b": 6
+        },
+        {
+          "type": "Equal",
+          "a": 4,
+          "b": 7
+        },
+        {
+          "type": "FixPoint",
+          "a": {
+            "e": 4,
+            "p": "center"
+          },
+          "x": "-pitch/2",
+          "y": "-pitch/2"
+        },
+        {
+          "type": "FixPoint",
+          "a": {
+            "e": 5,
+            "p": "center"
+          },
+          "x": "pitch/2",
+          "y": "-pitch/2"
+        },
+        {
+          "type": "FixPoint",
+          "a": {
+            "e": 6,
+            "p": "center"
+          },
+          "x": "pitch/2",
+          "y": "pitch/2"
+        },
+        {
+          "type": "FixPoint",
+          "a": {
+            "e": 7,
+            "p": "center"
+          },
+          "x": "-pitch/2",
+          "y": "pitch/2"
+        }
+      ]
+    },
+    {
+      "type": "Extrude",
+      "id": "extrude2",
+      "sketch": "sketch2",
+      "distance": 0.0,
+      "distance2": 12.0,
+      "op": "Join",
+      "target": "extrude1"
+    },
+    {
+      "type": "Sketch",
+      "id": "sketch3",
+      "plane": {
+        "face": {
+          "body": "extrude1",
+          "point": [
+            24.71,
+            -2.26,
+            120.0
+          ],
+          "name": "extrude1/f3"
+        }
+      },
+      "offset": 0.0,
+      "entities": [
+        {
+          "type": "Line",
+          "x0": -30.0,
+          "y0": -30.0,
+          "x1": 30.0,
+          "y1": -30.0
+        },
+        {
+          "type": "Line",
+          "x0": 30.0,
+          "y0": -30.0,
+          "x1": 30.0,
+          "y1": 30.0
+        },
+        {
+          "type": "Line",
+          "x0": 30.0,
+          "y0": 30.0,
+          "x1": -30.0,
+          "y1": 30.0
+        },
+        {
+          "type": "Line",
+          "x0": -30.0,
+          "y0": 30.0,
+          "x1": -30.0,
+          "y1": -30.0
+        },
+        {
+          "type": "Circle",
+          "cx": 0.0,
+          "cy": 0.0,
+          "r": 8.0
+        },
+        {
+          "type": "Circle",
+          "cx": -22.0,
+          "cy": -22.0,
+          "r": 3.0
+        },
+        {
+          "type": "Circle",
+          "cx": 22.0,
+          "cy": -22.0,
+          "r": 3.0
+        },
+        {
+          "type": "Circle",
+          "cx": 22.0,
+          "cy": 22.0,
+          "r": 3.0
+        },
+        {
+          "type": "Circle",
+          "cx": -22.0,
+          "cy": 22.0,
+          "r": 3.0
+        }
+      ],
+      "constraints": [
+        {
+          "type": "Coincident",
+          "a": {
+            "e": 0,
+            "p": "end"
+          },
+          "b": {
+            "e": 1,
+            "p": "start"
+          }
+        },
+        {
+          "type": "Coincident",
+          "a": {
+            "e": 1,
+            "p": "end"
+          },
+          "b": {
+            "e": 2,
+            "p": "start"
+          }
+        },
+        {
+          "type": "Coincident",
+          "a": {
+            "e": 2,
+            "p": "end"
+          },
+          "b": {
+            "e": 3,
+            "p": "start"
+          }
+        },
+        {
+          "type": "Coincident",
+          "a": {
+            "e": 0,
+            "p": "start"
+          },
+          "b": {
+            "e": 3,
+            "p": "end"
+          }
+        },
+        {
+          "type": "Horizontal",
+          "e": 0
+        },
+        {
+          "type": "Vertical",
+          "e": 1
+        },
+        {
+          "type": "Horizontal",
+          "e": 2
+        },
+        {
+          "type": "Vertical",
+          "e": 3
+        },
+        {
+          "type": "Distance",
+          "a": {
+            "e": 0,
+            "p": "start"
+          },
+          "b": {
+            "e": 0,
+            "p": "end"
+          },
+          "value": "cap"
+        },
+        {
+          "type": "Distance",
+          "a": {
+            "e": 0,
+            "p": "end"
+          },
+          "b": {
+            "e": 1,
+            "p": "end"
+          },
+          "value": "cap"
+        },
+        {
+          "type": "FixPoint",
+          "a": {
+            "e": 0,
+            "p": "start"
+          },
+          "x": "-(cap)/2",
+          "y": "-(cap)/2"
+        },
+        {
+          "type": "Radius",
+          "e": 4,
+          "value": "rod_d/2"
+        },
+        {
+          "type": "FixPoint",
+          "a": {
+            "e": 4,
+            "p": "center"
+          },
+          "x": 0.0,
+          "y": 0.0
+        },
+        {
+          "type": "Radius",
+          "e": 5,
+          "value": "bolt_d/2"
+        },
+        {
+          "type": "Equal",
+          "a": 5,
+          "b": 6
+        },
+        {
+          "type": "Equal",
+          "a": 5,
+          "b": 7
+        },
+        {
+          "type": "Equal",
+          "a": 5,
+          "b": 8
+        },
+        {
+          "type": "FixPoint",
+          "a": {
+            "e": 5,
+            "p": "center"
+          },
+          "x": "-pitch/2",
+          "y": "-pitch/2"
+        },
+        {
+          "type": "FixPoint",
+          "a": {
+            "e": 6,
+            "p": "center"
+          },
+          "x": "pitch/2",
+          "y": "-pitch/2"
+        },
+        {
+          "type": "FixPoint",
+          "a": {
+            "e": 7,
+            "p": "center"
+          },
+          "x": "pitch/2",
+          "y": "pitch/2"
+        },
+        {
+          "type": "FixPoint",
+          "a": {
+            "e": 8,
+            "p": "center"
+          },
+          "x": "-pitch/2",
+          "y": "pitch/2"
+        }
+      ]
+    },
+    {
+      "type": "Extrude",
+      "id": "extrude3",
+      "sketch": "sketch3",
+      "distance": 12.0,
+      "op": "Join",
+      "target": "extrude1"
+    },
+    {
+      "type": "Sketch",
+      "id": "sketch4",
+      "plane": "XY",
+      "offset": "stroke - 20",
+      "entities": [
+        {
+          "type": "Circle",
+          "cx": 0.0,
+          "cy": 0.0,
+          "r": 8.0
+        }
+      ],
+      "constraints": [
+        {
+          "type": "Radius",
+          "e": 0,
+          "value": "rod_d/2"
+        },
+        {
+          "type": "FixPoint",
+          "a": {
+            "e": 0,
+            "p": "center"
+          },
+          "x": 0.0,
+          "y": 0.0
+        }
+      ]
+    },
+    {
+      "type": "Extrude",
+      "id": "extrude4",
+      "sketch": "sketch4",
+      "distance": "stroke",
+      "op": "NewBody",
+      "target": null
+    },
+    {
+      "type": "Chamfer",
+      "id": "chamfer1",
+      "body": "extrude4",
+      "distance": 1.5,
+      "edges": "top"
+    },
+    {
+      "type": "Fillet",
+      "id": "fillet1",
+      "body": "extrude1",
+      "radius": 4.0,
+      "edges": "vertical"
+    },
+    {
+      "type": "Appearance",
+      "id": "appearance1",
+      "body": "extrude1",
+      "color": "#3b78c2"
+    },
+    {
+      "type": "Appearance",
+      "id": "appearance2",
+      "body": "extrude4",
+      "color": "#b8bcc4"
+    }
+  ]
+}

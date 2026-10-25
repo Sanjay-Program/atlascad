@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "units": "mm",
+  "parameters": { "len": "50", "ht": "20", "r": "8", "t": "10" },
+  "timeline": [
+    { "type": "Sketch", "id": "profile", "plane": "XZ",
+      "entities": [
+        { "type": "Line", "x0": 0, "y0": 0, "x1": "len", "y1": 0 },
+        { "type": "Line", "x0": "len", "y0": 0, "x1": "len", "y1": "ht - r" },
+        { "type": "Arc", "x0": "len", "y0": "ht - r", "xm": "len - r + r * 0.7071", "ym": "ht - r + r * 0.7071", "x1": "len - r", "y1": "ht" },
+        { "type": "Line", "x0": "len - r", "y0": "ht", "x1": 0, "y1": "ht" },
+        { "type": "Line", "x0": 0, "y0": "ht", "x1": 0, "y1": 0 },
+        { "type": "Circle", "cx": "len / 2", "cy": "ht / 2", "r": 4 }
+      ],
+      "constraints": [
+        { "type": "Horizontal", "e": 0 },
+        { "type": "Vertical", "e": 1 },
+        { "type": "Coincident", "a": { "e": 0, "p": "end" }, "b": { "e": 1, "p": "start" } },
+        { "type": "Coincident", "a": { "e": 1, "p": "end" }, "b": { "e": 2, "p": "start" } },
+        { "type": "Coincident", "a": { "e": 2, "p": "end" }, "b": { "e": 3, "p": "start" } },
+        { "type": "Coincident", "a": { "e": 3, "p": "end" }, "b": { "e": 4, "p": "start" } },
+        { "type": "Coincident", "a": { "e": 4, "p": "end" }, "b": { "e": 0, "p": "start" } },
+        { "type": "Radius", "e": 2, "value": "r" },
+        { "type": "FixPoint", "a": { "e": 0, "p": "start" }, "x": 0, "y": 0 },
+        { "type": "Distance", "a": { "e": 0, "p": "start" }, "b": { "e": 0, "p": "end" }, "value": "len" }
+      ] },
+    { "type": "Extrude", "id": "block", "sketch": "profile", "distance": "t", "op": "NewBody" },
+    { "type": "Fillet", "id": "soft", "body": "block", "radius": 2, "edges": { "pick": [[25, 0, 0]] } },
+    { "type": "Sketch", "id": "boss_sk", "plane": "XY", "offset": 0,
+      "entities": [ { "type": "Circle", "cx": 10, "cy": -5, "r": 6 } ] },
+    { "type": "Revolve", "id": "ring", "sketch": "profile", "axis_start": [0, -5], "axis_end": [1, -5], "angle": 90, "op": "NewBody" },
+    { "type": "Pattern", "id": "row", "body": "block", "count": [2, 1], "step": [60, 0] }
+  ]
+}

@@ -1,0 +1,52 @@
+// P3I.8 Task 2 (SM14.1, SM15.1, SM16.1; lesson `14-modeling-in-the-flat-view`): the flat view's
+// right-click menu as Onshape's: New sketch, Export DXF/DWG of flat pattern, Create drawing of
+// flat pattern. On a channel (a sheet metal Extrude of an open U): 01 the menu; New sketch opens a
+// sketch on the flat pattern (in the flat's coordinates); a rectangle; 02 accepted: the sketch is
+// drawn in the flat view over the flat; 03 Create drawing of flat pattern from the same menu.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("sketch front chain 0 30 0 0 60 0 60 30"),
+        Key("Shift+7"),
+        Click(ui("sheet-metal-model")),
+        WaitFor("sheet-metal-model-dialog"),
+        Click(ui("sheet-metal-model-operation-1")),
+        Click(xyz(30, 0, 0)),
+        Click(xyz(0, 0, 15)),
+        Click(xyz(60, 0, 15)),
+        Click(ui("sm-depth-field")),
+        Key("Ctrl+A"),
+        Type("80"),
+        Key("Tab"),
+        Click(ui("sheet-metal-model-dialog-accept")),
+        Key("F"),
+        Click(ui("panel-sheet-metal")),
+        RightClick(ui("smt-flat")),
+        Screenshot("01-flat-view-menu"),
+        Click(ui("smt-flat-sketch")),
+        WaitFor("sketch-dialog"),
+        Key("G"),
+        ClickWorld(15, -45),
+        ClickWorld(97, -39),
+        Key("Escape"),
+        Key("Escape"),
+        MoveWorld(56, -60),
+        Wait(3),
+        Screenshot("01b-drawing-in-the-flat-view"),
+        Click(ui("sketch-dialog-accept")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("02-sketch-on-the-flat-in-the-flat-view"),
+        // The menu on the sketch's line: Edit Sketch 2 and Show dimensions join it (lesson 15
+        // t0026.5).
+        RightClick(ui_at("smt-flat", 0.369, 0.5236)),
+        Screenshot("02a-flat-menu-on-the-sketch"),
+        Key("Escape"),
+        RightClick(ui("smt-flat")),
+        Click(ui("smt-flat-drawing")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-create-drawing-of-flat-pattern"),
+    ],
+)

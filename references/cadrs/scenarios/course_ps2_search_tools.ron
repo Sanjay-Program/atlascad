@@ -1,0 +1,60 @@
+// P3.9 / PS2.3: the toolbar's Search tools box, on the Control Arm (`control-arm add`).
+// 01 Alt+C: a field over the box, focused.
+// 02 "fil": the matching tool, Fillet, with its shortcut.
+// 03 "pattern": the pattern menu's three patterns; ↓ moves the highlight to Circular pattern.
+// 04 Enter: the Circular pattern dialog opens, as from the toolbar; cancelled (Esc).
+// 05 clicking the box, "ex": Extrude; clicking the row launches it (06: the Extrude dialog).
+// 07 in a sketch (Sketch on Top), Alt+C and "circ": the sketch toolbar's tools, each variant of
+//    a ▾ button a tool of its own (P3.11, P3.9 judge): Circumscribed polygon, Center point
+//    circle, 3 point circle (the list is the toolbar's own tools, so it follows the sketch mode).
+// 08 "point circle", ↓ to "3 point circle", Enter: the 3 point circle tool is on, the circle
+//    button showing its icon, as if chosen from the button's menu (no menu opens).
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("control-arm add"),
+        Key("P"),
+        Key("Shift+7"),
+        Key("F"),
+        MoveTo(1420, 900),
+        Key("Alt+C"),
+        WaitFor("search-tools-palette"),
+        Screenshot("01-alt-c-opens-search"),
+        Type("fil"),
+        Screenshot("02-fil-finds-fillet"),
+        Key("Ctrl+A"),
+        Type("pattern"),
+        Key("ArrowDown"),
+        Screenshot("03-pattern-highlight-circular"),
+        Key("Enter"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("04-circular-pattern-launched"),
+        Key("Escape"),
+        Click(ui("search-tools")),
+        WaitFor("search-tools-palette"),
+        Type("ex"),
+        Screenshot("05-ex-finds-extrude"),
+        Click(ui("search-tools-palette-item-extrude")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("06-extrude-launched"),
+        Key("Escape"),
+        Click(ui("sketch")),
+        WaitFor("sketch-dialog"),
+        Click(ui("feature-top")),
+        MoveTo(1420, 900),
+        Key("Alt+C"),
+        WaitFor("search-tools-palette"),
+        Type("circ"),
+        Screenshot("07-sketch-tools-circ"),
+        Key("Ctrl+A"),
+        Type("point circle"),
+        Key("ArrowDown"),
+        Key("Enter"),
+        MoveTo(1100, 600),
+        Wait(3),
+        Screenshot("08-circle-tool-on"),
+    ],
+)

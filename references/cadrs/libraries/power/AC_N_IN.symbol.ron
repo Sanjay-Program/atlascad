@@ -1,0 +1,75 @@
+(
+  id: "AC_N_IN",
+  fields: [
+    (
+      name: "Reference",
+      text: (text: "#PWR?", at: (x: 2540000, y: 1270000), angle: 0.0, style: (size: (w: 1270000, h: 1270000), h_align: Left, v_align: Center), visible: false),
+      show_name: false,
+    ),
+    (
+      name: "Value",
+      text: (text: "AC_N", at: (x: 0, y: 5080000), angle: 0.0, style: (size: (w: 1270000, h: 1270000), h_align: Center, v_align: Center), visible: true),
+      show_name: false,
+    ),
+    (
+      name: "Footprint",
+      text: (text: "", at: (x: 0, y: 0), angle: 0.0, style: (size: (w: 1270000, h: 1270000), h_align: Center, v_align: Center), visible: false),
+      show_name: false,
+    ),
+    (
+      name: "Datasheet",
+      text: (text: "~", at: (x: 0, y: 0), angle: 0.0, style: (size: (w: 1270000, h: 1270000), h_align: Center, v_align: Center), visible: false),
+      show_name: false,
+    ),
+    (
+      name: "Description",
+      text: (text: "AC neutral coming in: power symbol creates a global label with name \"AC_N\"", at: (x: 0, y: 0), angle: 0.0, style: (size: (w: 1270000, h: 1270000), h_align: Center, v_align: Center), visible: false),
+      show_name: false,
+    ),
+  ],
+  keywords: "global power ac mains neutral N input in",
+  footprint_filters: [],
+  unit_count: 1,
+  units_swappable: false,
+  unit_names: [],
+  has_alternate: false,
+  power: true,
+  show_pin_numbers: false,
+  show_pin_names: false,
+  pin_name_offset: 508000,
+  in_bom: false,
+  on_board: false,
+  graphics: [
+    (
+      item: Shape((geom: Polyline(pts: [(x: 0, y: 0), (x: 0, y: 1270000)], closed: false), stroke: (width: 254000, style: Default, color: None), fill: r#None)),
+      unit: 0,
+      style: 0,
+    ),
+    (
+      item: Shape((geom: Polyline(pts: [(x: 0, y: 1270000), (x: 1524000, y: 2540000), (x: 1524000, y: 4064000), (x: -1524000, y: 4064000), (x: -1524000, y: 2540000), (x: 0, y: 1270000)], closed: false), stroke: (width: 254000, style: Default, color: None), fill: r#None)),
+      unit: 0,
+      style: 0,
+    ),
+    (
+      item: Shape((geom: Polyline(pts: [(x: -889000, y: 3302000), (x: -740833, y: 3492500), (x: -592667, y: 3631956), (x: -444500, y: 3683000), (x: -296333, y: 3631956), (x: -148167, y: 3492500), (x: 0, y: 3302000), (x: 148167, y: 3111500), (x: 296333, y: 2972044), (x: 444500, y: 2921000), (x: 592667, y: 2972044), (x: 740833, y: 3111500), (x: 889000, y: 3302000)], closed: false), stroke: (width: 152400, style: Default, color: None), fill: r#None)),
+      unit: 0,
+      style: 0,
+    ),
+  ],
+  pins: [
+    (
+      number: "1",
+      name: "AC_N",
+      kind: PowerIn,
+      shape: Line,
+      at: (x: 0, y: 0),
+      angle: 90.0,
+      length: 0,
+      visible: false,
+      name_size: 1270000,
+      number_size: 1270000,
+      unit: 0,
+      style: 0,
+    ),
+  ],
+)

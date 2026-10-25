@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "reviewed_at": "2026-10-23",
+  "pricing_basis": "Public US USD prices, before tax where stated; local/regional price and checkout may differ.",
+  "competitors": [
+    {
+      "id": "autodesk.fusion",
+      "name": "Autodesk Fusion",
+      "category": ["mechanical_cad", "cam", "cae", "electronics"],
+      "price": {"currency": "USD", "amount": 680, "period": "year", "tier": "Fusion", "region": "US", "tax_basis": "not stated on cited overview", "confidence": "verified_vendor_page", "notes": "Personal use is limited to qualifying home, non-commercial projects. Autodesk pages showed differing promotion/term amounts on review; recheck checkout."},
+      "deployment": ["desktop", "cloud_connected"],
+      "license": "Proprietary subscription; personal-use restrictions apply.",
+      "capabilities": ["parametric_solid", "2d_drawings", "assemblies", "cam", "cae", "pcb", "collaboration", "automation_api"],
+      "offline": "Cloud-connected workflow; verify current offline behavior and limits for the selected plan.",
+      "sources": [
+        {"url": "https://www.autodesk.com/products/fusion-360/overview", "accessed": "2026-10-23", "supports": ["price", "product scope"], "confidence": "high"},
+        {"url": "https://www.autodesk.com/products/fusion-360/personal", "accessed": "2026-10-23", "supports": ["personal-use restrictions", "alternative pricing display"], "confidence": "high"}
+      ]
+    },
+    {
+      "id": "autodesk.autocad",
+      "name": "Autodesk AutoCAD",
+      "category": ["2d_drafting", "general_cad"],
+      "price": {"currency": "USD", "amount": 2095, "period": "year", "tier": "AutoCAD single user", "region": "US", "tax_basis": "excluding freight, handling and taxes per regional overview", "confidence": "verified_vendor_page", "notes": "Official FAQ also lists $260/month; region and term affect pricing."},
+      "deployment": ["desktop", "web", "mobile"],
+      "license": "Proprietary subscription.",
+      "capabilities": ["2d_drafting", "3d_solids_surfaces_meshes", "dimensions", "layouts", "automation_api", "industry_toolsets", "dwg_review"],
+      "offline": "Desktop application; do not infer unrestricted offline entitlement from the product page.",
+      "sources": [
+        {"url": "https://www.autodesk.com/solutions/autocad-subscription-faq", "accessed": "2026-10-23", "supports": ["price", "subscription terms"], "confidence": "high"},
+        {"url": "https://www.autodesk.com/products/autocad/features", "accessed": "2026-10-23", "supports": ["features", "automation", "web/mobile"], "confidence": "high"}
+      ]
+    },
+    {
+      "id": "solidworks.design",
+      "name": "SOLIDWORKS Design",
+      "category": ["mechanical_cad", "plm"],
+      "price": {"currency": "USD", "amount": 2820, "period": "year", "tier": "Standard single-user named-user", "region": "US", "tax_basis": "excluding local taxes", "confidence": "verified_vendor_page", "notes": "Professional $3,456/year and Premium $4,716/year on the same page; local cart/reseller pricing can differ."},
+      "deployment": ["local_install", "cloud_connected"],
+      "license": "Proprietary commercial subscription; device-license option also listed.",
+      "capabilities": ["parts", "assemblies", "drawings", "sheet_metal", "data_management", "collaboration", "rendering_tiered", "simulation_tiered", "automation"],
+      "offline": "Local installation with cloud-connected services; exact behavior is plan-dependent and not verified here.",
+      "sources": [
+        {"url": "https://www.solidworks.com/how-to-buy/solidworks-design-plans-pricing", "accessed": "2026-10-23", "supports": ["price", "license", "deployment"], "confidence": "high"},
+        {"url": "https://www.solidworks.com/product/solidworks-design", "accessed": "2026-10-23", "supports": ["capability tiers"], "confidence": "high"}
+      ]
+    },
+    {
+      "id": "ptc.onshape",
+      "name": "Onshape",
+      "category": ["mechanical_cad", "cloud_cad"],
+      "price": {"currency": "USD", "amount": 1500, "period": "year_per_user", "tier": "Standard", "region": "US display", "tax_basis": "not stated", "confidence": "verified_vendor_page", "notes": "Professional lists $2,500/user/year; Free is $0 for non-commercial use with public documents."},
+      "deployment": ["browser", "cloud", "mobile"],
+      "license": "Proprietary cloud subscription; free-plan commercial and privacy restrictions apply.",
+      "capabilities": ["parametric_solid", "assemblies", "drawings", "real_time_collaboration", "version_control", "api"],
+      "offline": "Cloud application; continuous connectivity is part of the normal workflow.",
+      "sources": [
+        {"url": "https://www.onshape.com/en/pricing", "accessed": "2026-10-23", "supports": ["price", "free-tier restrictions", "features"], "confidence": "high"}
+      ]
+    },
+    {
+      "id": "freecad.freecad",
+      "name": "FreeCAD",
+      "category": ["mechanical_cad", "open_source"],
+      "price": {"currency": null, "amount": 0, "period": "none", "tier": "all users", "region": "global", "tax_basis": "not applicable", "confidence": "verified_project_page", "notes": "Free/open-source software; no commercial subscription price."},
+      "deployment": ["local_desktop", "offline_capable"],
+      "license": "LGPL-2.1-or-later application; third-party components and workbenches may differ.",
+      "capabilities": ["parametric_solid", "workbenches", "scripting", "technical_drawings", "broad_interchange_ecosystem"],
+      "offline": "Local desktop application.",
+      "sources": [
+        {"url": "https://github.com/FreeCAD/FreeCAD", "accessed": "2026-10-23", "supports": ["project identity", "license"], "confidence": "high"},
+        {"url": "https://github.com/FreeCAD/FreeCAD-documentation/blob/main/wiki/Drawing.md", "accessed": "2026-10-23", "supports": ["TechDraw export"], "confidence": "high"}
+      ]
+    },
+    {
+      "id": "solvespace.solvespace",
+      "name": "SolveSpace",
+      "category": ["parametric_cad", "open_source"],
+      "price": {"currency": null, "amount": 0, "period": "none", "tier": "all users", "region": "global", "tax_basis": "not applicable", "confidence": "verified_project_page", "notes": "Free software; no vendor subscription price."},
+      "deployment": ["local_desktop", "offline_capable"],
+      "license": "GPLv3.",
+      "capabilities": ["2d_sketch", "3d_constraints", "extrude", "revolve", "helix", "boolean", "assembly", "dxf", "step", "stl", "gcode"],
+      "offline": "Local desktop application.",
+      "sources": [
+        {"url": "https://solvespace.com/features.pl", "accessed": "2026-10-23", "supports": ["features", "formats"], "confidence": "high"},
+        {"url": "https://solvespace.com/download.pl", "accessed": "2026-10-23", "supports": ["license"], "confidence": "high"}
+      ]
+    }
+  ]
+}

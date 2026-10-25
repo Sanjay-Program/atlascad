@@ -1,0 +1,43 @@
+// A planar face selected before Shift+E is what the extrude extrudes: "Face of Extrude 1" in
+// its Faces and sketch regions field, 5 deep, out of the part (Add, the green change).
+// 01 the block's top face selected.
+// 02 Shift+E: the face is in the field, Blind 5, the preview 5 above the top.
+// 03 accepted: the block is 55 tall.
+// 04 a sketch region selected (a square on Top beside the block), then Shift+E: the region is
+//    in the field, Blind 5, a New 5 tall slab.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("sketch top rect 60 0 100 40"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        Click(xyz(80, 20, 0)),
+        Click(ui("extrude-depth-field")),
+        Key("Ctrl+A"),
+        Type("50"),
+        Key("Enter"),
+        Key("F"),
+        Click(xyz(80, 20, 50)),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("01-face-selected"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        MoveTo(1420, 900),
+        Wait(5),
+        Screenshot("02-extrude-face-5"),
+        Key("Enter"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-accepted"),
+        Custom("sketch top rect 0 0 30 30"),
+        Key("F"),
+        Click(xyz(15, 15, 0)),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        MoveTo(1420, 900),
+        Wait(5),
+        Screenshot("04-extrude-region-5"),
+    ],
+)

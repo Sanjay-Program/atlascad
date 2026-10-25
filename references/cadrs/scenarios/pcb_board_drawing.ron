@@ -1,0 +1,50 @@
+// docs/PCB_IN_PART_STUDIO.md P7: a drawing of a Part Studio with a derived board. The
+// mains-sensor enclosure (`board setup`) with its AC sensor board derived onto Board location
+// (`board derive`).
+// 01 the Insert view dialog over a new ANSI A sheet, the Enclosure Part Studio picked, Top,
+//    the view's lines following the cursor.
+// 02 the Top view placed and an isometric view projected from it. In the Top view the board's
+//    layout (mask, pads, silkscreen) lies on its outline, faded toward the paper so the
+//    components' lines read over it; the isometric view sees the board at a slant (hidden in
+//    the tube): no picture.
+// 03 the Top view shaded: the layout in its own colours, the components' faces over it.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("board setup"),
+        Wait(5),
+        Custom("board derive"),
+        Wait(20),
+        Click(ui("insert-tab")),
+        Click(ui("create-drawing")),
+        WaitFor("create-drawing-dialog"),
+        Click(ui("template-filter-1")),
+        Click(ui("template-row-ANSI_A_INCH.dwt")),
+        Click(ui("create-drawing-ok")),
+        WaitFor("insert-view-dialog"),
+        Click(ui("browser-studio-1")),
+        Click(ui("insert-view-orientation")),
+        Click(ui("insert-view-orientation-option-1")),
+        MoveTo(620, 500),
+        Wait(20),
+        MoveTo(623, 500),
+        Wait(10),
+        Screenshot("01-insert-top"),
+        Click(at(623, 500)),
+        MoveTo(1000, 300),
+        Wait(20),
+        MoveTo(1003, 300),
+        Wait(10),
+        Click(at(1003, 300)),
+        Key("Escape"),
+        MoveTo(1500, 960),
+        Wait(20),
+        Screenshot("02-views"),
+        RightClick(at(623, 500)),
+        Click(ui("view-menu-shaded")),
+        MoveTo(1500, 960),
+        Wait(20),
+        Screenshot("03-top-shaded"),
+    ],
+)

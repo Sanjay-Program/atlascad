@@ -1,0 +1,35 @@
+[package]
+name = "cadrs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bevy.workspace = true
+cadrs_app.workspace = true
+cadrs_core.workspace = true
+cadrs_harness.workspace = true
+cadrs_ui.workspace = true
+
+[features]
+# Faster dev builds: Bevy as a shared library (`cargo run -F dev`). Not for shipped builds.
+dev = ["bevy/dynamic_linking"]
+# The app's tests (they build the whole app): a plain `cargo test` leaves them out.
+app-tests = []
+
+[[bin]]
+name = "cadrs"
+path = "src/main.rs"
+test = false
+
+[[test]]
+name = "startup"
+required-features = ["app-tests"]
+
+[[test]]
+name = "golden"
+required-features = ["app-tests"]
+
+[dev-dependencies]
+image.workspace = true

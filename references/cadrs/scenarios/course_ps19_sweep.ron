@@ -1,0 +1,69 @@
+// P3.7 / PS19: Sweep. Sketch 1 on Top is the path: an 80 line along X, a 60 line along Y and
+// the R20 sketch fillet between them (so 60 + 40 straight and a quarter circle). Sketch 2 on
+// Right is the profile: a Ø10 circle at the origin, where the path starts. (The volume of such
+// a sweep, π·25·(L1 + L2 + π/2·R), is asserted in the kernel's `sweep_along_paths`
+// conformance case.)
+// 01 PS19.1 the Sweep dialog as in `ex4-step15.png`: Solid / New, "Face of Sketch 2", the three
+//    path curves ("Curve of Sketch 1"), None, Final; the tube along the path.
+// 02 PS19.3 Thin: its default 5 mm wall is as thick as the profile's radius: the feature fails
+//    and says why (red title).
+// 03 Thickness 1 = 1 mm: a hollow tube.
+// 04 PS19.6 back to Solid, the profile control's options (None, Keep profile orientation, Lock
+//    profile direction).
+// 05 accepted: Sweep 1 in the list, Part 1.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Click(ui("sketch")),
+        WaitFor("sketch-dialog"),
+        Click(ui("feature-top")),
+        Key("N"),
+        Key("L"),
+        ClickWorld(0, 0),
+        ClickWorld(80, 0),
+        ClickWorld(80, 60),
+        Key("Escape"),
+        Key("Escape"),
+        Key("Shift+F"),
+        ClickWorld(80, 0),
+        Type("20"),
+        Key("Enter"),
+        Key("Escape"),
+        Click(ui("sketch-dialog-accept")),
+        Custom("sketch right circle 0 0 5"),
+        Key("Shift+7"),
+        Key("F"),
+        Click(ui("sweep")),
+        WaitFor("sweep-dialog"),
+        Click(xyz(0, 2, 2)),
+        Click(ui("sweep-path-field")),
+        Click(xyz(30, 0, 0)),
+        Click(xyz(74.142, 5.858, 0)),
+        Click(xyz(80, 45, 0)),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("01-sweep-l-path-solid"),
+        Click(ui("sweep-body-type-2")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("02-sweep-thin-5mm-too-thick"),
+        Click(ui("sweep-thickness1-field")),
+        Key("Ctrl+A"),
+        Type("1"),
+        Key("Tab"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-sweep-thin-1mm"),
+        Click(ui("sweep-body-type-0")),
+        Click(ui("sweep-profile-control")),
+        Hover(ui("sweep-profile-control-option-1")),
+        Wait(3),
+        Screenshot("04-sweep-profile-control-options"),
+        Click(ui("sweep-profile-control-option-0")),
+        Click(ui("sweep-dialog-accept")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("05-sweep-accepted"),
+    ],
+)

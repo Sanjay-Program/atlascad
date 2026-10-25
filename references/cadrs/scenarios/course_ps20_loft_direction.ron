@@ -1,0 +1,70 @@
+// P3.11 / PS20.4: a loft's Normal direction and Tangent direction conditions, each with a picked
+// vector (the closed forms asserted in the kernel's `loft_direction_conditions` and the feature
+// list's `loft_normal_and_tangent_direction`). A 20 × 20 square on Top is lofted to a Ø20
+// circle on Plane 1, 40 above it; Sketch 3 on Front holds one line leaning 14° towards +X (from
+// (25, 0) to (35, 40)), the picked direction. Plane 1 stays shown, as Onshape shows a plane
+// feature (nothing else stays highlighted after ✓).
+// 01 Start profile condition Normal direction, its Start direction field holding Sketch 3's
+//    line (picked in the view): the loft leaves the square along the line, leaning towards +X,
+//    and bends back to the circle; the direction's arrow (selection amber) stands on the
+//    square's middle, along the loft (fix round 1: a direction in the profile's plane gave a
+//    sliver fin at the square's corner; this one leans cleanly).
+// 02 End profile condition Tangent direction with the same line as its End direction and End
+//    magnitude 0.2: the loft rolls into the circle along the plane square to the line (with a
+//    large magnitude the side where that tilted plane rises would lift above the circle, as
+//    any tangency to it must); a second arrow on the circle's centre.
+// 03 accepted: one part, Loft 1; no arrows once the dialog is closed.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("sketch top rect -10 -10 10 10"),
+        Key("P"),
+        Key("Shift+7"),
+        Click(ui("plane")),
+        WaitFor("plane-dialog"),
+        Click(ui("feature-top")),
+        Click(ui("plane-offset-field")),
+        Key("Ctrl+A"),
+        Type("40"),
+        Key("Enter"),
+        Click(ui("feature-plane-1")),
+        Click(ui("sketch")),
+        WaitFor("sketch-dialog"),
+        Key("C"),
+        ClickWorld(0, 0),
+        ClickWorld(10, 0),
+        Key("Escape"),
+        Key("Escape"),
+        Click(ui("sketch-dialog-accept")),
+        Custom("sketch front chain 25 0 35 40"),
+        Key("Shift+7"),
+        Key("F"),
+        Click(ui("loft")),
+        WaitFor("loft-dialog"),
+        Click(xyz(5, -5, 0)),
+        Click(xyz(3, 3, 40)),
+        Click(ui("loft-start-condition")),
+        Click(ui("loft-start-condition-option-5")),
+        Click(ui("loft-start-direction-field")),
+        Click(xyz(30, 0, 20)),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("01-normal-direction-line"),
+        Click(ui("loft-end-condition")),
+        Click(ui("loft-end-condition-option-6")),
+        Click(ui("loft-end-direction-field")),
+        Click(xyz(30, 0, 20)),
+        Click(ui("loft-end-magnitude-field")),
+        Key("Ctrl+A"),
+        Type("0.2"),
+        Key("Tab"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("02-tangent-direction-line"),
+        Click(ui("loft-dialog-accept")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-accepted"),
+    ],
+)

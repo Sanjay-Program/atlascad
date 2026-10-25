@@ -1,0 +1,45 @@
+[package]
+name = "cadrum"
+version = "0.9.1"
+edition = "2021"
+description = "cadrum is a Rust CAD crate using statically-linked, headless OpenCASCADE. Runs natively and in WebAssembly"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/lzpel/cadrum"
+keywords = ["opencascade", "cad", "step", "gltf", "geometry"]
+categories = ["graphics", "science"]
+exclude = ["/figure", "/notes", "/steps", "/sandbox*", "/.github"]
+
+[features]
+default = ["png"]
+# Build OCCT from upstream sources when the cache is empty, instead of
+# downloading a prebuilt tarball. Off by default — most users will use the
+# prebuilt binary path.
+source = ["dep:cmake"]
+# PNG raster output for Scene2D via tiny-skia.
+png = ["dep:tiny-skia"]
+# Pure Rust CAD backend (no OCCT dependency)
+pure = []
+
+[dependencies]
+cxx = "1"
+glam = { version = ">=0.29", features = ["std"] }
+# Pure-Rust 2D rasterizer used by Scene2D::write_png. Pulled in only with
+# the `png` feature; tiny-skia bundles its own PNG encoder so no separate
+# `png` crate dep is needed.
+tiny-skia = { version = "0.11", optional = true }
+
+
+[build-dependencies]
+cxx-build = "1"
+# download and extract prebuilt OCCT tarball
+minreq = { version = "3", features = ["https-rustls"] }
+flate2 = "1"
+tar = "0.4"
+walkdir = "2"
+# source feature only: build OCCT from upstream sources
+cmake = { version = "0.1", optional = true }
+# source feature + CADRUM_BUNDLE_RUNTIME: query the target compiler for libstdc++.a path
+cc = "1"
+
+[dev-dependencies]

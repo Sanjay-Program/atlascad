@@ -1,0 +1,56 @@
+// Vector drawings dropped on the window (issue #9; `crate::drop_import`).
+// 01 fixtures/vector/bracket.svg dropped on the Part Studio seen from the top: "Sketch 1" on Top
+//    holds it, centred where it was dropped: a 60 × 30 plate with rounded corners (arcs), two
+//    holes (circles) and a free-form slot (Béziers), its regions shaded.
+// 02 Extruded 5 mm by the plate's region: the holes and the slot go through.
+// 03 A new sketch on Top, fixtures/vector/bracket.eps (through Ghostscript and pdftocairo)
+//    dropped into it to the plate's right: its curves added to the sketch, a 40 × 20 plate with
+//    a rounded corner and a hole.
+// 04 fixtures/logo.png dropped while sketching: not added, a note says to close the sketch.
+// 05 Sketch accepted, fixtures/import_bracket.stl dropped on the Part Studio: "Import 1" with
+//    the Import dialog open, as the toolbar's Import does once a file is picked.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("view 0 90"),
+        Wait(10),
+        Custom("drop-file fixtures/vector/bracket.svg"),
+        Wait(10),
+        Key("F"),
+        Wait(10),
+        Screenshot("01-svg-dropped-as-sketch"),
+        Click(ui("extrude")),
+        WaitFor("extrude-dialog"),
+        ClickWorld(-15, 10),
+        Key("Enter"),
+        Wait(10),
+        Custom("view -30 30"),
+        Wait(10),
+        Screenshot("02-extruded"),
+        Custom("view 0 90"),
+        Wait(5),
+        Click(ui("sketch")),
+        WaitFor("sketch-dialog"),
+        ClickAt(560, 575),
+        Wait(5),
+        MoveWorld(70, 0),
+        Custom("drop-file fixtures/vector/bracket.eps"),
+        Wait(10),
+        Key("F"),
+        MoveTo(1420, 900),
+        Wait(10),
+        Screenshot("03-eps-dropped-into-sketch"),
+        Custom("drop-file fixtures/logo.png"),
+        WaitFor("drop-toast"),
+        Wait(5),
+        Screenshot("04-picture-refused-while-sketching"),
+        Click(ui("sketch-dialog-accept")),
+        Wait(5),
+        Custom("drop-file fixtures/import_bracket.stl"),
+        WaitFor("import-dialog"),
+        Key("F"),
+        Wait(20),
+        Screenshot("05-stl-dropped-as-import"),
+    ],
+)

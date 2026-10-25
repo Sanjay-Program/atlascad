@@ -1,0 +1,1391 @@
+{
+  "schema_version": 1,
+  "modules": [
+    {
+      "id": "module.cadcraft.doc",
+      "name": "cadcraft-doc",
+      "repository_id": "repo.cadcraft",
+      "language": "rust",
+      "responsibility": "2D drawing database: entities, tables, header variables, copy-on-write EntityStore with cheap undo snapshots.",
+      "boundaries": [
+        "Owns 2D entity data and its serialisation; does not depend on a 3D kernel."
+      ],
+      "public_api": [
+        "Handle",
+        "EntityStore",
+        "Header"
+      ],
+      "internal_dependencies": [],
+      "external_dependencies": [
+        "serde"
+      ],
+      "consumes": [],
+      "provides": [
+        "cap.document.2d"
+      ],
+      "tests": "unknown",
+      "loc": 10689,
+      "files": 28,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "validated",
+      "consumers": [
+        "module.cadcraft.engine"
+      ],
+      "compat": "cadcraft 0.10",
+      "evidence": [
+        "docs/repository-audit.md section 3"
+      ]
+    },
+    {
+      "id": "module.cadcraft.geom",
+      "name": "cadcraft-geom",
+      "repository_id": "repo.cadcraft",
+      "language": "rust",
+      "responsibility": "2D/3D vectors, curves, NURBS, intersections and bounds for drafting.",
+      "boundaries": [
+        "Pure geometry with no document or kernel dependency; a single global EPS tolerance."
+      ],
+      "public_api": [
+        "Vec2",
+        "Vec3",
+        "Line",
+        "Arc",
+        "Circle",
+        "Spline",
+        "Bounds2"
+      ],
+      "internal_dependencies": [],
+      "external_dependencies": [],
+      "consumes": [],
+      "provides": [
+        "cap.2d.geometry"
+      ],
+      "tests": "passing",
+      "loc": 5031,
+      "files": 13,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "verified",
+      "consumers": [
+        "module.cadcraft.engine",
+        "module.cadcraft.io"
+      ],
+      "compat": "cadcraft 0.10",
+      "evidence": [
+        "docs/repository-audit.md section 3",
+        "engineering/quality/tests.json#t-cadcraft-geom"
+      ]
+    },
+    {
+      "id": "module.cadcraft.dxf",
+      "name": "cadcraft-dxf",
+      "repository_id": "repo.cadcraft",
+      "language": "rust",
+      "responsibility": "DXF reader/writer (R12-2018 read, R2000 write).",
+      "boundaries": [
+        "File format only; conversion to document entities happens in cadcraft-io."
+      ],
+      "public_api": [
+        "Reader",
+        "Writer"
+      ],
+      "internal_dependencies": [],
+      "external_dependencies": [
+        "serde"
+      ],
+      "consumes": [],
+      "provides": [
+        "cap.io.dxf"
+      ],
+      "tests": "unknown",
+      "loc": 1171,
+      "files": 4,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "validated",
+      "consumers": [
+        "module.cadcraft.io"
+      ],
+      "compat": "DXF R12-R2018",
+      "evidence": [
+        "docs/repository-audit.md section 3"
+      ]
+    },
+    {
+      "id": "module.cadcraft.dwg",
+      "name": "cadcraft-dwg",
+      "repository_id": "repo.cadcraft",
+      "language": "rust",
+      "responsibility": "DWG support through the third-party acadrust parser.",
+      "boundaries": [
+        "Thin layer over an MPL-2.0 dependency that must remain unmodified."
+      ],
+      "public_api": [
+        "DwgReader"
+      ],
+      "internal_dependencies": [],
+      "external_dependencies": [
+        "acadrust 0.6.4 (MPL-2.0)"
+      ],
+      "consumes": [],
+      "provides": [
+        "cap.io.dwg"
+      ],
+      "tests": "unknown",
+      "loc": 791,
+      "files": 1,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "validated",
+      "consumers": [
+        "module.cadcraft.io"
+      ],
+      "compat": "acadrust 0.6.4",
+      "evidence": [
+        "docs/license-inventory.md section 2",
+        "docs/security-review.md S-3"
+      ]
+    },
+    {
+      "id": "module.cadcraft.io",
+      "name": "cadcraft-io",
+      "repository_id": "repo.cadcraft",
+      "language": "rust",
+      "responsibility": "Import/export, plotting and export coordinate validation.",
+      "boundaries": [
+        "Owns file I/O and its resource caps (MAX_PAYLOAD = 64 MiB and related limits)."
+      ],
+      "public_api": [
+        "import",
+        "export",
+        "plot"
+      ],
+      "internal_dependencies": [
+        "module.cadcraft.dxf",
+        "module.cadcraft.dwg",
+        "module.cadcraft.doc"
+      ],
+      "external_dependencies": [
+        "quick-xml"
+      ],
+      "consumes": [
+        "cap.document.2d"
+      ],
+      "provides": [
+        "cap.io.dxf"
+      ],
+      "tests": "unknown",
+      "loc": 23106,
+      "files": 79,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "validated",
+      "consumers": [
+        "module.cadcraft.engine"
+      ],
+      "compat": "cadcraft 0.10",
+      "evidence": [
+        "docs/repository-audit.md section 3",
+        "docs/security-review.md S-3"
+      ]
+    },
+    {
+      "id": "module.cadcraft.engine",
+      "name": "cadcraft-engine",
+      "repository_id": "repo.cadcraft",
+      "language": "rust",
+      "responsibility": "Command engine, tools, selection and snapping for 2D drafting.",
+      "boundaries": [
+        "UI-agnostic command layer; the egui front end is a separate module."
+      ],
+      "public_api": [
+        "Cmd",
+        "Tool",
+        "Document access"
+      ],
+      "internal_dependencies": [
+        "module.cadcraft.doc",
+        "module.cadcraft.geom",
+        "module.cadcraft.io"
+      ],
+      "external_dependencies": [
+        "rstar 0.12.2",
+        "craft-docpath (git)"
+      ],
+      "consumes": [
+        "cap.document.2d",
+        "cap.2d.geometry"
+      ],
+      "provides": [
+        "cap.2d.drafting"
+      ],
+      "tests": "unknown",
+      "loc": 97341,
+      "files": 304,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "validated",
+      "consumers": [
+        "module.cadcraft.ui-egui"
+      ],
+      "compat": "cadcraft 0.10",
+      "evidence": [
+        "docs/repository-audit.md section 3"
+      ]
+    },
+    {
+      "id": "module.cadcraft.ui-egui",
+      "name": "cadcraft-ui-egui",
+      "repository_id": "repo.cadcraft",
+      "language": "rust",
+      "responsibility": "egui desktop front end for drafting.",
+      "boundaries": [
+        "Presentation only; domain behaviour lives in the engine."
+      ],
+      "public_api": [
+        "app"
+      ],
+      "internal_dependencies": [
+        "module.cadcraft.engine"
+      ],
+      "external_dependencies": [
+        "egui 0.36",
+        "craft-ui (git)"
+      ],
+      "consumes": [
+        "cap.2d.drafting",
+        "cap.2d.constraints"
+      ],
+      "provides": [
+        "cap.2d.drafting"
+      ],
+      "tests": "unknown",
+      "loc": 29979,
+      "files": 93,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "validated",
+      "consumers": [],
+      "compat": "egui 0.36",
+      "evidence": [
+        "docs/repository-audit.md section 3"
+      ]
+    },
+    {
+      "id": "module.cadcraft.constraints",
+      "name": "cadcraft-constraints",
+      "repository_id": "repo.cadcraft",
+      "language": "rust",
+      "responsibility": "2D geometric constraint solver.",
+      "boundaries": [
+        "Solver only; no document ownership."
+      ],
+      "public_api": [
+        "Constraint",
+        "solve"
+      ],
+      "internal_dependencies": [
+        "module.cadcraft.geom"
+      ],
+      "external_dependencies": [],
+      "consumes": [
+        "cap.2d.geometry"
+      ],
+      "provides": [
+        "cap.2d.constraints"
+      ],
+      "tests": "unknown",
+      "loc": 4283,
+      "files": 10,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "validated",
+      "consumers": [
+        "module.cadcraft.engine",
+        "module.cadcraft.ui-egui"
+      ],
+      "compat": "cadcraft 0.10",
+      "evidence": [
+        "docs/repository-audit.md section 3"
+      ]
+    },
+    {
+      "id": "module.cadcraft.mcp",
+      "name": "cadcraft-mcp",
+      "repository_id": "repo.cadcraft",
+      "language": "rust",
+      "responsibility": "MCP server exposing drafting commands to agents over a loopback control port.",
+      "boundaries": [
+        "Protocol adapter; it validates and forwards structured commands, never generated code."
+      ],
+      "public_api": [
+        "MCP tool schema"
+      ],
+      "internal_dependencies": [
+        "module.cadcraft.engine"
+      ],
+      "external_dependencies": [],
+      "consumes": [
+        "cap.2d.drafting"
+      ],
+      "provides": [
+        "cap.mcp.server"
+      ],
+      "tests": "unknown",
+      "loc": 1075,
+      "files": 8,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "validated",
+      "consumers": [],
+      "compat": "unversioned",
+      "evidence": [
+        "docs/security-review.md S-4"
+      ]
+    },
+    {
+      "id": "module.solidcraft.kernel",
+      "name": "solidcraft-kernel",
+      "repository_id": "repo.solidcraft",
+      "language": "rust",
+      "responsibility": "Production B-rep boundary over truck: features, booleans with guards, fillets, chamfers, healing, history.",
+      "boundaries": [
+        "No truck type appears in its public API, so the kernel can be replaced.",
+        "Every third-party call runs under a panic guard that maps to KernelError::Internal."
+      ],
+      "public_api": [
+        "Body",
+        "KernelError",
+        "feature evaluation"
+      ],
+      "internal_dependencies": [
+        "module.solidcraft.geom"
+      ],
+      "external_dependencies": [
+        "truck-modeling 0.6",
+        "truck-topology 0.6",
+        "truck-shapeops 0.4 (patched)",
+        "truck-meshalgo 0.4 (patched)",
+        "spade 2.15"
+      ],
+      "consumes": [],
+      "provides": [
+        "cap.kernel.boolean.difference",
+        "cap.kernel.fillet"
+      ],
+      "tests": "unknown",
+      "loc": 94803,
+      "files": 186,
+      "performance_baseline": "One crate build: 8 min 22 s wall, 2.56 GB peak RSS (docs/build-and-test.md section 4).",
+      "migration": "keep",
+      "integration_status": "validated",
+      "consumers": [
+        "module.solidcraft.doc",
+        "module.solidcraft.io"
+      ],
+      "compat": "solidcraft 0.18",
+      "evidence": [
+        "docs/repository-audit.md section 4",
+        "docs/kernel-comparison.md section 4.5"
+      ]
+    },
+    {
+      "id": "module.solidcraft.doc",
+      "name": "solidcraft-doc",
+      "repository_id": "repo.solidcraft",
+      "language": "rust",
+      "responsibility": "Parametric document: timeline of features, parameters, incremental recomputation, stable face anchors and lineage.",
+      "boundaries": [
+        "Owns the feature graph and topological naming; delegates geometry to the kernel module."
+      ],
+      "public_api": [
+        "Document",
+        "Feature",
+        "SketchId",
+        "FaceAnchor"
+      ],
+      "internal_dependencies": [
+        "module.solidcraft.kernel",
+        "module.solidcraft.sketch"
+      ],
+      "external_dependencies": [
+        "serde"
+      ],
+      "consumes": [
+        "cap.kernel.boolean.difference",
+        "cap.3d.sketch"
+      ],
+      "provides": [
+        "cap.document.parametric"
+      ],
+      "tests": "unknown",
+      "loc": 49089,
+      "files": 105,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "validated",
+      "consumers": [
+        "module.solidcraft.engine"
+      ],
+      "compat": "solidcraft 0.18",
+      "evidence": [
+        "docs/repository-audit.md section 4"
+      ]
+    },
+    {
+      "id": "module.solidcraft.sketch",
+      "name": "solidcraft-sketch",
+      "repository_id": "repo.solidcraft",
+      "language": "rust",
+      "responsibility": "2D sketches and their constraint solver for parametric features.",
+      "boundaries": [
+        "Sketch geometry and constraints; no document timeline."
+      ],
+      "public_api": [
+        "Sketch",
+        "constraint solve"
+      ],
+      "internal_dependencies": [
+        "module.solidcraft.geom"
+      ],
+      "external_dependencies": [],
+      "consumes": [],
+      "provides": [
+        "cap.3d.sketch"
+      ],
+      "tests": "unknown",
+      "loc": 23681,
+      "files": 47,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "validated",
+      "consumers": [
+        "module.solidcraft.doc"
+      ],
+      "compat": "solidcraft 0.18",
+      "evidence": [
+        "docs/repository-audit.md section 4"
+      ]
+    },
+    {
+      "id": "module.solidcraft.io",
+      "name": "solidcraft-io",
+      "repository_id": "repo.solidcraft",
+      "language": "rust",
+      "responsibility": "STEP, IGES, 3MF, STL, OBJ and glTF import/export with path confinement.",
+      "boundaries": [
+        "Owns format parsing and vfs confinement; lacks import budgets (security S-3)."
+      ],
+      "public_api": [
+        "import",
+        "export",
+        "vfs"
+      ],
+      "internal_dependencies": [
+        "module.solidcraft.kernel"
+      ],
+      "external_dependencies": [
+        "truck-stepio 0.3 (patched)",
+        "quick-xml",
+        "zip"
+      ],
+      "consumes": [
+        "cap.kernel.extrude"
+      ],
+      "provides": [
+        "cap.io.step",
+        "cap.io.mesh"
+      ],
+      "tests": "unknown",
+      "loc": 11541,
+      "files": 23,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "validated",
+      "consumers": [
+        "module.solidcraft.engine"
+      ],
+      "compat": "solidcraft 0.18",
+      "evidence": [
+        "docs/security-review.md S-3"
+      ]
+    },
+    {
+      "id": "module.solidcraft.geom",
+      "name": "solidcraft-geom",
+      "repository_id": "repo.solidcraft",
+      "language": "rust",
+      "responsibility": "3D geometry types and operations for the 3D application.",
+      "boundaries": [
+        "Its own vector types; deliberately not shared with cadcraft-geom, which the contract bridges."
+      ],
+      "public_api": [
+        "Vec3",
+        "curve and surface helpers"
+      ],
+      "internal_dependencies": [],
+      "external_dependencies": [],
+      "consumes": [],
+      "provides": [],
+      "tests": "unknown",
+      "loc": 14983,
+      "files": 34,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "validated",
+      "consumers": [
+        "module.solidcraft.kernel",
+        "module.solidcraft.sketch"
+      ],
+      "compat": "solidcraft 0.18",
+      "evidence": [
+        "docs/repository-audit.md section 4"
+      ]
+    },
+    {
+      "id": "module.solidcraft.engine",
+      "name": "solidcraft-engine",
+      "repository_id": "repo.solidcraft",
+      "language": "rust",
+      "responsibility": "Command engine for parametric modelling commands.",
+      "boundaries": [
+        "UI-agnostic command layer."
+      ],
+      "public_api": [
+        "command registry (schema-typed)"
+      ],
+      "internal_dependencies": [
+        "module.solidcraft.doc"
+      ],
+      "external_dependencies": [
+        "schemars"
+      ],
+      "consumes": [
+        "cap.document.parametric"
+      ],
+      "provides": [],
+      "tests": "unknown",
+      "loc": 103127,
+      "files": 267,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "validated",
+      "consumers": [
+        "module.solidcraft.ui-egui"
+      ],
+      "compat": "solidcraft 0.18",
+      "evidence": [
+        "docs/repository-audit.md section 4"
+      ]
+    },
+    {
+      "id": "module.solidcraft.ui-egui",
+      "name": "solidcraft-ui-egui",
+      "repository_id": "repo.solidcraft",
+      "language": "rust",
+      "responsibility": "egui desktop front end, plus the in-app agent chat surface.",
+      "boundaries": [
+        "Presentation; commands are validated through the engine."
+      ],
+      "public_api": [
+        "app"
+      ],
+      "internal_dependencies": [
+        "module.solidcraft.engine",
+        "module.solidcraft.render"
+      ],
+      "external_dependencies": [
+        "egui 0.36"
+      ],
+      "consumes": [
+        "cap.document.parametric",
+        "cap.render.3d"
+      ],
+      "provides": [],
+      "tests": "unknown",
+      "loc": 129669,
+      "files": 279,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "validated",
+      "consumers": [],
+      "compat": "egui 0.36",
+      "evidence": [
+        "docs/repository-audit.md section 4"
+      ]
+    },
+    {
+      "id": "module.solidcraft.render",
+      "name": "solidcraft-render",
+      "repository_id": "repo.solidcraft",
+      "language": "rust",
+      "responsibility": "Viewport rendering and picking for the 3D application.",
+      "boundaries": [
+        "No rendering performance claim is made: the only GPU here is integrated UHD."
+      ],
+      "public_api": [
+        "renderer"
+      ],
+      "internal_dependencies": [
+        "module.solidcraft.gpu"
+      ],
+      "external_dependencies": [
+        "wgpu 30"
+      ],
+      "consumes": [
+        "cap.render.3d"
+      ],
+      "provides": [
+        "cap.render.3d"
+      ],
+      "tests": "unknown",
+      "loc": 7894,
+      "files": 38,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "validated",
+      "consumers": [
+        "module.solidcraft.ui-egui"
+      ],
+      "compat": "wgpu 30",
+      "evidence": [
+        "docs/performance-baseline.md section 5"
+      ]
+    },
+    {
+      "id": "module.solidcraft.gpu",
+      "name": "solidcraft-gpu",
+      "repository_id": "repo.solidcraft",
+      "language": "rust",
+      "responsibility": "GPU resource layer shared by the renderer.",
+      "boundaries": [
+        "No measured performance on this host; integrated graphics only."
+      ],
+      "public_api": [
+        "gpu context"
+      ],
+      "internal_dependencies": [],
+      "external_dependencies": [
+        "wgpu 30"
+      ],
+      "consumes": [],
+      "provides": [],
+      "tests": "unknown",
+      "loc": 4722,
+      "files": 12,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "validated",
+      "consumers": [
+        "module.solidcraft.render"
+      ],
+      "compat": "wgpu 30",
+      "evidence": [
+        "docs/repository-audit.md section 4"
+      ]
+    },
+    {
+      "id": "module.solidcraft.mcp",
+      "name": "solidcraft-mcp",
+      "repository_id": "repo.solidcraft",
+      "language": "rust",
+      "responsibility": "MCP server exposing modelling commands, with --allow-path confinement.",
+      "boundaries": [
+        "Requires an explicit allowed directory; --allow-any-path is an opt-out, never a default."
+      ],
+      "public_api": [
+        "MCP tool schema"
+      ],
+      "internal_dependencies": [
+        "module.solidcraft.engine"
+      ],
+      "external_dependencies": [],
+      "consumes": [
+        "cap.document.parametric"
+      ],
+      "provides": [
+        "cap.mcp.server"
+      ],
+      "tests": "unknown",
+      "loc": 3031,
+      "files": 5,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "validated",
+      "consumers": [],
+      "compat": "unversioned",
+      "evidence": [
+        "docs/security-review.md S-4"
+      ]
+    },
+    {
+      "id": "module.solidcraft.vendor-truck",
+      "name": "solidcraft vendor (patched truck crates)",
+      "repository_id": "repo.solidcraft",
+      "language": "rust",
+      "responsibility": "Vendored, patched truck-geometry, truck-shapeops, truck-meshalgo and truck-stepio plus two UI crates, wired through [patch.crates-io].",
+      "boundaries": [
+        "Third-party code, excluded from the app's lint scope; modifications marked `SolidCraft:`.",
+        "Not a place for product logic."
+      ],
+      "public_api": [
+        "patch replacements (no new API)"
+      ],
+      "internal_dependencies": [],
+      "external_dependencies": [
+        "truck 0.6 upstream",
+        "egui-wgpu",
+        "matext4cgmath"
+      ],
+      "consumes": [],
+      "provides": [],
+      "tests": "unknown",
+      "loc": null,
+      "files": null,
+      "performance_baseline": null,
+      "migration": "keep",
+      "integration_status": "validated",
+      "consumers": [
+        "module.solidcraft.kernel",
+        "module.solidcraft.io"
+      ],
+      "compat": "truck 0.6",
+      "evidence": [
+        "docs/license-inventory.md section 4.3",
+        "apps/solidcraft/vendor/README.md"
+      ]
+    },
+    {
+      "id": "module.cad-contract",
+      "name": "cad-contract",
+      "repository_id": "repo.cad-contract",
+      "language": "rust",
+      "responsibility": "Shared vocabulary: units, stable IDs, tolerances, capabilities, kernel error taxonomy, mesh exchange, versioned document header with migrations.",
+      "boundaries": [
+        "Contains no geometry implementation and no kernel dependency.",
+        "SolidId is a session handle and must never be persisted; EntityId is the persistent identifier."
+      ],
+      "public_api": [
+        "Unit",
+        "EntityId",
+        "Tolerance",
+        "Capability",
+        "Kernel",
+        "Mesh",
+        "DocumentHeader"
+      ],
+      "internal_dependencies": [],
+      "external_dependencies": [
+        "serde",
+        "serde_json",
+        "thiserror"
+      ],
+      "consumes": [],
+      "provides": [
+        "cap.contract.versioned-document"
+      ],
+      "tests": "passing",
+      "loc": 2056,
+      "files": 9,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "integrated",
+      "consumers": [
+        "module.cad-kernel-truck",
+        "module.cad-cli",
+        "module.cad-document",
+        "module.cad-io",
+        "module.cad-studio"
+      ],
+      "compat": "contract v1, document schema v2",
+      "evidence": [
+        "docs/architecture.md section 3",
+        "engineering/quality/tests.json#t-cad-contract"
+      ]
+    },
+    {
+      "id": "module.cad-kernel-truck",
+      "name": "cad-kernel-truck",
+      "repository_id": "repo.cad-kernel-truck",
+      "language": "rust",
+      "responsibility": "Contract implementation over truck: extrude, union, intersection, tessellation with panic guard, volume-conservation guard and coplanar retry.",
+      "boundaries": [
+        "Advertises only capabilities a test exercises.",
+        "Refuses boolean difference with KernelError::Unsupported rather than returning a wrong solid.",
+        "Namespaced handles: a handle from another instance is UnknownSolid."
+      ],
+      "public_api": [
+        "TruckKernel implementing cad_contract::Kernel"
+      ],
+      "internal_dependencies": [
+        "module.cad-contract"
+      ],
+      "external_dependencies": [
+        "truck-modeling 0.6",
+        "truck-topology 0.6",
+        "truck-shapeops 0.4 (patched)",
+        "truck-meshalgo 0.4 (patched)"
+      ],
+      "consumes": [
+        "cap.contract.versioned-document"
+      ],
+      "provides": [
+        "cap.kernel.extrude",
+        "cap.kernel.boolean.union",
+        "cap.kernel.boolean.intersection",
+        "cap.kernel.tessellate"
+      ],
+      "tests": "passing",
+      "loc": 597,
+      "files": 1,
+      "performance_baseline": "Extrude 0.67 ms / 100 boxes; union 2.04 ms each at 0.0037 mm3 error (docs/performance-baseline.md).",
+      "migration": "not_applicable",
+      "integration_status": "verified",
+      "consumers": [
+        "module.cad-agent-geometry",
+        "module.cad-cli"
+      ],
+      "compat": "contract v1",
+      "evidence": [
+        "engineering/quality/benchmarks.json#bm-boolean-union",
+        "engineering/quality/benchmarks.json#bm-extrude",
+        "engineering/quality/tests.json#t-cad-kernel-truck",
+        "engineering/quality/tests.json#t-cad-kernel-truck-corpus"
+      ]
+    },
+    {
+      "id": "module.cad-engineering",
+      "name": "cad-engineering",
+      "repository_id": "repo.cad-engineering",
+      "language": "rust",
+      "responsibility": "Control plane: typed manifests, cross-validation, workspace observation, change detection, idempotent task synthesis and report rendering.",
+      "boundaries": [
+        "Read-only with respect to source repositories and the cargo target directory.",
+        "Writes only engineering/state, engineering/reports and (when a new task is genuinely new) engineering/tasks/backlog.json.",
+        "Does not run builds or tests; evidence is recorded by the session or CI."
+      ],
+      "public_api": [
+        "ManifestSet",
+        "Scanner",
+        "diff",
+        "tasks",
+        "report"
+      ],
+      "internal_dependencies": [],
+      "external_dependencies": [
+        "serde",
+        "serde_json",
+        "thiserror"
+      ],
+      "consumes": [],
+      "provides": [
+        "cap.engineering.change-detection"
+      ],
+      "tests": "passing",
+      "loc": 3621,
+      "files": 10,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "verified",
+      "consumers": [],
+      "compat": "manifest schema v1",
+      "evidence": [
+        "docs/engineering-control-plane.md",
+        "engineering/quality/tests.json#t-cad-engineering-20261025"
+      ]
+    },
+    {
+      "id": "module.kernel.truck",
+      "name": "truck",
+      "repository_id": "repo.truck",
+      "language": "rust",
+      "responsibility": "B-rep modelling kernel: topology, analytic and NURBS geometry, booleans, meshing.",
+      "boundaries": [
+        "Upstream kernel; all product adaptation happens in SolidCraft's kernel crate and the vendored patches."
+      ],
+      "public_api": [
+        "truck-modeling",
+        "truck-topology",
+        "truck-shapeops",
+        "truck-meshalgo"
+      ],
+      "internal_dependencies": [],
+      "external_dependencies": [],
+      "consumes": [],
+      "provides": [
+        "cap.kernel.extrude",
+        "cap.kernel.boolean.union",
+        "cap.kernel.boolean.intersection",
+        "cap.kernel.tessellate"
+      ],
+      "tests": "unknown",
+      "loc": null,
+      "files": 274,
+      "performance_baseline": "Measured through the adapter, not directly (docs/performance-baseline.md).",
+      "migration": "keep",
+      "integration_status": "integrated",
+      "consumers": [
+        "module.cad-kernel-truck",
+        "module.solidcraft.kernel"
+      ],
+      "compat": "0.6 / 0.4 patched",
+      "evidence": [
+        "docs/kernel-comparison.md section 4"
+      ]
+    },
+    {
+      "id": "module.kernel.cadrum",
+      "name": "cadrum",
+      "repository_id": "repo.cadrum",
+      "language": "rust + c/c++",
+      "responsibility": "Candidate OCCT-backed kernel with a native build.",
+      "boundaries": [
+        "Outside the shipping graph: statically links LGPL-2.1 OpenCASCADE."
+      ],
+      "public_api": [
+        "not used by the product"
+      ],
+      "internal_dependencies": [],
+      "external_dependencies": [
+        "OpenCASCADE (LGPL-2.1)"
+      ],
+      "consumes": [],
+      "provides": [],
+      "tests": "unknown",
+      "loc": null,
+      "files": 58,
+      "performance_baseline": null,
+      "migration": "isolate",
+      "integration_status": "blocked",
+      "consumers": [],
+      "compat": "unreleased",
+      "evidence": [
+        "docs/license-inventory.md section 4.2"
+      ]
+    },
+    {
+      "id": "module.kernel.opencascade-rs",
+      "name": "opencascade-rs",
+      "repository_id": "repo.opencascade-rs",
+      "language": "rust + c/c++",
+      "responsibility": "LGPL-2.1 bindings to OpenCASCADE, held outside the product pending an owner decision.",
+      "boundaries": [
+        "Prohibited in a proprietary binary by policy."
+      ],
+      "public_api": [
+        "not used by the product"
+      ],
+      "internal_dependencies": [],
+      "external_dependencies": [
+        "OpenCASCADE (LGPL-2.1)"
+      ],
+      "consumes": [],
+      "provides": [],
+      "tests": "unknown",
+      "loc": null,
+      "files": 117,
+      "performance_baseline": null,
+      "migration": "isolate",
+      "integration_status": "blocked",
+      "consumers": [],
+      "compat": "unreleased",
+      "evidence": [
+        "docs/license-inventory.md section 4.1"
+      ]
+    },
+    {
+      "id": "module.cad-cli",
+      "name": "cad-cli",
+      "repository_id": "repo.cad-cli",
+      "language": "rust",
+      "responsibility": "Headless product workflow: unit-aware box/union geometry, persistent parametric project create/edit/undo/redo/reopen, and validated binary STL export through cad-io.",
+      "boundaries": [
+        "No GUI or project browser; one project file per CLI invocation.",
+        "Project persistence and model validation are delegated to cad-document.",
+        "Units are converted once at the geometry boundary; the kernel receives millimetres.",
+        "Binary STL is a thin wrapper over cad-io; no general importer is provided."
+      ],
+      "public_api": [
+        "build_box",
+        "build_union",
+        "stl_bytes",
+        "write_stl_binary",
+        "read_stl_binary"
+      ],
+      "internal_dependencies": [
+        "module.cad-contract",
+        "module.cad-kernel-truck",
+        "module.cad-document",
+        "module.cad-io"
+      ],
+      "external_dependencies": [
+        "serde",
+        "serde_json",
+        "thiserror"
+      ],
+      "consumes": [
+        "cap.kernel.extrude",
+        "cap.kernel.tessellate",
+        "cap.contract.versioned-document",
+        "cap.document.project-persistence",
+        "cap.io.stl-export"
+      ],
+      "provides": [],
+      "tests": "passing",
+      "loc": 299,
+      "files": 3,
+      "performance_baseline": "box + STL write measured under 10 ms per invocation (bm-cli-box).",
+      "migration": "not_applicable",
+      "integration_status": "verified",
+      "consumers": [],
+      "compat": "contract v1, document schema v2",
+      "evidence": [
+        "crates/cad-cli/tests/end_to_end.rs",
+        "crates/cad-cli/tests/project_workflow.rs",
+        "engineering/quality/tests.json#t-cad-cli"
+      ]
+    },
+    {
+      "id": "module.cad-agent-api",
+      "name": "cad-agent-api",
+      "repository_id": "repo.cad-agent-api",
+      "language": "rust",
+      "responsibility": "The versioned CadAgent contract: agent identity and metadata, capability and permission declarations, versioned I/O envelopes, budgets and the structured error taxonomy.",
+      "boundaries": [
+        "Declares the agreement only; it contains no registry, no scheduler and no enforcement.",
+        "Depends on serde alone, so an agent implementation never drags in the runtime and the dependency points one way."
+      ],
+      "public_api": [
+        "Agent",
+        "AgentContext",
+        "AgentContract",
+        "AgentId",
+        "AgentMeta",
+        "Budgets",
+        "Permission",
+        "PermissionSet",
+        "OwnerDecision",
+        "AgentError",
+        "ErrorKind"
+      ],
+      "internal_dependencies": [],
+      "external_dependencies": [
+        "serde",
+        "serde_json",
+        "thiserror"
+      ],
+      "consumes": [],
+      "provides": [
+        "cap.agent.contract"
+      ],
+      "tests": "passing",
+      "loc": 958,
+      "files": 5,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "verified",
+      "consumers": [
+        "module.cad-agent-runtime",
+        "module.cad-agent-geometry"
+      ],
+      "compat": "agent contract v1",
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-agent-api",
+        "crates/cad-agent-api/src/lib.rs"
+      ]
+    },
+    {
+      "id": "module.cad-agent-runtime",
+      "name": "cad-agent-runtime",
+      "repository_id": "repo.cad-agent-runtime",
+      "language": "rust",
+      "responsibility": "The agent runtime: contract validation, the discovered-to-registered-to-ready lifecycle, capability grants, budget enforcement and the strict JSON Schema subset checker.",
+      "boundaries": [
+        "Hosts agents without knowing any particular one: the dependency runs agent -> contract and host -> runtime, never the other way round.",
+        "The schema checker enforces a documented keyword subset and refuses any keyword it does not implement, so a contract cannot promise more than the runtime checks."
+      ],
+      "public_api": [
+        "Registry",
+        "Lifecycle",
+        "Registration",
+        "ContractTestReport",
+        "validate",
+        "SchemaError"
+      ],
+      "internal_dependencies": [
+        "module.cad-agent-api"
+      ],
+      "external_dependencies": [
+        "serde",
+        "serde_json",
+        "thiserror"
+      ],
+      "consumes": [
+        "cap.agent.contract"
+      ],
+      "provides": [
+        "cap.agent.runtime"
+      ],
+      "tests": "passing",
+      "loc": 1318,
+      "files": 3,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "verified",
+      "consumers": [
+        "module.cad-agent-geometry"
+      ],
+      "compat": "agent contract v1",
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-agent-runtime",
+        "crates/cad-agent-runtime/src/registry.rs"
+      ]
+    },
+    {
+      "id": "module.cad-agent-geometry",
+      "name": "cad-agent-geometry",
+      "repository_id": "repo.cad-agent-geometry",
+      "language": "rust",
+      "responsibility": "The geometry-ops agent: extrude, boolean, tessellate and measure solids through the contract kernel, behind the agent runtime's lifecycle, schema, permission and budget enforcement.",
+      "boundaries": [
+        "Pure computation, plus one bounded read of a JSON profile file inside a confined workspace.",
+        "Holds one kernel for its lifetime; solid handles are session handles and are never persisted.",
+        "No document, no history, no filesystem write, no network, no shell."
+      ],
+      "public_api": [
+        "GeometryAgent",
+        "AGENT_ID",
+        "OPERATIONS"
+      ],
+      "internal_dependencies": [
+        "module.cad-agent-api",
+        "module.cad-contract",
+        "module.cad-kernel-truck"
+      ],
+      "external_dependencies": [
+        "serde_json"
+      ],
+      "consumes": [
+        "cap.agent.contract",
+        "cap.kernel.extrude",
+        "cap.kernel.tessellate"
+      ],
+      "provides": [
+        "cap.agent.geometry-ops"
+      ],
+      "tests": "passing",
+      "loc": 1609,
+      "files": 2,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "verified",
+      "consumers": [],
+      "compat": "agent contract v1",
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-agent-geometry",
+        "crates/cad-agent-geometry/tests/integration.rs"
+      ]
+    },
+    {
+      "id": "module.cad-document",
+      "name": "cad-document",
+      "repository_id": "repo.cad-document",
+      "language": "rust",
+      "responsibility": "Local parametric project payload: stable sketch/feature IDs, named parameters, rectangle/circle/regular-polygon profiles, extrude evaluation, bounded undo/redo, schema-checked save/load with schema-1 migration, integrity validation and atomic replacement.",
+      "boundaries": [
+        "Kernel handles are runtime-only and never serialized.",
+        "Schema 2 supports one extrude of one sketch profile; it is not a general sketch solver or feature graph.",
+        "Native project loads are limited to 64 MiB; unknown fields, invalid references and unsupported schemas are refused.",
+        "Up to 64 undo and redo snapshots are persisted and validated.",
+        "A circle is represented by a tolerance-bounded polygon, and its volume is that polygon\u2019s volume."
+      ],
+      "public_api": [
+        "Project",
+        "Parameter",
+        "Sketch",
+        "SketchProfile",
+        "Feature",
+        "Evaluated",
+        "ProjectError",
+        "MAX_PROJECT_BYTES"
+      ],
+      "internal_dependencies": [
+        "module.cad-contract"
+      ],
+      "external_dependencies": [
+        "serde",
+        "serde_json",
+        "thiserror"
+      ],
+      "consumes": [
+        "cap.contract.versioned-document",
+        "cap.kernel.extrude",
+        "cap.kernel.tessellate"
+      ],
+      "provides": [
+        "cap.document.project-persistence"
+      ],
+      "tests": "passing",
+      "loc": 1668,
+      "files": 1,
+      "performance_baseline": null,
+      "migration": "keep",
+      "integration_status": "verified",
+      "consumers": [
+        "module.cad-cli",
+        "module.cad-studio"
+      ],
+      "compat": "zcad schema 2 (loads schema 1); document header schema 2",
+      "evidence": [
+        "crates/cad-document/src/lib.rs",
+        "engineering/quality/tests.json#t-cad-document-schema2"
+      ]
+    },
+    {
+      "id": "module.cad-entitlements",
+      "name": "cad-entitlements",
+      "repository_id": "repo.cad-entitlements",
+      "language": "rust",
+      "responsibility": "Local entitlement policy model for tiers, quotas, overage decisions and idempotent payment lifecycle events.",
+      "boundaries": [
+        "Evaluates policy only; it does not authenticate users or call a billing provider.",
+        "Price constants are product hypotheses in INR and exclude tax; they are not charges or validated willingness-to-pay.",
+        "Cloud feature decisions do not gate local CAD editing."
+      ],
+      "public_api": [
+        "Catalog",
+        "Entitlement",
+        "Account",
+        "Tier",
+        "Decision",
+        "Overage",
+        "PaymentStatus"
+      ],
+      "internal_dependencies": [],
+      "external_dependencies": [
+        "serde",
+        "serde_json",
+        "thiserror"
+      ],
+      "consumes": [],
+      "provides": [
+        "cap.entitlements.policy"
+      ],
+      "tests": "passing",
+      "loc": 575,
+      "files": 1,
+      "performance_baseline": null,
+      "migration": "not_applicable",
+      "integration_status": "validated",
+      "consumers": [],
+      "compat": "entitlement policy schema v1",
+      "evidence": [
+        "crates/cad-entitlements/src/lib.rs",
+        "engineering/quality/tests.json#t-cad-entitlements"
+      ]
+    },
+    {
+      "id": "module.cad-io",
+      "name": "cad-io",
+      "repository_id": "repo.cad-io",
+      "language": "rust",
+      "responsibility": "Validated binary STL serialisation and parsing shared by the CLI and the studio.",
+      "boundaries": [
+        "Format only: no kernel, no document model.",
+        "STL has no unit field; the caller owns the document header that says what the numbers mean.",
+        "Untrusted input is length-checked before allocation."
+      ],
+      "public_api": [
+        "stl_bytes",
+        "write_stl_binary",
+        "read_stl_binary",
+        "StlError"
+      ],
+      "internal_dependencies": [
+        "module.cad-contract"
+      ],
+      "external_dependencies": [
+        "thiserror"
+      ],
+      "consumes": [
+        "cap.contract.versioned-document"
+      ],
+      "provides": [
+        "cap.io.stl-export"
+      ],
+      "tests": "passing",
+      "loc": 263,
+      "files": 1,
+      "performance_baseline": "A 28-triangle export through the studio measures 3.8 ms wall including HTTP (bm-studio-stl-export).",
+      "migration": "not_applicable",
+      "integration_status": "verified",
+      "consumers": [
+        "module.cad-cli",
+        "module.cad-studio"
+      ],
+      "compat": "contract v1",
+      "evidence": [
+        "crates/cad-io/src/lib.rs",
+        "engineering/quality/tests.json#t-cad-io"
+      ]
+    },
+    {
+      "id": "module.cad-studio",
+      "name": "cad-studio",
+      "repository_id": "repo.cad-studio",
+      "language": "rust + html/css/javascript (embedded assets)",
+      "responsibility": "Local-first application shell: project browser, named-parameter and profile editing, 3D WebGL viewport with orbit/pan/zoom/fit, wireframe, grid, face picking, command palette, light/dark theme, save and STL export.",
+      "boundaries": [
+        "Binds 127.0.0.1 only; refuses foreign POST origins and non-JSON bodies.",
+        "No endpoint accepts a filesystem path from the client; the project path is fixed at launch.",
+        "Headers are capped at 16 KiB and JSON bodies at 1 MiB; connections are capped at 64.",
+        "Single process, single project, no accounts, cloud, telemetry or collaboration.",
+        "The browser UI has no build step and no third-party JavaScript."
+      ],
+      "public_api": [
+        "start",
+        "StudioHandle",
+        "default_project",
+        "DEFAULT_PORT",
+        "StudioError"
+      ],
+      "internal_dependencies": [
+        "module.cad-contract",
+        "module.cad-document",
+        "module.cad-kernel-truck",
+        "module.cad-io"
+      ],
+      "external_dependencies": [
+        "serde",
+        "serde_json"
+      ],
+      "consumes": [
+        "cap.contract.versioned-document",
+        "cap.document.project-persistence",
+        "cap.kernel.extrude",
+        "cap.kernel.tessellate",
+        "cap.io.stl-export"
+      ],
+      "provides": [
+        "cap.app.local-studio",
+        "cap.ui.viewport-3d",
+        "cap.ui.command-palette"
+      ],
+      "tests": "passing",
+      "loc": 1284,
+      "files": 3,
+      "performance_baseline": "10 ms start to health (5 runs, 7-16 ms); 2.66 ms GET /api/state (300 requests, p95 4.29 ms); 4.44 ms parameter rebuild (30 requests); 4.50 ms atomic save; 3.98 ms STL export on a 28-triangle part (bm-studio-*). The accept loop's 10 ms poll added 7.5 ms to the state median and was removed.",
+      "migration": "not_applicable",
+      "integration_status": "verified",
+      "consumers": [],
+      "compat": "zcad schema 2, contract v1",
+      "evidence": [
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/tests/http_api.rs",
+        "engineering/quality/tests.json#t-cad-studio",
+        "docs/architecture-decisions/0008-local-first-app-shell-without-a-ui-toolkit.md"
+      ]
+    }
+  ]
+}

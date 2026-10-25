@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  fmt:
+    name: cargo fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # CI cannot clone the `.blueprints` submodule (agent tooling), so do
+          # not recurse. Jobs that compile or run code fetch the public
+          # `resources` submodule explicitly below.
+          submodules: false
+      # `rustfmt.toml` opts into unstable options (`fn_single_line`,
+      # `where_single_line`, `brace_style = "PreferSameLine"`); stable
+      # rustfmt silently ignores those, so the fmt check has to run on
+      # nightly to actually apply them.
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    name: cargo clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # CI cannot clone the `.blueprints` submodule (agent tooling), so do
+          # not recurse. Jobs that compile or run code fetch the public
+          # `resources` submodule explicitly below.
+          submodules: false
+      - run: git submodule update --init resources
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --all-targets -- -D warnings
+
+  test:
+    name: cargo test (cpu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # CI cannot clone the `.blueprints` submodule (agent tooling), so do
+          # not recurse. Jobs that compile or run code fetch the public
+          # `resources` submodule explicitly below.
+          submodules: false
+      - run: git submodule update --init resources
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@nextest
+      # Pinned: cargo-rdme's output is not stable across major versions, so an
+      # unpinned `@latest` would fail `readme-check` the day it majors.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-rdme@2.1.0
+      - uses: extractions/setup-just@v2
+      - run: just readme-check
+      - run: just test-cpu
+      - run: just test-doc
+
+  meshing-features:
+    name: monstertruck-meshing feature subsets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # CI cannot clone the `.blueprints` submodule (agent tooling), so do
+          # not recurse. Jobs that compile or run code fetch the public
+          # `resources` submodule explicitly below.
+          submodules: false
+      - run: git submodule update --init resources
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - uses: extractions/setup-just@v2
+      - run: just meshing-features
+
+  wasm-build:
+    name: cargo build (wasm32)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # CI cannot clone the `.blueprints` submodule (agent tooling), so do
+          # not recurse. Jobs that compile or run code fetch the public
+          # `resources` submodule explicitly below.
+          submodules: false
+      - run: git submodule update --init resources
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: extractions/setup-just@v2
+      - run: just wasm-build

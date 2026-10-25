@@ -1,0 +1,222 @@
+{
+  "schema_version": 1,
+  "interfaces": [
+    {
+      "id": "iface.cad-contract.kernel",
+      "name": "cad_contract::kernel::Kernel",
+      "kind": "rust_trait",
+      "provider_module": "module.cad-contract",
+      "version": "1",
+      "stability": "stable",
+      "schema": "crates/cad-contract/src/kernel.rs",
+      "consumers": [
+        "module.cad-agent-geometry",
+        "module.cad-cli",
+        "module.cad-kernel-truck",
+        "module.cad-studio"
+      ],
+      "contract_tests": [
+        "advertises_exactly_what_it_implements",
+        "an_expired_deadline_returns_timeout_and_leaves_the_kernel_usable",
+        "cancelling_a_running_operation_is_observed_and_the_instance_survives",
+        "difference_is_refused_rather_than_returned_wrong",
+        "extruded_box_has_the_exact_analytic_volume",
+        "handles_from_another_kernel_are_rejected",
+        "tessellation_is_a_closed_outward_manifold",
+        "the_trait_path_never_reports_cancellation"
+      ],
+      "compatibility_policy": "Additive methods need a default implementation; removing or changing a method requires a new trait version and a migration note in docs/architecture.md section 7.",
+      "status": "integrated"
+    },
+    {
+      "id": "iface.cad-contract.mesh",
+      "name": "cad_contract::mesh::Mesh",
+      "kind": "rust_crate_api",
+      "provider_module": "module.cad-contract",
+      "version": "1",
+      "stability": "stable",
+      "schema": "crates/cad-contract/src/mesh.rs",
+      "consumers": [
+        "module.cad-kernel-truck",
+        "module.cad-cli",
+        "module.cad-io",
+        "module.cad-studio"
+      ],
+      "contract_tests": [
+        "tessellation_is_valid_and_closed"
+      ],
+      "compatibility_policy": "Plain f64/u32 arrays only; adding a field needs a schema version bump because the type is serialisable.",
+      "status": "integrated"
+    },
+    {
+      "id": "iface.cad-contract.document-header",
+      "name": "cad_contract::document::DocumentHeader",
+      "kind": "json_schema",
+      "provider_module": "module.cad-contract",
+      "version": "2",
+      "stability": "draft",
+      "schema": "crates/cad-contract/src/document.rs",
+      "consumers": [
+        "module.cad-document"
+      ],
+      "contract_tests": [
+        "current_header_round_trips_without_migration",
+        "schema_0_file_migrates_through_two_steps",
+        "schema_1_file_gets_defaulted_tolerance_and_one_migration",
+        "newer_schema_is_refused_rather_than_downgraded"
+      ],
+      "compatibility_policy": "Migrations are forward-only and tested; a newer schema is an error, never a silent downgrade.",
+      "status": "integrated"
+    },
+    {
+      "id": "iface.engineering.manifests",
+      "name": "engineering manifests (schema v1)",
+      "kind": "json_schema",
+      "provider_module": "module.cad-engineering",
+      "version": "1",
+      "stability": "stable",
+      "schema": "engineering/manifest/*.json",
+      "consumers": [],
+      "contract_tests": [
+        "schema_drift_is_a_load_error",
+        "a_consistent_manifest_set_validates",
+        "duplicate_repository_ids_are_rejected"
+      ],
+      "compatibility_policy": "Every struct denies unknown fields; any incompatible shape change bumps schema_version and requires a migration in the scanner.",
+      "status": "validated"
+    },
+    {
+      "id": "iface.engineering.scan-state",
+      "name": "engineering/state/scan.json (schema v1)",
+      "kind": "json_schema",
+      "provider_module": "module.cad-engineering",
+      "version": "1",
+      "stability": "draft",
+      "schema": "crates/cad-engineering/src/model.rs#ScanState",
+      "consumers": [],
+      "contract_tests": [
+        "the_scanner_version_is_recorded",
+        "a_scan_that_finds_nothing_new_is_idempotent"
+      ],
+      "compatibility_policy": "State is disposable: if the schema changes, delete the state file and the next scan becomes the new baseline.",
+      "status": "validated"
+    },
+    {
+      "id": "iface.cadcraft.mcp",
+      "name": "CADCraft MCP tools",
+      "kind": "mcp",
+      "provider_module": "module.cadcraft.mcp",
+      "version": "unversioned",
+      "stability": "draft",
+      "schema": "apps/cadcraft/crates/mcp",
+      "consumers": [],
+      "contract_tests": [],
+      "compatibility_policy": "Not versioned yet; tool arguments are validated structures, never generated code.",
+      "status": "discovered"
+    },
+    {
+      "id": "iface.solidcraft.mcp",
+      "name": "SolidCraft MCP tools",
+      "kind": "mcp",
+      "provider_module": "module.solidcraft.mcp",
+      "version": "unversioned",
+      "stability": "draft",
+      "schema": "apps/solidcraft/crates/mcp",
+      "consumers": [],
+      "contract_tests": [],
+      "compatibility_policy": "Not versioned yet; requires --allow-path confinement.",
+      "status": "discovered"
+    },
+    {
+      "id": "iface.cad-agent.contract",
+      "name": "cad_agent_api::agent::Agent + AgentContract",
+      "kind": "rust_trait",
+      "provider_module": "module.cad-agent-api",
+      "version": "1",
+      "stability": "stable",
+      "schema": "crates/cad-agent-api/src/contract.rs",
+      "consumers": [
+        "module.cad-agent-runtime",
+        "module.cad-agent-geometry"
+      ],
+      "contract_tests": [
+        "ids_reject_empty_overlong_and_unsafe",
+        "a_foreign_contract_version_is_incompatible",
+        "a_deserialised_bad_id_is_caught_by_validate",
+        "grant_is_never_wider_than_the_request",
+        "zero_budgets_are_a_configuration_error"
+      ],
+      "compatibility_policy": "The contract version is a single integer. A breaking change to AgentContract or the Agent trait needs version 2 and a migration note; additive fields need a default.",
+      "status": "integrated"
+    },
+    {
+      "id": "iface.cad-agent.runtime",
+      "name": "cad_agent_runtime::registry::Registry",
+      "kind": "rust_crate_api",
+      "provider_module": "module.cad-agent-runtime",
+      "version": "1",
+      "stability": "stable",
+      "schema": "crates/cad-agent-runtime/src/registry.rs",
+      "consumers": [
+        "module.cad-agent-geometry"
+      ],
+      "contract_tests": [
+        "lifecycle_walks_discovered_registered_ready",
+        "activation_refuses_agents_whose_contract_tests_failed",
+        "an_incompatible_contract_is_rejected_up_front",
+        "shell_requires_an_owner_decision",
+        "the_call_budget_is_enforced_from_outside",
+        "invalid_input_never_reaches_the_agent",
+        "a_panicking_agent_is_quarantined"
+      ],
+      "compatibility_policy": "The registry is a plain struct with checked transition methods. Adding a lifecycle state or a registry method is additive; removing one needs a new version and a migration note.",
+      "status": "integrated"
+    },
+    {
+      "id": "iface.cad-document.project-file",
+      "name": "`.zcad` parametric project JSON",
+      "kind": "json_schema",
+      "provider_module": "module.cad-document",
+      "version": "2",
+      "stability": "draft",
+      "schema": "crates/cad-document/src/lib.rs",
+      "consumers": [
+        "module.cad-cli",
+        "module.cad-studio"
+      ],
+      "contract_tests": [
+        "save_and_reopen_preserves_parameters_and_features",
+        "a_schema_one_project_migrates_to_an_explicit_rectangle_profile",
+        "a_schema_two_payload_with_flat_rectangle_fields_is_refused",
+        "loading_rejects_dangling_feature_references",
+        "loading_rejects_non_positive_persisted_parameters",
+        "save_atomically_replaces_an_existing_project",
+        "load_refuses_an_oversized_file_before_reading_it",
+        "a_persisted_polygon_with_too_few_sides_is_refused"
+      ],
+      "compatibility_policy": "Unknown fields and newer schemas are rejected before editing or saving. Schema 1 is migrated forward to schema 2; there is no downgrade path. Any further incompatible payload change increments PROJECT_SCHEMA and needs a tested migration or explicit refusal.",
+      "status": "verified"
+    },
+    {
+      "id": "iface.cad-studio.http",
+      "name": "Atlas CAD Studio local HTTP API",
+      "kind": "http",
+      "provider_module": "module.cad-studio",
+      "version": "1",
+      "stability": "draft",
+      "schema": "crates/cad-studio/src/lib.rs",
+      "consumers": [],
+      "contract_tests": [
+        "state_is_a_complete_renderable_payload",
+        "parameter_edit_undo_redo_save_and_stl_export_work",
+        "profile_switch_rebuilds_circle_and_polygon_geometry",
+        "a_persisted_project_reopens_with_its_profile_and_history",
+        "the_api_refuses_foreign_origins_media_types_and_oversized_bodies",
+        "an_unknown_sketch_or_profile_is_a_clear_user_error",
+        "an_empty_project_reports_nothing_to_undo"
+      ],
+      "compatibility_policy": "The UI and server ship in the same binary, but the JSON shapes are explicit and reject unknown fields. Changing a field needs a test update and a note here; no endpoint accepts a client filesystem path.",
+      "status": "verified"
+    }
+  ]
+}

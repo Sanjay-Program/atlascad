@@ -1,0 +1,15 @@
+[package]
+name = "cadrust-wasm"
+description = "Browser build of the cadrust kernel: document JSON in, glb and status out over a small byte ABI"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+cadrust-core = { path = "../cadrust-core" }
+cadrum = { version = "0.9", default-features = false }
+serde_json = "1"

@@ -1,0 +1,45 @@
+[package]
+name = "truck-platform"
+version = "0.6.0"
+authors = ["Yoshinori Tanimura <tanimura@ricos.co.jp>"]
+edition = "2021"
+description = "graphic utility library based on wgpu"
+homepage = "https://github.com/ricosjp/truck"
+repository = "https://github.com/ricosjp/truck"
+license = "Apache-2.0"
+
+keywords = ["truck", "graphics"]
+categories = ["graphics"]
+
+[features]
+default = []
+webgl = ["wgpu/webgl"]
+
+[dependencies]
+bytemuck = { version = "1.25.2", features = ["derive"] }
+derive_more = { version = "2.1.1", features = ["full"] }
+futures-intrusive = "0.5.0"
+rustc-hash = "2.1.3"
+truck-base = { version = "0.5.0", path = "../truck-base" }
+wgpu = "30.0.1"
+winit = "0.30.13"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-time = "1.1.0"
+
+[dev-dependencies]
+image = "0.25.10"
+rayon = "1.12.0"
+env_logger = "0.11.11"
+naga = { version = "30.0.1", features = ["wgsl-in"] }
+pollster = "1.0.1"
+log = "0.4.34"
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-futures = "0.4.79"
+console_error_panic_hook = "0.1.7"
+console_log = "1.1.0"
+gloo-utils = "0.3.0"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+proptest = { version = "1.12.0", features = ["attr-macro"] }

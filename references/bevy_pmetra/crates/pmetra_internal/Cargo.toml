@@ -1,0 +1,41 @@
+[package]
+name = "pmetra_internal"
+version = "0.7.0"
+edition = "2021"
+authors = ["Nilay Savant"]
+description = "Internal crate for bevy_pmetra."
+
+
+[dependencies]
+bevy = { version = "0.18", default-features = false, features = [
+    "std",
+    "async_executor",
+    "bevy_pbr",
+    "bevy_render",
+    "bevy_text",
+    "bevy_ui",
+    "bevy_ui_render",
+    "multi_threaded",
+    "bevy_gizmos",
+    "bevy_color",
+    "default_font",
+    # Picking features...
+    "bevy_picking",
+    "mesh_picking",
+    # `Window` required for bevy_picking deselect all.
+    "bevy_window",
+    "bevy_log",
+] }
+anyhow = "1.0"
+strum = { version = "0.25", features = ["derive"] }
+# truck stuff
+truck-modeling = { git = "https://github.com/nilaysavant/truck.git", tag = "pmetra.v0.5.0" }
+truck-shapeops = { git = "https://github.com/nilaysavant/truck.git", tag = "pmetra.v0.5.0" }
+truck-meshalgo = { git = "https://github.com/nilaysavant/truck.git", tag = "pmetra.v0.5.0" }
+truck-topology = { git = "https://github.com/nilaysavant/truck.git", tag = "pmetra.v0.5.0" }
+truck-base = { git = "https://github.com/nilaysavant/truck.git", tag = "pmetra.v0.5.0" }
+truck-geometry = { git = "https://github.com/nilaysavant/truck.git", tag = "pmetra.v0.5.0" }
+# truck deps for custom adaptation...
+rustc-hash = "1.1.0"
+# async
+bevy_async_task = "0.12"

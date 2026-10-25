@@ -1,0 +1,68 @@
+// Section view with several planes (Onshape's Section view dialog: Exclude / Include, Section
+// planes, Items to exclude; the offset arrow and the rotation arc; hatched caps), on the drawing
+// bracket (`samples::drawing_bracket`: a 120 × 80 × 12 plate with four holes and an upright on
+// the Front plane with a Ø24 hole).
+// 01 the dialog: the Exclude and Include tabs, Section planes and Items to exclude; 02 the Front
+//    plane picked: the front half removed, the caps hatched.
+// 03 the Right plane picked too: only the wedge past both planes goes (a corner of the bracket
+//    cut out), each cap stopping at the other plane; the Right plane is the active one (its
+//    offset arrow and rotation arc).
+// 04 Angle 25: the Right plane turned about its axis, the arc's readout "25 deg".
+// 05 Offset 20 on it; 06 the Front plane's row clicked: the gizmo moves to it.
+// 07 the Include tab: Items to include (none: everything is still cut).
+// 08 the Front plane's ✕: one plane left, the Right plane turned 25°; 09 ✓: the section stays.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("drawing-bracket"),
+        Key("F"),
+        Click(ui("view-section")),
+        WaitFor("section-dialog"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("01-section-dialog"),
+        Click(ui("feature-front")),
+        MoveTo(1420, 900),
+        Wait(3),
+        ExpectText("section-planes", "Front plane"),
+        Screenshot("02-front-plane-hatched"),
+        Click(ui("feature-right")),
+        MoveTo(1420, 900),
+        Wait(3),
+        ExpectText("section-planes", "Right plane"),
+        Screenshot("03-two-planes-wedge"),
+        Click(ui("section-angle-field")),
+        Key("Ctrl+A"),
+        Type("25"),
+        Key("Enter"),
+        MoveTo(1420, 900),
+        Wait(3),
+        ExpectText("section-angle-label", "25 deg"),
+        Screenshot("04-right-plane-turned-25"),
+        Click(ui("section-offset-field")),
+        Key("Ctrl+A"),
+        Type("20"),
+        Key("Enter"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("05-offset-20"),
+        Click(ui("section-planes-item-0")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("06-front-plane-active"),
+        Click(ui("section-mode-1")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("07-include-tab"),
+        Click(ui("section-mode-0")),
+        Click(ui("section-planes-item-0-remove")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("08-one-plane-left"),
+        Click(ui("section-dialog-accept")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("09-accepted"),
+    ],
+)

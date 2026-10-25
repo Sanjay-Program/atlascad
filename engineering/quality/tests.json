@@ -1,0 +1,245 @@
+{
+  "schema_version": 1,
+  "records": [
+    {
+      "id": "t-cadcraft-geom",
+      "target": "repo.cadcraft",
+      "command": "cargo test -p cadcraft-geom",
+      "outcome": "success",
+      "passed": 84,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 40,
+      "recorded_at": "2026-10-21",
+      "notes": "Only CADCraft crate whose tests were executed. The remaining 2,128 test attributes were not run."
+    },
+    {
+      "id": "t-cad-contract",
+      "target": "repo.cad-contract",
+      "command": "cargo test --release -p cad-contract",
+      "outcome": "success",
+      "passed": 55,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-22",
+      "notes": "54 unit tests plus 1 doc test, re-run in this cycle."
+    },
+    {
+      "id": "t-cad-kernel-truck",
+      "target": "repo.cad-kernel-truck",
+      "command": "cargo test -p cad-kernel-truck",
+      "outcome": "success",
+      "passed": 26,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 150,
+      "recorded_at": "2026-10-22",
+      "notes": "26 tests, up from 14: the analytic volumes, the refusal of boolean difference, handle invalidation, tessellation_is_a_closed_outward_manifold, and the cancellation and deadline suite (an_expired_deadline_returns_timeout_and_leaves_the_kernel_usable, every_budgeted_entry_point_enforces_the_deadline, a_cancelled_token_stops_the_operation_and_can_be_reset, cancelling_a_running_operation_is_observed_and_the_instance_survives, the_trait_path_never_reports_cancellation). Re-run in this cycle."
+    },
+    {
+      "id": "t-cad-engineering",
+      "target": "repo.cad-engineering",
+      "command": "cargo test -p cad-engineering",
+      "outcome": "success",
+      "passed": 28,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 70,
+      "recorded_at": "2026-10-22",
+      "notes": "2 unit tests and 26 integration tests, including a real git fixture, a pinned-toolchain regression, idempotent merge and cycle detection. Re-run in this cycle."
+    },
+    {
+      "id": "t-cad-engineering-20261025",
+      "target": "repo.cad-engineering",
+      "command": "cargo test --offline -p cad-engineering -j 2",
+      "outcome": "success",
+      "passed": 30,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 150,
+      "recorded_at": "2026-10-25",
+      "notes": "4 unit tests and 26 integration tests. The two added unit tests cover the report's treatment of superseded records and workspace summaries, so a superseded per-package result is no longer counted twice. Supersedes the 2026-10-22 count of 28 (2 unit + 26 integration).",
+      "supersedes": [
+        "t-cad-engineering"
+      ]
+    },
+    {
+      "id": "t-solidcraft-kernel",
+      "target": "repo.solidcraft",
+      "command": "cargo test -p solidcraft-kernel",
+      "outcome": "not_run",
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": null,
+      "recorded_at": "2026-10-22",
+      "notes": "Not executed: 5,884 tests across the workspace and a 186-file crate that already needs 2.56 GB just to build. Recorded as not run, never as passing."
+    },
+    {
+      "id": "t-cad-cli",
+      "target": "repo.cad-cli",
+      "command": "cargo test --offline -p cad-document -p cad-cli -j 2",
+      "outcome": "success",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 90,
+      "recorded_at": "2026-10-23",
+      "notes": "9 geometry/STL integration tests plus the new multi-process CLI workflow: create, edit, reopen, undo, redo and export. The project output contains 800 mm3 after redo; the exported STL is parsed and its volume checked."
+    },
+    {
+      "id": "t-cad-agent-api",
+      "target": "repo.cad-agent-api",
+      "command": "cargo test -p cad-agent-api",
+      "outcome": "success",
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-22",
+      "notes": "13 unit tests: id syntax, contract version compatibility, grant never wider than the request, zero-budget rejection, and the error taxonomy's kinds and retryability. No doc tests."
+    },
+    {
+      "id": "t-cad-agent-runtime",
+      "target": "repo.cad-agent-runtime",
+      "command": "cargo test -p cad-agent-runtime",
+      "outcome": "success",
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-22",
+      "notes": "16 unit tests: the lifecycle, refusal to activate an agent whose contract tests failed, rejection of an incompatible contract version, owner-gated shell, the call budget, schema-enforced input, quarantine of a panicking agent, the strict schema subset and its upper-bound keywords (maxItems, maximum, maxLength). No doc tests."
+    },
+    {
+      "id": "t-cad-agent-geometry",
+      "target": "repo.cad-agent-geometry",
+      "command": "cargo test -p cad-agent-geometry",
+      "outcome": "success",
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 1350,
+      "recorded_at": "2026-10-22",
+      "notes": "12 unit tests plus 12 integration tests. The unit tests cover the contract's shape, the profile and point caps, and the agent's own bounds. The integration tests drive the agent through a real Registry: the lifecycle, the declared schema enforced before the agent runs, the read_workspace grant deciding the file operation, path-traversal refusal, a failed contract-test report keeping the agent out of ready, cancellation reported as Cancelled, a cancellation observed mid-flight, an expired deadline reported as Timeout, the output and call budgets, and every reply satisfying the declared output schema. No doc tests."
+    },
+    {
+      "id": "t-cad-kernel-truck-corpus",
+      "target": "repo.cad-kernel-truck",
+      "command": "cargo run -p cad-kernel-truck --example corpus",
+      "outcome": "success",
+      "passed": 8,
+      "failed": 0,
+      "skipped": 2,
+      "duration_ms": 300,
+      "recorded_at": "2026-10-22",
+      "notes": "The analytic correctness corpus, run as a binary. 10 fixtures: 8 ok, 2 known-failure (union_tangent_contact, intersection_large_coordinates), 0 regressions, 0 unexpected passes, exit code 0. The 3 difference fixtures are reported unsupported by the kernel, which the corpus counts as correct rather than as a pass. The 2 known failures are recorded expectations, not skips: the corpus reports them so a future fix has to promote the baseline deliberately."
+    },
+    {
+      "id": "t-cad-document",
+      "target": "repo.cad-document",
+      "command": "cargo test --offline -p cad-document -p cad-cli -j 2",
+      "outcome": "success",
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 10,
+      "recorded_at": "2026-10-23",
+      "notes": "18 document unit tests: atomic replacement/no-clobber on invalid save, native round trip, bounded file reads, persisted undo/redo, schema-1 compatibility without history fields, nested unknown-field rejection, invalid history/reference/value rejection and 64 MiB size limit."
+    },
+    {
+      "id": "t-platform-workspace-20261023",
+      "target": "workspace",
+      "command": "cargo test --offline --workspace -j 2",
+      "outcome": "success",
+      "passed": 200,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 9300,
+      "recorded_at": "2026-10-23",
+      "notes": "All 9 platform workspace packages passed, including 1 doctest: cad-agent-api 13, cad-agent-geometry 24 (12 unit + 12 integration), cad-agent-runtime 16, cad-cli 10 (9 end-to-end + 1 multi-process project workflow), cad-contract 55 including doctest, cad-document 18, cad-engineering 28, cad-entitlements 10 and cad-kernel-truck 26.",
+      "summary": true
+    },
+    {
+      "id": "t-cad-entitlements",
+      "target": "repo.cad-entitlements",
+      "command": "cargo test --offline --workspace -j 2",
+      "outcome": "success",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-23",
+      "notes": "10 entitlement policy tests executed as part of the recorded full workspace run; covers quotas, overage, local edits during failed payment, lifecycle events and hypothesis prices. No provider integration is tested because none exists."
+    },
+    {
+      "id": "t-cad-document-schema2",
+      "target": "repo.cad-document",
+      "command": "cargo test --offline -p cad-document -j 2",
+      "outcome": "success",
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-25",
+      "notes": "27 tests: schema-2 circle and regular-polygon profiles with tolerance-bounded tessellation, analytic polygon area and measured prism volume, schema-1 to schema-2 migration, persisted-profile validation, profile/origin editing, and the prior rectangle, undo/redo, atomic-save and corrupt-input cases. Supersedes the 2026-10-23 record without deleting it.",
+      "supersedes": [
+        "t-cad-document"
+      ]
+    },
+    {
+      "id": "t-cad-io",
+      "target": "repo.cad-io",
+      "command": "cargo test --offline -p cad-io -j 2",
+      "outcome": "success",
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-25",
+      "notes": "6 tests for the shared binary-STL writer/reader: exact 50-byte facets, volume-preserving round trip, truncation refusal, impossible declared counts refused before allocation, invalid mesh not written, empty input refused."
+    },
+    {
+      "id": "t-cad-studio",
+      "target": "repo.cad-studio",
+      "command": "cargo test --offline -p cad-studio -j 2",
+      "outcome": "success",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 100,
+      "recorded_at": "2026-10-25",
+      "notes": "2 unit tests plus 8 HTTP integration tests that drive a real loopback server: complete renderable state, parameter edit/undo/redo/save/reopen, STL export parsed back to a mesh, circle and polygon profile rebuilds against analytic volumes, foreign or empty Host refused, foreign Origin refusal, wrong media type, oversized body, malformed and unknown-field JSON, unknown sketch/profile/side errors, and an empty project reporting nothing to undo."
+    },
+    {
+      "id": "t-platform-workspace-20261025",
+      "target": "repo.platform",
+      "command": "cargo test --offline --workspace -j 2",
+      "outcome": "success",
+      "passed": 224,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 10570,
+      "recorded_at": "2026-10-25",
+      "notes": "224 tests across 11 workspace packages, including 1 doc test, plus fmt and clippy --all-targets -D warnings clean. Workspace-wide summary; it duplicates the per-package records and is excluded from summed totals. Superseded by the final 2026-10-25 run after the last test additions.",
+      "summary": true
+    },
+    {
+      "id": "t-platform-workspace-20261025-final",
+      "target": "repo.platform",
+      "command": "cargo test --offline --workspace -j 2",
+      "outcome": "success",
+      "passed": 227,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 2573,
+      "recorded_at": "2026-10-25",
+      "notes": "227 tests across 11 workspace packages, including 1 doc test, plus fmt and clippy --all-targets -D warnings clean: cad-agent-api 13, cad-agent-geometry 24 (12 unit + 12 integration), cad-agent-runtime 16, cad-cli 10 (9 end-to-end + 1 project workflow), cad-contract 55 (54 unit + 1 doc test), cad-document 27, cad-engineering 30 (4 unit + 26 integration), cad-entitlements 10, cad-io 6, cad-kernel-truck 26 and cad-studio 10 (2 unit + 8 HTTP integration). Workspace-wide summary; it duplicates the per-package records and is excluded from summed totals.",
+      "supersedes": [
+        "t-platform-workspace-20261025"
+      ],
+      "summary": true
+    }
+  ]
+}

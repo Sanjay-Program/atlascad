@@ -1,0 +1,24 @@
+[package]
+name = "cadrs_router_kernels"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# The autorouter's search kernels in plain no_std Rust: the CPU router (`cadrs_router`) calls
+# them directly, and rust-gpu compiles the same code to a SPIR-V compute shader for the GPU
+# router (no WGSL). Rebuild the shader after changing this crate:
+#   cargo gpu build --shader-crate crates/cadrs_router_kernels \
+#       --output-dir crates/cadrs_router/shaders
+# (cargo-gpu installs the nightly toolchain rust-gpu needs; the workspace stays on its own.)
+[lib]
+crate-type = ["lib", "dylib"]
+
+[target.'cfg(target_arch = "spirv")'.dependencies]
+spirv-std = "=0.10.0-alpha.1"
+# glam 0.33 keeps its vector types behind `all-types` (a default feature spirv-std turns off
+# for SPIR-V).
+glam = { version = "0.33", default-features = false, features = ["libm", "all-types"] }
+
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(target_arch, values("spirv"))'] }

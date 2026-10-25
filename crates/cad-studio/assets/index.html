@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Atlas CAD Studio</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <a class="skip-link" href="#viewport">Skip to viewport</a>
+
+  <header class="topbar">
+    <div class="brand">
+      <img src="/favicon.svg" alt="" width="24" height="24">
+      <span class="brand-name">Atlas CAD</span>
+      <span class="brand-tag">studio</span>
+    </div>
+    <div class="doc-title" id="docTitle" title="Project name">Loading…</div>
+    <nav class="top-actions" aria-label="Document actions">
+      <button id="projectBtn" class="icon-button drawer-button" title="Project panel" aria-label="Toggle project panel" aria-expanded="false">▤</button>
+      <button id="inspectorBtn" class="icon-button drawer-button" title="Inspector" aria-label="Toggle inspector panel" aria-expanded="false">ⓘ</button>
+      <button id="undoBtn" class="icon-button" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>↶</button>
+      <button id="redoBtn" class="icon-button" title="Redo (Ctrl+Y)" aria-label="Redo" disabled>↷</button>
+      <button id="saveBtn" class="button ghost" title="Save project (Ctrl+S)">Save</button>
+      <button id="exportBtn" class="button ghost" title="Export binary STL">Export STL</button>
+      <button id="paletteBtn" class="button command" title="Command palette (Ctrl+K)">
+        <span>Commands</span><kbd>Ctrl K</kbd>
+      </button>
+      <button id="themeBtn" class="icon-button" title="Toggle light/dark theme" aria-label="Toggle theme">◐</button>
+    </nav>
+  </header>
+
+  <main class="workspace">
+    <aside class="panel panel-left" aria-label="Project browser">
+      <section class="panel-section">
+        <div class="section-head">
+          <h2>Project</h2>
+          <span id="dirtyBadge" class="badge">saved</span>
+        </div>
+        <div class="meta-grid">
+          <span>File</span><span id="fileName" class="truncate" title="">—</span>
+          <span>Units</span><span id="unitLabel">mm</span>
+          <span>Revision</span><span id="revisionLabel">—</span>
+          <span>History</span><span id="historyLabel">—</span>
+        </div>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-head"><h2>Sketch profile</h2><span class="hint" id="segmentsLabel"></span></div>
+        <div class="field">
+          <label for="profileKind">Shape</label>
+          <select id="profileKind">
+            <option value="rectangle">Rectangle</option>
+            <option value="circle">Circle</option>
+            <option value="regular_polygon">Regular polygon</option>
+          </select>
+        </div>
+        <div class="field" id="sidesField" hidden>
+          <label for="sidesInput">Sides</label>
+          <input id="sidesInput" type="number" min="3" max="256" step="1" value="6" inputmode="numeric">
+        </div>
+        <p class="hint" id="profileHint">A rectangle is sized by width × height.</p>
+      </section>
+
+      <section class="panel-section grow">
+        <div class="section-head"><h2>Parameters</h2><span class="hint">document units</span></div>
+        <div id="parameters" class="parameter-list"></div>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-head"><h2>Model tree</h2></div>
+        <div id="tree" class="tree"></div>
+      </section>
+    </aside>
+
+    <section class="viewport-shell">
+      <canvas id="viewport" tabindex="0" aria-label="3D viewport. Drag to orbit, right-drag or Shift-drag to pan, scroll to zoom, click a face to inspect it."></canvas>
+      <div class="view-toolbar" role="toolbar" aria-label="Viewport controls">
+        <button type="button" data-view="iso" title="Isometric view (4)">Iso</button>
+        <button type="button" data-view="front" title="Front view (1)">Front</button>
+        <button type="button" data-view="top" title="Top view (2)">Top</button>
+        <button type="button" data-view="right" title="Right view (3)">Right</button>
+        <span class="toolbar-separator" aria-hidden="true"></span>
+        <button type="button" id="fitBtn" title="Fit model (F)">Fit</button>
+        <button type="button" id="wireBtn" title="Wireframe (W)" aria-pressed="false">Wire</button>
+        <button type="button" id="gridBtn" title="Grid (G)" aria-pressed="true">Grid</button>
+      </div>
+      <div class="axis-gizmo" aria-hidden="true">
+        <span class="axis axis-z">Z</span>
+        <span class="axis axis-x">X</span>
+        <span class="axis axis-y">Y</span>
+      </div>
+      <div id="viewportNotice" class="viewport-notice" hidden>
+        <h3>No geometry yet</h3>
+        <p>This project has no solid feature to display.</p>
+      </div>
+      <div id="pickCard" class="pick-card" hidden>
+        <div class="pick-head"><strong>Face</strong><button type="button" id="pickClose" class="link" aria-label="Dismiss face inspection">dismiss</button></div>
+        <div class="meta-grid compact">
+          <span>X</span><span id="pickX">—</span>
+          <span>Y</span><span id="pickY">—</span>
+          <span>Z</span><span id="pickZ">—</span>
+          <span>Normal</span><span id="pickNormal">—</span>
+        </div>
+      </div>
+    </section>
+
+    <div id="drawerScrim" class="drawer-scrim" aria-hidden="true"></div>
+
+    <aside class="panel panel-right" aria-label="Properties and activity">
+      <section class="panel-section">
+        <div class="section-head"><h2>Properties</h2></div>
+        <div class="meta-grid" id="properties">
+          <span>Volume</span><span>—</span>
+        </div>
+      </section>
+      <section class="panel-section">
+        <div class="section-head"><h2>Kernel</h2></div>
+        <div class="meta-grid" id="kernelInfo">
+          <span>Name</span><span>—</span>
+        </div>
+      </section>
+      <section class="panel-section grow">
+        <div class="section-head"><h2>Activity</h2><button type="button" id="clearLog" class="link">clear</button></div>
+        <ul id="log" class="log" aria-live="polite"></ul>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="statusbar">
+    <span id="statusMessage" class="status-message">Connecting…</span>
+    <span class="spacer"></span>
+    <span id="statusPick" class="status-item">—</span>
+    <span id="statusGeometry" class="status-item">—</span>
+    <span id="statusUnits" class="status-item">mm</span>
+  </footer>
+
+  <div id="palette" class="palette" hidden>
+    <div class="palette-backdrop" data-close="palette"></div>
+    <div class="palette-card" role="dialog" aria-modal="true" aria-label="Command palette">
+      <div class="palette-input-wrap">
+        <span class="palette-sigil" aria-hidden="true">⌘</span>
+        <input id="paletteInput" type="text" placeholder="Type a command or parameter…" autocomplete="off" spellcheck="false" aria-controls="paletteList" aria-autocomplete="list">
+        <kbd>Esc</kbd>
+      </div>
+      <ul id="paletteList" class="palette-list" role="listbox" aria-label="Commands"></ul>
+      <div class="palette-foot"><span>↑ ↓ navigate</span><span>↵ run</span><span>Esc close</span></div>
+    </div>
+  </div>
+
+  <div id="help" class="help" hidden>
+    <div class="help-backdrop" data-close="help"></div>
+    <div class="help-card" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <div class="section-head">
+        <h2 id="helpTitle">Keyboard shortcuts</h2>
+        <button type="button" class="link" data-close="help">close</button>
+      </div>
+      <dl class="shortcut-grid">
+        <dt>Ctrl K</dt><dd>Command palette</dd>
+        <dt>Ctrl S</dt><dd>Save project</dd>
+        <dt>Ctrl Z</dt><dd>Undo</dd>
+        <dt>Ctrl Shift Z</dt><dd>Redo</dd>
+        <dt>F</dt><dd>Fit model to view</dd>
+        <dt>1 / 2 / 3 / 4</dt><dd>Front / top / right / isometric</dd>
+        <dt>W</dt><dd>Toggle wireframe</dd>
+        <dt>G</dt><dd>Toggle grid</dd>
+        <dt>Esc</dt><dd>Close a panel or palette</dd>
+        <dt>Drag</dt><dd>Orbit</dd>
+        <dt>Shift + drag</dt><dd>Pan</dd>
+        <dt>Scroll</dt><dd>Zoom</dd>
+      </dl>
+      <p class="hint">All commands in the palette are connected to the project API. There are no placeholder actions.</p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="/app.js"></script>
+</body>
+</html>

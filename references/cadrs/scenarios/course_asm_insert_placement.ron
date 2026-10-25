@@ -1,0 +1,72 @@
+// P3B.1 / A2.3, A2.6, A3.6, X1, X3: the Insert dialog's placement rule on the Ex1 stand-in
+// (`fixtures/motor_mount_standin.cadrs`).
+// 01 the dialog (Current document → Part Studios: the studio row and its part, thumbnails,
+//    search, type filters); the part picked with the pointer inside the dialog shows where it is
+//    in its Part Studio (on the origin).
+// 02 the pointer in the graphics area: the part follows it.
+// 03 picking the row again inserts the waiting one at its studio position; two clicks in the
+//    graphics area drop two more: "Inserted: 3".
+// 04 the search field filters the tree ("mount" keeps it, "xyz" empties it).
+// 05 Undo to remove instances: "Inserted: 2"; 06 ✓: two instances, <1> and <2>.
+// 07 live: the studio's upright (Extrude 2) edited from 3 in to 1.5 in; 08 back in the assembly
+//    both instances show the shorter upright at once.
+Scenario(
+    start: Some("document"),
+    steps: [
+        Custom("fixture motor_mount_standin"),
+        Click(ui("insert-tab")),
+        WaitFor("create-assembly"),
+        Click(ui("create-assembly")),
+        Key("Shift+7"),
+        Scroll(at(900, 520), -3),
+        Wait(20),
+        Click(ui("insert")),
+        WaitFor("insert-dialog"),
+        Click(ui("insert-part-dc-motor-mount-stand-in")),
+        Hover(ui("insert-tree")),
+        Wait(3),
+        Screenshot("01-inside-dialog-studio-position"),
+        Hover(world(160, 40)),
+        Wait(3),
+        Screenshot("02-outside-follows-pointer"),
+        Click(ui("insert-part-dc-motor-mount-stand-in")),
+        Click(world(160, 40)),
+        Click(world(-150, 20)),
+        Hover(ui("insert-count")),
+        Wait(3),
+        Screenshot("03-inserted-3"),
+        Click(ui("insert-search")),
+        Type("mount"),
+        Screenshot("04a-search-mount"),
+        Key("Ctrl+A"),
+        Type("xyz"),
+        Screenshot("04b-search-no-match"),
+        Key("Ctrl+A"),
+        Key("Backspace"),
+        Click(ui("insert-undo")),
+        Hover(ui("insert-count")),
+        Wait(3),
+        Screenshot("05-undo-inserted-2"),
+        Click(ui("insert-dialog-accept")),
+        MoveTo(1420, 780),
+        Wait(2),
+        Screenshot("06-accepted-two-instances"),
+        // Live: edit the studio's upright, then come back.
+        Click(ui("tab-motor-mount")),
+        Wait(10),
+        DoubleClick(ui("feature-extrude-2")),
+        WaitFor("extrude-dialog"),
+        Click(ui("extrude-depth-field")),
+        Key("Ctrl+A"),
+        Type("1.5"),
+        Key("Enter"),
+        Key("Enter"),
+        MoveTo(1420, 780),
+        Wait(2),
+        Screenshot("07-studio-upright-1.5in"),
+        Click(ui("tab-assembly-1")),
+        MoveTo(1420, 780),
+        Wait(2),
+        Screenshot("08-assembly-updated-live"),
+    ],
+)

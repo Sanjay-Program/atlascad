@@ -1,0 +1,67 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/cad-contract",
+    "crates/cad-kernel-truck",
+    "crates/cad-engineering",
+    "crates/cad-cli",
+    "crates/cad-agent-api",
+    "crates/cad-agent-runtime",
+    "crates/cad-agent-geometry",
+    "crates/cad-document",
+    "crates/cad-entitlements",
+    "crates/cad-io",
+    "crates/cad-studio",
+]
+# The reference and kernel checkouts are independent repositories with their own histories and
+# manifests. Without this, this workspace root would claim any nested package whose manifest has no
+# `[workspace]` of its own, breaking `cargo` commands inside those repositories.
+exclude = ["apps", "kernels", "references"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license-file = "LICENSE"
+rust-version = "1.90"
+publish = false
+
+[workspace.dependencies]
+cad-contract = { path = "crates/cad-contract" }
+cad-kernel-truck = { path = "crates/cad-kernel-truck" }
+cad-agent-api = { path = "crates/cad-agent-api" }
+cad-agent-runtime = { path = "crates/cad-agent-runtime" }
+cad-agent-geometry = { path = "crates/cad-agent-geometry" }
+cad-document = { path = "crates/cad-document" }
+cad-entitlements = { path = "crates/cad-entitlements" }
+cad-io = { path = "crates/cad-io" }
+cad-studio = { path = "crates/cad-studio" }
+
+# Same pinned versions the SolidCraft kernel uses, so measurements describe the
+# kernel this platform actually ships rather than a different release.
+truck-modeling = "0.6"
+truck-topology = "0.6"
+truck-shapeops = { version = "0.4", default-features = false }
+truck-meshalgo = { version = "0.4", default-features = false, features = ["tessellation"] }
+
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[patch.crates-io]
+# Stock truck-shapeops 0.4.0 returns `None` for solids that properly overlap (measured, see
+# docs/kernel-comparison.md): only disjoint or fully-contained pairs succeed. SolidCraft vendors a
+# patched copy that fixes the intersection-curve, face-division and integration paths, and that is
+# the boolean engine the platform actually ships. Using the published crate here would mean
+# advertising boolean support that does not work.
+truck-shapeops = { path = "apps/solidcraft/vendor/truck-shapeops" }
+# The patched shapeops uses the patched geometry's `TrySubs`; the two must be patched together.
+truck-geometry = { path = "apps/solidcraft/vendor/truck-geometry" }
+truck-meshalgo = { path = "apps/solidcraft/vendor/truck-meshalgo" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"

@@ -1,0 +1,7 @@
+[
+  {
+    "source_path": "../cadrs_router/shaders/cadrs_router_kernels.spv",
+    "entry_point": "relax",
+    "wgsl_entry_point": "relax"
+  }
+]

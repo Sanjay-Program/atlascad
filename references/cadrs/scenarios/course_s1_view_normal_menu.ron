@@ -1,0 +1,41 @@
+// T2 / S1.5: "N, or right-click → View normal to sketch plane, turns the view normal to the
+// sketch plane." A sketch on Front, a circle, seen in the default view; right-clicking empty
+// space in the sketch opens the sketch's menu (grouped like the dimension menu,
+// `dimension/dimension-driven-01.png`); View normal to sketch plane turns the view, animated.
+// Then, after ✓, right-clicking the sketch's region in the modeling view offers the same for
+// the sketch.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Click(ui("sketch")),
+        WaitFor("sketch-dialog"),
+        Click(ui("feature-front")),
+        Key("C"),
+        ClickWorld(0, 30),
+        ClickWorld(20, 30),
+        Key("Escape"),
+        Key("Escape"),
+        RightClick(at(1250, 800)),
+        WaitFor("sketch-context-menu"),
+        Hover(ui("viewport-normal-to")),
+        Wait(3),
+        Screenshot("01-right-click-sketch-menu"),
+        Click(ui("viewport-normal-to")),
+        Screenshot("02-turning-normal-to-front"),
+        MoveTo(1400, 850),
+        Wait(3),
+        Screenshot("03-normal-to-sketch-plane"),
+        Key("Shift+7"),
+        Key("Enter"),
+        RightClick(xyz(0, 0, 30)),
+        WaitFor("viewport-context-menu"),
+        Hover(ui("viewport-normal-to")),
+        Wait(3),
+        Screenshot("04-right-click-accepted-sketch"),
+        Click(ui("viewport-normal-to")),
+        MoveTo(1400, 850),
+        Wait(3),
+        Screenshot("05-normal-to-the-sketch"),
+    ],
+)

@@ -1,0 +1,119 @@
+// P3.8 / X11, PS15.2, PS24.1, PS27.2, PS27.7: mate connectors. A 100 × 60 × 20 block with a
+// Ø20 boss on its top (the hole-at-a-connector volume is asserted in `cadrs_core/tests/pattern.rs`).
+// 01 Mate connector 1: Origin entity the block's top face (its centroid, Z up), Move Z 10 mm and
+//    Rotation 30 deg: the triad (X red, Y green, Z blue) above the face, turned.
+//    P3.11 (P3.8 judge): under the Move rows, the Owner part (Part 1, filled from the origin
+//    entity's part), and under the Origin entity the Alignment field.
+// 01a Alignment = the block's top front edge (along X): the primary axis (blue Z) now lies along
+//    X, so the Z translation of 10 moves it along X from the face's centre (it sits on the top
+//    face, beside the boss); the edge is picked again to clear it before accepting.
+// 02 accepted; K hides the connectors (PS27.7).
+// 03 K again: shown.
+// 04 Hole: the mate connector button next to "Sketch points to place holes"; hovering the boss's
+//    top face shows its implicit connector (at its centroid).
+// 04a P3.11 (P3.8 judge): hovering the block's top face: a dot at each implicit connector on it
+//    (its centre, its four corners, its edges' midpoints and the boss's circle centre), and the
+//    face's own connector glyph at its centre.
+// 05 the boss's circular edge clicked (its centre's implicit connector) and Mate connector 1 in
+//    the list: a hole at each ("Mate connector", "Mate connector 1"), drilled along −Z.
+// 06 Circular pattern 1: a Part pattern of a small cube about Mate connector 1's Z axis (the
+//    Axis of pattern field's mate connector button), 4 instances.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("sketch top rect 0 0 100 60"),
+        Key("P"),
+        Key("Shift+7"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        Click(xyz(20, 20, 0)),
+        Click(ui("extrude-depth-field")),
+        Key("Ctrl+A"),
+        Type("20"),
+        Key("Enter"),
+        Custom("sketch top circle 75 30 10"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        Click(ui("feature-sketch-2")),
+        Click(ui("extrude-starting-offset-checkbox")),
+        Click(ui("extrude-start-offset-field")),
+        Key("Ctrl+A"),
+        Type("20"),
+        Key("Tab"),
+        Click(ui("extrude-depth-field")),
+        Key("Ctrl+A"),
+        Type("8"),
+        Key("Enter"),
+        Key("F"),
+        Click(ui("mate-connector")),
+        WaitFor("mate-connector-dialog"),
+        Click(xyz(30, 30, 20)),
+        Click(ui("mate-connector-move-checkbox")),
+        Click(ui("mate-connector-z-field")),
+        Key("Ctrl+A"),
+        Type("10"),
+        Key("Tab"),
+        Click(ui("mate-connector-rotation-field")),
+        Key("Ctrl+A"),
+        Type("30"),
+        Key("Tab"),
+        Click(ui("mate-connector-dialog-title")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("01-mate-connector-top-face-moved"),
+        // P3.11: the Alignment field takes the block's top front edge (along X).
+        Click(ui("mate-connector-alignment-field")),
+        Click(xyz(50, 0, 20)),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("01a-alignment-front-edge"),
+        Click(xyz(50, 0, 20)),
+        Click(ui("mate-connector-dialog-accept")),
+        Key("K"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("02-k-hides-connectors"),
+        Key("K"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-k-shows-connectors"),
+        Click(ui("hole")),
+        WaitFor("hole-dialog"),
+        Click(ui("hole-connector-button")),
+        Hover(xyz(78, 33, 28)),
+        Wait(10),
+        Screenshot("04-implicit-connector-hover"),
+        Hover(xyz(20, 45, 20)),
+        Wait(10),
+        Screenshot("04a-block-top-connector-dots"),
+        Click(xyz(85, 30, 28)),
+        Click(ui("feature-mate-connector-1")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("05-holes-at-connectors"),
+        Click(ui("hole-dialog-accept")),
+        Custom("sketch top rect 45 -30 55 -20"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        Click(ui("feature-sketch-3")),
+        Click(ui("extrude-operation-0")),
+        Click(ui("extrude-depth-field")),
+        Key("Ctrl+A"),
+        Type("10"),
+        Key("Enter"),
+        Key("F"),
+        Click(ui("pattern")),
+        WaitFor("pattern-menu"),
+        Click(ui("pattern-menu-circular")),
+        WaitFor("circular-pattern-dialog"),
+        Click(ui("part-row-part-2")),
+        Click(ui("circular-pattern-axis-connector")),
+        Click(ui("feature-mate-connector-1")),
+        Key("F"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("06-circular-pattern-about-connector"),
+        Click(ui("circular-pattern-dialog-accept")),
+    ],
+)

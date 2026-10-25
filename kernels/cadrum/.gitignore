@@ -1,0 +1,16 @@
+target/
+out/
+logs/
+linkedin.md
+.venv/
+*.brep
+*.log
+*.step
+*.stl
+*.svg
+*.png
+*.glb
+*.tar.gz
+uv.lock
+*.dockerignore
+.DS_Store

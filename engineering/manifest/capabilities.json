@@ -1,0 +1,430 @@
+{
+  "schema_version": 1,
+  "capabilities": [
+    {
+      "id": "cap.2d.drafting",
+      "name": "2D drafting",
+      "description": "Interactive drawing, editing, selection and snapping for 2D entities.",
+      "provided_by": [
+        "module.cadcraft.engine",
+        "module.cadcraft.ui-egui"
+      ],
+      "verification": "advertised",
+      "evidence": [
+        "apps/cadcraft reports 2,212 test attributes; they were not executed here"
+      ],
+      "notes": "Code exists and is shipped by CADCraft. Not verified in this workspace because the engine and UI were not built on this 7.4 GB host."
+    },
+    {
+      "id": "cap.2d.constraints",
+      "name": "2D constraints",
+      "description": "Geometric constraint solving for drafting.",
+      "provided_by": [
+        "module.cadcraft.constraints"
+      ],
+      "verification": "advertised",
+      "evidence": [
+        "crates/constraints in apps/cadcraft"
+      ],
+      "notes": "No test result recorded; solving performance is not benchmarked."
+    },
+    {
+      "id": "cap.2d.geometry",
+      "name": "2D geometry",
+      "description": "Vectors, lines, arcs, circles, splines, intersections and bounds.",
+      "provided_by": [
+        "module.cadcraft.geom"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "engineering/quality/tests.json#t-cadcraft-geom (84 passed, 0 failed)"
+      ],
+      "notes": "Verified by execution on this host. Tolerance is a single global EPS = 1e-9, not the contract Tolerance type."
+    },
+    {
+      "id": "cap.io.dxf",
+      "name": "DXF import/export",
+      "description": "Read DXF R12-2018 and write R2000.",
+      "provided_by": [
+        "module.cadcraft.dxf",
+        "module.cadcraft.io"
+      ],
+      "verification": "advertised",
+      "evidence": [
+        "apps/cadcraft/crates/dxf"
+      ],
+      "notes": "Round-trip fidelity is not measured here; units are carried as INSUNITS rather than typed."
+    },
+    {
+      "id": "cap.io.dwg",
+      "name": "DWG import",
+      "description": "Read DWG through the acadrust parser.",
+      "provided_by": [
+        "module.cadcraft.dwg"
+      ],
+      "verification": "advertised",
+      "evidence": [
+        "docs/license-inventory.md section 2"
+      ],
+      "notes": "Depends on MPL-2.0 acadrust used unmodified. No DWG corpus exists to judge compatibility."
+    },
+    {
+      "id": "cap.document.2d",
+      "name": "2D document model",
+      "description": "Entity store with stable handles and cheap copy-on-write undo snapshots.",
+      "provided_by": [
+        "module.cadcraft.doc"
+      ],
+      "verification": "advertised",
+      "evidence": [
+        "docs/repository-audit.md section 3"
+      ],
+      "notes": "Undo cost is designed for but never measured."
+    },
+    {
+      "id": "cap.document.parametric",
+      "name": "Parametric 3D document",
+      "description": "Feature timeline with incremental recomputation and stable topological references.",
+      "provided_by": [
+        "module.solidcraft.doc"
+      ],
+      "verification": "advertised",
+      "evidence": [
+        "apps/solidcraft/crates/doc (feature_refs, face_anchor, lineage)"
+      ],
+      "notes": "SolidCraft advertises its broad feature timeline with stable face lineage; locally verified persistence is separately recorded as cap.document.project-persistence and supports rectangle plus extrude only."
+    },
+    {
+      "id": "cap.3d.sketch",
+      "name": "3D sketch and constraints",
+      "description": "Sketches consumed by parametric features, with a constraint solver.",
+      "provided_by": [
+        "module.solidcraft.sketch"
+      ],
+      "verification": "advertised",
+      "evidence": [
+        "apps/solidcraft/crates/sketch"
+      ],
+      "notes": "Solver performance is not benchmarked."
+    },
+    {
+      "id": "cap.kernel.extrude",
+      "name": "Extrude",
+      "description": "Sweep a validated planar profile into a solid.",
+      "provided_by": [
+        "module.cad-kernel-truck",
+        "module.kernel.truck"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-kernel-truck",
+        "engineering/quality/benchmarks.json#bm-extrude (50,000 mm3 exact)"
+      ],
+      "notes": "Analytic volume asserted, not self-consistency."
+    },
+    {
+      "id": "cap.kernel.boolean.union",
+      "name": "Boolean union",
+      "description": "Union two solids, counting the shared volume once.",
+      "provided_by": [
+        "module.cad-kernel-truck",
+        "module.kernel.truck"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-kernel-truck",
+        "engineering/quality/benchmarks.json#bm-boolean-union (1120 mm3, error 0.0037)"
+      ],
+      "notes": "100 of 100 benchmark unions needed the coplanar retry nudge."
+    },
+    {
+      "id": "cap.kernel.boolean.intersection",
+      "name": "Boolean intersection",
+      "description": "Intersection of two solids.",
+      "provided_by": [
+        "module.cad-kernel-truck",
+        "module.kernel.truck"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-kernel-truck"
+      ],
+      "notes": "Verified on a 2x2x10 mm overlap (40 mm3)."
+    },
+    {
+      "id": "cap.kernel.boolean.difference",
+      "name": "Boolean difference",
+      "description": "Subtract one solid from another.",
+      "provided_by": [
+        "module.solidcraft.kernel"
+      ],
+      "verification": "advertised",
+      "evidence": [
+        "docs/kernel-comparison.md section 4.2"
+      ],
+      "notes": "The published truck path returns a solid with the wrong volume (1053.3 mm3 vs 840 analytic), so the experimental adapter refuses it. SolidCraft's production kernel has its own guarded implementation, but its test suite was not run here."
+    },
+    {
+      "id": "cap.kernel.fillet",
+      "name": "Fillet and chamfer",
+      "description": "Round or bevel edges.",
+      "provided_by": [
+        "module.solidcraft.kernel"
+      ],
+      "verification": "advertised",
+      "evidence": [
+        "docs/kernel-comparison.md section 3"
+      ],
+      "notes": "Present in SolidCraft's kernel (read from source); not exercised in this workspace because the kernel test suite was not run."
+    },
+    {
+      "id": "cap.kernel.tessellate",
+      "name": "Tessellation",
+      "description": "Convert a solid into a validated, closed triangle mesh.",
+      "provided_by": [
+        "module.cad-kernel-truck",
+        "module.kernel.truck"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-kernel-truck",
+        "engineering/quality/benchmarks.json#bm-tessellate",
+        "cad-kernel-truck::tests::tessellation_is_a_closed_outward_manifold"
+      ],
+      "notes": "Verified for planar boxes only. Curved-surface tessellation was not measured. Per-face vertices are welded and the winding is made consistent outward on the way out: before that repair a box cap was wound inward and the mesh reported 8 open edges. The studio also tessellates circle-derived polygons; those are still planar profiles, so no curved-surface claim is added."
+    },
+    {
+      "id": "cap.io.step",
+      "name": "STEP import/export",
+      "description": "Read and write STEP through truck-stepio.",
+      "provided_by": [
+        "module.solidcraft.io"
+      ],
+      "verification": "advertised",
+      "evidence": [
+        "apps/solidcraft/Cargo.toml (truck-stepio 0.3, patched)"
+      ],
+      "notes": "No round-trip measurement recorded."
+    },
+    {
+      "id": "cap.io.mesh",
+      "name": "Mesh import/export",
+      "description": "STL, OBJ, 3MF and glTF import/export.",
+      "provided_by": [
+        "module.solidcraft.io"
+      ],
+      "verification": "advertised",
+      "evidence": [
+        "apps/solidcraft/crates/io"
+      ],
+      "notes": "No import budgets (file size, zip entries, uncompressed size) are implemented yet."
+    },
+    {
+      "id": "cap.mcp.server",
+      "name": "MCP server",
+      "description": "Expose CAD commands to agents over the Model Context Protocol.",
+      "provided_by": [
+        "module.cadcraft.mcp",
+        "module.solidcraft.mcp"
+      ],
+      "verification": "advertised",
+      "evidence": [
+        "docs/security-review.md S-4"
+      ],
+      "notes": "Transport internals were not audited. A loopback control port is reachable by any local process."
+    },
+    {
+      "id": "cap.render.3d",
+      "name": "3D viewport rendering",
+      "description": "Render solids with wgpu and pick entities.",
+      "provided_by": [
+        "module.solidcraft.render"
+      ],
+      "verification": "advertised",
+      "evidence": [
+        "apps/solidcraft/crates/render"
+      ],
+      "notes": "No frame-time or picking measurement is claimed: the only GPU on this host is integrated UHD."
+    },
+    {
+      "id": "cap.contract.versioned-document",
+      "name": "Versioned document header",
+      "description": "A schema-versioned document header with tested migrations v0 to v2 and an explicit refusal of newer schemas.",
+      "provided_by": [
+        "module.cad-contract"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-contract"
+      ],
+      "notes": "The parametric project layer writes this header as part of `.zcad`; the project payload has an independent schema."
+    },
+    {
+      "id": "cap.engineering.change-detection",
+      "name": "Workspace change detection",
+      "description": "Observe repositories, detect changed files and commits, generate idempotent tasks and render an evidence report.",
+      "provided_by": [
+        "module.cad-engineering"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-engineering"
+      ],
+      "notes": "Verified by 25 integration tests on this host, including a real git repository fixture."
+    },
+    {
+      "id": "cap.saas.billing",
+      "name": "SaaS billing",
+      "description": "Subscription entitlements and a billing provider integration.",
+      "provided_by": [],
+      "verification": "absent",
+      "evidence": [],
+      "notes": "Not implemented. Pricing tiers are a product requirement, not working software."
+    },
+    {
+      "id": "cap.wasm.web",
+      "name": "WebAssembly build",
+      "description": "Run the geometry stack in a browser.",
+      "provided_by": [],
+      "verification": "absent",
+      "evidence": [],
+      "notes": "wasm32-unknown-unknown and wasm-pack are not installed on this host; no WASM build has been performed."
+    },
+    {
+      "id": "cap.collaboration.realtime",
+      "name": "Realtime collaboration",
+      "description": "Multi-user editing with conflict resolution.",
+      "provided_by": [],
+      "verification": "absent",
+      "evidence": [],
+      "notes": "Not implemented. The current native project is single-user and feature-limited; semantic change merging and conflict recovery remain prerequisites."
+    },
+    {
+      "id": "cap.io.stl-export",
+      "name": "Binary STL export",
+      "description": "Write a validated triangle mesh as a binary STL file.",
+      "provided_by": [
+        "module.cad-io",
+        "module.cad-cli",
+        "module.cad-studio"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-io",
+        "engineering/quality/tests.json#t-cad-studio",
+        "engineering/quality/tests.json#t-cad-cli",
+        "an independent Python parser read the written file: 12 triangles, volume 500.0000 mm3, 0 open edges"
+      ],
+      "notes": "Written by cad-io; the CLI and studio are thin callers. STL has no unit field, so a document header must accompany it when units matter."
+    },
+    {
+      "id": "cap.agent.contract",
+      "name": "Agent contract",
+      "description": "A versioned, self-describing declaration of what an agent is, what it accepts, what it produces and what it may do.",
+      "provided_by": [
+        "module.cad-agent-api"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-agent-api (13 passed, 0 failed)"
+      ],
+      "notes": "The contract version is a single integer. A contract that declares a different version is refused before it is stored, not half-interpreted."
+    },
+    {
+      "id": "cap.agent.runtime",
+      "name": "Agent runtime",
+      "description": "Registration, lifecycle enforcement, capability grants, budget enforcement and schema checking around agent calls.",
+      "provided_by": [
+        "module.cad-agent-runtime"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-agent-runtime (16 passed, 0 failed)"
+      ],
+      "notes": "An agent reaches ready only with a passing contract-test report and an owner decision covering every owner-gated permission it declares."
+    },
+    {
+      "id": "cap.agent.geometry-ops",
+      "name": "Geometry operations agent",
+      "description": "Extrude, boolean, tessellate and measure solids through the shared kernel contract, inside the agent runtime.",
+      "provided_by": [
+        "module.cad-agent-geometry"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-agent-geometry (24 passed, 0 failed)"
+      ],
+      "notes": "Boolean difference is refused because the underlying adapter does not advertise it; the agent reports that rather than returning a wrong solid."
+    },
+    {
+      "id": "cap.document.project-persistence",
+      "name": "Local parametric project persistence",
+      "description": "Create, validate, save, reopen, edit, recompute and export a parameterized project with rectangle, circle or regular-polygon sketches, an extrude, and stable entity IDs.",
+      "provided_by": [
+        "module.cad-document"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-document-schema2",
+        "crates/cad-studio/tests/http_api.rs",
+        "crates/cad-cli/tests/end_to_end.rs"
+      ],
+      "notes": "Schema 2 stores an explicit profile and migrates schema 1 on load. Saves sync a sibling temporary file before atomic rename; load validates live state and up to 64 history snapshots and rejects files over 64 MiB. Undo/redo survives separate CLI invocations and studio requests."
+    },
+    {
+      "id": "cap.entitlements.policy",
+      "name": "Local entitlement policy",
+      "description": "Evaluate local/cloud feature tier inclusion, quotas, overage behavior and idempotent payment lifecycle events.",
+      "provided_by": [
+        "module.cad-entitlements"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-entitlements"
+      ],
+      "notes": "Policy logic only. No billing provider or live subscription service exists; prices are hypotheses and tax is not modeled as revenue."
+    },
+    {
+      "id": "cap.app.local-studio",
+      "name": "Local-first CAD studio",
+      "description": "Open a project, edit named parameters and the sketch profile, rebuild geometry, undo/redo, inspect faces, save atomically and export STL in a desktop browser session served from 127.0.0.1.",
+      "provided_by": [
+        "module.cad-studio"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-studio",
+        "crates/cad-studio/tests/http_api.rs",
+        "browser exercise: parameter 40 -> 20 rebuilt 6,000 mm3; circle and octagon rebuilds matched analytic volumes; save wrote schema 2; face pick returned X/Y/Z and normal"
+      ],
+      "notes": "No accounts, cloud, collaboration or telemetry. The listener is loopback-only and every POST requires a same-origin Origin. It is one project per process, not a multi-user service."
+    },
+    {
+      "id": "cap.ui.viewport-3d",
+      "name": "3D viewport and face picking",
+      "description": "WebGL1 orbit/pan/zoom/fit viewport with shaded mesh, wireframe, grid, axes, sketch outline, and ray-triangle face picking.",
+      "provided_by": [
+        "module.cad-studio"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "browser exercise: WebGL context ready; 92-triangle circle mesh uploaded; clicking the viewport returned X -3.39, Y -3.65, Z 7.85 mm and normal (-0.609, -0.793, 0)",
+        "browser exercise: parameter and profile changes rebuilt and reframed the model without console or network errors"
+      ],
+      "notes": "Exercised in Chromium through the harness. There is no pixel-level visual regression suite, and no performance claim for large meshes."
+    },
+    {
+      "id": "cap.ui.command-palette",
+      "name": "Command palette",
+      "description": "Searchable, keyboard-driven palette over real document, view, profile, parameter and help commands.",
+      "provided_by": [
+        "module.cad-studio"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "browser exercise: Ctrl+K listed 19 connected commands; running \u201cProfile: circle\u201d changed the project profile and rebuilt 92 triangles"
+      ],
+      "notes": "Every entry invokes the same API or UI function as its button; there are no placeholder commands."
+    }
+  ]
+}

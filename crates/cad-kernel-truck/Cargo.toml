@@ -1,0 +1,22 @@
+[package]
+name = "cad-kernel-truck"
+description = "A truck-backed implementation of the cad-contract kernel interface: extrude, booleans, tessellation."
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+cad-contract.workspace = true
+truck-modeling.workspace = true
+truck-topology.workspace = true
+truck-shapeops.workspace = true
+truck-meshalgo.workspace = true
+
+[lints]
+workspace = true
+
+[[example]]
+name = "bench"
+path = "examples/bench.rs"

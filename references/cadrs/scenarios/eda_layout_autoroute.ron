@@ -1,0 +1,77 @@
+// The Layout's auto-router and track editing. Points are board millimetres (`flat(x, y)`).
+// 01 the course board placed but unrouted (`eda-example gs16`): its ratsnest.
+// 02 Auto-route (the strip's button): every net routed, off the main thread, one undo step;
+//    the toast says how long it took and on what.
+// 03 the routed course board (`eda-example gs17`), the led track double-clicked: every track
+//    and via of its net selected.
+// 03b the VCC via Shift+double-clicked: its net's tracks and via added to the led net's.
+// 04 the led track dragged 2 mm down: short tracks keep its ends on D1's and R1's pads.
+// 05 the VCC corner at the via dragged 1 mm right: the via and both tracks' ends with it.
+// 06 a box over the left half, R: what it selected turned together about its middle.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("pcb-studio"),
+        WaitFor("pcb-tree"),
+        Custom("eda-example gs16"),
+        WaitFor("eda-mode-bar"),
+        Click(ui("eda-mode-layout")),
+        Wait(5),
+        Custom("eda-zoom -5 -5 50 55"),
+        MoveTo(1100, 900),
+        Wait(3),
+        Screenshot("01-unrouted"),
+        Click(ui("pcb-autoroute")),
+        WaitFor("toast-message"),
+        Wait(90),
+        MoveTo(1100, 900),
+        Wait(3),
+        Screenshot("02-auto-routed"),
+        ExpectText("toast-message", "Auto-routed"),
+        Custom("eda-example gs17"),
+        Wait(5),
+        // (The toast covers the mode bar.)
+        Custom("eda-mode layout"),
+        Wait(5),
+        Custom("eda-zoom -5 -5 50 55"),
+        DoubleClick(flat(16.0, 11.46)),
+        Wait(3),
+        MoveTo(1100, 900),
+        Wait(3),
+        Screenshot("03-net-selected"),
+        KeyDown("Shift"),
+        DoubleClick(flat(37.23, 20.0)),
+        KeyUp("Shift"),
+        Wait(3),
+        MoveTo(1100, 900),
+        Wait(3),
+        Screenshot("03b-nets-added"),
+        Key("Escape"),
+        Press(flat(16.0, 11.46)),
+        Hover(flat(16.0, 10.5)),
+        Hover(flat(16.0, 9.46)),
+        Release,
+        Wait(3),
+        MoveTo(1100, 900),
+        Wait(3),
+        Screenshot("04-track-dragged"),
+        Press(flat(37.23, 20.0)),
+        Hover(flat(37.7, 20.0)),
+        Hover(flat(38.23, 20.0)),
+        Release,
+        Wait(3),
+        MoveTo(1100, 900),
+        Wait(3),
+        Screenshot("05-corner-dragged"),
+        Press(flat(-2.0, -2.0)),
+        Hover(flat(10.0, 25.0)),
+        Hover(flat(22.0, 52.0)),
+        Release,
+        Key("R"),
+        Wait(3),
+        MoveTo(1100, 900),
+        Wait(3),
+        Screenshot("06-box-turned"),
+    ],
+)

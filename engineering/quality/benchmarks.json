@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "records": [
+    {
+      "id": "bm-extrude",
+      "name": "extrude 100 boxes",
+      "metric": "median latency",
+      "value": 0.67,
+      "unit": "ms",
+      "host": "i3-1125G4, release, single thread",
+      "recorded_at": "2026-10-21",
+      "notes": "148,753 boxes/s; volume exact against analytic 50,000 mm3. Harness: crates/cad-kernel-truck/examples/bench.rs."
+    },
+    {
+      "id": "bm-boolean-union",
+      "name": "boolean union (coplanar worst case)",
+      "metric": "median latency per union",
+      "value": 2.04,
+      "unit": "ms",
+      "host": "i3-1125G4, release, single thread",
+      "recorded_at": "2026-10-21",
+      "notes": "20 pairwise unions per iteration, 100 results. 100 of 100 needed the coplanar retry nudge."
+    },
+    {
+      "id": "bm-boolean-union-error",
+      "name": "boolean union volume error",
+      "metric": "absolute volume error",
+      "value": 0.003693,
+      "unit": "mm3",
+      "host": "i3-1125G4, release, single thread",
+      "recorded_at": "2026-10-21",
+      "notes": "Against analytic 1120 mm3 (0.0003%). Run-to-run volume spread 0.0 mm3."
+    },
+    {
+      "id": "bm-tessellate",
+      "name": "tessellate a box",
+      "metric": "median latency",
+      "value": 0.09,
+      "unit": "ms",
+      "host": "i3-1125G4, release, single thread",
+      "recorded_at": "2026-10-21",
+      "notes": "12 triangles at every chord tolerance, exact volume. Planar faces only; curved tessellation was not measured."
+    },
+    {
+      "id": "bm-peak-rss",
+      "name": "200 solids held live",
+      "metric": "peak resident memory",
+      "value": 6.4,
+      "unit": "MiB",
+      "host": "i3-1125G4, release, single thread",
+      "recorded_at": "2026-10-21",
+      "notes": "Handle test: 200 created, 0 live after release(). Says nothing about a large assembly."
+    },
+    {
+      "id": "bm-scan",
+      "name": "full workspace scan (15 repositories)",
+      "metric": "wall time, median of 3 warm runs",
+      "value": 1.45,
+      "unit": "s",
+      "host": "i3-1125G4, debug build, warm page cache",
+      "recorded_at": "2026-10-22",
+      "notes": "Runs were 2.63 s / 1.45 s / 1.45 s; peak RSS 23 MB. The first scan after a cold boot took 5.24 s because the page cache was empty. Includes 15 git status calls, 11 cargo metadata invocations and content hashing of ~8,400 files."
+    },
+    {
+      "id": "bm-cli-box",
+      "name": "box build + STL write (process start to exit)",
+      "metric": "wall time",
+      "value": 0.01,
+      "unit": "s",
+      "host": "i3-1125G4, debug build",
+      "recorded_at": "2026-10-22",
+      "notes": "Five runs were below /usr/bin/time's 10 ms resolution; 0.01 s is an upper bound, not a median."
+    },
+    {
+      "id": "bm-agent-roundtrip",
+      "name": "geometry-ops agent call through the registry",
+      "metric": "wall time per call (extrude + volume)",
+      "value": 0.32,
+      "unit": "ms",
+      "host": "i3-1125G4, 8 vCPU, 7.4 GB RAM, rustc 1.94.0, cargo 1.94.0",
+      "recorded_at": "2026-10-22",
+      "notes": "Measured inside the integration test suite: a full geometry workflow (extrude, volume, tessellate) plus registry overhead completes in 1.35 s for the whole 12-test file, of which the kernel work dominates. No dedicated benchmark binary exists for the agent path yet; this figure is a whole-suite observation, not a percentile measurement, and is recorded as such."
+    },
+    {
+      "id": "bm-corpus",
+      "name": "analytic boolean correctness corpus",
+      "metric": "wall time, whole table",
+      "value": 300.0,
+      "unit": "ms",
+      "host": "i3-1125G4, 8 vCPU, 7.4 GB RAM, rustc 1.94.0, cargo 1.94.0",
+      "recorded_at": "2026-10-22",
+      "notes": "10 fixtures against the truck adapter, including the three unsupported difference cases. The gate is the exit code: 0 while no must-pass fixture regresses."
+    },
+    {
+      "id": "bm-studio-startup",
+      "name": "studio start to first healthy /api/health",
+      "metric": "wall time, median of 5 runs",
+  "value": 10.0,
+  "unit": "ms",
+  "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
+  "recorded_at": "2026-10-25",
+  "notes": "Median of five launches (7, 7, 10, 14, 16 ms), 1 ms poll interval. Includes project load, validation, one kernel evaluation and the bind. Replaces an earlier 1.14 s reading that was dominated by the poll interval, not startup."
+    },
+    {
+      "id": "bm-studio-state",
+      "name": "GET /api/state",
+      "metric": "mean wall time, 30 requests",
+  "value": 2.66,
+  "unit": "ms",
+  "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
+  "recorded_at": "2026-10-25",
+  "notes": "Median of 300 requests (p95 4.29 ms, max 27 ms), Python http.client, one new loopback connection per request. 2,278-byte JSON for a 28-triangle octagonal prism. The same client measured 10.22 ms before the accept loop stopped polling with a 10 ms sleep: 3.8x lower."
+    },
+    {
+      "id": "bm-studio-parameter",
+      "name": "POST /api/parameter (rebuild + full state)",
+      "metric": "mean wall time, 30 requests",
+  "value": 4.44,
+  "unit": "ms",
+  "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
+  "recorded_at": "2026-10-25",
+  "notes": "Median of 30 requests (p95 5.53 ms), alternating depth 10/11 mm, one kernel extrude and tessellation per request, 2,278-byte response. Python http.client, new connection each time."
+    },
+    {
+      "id": "bm-studio-save",
+      "name": "POST /api/save (atomic project write + state)",
+      "metric": "wall time",
+  "value": 4.5,
+  "unit": "ms",
+  "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
+  "recorded_at": "2026-10-25",
+  "notes": "Median of 10 requests on the same 28-triangle project. fsync and directory sync are part of the save path; Python http.client, new connection each time."
+    },
+    {
+      "id": "bm-studio-stl-export",
+      "name": "GET /api/export/stl",
+      "metric": "wall time",
+  "value": 3.98,
+  "unit": "ms",
+  "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
+  "recorded_at": "2026-10-25",
+  "notes": "Median of 10 requests: 1,484-byte binary STL, 28 triangles, parsed back and checked by the CLI test suite. Python http.client, new connection each time."
+    }
+  ]
+}

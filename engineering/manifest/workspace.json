@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "scan_roots": [
+    "apps",
+    "kernels",
+    "references",
+    "crates"
+  ],
+  "ignore": {
+    "directories": [
+      ".git",
+      "target",
+      "node_modules",
+      "dist",
+      "build",
+      ".venv",
+      "__pycache__",
+      ".next",
+      ".turbo",
+      ".cargo",
+      ".freebuff",
+      ".idea",
+      ".vscode",
+      ".gradle",
+      "pkg",
+      "out"
+    ],
+    "suffixes": [
+      ".zip"
+    ],
+    "max_hash_bytes": 8388608,
+    "follow_symlinks": false
+  },
+  "license_policy": {
+    "allowed": [
+      "MIT",
+      "MIT OR Apache-2.0",
+      "Apache-2.0",
+      "Apache-2.0 OR MIT",
+      "MIT/Apache-2.0",
+      "BSD-2-Clause",
+      "BSD-3-Clause",
+      "ISC",
+      "Zlib",
+      "Unicode-3.0",
+      "MPL-2.0",
+      "LicenseRef-AtlasCAD-Personal-NonCommercial"
+    ],
+    "denied_substrings": [
+      "GPL",
+      "SSPL",
+      "CDDL",
+      "Commons Clause"
+    ],
+    "notes": [
+      "MPL-2.0 is allowed only for unmodified dependencies (acadrust, colored); modifying one creates a file-level source-publication obligation.",
+      "The deny list is a guard, not legal advice. G1 remains open; G2 records the current personal, non-commercial root license in docs/roadmap.md and LICENSE.",
+      "LGPL matches the GPL substring on purpose: a statically linked LGPL kernel cannot be shipped closed-source without relink rights.",
+      "LicenseRef-AtlasCAD-Personal-NonCommercial applies only to first-party root workspace crates. Do not treat it as permission to use the AtlasCAD platform commercially or as a license for imported components."
+    ]
+  },
+  "notes": [
+    "Fingerprints cover each declared path; root-level files such as Cargo.toml and docs/ are curated evidence, not scanned inputs.",
+    "Symlinks are never followed, so a scan cannot escape the workspace or loop.",
+    "The workspace is tracked by the root Git repository; source origins and imported revisions are recorded in docs/integration/source-snapshot.md."
+  ]
+}

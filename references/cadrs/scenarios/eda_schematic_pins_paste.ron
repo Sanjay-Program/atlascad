@@ -1,0 +1,59 @@
+// Pin ends and pasting in the schematic (`eda-example wire-editing`: a 4-pin connector J1 with
+// wires, an upright with a tee).
+// 01 the pointer over J1 (Select): its pin ends marked with blue squares where wires join.
+// 02 the Wire tool (W), the pointer on J1's pin 2: every pin end on the sheet marked, pin 2's
+//    filled (the wire would join there).
+// 03 J1 selected, copied (Ctrl+C) with the pointer far off to the left, pasted (Ctrl+V) with
+//    the pointer at (70, 70): the copy follows the pointer centred on it, not offset.
+// 04 placed there with a click; its pins, joined to nothing, marked.
+// 05 a net label (L, "NET1") following the pointer onto the level wire: its anchor's square
+//    filled where it will join.
+// 06 placed off any wire: its anchor marked (it joins nothing).
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("pcb-studio"),
+        WaitFor("pcb-tree"),
+        Custom("eda-example wire-editing"),
+        WaitFor("eda-mode-bar"),
+        Click(ui("eda-mode-schematic")),
+        WaitFor("sch-erc"),
+        Custom("eda-zoom 20 50 120 115"),
+        Hover(flat(101.6, 100.33)),
+        Wait(3),
+        Screenshot("01-hover-symbol"),
+        Key("W"),
+        Hover(flat(96.52, 102.87)),
+        Wait(3),
+        Screenshot("02-wire-tool"),
+        Key("Escape"),
+        Key("Escape"),
+        Click(flat(101.6, 100.33)),
+        Hover(flat(30.0, 60.0)),
+        Key("Ctrl+C"),
+        Hover(flat(65.0, 70.0)),
+        Key("Ctrl+V"),
+        Hover(flat(70.0, 70.0)),
+        Wait(3),
+        Screenshot("03-paste-follows"),
+        Click(flat(70.0, 70.0)),
+        Key("Escape"),
+        MoveTo(1100, 900),
+        Wait(3),
+        Screenshot("04-pasted"),
+        Key("L"),
+        WaitFor("eda-label-dialog"),
+        Click(ui("eda-label-text-field")),
+        Type("NET1"),
+        Click(ui("eda-label-ok")),
+        Hover(flat(35.56, 101.6)),
+        Wait(3),
+        Screenshot("05-label-on-wire"),
+        Click(flat(35.56, 91.44)),
+        Key("Escape"),
+        MoveTo(1100, 900),
+        Wait(3),
+        Screenshot("06-label-alone"),
+    ],
+)

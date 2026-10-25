@@ -1,0 +1,24 @@
+# Rust build output (root workspace and nested source workspaces)
+/target/
+**/target/
+
+# Local-only project tooling and downloaded research archive
+/.freebuff/
+/OpenCADStudio-main.zip
+
+# Common generated output
+/dist/
+/build/
+**/*.log
+
+# Local editor and operating-system files
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
+
+# Local credentials; example configuration files remain trackable
+.env
+.env.local
+.env.*.local

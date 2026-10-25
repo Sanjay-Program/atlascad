@@ -1,0 +1,49 @@
+// Hovering an Add or a Remove in the feature list shows its change over the parts, through
+// their walls: what a Remove takes out in red, what an Add adds in green.
+// 01 a 40 x 40 x 50 block; Extrude 2 removes a Ø16 circle 30 up from its bottom (a blind hole
+//    that ends inside the block). Its row hovered: the red cylinder shows through the block,
+//    ending 20 below the top.
+// 02 Extrude 3 adds a 40 x 20 x 20 block overlapping the first one's side. Its row hovered:
+//    the green body over the block.
+// 03 nothing hovered: no change shown.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("sketch top rect 60 0 100 40"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        Click(xyz(80, 20, 0)),
+        Click(ui("extrude-depth-field")),
+        Key("Ctrl+A"),
+        Type("50"),
+        Key("Enter"),
+        Custom("sketch top circle 80 20 8"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        Click(ui("feature-sketch-2")),
+        Click(ui("extrude-operation-2")),
+        Click(ui("extrude-depth-field")),
+        Key("Ctrl+A"),
+        Type("30"),
+        Key("Enter"),
+        Custom("sketch top rect 90 10 130 30"),
+        Key("Shift+E"),
+        WaitFor("extrude-dialog"),
+        Click(ui("feature-sketch-3")),
+        Click(ui("extrude-depth-field")),
+        Key("Ctrl+A"),
+        Type("20"),
+        Key("Enter"),
+        Key("F"),
+        Hover(ui("feature-extrude-2")),
+        Wait(10),
+        Screenshot("01-hover-remove"),
+        Hover(ui("feature-extrude-3")),
+        Wait(10),
+        Screenshot("02-hover-add"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-no-hover"),
+    ],
+)

@@ -1,0 +1,18 @@
+[package]
+name = "craft-docpath"
+description = "Decide whether a file path or file URL stored in a document refers to a local file."
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+rust-version = "1.95"
+repository = "https://github.com/storytold/craft-libs"
+
+# Upstream inherited these from its workspace (`[lints] workspace = true`). Inlining them keeps
+# the vendored copy's lint behaviour identical to the git dependency it replaces.
+[lints.rust]
+unsafe_code = "forbid"
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(craft_pdf_unicode_fixtures)"] }
+
+[lints.clippy]
+dbg_macro = "warn"
+todo = "warn"

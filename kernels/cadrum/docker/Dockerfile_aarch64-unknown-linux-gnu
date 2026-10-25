@@ -1,0 +1,32 @@
+# Prebuild OCCT for aarch64-unknown-linux-gnu using the manylinux_2_28_aarch64
+# base image. Covers 64-bit ARM Linux: Raspberry Pi 4/5 (64-bit OS), AWS
+# Graviton, Oracle Ampere, Apple Silicon Linux VMs.
+#
+# Execution environment notes:
+# - On an x86_64 Docker host (e.g. Docker Desktop or linux/amd64), `docker run`
+#   of this image uses QEMU user-mode emulation and takes 3–5 hours.
+# - For native-speed builds, run this image under GitHub Actions on an
+#   `ubuntu-24.04-arm` runner (free for public repositories).
+FROM quay.io/pypa/manylinux_2_28_aarch64
+
+# Base gcc-c++ (g++ 8.5). The image has /usr/bin/gcc but no base /usr/bin/g++;
+# without this, CXX=/usr/bin/g++ would be missing and cmake's C++ compiler probe fails.
+RUN dnf install -y gcc-c++ && dnf clean all
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
+ENV PATH=/root/.cargo/bin:$PATH
+
+# Pin to the AlmaLinux 8 base gcc (~8.5), NOT the PATH-default gcc-toolset. The base
+# gcc references only old libstdc++/libgcc symbols, so the prebuilt links against any
+# newer consumer runtime (e.g. Amazon Linux 2023 / gcc 11.4.1) with no bundling (#147).
+# build.rs forwards CC/CXX to CMAKE_C/CXX_COMPILER for the OCCT source build.
+ENV CC=/usr/bin/gcc
+ENV CXX=/usr/bin/g++
+ENV AR=/usr/bin/ar
+ENV CARGO_BUILD_TARGET=aarch64-unknown-linux-gnu
+
+# add cargo target
+RUN rustup target add ${CARGO_BUILD_TARGET}
+
+# No COPY: source is bind-mounted at `docker run` time (see makefile `cross-%`),
+# keeping this a project-agnostic toolchain image.

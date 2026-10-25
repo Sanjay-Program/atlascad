@@ -1,0 +1,1201 @@
+{
+  "schema_version": 1,
+  "repositories": [
+    {
+      "id": "repo.cadcraft",
+      "name": "CADCraft",
+      "path": "apps/cadcraft",
+      "kind": "application",
+      "origin": "https://github.com/storytold/cadcraft.git",
+      "branch": "main",
+      "version": "0.10.0",
+      "license": {
+        "spdx": "MIT OR Apache-2.0",
+        "status": "approved",
+        "notes": "LICENSE-MIT, LICENSE-APACHE, NOTICE and ATTRIBUTION.md present. The 485-package resolved graph contains MPL-2.0 (acadrust, colored) used unmodified and no GPL-only dependency."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 618
+        },
+        {
+          "language": "python",
+          "files": 1
+        }
+      ],
+      "role": "Primary 2D drafting application: DXF R12-2018 read/R2000 write, DWG via acadrust, constraints, layouts, plotting, MCP server and CLI.",
+      "capabilities": [
+        "cap.2d.drafting",
+        "cap.2d.constraints",
+        "cap.2d.geometry",
+        "cap.io.dxf",
+        "cap.io.dwg",
+        "cap.document.2d",
+        "cap.mcp.server"
+      ],
+      "interfaces": [
+        "iface.cadcraft.mcp"
+      ],
+      "dependencies": [],
+      "build_commands": [
+        "cargo fetch",
+        "cargo build -p cadcraft-color",
+        "cargo build -p cadcraft-geom"
+      ],
+      "test_commands": [
+        "cargo test -p cadcraft-geom"
+      ],
+      "integration_status": "validated",
+      "conversion": "keep",
+      "conversion_rationale": "Already Rust (618 of 750 files). The remaining Python is one helper script. A language rewrite would destroy working software for a label, which the brief forbids.",
+      "known_limitations": [
+        "Workspace-wide build and the full 2,212-test suite were not run on this 7.4 GB host (docs/build-and-test.md section 3).",
+        "No SECURITY.md (security review S-1/process).",
+        "Two craft-libs revisions are now vendored and approved under MIT OR Apache-2.0; they remain outside registry advisory feeds, so keep their pins and provenance reviewed.",
+        "README states entities CADCraft does not model are not kept on save; the preservation requirement is therefore partial."
+      ],
+      "last_verified_commit": "0cf3bdea83ebbe02fb2e674b23f07de4acfa73da",
+      "tasks": [
+        "task.license.craftlibs",
+        "task.cadcraft.security-md",
+        "task.adoption.cadcraft-units"
+      ],
+      "evidence": [
+        "docs/repository-audit.md section 3",
+        "docs/build-and-test.md section 3",
+        "docs/license-inventory.md section 2",
+        "engineering/quality/tests.json#t-cadcraft-geom"
+      ]
+    },
+    {
+      "id": "repo.solidcraft",
+      "name": "SolidCraft",
+      "path": "apps/solidcraft",
+      "kind": "application",
+      "origin": "https://github.com/tangency-labs/solidcraft.git",
+      "branch": "main",
+      "version": "0.18.3",
+      "license": {
+        "spdx": "MIT OR Apache-2.0",
+        "status": "approved",
+        "notes": "LICENSE-MIT, LICENSE-APACHE, NOTICE, ATTRIBUTION.md and THIRD-PARTY-LICENSES.txt present. Vendored truck crates are Apache-2.0 with modifications marked `SolidCraft:`."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 1154
+        },
+        {
+          "language": "python",
+          "files": 42
+        },
+        {
+          "language": "typescript/javascript",
+          "files": 10
+        }
+      ],
+      "role": "Primary parametric 3D application: sketches and constraints, feature timeline, assemblies, sheet metal, STEP/IGES/3MF/STL/OBJ/glTF, desktop + web + CLI + MCP.",
+      "capabilities": [
+        "cap.document.parametric",
+        "cap.3d.sketch",
+        "cap.kernel.boolean.difference",
+        "cap.kernel.fillet",
+        "cap.io.step",
+        "cap.io.mesh",
+        "cap.render.3d",
+        "cap.mcp.server"
+      ],
+      "interfaces": [
+        "iface.solidcraft.mcp"
+      ],
+      "dependencies": [],
+      "build_commands": [
+        "CARGO_BUILD_JOBS=2 cargo build -p solidcraft-derive",
+        "CARGO_BUILD_JOBS=2 cargo build -p solidcraft-kernel"
+      ],
+      "test_commands": [
+        "cargo test -p solidcraft-kernel"
+      ],
+      "integration_status": "validated",
+      "conversion": "keep",
+      "conversion_rationale": "Already Rust, and it owns the only production-grade kernel boundary in the workspace (94,803 LOC with no truck types in its public API). It is the integration point, not a migration target.",
+      "known_limitations": [
+        "The 5,884-test suite was not run here; one crate build took 8 min 22 s and peaked at 2.56 GB RSS.",
+        "Declares rust-version 1.95 while the installed toolchain is 1.94.0; cargo 1.94 tolerates this but a future cargo may not.",
+        "The kernel's boolean differences and chains are separate from the contract adapter; the adapter refuses difference rather than returning a wrong solid.",
+        "The git remote (tangency-labs) differs from the repository URL in Cargo.toml (bherbruck), so this checkout is a fork of the declared upstream.",
+        "Untrusted-import size and cancellation budgets are missing in crates/io (security S-3)."
+      ],
+      "last_verified_commit": "775e5155bbff9a01acbd6da09da2dfe87be708dc",
+      "tasks": [
+        "task.contract.solidcraft-adoption",
+        "task.io.import-budgets",
+        "task.quality.solidcraft-tests"
+      ],
+      "evidence": [
+        "docs/repository-audit.md section 4",
+        "docs/build-and-test.md section 4",
+        "docs/kernel-comparison.md section 4",
+        "engineering/quality/builds.json#b-solidcraft-kernel"
+      ]
+    },
+    {
+      "id": "repo.truck",
+      "name": "truck",
+      "path": "kernels/truck",
+      "kind": "kernel",
+      "origin": "https://github.com/ricosjp/truck.git",
+      "branch": "master",
+      "version": "0.6.x",
+      "license": {
+        "spdx": "Apache-2.0",
+        "status": "approved",
+        "notes": "LICENSE file is the Apache-2.0 text; crates.io metadata agrees. Apache-2.0 section 4(d) requires NOTICE preservation when redistributed."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 274
+        },
+        {
+          "language": "typescript/javascript",
+          "files": 3
+        }
+      ],
+      "role": "Primary 3D B-rep kernel. The product consumes it through SolidCraft's vendored patched crates, not the published crates alone.",
+      "capabilities": [
+        "cap.kernel.extrude",
+        "cap.kernel.boolean.union",
+        "cap.kernel.boolean.intersection",
+        "cap.kernel.tessellate"
+      ],
+      "interfaces": [],
+      "dependencies": [],
+      "build_commands": [
+        "cargo build -p truck-modeling"
+      ],
+      "test_commands": [
+        "cargo test"
+      ],
+      "integration_status": "integrated",
+      "conversion": "keep",
+      "conversion_rationale": "Apache-2.0, pure Rust, and the only kernel with a production integration and an oracle behind it. No rewriting candidate demonstrated an advantage.",
+      "known_limitations": [
+        "Published truck-shapeops fails every coplanar overlapping boolean; four crates are patched under apps/solidcraft/vendor.",
+        "A third chained union panics inside intersection_curve.rs (caught as KernelError::Internal, operation unavailable).",
+        "Upstream face ordering after a boolean is not stable; SolidCraft's patch restores deterministic ordering."
+      ],
+      "last_verified_commit": "78d699b0792b39e27c2bf073b682986701644e91",
+      "tasks": [
+        "task.corpus.booleans"
+      ],
+      "evidence": [
+        "docs/kernel-comparison.md sections 2-4",
+        "docs/performance-baseline.md section 2",
+        "crates/cad-kernel-truck/tests"
+      ]
+    },
+    {
+      "id": "repo.monstertruck",
+      "name": "monstertruck",
+      "path": "kernels/monstertruck",
+      "kind": "kernel",
+      "origin": "https://github.com/virtualritz/monstertruck.git",
+      "branch": "master",
+      "version": "unreleased fork",
+      "license": {
+        "spdx": "Apache-2.0",
+        "status": "approved",
+        "notes": "LICENSE file present. Fork/rename of truck; not in any shipping dependency graph."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 456
+        }
+      ],
+      "role": "Read-only reference: a fork/rename of truck. Not integrated and not built on this host.",
+      "capabilities": [],
+      "interfaces": [],
+      "dependencies": [],
+      "build_commands": [],
+      "test_commands": [],
+      "integration_status": "discovered",
+      "conversion": "keep",
+      "conversion_rationale": "Kept as a reference outside the shipping graph. Two copies of one kernel would double the test surface with no demonstrated capability gain.",
+      "known_limitations": [
+        "Duplicates upstream truck; no measured advantage.",
+        "Not built, so nothing is claimed about it beyond its repository contents."
+      ],
+      "last_verified_commit": "d2ad1ed7aa420b7f32cd2c1e3ad319b46d593652",
+      "tasks": [],
+      "evidence": [
+        "docs/kernel-comparison.md section 6",
+        "docs/repository-audit.md section 6"
+      ]
+    },
+    {
+      "id": "repo.cascade-rs",
+      "name": "cascade-rs",
+      "path": "kernels/cascade-rs",
+      "kind": "kernel",
+      "origin": "https://github.com/DonSqualo/cascade-rs.git",
+      "branch": "master",
+      "version": "pre-1.0",
+      "license": {
+        "spdx": "Apache-2.0",
+        "status": "needs_review",
+        "notes": "Declared in Cargo.toml, but no root LICENSE file ships with the checkout; the licence text must be confirmed before any use."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 103
+        }
+      ],
+      "role": "Candidate pure-Rust B-rep kernel, kept as a reference. Not built and not integrated.",
+      "capabilities": [],
+      "interfaces": [],
+      "dependencies": [],
+      "build_commands": [],
+      "test_commands": [],
+      "integration_status": "discovered",
+      "conversion": "keep",
+      "conversion_rationale": "A candidate, not a component. Building it on this host would cost hours with no measured benefit over the integrated kernel.",
+      "known_limitations": [
+        "Self-reported feature checklist; not independently verified.",
+        "No licence text in the checkout, only manifest metadata."
+      ],
+      "last_verified_commit": "c68c1d2c3c7ff24d9f0d21b926748273bb856842",
+      "tasks": [],
+      "evidence": [
+        "docs/kernel-comparison.md section 6"
+      ]
+    },
+    {
+      "id": "repo.hagane",
+      "name": "Hagane",
+      "path": "kernels/hagane",
+      "kind": "kernel",
+      "origin": "https://github.com/rsasaki0109/Hagane.git",
+      "branch": "main",
+      "version": "pre-1.0",
+      "license": {
+        "spdx": "MIT OR Apache-2.0",
+        "status": "approved",
+        "notes": "LICENSE-MIT and LICENSE-APACHE present. Self-described as an early foundation."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 479
+        },
+        {
+          "language": "typescript/javascript",
+          "files": 38
+        }
+      ],
+      "role": "Candidate pure-Rust kernel, kept as a reference. Not built and not integrated.",
+      "capabilities": [],
+      "interfaces": [],
+      "dependencies": [],
+      "build_commands": [],
+      "test_commands": [],
+      "integration_status": "discovered",
+      "conversion": "keep",
+      "conversion_rationale": "No boolean corpus or maturity evidence; a demo is not a kernel qualification.",
+      "known_limitations": [
+        "Early-stage maturity; no measured geometry results on this host."
+      ],
+      "last_verified_commit": "45e423c9c5f1eea33a5ca23e44abde2d63cdd95d",
+      "tasks": [],
+      "evidence": [
+        "docs/kernel-comparison.md section 6"
+      ]
+    },
+    {
+      "id": "repo.cadrum",
+      "name": "cadrum",
+      "path": "kernels/cadrum",
+      "kind": "kernel",
+      "origin": "https://github.com/lzpel/cadrum.git",
+      "branch": "main",
+      "version": "unreleased",
+      "license": {
+        "spdx": "MIT wrapper + LGPL-2.1 bundled OpenCASCADE",
+        "status": "restricted",
+        "notes": "The MIT licence covers cadrum's Rust source only. A binary that statically links headless OpenCASCADE carries LGPL-2.1 obligations. Owner decision G1 is open; do not distribute."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 53
+        },
+        {
+          "language": "c/c++",
+          "files": 5
+        }
+      ],
+      "role": "Candidate OCCT-based kernel with a native build. Excluded from the shipping graph for licence reasons.",
+      "capabilities": [],
+      "interfaces": [],
+      "dependencies": [],
+      "build_commands": [],
+      "test_commands": [],
+      "integration_status": "blocked",
+      "conversion": "isolate",
+      "conversion_rationale": "Would require a native OCCT build and an LGPL relink strategy. Isolated outside the product until the owner answers G1.",
+      "known_limitations": [
+        "Statically links LGPL-2.1 OpenCASCADE regardless of the wrapper's MIT licence.",
+        "Requires cmake or a prebuilt OCCT tarball; not attempted on this host."
+      ],
+      "last_verified_commit": "c59916dbbf135c21c64d80f378b0674432df50bb",
+      "tasks": [
+        "task.decision.occt-licence"
+      ],
+      "evidence": [
+        "docs/license-inventory.md section 4.2",
+        "docs/kernel-comparison.md section 6"
+      ]
+    },
+    {
+      "id": "repo.opencascade-rs",
+      "name": "opencascade-rs",
+      "path": "kernels/opencascade-rs",
+      "kind": "kernel",
+      "origin": "https://github.com/bschwind/opencascade-rs.git",
+      "branch": "main",
+      "version": "unreleased",
+      "license": {
+        "spdx": "LGPL-2.1",
+        "status": "prohibited",
+        "notes": "LGPL-2.1 bindings. Static linking into a closed-source binary does not satisfy section 6 without relink rights. Not in any shipping graph today."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 117
+        }
+      ],
+      "role": "OCCT bindings, excluded from the shipping product pending an owner decision.",
+      "capabilities": [],
+      "interfaces": [],
+      "dependencies": [],
+      "build_commands": [],
+      "test_commands": [],
+      "integration_status": "blocked",
+      "conversion": "isolate",
+      "conversion_rationale": "Prohibited in a proprietary binary by policy; the capability decision belongs to the owner, not to an engineering session.",
+      "known_limitations": [
+        "LGPL-2.1 obligations; needs cmake plus a full OCCT build even to test."
+      ],
+      "last_verified_commit": "32758df23a137f4e7c786c618b0317fc3badb3b2",
+      "tasks": [
+        "task.decision.occt-licence"
+      ],
+      "evidence": [
+        "docs/license-inventory.md section 4.1"
+      ]
+    },
+    {
+      "id": "repo.cadrs",
+      "name": "cadrs",
+      "path": "references/cadrs",
+      "kind": "reference",
+      "origin": "https://github.com/gswdh/cadrs.git",
+      "branch": "main",
+      "version": "unreleased",
+      "license": {
+        "spdx": "MIT OR Apache-2.0",
+        "status": "approved",
+        "notes": "LICENSE-MIT and LICENSE-APACHE present. Read for ideas only; no code copied."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 719
+        }
+      ],
+      "role": "Read-only reference application.",
+      "capabilities": [],
+      "interfaces": [],
+      "dependencies": [],
+      "build_commands": [],
+      "test_commands": [],
+      "integration_status": "discovered",
+      "conversion": "keep",
+      "conversion_rationale": "Reference material, deliberately outside the shipping graph.",
+      "known_limitations": [
+        "Not built; no claims made."
+      ],
+      "last_verified_commit": "74dd5771cfc3f3c2c75958d273aa032d92d1e1f2",
+      "tasks": [],
+      "evidence": [
+        "docs/repository-audit.md section 1"
+      ]
+    },
+    {
+      "id": "repo.cadrust",
+      "name": "cadrust",
+      "path": "references/cadrust",
+      "kind": "reference",
+      "origin": "https://github.com/mac999/cadrust.git",
+      "branch": "main",
+      "version": "unreleased",
+      "license": {
+        "spdx": "MIT",
+        "status": "approved",
+        "notes": "LICENSE present (MIT). Read for ideas only."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 15
+        },
+        {
+          "language": "python",
+          "files": 15
+        }
+      ],
+      "role": "Read-only reference application.",
+      "capabilities": [],
+      "interfaces": [],
+      "dependencies": [],
+      "build_commands": [],
+      "test_commands": [],
+      "integration_status": "discovered",
+      "conversion": "keep",
+      "conversion_rationale": "Reference material, deliberately outside the shipping graph.",
+      "known_limitations": [
+        "Not built; no claims made."
+      ],
+      "last_verified_commit": "519cb390fd1c2e3079dd520ac4899474565f6b98",
+      "tasks": [],
+      "evidence": [
+        "docs/repository-audit.md section 1"
+      ]
+    },
+    {
+      "id": "repo.bevy-pmetra",
+      "name": "bevy_pmetra",
+      "path": "references/bevy_pmetra",
+      "kind": "reference",
+      "origin": "https://github.com/nilaysavant/bevy_pmetra.git",
+      "branch": "master",
+      "version": "unreleased",
+      "license": {
+        "spdx": "MIT OR Apache-2.0",
+        "status": "approved",
+        "notes": "LICENSE-MIT and LICENSE-APACHE present. Read for ideas only."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 86
+        }
+      ],
+      "role": "Read-only reference: parametric modelling on Bevy.",
+      "capabilities": [],
+      "interfaces": [],
+      "dependencies": [],
+      "build_commands": [],
+      "test_commands": [],
+      "integration_status": "discovered",
+      "conversion": "keep",
+      "conversion_rationale": "Reference material, deliberately outside the shipping graph.",
+      "known_limitations": [
+        "Not built; no claims made."
+      ],
+      "last_verified_commit": "6933b23d75bd3168ab398bb288a40a6cd3f2c516",
+      "tasks": [],
+      "evidence": [
+        "docs/repository-audit.md section 1"
+      ]
+    },
+    {
+      "id": "repo.opencadstudio",
+      "name": "OpenCADStudio (archive)",
+      "path": "",
+      "kind": "external",
+      "origin": null,
+      "branch": null,
+      "version": "2026.42.0 (declared in the archive manifest)",
+      "license": {
+        "spdx": "GPL-3.0-only",
+        "status": "restricted",
+        "notes": "Verified from OpenCADStudio-main.zip: LICENSE is the GNU GPL v3 text, 1,797 files, 892 Rust. Copyleft: no code may enter the proprietary product. The archive stays unextracted; the local directory is empty."
+      },
+      "languages": [
+        {
+          "language": "rust (archive only)",
+          "files": 892
+        }
+      ],
+      "role": "External GPL-3.0 archive reference. It is not present in this workspace and no source is deployed from it.",
+      "capabilities": [],
+      "interfaces": [],
+      "dependencies": [],
+      "build_commands": [],
+      "test_commands": [],
+      "integration_status": "discovered",
+      "conversion": "retire",
+      "conversion_rationale": "GPL-3.0 reference only and the archive is not part of the workspace. Reading for architecture is permitted; copying would force GPL-3.0 on the distribution.",
+      "known_limitations": [
+        "The archive is intentionally excluded from the workspace; no local copy exists to fingerprint or build.",
+        "No Git history, so identity relies on the archive name and declared contents."
+      ],
+      "last_verified_commit": null,
+      "tasks": [],
+      "evidence": [
+        "docs/license-inventory.md section 1 and 4.5"
+      ]
+    },
+    {
+      "id": "repo.craft-libs",
+      "name": "craft-libs (external git dependency)",
+      "path": "",
+      "kind": "external",
+      "origin": "https://github.com/storytold/craft-libs",
+      "branch": null,
+      "version": "pinned revisions 82a24b00..., 5c874d51...",
+      "license": {
+        "spdx": "MIT OR Apache-2.0",
+        "status": "approved",
+        "notes": "Read from the pinned checkouts: workspace Cargo.toml declares MIT OR Apache-2.0, with LICENSE-MIT and LICENSE-APACHE present. All nine crates use license.workspace = true. The five vendored PDF-backend crates (hayro, hayro-cmap, hayro-interpret, hayro-jbig2, hayro-syntax) carry MIT/Apache dual licences; bundled data assets are CC0-1.0 or BSD-2-Clause style. No copyleft found in either pinned tree. Two revisions vendored into apps/cadcraft/vendor/ with PROVENANCE.md and sha256 manifests: craft-docpath at 82a24b00... (12 unit + 1 doc test pass standalone), craft-ui at 5c874d51... (own compile blocked by pre-existing epaint unstable-feature incompatibility, unrelated to vendoring)."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 0
+        }
+      ],
+      "role": "External supply-chain dependency of CADCraft, now vendored at two pinned revisions into apps/cadcraft/vendor/ so release builds do not need GitHub.",
+      "capabilities": [],
+      "interfaces": [],
+      "dependencies": [],
+      "build_commands": [],
+      "test_commands": [],
+      "integration_status": "validated",
+      "conversion": "keep",
+      "conversion_rationale": "Mature dual-licensed (MIT OR Apache-2.0) library; vendored at pinned revisions, so nothing to replace and no network needed for release builds.",
+      "known_limitations": [
+        "Both pinned revisions declare rust-version 1.95; this host has rustc 1.94.0, so CADCraft crates depending on them (engine, ui-egui) cannot be compiled here (pre-existing, unrelated to vendoring).",
+        "craft-ui transitively depends on egui 0.36 which uses an unstable library feature (push_mut) unsupported by this host; pre-existing, unrelated to vendoring.",
+        "Reproducibility no longer depends on GitHub (vendored), but the pinned MSRV pins the toolchain."
+      ],
+      "last_verified_commit": null,
+      "tasks": [
+        "task.license.craftlibs"
+      ],
+      "evidence": [
+        "apps/cadcraft/vendor/craft-libs-docpath/PROVENANCE.md",
+        "apps/cadcraft/vendor/craft-libs-ui/PROVENANCE.md",
+        "engineering/quality/tests.json (craft-docpath standalone tests verified)",
+        "apps/cadcraft/Cargo.toml (path dependencies)",
+        "apps/cadcraft/Cargo.lock (source removed = vendored)"
+      ]
+    },
+    {
+      "id": "repo.cad-contract",
+      "name": "cad-contract",
+      "path": "crates/cad-contract",
+      "kind": "platform",
+      "origin": null,
+      "branch": null,
+      "version": "0.1.0",
+      "license": {
+        "spdx": "LicenseRef-AtlasCAD-Personal-NonCommercial",
+        "status": "approved",
+        "notes": "The root LICENSE applies personal, non-commercial terms to this first-party AtlasCAD crate. Imported dependencies retain their own licenses."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 9
+        }
+      ],
+      "role": "Shared contract: units, stable IDs, tolerances, capabilities, kernel error taxonomy, mesh exchange, versioned document header.",
+      "capabilities": [
+        "cap.contract.versioned-document"
+      ],
+      "interfaces": [
+        "iface.cad-contract.kernel",
+        "iface.cad-contract.document-header",
+        "iface.cad-contract.mesh"
+      ],
+      "dependencies": [],
+      "build_commands": [
+        "cargo build -p cad-contract"
+      ],
+      "test_commands": [
+        "cargo test -p cad-contract"
+      ],
+      "integration_status": "integrated",
+      "conversion": "not_applicable",
+      "conversion_rationale": "New Rust crate; there is nothing to convert.",
+      "known_limitations": [
+        "cad-document writes the header in its `.zcad` project; generic header migrations are tested in cad-contract.",
+        "No Vec3 of its own by design, so callers keep their own vector types."
+      ],
+      "last_verified_commit": null,
+      "tasks": [
+        "task.contract.solidcraft-adoption"
+      ],
+      "evidence": [
+        "docs/architecture.md section 3",
+        "engineering/quality/tests.json#t-cad-contract"
+      ]
+    },
+    {
+      "id": "repo.cad-kernel-truck",
+      "name": "cad-kernel-truck",
+      "path": "crates/cad-kernel-truck",
+      "kind": "platform",
+      "origin": null,
+      "branch": null,
+      "version": "0.1.0",
+      "license": {
+        "spdx": "LicenseRef-AtlasCAD-Personal-NonCommercial",
+        "status": "approved",
+        "notes": "The root LICENSE applies personal, non-commercial terms to this first-party AtlasCAD crate. Imported dependencies retain their own licenses. Links Apache-2.0 Truck crates from apps/solidcraft/vendor; those remain under their own license."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 1
+        }
+      ],
+      "role": "Truck-backed implementation of the contract kernel interface: extrude, union, intersection, tessellation.",
+      "capabilities": [
+        "cap.kernel.boolean.intersection",
+        "cap.kernel.boolean.union",
+        "cap.kernel.extrude",
+        "cap.kernel.tessellate"
+      ],
+      "interfaces": [
+        "iface.cad-contract.kernel"
+      ],
+      "dependencies": [
+        "repo.truck",
+        "repo.solidcraft"
+      ],
+      "build_commands": [
+        "cargo build -p cad-kernel-truck"
+      ],
+      "test_commands": [
+        "cargo test -p cad-kernel-truck"
+      ],
+      "integration_status": "verified",
+      "conversion": "not_applicable",
+      "conversion_rationale": "New Rust crate wrapping an Apache-2.0 Rust kernel; no foreign code is involved.",
+      "known_limitations": [
+        "Does not advertise boolean difference: the underlying path returns a wrong solid (docs/kernel-comparison.md section 4.2).",
+        "Chained unions fail at the third operand (kernel-level, caught as Internal).",
+        "Depends on SolidCraft's vendored patched truck crates by path, so it is coupled to that checkout.",
+        "Cancellation and deadlines are cooperative checkpoints, not preemption: a single pathological boolean inside truck cannot be interrupted.",
+        "Two corpus fixtures are recorded known failures (tangent contact, coordinates near 1e6 mm); they are not regressions and not passes."
+      ],
+      "last_verified_commit": null,
+      "tasks": [
+        "task.corpus.booleans",
+        "task.adapter.cancellation"
+      ],
+      "evidence": [
+        "docs/architecture.md section 4",
+        "docs/kernel-comparison.md section 4",
+        "engineering/quality/tests.json#t-cad-kernel-truck",
+        "engineering/quality/benchmarks.json#bm-extrude"
+      ]
+    },
+    {
+      "id": "repo.cad-engineering",
+      "name": "cad-engineering",
+      "path": "crates/cad-engineering",
+      "kind": "platform",
+      "origin": null,
+      "branch": null,
+      "version": "0.1.0",
+      "license": {
+        "spdx": "LicenseRef-AtlasCAD-Personal-NonCommercial",
+        "status": "approved",
+        "notes": "The root LICENSE applies personal, non-commercial terms to this first-party AtlasCAD crate. Imported dependencies retain their own licenses."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 10
+        }
+      ],
+      "role": "Integration control plane: typed manifests, workspace scanner, change detection, idempotent task generation, evidence report.",
+      "capabilities": [
+        "cap.engineering.change-detection"
+      ],
+      "interfaces": [
+        "iface.engineering.manifests",
+        "iface.engineering.scan-state"
+      ],
+      "dependencies": [],
+      "build_commands": [
+        "cargo build -p cad-engineering"
+      ],
+      "test_commands": [
+        "cargo test -p cad-engineering"
+      ],
+      "integration_status": "verified",
+      "conversion": "not_applicable",
+      "conversion_rationale": "New Rust crate.",
+      "known_limitations": [
+        "Fingerprinting is FNV-1a 64-bit: fast and reproducible, not cryptographic.",
+        "Files over 8 MiB are identified by size and mtime rather than content.",
+        "It tracks state; it does not run builds or tests, so evidence records are written by an engineering session or CI."
+      ],
+      "last_verified_commit": null,
+      "tasks": [
+        "task.engineering.agent-runtime"
+      ],
+      "evidence": [
+        "docs/engineering-control-plane.md",
+        "engineering/quality/tests.json#t-cad-engineering"
+      ]
+    },
+    {
+      "id": "repo.cad-cli",
+      "name": "cad-cli",
+      "path": "crates/cad-cli",
+      "kind": "platform",
+      "origin": null,
+      "branch": null,
+      "version": "0.1.0",
+      "license": {
+        "spdx": "LicenseRef-AtlasCAD-Personal-NonCommercial",
+        "status": "approved",
+        "notes": "The root LICENSE applies personal, non-commercial terms to this first-party AtlasCAD crate. Imported dependencies retain their own licenses."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 3
+        }
+      ],
+      "role": "Headless product workflow for parametric project creation/editing/rebuild, unit-aware geometry, and binary STL export through cad-io.",
+      "capabilities": [
+        "cap.kernel.extrude",
+        "cap.kernel.tessellate",
+        "cap.document.project-persistence"
+      ],
+      "interfaces": [
+        "iface.cad-contract.kernel",
+        "iface.cad-contract.mesh",
+        "iface.cad-document.project-file"
+      ],
+      "dependencies": [
+        "repo.cad-contract",
+        "repo.cad-kernel-truck",
+        "repo.cad-document",
+        "repo.cad-io"
+      ],
+      "build_commands": [
+        "cargo build -p cad-cli"
+      ],
+      "test_commands": [
+        "cargo test -p cad-cli"
+      ],
+      "integration_status": "verified",
+      "conversion": "not_applicable",
+      "conversion_rationale": "A new Rust crate that consumes existing components; nothing was converted.",
+      "known_limitations": [
+        "Only one rectangle sketch and one extrude feature are supported by the native project workflow.",
+        "Undo/redo history is persisted with a 64-snapshot bound; named revisions and branching are not implemented.",
+        "STL export is binary and carries no units; native `.zcad` project stores units and schema metadata."
+      ],
+      "last_verified_commit": null,
+      "tasks": [
+        "task.integration.cli"
+      ],
+      "evidence": [
+        "crates/cad-cli/tests/end_to_end.rs",
+        "crates/cad-cli/tests/project_workflow.rs",
+        "engineering/quality/tests.json#t-cad-cli",
+        "engineering/quality/benchmarks.json#bm-cli-box"
+      ]
+    },
+    {
+      "id": "repo.cad-agent-api",
+      "name": "cad-agent-api",
+      "path": "crates/cad-agent-api",
+      "kind": "platform",
+      "origin": null,
+      "branch": null,
+      "version": "0.1.0",
+      "license": {
+        "spdx": "LicenseRef-AtlasCAD-Personal-NonCommercial",
+        "status": "approved",
+        "notes": "The root LICENSE applies personal, non-commercial terms to this first-party AtlasCAD crate. Imported dependencies retain their own licenses."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 5
+        }
+      ],
+      "role": "The versioned CadAgent contract: agent identity and metadata, capability and permission declarations, versioned I/O envelopes, budgets and the structured error taxonomy.",
+      "capabilities": [
+        "cap.agent.contract"
+      ],
+      "interfaces": [
+        "iface.cad-agent.contract"
+      ],
+      "dependencies": [],
+      "build_commands": [
+        "cargo build -p cad-agent-api"
+      ],
+      "test_commands": [
+        "cargo test -p cad-agent-api"
+      ],
+      "integration_status": "verified",
+      "conversion": "not_applicable",
+      "conversion_rationale": "New Rust crate; there is nothing to convert.",
+      "known_limitations": [
+        "Declares the agreement only: there is no registry, no scheduler and no enforcement here, by design.",
+        "The contract version is a single integer, so there is no minor-version negotiation; a breaking change needs version 2."
+      ],
+      "last_verified_commit": null,
+      "tasks": [
+        "task.engineering.agent-runtime"
+      ],
+      "evidence": [
+        "crates/cad-agent-api/src/lib.rs",
+        "engineering/quality/tests.json#t-cad-agent-api"
+      ]
+    },
+    {
+      "id": "repo.cad-agent-runtime",
+      "name": "cad-agent-runtime",
+      "path": "crates/cad-agent-runtime",
+      "kind": "platform",
+      "origin": null,
+      "branch": null,
+      "version": "0.1.0",
+      "license": {
+        "spdx": "LicenseRef-AtlasCAD-Personal-NonCommercial",
+        "status": "approved",
+        "notes": "The root LICENSE applies personal, non-commercial terms to this first-party AtlasCAD crate. Imported dependencies retain their own licenses."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 3
+        }
+      ],
+      "role": "The agent runtime: contract validation, the discovered-to-registered-to-ready lifecycle, capability grants, budget enforcement and a strict JSON Schema subset checker.",
+      "capabilities": [
+        "cap.agent.runtime"
+      ],
+      "interfaces": [
+        "iface.cad-agent.runtime"
+      ],
+      "dependencies": [
+        "repo.cad-agent-api"
+      ],
+      "build_commands": [
+        "cargo build -p cad-agent-runtime"
+      ],
+      "test_commands": [
+        "cargo test -p cad-agent-runtime"
+      ],
+      "integration_status": "verified",
+      "conversion": "not_applicable",
+      "conversion_rationale": "New Rust crate; there is nothing to convert.",
+      "known_limitations": [
+        "In-process only: the registry is a plain struct with &mut self methods, so one owner at a time and no cross-process isolation.",
+        "The schema checker implements a documented keyword subset and refuses any other keyword rather than ignoring it.",
+        "No scheduling: a call is synchronous and bounded by the contract's budgets, so a long operation blocks the calling thread."
+      ],
+      "last_verified_commit": null,
+      "tasks": [
+        "task.engineering.agent-runtime"
+      ],
+      "evidence": [
+        "crates/cad-agent-runtime/src/registry.rs",
+        "engineering/quality/tests.json#t-cad-agent-runtime"
+      ]
+    },
+    {
+      "id": "repo.cad-agent-geometry",
+      "name": "cad-agent-geometry",
+      "path": "crates/cad-agent-geometry",
+      "kind": "platform",
+      "origin": null,
+      "branch": null,
+      "version": "0.1.0",
+      "license": {
+        "spdx": "LicenseRef-AtlasCAD-Personal-NonCommercial",
+        "status": "approved",
+        "notes": "The root LICENSE applies personal, non-commercial terms to this first-party AtlasCAD crate. Imported dependencies retain their own licenses."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 2
+        }
+      ],
+      "role": "The geometry-ops agent: the first agent that runs inside the registry, exposing the contract kernel's operations to an agent loop.",
+      "capabilities": [
+        "cap.agent.geometry-ops"
+      ],
+      "interfaces": [
+        "iface.cad-agent.contract",
+        "iface.cad-contract.kernel"
+      ],
+      "dependencies": [
+        "repo.cad-agent-api",
+        "repo.cad-contract",
+        "repo.cad-kernel-truck"
+      ],
+      "build_commands": [
+        "cargo build -p cad-agent-geometry"
+      ],
+      "test_commands": [
+        "cargo test -p cad-agent-geometry"
+      ],
+      "integration_status": "verified",
+      "conversion": "not_applicable",
+      "conversion_rationale": "New Rust crate; there is nothing to convert.",
+      "known_limitations": [
+        "Boolean difference is refused: the truck adapter does not advertise it, so the agent reports it as unsupported rather than returning a wrong solid.",
+        "Solid handles are session handles: they are valid for this agent's lifetime and must never be persisted.",
+        "The reply carries measurements, never geometry, so a caller cannot obtain a mesh through the agent.",
+        "The workspace file read is bounded to a single JSON profile under 1 MiB; there is no import of any other format."
+      ],
+      "last_verified_commit": null,
+      "tasks": [
+        "task.agent.geometry-ops"
+      ],
+      "evidence": [
+        "crates/cad-agent-geometry/src/lib.rs",
+        "crates/cad-agent-geometry/tests/integration.rs",
+        "engineering/quality/tests.json#t-cad-agent-geometry"
+      ]
+    },
+    {
+      "id": "repo.cad-document",
+      "name": "cad-document",
+      "path": "crates/cad-document",
+      "kind": "platform",
+      "origin": null,
+      "branch": null,
+      "version": "0.1.0",
+      "license": {
+        "spdx": "LicenseRef-AtlasCAD-Personal-NonCommercial",
+        "status": "approved",
+        "notes": "The root LICENSE applies personal, non-commercial terms to this first-party AtlasCAD crate. Imported dependencies retain their own licenses."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 1
+        }
+      ],
+      "role": "Local parametric project payload with schema-2 rectangle, circle and regular-polygon sketches, extrude, named parameters, bounded undo/redo, atomic save/load and schema-1 migration.",
+      "capabilities": [
+        "cap.document.project-persistence"
+      ],
+      "interfaces": [
+        "iface.cad-document.project-file"
+      ],
+      "dependencies": [
+        "repo.cad-contract"
+      ],
+      "build_commands": [
+        "cargo build -p cad-document"
+      ],
+      "test_commands": [
+        "cargo test -p cad-document"
+      ],
+      "integration_status": "verified",
+      "conversion": "not_applicable",
+      "conversion_rationale": "New Rust crate; no existing source was converted.",
+      "known_limitations": [
+        "One extrude of one sketch; no general sketch entities, constraints, booleans or multi-body features.",
+        "A circle is a tolerance-bounded polygon; its volume is the polygon volume, not an analytic cylinder.",
+        "Native project files are capped at 64 MiB; undo/redo is limited to 64 snapshots in each direction.",
+        "Schema 1 is migrated forward to schema 2 on load; there is no downgrade path."
+      ],
+      "last_verified_commit": null,
+      "tasks": [],
+      "evidence": [
+        "crates/cad-document/src/lib.rs",
+        "engineering/quality/tests.json#t-cad-document",
+        "engineering/quality/tests.json#t-cad-document-schema2"
+      ]
+    },
+    {
+      "id": "repo.cad-entitlements",
+      "name": "cad-entitlements",
+      "path": "crates/cad-entitlements",
+      "kind": "platform",
+      "origin": null,
+      "branch": null,
+      "version": "0.1.0",
+      "license": {
+        "spdx": "LicenseRef-AtlasCAD-Personal-NonCommercial",
+        "status": "approved",
+        "notes": "The root LICENSE applies personal, non-commercial terms to this first-party AtlasCAD crate. Imported dependencies retain their own licenses."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 1
+        }
+      ],
+      "role": "Local subscription entitlement rules for tiers, quotas and payment lifecycle policy; no billing provider.",
+      "capabilities": [
+        "cap.entitlements.policy"
+      ],
+      "interfaces": [],
+      "dependencies": [],
+      "build_commands": [
+        "cargo build -p cad-entitlements"
+      ],
+      "test_commands": [
+        "cargo test -p cad-entitlements"
+      ],
+      "integration_status": "validated",
+      "conversion": "not_applicable",
+      "conversion_rationale": "New Rust crate; no existing source was converted.",
+      "known_limitations": [
+        "No authentication, persistence, payment gateway, tax calculation, or live billing.",
+        "Pricing values are hypotheses, not validated prices."
+      ],
+      "last_verified_commit": null,
+      "tasks": [],
+      "evidence": [
+        "crates/cad-entitlements/src/lib.rs",
+        "engineering/quality/tests.json#t-cad-entitlements"
+      ]
+    },
+    {
+      "id": "repo.cad-io",
+      "name": "cad-io",
+      "path": "crates/cad-io",
+      "kind": "platform",
+      "origin": null,
+      "branch": null,
+      "version": "0.1.0",
+      "license": {
+        "spdx": "LicenseRef-AtlasCAD-Personal-NonCommercial",
+        "status": "approved",
+        "notes": "The root LICENSE applies personal, non-commercial terms to this first-party AtlasCAD crate. Imported dependencies retain their own licenses."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 1
+        }
+      ],
+      "role": "Validated mesh interchange: binary STL writing and parsing shared by the CLI and studio.",
+      "capabilities": [
+        "cap.io.stl-export"
+      ],
+      "interfaces": [
+        "iface.cad-contract.mesh"
+      ],
+      "dependencies": [
+        "repo.cad-contract"
+      ],
+      "build_commands": [
+        "cargo build -p cad-io"
+      ],
+      "test_commands": [
+        "cargo test -p cad-io"
+      ],
+      "integration_status": "verified",
+      "conversion": "not_applicable",
+      "conversion_rationale": "New Rust crate; the STL code moved out of cad-cli so the studio reuses one implementation.",
+      "known_limitations": [
+        "Binary STL only; no ASCII STL, OBJ or STEP.",
+        "STL carries no units, bodies, colours or feature history; callers must keep the document header."
+      ],
+      "last_verified_commit": null,
+      "tasks": [],
+      "evidence": [
+        "crates/cad-io/src/lib.rs",
+        "engineering/quality/tests.json#t-cad-io"
+      ]
+    },
+    {
+      "id": "repo.cad-studio",
+      "name": "cad-studio",
+      "path": "crates/cad-studio",
+      "kind": "platform",
+      "origin": null,
+      "branch": null,
+      "version": "0.1.0",
+      "license": {
+        "spdx": "LicenseRef-AtlasCAD-Personal-NonCommercial",
+        "status": "approved",
+        "notes": "The root LICENSE applies personal, non-commercial terms to this first-party AtlasCAD crate. Imported dependencies retain their own licenses."
+      },
+      "languages": [
+        {
+          "language": "rust",
+          "files": 3
+        },
+        {
+          "language": "javascript",
+          "files": 1
+        },
+        {
+          "language": "css",
+          "files": 1
+        },
+        {
+          "language": "html",
+          "files": 1
+        }
+      ],
+      "role": "Local-first application shell: project browser, parameter and profile editing, 3D WebGL viewport with picking and view controls, command palette, themes, atomic save and STL export over a loopback HTTP API.",
+      "capabilities": [
+        "cap.app.local-studio",
+        "cap.ui.viewport-3d",
+        "cap.ui.command-palette"
+      ],
+      "interfaces": [
+        "iface.cad-studio.http",
+        "iface.cad-document.project-file",
+        "iface.cad-contract.kernel",
+        "iface.cad-contract.mesh"
+      ],
+      "dependencies": [
+        "repo.cad-contract",
+        "repo.cad-document",
+        "repo.cad-kernel-truck",
+        "repo.cad-io"
+      ],
+      "build_commands": [
+        "cargo build -p cad-studio"
+      ],
+      "test_commands": [
+        "cargo test -p cad-studio"
+      ],
+      "integration_status": "verified",
+      "conversion": "not_applicable",
+      "conversion_rationale": "New Rust crate with dependency-free embedded HTML/CSS/JS; no existing UI was rewritten.",
+      "known_limitations": [
+        "Binds 127.0.0.1 only and serves one project chosen at launch; it is not a hosted or multi-user service.",
+        "The viewport is WebGL1 with flat shading; no pixel-level visual regression suite exists.",
+        "One extrude of one sketch per project; no sketch drawing tools, constraints, booleans or assemblies.",
+        "No autosave or crash-recovery snapshot yet; Save is explicit."
+      ],
+      "last_verified_commit": null,
+      "tasks": [],
+      "evidence": [
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/tests/http_api.rs",
+        "engineering/quality/tests.json#t-cad-studio",
+        "engineering/quality/benchmarks.json#bm-studio-state"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+// P3I.8 / SM17 (lesson `17-importing-legacy-sheet-metal`, t0043–t0061): a folded part imported
+// from STEP, made active sheet metal. The part is the legacy Case (`sm-legacy-case-step`,
+// `samples::sheetmetal_legacy::case_round`): an open box, 2 mm, R3, round holes at its corners
+// (the walls meet the base only through the bends), exported by cadrs as a plain solid, like the
+// lesson's "Case" (t0043.9). Thickened again, the holes are recognised as the corners' reliefs:
+// the same flat and volume as the original (`cadrs_core/tests/sheetmetal_legacy.rs`).
+// 01 the import.
+// 02 Sheet metal model → Thicken, Tangent propagation, one pick on the base's outer face: the
+//    base and all four walls taken (across the bends, round the open corners); 2 mm, R3, the
+//    thickness flipped into the part. SM17.2: the Sheet metal table and flat view open during
+//    the dialog: only Tangent joints where the bends are, drawn on the flat as thin lines, no bend
+//    lines (t0043.9); the whole picked skin highlighted.
+// 03 the four bend cylinders picked under Edges or cylinders to bend, the dialog still open: the
+//    table lists the four bends, the flat has their bend lines (t0060.7).
+// 04 accepted.
+// 05 the import removed with Delete part.
+// (`cadrs_core/tests/sheetmetal_legacy.rs`: the same volume and flat as the original, for the
+// Case and for a C-channel.)
+Scenario(
+    start: Some("landing"),
+    steps: [
+        Custom("sm-legacy-case-step target/imports/case.step"),
+        Click(ui("create")),
+        Click(ui("import-files")),
+        Click(ui("import-picker-folder")),
+        Key("Ctrl+A"),
+        Type("target/imports"),
+        Key("Enter"),
+        Click(ui("import-picker-row-case.step")),
+        Click(ui("import-picker-open")),
+        // The Case's round reliefs fold through the bends as facets, so its STEP is large and
+        // slow to read.
+        WaitFor("import-dialog"),
+        Click(ui("import-ok")),
+        Click(ui("tab-case")),
+        Custom("view 30 30 40 30 20 0.12"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("01-imported-case"),
+        Click(ui("sheet-metal-model")),
+        WaitFor("sheet-metal-model-dialog"),
+        Click(ui("sheet-metal-model-operation-2")),
+        Click(ui("sm-tangent-propagation-checkbox")),
+        Click(ui("sm-faces-field")),
+        Custom("view 30 -30 40 30 20 0.12"),
+        Click(xyz(40, 30, -2)),
+        Click(ui("sm-thickness-field")),
+        Key("Ctrl+A"),
+        Type("2"),
+        Key("Tab"),
+        Click(ui("sm-bend-radius-field")),
+        Key("Ctrl+A"),
+        Type("3"),
+        Key("Tab"),
+        Click(ui("sm-thickness-flip")),
+        Click(ui("panel-sheet-metal")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("02-thicken-tangent-joints-no-bends"),
+        // The panel closed for the picks (the whole view to pick in).
+        Click(ui("panel-sheet-metal")),
+        Click(ui("sm-bends-field")),
+        Click(xyz(40, -0.536, -0.536)),
+        Click(xyz(80.536, 30, -0.536)),
+        Custom("view 210 -30 40 30 20 0.12"),
+        Click(xyz(40, 60.536, -0.536)),
+        Click(xyz(-0.536, 30, -0.536)),
+        Custom("view 30 30 40 30 20 0.12"),
+        Click(ui("panel-sheet-metal")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-bend-cylinders-picked"),
+        Click(ui("sheet-metal-model-dialog-accept")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("04-accepted"),
+        RightClick(ui("part-row-case")),
+        Click(ui("part-delete")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("05-import-deleted"),
+    ],
+)

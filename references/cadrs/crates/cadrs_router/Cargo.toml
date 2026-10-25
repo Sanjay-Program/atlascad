@@ -1,0 +1,25 @@
+[package]
+name = "cadrs_router"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# The PCB autorouter: a board's unrouted nets onto a grid of cells per copper layer, negotiated
+# (PathFinder) so nets settle without overlapping, then back as tracks and vias. The search
+# step is cadrs_router_kernels' Rust, run by A* on the CPU or compiled by rust-gpu to SPIR-V
+# and run on the GPU (feature `gpu`, on by default), many nets at once. No Bevy.
+[features]
+default = ["gpu"]
+gpu = ["dep:wgpu", "dep:futures-lite", "dep:bytemuck"]
+
+[dependencies]
+cadrs_eda.workspace = true
+cadrs_router_kernels.workspace = true
+uuid.workspace = true
+wgpu = { workspace = true, optional = true }
+futures-lite = { workspace = true, optional = true }
+bytemuck = { workspace = true, optional = true }
+
+[dev-dependencies]
+cadrs_kicad.workspace = true

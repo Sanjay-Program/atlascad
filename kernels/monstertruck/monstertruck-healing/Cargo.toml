@@ -1,0 +1,41 @@
+[package]
+name = "monstertruck-healing"
+version = "0.4.1"
+authors = ["Moritz Moeller <virtualritz@protonmail.com>"]
+edition = "2024"
+description = "Shape healing for solids imported from other CAD systems"
+homepage = "https://github.com/virtualritz/monstertruck"
+repository = "https://github.com/virtualritz/monstertruck"
+license = "Apache-2.0"
+
+[features]
+default = []
+step-test = []
+
+[dependencies]
+ahash = { workspace = true }
+itertools = { workspace = true }
+rustc-hash = { workspace = true }
+monstertruck-geometry = { workspace = true }
+monstertruck-traits = { workspace = true }
+monstertruck-meshing = { workspace = true }
+monstertruck-topology = { workspace = true }
+# `web_time::Instant` is `std::time::Instant` on native and falls back to the
+# browser performance clock on wasm32, where `std::time::Instant::now()` panics.
+web-time = { workspace = true }
+
+# `ahash` 0.8's default `runtime-rng` feature pulls `getrandom` 0.3, whose
+# `wasm_js` BACKEND (selected by the `getrandom_backend="wasm_js"` rustflag that
+# `just wasm-build` passes) refuses to compile unless `getrandom` 0.3 also has
+# its `wasm_js` FEATURE enabled. The workspace `getrandom` entry is 0.3's
+# successor 0.4, and enabling a feature there does not reach the 0.3 copy, so it
+# has to be named separately and renamed to avoid colliding with it.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom_wasm_js = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+
+[dev-dependencies]
+monstertruck-modeling = { workspace = true }
+# Path-only ON PURPOSE: this crate publishes BEFORE monstertruck-io, so a
+# versioned dev-dependency could not resolve. cargo strips path-only
+# dev-dependencies at publish; local `cargo test` is unaffected.
+monstertruck-io = { path = "../monstertruck-io", features = ["step"] }

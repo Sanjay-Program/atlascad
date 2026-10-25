@@ -1,0 +1,541 @@
+use super::edge::{loops_to_ffi, Edge};
+use super::face::Face;
+use super::ffi;
+use crate::common::boolean::Boolean;
+use crate::common::error::Error;
+use crate::traits::{ProfileOrient, SolidStruct, Transform};
+use glam::DVec3;
+use std::sync::OnceLock;
+
+/// Encode `ProfileOrient` into FFI arguments: (kind, ux, uy, uz, aux_spine_edges).
+fn encode_orient(orient: ProfileOrient) -> (u32, f64, f64, f64, cxx::UniquePtr<cxx::CxxVector<ffi::TopoDS_Edge>>) {
+	let mut aux_vec = ffi::edge_vec_new();
+	let (kind, ux, uy, uz) = match orient {
+		ProfileOrient::Fixed => (0u32, 0.0, 0.0, 0.0),
+		ProfileOrient::Torsion => (1u32, 0.0, 0.0, 0.0),
+		ProfileOrient::Up(v) => (2u32, v.x, v.y, v.z),
+		ProfileOrient::Auxiliary(edges) => {
+			for e in edges {
+				ffi::edge_vec_push(aux_vec.pin_mut(), &e.inner);
+			}
+			(3u32, 0.0, 0.0, 0.0)
+		}
+	};
+	(kind, ux, uy, uz, aux_vec)
+}
+
+fn remap_colormap_by_order(old_inner: &ffi::TopoDS_Solid, new_inner: &ffi::TopoDS_Solid, old_colormap: &std::collections::HashMap<u64, crate::common::color::Color>) -> std::collections::HashMap<u64, crate::common::color::Color> {
+	let mut colormap = std::collections::HashMap::new();
+	let old_faces = ffi::solid_faces(old_inner);
+	let new_faces = ffi::solid_faces(new_inner);
+	for (old_face, new_face) in old_faces.iter().zip(new_faces.iter()) {
+		if let Some(&color) = old_colormap.get(&ffi::face_tshape_id(old_face)) {
+			colormap.insert(ffi::face_tshape_id(new_face), color);
+		}
+	}
+	// The solid's own colour is keyed by its TShape id, which these ops change
+	// (they rebuild topology), so it needs the same remap the faces get.
+	if let Some(&color) = old_colormap.get(&ffi::solid_tshape_id(old_inner)) {
+		colormap.insert(ffi::solid_tshape_id(new_inner), color);
+	}
+	colormap
+}
+
+/// A single solid topology shape wrapping a `TopoDS_Solid`.
+///
+/// `inner` is private to prevent external mutation that could break the solid invariant.
+/// Use the provided methods to query and transform the solid.
+///
+/// `edges` / `faces` are lazy `OnceLock` caches populated on first `iter_edge` /
+/// `iter_face` call. Since topology-changing ops consume `self` and construct
+/// a new `Solid` via `Solid::new`, these caches are invalidated automatically
+/// (new instance → fresh `OnceLock::new()`). See
+/// `notes/20260420-OCCTトポロジ不変性と設計含意.md`.
+pub struct Solid {
+	inner: cxx::UniquePtr<ffi::TopoDS_Solid>,
+	edges: OnceLock<Vec<Edge>>,
+	faces: OnceLock<Vec<Face>>,
+	/// Keyed by a face's TShape id, or by `Solid::id()` for the solid as a whole; a face
+	/// colour wins over the solid's. Other solids' keys may be present (`from_ffi`).
+	colormap: std::collections::HashMap<u64, crate::common::color::Color>,
+	/// Face-derivation history from the most recent boolean operation.
+	///
+	/// Flat `[post_id, src_id, post_id, src_id, ...]` pairs:
+	/// - `post_id` is the TShape* of a face in this Solid (or, after
+	///   decompose, possibly in a sibling result Solid — over-inclusion
+	///   is harmless because consumers filter by `src_id`).
+	/// - `src_id` is the TShape* of the originating face in either
+	///   boolean input (a or b — distinction is intentionally lost;
+	///   TShape* is globally unique so callers filter by membership).
+	///
+	/// Empty for primitives, builders (extrude/sweep/loft/bspline/shell/
+	/// fillet/chamfer), I/O reads, and after scale/mirror/Clone (which
+	/// rebuild topology). Preserved across translate/rotate/color.
+	history: Vec<u64>,
+}
+
+impl Solid {
+	/// Create a `Solid` from a `TopoDS_Solid`.
+	pub(crate) fn new(inner: cxx::UniquePtr<ffi::TopoDS_Solid>, colormap: std::collections::HashMap<u64, crate::common::color::Color>, history: Vec<u64>) -> Self {
+		Solid { inner, edges: OnceLock::new(), faces: OnceLock::new(), colormap, history }
+	}
+
+	// ==================== Internal accessors ====================
+
+	/// Borrow the underlying `TopoDS_Solid` (crate-internal only).
+	pub(crate) fn inner(&self) -> &ffi::TopoDS_Solid {
+		&self.inner
+	}
+
+	/// Collect solids into the `std::vector` the multi-solid FFI calls take (shallow handle copies).
+	pub(super) fn to_ffi<'a>(solids: impl IntoIterator<Item = &'a Solid>) -> cxx::UniquePtr<cxx::CxxVector<ffi::TopoDS_Solid>> {
+		let mut vec = ffi::shape_vec_new();
+		for s in solids {
+			ffi::shape_vec_push(vec.pin_mut(), &s.inner);
+		}
+		vec
+	}
+
+	/// Wrap the solids of one FFI result. Each gets a clone of the whole `colormap`
+	/// and the `history` pairs whose post face it owns.
+	pub(super) fn from_ffi(solids: &cxx::CxxVector<ffi::TopoDS_Solid>, colormap: &std::collections::HashMap<u64, crate::common::color::Color>, history: &[u64]) -> Vec<Solid> {
+		solids
+			.iter()
+			.map(|s| {
+				let local: std::collections::HashSet<u64> = ffi::solid_faces(s).iter().map(ffi::face_tshape_id).collect();
+				let history = history.chunks_exact(2).filter(|p| local.contains(&p[0])).flatten().copied().collect();
+				Solid::new(ffi::clone_solid_handle(s), colormap.clone(), history)
+			})
+			.collect()
+	}
+
+	// ==================== Color accessors ====================
+
+	/// Read-only access to the per-face colormap.
+	pub fn colormap(&self) -> &std::collections::HashMap<u64, crate::common::color::Color> {
+		&self.colormap
+	}
+
+	/// Mutable access to the per-face colormap.
+	pub fn colormap_mut(&mut self) -> &mut std::collections::HashMap<u64, crate::common::color::Color> {
+		&mut self.colormap
+	}
+
+	/// Carry face colours across `history` `[post_id, src_id]` pairs, and the solid's
+	/// own colour onto the new solid (shell/fillet/chamfer/clean).
+	fn remap_colormap(&self, new_inner: &ffi::TopoDS_Solid, history: &[u64]) -> std::collections::HashMap<u64, crate::common::color::Color> {
+		let mut colormap: std::collections::HashMap<u64, crate::common::color::Color> = history.chunks_exact(2).filter_map(|p| Some((p[0], *self.colormap.get(&p[1])?))).collect();
+		// `history` is a face→face relation and has no entry for the solid, whose
+		// TShape id these ops change. Carry it across by hand.
+		if let Some(&color) = self.colormap.get(&ffi::solid_tshape_id(&self.inner)) {
+			colormap.insert(ffi::solid_tshape_id(new_inner), color);
+		}
+		colormap
+	}
+}
+
+impl std::fmt::Debug for Solid {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "Solid({}, center={:?}, faces={}, edges={})", self.id(), self.center(), self.iter_face().count(), self.iter_edge().count())
+	}
+}
+
+impl SolidStruct for Solid {
+	type Edge = Edge;
+	type Face = Face;
+
+	// ==================== Identity ====================
+
+	fn id(&self) -> u64 {
+		ffi::solid_tshape_id(&self.inner)
+	}
+
+	// ==================== Constructors ====================
+
+	fn cube(corner0: DVec3, corner1: DVec3) -> Solid {
+		let inner = ffi::make_box(corner0.x, corner0.y, corner0.z, corner1.x, corner1.y, corner1.z);
+		Solid::new(inner, std::collections::HashMap::new(), Default::default())
+	}
+
+	fn cylinder(r: f64, height: DVec3) -> Solid {
+		let inner = ffi::make_cylinder(0.0, 0.0, 0.0, height.x, height.y, height.z, r, height.length());
+		Solid::new(inner, std::collections::HashMap::new(), Default::default())
+	}
+
+	fn sphere(radius: f64) -> Solid {
+		let inner = ffi::make_sphere(0.0, 0.0, 0.0, radius);
+		Solid::new(inner, std::collections::HashMap::new(), Default::default())
+	}
+
+	fn cone(r1: f64, r2: f64, height: DVec3) -> Solid {
+		let inner = ffi::make_cone(0.0, 0.0, 0.0, height.x, height.y, height.z, r1, r2, height.length());
+		Solid::new(inner, std::collections::HashMap::new(), Default::default())
+	}
+
+	fn torus(r1: f64, r2: f64, axis: DVec3) -> Solid {
+		let inner = ffi::make_torus(0.0, 0.0, 0.0, axis.x, axis.y, axis.z, r1, r2);
+		Solid::new(inner, std::collections::HashMap::new(), Default::default())
+	}
+
+	fn half_space(plane_origin: DVec3, plane_normal: DVec3) -> Solid {
+		let inner = ffi::make_half_space(plane_origin.x, plane_origin.y, plane_origin.z, plane_normal.x, plane_normal.y, plane_normal.z);
+		Solid::new(inner, std::collections::HashMap::new(), Default::default())
+	}
+
+	// ==================== Topology iteration ====================
+	//
+	// `iter_edge` / `iter_face` lazily populate `OnceLock<Vec<T>>` caches on
+	// first call. Subsequent calls return the cached vector's slice iter.
+	// Topology-changing ops construct a fresh `Solid` via `Solid::new` so
+	// these caches are invalidated automatically (new instance → fresh
+	// `OnceLock::new()`). See `notes/20260420-OCCTトポロジ不変性と設計含意.md`.
+
+	fn iter_edge(&self) -> impl Iterator<Item = &Edge> + '_ {
+		self.edges.get_or_init(|| ffi::solid_edges(&self.inner).iter().map(|e_ref| Edge { inner: ffi::clone_edge_handle(e_ref) }).collect()).iter()
+	}
+
+	fn iter_face(&self) -> impl Iterator<Item = &Face> + '_ {
+		self.faces.get_or_init(|| ffi::solid_faces(&self.inner).iter().map(|f_ref| Face::new(ffi::clone_face_handle(f_ref))).collect()).iter()
+	}
+
+	fn iter_history(&self) -> impl Iterator<Item = [u64; 2]> + '_ {
+		self.history.chunks_exact(2).map(|c| [c[0], c[1]])
+	}
+
+	// ==================== Extrude ====================
+
+	fn extrude<'a>(profile: impl IntoIterator<Item = &'a Edge>, dir: DVec3) -> Result<Self, Error> {
+		let edges = loops_to_ffi(profile)?;
+		let shape = ffi::make_extrude(&edges, dir.x, dir.y, dir.z).map_err(|e| Error::Extrude(e.what().into()))?;
+		Ok(Solid::new(shape, std::collections::HashMap::new(), Default::default()))
+	}
+
+	fn revolve<'a>(profile: impl IntoIterator<Item = &'a Edge>, axis_origin: DVec3, axis_direction: DVec3, angle: f64) -> Result<Self, Error> {
+		let edges = loops_to_ffi(profile)?;
+		let shape = ffi::make_revolve(&edges, axis_origin.x, axis_origin.y, axis_origin.z, axis_direction.x, axis_direction.y, axis_direction.z, angle).map_err(|e| Error::Revolve(format!("angle={angle} about {axis_direction:?} through {axis_origin:?}: {}", e.what())))?;
+		Ok(Solid::new(shape, std::collections::HashMap::new(), Default::default()))
+	}
+
+	// ==================== Shell ====================
+
+	fn shell<'a>(&self, thickness: f64, open_faces: impl IntoIterator<Item = &'a Face>) -> Result<Self, Error> {
+		let mut face_vec = ffi::face_vec_new();
+		for f in open_faces {
+			ffi::face_vec_push(face_vec.pin_mut(), &f.inner);
+		}
+		let mut history: Vec<u64> = Default::default();
+		let shape = ffi::builder_thick_solid(&self.inner, &face_vec, thickness, &mut history).map_err(|e| Error::Shell(format!("thickness={thickness} incompatible with the geometry, or self-intersecting offset ({} open face(s)): {}", face_vec.len(), e.what())))?;
+		let colormap = self.remap_colormap(&shape, &history);
+		Ok(Solid::new(shape, colormap, history))
+	}
+
+	// ==================== Fillet / Chamfer ====================
+
+	fn fillet_edges<'a>(&self, radius: f64, edges: impl IntoIterator<Item = &'a Edge>) -> Result<Self, Error> {
+		let mut edge_vec = ffi::edge_vec_new();
+		for e in edges {
+			ffi::edge_vec_push(edge_vec.pin_mut(), &e.inner);
+		}
+		let mut history: Vec<u64> = Default::default();
+		let shape = ffi::builder_fillet(&self.inner, &edge_vec, radius, &mut history).map_err(|e| Error::Fillet(format!("radius={radius} does not fit the local geometry on {} edge(s): {}", edge_vec.len(), e.what())))?;
+		let colormap = self.remap_colormap(&shape, &history);
+		Ok(Solid::new(shape, colormap, history))
+	}
+
+	fn chamfer_edges<'a>(&self, distance: f64, edges: impl IntoIterator<Item = &'a Edge>) -> Result<Self, Error> {
+		let mut edge_vec = ffi::edge_vec_new();
+		for e in edges {
+			ffi::edge_vec_push(edge_vec.pin_mut(), &e.inner);
+		}
+		let mut history: Vec<u64> = Default::default();
+		let shape = ffi::builder_chamfer(&self.inner, &edge_vec, distance, &mut history).map_err(|e| Error::Chamfer(format!("distance={distance} does not fit the local geometry on {} edge(s): {}", edge_vec.len(), e.what())))?;
+		let colormap = self.remap_colormap(&shape, &history);
+		Ok(Solid::new(shape, colormap, history))
+	}
+
+	// ==================== Sweep ====================
+
+	fn sweep<'a, 'b, 'c>(profile: impl IntoIterator<Item = &'a Edge>, spine: impl IntoIterator<Item = &'b Edge>, orient: ProfileOrient<'c>) -> Result<Self, Error> {
+		let mut profile_vec = ffi::edge_vec_new();
+		for e in profile {
+			ffi::edge_vec_push(profile_vec.pin_mut(), &e.inner);
+		}
+		let mut spine_vec = ffi::edge_vec_new();
+		for e in spine {
+			ffi::edge_vec_push(spine_vec.pin_mut(), &e.inner);
+		}
+		let (kind, ux, uy, uz, aux_vec) = encode_orient(orient);
+		let shape = ffi::make_pipe_shell(&profile_vec, &spine_vec, kind, ux, uy, uz, &aux_vec).map_err(|e| Error::Sweep(format!("profile ({} edge(s)) could not be swept along the spine ({} edge(s)): {}", profile_vec.len(), spine_vec.len(), e.what())))?;
+		Ok(Solid::new(shape, std::collections::HashMap::new(), Default::default()))
+	}
+
+	// ==================== Loft / ThruSections ====================
+
+	fn loft<'a, I: IntoIterator<Item = &'a Edge>, S: IntoIterator<Item = I>>(sections: S, ruled: bool) -> Result<Self, Error>
+	where
+		Edge: 'a,
+	{
+		let mut all_edges = ffi::edge_vec_new();
+		let mut section_count = 0usize;
+
+		for sec in sections {
+			if section_count > 0 {
+				ffi::edge_vec_push_null(all_edges.pin_mut());
+			}
+			let mut count = 0u32;
+			for edge in sec {
+				ffi::edge_vec_push(all_edges.pin_mut(), &edge.inner);
+				count += 1;
+			}
+			if count == 0 {
+				return Err(Error::Loft(format!("loft: section {} is empty (each section must contain ≥1 edge)", section_count)));
+			}
+			section_count += 1;
+		}
+
+		if section_count < 2 {
+			return Err(Error::Loft(format!("loft: need ≥2 sections, got {} (a single section has no thickness to skin across)", section_count)));
+		}
+
+		let shape = ffi::make_loft(&all_edges, ruled).map_err(|e| Error::Loft(format!("loft: OCCT BRepOffsetAPI_ThruSections failed (sections={section_count}, ruled={ruled}): {}", e.what())))?;
+		Ok(Solid::new(shape, std::collections::HashMap::new(), Default::default()))
+	}
+
+	// ==================== Sew ====================
+
+	fn sew<'a>(faces: impl IntoIterator<Item = &'a Face>, tolerance: f64) -> Result<Self, Error>
+	where
+		Face: 'a,
+	{
+		let mut face_vec = ffi::face_vec_new();
+		let mut count = 0usize;
+		for f in faces {
+			ffi::face_vec_push(face_vec.pin_mut(), &f.inner);
+			count += 1;
+		}
+		if count == 0 {
+			return Err(Error::Sew("sew: no faces given (need a face set forming one closed shell)".into()));
+		}
+		let shape = ffi::make_sewn_solid(&face_vec, tolerance).map_err(|e| Error::Sew(format!("sew: {count} faces do not form exactly one closed shell within tolerance {tolerance}: {}", e.what())))?;
+		Ok(Solid::new(shape, std::collections::HashMap::new(), Default::default()))
+	}
+
+	// ==================== Offset surface ====================
+
+	fn offset<'a>(&self, offset: f64, faces: impl IntoIterator<Item = &'a Face>) -> Result<Self, Error> {
+		let mut face_vec = ffi::face_vec_new();
+		for f in faces {
+			ffi::face_vec_push(face_vec.pin_mut(), &f.inner);
+		}
+		let mut history: Vec<u64> = Default::default();
+		let shape = ffi::make_offset(&self.inner, &face_vec, offset, Edge::precision_distance(), &mut history).map_err(|e| Error::Offset(format!("offset: OCCT BRepOffset_MakeOffset failed (offset={offset}): {}", e.what())))?;
+		let colormap = self.remap_colormap(&shape, &history);
+		Ok(Solid::new(shape, colormap, history))
+	}
+
+	// ==================== Bspline ====================
+
+	fn bspline(u: usize, v: usize, u_periodic: bool, v_periodic: bool, point: impl Fn(usize, usize) -> DVec3) -> Result<Self, Error> {
+		if u.min(v) < 3 {
+			return Err(Error::Bspline(format!("grid is too small (u={u}, v={v}, u_periodic={u_periodic}, v_periodic={v_periodic})")));
+		}
+
+		let coords: Vec<f64> = (0..u * v).flat_map(|k| point(k / v, k % v).to_array()).collect();
+
+		let shape = ffi::make_bspline_solid(&coords, u as u32, v as u32, u_periodic, v_periodic).map_err(|e| Error::Bspline(format!("OCCT construction failed (u={u}, v={v}, u_periodic={u_periodic}, v_periodic={v_periodic}): {}", e.what())))?;
+		Ok(Solid::new(shape, std::collections::HashMap::new(), Default::default()))
+	}
+
+	// ==================== Clean ====================
+
+	fn clean(&self) -> Result<Self, Error> {
+		let mut history: Vec<u64> = Default::default();
+		let inner = ffi::builder_clean(&self.inner, &mut history).map_err(|e| Error::Clean(e.what().into()))?;
+		let colormap = self.remap_colormap(&inner, &history);
+		Ok(Solid::new(inner, colormap, history))
+	}
+
+	// ==================== Boolean primitive ====================
+
+	fn boolean<'a>(solids: impl IntoIterator<Item = &'a Self>, clauses: impl IntoIterator<Item = i64>) -> Boolean<Self>
+	where
+		Self: 'a,
+	{
+		// TShape* を共有する shallow copy で Boolean を組む。Solid::clone() (=
+		// BRepBuilderAPI_Copy) と違い、各 face の id() が元と一致するため
+		// boolean 結果の history (post_id, src_id) を呼び出し側の face id と
+		// 照合できる。
+		let solids: Vec<Solid> = solids.into_iter().map(|s| Solid { inner: ffi::clone_solid_handle(&s.inner), edges: OnceLock::new(), faces: OnceLock::new(), colormap: s.colormap.clone(), history: s.history.clone() }).collect();
+		Boolean::from_parts(solids, clauses.into_iter().collect())
+	}
+	fn boolean_build(b: &Boolean<Self>) -> Result<Vec<Self>, Error> {
+		// CellsBuilder ベースの一括評価。DIMACS-flat DNF (`clauses`) を C++ 側に渡す。
+		let (solids, clauses) = (b.solids(), b.clauses());
+		if solids.is_empty() || clauses.is_empty() {
+			return Err(Error::NotOne(0));
+		}
+		debug_assert!(clauses.last() == Some(&0), "clauses must be 0-terminated");
+
+		let solid_vec = Solid::to_ffi(solids);
+		let mut history: Vec<u64> = Default::default();
+		let result = ffi::builder_cells(&solid_vec, clauses, &mut history).map_err(|e| Error::Boolean(e.what().into()))?;
+
+		let colormap = {
+			let mut m = std::collections::HashMap::new();
+			for pair in history.chunks_exact(2) {
+				for s in solids {
+					if let Some(&c) = s.colormap.get(&pair[1]) {
+						m.entry(pair[0]).or_insert(c);
+						break;
+					}
+				}
+			}
+			m
+		};
+
+		// No history carries a solid colour — the result volume descends from no single
+		// operand. Take the left operand's, as Fusion 360 does.
+		let solid_color = solids[0].colormap.get(&solids[0].id()).copied();
+
+		let mut out = Solid::from_ffi(&result, &colormap, &history);
+		// Only now do the result solids exist, so only now can their ids be keyed.
+		if let Some(c) = solid_color {
+			for s in &mut out {
+				let id = s.id();
+				s.colormap_mut().insert(id, c);
+			}
+		}
+		Ok(out)
+	}
+
+	// --- I/O (delegates to super::io helpers) ---
+
+	fn read_step<R: std::io::Read>(reader: &mut R) -> Result<Vec<Self>, Error> {
+		super::io::read_step(reader)
+	}
+
+	fn read_brep<R: std::io::Read>(reader: &mut R) -> Result<Vec<Self>, Error> {
+		super::io::read_brep(reader)
+	}
+
+	fn write_step<'a, W: std::io::Write>(solids: impl IntoIterator<Item = &'a Self>, writer: &mut W) -> Result<(), Error>
+	where
+		Self: 'a,
+	{
+		super::io::write_step(solids, writer)
+	}
+
+	fn write_brep<'a, W: std::io::Write>(solids: impl IntoIterator<Item = &'a Self>, writer: &mut W) -> Result<(), Error>
+	where
+		Self: 'a,
+	{
+		super::io::write_brep(solids, writer)
+	}
+
+	fn mesh<'a>(solids: impl IntoIterator<Item = &'a Self>, options: crate::traits::Tessellation) -> Result<crate::common::mesh::Mesh, Error>
+	where
+		Self: 'a,
+	{
+		super::io::mesh(solids, options)
+	}
+
+	// ==================== Queries ====================
+
+	fn volume(&self) -> f64 {
+		ffi::shape_volume(&self.inner)
+	}
+
+	fn center(&self) -> DVec3 {
+		let (mut x, mut y, mut z) = (0.0_f64, 0.0_f64, 0.0_f64);
+		ffi::shape_center_of_mass(&self.inner, &mut x, &mut y, &mut z);
+		DVec3::new(x, y, z)
+	}
+
+	fn inertia(&self) -> glam::DMat3 {
+		let (mut m00, mut m01, mut m02) = (0.0_f64, 0.0_f64, 0.0_f64);
+		let (mut m10, mut m11, mut m12) = (0.0_f64, 0.0_f64, 0.0_f64);
+		let (mut m20, mut m21, mut m22) = (0.0_f64, 0.0_f64, 0.0_f64);
+		ffi::shape_inertia_tensor(&self.inner, &mut m00, &mut m01, &mut m02, &mut m10, &mut m11, &mut m12, &mut m20, &mut m21, &mut m22);
+		// OCCT fills row-major; DMat3::from_cols_array is column-major so
+		// transpose when handing the components over.
+		glam::DMat3::from_cols_array(&[m00, m10, m20, m01, m11, m21, m02, m12, m22])
+	}
+
+	fn contains(&self, point: DVec3) -> bool {
+		ffi::shape_contains_point(&self.inner, point.x, point.y, point.z)
+	}
+
+	fn bounding_box(&self) -> [DVec3; 2] {
+		let (mut xmin, mut ymin, mut zmin) = (0.0_f64, 0.0_f64, 0.0_f64);
+		let (mut xmax, mut ymax, mut zmax) = (0.0_f64, 0.0_f64, 0.0_f64);
+		ffi::shape_bounding_box(&self.inner, &mut xmin, &mut ymin, &mut zmin, &mut xmax, &mut ymax, &mut zmax);
+		[DVec3::new(xmin, ymin, zmin), DVec3::new(xmax, ymax, zmax)]
+	}
+
+	// ==================== Color ====================
+
+	fn color(self, color: impl Into<crate::common::color::Color>) -> Self {
+		let c = color.into();
+		// Existing face colours are dropped: painting the whole solid is a statement
+		// about the whole solid.
+		let colormap = std::collections::HashMap::from([(ffi::solid_tshape_id(&self.inner), c)]);
+		Self::new(self.inner, colormap, self.history)
+	}
+
+	fn color_clear(self) -> Self {
+		Self::new(self.inner, std::collections::HashMap::new(), self.history)
+	}
+}
+
+// ==================== impl Transform for Solid ====================
+
+impl Transform for Solid {
+	fn translate(self, translation: DVec3) -> Self {
+		let inner = ffi::transform_translate(&self.inner, translation.x, translation.y, translation.z);
+		// translate/rotate use shape.Moved() — TShape is shared but Location
+		// changes, so cached edges/faces (which embed Location) would go stale.
+		// Solid::new gives a fresh OnceLock::new() cache matching the new Location.
+		// `history` is preserved because TShape* (= post_id) is unchanged.
+		Solid::new(inner, self.colormap, self.history)
+	}
+
+	fn rotate(self, axis_origin: DVec3, axis_direction: DVec3, angle: f64) -> Self {
+		let inner = ffi::transform_rotate(&self.inner, axis_origin.x, axis_origin.y, axis_origin.z, axis_direction.x, axis_direction.y, axis_direction.z, angle).unwrap_or_else(|e| panic!("Solid::rotate: {}", e.what()));
+		Solid::new(inner, self.colormap, self.history)
+	}
+
+	// scale/mirror consume self for API consistency, but internally clone the geometry.
+	// Unlike translate/rotate which use gp_Trsf + shape.Moved() (preserving TShape),
+	// scale/mirror cannot use Moved(): since OCCT Fix 0027457 (v7.6), TopLoc_Location
+	// rejects gp_Trsf with scale != 1 or negative determinant, because downstream
+	// algorithms (meshing, booleans) break on non-rigid transforms in locations.
+	// Therefore BRepBuilderAPI_Transform is required, which rebuilds topology.
+	// C++ impl: cpp/wrapper.cpp transform_scale() / transform_mirror()
+	// See: https://dev.opencascade.org/content/how-scale-or-mirror-shape
+	//      BRepBuilderAPI_Transform.cxx:48-49 (myUseModif branch)
+
+	fn scale(self, center: DVec3, factor: f64) -> Self {
+		let inner = ffi::transform_scale(&self.inner, center.x, center.y, center.z, factor).unwrap_or_else(|e| panic!("Solid::scale: {}", e.what()));
+		let colormap = remap_colormap_by_order(&self.inner, &inner, &self.colormap);
+		// scale/mirror rebuild topology via BRepBuilderAPI_Transform → post_ids
+		// in old `history` no longer exist. Drop history (caller must re-derive
+		// from a fresh boolean call).
+		Solid::new(inner, colormap, Default::default())
+	}
+
+	fn mirror(self, plane_origin: DVec3, plane_normal: DVec3) -> Self {
+		let inner = ffi::transform_mirror(&self.inner, plane_origin.x, plane_origin.y, plane_origin.z, plane_normal.x, plane_normal.y, plane_normal.z).unwrap_or_else(|e| panic!("Solid::mirror: {}", e.what()));
+		let colormap = remap_colormap_by_order(&self.inner, &inner, &self.colormap);
+		Solid::new(inner, colormap, Default::default())
+	}
+}
+
+impl Clone for Solid {
+	fn clone(&self) -> Self {
+		let inner = ffi::deep_copy(&self.inner);
+		let colormap = remap_colormap_by_order(&self.inner, &inner, &self.colormap);
+		// deep_copy rebuilds topology — post_ids in `history` no longer point
+		// to faces of the new shape. Drop history rather than remapping.
+		Solid::new(inner, colormap, Default::default())
+	}
+}

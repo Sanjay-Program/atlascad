@@ -1,0 +1,62 @@
+// Flange on several edges with an automatic miter (P3I.4, SM3.1, SM3.5): two flanges of one
+// feature on the east and north edges of a 60 × 40 × 1 plate meet at its corner: a rip (an edge
+// joint, "Joint C") between them, the minimal gap apart; then Automatic miter off ends the
+// flanges where the miter plane (through the corner's outside) cuts their insides, seen from
+// outside the corner: 45 deg (both at the plate's corner), then 30 deg (the east flange stops
+// T·(cot 30° − 1) short, the north one runs T·(1 − tan 30°) on: the seam moves off the corner);
+// then a 60 deg bend angle and Outer alignment.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("sketch top rect 0 0 60 40"),
+        Key("Shift+7"),
+        Click(ui("sheet-metal-model")),
+        WaitFor("sheet-metal-model-dialog"),
+        Click(ui("sheet-metal-model-operation-2")),
+        Click(xyz(30, 20, 0)),
+        Click(ui("sheet-metal-model-dialog-accept")),
+        Click(ui("sheet-metal-model-caret")),
+        Click(ui("sheet-metal-menu-flange")),
+        WaitFor("sheet-metal-flange-dialog"),
+        Custom("view 30 30 40 20 0 0.11"),
+        Click(xyz(60, 20, 1)),
+        Click(xyz(30, 40, 1)),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("01-two-flanges-mitred"),
+        Custom("view 30 30 60 40 10 0.04"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("02-mitred-corner"),
+        // Automatic miter off: the ends cut at the miter angle, looked at from outside the corner
+        // (the seam between the two flanges' faces).
+        Click(ui("smf-auto-miter-checkbox")),
+        Custom("view 135 15 60 40 12 0.035"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03-miter-angle-45"),
+        Click(ui("smf-miter-angle-field")),
+        Key("Ctrl+A"),
+        Type("30"),
+        Key("Tab"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("03b-miter-angle-30"),
+        Click(ui("smf-auto-miter-checkbox")),
+        Click(ui("smf-bend-angle-field")),
+        Key("Ctrl+A"),
+        Type("60"),
+        Key("Tab"),
+        Click(ui("smf-alignment")),
+        Click(ui("smf-alignment-option-1")),
+        Custom("view 30 30 40 20 0 0.11"),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("04-60-outer"),
+        Click(ui("sheet-metal-flange-dialog-accept")),
+        MoveTo(1420, 900),
+        Wait(3),
+        Screenshot("05-accepted"),
+    ],
+)

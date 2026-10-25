@@ -1,0 +1,45 @@
+AtlasCAD Personal and Non-Commercial License, Version 1.0
+
+Copyright (c) 2026 Sanjay-Program.
+
+This license applies only to original AtlasCAD materials in the root Rust platform
+workspace (`crates/`) and AtlasCAD-authored root-level documentation and project
+metadata, unless a file contains a different license notice. It does not apply to
+the imported source trees under `apps/`, `kernels/`, or `references/`, or to any
+third-party or vendored material that includes its own copyright or license notice.
+Those materials remain under their respective licenses. This file does not change,
+replace, or add restrictions to those licenses.
+
+1. Permission for non-commercial use
+
+The rights holder grants you a worldwide, non-exclusive, royalty-free license to
+use, run, study, copy, and modify the covered materials for personal, educational,
+research, charitable, or other non-commercial purposes.
+
+You may share unmodified copies or your modifications for non-commercial purposes
+if you include this license and preserve applicable copyright and attribution
+notices. You must identify material changes that you make. Any copy or modification
+you share under this license must remain subject to these same non-commercial
+terms.
+
+2. Commercial use requires separate permission
+
+You may not use, copy, modify, distribute, sublicense, sell, host, or provide the
+covered materials as part of a commercial activity without prior written permission
+from the rights holder. Commercial activity includes use primarily intended for
+commercial advantage or monetary compensation, including use in a business's
+operations or products, paid work or services, paid hosting, or advertising-funded
+services. Contact the repository owner to request commercial permission.
+
+3. Other rights
+
+This license does not grant rights to trademarks, service marks, patents, or names
+associated with AtlasCAD. You must not imply endorsement by the rights holder.
+
+4. No warranty
+
+THE COVERED MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE, AND NON-INFRINGEMENT. TO THE EXTENT PERMITTED BY LAW, THE RIGHTS HOLDER
+WILL NOT BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE
+MATERIALS OR THEIR USE.

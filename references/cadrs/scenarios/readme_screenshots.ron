@@ -1,0 +1,21 @@
+// The README's screenshots (.github/images/): the pneumatic cylinder sample in its Part Studio
+// and its assembly, planes hidden, nothing selected, isometric and zoomed to fit.
+Scenario(
+    start: Some("document"),
+    steps: [
+        WaitFor("document-shell"),
+        Custom("fixture pneumatic_cylinder_ex3"),
+        Key("P"),
+        Key("Shift+7"),
+        Key("F"),
+        MoveTo(1420, 900),
+        Wait(5),
+        Screenshot("01-part-studio"),
+        Click(ui("tab-cylinder-assembly")),
+        Key("Shift+7"),
+        Key("F"),
+        MoveTo(1420, 900),
+        Wait(5),
+        Screenshot("02-assembly"),
+    ],
+)
