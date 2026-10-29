@@ -1102,6 +1102,162 @@ fn a_cut_removes_the_analytic_volume_and_survives_save_reopen_and_undo()
     Ok(())
 }
 
+/// The arc-based sector profile through the real Truck kernel: an arc sketch cuts a pocket out of a
+/// plate, and the result is measured against the analytic area of the polygon the arc resolves to.
+///
+/// This is the M11e regression: the sector is the new sketch entity, and using it as a **cut** tool
+/// proves it reaches the boolean path and not only the extrude path. The tool is a quarter sector of
+/// a 5 mm circle placed at the plate's centre, so none of its faces are coincident with the plate's
+/// — the boolean case the kernel handles worst is deliberately avoided here, because this test is
+/// about the profile, not about coincidence.
+#[test]
+fn an_arc_sector_cuts_its_analytic_volume_and_survives_save_reopen_and_undo()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, path, handle) = fixture("sector", [10.0, 10.0, 5.0])?;
+    let addr = handle.addr();
+
+    // The sector is driven by the `diameter` parameter, which the fixture leaves at its 10 mm
+    // default. Shrink it to 5 mm so the quarter sector is radius 2.5 at the plate's centre and no
+    // face of the tool is coincident with the plate.
+    let resized = post(addr, "/api/parameter", r#"{"id":"diameter","value":5}"#)?;
+    assert_eq!(resized.status, 200);
+
+    // A quarter sector of that 5 mm circle: radius 2.5, 0° to 90°.
+    let added = post(
+        addr,
+        "/api/sketch",
+        r#"{"kind":"sector","origin":[5,5],"start_degrees":0,"sweep_degrees":90}"#,
+    )?;
+    assert_eq!(
+        added.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&added.body)
+    );
+    let payload = json(&added)?;
+    let sketch = payload["sketches"][1].clone();
+    let sketch_id = sketch["id"].as_u64().ok_or("sector sketch id")?;
+    assert_eq!(sketch["profile"]["kind"], "sector");
+    assert_eq!(sketch["profile"]["start_degrees"], 0.0);
+    assert_eq!(sketch["profile"]["sweep_degrees"], 90.0);
+    let segments = sketch["segments"].as_u64().ok_or("segments")?;
+    // One centre point plus the arc: a quarter turn of a tolerance-bounded circle is at least two
+    // facets, and the whole lens stays bounded.
+    assert!((4..=258).contains(&segments), "segments {segments}");
+
+    // Both impossible sweeps are refused with a reason that names the alternative.
+    let full_turn = post(
+        addr,
+        "/api/sketch",
+        r#"{"kind":"sector","sweep_degrees":360}"#,
+    )?;
+    assert_eq!(full_turn.status, 400);
+    assert!(
+        json(&full_turn)?["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("circle"),
+        "a full turn must point at the circle profile"
+    );
+    let empty = post(
+        addr,
+        "/api/sketch",
+        r#"{"kind":"sector","sweep_degrees":0}"#,
+    )?;
+    assert_eq!(empty.status, 400);
+
+    let cut = post(
+        addr,
+        "/api/feature/extrude",
+        &format!(r#"{{"sketch_id":{sketch_id},"operation":"cut"}}"#),
+    )?;
+    assert_eq!(cut.status, 200, "{}", String::from_utf8_lossy(&cut.body));
+    let payload = json(&cut)?;
+    // The arc resolves to an inscribed polygon, so the removed volume is the shoelace area of that
+    // polygon x the 5 mm depth. Asserting that exact value (not "about a quarter disc") is what ties
+    // the number to the geometry the document actually handed the kernel.
+    let facets = (segments - 2) as f64;
+    let radius = 2.5;
+    let sector_area = 0.5 * facets * radius * radius * (std::f64::consts::FRAC_PI_2 / facets).sin();
+    let analytic = 500.0 - sector_area * 5.0;
+    // 2%, not 1%: at a 2.5 mm radius the full circle hits the 24-facet floor, so a quarter turn is
+    // only six chords and its inscribed area is ~1.1% under the true quarter disc. The exact
+    // assertion is the polygon value below; this one only says the arc is a real arc.
+    assert!(
+        (sector_area - std::f64::consts::PI * radius * radius / 4.0).abs()
+            / (std::f64::consts::PI * radius * radius / 4.0)
+            < 0.02,
+        "the polygon area {sector_area} is not within 2% of the quarter disc"
+    );
+    let volume = payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!(
+        (volume - analytic).abs() < 1e-2,
+        "sector cut volume {volume}, analytic {analytic}"
+    );
+    assert_eq!(payload["features"][1]["operation"], "cut");
+    assert_eq!(payload["features"][1]["status"], "built");
+    assert!(payload["failure"].is_null());
+    // A pocket does not move the plate's outer bounds.
+    for (axis, expected) in [(0, 10.0), (1, 10.0), (2, 5.0)] {
+        let max = payload["bounds"]["max"][axis].as_f64().ok_or("bound")?;
+        assert!((max - expected).abs() < 1e-3, "bound {axis} was {max}");
+    }
+
+    // Undo removes the sector cut, redo restores the same measurement.
+    let undone = post(addr, "/api/undo", "{}")?;
+    assert_eq!(undone.status, 200);
+    assert!(
+        (json(&undone)?["geometry"]["volume_mm3"]
+            .as_f64()
+            .ok_or("volume")?
+            - 500.0)
+            .abs()
+            < 1e-6
+    );
+    let redone = post(addr, "/api/redo", "{}")?;
+    assert_eq!(redone.status, 200);
+    let volume = json(&redone)?["geometry"]["volume_mm3"]
+        .as_f64()
+        .ok_or("volume")?;
+    assert!(
+        (volume - analytic).abs() < 1e-2,
+        "volume after redo {volume}"
+    );
+
+    let saved = post(addr, "/api/save", "{}")?;
+    assert_eq!(saved.status, 200);
+    drop(handle);
+
+    let reopened = cad_document::Project::load(&path)?;
+    let reopened = start(reopened, path, 0)?;
+    let state = json(&request(reopened.addr(), "GET", "/api/state", &[], &[])?)?;
+    assert_eq!(state["sketches"][1]["profile"]["kind"], "sector");
+    assert_eq!(state["sketches"][1]["profile"]["start_degrees"], 0.0);
+    assert_eq!(state["sketches"][1]["profile"]["sweep_degrees"], 90.0);
+    let volume = state["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!(
+        (volume - analytic).abs() < 1e-2,
+        "reopened sector cut volume {volume}, analytic {analytic}"
+    );
+
+    // The export is the cut solid and it is watertight: a pocket whose tessellation had open edges
+    // would pass a volume-only assertion.
+    let exported = request(reopened.addr(), "GET", "/api/export/stl", &[], &[])?;
+    assert_eq!(exported.status, 200);
+    let mesh = cad_io::read_stl_binary(&exported.body)?;
+    assert!(
+        (mesh.signed_volume().abs() - analytic).abs() < 1e-2,
+        "exported volume {}",
+        mesh.signed_volume()
+    );
+    assert_eq!(
+        welded_open_edges(&mesh),
+        0,
+        "an exported solid must be a closed manifold"
+    );
+    Ok(())
+}
+
 /// Open edges of a mesh after merging vertices that share a position.
 ///
 /// An STL stores three independent vertices per triangle, so [`Mesh::open_edges`] on what the reader

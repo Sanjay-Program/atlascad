@@ -70,16 +70,16 @@ Chrome.
 | `GET /api/export/stl`, 1 020 triangles | 0.5 ms, 51 KB | release server |
 | Server resident memory, 256-vertex body | 7.2 MB | `ps -o rss=` |
 | `atlas box --size 10,10,5 --out part.stl` | < 10 ms, 4.5 MB RSS, 684-byte STL, 12 triangles | release CLI |
-| Workspace tests | **286 passed, 0 failed** | `cargo test --offline --workspace -j 2` |
+| Workspace tests | **291 passed, 0 failed** | `cargo test --offline --workspace -j 2` |
 | fmt / clippy | clean, 0 warnings | `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -D warnings` |
 | Kernel corpus | 8 must-pass ok, 3 recorded known failures, **0 regressions** | `cargo run -p cad-kernel-truck --example corpus` |
 | Control-plane validation | 0 errors, 0 warnings | `atlas-eng validate` |
-| Full release gate, warm | **6 s**, all checks | `./scripts/gate.sh` |
+| Full release gate, warm | **~18 s** including the release rebuild, simulation and browser check | `./scripts/gate.sh` |
 | Deployable bundle | 3.1 MB tarball, verified by extraction + checksums + smoke tests | `./scripts/package.sh` |
 | Dependency licence audit | 83 packages, 83 allowed, 0 denied, 0 unknown | `atlas-eng licences` |
 | CycloneDX SBOM | 83 components, byte-identical across runs | `atlas-eng sbom --write` |
 | Live simulation | **56 assertions**: 31 over HTTP (cut, join, undo/redo, rebuild, save, restart, STL, `kill -9` recovery), 21 driving the shipped `atlas`/`atlas-eng` on real files, 4 on the shared-session token boundary | `./scripts/simulate.sh` |
-| Live browser smoke check | **8 assertions** loopback + **10** shared (the Share panel), 0 console errors | `node scripts/browser-check.mjs <url>` |
+| Live browser smoke check | **11 assertions** loopback + **13** shared (the Share panel and the sector profile form), 0 console errors | `node scripts/browser-check.mjs <url>` |
 
 **What this says:** the performance and memory story is genuinely good for parts of a few hundred
 faces, and the error discipline is real. Neither is the problem.
@@ -231,8 +231,13 @@ console errors). Workspace **279 tests, 0 failed**, fmt and clippy clean.
   `atlas` and `atlas-eng` binaries on real files (21 assertions: box and union STL volumes, a headless
   project edit and undo, manifest validation, the licence policy and a byte-identical SBOM), and a
   shared session's token boundary (4 assertions).
-  `scripts/browser-check.mjs` loads the live page in headless Chrome loopback and shared (8 + 10
-  assertions, zero console errors).
+  `scripts/browser-check.mjs` loads the live page in headless Chrome loopback and shared (11 + 13
+  assertions, zero console errors), including creating an arc-sector sketch through the form and
+  reopening its angles from the tree.
+* `scripts/simulate.sh` **always rebuilds the release binaries** before driving them. It used to build
+  only when they were missing, which let the browser check run against a page that no longer matched
+  the tree; the defect was found by the sector browser assertion failing on a control the stale asset
+  did not have.
 * `.github/workflows/ci.yml` and `deny.toml` add the advisory and provenance job. **The workflow has
   not been executed on a runner**; only the gate it calls was run here.
 

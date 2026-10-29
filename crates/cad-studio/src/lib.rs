@@ -1044,7 +1044,14 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         },
         "/api/sketch" => match parse_body::<NewSketchRequest>(request) {
             Ok(body) => {
-                let profile = match profile_from_parts(&body.kind, body.sides, body.points, None) {
+                let profile = match profile_from_parts(
+                    &body.kind,
+                    body.sides,
+                    body.points,
+                    body.start_degrees,
+                    body.sweep_degrees,
+                    None,
+                ) {
                     Ok(profile) => profile,
                     Err(error) => return error_response(&error),
                 };
@@ -1150,6 +1157,13 @@ struct ProfileRequest {
     /// refused for every other kind, so a request cannot silently discard a drawn profile.
     #[serde(default)]
     points: Option<Vec<[f64; 2]>>,
+    /// For a sector: where its arc starts, in degrees counter-clockwise from +X. Absent keeps the
+    /// angles the sketch already has (or 0 for a new sector).
+    #[serde(default)]
+    start_degrees: Option<f64>,
+    /// For a sector: how far its arc sweeps, in degrees. Must be between 0 and 360 exclusive.
+    #[serde(default)]
+    sweep_degrees: Option<f64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1172,6 +1186,12 @@ struct NewSketchRequest {
     /// A drawn loop, in document units, relative to `origin`. Required for `polyline`.
     #[serde(default)]
     points: Option<Vec<[f64; 2]>>,
+    /// For a sector: where its arc starts, in degrees. Defaults to 0.
+    #[serde(default)]
+    start_degrees: Option<f64>,
+    /// For a sector: how far its arc sweeps, in degrees. Defaults to 90.
+    #[serde(default)]
+    sweep_degrees: Option<f64>,
 }
 
 /// A new extrude. `operation` decides whether it starts the body or joins the one built so far; the
@@ -1233,6 +1253,8 @@ fn profile_for(
         &request.kind,
         request.sides,
         request.points.clone(),
+        request.start_degrees,
+        request.sweep_degrees,
         current,
     )
 }
@@ -1245,6 +1267,8 @@ fn profile_from_parts(
     kind: &str,
     sides: Option<u32>,
     points: Option<Vec<[f64; 2]>>,
+    start_degrees: Option<f64>,
+    sweep_degrees: Option<f64>,
     current: Option<&SketchProfile>,
 ) -> Result<SketchProfile, StudioError> {
     let kind = kind.trim().to_ascii_lowercase();
@@ -1288,8 +1312,26 @@ fn profile_from_parts(
             })?;
             Ok(SketchProfile::Polyline { points })
         }
+        "sector" | "arc" | "pie" => {
+            // An angle omitted by the request keeps what the sketch already has, so replacing a
+            // rectangle with a sector and then nudging the sweep does not reset the start angle.
+            let (start, sweep) = match current {
+                Some(SketchProfile::Sector {
+                    start_degrees,
+                    sweep_degrees,
+                    ..
+                }) => (*start_degrees, *sweep_degrees),
+                _ => (0.0, 90.0),
+            };
+            Ok(SketchProfile::Sector {
+                diameter_param: "diameter".to_string(),
+                start_degrees: start_degrees.unwrap_or(start),
+                sweep_degrees: sweep_degrees.unwrap_or(sweep),
+            })
+        }
         other => Err(StudioError::BadRequest(format!(
-            "unknown profile `{other}`; expected rectangle, circle, regular_polygon, or polyline"
+            "unknown profile `{other}`; expected rectangle, circle, regular_polygon, polyline, or \
+             sector"
         ))),
     }
 }

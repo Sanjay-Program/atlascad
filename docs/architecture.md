@@ -277,13 +277,15 @@ cad-studio  ──  cad-document (parameters, feature graph, undo, .zcad)
    sync, hosted storage, or concurrent multi-user editing (a share is one document, one history, and
    whichever client last wrote wins). `wasm32-unknown-unknown` is not
    installed on this machine and no WASM build was attempted; neither is claimed.
-4. **The feature graph is linear and single-body.** `.zcad` schema 5 persists a header, named
+4. **The feature graph is linear and single-body.** `.zcad` schema 6 persists a header, named
    parameters, an ordered list of sketches and features with stable IDs, where the first feature
    starts the body and every later one is a join (union into the body) or a cut (difference out of
    the body) through the kernel's booleans. A feature is an extrude along +Z by a parameter, or a
    full-turn revolve of the sketch about one of its own axes; a partial revolve is refused because it
    would be an open shell, and a profile that crosses the axis is refused because it has no solid of
-   revolution. There is no sweep, loft, fillet, pattern, arbitrary-axis revolve, multi-body,
+   revolution. A sketch profile is a rectangle, circle, regular polygon, drawn polyline or arc sector;
+   there is only one closed profile per sketch, not an entity graph. There is no sweep, loft, fillet,
+   pattern, arbitrary-axis revolve, multi-body,
    constraint solver, assembly or drawing. A per-feature
    `BuildCache` keeps the body after each function prefix, so an unchanged request does no kernel work
    and an edit re-runs only the features that read it; it is session state, never persisted, and

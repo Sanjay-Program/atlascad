@@ -55,12 +55,23 @@
             <option value="rectangle">Rectangle</option>
             <option value="circle">Circle</option>
             <option value="regular_polygon">Regular polygon</option>
+            <option value="sector">Sector (arc)</option>
             <option value="polyline">Polyline (draw)</option>
           </select>
         </div>
         <div class="field" id="newSidesField" hidden>
           <label for="newSidesInput">Sides</label>
           <input id="newSidesInput" type="number" min="3" max="256" step="1" value="6" inputmode="numeric">
+        </div>
+        <div class="field-row" id="newSectorField" hidden>
+          <div class="field">
+            <label for="newSectorStart">Start °</label>
+            <input id="newSectorStart" type="number" step="any" value="0" inputmode="decimal" aria-label="New sector start angle in degrees">
+          </div>
+          <div class="field">
+            <label for="newSectorSweep">Sweep °</label>
+            <input id="newSectorSweep" type="number" step="any" min="0" max="360" value="90" inputmode="decimal" aria-label="New sector sweep angle in degrees">
+          </div>
         </div>
         <div class="field-row">
           <div class="field">
@@ -117,6 +128,7 @@
             <option value="rectangle">Rectangle</option>
             <option value="circle">Circle</option>
             <option value="regular_polygon">Regular polygon</option>
+            <option value="sector">Sector (arc)</option>
             <!-- A drawn loop cannot be produced from the shape picker; it is shown here so the
                  current profile is visible, and replacing it with a parameter-driven shape is
                  still possible. -->
@@ -126,6 +138,16 @@
         <div class="field" id="sidesField" hidden>
           <label for="sidesInput">Sides</label>
           <input id="sidesInput" type="number" min="3" max="256" step="1" value="6" inputmode="numeric">
+        </div>
+        <div class="field-row" id="sectorField" hidden>
+          <div class="field">
+            <label for="sectorStart">Start °</label>
+            <input id="sectorStart" type="number" step="any" aria-label="Sector start angle in degrees">
+          </div>
+          <div class="field">
+            <label for="sectorSweep">Sweep °</label>
+            <input id="sectorSweep" type="number" step="any" min="0" max="360" aria-label="Sector sweep angle in degrees">
+          </div>
         </div>
         <p class="hint" id="profileHint">A rectangle is sized by width × height.</p>
       </section>

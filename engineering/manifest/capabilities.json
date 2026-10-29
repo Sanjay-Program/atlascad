@@ -491,6 +491,22 @@
       "notes": "Runs offline. The licence policy fails closed on an unrecognised licence. CI wiring exists but has not run on a runner; signing, installers, an update channel and advisory scanning are outstanding."
     },
     {
+      "id": "cap.document.arc-sector-profile",
+      "name": "Arc-sector sketch profile",
+      "description": "A sketch profile that is one arc of a parameter-driven circle plus the two radii that close it at the sketch origin, with literal start and sweep angles in degrees.",
+      "provided_by": [
+        "module.cad-document",
+        "module.cad-studio"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "crates/cad-document/src/lib.rs::tests::a_sector_resolves_an_arc_from_its_centre_with_its_analytic_area",
+        "crates/cad-studio/tests/http_api.rs::an_arc_sector_cuts_its_analytic_volume_and_survives_save_reopen_and_undo",
+        "engineering/quality/tests.json#t-platform-workspace-20261029-m11e"
+      ],
+      "notes": "The arc is a tolerance-bounded polygon (circle chord tolerance scaled to the swept fraction, floor of two facets), not an exact B-rep arc. Sweep must be strictly between 0 and 360 degrees; a full turn is refused with a message naming the circle profile. One profile per sketch, so an arc and a segment loop cannot be mixed in one sketch."
+    },
+    {
       "id": "cap.studio.share",
       "name": "Token-gated LAN session sharing",
       "description": "Expose one live studio session on the local network behind a 128-bit session token; the page shows the link, and every API call must present the token.",

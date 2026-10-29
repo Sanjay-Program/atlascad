@@ -98,7 +98,10 @@ feature ID and message, and undoable like any other change.
 - **schema 4 → 5:** the same shape is preserved and the schema number is bumped for the revolve
   feature (`migrate_v4_to_v5`). A schema-4 feature becomes `kind: extrude`; a schema-5 file may hold
   `kind: revolve { axis }`, which only a reader that knows schema 5 can evaluate.
-- **schema 5:** parsed directly.
+- **schema 5 → 6:** only the version changes (`migrate_v5_to_v6`). Schema 6 adds the arc-sector
+  profile; a schema-5 file cannot contain one, so its meaning is unchanged. The bump exists so a
+  schema-5 reader says "newer schema" instead of failing to read the profile kind.
+- **schema 6:** parsed directly.
 - Anything newer is refused with `UnsupportedSchema { found, supported }`.
 
 Migration happens in memory on load; **no file is rewritten unless the user saves**, and the

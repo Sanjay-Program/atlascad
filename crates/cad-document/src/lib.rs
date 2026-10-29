@@ -63,7 +63,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 ///   is an extrude **or** a revolve instead of an extrude with an optional variant. A schema-4 file
 ///   is migrated on load by wrapping each feature's `depth_param` in `{"type":"extrude", …}`.
 ///   Schemas 1 to 4 are migrated on load.
-pub const PROJECT_SCHEMA: u32 = 5;
+/// * Schema 6 adds [`SketchProfile::Sector`], an arc-based closed profile. A schema-5 build refuses
+///   the new profile kind, which would read as "invalid profile" rather than "newer schema", so the
+///   version is bumped; a schema-5 file is migrated to 6 on load with no field changes.
+pub const PROJECT_SCHEMA: u32 = 6;
 
 /// Smallest regular polygon the sketch model accepts.
 pub const MIN_POLYGON_SIDES: u32 = 3;
@@ -93,6 +96,8 @@ pub const MAX_POLYLINE_POINTS: usize = 256;
 pub const CUT_OVERSHOOT_MM: f64 = 1e-2;
 const MIN_CIRCLE_SEGMENTS: usize = 24;
 const MAX_CIRCLE_SEGMENTS: usize = 256;
+/// Fewest facets an arc may be approximated by: two, so a sector is never a single chord.
+const MIN_ARC_SEGMENTS: usize = 2;
 /// Maximum accepted serialized project size, checked before parsing untrusted input.
 pub const MAX_PROJECT_BYTES: u64 = 64 * 1024 * 1024;
 
@@ -165,6 +170,24 @@ pub enum SketchProfile {
     /// to counter-clockwise when the profile is resolved, so the kernel always receives an
     /// outward-oriented solid.
     Polyline { points: Vec<[f64; 2]> },
+    /// A pie slice: the region bounded by one arc and the two radii to its centre.
+    ///
+    /// This is the arc-based profile. Unlike [`SketchProfile::Circle`], which approximates the whole
+    /// circumference, a sector is a single arc from `start_degrees` sweeping `sweep_degrees`
+    /// counter-clockwise, plus the two radii that close it at the sketch origin. The arc is
+    /// tessellated with the same chord tolerance as a circle and scaled to the swept fraction of
+    /// the turn, so a small sector does not inherit a full circle's facet count.
+    ///
+    /// `sweep_degrees` must be strictly between 0 and 360: a zero sweep encloses no area, and a full
+    /// turn is not a sector (the two radii coincide) — use [`SketchProfile::Circle`] for a disc.
+    Sector {
+        /// Diameter of the circle the sector is cut from.
+        diameter_param: String,
+        /// Where the arc starts, in degrees counter-clockwise from +X; used modulo 360.
+        start_degrees: f64,
+        /// How far the arc sweeps counter-clockwise, in degrees, exclusive of 0 and 360.
+        sweep_degrees: f64,
+    },
 }
 
 impl SketchProfile {
@@ -175,6 +198,7 @@ impl SketchProfile {
             SketchProfile::Circle { .. } => "circle",
             SketchProfile::RegularPolygon { .. } => "regular_polygon",
             SketchProfile::Polyline { .. } => "polyline",
+            SketchProfile::Sector { .. } => "sector",
         }
     }
 }
@@ -781,6 +805,28 @@ impl Project {
         self.add_sketch(SketchProfile::Polyline { points }, origin)
     }
 
+    /// Add an arc-based sector driven by an existing diameter parameter.
+    ///
+    /// `start_degrees` and `sweep_degrees` are literal angles rather than parameters because the
+    /// parameter map holds positive lengths, and a start angle of 0 is meaningful. The sweep is
+    /// validated before the sketch is added.
+    pub fn add_sector_sketch(
+        &mut self,
+        diameter_param: &str,
+        start_degrees: f64,
+        sweep_degrees: f64,
+        origin: [f64; 2],
+    ) -> Result<EntityId, ProjectError> {
+        self.add_sketch(
+            SketchProfile::Sector {
+                diameter_param: diameter_param.to_string(),
+                start_degrees,
+                sweep_degrees,
+            },
+            origin,
+        )
+    }
+
     /// Add a sketch with an arbitrary validated profile.
     pub fn add_sketch(
         &mut self,
@@ -869,6 +915,14 @@ impl Project {
                 validate_sides(*sides)?;
             }
             SketchProfile::Polyline { points } => validate_polyline(points)?,
+            SketchProfile::Sector {
+                diameter_param,
+                start_degrees,
+                sweep_degrees,
+            } => {
+                let _ = self.parameter(diameter_param)?;
+                validate_sector(*start_degrees, *sweep_degrees)?;
+            }
         }
         Ok(())
     }
@@ -1018,14 +1072,31 @@ impl Project {
 
     /// Number of polygon segments this sketch evaluates to.
     ///
-    /// A rectangle is four, a regular polygon is its side count, a polyline is its point count, and
-    /// a circle follows the document's linear tolerance:
-    /// `n = ceil(2π / (2·acos(1 − tol / r)))`, bounded to 24..=256.
+    /// A rectangle is four, a regular polygon is its side count, a polyline is its point count, a
+    /// sector is its arc's facet count plus the two radii, and a circle follows the document's
+    /// linear tolerance: `n = ceil(2π / (2·acos(1 − tol / r)))`, bounded to 24..=256.
     pub fn sketch_segment_count(&self, sketch: &Sketch) -> Result<usize, ProjectError> {
         match &sketch.profile {
             SketchProfile::Rectangle { .. } => Ok(4),
             SketchProfile::RegularPolygon { sides, .. } => Ok(*sides as usize),
             SketchProfile::Polyline { points } => Ok(points.len()),
+            SketchProfile::Sector {
+                diameter_param,
+                start_degrees,
+                sweep_degrees,
+            } => {
+                validate_sector(*start_degrees, *sweep_degrees)?;
+                let diameter = self
+                    .header
+                    .units
+                    .to_mm(self.parameter(diameter_param)?)
+                    .abs();
+                Ok(arc_segments(
+                    diameter * 0.5,
+                    self.header.tolerance.linear_mm(),
+                    *sweep_degrees,
+                ) + 2)
+            }
             SketchProfile::Circle { diameter_param } => {
                 let diameter = self
                     .header
@@ -1095,6 +1166,27 @@ impl Project {
                 // profile so the solid is outward-oriented and its volume positive.
                 if signed_area(&profile) < 0.0 {
                     profile.reverse();
+                }
+                profile
+            }
+            SketchProfile::Sector {
+                diameter_param,
+                start_degrees,
+                sweep_degrees,
+            } => {
+                validate_sector(*start_degrees, *sweep_degrees)?;
+                let radius = unit.to_mm(self.parameter(diameter_param)?).abs() * 0.5;
+                let segments =
+                    arc_segments(radius, self.header.tolerance.linear_mm(), *sweep_degrees);
+                // Centre first, then the arc counter-clockwise: centre -> arc start -> arc end ->
+                // centre is a positively wound loop, so no reversal is needed.
+                let start = start_degrees.rem_euclid(360.0).to_radians();
+                let sweep = sweep_degrees.to_radians();
+                let mut profile = Vec::with_capacity(segments + 2);
+                profile.push([ox, oy]);
+                for index in 0..=segments {
+                    let angle = start + sweep * index as f64 / segments as f64;
+                    profile.push([ox + radius * angle.cos(), oy + radius * angle.sin()]);
                 }
                 profile
             }
@@ -1540,12 +1632,15 @@ impl Project {
             .ok_or_else(|| ProjectError::Invalid("missing `schema`".into()))?;
         let schema = u32::try_from(schema).unwrap_or(u32::MAX);
         let value = match schema {
-            1 => migrate_v4_to_v5(migrate_v3_to_v4(migrate_v2_to_v3(migrate_v1_to_v2(
+            1 => migrate_v5_to_v6(migrate_v4_to_v5(migrate_v3_to_v4(migrate_v2_to_v3(
+                migrate_v1_to_v2(value)?,
+            )?)?)?)?,
+            2 => migrate_v5_to_v6(migrate_v4_to_v5(migrate_v3_to_v4(migrate_v2_to_v3(
                 value,
             )?)?)?)?,
-            2 => migrate_v4_to_v5(migrate_v3_to_v4(migrate_v2_to_v3(value)?)?)?,
-            3 => migrate_v4_to_v5(migrate_v3_to_v4(value)?)?,
-            4 => migrate_v4_to_v5(value)?,
+            3 => migrate_v5_to_v6(migrate_v4_to_v5(migrate_v3_to_v4(value)?)?)?,
+            4 => migrate_v5_to_v6(migrate_v4_to_v5(value)?)?,
+            5 => migrate_v5_to_v6(value)?,
             PROJECT_SCHEMA => value,
             _ => {
                 return Err(ProjectError::UnsupportedSchema {
@@ -1731,6 +1826,19 @@ fn validate_contents(
                 validate_sides(*sides)?;
             }
             SketchProfile::Polyline { points } => validate_polyline(points)?,
+            SketchProfile::Sector {
+                diameter_param,
+                start_degrees,
+                sweep_degrees,
+            } => {
+                if !parameter_ids.contains(diameter_param.as_str()) {
+                    return Err(ProjectError::Invalid(format!(
+                        "sketch {} references a missing parameter",
+                        sketch.id
+                    )));
+                }
+                validate_sector(*start_degrees, *sweep_degrees)?;
+            }
         }
         if sketch
             .origin
@@ -1826,6 +1934,26 @@ fn signed_area(points: &[[f64; 2]]) -> f64 {
     twice * 0.5
 }
 
+/// Check a sector's literal angles.
+///
+/// The sweep is the one input that can describe something the document cannot build: 0° encloses
+/// no area, and 360° makes the two radii coincide, which is a disc rather than a sector. Both are
+/// refused with a message that names the alternative instead of failing inside `validate_profile`.
+fn validate_sector(start_degrees: f64, sweep_degrees: f64) -> Result<(), ProjectError> {
+    if !start_degrees.is_finite() {
+        return Err(ProjectError::Invalid(
+            "a sector start angle must be a finite number of degrees".into(),
+        ));
+    }
+    if !sweep_degrees.is_finite() || sweep_degrees <= 0.0 || sweep_degrees >= 360.0 {
+        return Err(ProjectError::Invalid(format!(
+            "a sector sweep must be between 0 and 360 degrees, exclusive; got {sweep_degrees}. A \
+             full turn is a circle profile"
+        )));
+    }
+    Ok(())
+}
+
 fn validate_sides(sides: u32) -> Result<(), ProjectError> {
     if (MIN_POLYGON_SIDES..=MAX_POLYGON_SIDES).contains(&sides) {
         Ok(())
@@ -1856,6 +1984,20 @@ fn circle_segments(radius_mm: f64, tolerance_mm: f64) -> usize {
         MAX_CIRCLE_SEGMENTS as f64
     };
     (count as usize).clamp(MIN_CIRCLE_SEGMENTS, MAX_CIRCLE_SEGMENTS)
+}
+
+/// Facets used to approximate a sector's arc.
+///
+/// The circle's tolerance-bounded count is scaled to the swept fraction of the turn, so the chord
+/// tolerance of a quarter sector matches a circle of the same radius rather than being four times
+/// coarser. At least two facets are always used: one chord per radius would repeat a point.
+fn arc_segments(radius_mm: f64, tolerance_mm: f64, sweep_degrees: f64) -> usize {
+    let full = circle_segments(radius_mm, tolerance_mm) as f64;
+    let scaled = (full * sweep_degrees / 360.0).ceil();
+    if !scaled.is_finite() {
+        return MIN_ARC_SEGMENTS;
+    }
+    (scaled as usize).clamp(MIN_ARC_SEGMENTS, MAX_CIRCLE_SEGMENTS)
 }
 
 /// Convert a schema-1 payload in place: flat rectangle fields become an explicit
@@ -1977,6 +2119,20 @@ fn migrate_v4_to_v5(mut value: serde_json::Value) -> Result<serde_json::Value, P
             );
         }
     }
+    let object = value
+        .as_object_mut()
+        .ok_or_else(|| ProjectError::Invalid("project JSON is not an object".into()))?;
+    object.insert("schema".into(), serde_json::json!(PROJECT_SCHEMA));
+    Ok(value)
+}
+
+/// Convert a schema-5 payload in place: only the version changes.
+///
+/// Schema 6 adds [`SketchProfile::Sector`] and no field is renamed or removed, so a schema-5 file is
+/// already a valid schema-6 file. The bump exists so a schema-5 build says "newer schema" for a
+/// project containing a sector instead of failing to read the profile. No file is rewritten by
+/// loading it.
+fn migrate_v5_to_v6(mut value: serde_json::Value) -> Result<serde_json::Value, ProjectError> {
     let object = value
         .as_object_mut()
         .ok_or_else(|| ProjectError::Invalid("project JSON is not an object".into()))?;
@@ -3390,6 +3546,157 @@ mod tests {
             "area was {}",
             signed_area(&profile)
         );
+        Ok(())
+    }
+
+    /// A quarter sector of a 20 mm diameter circle: π·10²/4 = 78.5398 mm².
+    const SECTOR_ANALYTIC_AREA_MM2: f64 = std::f64::consts::PI * 100.0 / 4.0;
+
+    fn sector_project() -> Result<(Project, EntityId), ProjectError> {
+        let mut project = Project::new("pie", DocumentId::new(21), Unit::Millimeter);
+        project.set_parameter("diameter", 20.0)?;
+        let id = project.add_sector_sketch("diameter", 0.0, 90.0, [0.0, 0.0])?;
+        project.add_extrude(id, "depth")?;
+        Ok((project, id))
+    }
+
+    #[test]
+    fn a_sector_resolves_an_arc_from_its_centre_with_its_analytic_area() -> TestResult {
+        let (project, id) = sector_project()?;
+        let sketch = project.sketch(id).ok_or("sketch must exist")?;
+        assert_eq!(sketch.profile.kind(), "sector");
+
+        let segments = project.sketch_segment_count(sketch)?;
+        let profile = project.sketch_profile_mm(sketch)?;
+        // The profile is the centre plus the arc, so one more point than facets and radii.
+        assert_eq!(profile.len(), segments);
+        assert!((4..=MAX_CIRCLE_SEGMENTS + 2).contains(&segments));
+
+        // The loop starts at the sector's centre, which is the sketch origin.
+        assert!((profile[0][0]).abs() < 1e-12 && (profile[0][1]).abs() < 1e-12);
+        // Every other point lies on the circle the sector is cut from, and the arc runs exactly
+        // from 0° to 90° counter-clockwise.
+        for point in &profile[1..] {
+            let radius = (point[0] * point[0] + point[1] * point[1]).sqrt();
+            assert!((radius - 10.0).abs() < 1e-9, "radius was {radius}");
+            assert!(
+                point[0] >= -1e-9 && point[1] >= -1e-9,
+                "point left the quadrant"
+            );
+        }
+        let first = profile[1];
+        let last = profile[segments - 1];
+        assert!((first[0] - 10.0).abs() < 1e-9 && first[1].abs() < 1e-9);
+        assert!(last[0].abs() < 1e-9 && (last[1] - 10.0).abs() < 1e-9);
+
+        // The facet count is the circle's count scaled to a quarter turn, and the polygon area is
+        // the shoelace area of exactly that many facets.
+        let arc_facets = segments - 2;
+        let analytic_polygon = 0.5
+            * arc_facets as f64
+            * 100.0
+            * (std::f64::consts::FRAC_PI_2 / arc_facets as f64).sin();
+        assert!(
+            (signed_area(&profile) - analytic_polygon).abs() < 1e-9,
+            "shoelace area {} vs analytic polygon {analytic_polygon}",
+            signed_area(&profile)
+        );
+        // An inscribed polygon under-estimates the disc sector, but only slightly.
+        let area = signed_area(&profile);
+        assert!(area < SECTOR_ANALYTIC_AREA_MM2);
+        assert!(
+            (area - SECTOR_ANALYTIC_AREA_MM2).abs() / SECTOR_ANALYTIC_AREA_MM2 < 0.01,
+            "area {area} is not within 1% of {SECTOR_ANALYTIC_AREA_MM2}"
+        );
+
+        let mut kernel = PrismKernel::new();
+        let evaluated = project.evaluate(&mut kernel)?;
+        // A prism has volume = cap area x depth exactly.
+        assert!(
+            (evaluated.volume_mm3 - area * 5.0).abs() < 1e-9,
+            "volume was {} for area {area}",
+            evaluated.volume_mm3
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_sectors_sweep_must_be_between_zero_and_a_full_turn() -> TestResult {
+        let mut project = Project::new("bad-pie", DocumentId::new(22), Unit::Millimeter);
+        assert!(
+            project
+                .add_sector_sketch("diameter", 0.0, 0.0, [0.0, 0.0])
+                .is_err_and(|error| error.to_string().contains("sweep")),
+            "a zero sweep encloses no area and must be refused"
+        );
+        assert!(
+            project
+                .add_sector_sketch("diameter", 0.0, 360.0, [0.0, 0.0])
+                .is_err_and(|error| error.to_string().contains("circle")),
+            "a full turn is a circle, not a sector, and must say so"
+        );
+        assert!(
+            project
+                .add_sector_sketch("diameter", 0.0, f64::NAN, [0.0, 0.0])
+                .is_err()
+        );
+        assert!(
+            project
+                .add_sector_sketch("diameter", f64::INFINITY, 90.0, [0.0, 0.0])
+                .is_err()
+        );
+        assert!(matches!(
+            project.add_sector_sketch("missing", 0.0, 90.0, [0.0, 0.0]),
+            Err(ProjectError::UnknownParameter(_))
+        ));
+        // Nothing was added by a refused profile.
+        assert!(project.sketches().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn a_sector_survives_save_and_reopen() -> TestResult {
+        let dir = TempDir::new("sector")?;
+        let (project, id) = sector_project()?;
+        let path = dir.0.join("pie.zcad");
+        project.save(&path)?;
+
+        let loaded = Project::load(&path)?;
+        assert_eq!(loaded.schema, PROJECT_SCHEMA);
+        assert_eq!(loaded.sketches(), project.sketches());
+        assert_eq!(loaded.features(), project.features());
+
+        let mut before = PrismKernel::new();
+        let mut after = PrismKernel::new();
+        let original = project.evaluate(&mut before)?.volume_mm3;
+        let reopened = loaded.evaluate(&mut after)?.volume_mm3;
+        assert!((original - reopened).abs() < 1e-9);
+        assert_eq!(
+            loaded
+                .sketch(id)
+                .ok_or("the sector must still exist")?
+                .profile
+                .kind(),
+            "sector"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_schema_five_project_migrates_to_schema_six() -> TestResult {
+        let (project, _) = sector_project()?;
+        let mut value = serde_json::to_value(&project)
+            .map_err(|error| format!("serialize fixture: {error}"))?;
+        // Schema 5 differs only in the version: the sector itself is not a schema-6 shape, the
+        // version exists so an older build refuses the file instead of misreading the profile.
+        value["schema"] = serde_json::json!(5);
+        let bytes = serde_json::to_vec(&value)
+            .map_err(|error| format!("serialize legacy fixture: {error}"))?;
+
+        let loaded = Project::from_json(&bytes)?;
+        assert_eq!(loaded.schema, PROJECT_SCHEMA);
+        let mut kernel = PrismKernel::new();
+        assert!(loaded.evaluate(&mut kernel)?.volume_mm3 > 0.0);
         Ok(())
     }
 

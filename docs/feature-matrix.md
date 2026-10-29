@@ -85,7 +85,7 @@ Verified on this machine (2026-10-22).
 | STL read/write shared by CLI and app | **Shipped (verified here)** | `cad-io`: binary STL byte writer and validating reader, round-trip and malformed-input tests; not part of the `Kernel` trait |
 | STEP through the contract | **Planned** | truck-stepio is available; not wired |
 | Fillet/chamfer through the contract | **Planned** | present in SolidCraft's kernel, not in the contract |
-| Document payload model (entities/features) | **Partial (verified here)** | `cad-document` stores one sketch (rectangle/circle/polygon), one extrude feature, named parameters, revision, and bounded undo history; no general entity graph, constraints, or multi-feature timeline |
+| Document payload model (entities/features) | **Partial (verified here)** | `cad-document` stores an ordered sketch/feature graph (rectangle/circle/polygon/polyline/sector profiles; extrude with new-body/join/cut; full-turn revolve), named parameters, revision, and bounded undo history; no general entity graph or constraints |
 | Undo/redo through the contract | **Planned** | each app has its own; no shared transaction type yet |
 
 ## 3b. The agent platform — what this milestone added
@@ -115,9 +115,9 @@ running app in a browser at 392 px and full width; the multi-feature workflow is
 | Capability | Status | Evidence / limit |
 |---|---|---|
 | Local project create/open/save as versioned `.zcad` JSON | **Shipped (verified here)** | `Project::save`/`load`, CLI `--new`/`--file`, API `/api/save`; save is atomic via a temporary file |
-| Rectangle, circle, regular-polygon and drawn-polyline sketch profiles | **Shipped (verified here)** | profile switch API and UI; polygon sides 3–256; a drawn loop is 3–256 points and is validated (finite, no repeated consecutive point, non-zero area) before it reaches the kernel |
+| Rectangle, circle, regular-polygon, drawn-polyline and arc-sector sketch profiles | **Shipped (verified here)** | profile switch API and UI; polygon sides 3–256; a drawn loop is 3–256 points and is validated (finite, no repeated consecutive point, non-zero area) before it reaches the kernel; a sector is one arc of its diameter circle (start/sweep in degrees, sweep strictly between 0 and 360) tessellated at the circle's chord tolerance scaled to the swept fraction, then validated by the same gate |
 | Named parameters (width, height, depth) with re-evaluation | **Shipped (verified here)** | dependency-aware parameter map; 0.1–10,000 mm bounds; invalid values rejected with a typed error; an edit rebuilds every dependent feature |
-| Ordered feature graph: multiple sketches, extrudes and revolves with stable IDs | **Shipped (verified here)** | `.zcad` schema 5; a feature may only reference an earlier sketch; schema-1/2/3/4 migration on load |
+| Ordered feature graph: multiple sketches, extrudes and revolves with stable IDs | **Shipped (verified here)** | `.zcad` schema 6; a feature may only reference an earlier sketch; schema-1/2/3/4/5 migration on load |
 | Incremental rebuild (`BuildCache`) | **Shipped (verified here)** | the body after each feature prefix is cached by resolved inputs; an unchanged request does no kernel work and an edit re-runs only the features that read it. Session-scoped, never persisted; a shared parameter still invalidates every feature that reads it (`docs/performance-baseline.md` §9) |
 | Extrude as `new_body`, `join` (union) or `cut` (difference) | **Shipped (verified here)** | cut through `Kernel::boolean(Difference)`; refused with a stated reason if the kernel does not advertise it; a plate minus a coplanar tool measures the analytic cut volume; the same capability gate and failure reporting the join uses |
 | Full-turn revolve about a sketch axis | **Shipped (verified here)** | `Kernel::revolve` through truck's `rsweep`; a rectangle on the axis measures the analytic cylinder (150.796 mm³) and an offset rectangle the analytic annulus (113.097 mm³), both watertight; a partial turn, an unknown axis and a profile crossing the axis are refused with a reason; save/reopen and STL export covered over HTTP |

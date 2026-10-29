@@ -1217,6 +1217,7 @@
     const project = app.project;
     const kind = byId("newSketchKind").value;
     byId("newSidesField").hidden = kind !== "regular_polygon";
+    byId("newSectorField").hidden = kind !== "sector";
     byId("addSketchBtn").disabled = app.busy;
     byId("addSketchBtn").textContent = kind === "polyline" ? "Draw polyline" : "Add sketch";
 
@@ -1416,16 +1417,27 @@
     if (!sketch) {
       select.disabled = true;
       byId("sidesInput").disabled = true;
+      byId("sectorStart").disabled = true;
+      byId("sectorSweep").disabled = true;
       sidesField.hidden = true;
+      byId("sectorField").hidden = true;
       segments.textContent = "no sketch";
       return;
     }
     select.disabled = app.busy;
     byId("sidesInput").disabled = app.busy;
+    byId("sectorStart").disabled = app.busy;
+    byId("sectorSweep").disabled = app.busy;
     select.value = sketch.profile.kind;
     const isPolygon = sketch.profile.kind === "regular_polygon";
     sidesField.hidden = !isPolygon;
     if (isPolygon) byId("sidesInput").value = String(sketch.profile.sides);
+    const isSector = sketch.profile.kind === "sector";
+    byId("sectorField").hidden = !isSector;
+    if (isSector) {
+      byId("sectorStart").value = String(sketch.profile.start_degrees);
+      byId("sectorSweep").value = String(sketch.profile.sweep_degrees);
+    }
     segments.textContent = `sketch ${sketch.id} · ${sketch.segments} segments`;
     if (sketch.profile.kind === "rectangle") {
       hint.textContent = "A rectangle is sized by width × height.";
@@ -1433,7 +1445,10 @@
       hint.textContent = "A circle is approximated by a tolerance-bounded polygon.";
     } else if (sketch.profile.kind === "polyline") {
       hint.textContent =
-        "A drawn polyline can be replaced by a rectangle, circle, or polygon; draw another to change the loop.";
+        "A drawn polyline can be replaced by a rectangle, circle, polygon, or sector; draw another to change the loop.";
+    } else if (sketch.profile.kind === "sector") {
+      hint.textContent =
+        "A sector is one arc of the diameter circle plus the two radii to its centre. A full turn is a circle.";
     } else {
       hint.textContent = "A regular polygon is circumscribed by the diameter.";
     }
@@ -1579,6 +1594,26 @@
       }
       body.sides = sides;
       if (sketch.profile.kind === kind && sketch.profile.sides === sides) return;
+    } else if (kind === "sector") {
+      const start = Number(byId("sectorStart").value);
+      const sweep = Number(byId("sectorSweep").value);
+      if (!Number.isFinite(start)) {
+        toast("A sector start angle needs a finite number of degrees.", true);
+        return;
+      }
+      if (!Number.isFinite(sweep) || sweep <= 0 || sweep >= 360) {
+        toast("A sector sweep must be between 0 and 360 degrees; use a circle for a full turn.", true);
+        return;
+      }
+      body.start_degrees = start;
+      body.sweep_degrees = sweep;
+      if (
+        sketch.profile.kind === kind &&
+        sketch.profile.start_degrees === start &&
+        sketch.profile.sweep_degrees === sweep
+      ) {
+        return;
+      }
     } else if (sketch.profile.kind === kind) {
       return;
     }
@@ -1626,6 +1661,19 @@
         return;
       }
       body.sides = sides;
+    } else if (kind === "sector") {
+      const start = Number(byId("newSectorStart").value);
+      const sweep = Number(byId("newSectorSweep").value);
+      if (!Number.isFinite(start)) {
+        toast("A sector start angle needs a finite number of degrees.", true);
+        return;
+      }
+      if (!Number.isFinite(sweep) || sweep <= 0 || sweep >= 360) {
+        toast("A sector sweep must be between 0 and 360 degrees; use a circle for a full turn.", true);
+        return;
+      }
+      body.start_degrees = start;
+      body.sweep_degrees = sweep;
     }
     const next = await mutate("/api/sketch", body, `Sketch added (${profileName(kind)})`);
     if (next) selectNewest("sketch", next);
@@ -2076,6 +2124,18 @@
     byId("sidesInput").addEventListener("blur", () => {
       if (byId("profileKind").value === "regular_polygon") setProfile("regular_polygon");
     });
+    for (const id of ["sectorStart", "sectorSweep"]) {
+      byId(id).addEventListener("change", () => {
+        if (byId("profileKind").value === "sector") setProfile("sector");
+      });
+      byId(id).addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          if (byId("profileKind").value === "sector") setProfile("sector");
+          byId(id).blur();
+        }
+      });
+    }
     byId("addSketchBtn").addEventListener("click", addSketch);
     byId("addFeatureBtn").addEventListener("click", addFeature);
     byId("newFeatureKind").addEventListener("change", () => {
@@ -2092,8 +2152,10 @@
     byId("newSketchKind").addEventListener("change", () => {
       const kind = byId("newSketchKind").value;
       byId("newSidesField").hidden = kind !== "regular_polygon";
+      byId("newSectorField").hidden = kind !== "sector";
       byId("addSketchBtn").textContent = kind === "polyline" ? "Draw polyline" : "Add sketch";
       if (kind === "regular_polygon") byId("newSidesInput").focus();
+      if (kind === "sector") byId("newSectorStart").focus();
     });
     // Enter walks the creation form: X, then Y, then submit.
     byId("newOriginX").addEventListener("keydown", (event) => {
@@ -2114,6 +2176,14 @@
         addSketch();
       }
     });
+    for (const id of ["newSectorStart", "newSectorSweep"]) {
+      byId(id).addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          addSketch();
+        }
+      });
+    }
     byId("originX").addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         event.preventDefault();

@@ -277,28 +277,78 @@ as a `Revolve 2` row, `Turn: full revolution`, 3,133.72 mm³ against the analyti
 enabled, row present after save and reload). The revolve itself is **not benchmarked** — no
 performance record exists for it.
 
----
-
-### M11e — Additional sketch entities (S)
+---### M11e — Additional sketch entities (S)
 
 **Goal:** sketches can contain arcs and straight segments beyond rectangle/circle/regular-polygon, so a
 profile is not limited to those three primitives.
 
-**Status:** proposed · **Priority:** user_value · **Risk:** medium · **Depends on:** a profile-validation
-decision · **Blocks:** nothing. M11d shipped with rectangle and polygon profiles, so the missing arcs and
-segments now limit what a revolve can express rather than blocking it.
+**Status:** verified 2026-10-29 · **Priority:** user_value · **Risk:** medium · **Verified:** 2026-10-29
+· **Depends on:** nothing · **Blocks:** nothing. Evidence:
+`engineering/quality/tests.json#t-platform-workspace-20261029-m11e`.
 
-**Acceptance criteria:**
+**Delivered:**
 
-1. `SketchProfile` gains variants for an arc-based profile and a segmented polyline profile, each a closed
-   polygon the existing validation already accepts.
-2. The profile is still validated before it reaches the kernel — at least 3 points, finite, no repeated
-   consecutive point, non-zero area — the same gate the extrude path uses.
-3. Analytic area tests exist for an L-shape and a sector-shaped profile, asserted against the shoelace area.
-4. M11b cut exercises at least one new-profile cut, so the new profiles are not untested in the boolean
-   path.
+1. `SketchProfile::Sector { diameter_param, start_degrees, sweep_degrees }` — an arc plus the two radii
+   that close it at the sketch origin. The arc is tessellated with the circle's chord tolerance scaled
+   to the swept fraction of the turn (`arc_segments`), so a quarter sector gets a quarter of a
+   circle's facets rather than inheriting the whole circle's count, with a floor of two facets.
+2. The segmented requirement was already met by `SketchProfile::Polyline` (schema 4, M11d cycle), so no
+   second segment variant was added: it would have been a duplicate of an existing profile. The arc is
+   the genuinely missing entity.
+3. `.zcad` **schema 6**. The new profile kind is an additive enum variant, but a schema-5 reader would
+   report it as an invalid profile rather than a newer schema, so the version is bumped and
+   `migrate_v5_to_v6` (version only, no field changes) runs on load.
+4. Validation happens in two places, both before the kernel: `validate_sector` refuses a non-finite
+   angle, a `sweep_degrees` that is not strictly between 0 and 360, and a missing diameter parameter —
+   on creation *and* on load. The resolved loop then goes through the same `validate_profile` gate as
+   every other profile (≥3 points, finite, no repeated consecutive point, non-zero area).
+5. The studio exposes it end to end: a **Sector (arc)** option in both the create and the profile
+   selectors, Start°/Sweep° fields that appear only for a sector, the same range check in the page as
+   in the server, and the angles preserved when the kind is switched away and back.
 
-**Out of scope:** spline profiles, constraint-driven sketches, dimensions.
+**Measured / asserted:**
+
+* `cad-document`: a quarter sector of a 20 mm circle resolves its arc from 0° to 90° at radius 10,
+  starting at the centre; its shoelace area equals the analytic inscribed-polygon formula to 1e-9 and
+  is under the true quarter disc by less than 1%; its prism volume equals that area × depth exactly.
+* `cad-studio` over HTTP on the real Truck kernel: a quarter sector of a 5 mm circle at (5,5) cuts a
+  10×10×5 plate. The remaining volume is the analytic 500 − (*n*-gon area × 5) to 1e-2 mm³, the plate's
+  bounds are unchanged, undo returns 500 mm³, redo restores the cut, save/reopen preserves the profile
+  and the angles, and the exported STL is watertight (0 open edges after welding).
+* Headless Chrome: the Create form opens Start°/Sweep°, adding the sketch puts a `sector` row in the
+  tree, and selecting it reopens the panel with the angles it was created with (3 new browser
+  assertions).
+
+**Recorded limitations, not claimed away:**
+
+1. The arc is a **tolerance-bounded polyline**, not an exact B-rep arc. At small radii the 24-facet
+   circle floor makes a quarter sector only six chords, ~1.1% under the true quarter disc; the
+   document is exact about the polygon it produces, not about the ideal arc.
+2. `sweep_degrees` must be strictly between 0 and 360. A full turn is refused with a message that
+   names the circle profile, and a zero sweep has no area.
+3. Angles are literal numbers on the profile rather than parameters: the parameter map holds positive
+   lengths, and a start angle of 0 is meaningful. Changing an angle is therefore a profile edit, not a
+   parameter edit, and does not appear in the parameter panel.
+4. One arc per sketch. A profile that needs two arcs or a tangent blend still needs a polyline, and a
+   polyline is still a straight-segment loop — there is no mixing of arc and segment entities in one
+   sketch, because a sketch is still one closed profile rather than an entity graph.
+5. A sector whose arc crosses the revolve axis is refused by the same straddle check as any other
+   profile; there is no partial revolve.
+
+**Acceptance criteria, and where each landed:**
+
+1. Met for the arc; the segmented half was already shipped as `Polyline`, and a duplicate was not
+   added. A schema-5 reader refuses a sector file as "newer schema" rather than misreading it.
+2. Met — `validate_sector` plus the shared `validate_profile` gate, exercised on creation and on load.
+3. Met — the L-shape shoelace assertion already existed (`a_concave_polyline_resolves_its_analytic_area`,
+   500 mm²); the sector assertion is
+   `a_sector_resolves_an_arc_from_its_centre_with_its_analytic_area`.
+4. Met — `an_arc_sector_cuts_its_analytic_volume_and_survives_save_reopen_and_undo` cuts a plate with
+   the new profile and asserts the analytic volume, bounds, undo/redo, save/reopen and a watertight
+   export.
+
+**Out of scope, and still out:** spline profiles, constraint-driven sketches, dimensions, multiple
+entities per sketch, exact B-rep arcs.
 
 ---
 
@@ -687,17 +737,18 @@ The machine-readable task files are:
 If the goal of the next cycle is to keep the application moving while the higher-value kernel and governance
 work waits on a larger host and an owner decision, the ordered slice is:
 
-1. **M11e additional sketch entities** — arcs and polyline profiles, with analytic area tests and at least
-   one cut that exercises them. This is the next ready task: revolve exists but can only turn the three
-   primitives and a drawn polyline, so a lathe profile with a fillet or a taper is not expressible.
+1. **M11f named revisions and recovery snapshots** — the persistence piece that M7 needs before
+   collaboration or versioning. This is now the next ready task: crash recovery exists, but there is
+   one last-unsaved-edit snapshot per project, not a named history.
 2. **Cache follow-up (measurement)** — measure peak RSS with 32 cached prefixes on a large-mesh project
    and decide whether the bound or the `Arc<Mesh>` representation should change. The bound is enforced
    but its memory cost is unmeasured.
-3. **M11f named revisions and recovery snapshots** — the persistence piece that M7 needs before
-   collaboration or versioning.
+3. **A second named agent plus a CLI host (M9)** — the runtime is exercised only by tests today; a host
+   and a second permission profile would make the platform claim honest.
 
 Closed in earlier cycles, kept here so the ordering is not rewritten after the fact: M11b cut (2026-10-28),
-M11c per-feature rebuild cache (2026-10-29), M11d revolve (2026-10-29).
+M11c per-feature rebuild cache (2026-10-29), M11d revolve (2026-10-29), M11e arc sector profile
+(2026-10-29).
 
 If the goal of the next cycle is to make the contract honest about the real kernel, the slice is:
 
@@ -719,23 +770,28 @@ acceptance criteria. The registry and this file are updated together when a slic
 
 ## 9. What must not be claimed before these tasks close
 
-1. **"Booleans work."** Union/intersection do; **difference and boolean chains do not** through the shared
-   adapter. The corpus records two further failures — tangent contact and coordinates near 1e6 mm — that the
-   feature matrix previously did not know about.
-2. **"Cut is implemented."** Not until M11b's acceptance criteria are met, including the analytic through-cut
-   and blind-cut volumes in the corpus and in an HTTP test, and a kernel without difference refuses with a
-   reason.
+1. **"Booleans work."** Union, intersection and difference work for the recorded corpus fixtures —
+   including both coplanar-free cut fixtures, exactly. They still fail on **coplanar operands** (a
+   recorded known failure with a 0.176 mm³ membrane on 84 000 mm³ and 8 hairline non-manifold edges),
+   on **tangent contact** and at **coordinates near 1e6 mm**, and boolean **chains of 3+ operands panic
+   inside truck**. Do not generalise from the passing fixtures.
+2. **"Cut is verified for what it covers."** M11b is closed: the analytic through-cut and blind-cut
+   volumes are asserted in the corpus and over HTTP, the document refuses a cut on a kernel that does
+   not advertise difference, and save/reopen/undo cover it. The recorded limits stand: a coplanar cut
+   is a known failure, every cut starts on the z = 0 sketch plane, and a cut that would remove the
+   whole body is refused.
 3. **"The real kernel is verified against the corpus."** Not until M2's remaining acceptance is met on a
    ≥16 GB host.
 4. **"The agent platform is production-ready."** One agent exists and runs; there is no scheduler, no
    persistence of registrations, no process isolation for third-party code, and no second agent to show that
    the contract is not accidentally geometry-specific.
 5. **"Atlas Studio is a CAD product."** It is a verified multi-feature local workflow: ordered sketches and
-   extrudes with stable IDs, `new_body`/`join`, parameter and sketch-placement edits that rebuild every
-   dependent feature, per-feature rebuild status with failure reporting, undo/redo, save, reopen, and binary
-   STL export. It does **not** yet provide sketch constraints, dimensions, cut or other booleans beyond join,
-   revolve, multi-body, assemblies, drawings, STL/STEP/IGES/DXF import, or native neutral-format interchange.
-   Those remain planned work in this file and in `docs/roadmap.md`.
+   extrudes with stable IDs, `new_body`/`join`/`cut`, a full-turn revolve, rectangle/circle/polygon/
+   polyline/sector profiles, parameter and sketch-placement edits that rebuild every dependent feature,
+   per-feature rebuild status with failure reporting, undo/redo, save, reopen, and binary STL export. It
+   does **not** yet provide sketch constraints, dimensions, loft, sweep, fillet, chamfer, shell, patterns,
+   multi-body, assemblies, drawings, or STEP/IGES/DXF import and native neutral-format interchange. Those
+   remain planned work in this file and in `docs/roadmap.md`.
 6. **"The application is fast enough."** The 17.3 ms rebuild figure is a measurement, not a target. M6
    establishes the baselines that would let a performance claim be honest.
 7. **"Dependencies are safe."** Not until M5 closes S-1, S-2 and S-5. Advisory scanning is still not running

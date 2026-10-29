@@ -23,11 +23,12 @@ if [ "${1:-}" = "--http" ]; then
   HTTP_ONLY=1
 fi
 
-if [ ! -x target/release/cad-studio ] || [ ! -x target/release/atlas ] || \
-   [ ! -x target/release/atlas-eng ]; then
-  printf '==> building release binaries\n'
-  cargo build --offline --release -p cad-studio -p cad-cli -p cad-engineering -j "${JOBS:-2}"
-fi
+# Always build, never "only if missing". The studio embeds its page and script at compile time, so a
+# stale release binary would let this simulation — and the headless-browser check that drives the
+# real page — pass against code that is no longer in the tree. An up-to-date incremental release
+# build is a no-op, which is a small price for the check meaning what it says.
+printf '==> building release binaries\n'
+cargo build --offline --release -p cad-studio -p cad-cli -p cad-engineering -j "${JOBS:-2}"
 
 python3 scripts/simulate.py
 

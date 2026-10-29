@@ -522,6 +522,64 @@
       ]
     },
     {
+      "id": "t-cad-document-m11e",
+      "target": "repo.cad-document",
+      "command": "cargo test --offline -p cad-document",
+      "outcome": "success",
+      "passed": 65,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 1110,
+      "recorded_at": "2026-10-29",
+      "notes": "61 previous tests plus 4 for the arc-sector profile: a quarter sector of a 20 mm circle resolves its arc from 0 to 90 degrees at radius 10 starting at the centre, its shoelace area matches the analytic inscribed-polygon formula to 1e-9 and is within 1% of the true quarter disc, and its prism volume is exactly area x depth; a sweep of 0, a sweep of 360 (which must point at the circle profile) and non-finite angles are refused without adding a sketch; a sector survives save and reopen with the same profile and volume; and a schema-5 payload migrates to schema 6. Measured by running the suite, not by adding up test attributes.",
+      "supersedes": [
+        "t-cad-document-m11f"
+      ]
+    },
+    {
+      "id": "t-cad-studio-m11e",
+      "target": "repo.cad-studio",
+      "command": "cargo test --offline -p cad-studio",
+      "outcome": "success",
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 220,
+      "recorded_at": "2026-10-29",
+      "notes": "19 previous tests plus one over a real socket and the real Truck kernel: a quarter sector of a 5 mm circle at (5,5) cuts a 10x10x5 plate; the remaining volume is the analytic 500 - (n-gon area x 5) within 1e-2 mm3, the outer bounds are unchanged, undo returns 500 mm3, redo restores the cut, save/reopen preserves the profile and both angles, and the exported STL is watertight after welding (0 open edges). Two impossible sweeps are refused with 400 and the full-turn message names the circle profile. The superseded record counted 21 cad-studio tests; the measured count before this cycle was 19.",
+      "supersedes": [
+        "t-cad-studio-m11f"
+      ]
+    },
+    {
+      "id": "t-cad-studio-browser-m11e",
+      "target": "repo.cad-studio",
+      "command": "node scripts/browser-check.mjs <url>  (3 of the run's assertions are new)",
+      "outcome": "success",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-29",
+      "notes": "Headless Chrome over CDP against the release server, 3 new DOM assertions in scripts/browser-check.mjs: choosing Sector in the Create form opens the Start/Sweep fields with the typed values; adding the sketch puts a `sector` badge in the tree; selecting that row reopens the profile panel with sector selected and the angles 30/120 it was created with. The whole browser run is now 11 assertions on a loopback page and 13 on a shared page, zero console errors in both. Browser assertions, not cargo tests.",
+      "supersedes": []
+    },
+    {
+      "id": "t-platform-workspace-20261029-m11e",
+      "target": "repo.platform",
+      "command": "./scripts/gate.sh",
+      "outcome": "success",
+      "passed": 291,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 17760,
+      "recorded_at": "2026-10-29",
+      "notes": "Gate after the arc-sector profile: fmt clean, clippy --all-targets -D warnings (0 warnings), 291 workspace tests across 11 packages with 0 failures (cad-document 65, cad-studio 20), corpus 8 ok / 3 known failure / 0 regressions with no fixture skipped, manifests 0 error / 0 warning across 14 files, licences 83/83 allowed, SBOM 83 components, live simulation 56 HTTP/CLI assertions (31 server, 21 CLI/control plane, 4 share) and headless Chrome 11 assertions loopback + 13 shared. The gate now always rebuilds the release binaries before the simulation: the studio embeds its page at compile time, and a stale binary had let the browser check run against assets that were no longer in the tree. That defect was found by this cycle's browser check failing on a missing sector control.",
+      "supersedes": [
+        "t-platform-workspace-20261029-share"
+      ]
+    },
+    {
       "id": "t-platform-workspace-20261029-share",
       "target": "repo.platform",
       "command": "./scripts/gate.sh",

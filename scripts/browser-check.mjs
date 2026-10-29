@@ -200,6 +200,51 @@ try {
     );
   }
 
+  // The arc-based sector is the M11e sketch entity, so its controls have to reach the API from the
+  // page, not just exist in the markup. This runs last because it adds a third entity to the tree.
+  await evaluate(`(() => {
+    const kind = document.getElementById("newSketchKind");
+    kind.value = "sector";
+    kind.dispatchEvent(new Event("change"));
+    document.getElementById("newSectorStart").value = "30";
+    document.getElementById("newSectorSweep").value = "120";
+    return true;
+  })()`);
+  const sectorForm = await evaluate(
+    '({ shown: !document.getElementById("newSectorField").hidden, start: document.getElementById("newSectorStart").value })'
+  );
+  check(
+    sectorForm.shown && sectorForm.start === '30',
+    `the sector form did not open with its angles: ${JSON.stringify(sectorForm)}`
+  );
+  await evaluate('document.getElementById("addSketchBtn").click()');
+  await waitFor(
+    'document.querySelectorAll("#tree .tree-item").length === 3',
+    'the sector sketch to appear in the tree'
+  );
+  const sectorRow = await evaluate(
+    'Array.from(document.querySelectorAll("#tree .tree-badge"), (node) => node.textContent.trim())'
+  );
+  check(sectorRow.includes('sector'), `the new sketch is not a sector: ${JSON.stringify(sectorRow)}`);
+  // Selecting the new sketch must show its own angles, not the defaults.
+  const sectorProfile = await evaluate(`(() => {
+    const sketch = document.querySelectorAll("#tree .tree-item")[2];
+    sketch.click();
+    return {
+      hidden: document.getElementById("sectorField").hidden,
+      start: document.getElementById("sectorStart").value,
+      sweep: document.getElementById("sectorSweep").value,
+      kind: document.getElementById("profileKind").value,
+    };
+  })()`);
+  check(
+    !sectorProfile.hidden &&
+      sectorProfile.start === '30' &&
+      sectorProfile.sweep === '120' &&
+      sectorProfile.kind === 'sector',
+    `the sector profile panel shows ${JSON.stringify(sectorProfile)}`
+  );
+
   check(consoleErrors.length === 0, `console errors: ${consoleErrors.join(' | ')}`);
 
   console.log(`==> browser check passed (${passed} assertions)`);

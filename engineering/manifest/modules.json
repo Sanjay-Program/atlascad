@@ -1200,10 +1200,10 @@
       "name": "cad-document",
       "repository_id": "repo.cad-document",
       "language": "rust",
-      "responsibility": "Local parametric project payload: stable sketch/feature IDs, named parameters, rectangle/circle/regular-polygon/polyline profiles, an ordered feature graph rebuilt through the kernel (new body, union join, difference cut, or a full-turn revolve about a sketch axis), a per-feature rebuild cache keyed by resolved inputs, crash-recovery snapshots of unsaved edits, bounded undo/redo, schema-checked save/load with schema 1-4 migration, integrity validation and atomic replacement.",
+      "responsibility": "Local parametric project payload: stable sketch/feature IDs, named parameters, rectangle/circle/regular-polygon/polyline/arc-sector profiles, an ordered feature graph rebuilt through the kernel (new body, union join, difference cut, or a full-turn revolve about a sketch axis), a per-feature rebuild cache keyed by resolved inputs, crash-recovery snapshots of unsaved edits, bounded undo/redo, schema-checked save/load with schema 1-5 migration, integrity validation and atomic replacement.",
       "boundaries": [
         "Kernel handles are runtime-only and never serialized; BuildCache holds them for the session only and is never persisted.",
-        "Schema 5 stores an ordered, linear, single-body history: the first feature starts the body and every later feature joins or cuts it. A feature is an extrude or a full-turn revolve. There is no multi-body graph or constraint solver.",
+        "Schema 6 stores an ordered, linear, single-body history: the first feature starts the body and every later feature joins or cuts it. A feature is an extrude or a full-turn revolve. There is no multi-body graph or constraint solver.",
         "A feature may only reference a sketch created before it; a forward reference or dependency cycle is refused on load and cannot be created.",
         "A kernel failure is a reported result: the failing feature's ID and message are returned with the last good mesh, not an error that discards the document.",
         "Native project loads are limited to 64 MiB; unknown fields, invalid references and unsupported schemas are refused.",
@@ -1246,10 +1246,11 @@
         "cap.kernel.boolean.difference",
         "cap.kernel.transform"
       ],
-      "provides": [
-        "cap.document.project-persistence",
-        "cap.document.feature-graph"
-      ],
+  "provides": [
+    "cap.document.project-persistence",
+    "cap.document.feature-graph",
+    "cap.document.arc-sector-profile"
+  ],
       "tests": "passing",
       "loc": 3304,
       "files": 1,
@@ -1260,10 +1261,10 @@
         "module.cad-cli",
         "module.cad-studio"
       ],
-      "compat": "zcad schema 5 (loads schemas 1-4); document header schema 2",
+      "compat": "zcad schema 6 (loads schemas 1-5); document header schema 2",
       "evidence": [
-        "crates/cad-document/src/lib.rs",
-        "engineering/quality/tests.json#t-cad-document-m11d",
+    "crates/cad-document/src/lib.rs",
+    "engineering/quality/tests.json#t-cad-document-m11e",
         "docs/architecture-decisions/0009-feature-graph.md",
         "docs/performance-baseline.md section 9"
       ]
@@ -1361,7 +1362,7 @@
       "name": "cad-studio",
       "repository_id": "repo.cad-studio",
       "language": "rust + html/css/javascript (embedded assets)",
-      "responsibility": "Local-first HTTP API and single-page viewer: sketch creation, extrude and revolve features, parameter and placement edits, a session rebuild cache, autosave to a recovery snapshot with restore/discard, undo/redo, save, and binary STL export.",
+      "responsibility": "Local-first HTTP API and single-page viewer: sketch creation (including the arc-sector profile), extrude and revolve features, parameter and placement edits, a session rebuild cache, autosave to a recovery snapshot with restore/discard, undo/redo, save, and binary STL export.",
       "boundaries": [
         "Binds 127.0.0.1 only; refuses foreign POST origins and non-JSON bodies.",
         "No endpoint accepts a filesystem path from the client; the project path is fixed at launch.",
@@ -1409,12 +1410,12 @@
       "migration": "not_applicable",
       "integration_status": "verified",
       "consumers": [],
-      "compat": "zcad schema 3 (schema 1 and 2 migrate), contract v1",
+      "compat": "zcad schema 6 via cad-document (loads schemas 1-5), contract v1",
       "evidence": [
         "crates/cad-studio/src/lib.rs",
         "crates/cad-studio/tests/http_api.rs",
-        "engineering/quality/tests.json#t-cad-studio-m11",
-        "engineering/quality/tests.json#t-cad-studio-browser-m11",
+    "engineering/quality/tests.json#t-cad-studio-m11e",
+    "engineering/quality/tests.json#t-cad-studio-browser-m11e",
         "docs/architecture-decisions/0009-feature-graph.md",
         "docs/quality/m11-feature-graph.md"
       ]

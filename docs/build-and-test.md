@@ -81,6 +81,23 @@ headless-browser check to **8 assertions loopback + 10 shared** — the shared p
 panel with its tokenised link, exports an STL with that token, and both runs end with zero console
 errors.
 
+**Re-run 2026-10-29 after the arc-sector profile (M11e):** **291 tests passed, 0 failed, 0 skipped**,
+including one doctest; fmt and clippy `-D warnings` clean. The record is
+`t-platform-workspace-20261029-m11e`. Five tests are new: four in `cad-document` (a quarter sector
+resolves an arc from its centre with its analytic shoelace area and exact prism volume; a sweep of 0°,
+a sweep of 360° and non-finite angles are refused; a sector survives save/reopen; a schema-5 file
+migrates to schema 6) and one over HTTP in `cad-studio` (an arc sector cuts a plate to the analytic
+volume on the real Truck kernel, survives undo/redo and save/reopen, and exports a watertight STL).
+The browser check gained 3 assertions and is now **11 loopback + 13 shared**: the Create form opens
+its Start°/Sweep° fields, adding the sketch puts a `sector` row in the tree, and selecting it reopens
+the panel with the angles it was created with.
+
+**Gate defect found and fixed in the same cycle:** `scripts/simulate.sh` built the release binaries
+only when they were *missing*, so the headless-browser check could drive a stale binary whose page no
+longer matched the tree — which is exactly what happened when the first sector browser assertion ran.
+The script now always runs an incremental `cargo build --release` before the simulation; a warm build
+is ~0.1 s and the gate takes ~18 s end to end.
+
 `cad-studio` additionally passed manual browser checks in the bundled preview pane at both 392 px and
 wider viewports: parameter editing (including zero/oversized rejection), profile switching between
 rectangle, circle and polygon, polygon side changes, undo/redo, save, face picking with measurement,

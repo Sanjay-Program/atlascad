@@ -18,20 +18,23 @@
 | `t-cad-feature-graph` | `cargo test --offline -p cad-document` | 36 | 0 | 0 | **2026-10-27**, superseded by `t-cad-document-m11c` (51): profiles, schema 3 feature graph, two-feature union volume, dependency refusal, failure propagation, schema-1/2 migration, undo/redo, corrupt input |
 | `t-cad-document-m11c` | `cargo test --offline -p cad-document` | 51 | 0 | 0 | **2026-10-29**, superseded by `t-cad-document-m11d` (57): the 36 above plus 7 per-feature-cache tests and 8 earlier cut/polyline tests; a cached edit of the last feature issues exactly one extrude and one union, an unchanged history issues none, an earlier edit invalidates every later prefix, a failure is reproduced rather than cached away, and a fresh kernel instance discards the cache |
 | `t-cad-document-m11d` | `cargo test --offline -p cad-document` | 57 | 0 | 0 | **2026-10-29**, superseded by `t-cad-document-m11f` (61): the 51 above plus 6 revolve tests — axis resolution, refusal when the kernel does not advertise `Revolve`, a join revolve through the union, save/reopen with the axis, schema-4 migration to schema 5, and a cached revolve that does not revolve again |
-| `t-cad-document-m11f` | `cargo test --offline -p cad-document` | 61 | 0 | 0 | **2026-10-29**: the 57 above plus 4 crash-recovery tests — an unsaved edit is offered from its snapshot while the file is untouched, a snapshot superseded by a save is deleted, a corrupt snapshot is ignored, and a truncated project file falls back to its snapshot |
+| `t-cad-document-m11f` | `cargo test --offline -p cad-document` | 61 | 0 | 0 | **2026-10-29**, superseded by `t-cad-document-m11e` (65): the 57 above plus 4 crash-recovery tests — an unsaved edit is offered from its snapshot while the file is untouched, a snapshot superseded by a save is deleted, a corrupt snapshot is ignored, and a truncated project file falls back to its snapshot |
+| `t-cad-document-m11e` | `cargo test --offline -p cad-document` | 65 | 0 | 0 | **2026-10-29**: the 61 above plus 4 arc-sector tests — a quarter sector resolves its arc from 0° to 90° at radius 10 starting at the centre, with the analytic inscribed-polygon area to 1e-9 (within 1% of the true quarter disc) and an exact prism volume; a 0° sweep, a 360° sweep and non-finite angles are refused without adding a sketch; a sector survives save/reopen with the same profile and volume; and a schema-5 payload migrates to schema 6 |
 | `t-cad-entitlements` | `cargo test --offline --workspace` | 10 | 0 | 0 | policy only; no billing provider exists |
 | `t-cad-io` | `cargo test --offline -p cad-io` | 6 | 0 | 0 | binary STL facet layout, round trip, truncation and declared-count refusal |
 | `t-cad-studio-m11` | `cargo test --offline -p cad-studio` | 13 | 0 | 0 | **2026-10-27**, superseded by `t-cad-studio-m11d` (17): 2 unit + 11 real-socket HTTP tests, including join volume and save/reopen, failed-feature reporting, foreign/empty Host, same-origin, body limits and STL parse-back |
 | `t-cad-studio-m11d` | `cargo test --offline -p cad-studio` | 17 | 0 | 0 | **2026-10-29**, superseded by `t-cad-studio-m11f` (19): 2 unit + 15 HTTP tests; the four revolve ones cover an analytic annulus over a real socket through save/reopen to a watertight STL, a profile across the axis as a failed feature with export refused, the revolve endpoint's refusals, and the capability gate on the UI's feature-kind option |
-| `t-cad-studio-m11f` | `cargo test --offline -p cad-studio` | 19 | 0 | 0 | **2026-10-29**: the 17 above plus 2 recovery tests — an unsaved edit survives a dropped server handle, is offered on restart with `recovered`/`dirty` true, and is promoted by a save; and discard returns to the file body, clears the flag and deletes the snapshot |
+| `t-cad-studio-m11f` | `cargo test --offline -p cad-studio` | 19 | 0 | 0 | **2026-10-29**, superseded by `t-cad-studio-m11e` (20): the 17 above plus 2 recovery tests — an unsaved edit survives a dropped server handle, is offered on restart with `recovered`/`dirty` true, and is promoted by a save; and discard returns to the file body, clears the flag and deletes the snapshot |
+| `t-cad-studio-m11e` | `cargo test --offline -p cad-studio` | 20 | 0 | 0 | **2026-10-29**: the 19 above plus 1 real-socket test on the real Truck kernel — a quarter sector cuts a 10×10×5 plate to the analytic 500 − (n-gon area × 5) within 1e-2 mm³, bounds unchanged, undo back to 500 mm³, redo restoring the cut, save/reopen preserving the profile and both angles, and a watertight exported STL; two impossible sweeps are refused with 400. The measured count before this cycle was 19, not the 21 the share record recorded |
 | `t-cad-studio-browser-m11` | `node target/studio-qa/drive.mjs <url>` (headless Chrome over CDP) | 7 | 0 | 0 | **2026-10-27**: assertions, not cargo tests — sketch → extrude → second sketch → origin move → join → failure banner → undo → save |
 | `t-cad-studio-browser-m11d` | `node target/studio-qa/revolve.mjs <url>` (headless Chrome over CDP) | 11 | 0 | 0 | **2026-10-29**: assertions, not cargo tests — the Revolve option enabled on a capable kernel, depth field hidden and axis field shown, the turn added as a `built` row, `Turn: full revolution` and 3,133.72 mm³ in the properties (analytic 3,141.59), export enabled, and the row back after save + reload, with zero console errors |
 | `t-cad-studio-browser-m11f` | `node target/studio-qa/recovery.mjs <url>` (headless Chrome over CDP) | 9 | 0 | 0 | **2026-10-29**: assertions, not cargo tests — the recovery banner with the time of the edit, the `unsaved` badge, the recovered 800 mm³ body, discard back to the file's 500 mm³ and `saved`, no banner after a later edit, save clearing the badge, zero console errors |
+| `t-cad-studio-browser-m11e` | `node scripts/browser-check.mjs <url>` (headless Chrome over CDP) | 3 | 0 | 0 | **2026-10-29**: the 3 new sector assertions inside the gate's browser run (11 loopback + 13 shared in total) — the Create form opens its Start°/Sweep° fields with the typed values, adding the sketch puts a `sector` row in the tree, and selecting it reopens the profile panel with `sector` and the angles 30/120 it was created with |
 | `t-cadcraft-geom` | `cargo test -p cadcraft-geom` | 84 | 0 | 0 | from the audit session |
 
-Total recorded passes: **398** (including the 27 browser assertions and the 84 CADCraft audit tests).
-The workspace summary records **279** tests in the root workspace
-(`t-platform-workspace-20261029-m11f`), up from 273 earlier the same day; the larger total includes
+Total recorded passes: **406** (including the 30 browser assertions and the 84 CADCraft audit tests).
+The workspace summary records **291** tests in the root workspace
+(`t-platform-workspace-20261029-m11e`), up from 286 earlier the same day; the larger total includes
 the CADCraft audit suite, the browser assertions and the corpus binary, which are not part of that
 workspace run. Rows marked superseded are kept as history and are not counted.
 
@@ -133,6 +136,19 @@ packaged CLI. The CI workflow and `deny.toml` were added but have **not** run on
 live simulation grew to **56 HTTP/CLI assertions** (4 of them the share boundary) and the browser
 check to **8 loopback + 10 shared**, where the shared page renders the **Share** panel with its
 tokenised link, zero console errors in both runs.
+
+### Dated run: 2026-10-29 (arc-sector profile, M11e)
+
+`cargo test --offline --workspace -j 2` — **291 passed, 0 failed, 0 skipped**; fmt clean and clippy
+`-D warnings` at 0 warnings. The record is `t-platform-workspace-20261029-m11e`. Five new tests: four
+in `cad-document` (sector arc resolution and analytic area, refusal of a 0°/360°/non-finite sweep,
+save/reopen, schema-5→6 migration) and one in `cad-studio` (a sector cut of a plate over a real socket,
+analytic volume, undo/redo, save/reopen, watertight STL). The corpus still prints 8 ok / 3 known
+failures / 0 regressions with no fixture skipped, the manifests validate 0/0, the licence policy is
+83/83 allowed and the SBOM is 83 components. The live simulation is unchanged at 56 HTTP/CLI
+assertions; the browser check grew to **11 loopback + 13 shared**. The gate now always rebuilds the
+release binaries before the simulation — it previously reused a stale one, which let the browser
+check drive a page that no longer matched the tree. This cycle found that defect by failing on it.
 
 ## 3. What the tests actually assert
 
