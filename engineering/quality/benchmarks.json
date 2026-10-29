@@ -2,6 +2,26 @@
   "schema_version": 1,
   "records": [
     {
+      "id": "bm-cache-memory-32",
+      "name": "peak RSS with 32 cached prefixes versus an uncached rebuild",
+      "metric": "peak resident set size (VmHWM), one process per mode",
+      "value": 68796,
+      "unit": "kB cached (27572 kB uncached)",
+      "host": "i3-1125G4, release, single thread",
+      "recorded_at": "2026-10-29",
+      "notes": "32 overlapping 64-point-polyline cylinders joined in sequence, final mesh 10460 triangles, both modes complete with the same volume. Cache cost +41.2 MB (~1.3 MB per retained prefix). Scaling: 8 features 12592/10684 kB, 16 features 25724/16460 kB. A second 32-feature run measured 70772/28808 kB. Harness: cargo run --release -p cad-studio --example cache_memory -- <cached|uncached> 32. Recorded in docs/performance-baseline.md section 10; the 32-prefix bound was kept."
+    },
+    {
+      "id": "bm-cache-memory-16",
+      "name": "peak RSS with 16 cached prefixes versus an uncached rebuild",
+      "metric": "peak resident set size (VmHWM), one process per mode",
+      "value": 25724,
+      "unit": "kB cached (16460 kB uncached)",
+      "host": "i3-1125G4, release, single thread",
+      "recorded_at": "2026-10-29",
+      "notes": "Same harness and history shape as bm-cache-memory-32 with 16 features, final mesh 5194 triangles; cache cost +9.3 MB."
+    },
+    {
       "id": "bm-extrude",
       "name": "extrude 100 boxes",
       "metric": "median latency",

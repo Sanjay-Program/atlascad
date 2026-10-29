@@ -17,9 +17,9 @@
 //! Prints the peak RSS (`VmHWM`), the elapsed build time, the final triangle count and, for the
 //! cached mode, how many prefixes the cache holds. No number here is asserted by a test; the record
 //! is the measurement in `docs/performance-baseline.md` §10.
+use cad_contract::Kernel;
 use cad_contract::ids::DocumentId;
 use cad_contract::units::Unit;
-use cad_contract::Kernel;
 use cad_document::{BuildCache, Project};
 use std::time::Instant;
 
@@ -27,10 +27,7 @@ fn circle(radius: f64, points: usize, centre_x: f64) -> Vec<[f64; 2]> {
     (0..points)
         .map(|index| {
             let angle = std::f64::consts::TAU * index as f64 / points as f64;
-            [
-                centre_x + radius * angle.cos(),
-                radius * angle.sin(),
-            ]
+            [centre_x + radius * angle.cos(), radius * angle.sin()]
         })
         .collect()
 }
@@ -44,7 +41,7 @@ fn peak_rss_kb() -> Option<u64> {
     })
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = std::env::args().skip(1);
     let mode = arguments.next().unwrap_or_else(|| "cached".to_string());
     let features: usize = arguments
@@ -62,17 +59,12 @@ fn main() {
 
     let mut project = Project::new("cache-memory", DocumentId::new(1), Unit::Millimeter);
     for index in 0..features {
-        let sketch = project
-            .add_polyline_sketch(circle(4.0, 64, index as f64 * 6.0), [0.0, 0.0])
-            .expect("a circle polyline is a valid profile");
+        let sketch =
+            project.add_polyline_sketch(circle(4.0, 64, index as f64 * 6.0), [0.0, 0.0])?;
         if index == 0 {
-            project
-                .add_extrude(sketch, "depth")
-                .expect("the first extrude starts the body");
+            project.add_extrude(sketch, "depth")?;
         } else {
-            project
-                .add_join_extrude(sketch, "depth")
-                .expect("a later extrude joins the body");
+            project.add_join_extrude(sketch, "depth")?;
         }
     }
 
@@ -80,9 +72,7 @@ fn main() {
     let start = Instant::now();
     if cached {
         let mut cache = BuildCache::new();
-        let build = project
-            .build_with_cache(&mut kernel, &mut cache)
-            .expect("the history is valid");
+        let build = project.build_with_cache(&mut kernel, &mut cache)?;
         let elapsed = start.elapsed();
         println!(
             "mode=cached features={features} prefixes={} triangles={} complete={} elapsed_ms={} peak_rss_kb={}",
@@ -95,7 +85,7 @@ fn main() {
         // Keep the cache alive until after the measurement is read.
         std::hint::black_box(&cache);
     } else {
-        let build = project.build(&mut kernel).expect("the history is valid");
+        let build = project.build(&mut kernel)?;
         let elapsed = start.elapsed();
         if let Some(solid) = build.solid {
             kernel.release(solid);
@@ -108,4 +98,5 @@ fn main() {
             peak_rss_kb().map_or("unknown".to_string(), |kb| kb.to_string())
         );
     }
+    Ok(())
 }

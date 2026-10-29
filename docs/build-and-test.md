@@ -98,6 +98,23 @@ longer matched the tree — which is exactly what happened when the first sector
 The script now always runs an incremental `cargo build --release` before the simulation; a warm build
 is ~0.1 s and the gate takes ~18 s end to end.
 
+**Re-run 2026-10-29 after named revisions (M11f):** **298 tests passed, 0 failed, 0 skipped**,
+including one doctest; fmt and clippy `-D warnings` clean. The record is
+`t-platform-workspace-20261029-revisions`. Seven tests are new: five in `cad-document` (a named
+revision restores the history it captured and is one undo away; names are trimmed, bounded and
+unique; the newest 32 copies are kept with monotonic ids; schema 6 migrates to 7; a truncated project
+file with no snapshot opens the previous good `<file>.backup` and repairs it on save) and two over
+HTTP in `cad-studio` (record/edit/restore/undo/redo/save/reopen/delete of named revisions, a 404 for
+an unknown id, and the `recovery.source: "backup"` path). The browser check grew to **15 loopback +
+17 shared**: the Revisions panel records a copy, a parameter edit changes the body, Restore returns
+the original measurement, and the palette offers the same restore. The first browser attempt caught a
+real defect — revision rows were rendered while the app was busy, so their buttons were created
+disabled and never re-enabled; `setBusy` now re-renders the list.
+
+The rebuild cache's memory is no longer unmeasured: `docs/performance-baseline.md` §10 records peak
+RSS of **68,796 kB cached against 27,572 kB uncached** on a 32-feature, 10,460-triangle history
+(`bm-cache-memory-32`), plus the 8- and 16-feature scaling points. The 32-prefix bound was kept.
+
 `cad-studio` additionally passed manual browser checks in the bundled preview pane at both 392 px and
 wider viewports: parameter editing (including zero/oversized rejection), profile switching between
 rectangle, circle and polygon, polygon side changes, undo/redo, save, face picking with measurement,

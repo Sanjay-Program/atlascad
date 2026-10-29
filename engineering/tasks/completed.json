@@ -2347,6 +2347,83 @@
       ],
       "verified_on": "2026-10-29",
       "verified_host": "Linux, 8 cores, 7 GB RAM, rustc 1.95.0, debug and release builds"
+    },
+    {
+      "id": "task.m11f.named-revisions",
+      "title": "Named revisions and the last-good on-disk copy",
+      "rationale": "Crash recovery kept one last-unsaved-edit snapshot, so there was no way to come back to a known-good state after a bad edit, and a corrupt project file with no snapshot was unrecoverable. A user needs a named restore point they can return to by name, and a CAD file needs a previous good copy so a truncated write is not the end of the document.",
+      "priority": "user_value",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "The document records named, timestamped revisions stored separately from undo, surviving save/reopen.",
+        "A revision can be named and recovered by ID, and a restore is reversible.",
+        "The last good on-disk revision is retained so a corrupt file with no snapshot is recoverable.",
+        "The studio has a revisions panel and a palette command to revert to a named revision."
+      ],
+      "inputs": [
+        "module.cad-document",
+        "module.cad-studio"
+      ],
+      "outputs": [
+        "crates/cad-document/src/lib.rs",
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/assets/app.js",
+        "crates/cad-studio/assets/index.html",
+        "crates/cad-studio/assets/app.css"
+      ],
+      "depends_on": [
+        "task.m11f.crash-recovery"
+      ],
+      "blocks": [],
+      "expected_changes": [
+        "crates/cad-document/src/lib.rs",
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/tests/http_api.rs",
+        "crates/cad-studio/assets/app.js",
+        "crates/cad-studio/assets/index.html",
+        "docs/tasks.md",
+        "docs/feature-matrix.md"
+      ],
+      "required_tests": [
+        "cargo test --offline -p cad-document",
+        "cargo test --offline -p cad-studio",
+        "cargo test --offline --workspace -j 2",
+        "./scripts/gate.sh"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "rollback": "Drop `revisions`/`next_revision` from the project, `NamedRevision`/`RevisionSummary`, the three revision methods and the three studio routes, and revert `PROJECT_SCHEMA` to 6. A schema-7 file without revisions is a valid schema-6 file apart from the version field; a file with revisions must have them exported first, because the rollback cannot read them. The backup file is independent: stop calling `refresh_backup` and the old file simply stops being retained.",
+      "source": "curated",
+      "trigger_digest": null,
+      "acceptance_results": [
+        "Met: `Project` persists `revisions` and `next_revision` under schema 7; `a_named_revision_restores_the_history_it_captured` and `revisions_are_named_and_bounded_and_survive_save_and_reopen` cover record, restore, save/reopen and delete. A revision copies parameters/sketches/features only, so it cannot resurrect a deleted copy or a stale undo stack.",
+        "Met: names are trimmed, non-empty, at most 80 characters and unique case-insensitively; ids are a separate space; `restore_revision` pushes the current history onto the undo stack first, and the test undoes the restore back to 1200 mm3. Over HTTP an unknown id is 404 unknown_revision.",
+        "Met: `save` copies the previous file to `<path>.backup` through a temporary file and a rename; `a_corrupt_project_opens_its_previous_good_copy` truncates the file and opens the 5 mm backup with `source: Backup`, then repairs it by saving. `a_damaged_project_reopens_the_previous_saved_copy` asserts the same over HTTP, including `recovery.source: backup` in /api/state.",
+        "Met and browser-driven: the Revisions panel records `browser baseline`, a parameter edit changes the body, Restore returns the original measurement, and the palette offers `Restore revision “browser baseline”` (4 new assertions, 15 loopback + 17 shared, zero console errors)."
+      ],
+      "contract_changes": [
+        "`PROJECT_SCHEMA` raised to 7 with an additive `migrate_v6_to_v7`.",
+        "`Project::add_revision`, `restore_revision`, `remove_revision`, `revisions`, `RevisionSummary`, `ProjectError::UnknownRevision`, `RecoverySource`, `RecoveryInfo::source`, `backup_path`.",
+        "Studio routes POST /api/revision, /api/revision/restore, /api/revision/remove; `revisions` and `recovery.source` added to the state payload."
+      ],
+      "limitations": [
+        "A revision is a full copy of the history, so file size grows with each one; only the 32-copy bound limits it.",
+        "No diff, labels, tags, branches, merge or cloud copy.",
+        "The palette's save command uses the panel's name field or generates `Revision N`, which is convenient but not descriptive.",
+        "The backup is best-effort: a save in a read-only or full directory succeeds without refreshing it.",
+        "Snapshot and backup are per file path; opening the same document from another path sees neither.",
+        "No audit log of who created a revision (single-user application; there is no account layer)."
+      ],
+      "evidence": [
+        "crates/cad-document/src/lib.rs::tests::{a_named_revision_restores_the_history_it_captured, revisions_are_named_and_bounded_and_survive_save_and_reopen, only_the_newest_revisions_are_kept_at_the_bound, a_schema_six_project_migrates_to_schema_seven, a_corrupt_project_opens_its_previous_good_copy}",
+        "crates/cad-studio/tests/http_api.rs::{a_named_revision_restores_its_copy_and_survives_save_and_reopen, a_damaged_project_reopens_the_previous_saved_copy}",
+        "scripts/browser-check.mjs (4 new assertions; 15 loopback + 17 shared, 0 console errors)",
+        "engineering/quality/tests.json#t-platform-workspace-20261029-revisions (298 passed, 0 failed)",
+        "engineering/manifest/capabilities.json#cap.document.named-revisions"
+      ],
+      "verified_on": "2026-10-29",
+      "verified_host": "Linux, 8 cores, 7 GB RAM, rustc 1.95.0, debug and release builds"
     }
   ]
 }

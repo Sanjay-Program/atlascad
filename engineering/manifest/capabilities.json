@@ -507,6 +507,23 @@
       "notes": "The arc is a tolerance-bounded polygon (circle chord tolerance scaled to the swept fraction, floor of two facets), not an exact B-rep arc. Sweep must be strictly between 0 and 360 degrees; a full turn is refused with a message naming the circle profile. One profile per sketch, so an arc and a segment loop cannot be mixed in one sketch."
     },
     {
+      "id": "cap.document.named-revisions",
+      "name": "Named revisions and last-good-file backup",
+      "description": "Record up to 32 named, timestamped copies of a project's editable history, restore one by ID as a single undoable step, and reopen the previous good copy when the project file cannot be read.",
+      "provided_by": [
+        "module.cad-document",
+        "module.cad-studio"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "crates/cad-document/src/lib.rs::tests::a_named_revision_restores_the_history_it_captured",
+        "crates/cad-document/src/lib.rs::tests::a_corrupt_project_opens_its_previous_good_copy",
+        "crates/cad-studio/tests/http_api.rs::a_named_revision_restores_its_copy_and_survives_save_and_reopen",
+        "engineering/quality/tests.json#t-platform-workspace-20261029-revisions"
+      ],
+      "notes": "A revision is a full copy of parameters/sketches/features, not a diff; the oldest is dropped at 32. Restoring pushes the current history onto the undo stack first. The backup is best-effort: a save in a read-only directory still succeeds without refreshing it. No branch, merge, cloud copy or audit log."
+    },
+    {
       "id": "cap.studio.share",
       "name": "Token-gated LAN session sharing",
       "description": "Expose one live studio session on the local network behind a 128-bit session token; the page shows the link, and every API call must present the token.",

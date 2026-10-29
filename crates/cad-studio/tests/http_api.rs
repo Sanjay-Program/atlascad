@@ -1268,7 +1268,12 @@ fn a_named_revision_restores_its_copy_and_survives_save_and_reopen()
 
     // 10 x 10 x 5 = 500 mm³ is the starting point, recorded as the first named copy.
     let recorded = post(addr, "/api/revision", r#"{"name":"thin"}"#)?;
-    assert_eq!(recorded.status, 200, "{}", String::from_utf8_lossy(&recorded.body));
+    assert_eq!(
+        recorded.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&recorded.body)
+    );
     let payload = json(&recorded)?;
     let revisions = payload["revisions"].as_array().ok_or("revisions")?;
     assert_eq!(revisions.len(), 1);
@@ -1284,12 +1289,15 @@ fn a_named_revision_restores_its_copy_and_survives_save_and_reopen()
             .as_f64()
             .ok_or("volume")?
             - 1200.0)
-        .abs()
+            .abs()
             < 1e-6
     );
     let second = post(addr, "/api/revision", r#"{"name":"thick"}"#)?;
     assert_eq!(second.status, 200);
-    assert_eq!(json(&second)?["revisions"].as_array().map(Vec::len), Some(2));
+    assert_eq!(
+        json(&second)?["revisions"].as_array().map(Vec::len),
+        Some(2)
+    );
 
     // A duplicate name and an empty name are refused, and the document keeps exactly two copies.
     let duplicate = post(addr, "/api/revision", r#"{"name":"THIN"}"#)?;
@@ -1309,7 +1317,12 @@ fn a_named_revision_restores_its_copy_and_survives_save_and_reopen()
         "/api/revision/restore",
         &format!(r#"{{"id":{thin_id}}}"#),
     )?;
-    assert_eq!(restored.status, 200, "{}", String::from_utf8_lossy(&restored.body));
+    assert_eq!(
+        restored.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&restored.body)
+    );
     let payload = json(&restored)?;
     assert!((payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")? - 500.0).abs() < 1e-6);
     assert_eq!(payload["revisions"].as_array().map(Vec::len), Some(2));
@@ -1320,12 +1333,19 @@ fn a_named_revision_restores_its_copy_and_survives_save_and_reopen()
             .as_f64()
             .ok_or("volume")?
             - 1200.0)
-        .abs()
+            .abs()
             < 1e-6
     );
     let redone = post(addr, "/api/redo", "{}")?;
     assert_eq!(redone.status, 200);
-    assert!((json(&redone)?["geometry"]["volume_mm3"].as_f64().ok_or("volume")? - 500.0).abs() < 1e-6);
+    assert!(
+        (json(&redone)?["geometry"]["volume_mm3"]
+            .as_f64()
+            .ok_or("volume")?
+            - 500.0)
+            .abs()
+            < 1e-6
+    );
 
     // An unknown revision is a 404 with a typed error, not a silent no-op.
     let unknown = post(addr, "/api/revision/restore", r#"{"id":999}"#)?;
@@ -1354,7 +1374,7 @@ fn a_named_revision_restores_its_copy_and_survives_save_and_reopen()
             .as_f64()
             .ok_or("volume")?
             - 500.0)
-        .abs()
+            .abs()
             < 1e-6
     );
 
@@ -1365,7 +1385,12 @@ fn a_named_revision_restores_its_copy_and_survives_save_and_reopen()
         "/api/revision/remove",
         &format!(r#"{{"id":{second_id}}}"#),
     )?;
-    assert_eq!(removed.status, 200, "{}", String::from_utf8_lossy(&removed.body));
+    assert_eq!(
+        removed.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&removed.body)
+    );
     let payload = json(&removed)?;
     assert_eq!(payload["revisions"].as_array().map(Vec::len), Some(1));
     assert!((payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")? - 500.0).abs() < 1e-6);

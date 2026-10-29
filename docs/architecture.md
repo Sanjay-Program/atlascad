@@ -277,7 +277,7 @@ cad-studio  ──  cad-document (parameters, feature graph, undo, .zcad)
    sync, hosted storage, or concurrent multi-user editing (a share is one document, one history, and
    whichever client last wrote wins). `wasm32-unknown-unknown` is not
    installed on this machine and no WASM build was attempted; neither is claimed.
-4. **The feature graph is linear and single-body.** `.zcad` schema 6 persists a header, named
+4. **The feature graph is linear and single-body.** `.zcad` schema 7 persists a header, named
    parameters, an ordered list of sketches and features with stable IDs, where the first feature
    starts the body and every later one is a join (union into the body) or a cut (difference out of
    the body) through the kernel's booleans. A feature is an extrude along +Z by a parameter, or a
@@ -289,7 +289,11 @@ cad-studio  ──  cad-document (parameters, feature graph, undo, .zcad)
    constraint solver, assembly or drawing. A per-feature
    `BuildCache` keeps the body after each function prefix, so an unchanged request does no kernel work
    and an edit re-runs only the features that read it; it is session state, never persisted, and
-   `Project::build` remains the uncached path. The header and payload schema are versioned
+   `Project::build` remains the uncached path. Up to 32 **named revisions** are persisted with the
+   project as full copies of the editable history; they are restore points, not a diff or a branch.
+   Alongside the file, `<name>.zcad.recovery` holds the last unsaved edit and `<name>.zcad.backup`
+   holds the previous good save, and neither is read unless the project itself cannot be opened. The
+   header and payload schema are versioned
    independently, and schema 1, 2, 3 and 4 files migrate on load without being rewritten on disk. An
    unsaved edit is snapshotted to a separate `<project>.recovery` file after each change, so a crash
    loses no work and a corrupt project file can still be recovered; the snapshot never writes the

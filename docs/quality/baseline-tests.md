@@ -19,24 +19,27 @@
 | `t-cad-document-m11c` | `cargo test --offline -p cad-document` | 51 | 0 | 0 | **2026-10-29**, superseded by `t-cad-document-m11d` (57): the 36 above plus 7 per-feature-cache tests and 8 earlier cut/polyline tests; a cached edit of the last feature issues exactly one extrude and one union, an unchanged history issues none, an earlier edit invalidates every later prefix, a failure is reproduced rather than cached away, and a fresh kernel instance discards the cache |
 | `t-cad-document-m11d` | `cargo test --offline -p cad-document` | 57 | 0 | 0 | **2026-10-29**, superseded by `t-cad-document-m11f` (61): the 51 above plus 6 revolve tests — axis resolution, refusal when the kernel does not advertise `Revolve`, a join revolve through the union, save/reopen with the axis, schema-4 migration to schema 5, and a cached revolve that does not revolve again |
 | `t-cad-document-m11f` | `cargo test --offline -p cad-document` | 61 | 0 | 0 | **2026-10-29**, superseded by `t-cad-document-m11e` (65): the 57 above plus 4 crash-recovery tests — an unsaved edit is offered from its snapshot while the file is untouched, a snapshot superseded by a save is deleted, a corrupt snapshot is ignored, and a truncated project file falls back to its snapshot |
-| `t-cad-document-m11e` | `cargo test --offline -p cad-document` | 65 | 0 | 0 | **2026-10-29**: the 61 above plus 4 arc-sector tests — a quarter sector resolves its arc from 0° to 90° at radius 10 starting at the centre, with the analytic inscribed-polygon area to 1e-9 (within 1% of the true quarter disc) and an exact prism volume; a 0° sweep, a 360° sweep and non-finite angles are refused without adding a sketch; a sector survives save/reopen with the same profile and volume; and a schema-5 payload migrates to schema 6 |
+| `t-cad-document-m11e` | `cargo test --offline -p cad-document` | 65 | 0 | 0 | **2026-10-29**, superseded by `t-cad-document-m11fr` (70): the 61 above plus 4 arc-sector tests — a quarter sector resolves its arc from 0° to 90° at radius 10 starting at the centre, with the analytic inscribed-polygon area to 1e-9 (within 1% of the true quarter disc) and an exact prism volume; a 0° sweep, a 360° sweep and non-finite angles are refused without adding a sketch; a sector survives save/reopen with the same profile and volume; and a schema-5 payload migrates to schema 6 |
+| `t-cad-document-m11fr` | `cargo test --offline -p cad-document` | 70 | 0 | 0 | **2026-10-29**: the 65 above plus 5 named-revision tests — a revision restores the history it captured (depth 12 → copy → depth 4 → restore = 1200 mm³) and the restore is one undo away; names are trimmed, bounded and unique case-insensitively; the newest 32 copies are kept with monotonic ids; schema 6 migrates to 7; and a truncated project with no snapshot opens the previous good `<file>.backup` and repairs it on save |
 | `t-cad-entitlements` | `cargo test --offline --workspace` | 10 | 0 | 0 | policy only; no billing provider exists |
 | `t-cad-io` | `cargo test --offline -p cad-io` | 6 | 0 | 0 | binary STL facet layout, round trip, truncation and declared-count refusal |
 | `t-cad-studio-m11` | `cargo test --offline -p cad-studio` | 13 | 0 | 0 | **2026-10-27**, superseded by `t-cad-studio-m11d` (17): 2 unit + 11 real-socket HTTP tests, including join volume and save/reopen, failed-feature reporting, foreign/empty Host, same-origin, body limits and STL parse-back |
 | `t-cad-studio-m11d` | `cargo test --offline -p cad-studio` | 17 | 0 | 0 | **2026-10-29**, superseded by `t-cad-studio-m11f` (19): 2 unit + 15 HTTP tests; the four revolve ones cover an analytic annulus over a real socket through save/reopen to a watertight STL, a profile across the axis as a failed feature with export refused, the revolve endpoint's refusals, and the capability gate on the UI's feature-kind option |
 | `t-cad-studio-m11f` | `cargo test --offline -p cad-studio` | 19 | 0 | 0 | **2026-10-29**, superseded by `t-cad-studio-m11e` (20): the 17 above plus 2 recovery tests — an unsaved edit survives a dropped server handle, is offered on restart with `recovered`/`dirty` true, and is promoted by a save; and discard returns to the file body, clears the flag and deletes the snapshot |
-| `t-cad-studio-m11e` | `cargo test --offline -p cad-studio` | 20 | 0 | 0 | **2026-10-29**: the 19 above plus 1 real-socket test on the real Truck kernel — a quarter sector cuts a 10×10×5 plate to the analytic 500 − (n-gon area × 5) within 1e-2 mm³, bounds unchanged, undo back to 500 mm³, redo restoring the cut, save/reopen preserving the profile and both angles, and a watertight exported STL; two impossible sweeps are refused with 400. The measured count before this cycle was 19, not the 21 the share record recorded |
+| `t-cad-studio-m11e` | `cargo test --offline -p cad-studio` | 20 | 0 | 0 | **2026-10-29**, superseded by `t-cad-studio-m11fr` (24): the 19 above plus 1 real-socket test on the real Truck kernel — a quarter sector cuts a 10×10×5 plate to the analytic 500 − (n-gon area × 5) within 1e-2 mm³, bounds unchanged, undo back to 500 mm³, redo restoring the cut, save/reopen preserving the profile and both angles, and a watertight exported STL; two impossible sweeps are refused with 400. The measured count before this cycle was 19, not the 21 the share record recorded |
+| `t-cad-studio-m11fr` | `cargo test --offline -p cad-studio` | 24 | 0 | 0 | **2026-10-29**: the 20 above plus 2 real-socket tests — named revisions record/edit/restore/undo/redo/save/reopen/delete over HTTP with a 404 for an unknown id, and a project file truncated after a save reopens the previous good copy with `recovery.source: "backup"` and the pre-edit body. Total includes the 2 unit tests |
 | `t-cad-studio-browser-m11` | `node target/studio-qa/drive.mjs <url>` (headless Chrome over CDP) | 7 | 0 | 0 | **2026-10-27**: assertions, not cargo tests — sketch → extrude → second sketch → origin move → join → failure banner → undo → save |
 | `t-cad-studio-browser-m11d` | `node target/studio-qa/revolve.mjs <url>` (headless Chrome over CDP) | 11 | 0 | 0 | **2026-10-29**: assertions, not cargo tests — the Revolve option enabled on a capable kernel, depth field hidden and axis field shown, the turn added as a `built` row, `Turn: full revolution` and 3,133.72 mm³ in the properties (analytic 3,141.59), export enabled, and the row back after save + reload, with zero console errors |
 | `t-cad-studio-browser-m11f` | `node target/studio-qa/recovery.mjs <url>` (headless Chrome over CDP) | 9 | 0 | 0 | **2026-10-29**: assertions, not cargo tests — the recovery banner with the time of the edit, the `unsaved` badge, the recovered 800 mm³ body, discard back to the file's 500 mm³ and `saved`, no banner after a later edit, save clearing the badge, zero console errors |
-| `t-cad-studio-browser-m11e` | `node scripts/browser-check.mjs <url>` (headless Chrome over CDP) | 3 | 0 | 0 | **2026-10-29**: the 3 new sector assertions inside the gate's browser run (11 loopback + 13 shared in total) — the Create form opens its Start°/Sweep° fields with the typed values, adding the sketch puts a `sector` row in the tree, and selecting it reopens the profile panel with `sector` and the angles 30/120 it was created with |
+| `t-cad-studio-browser-m11e` | `node scripts/browser-check.mjs <url>` (headless Chrome over CDP) | 3 | 0 | 0 | **2026-10-29**: the 3 sector assertions inside the gate's browser run — the Create form opens its Start°/Sweep° fields with the typed values, adding the sketch puts a `sector` row in the tree, and selecting it reopens the profile panel with `sector` and the angles 30/120 it was created with |
+| `t-cad-studio-browser-m11fr` | `node scripts/browser-check.mjs <url>` (headless Chrome over CDP) | 4 | 0 | 0 | **2026-10-29**: the 4 new revision assertions (15 loopback + 17 shared in total) — the Revisions panel records `browser baseline` and shows the row, a depth edit through the parameter panel changes the measured body, Restore returns the original measurement, and the palette offers `Restore revision “browser baseline”`. The first attempt timed out on revision buttons rendered disabled while busy; `setBusy` now re-renders the list |
 | `t-cadcraft-geom` | `cargo test -p cadcraft-geom` | 84 | 0 | 0 | from the audit session |
 
-Total recorded passes: **406** (including the 30 browser assertions and the 84 CADCraft audit tests).
-The workspace summary records **291** tests in the root workspace
-(`t-platform-workspace-20261029-m11e`), up from 286 earlier the same day; the larger total includes
-the CADCraft audit suite, the browser assertions and the corpus binary, which are not part of that
-workspace run. Rows marked superseded are kept as history and are not counted.
+Total recorded passes: **419** (including the 34 browser assertions and the 84 CADCraft audit tests).
+The workspace summary records **298** tests in the root workspace
+(`t-platform-workspace-20261029-revisions`), up from 291 earlier the same day; the larger total
+includes the CADCraft audit suite, the browser assertions and the corpus binary, which are not part
+of that workspace run. Rows marked superseded are kept as history and are not counted.
 
 The three "skipped" corpus fixtures are **recorded known failures**, not skipped tests: tangent
 contact, intersection at coordinates near 1e6 mm and a coplanar cut ran and failed as the baseline
@@ -136,6 +139,19 @@ packaged CLI. The CI workflow and `deny.toml` were added but have **not** run on
 live simulation grew to **56 HTTP/CLI assertions** (4 of them the share boundary) and the browser
 check to **8 loopback + 10 shared**, where the shared page renders the **Share** panel with its
 tokenised link, zero console errors in both runs.
+
+### Dated run: 2026-10-29 (named revisions and backup, M11f)
+
+`cargo test --offline --workspace -j 2` — **298 passed, 0 failed, 0 skipped**; fmt clean and clippy
+`-D warnings` at 0 warnings. The record is `t-platform-workspace-20261029-revisions`. Seven new tests:
+five in `cad-document` (named revision restore and undo, naming rules and the 32-copy bound,
+schema-6→7 migration, and the truncated-file→backup path) and two in `cad-studio` (the revision
+workflow over HTTP with a 404 for an unknown id, and the `recovery.source: "backup"` payload). The
+corpus still prints 8 ok / 3 known failures / 0 regressions with no fixture skipped, manifests 0/0,
+licences 83/83 and SBOM 83 components. The live simulation is unchanged at 56 HTTP/CLI assertions; the
+browser check is **15 loopback + 17 shared**. The cache memory question from §9 is closed by
+`bm-cache-memory-32` in `docs/performance-baseline.md` §10: 68,796 kB cached against 27,572 kB
+uncached on a 32-feature, 10,460-triangle history.
 
 ### Dated run: 2026-10-29 (arc-sector profile, M11e)
 

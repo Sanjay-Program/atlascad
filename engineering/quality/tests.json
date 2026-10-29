@@ -565,6 +565,64 @@
       "supersedes": []
     },
     {
+      "id": "t-cad-document-m11fr",
+      "target": "repo.cad-document",
+      "command": "cargo test --offline -p cad-document",
+      "outcome": "success",
+      "passed": 70,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 1100,
+      "recorded_at": "2026-10-29",
+      "notes": "65 previous tests plus 5 for named revisions and the last-good-file backup: a revision restores the history it captured (depth 12 -> revision -> depth 4 -> restore -> 1200 mm3) and the restore is one undo away; names are trimmed, bounded and unique case-insensitively, revisions survive save/reopen and can be removed; only the newest 32 are kept and ids stay monotonic; a schema-6 payload migrates to schema 7; and a truncated project file with no snapshot opens the previous good `<file>.backup` with source Backup and the 5 mm body, then repairs the file on save.",
+      "supersedes": [
+        "t-cad-document-m11e"
+      ]
+    },
+    {
+      "id": "t-cad-studio-m11fr",
+      "target": "repo.cad-studio",
+      "command": "cargo test --offline -p cad-studio",
+      "outcome": "success",
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 120,
+      "recorded_at": "2026-10-29",
+      "notes": "22 previous tests plus 2 over a real socket: named revisions record two copies, a depth change between them measures 1200 mm3, restoring the first returns 500 mm3 with the list intact, undo/redo cover the restore, duplicate/empty names are 400, an unknown id is 404 unknown_revision, save/reopen keeps both copies restorable, and remove is typed and geometry-neutral; and a project file truncated after a save reopens the previous good copy with `recovery.source: backup` and the pre-edit body. The measured total includes the 2 unit tests.",
+      "supersedes": [
+        "t-cad-studio-m11e"
+      ]
+    },
+    {
+      "id": "t-cad-studio-browser-m11fr",
+      "target": "repo.cad-studio",
+      "command": "node scripts/browser-check.mjs <url>  (4 of the run's assertions are new)",
+      "outcome": "success",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-29",
+      "notes": "Headless Chrome over CDP against the release server, 4 new DOM assertions: the Revisions panel records `browser baseline` and shows the row with its name; a depth edit through the parameter panel changes the measured body; clicking Restore returns the original measurement; and the command palette offers `Restore revision “browser baseline”`. The whole run is now 15 assertions loopback and 17 shared, zero console errors. The first attempt timed out because revision buttons were rendered disabled while the app was busy; setBusy now re-renders the list.",
+      "supersedes": []
+    },
+    {
+      "id": "t-platform-workspace-20261029-revisions",
+      "target": "repo.platform",
+      "command": "./scripts/gate.sh",
+      "outcome": "success",
+      "passed": 298,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 15280,
+      "recorded_at": "2026-10-29",
+      "notes": "Gate after named revisions, the last-good-file backup and the cache memory measurement: fmt clean, clippy --all-targets -D warnings (0 warnings), 298 workspace tests across 11 packages with 0 failures (cad-document 70, cad-studio 24), corpus 8 ok / 3 known failure / 0 regressions with no fixture skipped, manifests 0/0, licences 83/83 allowed, SBOM 83 components, live simulation 56 HTTP/CLI assertions and headless Chrome 15 loopback + 17 shared. The cache memory record is bm-cache-memory-32 (68796 kB cached against 27572 kB uncached on a 32-feature history, docs/performance-baseline.md section 10).",
+      "supersedes": [
+        "t-platform-workspace-20261029-m11e"
+      ]
+    },
+    {
       "id": "t-platform-workspace-20261029-m11e",
       "target": "repo.platform",
       "command": "./scripts/gate.sh",

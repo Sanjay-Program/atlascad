@@ -140,10 +140,11 @@ win rather than assert one. See `docs/performance-baseline.md` §8.
    analytic area test and a cut that exercises it; the segmented half was already the drawn polyline.
    A lathe profile with a taper or a fillet is still a polyline of straight segments — there is no
    second arc, tangent blend or entity graph within one sketch.
-2. **Cache memory measurement.** Measure peak RSS with 32 cached prefixes on a large-mesh project
-   before deciding whether the bound or the `Arc<Mesh>` representation changes.
-3. **Named revisions and recovery snapshots** (M11f), the persistence piece collaboration and
-   versioning need first.
+2. ~~**Cache memory measurement.**~~ Measured 2026-10-29 (`docs/performance-baseline.md` §10):
+   68,796 kB cached against 27,572 kB uncached on a 32-feature, 10,460-triangle history, +41.2 MB for
+the retained prefixes. The 32-prefix bound was kept.
+3. ~~**Named revisions and recovery snapshots** (M11f).~~ Delivered 2026-10-29, with the previous good
+   file kept as `<file>.backup`; see `docs/tasks.md`.
 
 Closed since this document was written: cut through a verified difference (2026-10-28), the
 per-feature rebuild cache (2026-10-29), full-turn revolve (2026-10-29, schema 5) and the arc-sector

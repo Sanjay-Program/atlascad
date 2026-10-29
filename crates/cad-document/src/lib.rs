@@ -1782,7 +1782,9 @@ impl Project {
             2 => migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(migrate_v3_to_v4(
                 migrate_v2_to_v3(value)?,
             )?)?)?)?,
-            3 => migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(migrate_v3_to_v4(value)?)?)?)?,
+            3 => migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(migrate_v3_to_v4(
+                value,
+            )?)?)?)?,
             4 => migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(value)?)?)?,
             5 => migrate_v6_to_v7(migrate_v5_to_v6(value)?)?,
             6 => migrate_v6_to_v7(value)?,

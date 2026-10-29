@@ -271,3 +271,36 @@ STL parse-back through the cached path). The kernel-call log asserts that an unc
 cache, a release-build HTTP figure (§9.1 is debug, to stay comparable with §8), memory above 32 cached
 prefixes (the bound is enforced by release, not measured), or hash-collision resistance beyond 64-bit
 FNV-1a.
+
+## 10. Rebuild-cache memory — 2026-10-29
+
+§9 left one question open: the cache keeps up to 32 bodies and their tessellations alive, but its
+memory cost was *enforced, not measured*. This is the measurement.
+
+**Method.** `cargo run --release -p cad-studio --example cache_memory -- <cached|uncached> <N>`, one
+mode per process (peak resident memory is a process-wide high-water mark, so two modes in one process
+cannot be attributed). The history is N overlapping cylinders, each sketched as a 64-point polyline and
+joined onto the running body, so every prefix is a *different* body — the worst case for the cache.
+Peak RSS is `VmHWM` from `/proc/self/status`, read after the build. Same host as §9: Linux, 8 cores,
+7 GB RAM, rustc 1.95.0, release build.
+
+| Features | Final triangles | Uncached peak RSS | Cached peak RSS | Cache cost | Cached build |
+|---:|---:|---:|---:|---:|---:|
+| 8 | 2 554 | 10 684 kB | 12 592 kB | +1.9 MB | 641 ms |
+| 16 | 5 194 | 16 460 kB | 25 724 kB | +9.3 MB | 2 422 ms |
+| 32 | 10 460 | 27 572 kB | 68 796 kB | +41.2 MB | 9 574 ms |
+
+A second 32-feature run measured 70 772 kB cached / 28 808 kB uncached, so the delta is stable to a few
+megabytes. The cost per retained prefix in the 32-feature run is ~1.3 MB, and it grows with the prefix
+index because the mesh does.
+
+**What the numbers say.** The 32-prefix bound is safe for the histories this application builds today:
+a 32-feature part costs ~69 MB resident, which is unremarkable for a desktop CAD session. The growth is
+superlinear in history length (each prefix mesh is larger than the last, so the cache holds O(N²)
+facets), which is the bound's real justification. No change was made: the measurement does not show a
+problem at 32 features, and the alternative (`Arc<Mesh>` or caching only every k-th prefix) would
+change the reuse that makes an undo cheap. It is now a recorded ceiling rather than an unmeasured claim.
+
+**Not claimed:** memory for histories longer than 32 features (the bound discards older prefixes, and
+beyond it the retained window is still the 32 newest), B-rep memory separately from mesh memory, or
+behaviour under a different allocator or on another platform.

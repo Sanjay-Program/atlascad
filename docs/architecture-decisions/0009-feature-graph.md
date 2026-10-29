@@ -101,7 +101,10 @@ feature ID and message, and undoable like any other change.
 - **schema 5 → 6:** only the version changes (`migrate_v5_to_v6`). Schema 6 adds the arc-sector
   profile; a schema-5 file cannot contain one, so its meaning is unchanged. The bump exists so a
   schema-5 reader says "newer schema" instead of failing to read the profile kind.
-- **schema 6:** parsed directly.
+- **schema 6 → 7:** only the version changes (`migrate_v6_to_v7`). Schema 7 adds the optional
+  `revisions` list and `next_revision` counter, both defaulted; a schema-6 file starts with no
+  revisions and means exactly what it did before.
+- **schema 7:** parsed directly.
 - Anything newer is refused with `UnsupportedSchema { found, supported }`.
 
 Migration happens in memory on load; **no file is rewritten unless the user saves**, and the

@@ -1,6 +1,30 @@
 {
   "schema_version": 1,
-  "observed_at_unix": 1793283167,
+  "observed_at_unix": 1793285514,
   "compared_with_previous": true,
-  "changes": []
+  "changes": [
+    {
+      "repo_id": "repo.cad-document",
+      "kind": "files_modified",
+      "summary": "1 tracked file(s) changed against the previous fingerprint",
+      "details": [
+        "~ src/lib.rs"
+      ],
+      "digest": "3d1a46bc440764f3"
+    },
+    {
+      "repo_id": "repo.cad-studio",
+      "kind": "files_modified",
+      "summary": "6 tracked file(s) changed against the previous fingerprint",
+      "details": [
+        "~ assets/app.css",
+        "~ assets/app.js",
+        "~ assets/index.html",
+        "+ examples/cache_memory.rs",
+        "~ src/lib.rs",
+        "~ tests/http_api.rs"
+      ],
+      "digest": "16305a46383a8e53"
+    }
+  ]
 }

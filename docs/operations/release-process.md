@@ -38,7 +38,7 @@ The gate runs, in order and offline:
    project edit/undo, manifest validation, the licence policy, a byte-identical SBOM), and a shared
    studio's token boundary (4 assertions: 401 without a token, the page served, the link in the
    payload, a token-bearing edit), then the live page loaded in headless Chrome loopback and shared
-   (11 + 13 assertions, skipped with a message when no browser exists).
+   (15 + 17 assertions, skipped with a message when no browser exists).
 
 CI (`.github/workflows/ci.yml`) runs the same gate, then packages and uploads the bundle and SBOM, and
 runs `cargo-deny` for advisories, banned crates and dependency sources. **The workflow has not been

@@ -32,8 +32,8 @@ use cad_contract::ids::{DocumentId, EntityId};
 use cad_contract::kernel::Kernel;
 use cad_document::{
     BuildCache, ExtrudeOperation, FeatureFailure, FeatureKind, FeatureOutcome, FeatureReport,
-    Project, ProjectError, RecoveryInfo, RecoverySource, RevisionSummary, RevolveAxis, SketchProfile,
-    clear_recovery,
+    Project, ProjectError, RecoveryInfo, RecoverySource, RevisionSummary, RevolveAxis,
+    SketchProfile, clear_recovery,
 };
 use cad_kernel_truck::TruckKernel;
 use serde::{Deserialize, Serialize};

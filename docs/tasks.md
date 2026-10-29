@@ -357,31 +357,81 @@ entities per sketch, exact B-rep arcs.
 **Goal:** a project can record named snapshots of its history, and recover from a crash or a bad edit by
 reverting to a named revision.
 
-**Status:** in progress — crash recovery delivered 2026-10-29, named revisions outstanding ·
-**Priority:** user_value · **Risk:** medium · **Depends on:** nothing · **Blocks:** collaboration and
-any multi-user workflow. Evidence for the delivered half:
-`engineering/tasks/completed.json#task.m11f.crash-recovery`.
+**Status:** verified 2026-10-29 · **Priority:** user_value · **Risk:** medium · **Depends on:** nothing
+· **Blocks:** collaboration and any multi-user workflow. Evidence:
+`engineering/tasks/completed.json#task.m11f.crash-recovery` and `#task.m11f.named-revisions`.
 
-**Acceptance criteria, and where each stands:**
+**Delivered (crash recovery, 2026-10-29):** `crates/cad-document` keeps an unsaved-edit snapshot next
+to the project (`<file>.recovery`), offers it when it belongs to the current file version, falls back
+to it when the project file cannot be read, deletes a superseded snapshot and ignores a corrupt one.
+The studio shows a recovery banner with the time of the recovered edit and one discard action. A
+`kill -9` with an unsaved edit used to lose it (24,000 mm³ → 12,000 mm³ on reopen); the same scenario
+now reopens at 24,000 mm³ with `recovered` and `dirty` in `/api/state`.
 
-1. **Outstanding.** The document has no `revisions` list; there is one last-unsaved-edit snapshot per
-   project, not a history of named ones.
-2. **Outstanding.** A revision cannot be named or recovered by ID.
-3. **Partial, met for the crash case.** `crates/cad-document` keeps an unsaved-edit snapshot next to
-   the project (`<file>.recovery`), offers it when it belongs to the current file version, falls back
-   to it when the project file cannot be read, deletes a superseded snapshot and ignores a corrupt
-   one. The *last good on-disk revision* is not separately retained, so a corrupt file with no
-   snapshot still fails to open.
-4. **Partial.** The studio shows a recovery banner with the time of the recovered edit and one
-   discard action; there is no revisions panel and no palette command to revert to a named revision.
+**Delivered (named revisions, 2026-10-29):**
 
-**Measured defect this closed:** a `kill -9` with an unsaved edit lost it (24,000 mm³ → 12,000 mm³ on
-reopen). After the change the same scenario reopens at 24,000 mm³, reports `recovered` and `dirty` in
-`/api/state`, and prints the recovery on startup. 4 document tests, 2 HTTP tests, 9 browser assertions.
+1. `Project` carries `revisions: Vec<NamedRevision>` and `next_revision`, both defaulted, in **schema
+   7**. A revision is a named, timestamped copy of the editable history — parameters, sketches,
+   features and the next entity id — deliberately **not** of the undo stacks, the recovery state or
+   the other revisions, so restoring one cannot resurrect a deleted copy or a stale history.
+2. `add_revision(name)`, `restore_revision(id)` and `remove_revision(id)` with `RevisionSummary` for
+   listing. Names are trimmed, non-empty, limited to 80 characters and unique case-insensitively;
+   ids live in their own space so recording a revision never shifts sketch or feature numbering.
+3. **Retention is a stated rule, not silent loss:** at most `MAX_REVISIONS` (32) copies are kept and
+   the oldest is dropped when a thirty-third is added. `revisions()` always reports what is kept.
+4. A restore pushes the current history onto the undo stack first, so restoring the wrong revision is
+   one undo away. Recording a revision is not an undo step, because it changes no geometry, but it
+   does bump the document revision so the copy is not lost by closing the window unsaved.
+5. **The last good on-disk revision is retained.** A successful save copies the previous file to
+   `<path>.backup` (through a temporary file and a rename) before replacing it; opening a project that
+   cannot be read and has no snapshot now falls back to that backup and reports
+   `recovery.source: "backup"` with `file_unreadable: true`, so the banner says "previous saved copy"
+   rather than pretending nothing happened. Saving the recovered document repairs the file.
+6. Studio: a **Revisions** panel (name field, Save revision, one row per copy with Restore and delete),
+   palette commands (`Save a named revision`, `Restore revision “<name>”`), and POST `/api/revision`,
+   `/api/revision/restore`, `/api/revision/remove`. An unknown revision is `404 unknown_revision`.
 
-**Remaining work:** named, timestamped revisions stored separately from undo, surviving save/reopen
-and recoverable by ID; a revisions panel and palette command; retention of the last good on-disk
-revision so a corrupt file with no snapshot is recoverable too.
+**Defect found and fixed while driving the UI:** revision rows were rendered inside `applyState`,
+which runs while a mutation is still in flight, so their buttons were created disabled and never
+re-enabled by `setBusy(false)`. The headless-browser restore step timed out until `setBusy` re-rendered
+the list. This is exactly what the browser assertion exists to catch.
+
+**Measured (2026-10-29):**
+
+| Workload | Result |
+|---|---|
+| Record, edit depth 5 → 12 mm, restore | 500 → 1,200 → 500 mm³ over HTTP, revisions preserved |
+| Save and reopen | both copies still listed and restorable after a restart |
+| Truncated project file with no snapshot | reopens the 5 mm backup, `source: "backup"`, `file_unreadable: true` |
+| Duplicate / empty / over-long name | `400` with a message; the document keeps its existing copies |
+| Unknown revision id | `404 unknown_revision` |
+| Browser | Revisions panel creates "browser baseline", a parameter edit changes the body, Restore returns the original measurement, palette offers the restore (4 new assertions) |
+
+**Recorded limitations, not claimed away:**
+
+1. A revision is a full copy of the history, so the file grows with each one; the 32-copy bound is the
+   only limit and the per-copy size is not separately capped beyond `MAX_PROJECT_BYTES` for the whole
+   file.
+2. No diff, labels, tags, branches or merge. A revision is a restore point only.
+3. Recording a revision does not ask for a name dialog when the palette is used with an empty field —
+   it generates `Revision N`, which is convenient but not very descriptive.
+4. The backup is best-effort: a save in a read-only or full directory still succeeds, and the previous
+   copy is then not refreshed. The atomic save itself is unaffected.
+5. Backup and snapshot are single files per project path; opening a project from a different path does
+   not see either.
+6. No remote or cloud copy, no retention policy beyond the 32-copy bound, and no audit log of who
+   created a revision.
+
+**Acceptance criteria:**
+
+1. The document records named, timestamped revisions stored separately from undo, surviving
+   save/reopen. **Met.**
+2. A revision can be named and recovered by ID. **Met**, with duplicate names refused.
+3. The last good on-disk revision is retained so a corrupt file with no snapshot is recoverable.
+   **Met** for a corrupt *project file* with a valid backup; the backup is refreshed only by a
+   successful save.
+4. The studio has a revisions panel and a palette command to revert to a named revision. **Met**, and
+   driven in headless Chrome.
 
 **Out of scope:** branch/merge, collaborative editing, cloud sync.
 
@@ -737,18 +787,17 @@ The machine-readable task files are:
 If the goal of the next cycle is to keep the application moving while the higher-value kernel and governance
 work waits on a larger host and an owner decision, the ordered slice is:
 
-1. **M11f named revisions and recovery snapshots** — the persistence piece that M7 needs before
-   collaboration or versioning. This is now the next ready task: crash recovery exists, but there is
-   one last-unsaved-edit snapshot per project, not a named history.
-2. **Cache follow-up (measurement)** — measure peak RSS with 32 cached prefixes on a large-mesh project
-   and decide whether the bound or the `Arc<Mesh>` representation should change. The bound is enforced
-   but its memory cost is unmeasured.
-3. **A second named agent plus a CLI host (M9)** — the runtime is exercised only by tests today; a host
+1. **A second named agent plus a CLI host (M9)** — the runtime is exercised only by tests today; a host
    and a second permission profile would make the platform claim honest.
+2. **Import budgets and cancellation outside the adapter (M4 remaining)** — SolidCraft's IO crates
+   still have no file-size or entity-count limits, which is security finding S-3.
+3. **A larger host for M1/M2 and the SolidCraft suite** — the contract has never described the kernel
+   that `apps/solidcraft` actually ships, because its tests need more RAM than this machine has.
 
 Closed in earlier cycles, kept here so the ordering is not rewritten after the fact: M11b cut (2026-10-28),
 M11c per-feature rebuild cache (2026-10-29), M11d revolve (2026-10-29), M11e arc sector profile
-(2026-10-29).
+(2026-10-29), M11f named revisions and last-good-file backup (2026-10-29), the cache memory
+measurement (2026-10-29, `docs/performance-baseline.md` §10).
 
 If the goal of the next cycle is to make the contract honest about the real kernel, the slice is:
 
@@ -788,7 +837,8 @@ acceptance criteria. The registry and this file are updated together when a slic
 5. **"Atlas Studio is a CAD product."** It is a verified multi-feature local workflow: ordered sketches and
    extrudes with stable IDs, `new_body`/`join`/`cut`, a full-turn revolve, rectangle/circle/polygon/
    polyline/sector profiles, parameter and sketch-placement edits that rebuild every dependent feature,
-   per-feature rebuild status with failure reporting, undo/redo, save, reopen, and binary STL export. It
+   per-feature rebuild status with failure reporting, undo/redo, named revisions with restore,
+   crash recovery and a last-good-file backup, save, reopen, and binary STL export. It
    does **not** yet provide sketch constraints, dimensions, loft, sweep, fillet, chamfer, shell, patterns,
    multi-body, assemblies, drawings, or STEP/IGES/DXF import and native neutral-format interchange. Those
    remain planned work in this file and in `docs/roadmap.md`.
