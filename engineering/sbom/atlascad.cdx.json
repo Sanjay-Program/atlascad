@@ -1,0 +1,1786 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "allocator-api2",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/allocator-api2@0.2.21",
+      "type": "library",
+      "version": "0.2.21"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "name": "approx",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/approx@0.4.0",
+      "type": "library",
+      "version": "0.4.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "array-macro",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/array-macro@2.1.8",
+      "type": "library",
+      "version": "2.1.8"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "Apache-2.0 OR MIT"
+        }
+      ],
+      "name": "autocfg",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: Apache-2.0 OR MIT"
+        }
+      ],
+      "purl": "pkg:cargo/autocfg@1.5.1",
+      "type": "library",
+      "version": "1.5.1"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "name": "branches",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT"
+        }
+      ],
+      "purl": "pkg:cargo/branches@0.3.0",
+      "type": "library",
+      "version": "0.3.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "Zlib OR Apache-2.0 OR MIT"
+        }
+      ],
+      "name": "bytemuck",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: Zlib OR Apache-2.0 OR MIT"
+        }
+      ],
+      "purl": "pkg:cargo/bytemuck@1.25.2",
+      "type": "library",
+      "version": "1.25.2"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "Zlib OR Apache-2.0 OR MIT"
+        }
+      ],
+      "name": "bytemuck_derive",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: Zlib OR Apache-2.0 OR MIT"
+        }
+      ],
+      "purl": "pkg:cargo/bytemuck_derive@1.12.1",
+      "type": "library",
+      "version": "1.12.1"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
+      "name": "cad-agent-api",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/cad-agent-api@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
+      "name": "cad-agent-geometry",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/cad-agent-geometry@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
+      "name": "cad-agent-runtime",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/cad-agent-runtime@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
+      "name": "cad-cli",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/cad-cli@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
+      "name": "cad-contract",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/cad-contract@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
+      "name": "cad-document",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/cad-document@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
+      "name": "cad-engineering",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/cad-engineering@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
+      "name": "cad-entitlements",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/cad-entitlements@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
+      "name": "cad-io",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/cad-io@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
+      "name": "cad-kernel-truck",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/cad-kernel-truck@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
+      "name": "cad-studio",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/cad-studio@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "cfg-if",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/cfg-if@1.0.5",
+      "type": "library",
+      "version": "1.0.5"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "name": "cgmath",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/cgmath@0.18.0",
+      "type": "library",
+      "version": "0.18.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "name": "convert_case",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT"
+        }
+      ],
+      "purl": "pkg:cargo/convert_case@0.4.0",
+      "type": "library",
+      "version": "0.4.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "crossbeam-deque",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/crossbeam-deque@0.8.8",
+      "type": "library",
+      "version": "0.8.8"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "crossbeam-epoch",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/crossbeam-epoch@0.9.21",
+      "type": "library",
+      "version": "0.9.21"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "crossbeam-utils",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/crossbeam-utils@0.8.23",
+      "type": "library",
+      "version": "0.8.23"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "name": "derive_more",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT"
+        }
+      ],
+      "purl": "pkg:cargo/derive_more@0.99.20",
+      "type": "library",
+      "version": "0.99.20"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "either",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/either@1.19.0",
+      "type": "library",
+      "version": "1.19.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "Apache-2.0 OR MIT"
+        }
+      ],
+      "name": "equivalent",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: Apache-2.0 OR MIT"
+        }
+      ],
+      "purl": "pkg:cargo/equivalent@1.0.3",
+      "type": "library",
+      "version": "1.0.3"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "Zlib"
+        }
+      ],
+      "name": "foldhash",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: Zlib"
+        }
+      ],
+      "purl": "pkg:cargo/foldhash@0.2.0",
+      "type": "library",
+      "version": "0.2.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "getrandom",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/getrandom@0.2.17",
+      "type": "library",
+      "version": "0.2.17"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "hashbrown",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/hashbrown@0.16.1",
+      "type": "library",
+      "version": "0.16.1"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "itertools",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/itertools@0.13.0",
+      "type": "library",
+      "version": "0.13.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "itoa",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/itoa@1.0.18",
+      "type": "library",
+      "version": "1.0.18"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "katexit",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/katexit@0.1.5",
+      "type": "library",
+      "version": "0.1.5"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "libc",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/libc@0.2.191",
+      "type": "library",
+      "version": "0.2.191"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "lock_api",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/lock_api@0.4.14",
+      "type": "library",
+      "version": "0.4.14"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "name": "matext4cgmath",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/matext4cgmath@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "Unlicense OR MIT"
+        }
+      ],
+      "name": "memchr",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: Unlicense OR MIT"
+        }
+      ],
+      "purl": "pkg:cargo/memchr@2.8.3",
+      "type": "library",
+      "version": "2.8.3"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "num-complex",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/num-complex@0.4.6",
+      "type": "library",
+      "version": "0.4.6"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "num-traits",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/num-traits@0.2.19",
+      "type": "library",
+      "version": "0.2.19"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "parking_lot",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/parking_lot@0.12.5",
+      "type": "library",
+      "version": "0.12.5"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "parking_lot_core",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/parking_lot_core@0.9.12",
+      "type": "library",
+      "version": "0.9.12"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "ppv-lite86",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/ppv-lite86@0.2.21",
+      "type": "library",
+      "version": "0.2.21"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "proc-macro-error",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/proc-macro-error@1.0.4",
+      "type": "library",
+      "version": "1.0.4"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "proc-macro-error-attr",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/proc-macro-error-attr@1.0.4",
+      "type": "library",
+      "version": "1.0.4"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "proc-macro2",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/proc-macro2@1.0.107",
+      "type": "library",
+      "version": "1.0.107"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "quote",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/quote@1.0.47",
+      "type": "library",
+      "version": "1.0.47"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "rand",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/rand@0.8.8",
+      "type": "library",
+      "version": "0.8.8"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "rand_chacha",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/rand_chacha@0.3.1",
+      "type": "library",
+      "version": "0.3.1"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "rand_core",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/rand_core@0.6.4",
+      "type": "library",
+      "version": "0.6.4"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "rayon",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/rayon@1.12.0",
+      "type": "library",
+      "version": "1.12.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "rayon-core",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/rayon-core@1.13.0",
+      "type": "library",
+      "version": "1.13.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "rclite",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/rclite@0.2.8",
+      "type": "library",
+      "version": "0.2.8"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "robust",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/robust@1.2.0",
+      "type": "library",
+      "version": "1.2.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "Apache-2.0 OR MIT"
+        }
+      ],
+      "name": "rustc-hash",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: Apache-2.0 OR MIT"
+        }
+      ],
+      "purl": "pkg:cargo/rustc-hash@2.1.3",
+      "type": "library",
+      "version": "2.1.3"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "rustc_version",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/rustc_version@0.4.1",
+      "type": "library",
+      "version": "0.4.1"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "scopeguard",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/scopeguard@1.2.0",
+      "type": "library",
+      "version": "1.2.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "semver",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/semver@1.0.28",
+      "type": "library",
+      "version": "1.0.28"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "serde",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/serde@1.0.229",
+      "type": "library",
+      "version": "1.0.229"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "serde_core",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/serde_core@1.0.229",
+      "type": "library",
+      "version": "1.0.229"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "serde_derive",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/serde_derive@1.0.229",
+      "type": "library",
+      "version": "1.0.229"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "serde_json",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/serde_json@1.0.154",
+      "type": "library",
+      "version": "1.0.154"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "smallvec",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/smallvec@1.16.3",
+      "type": "library",
+      "version": "1.16.3"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "spade",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/spade@2.15.1",
+      "type": "library",
+      "version": "2.15.1"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "syn",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/syn@1.0.109",
+      "type": "library",
+      "version": "1.0.109"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "syn",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/syn@2.0.119",
+      "type": "library",
+      "version": "2.0.119"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "syn",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/syn@3.0.9",
+      "type": "library",
+      "version": "3.0.9"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "thiserror",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/thiserror@1.0.69",
+      "type": "library",
+      "version": "1.0.69"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "thiserror",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/thiserror@2.0.21",
+      "type": "library",
+      "version": "2.0.21"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "thiserror-impl",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/thiserror-impl@1.0.69",
+      "type": "library",
+      "version": "1.0.69"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "name": "thiserror-impl",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/thiserror-impl@2.0.21",
+      "type": "library",
+      "version": "2.0.21"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "name": "truck-base",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/truck-base@0.5.0",
+      "type": "library",
+      "version": "0.5.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "name": "truck-derivers",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/truck-derivers@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "name": "truck-geometry",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/truck-geometry@0.5.0",
+      "type": "library",
+      "version": "0.5.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "name": "truck-geotrait",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/truck-geotrait@0.4.0",
+      "type": "library",
+      "version": "0.4.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "name": "truck-meshalgo",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/truck-meshalgo@0.4.0",
+      "type": "library",
+      "version": "0.4.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "name": "truck-modeling",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/truck-modeling@0.6.0",
+      "type": "library",
+      "version": "0.6.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "name": "truck-polymesh",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/truck-polymesh@0.6.0",
+      "type": "library",
+      "version": "0.6.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "name": "truck-shapeops",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/truck-shapeops@0.4.0",
+      "type": "library",
+      "version": "0.4.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "name": "truck-topology",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/truck-topology@0.6.0",
+      "type": "library",
+      "version": "0.6.0"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "(MIT OR Apache-2.0) AND Unicode-3.0"
+        }
+      ],
+      "name": "unicode-ident",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: (MIT OR Apache-2.0) AND Unicode-3.0"
+        }
+      ],
+      "purl": "pkg:cargo/unicode-ident@1.0.27",
+      "type": "library",
+      "version": "1.0.27"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT/Apache-2.0"
+        }
+      ],
+      "name": "version_check",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT/Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/version_check@0.9.5",
+      "type": "library",
+      "version": "0.9.5"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "BSD-2-Clause OR Apache-2.0 OR MIT"
+        }
+      ],
+      "name": "zerocopy",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: BSD-2-Clause OR Apache-2.0 OR MIT"
+        }
+      ],
+      "purl": "pkg:cargo/zerocopy@0.8.63",
+      "type": "library",
+      "version": "0.8.63"
+    },
+    {
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "name": "zmij",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "allow-listed: MIT"
+        }
+      ],
+      "purl": "pkg:cargo/zmij@1.0.23",
+      "type": "library",
+      "version": "1.0.23"
+    }
+  ],
+  "metadata": {
+    "component": {
+      "name": "atlascad",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    "tools": [
+      {
+        "name": "atlas-eng",
+        "vendor": "AtlasCAD",
+        "version": "0.1.0"
+      }
+    ]
+  },
+  "specVersion": "1.5",
+  "version": 1
+}

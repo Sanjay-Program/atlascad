@@ -19,6 +19,7 @@ use cad_engineering::model::*;
 use cad_engineering::paths;
 use cad_engineering::report::{self, ReportInput};
 use cad_engineering::scan::Scanner;
+use cad_engineering::supply;
 use cad_engineering::tasks;
 use cad_engineering::{Error, ManifestSet, Result};
 use serde::Serialize;
@@ -51,6 +52,8 @@ fn run() -> Result<i32> {
         "scan" => cmd_scan(&args.root, args.write),
         "report" => cmd_report(&args.root, args.write),
         "tasks" => cmd_tasks(&args.root),
+        "licences" | "licenses" => cmd_licences(&args.root),
+        "sbom" => cmd_sbom(&args.root, args.write),
         "help" | "--help" | "-h" => {
             usage();
             Ok(0)
@@ -102,6 +105,10 @@ fn usage() {
     println!("  atlas-eng scan     [--root PATH] [--write]");
     println!("  atlas-eng report   [--root PATH] [--write]");
     println!("  atlas-eng tasks    [--root PATH]");
+    println!(
+        "  atlas-eng licences [--root PATH]    check every dependency's licence against policy"
+    );
+    println!("  atlas-eng sbom     [--root PATH] [--write]   emit a CycloneDX SBOM");
     println!();
     println!("`scan` is read-only without --write. Nothing here modifies a source repository.");
 }
@@ -256,6 +263,57 @@ fn cmd_report(root: &Path, write: bool) -> Result<i32> {
     } else {
         print!("{rendered}");
     }
+    Ok(0)
+}
+
+/// Check the resolved dependency graph against the release licence policy.
+///
+/// Exit code 1 when any package is denied or unrecognised, so this can gate a release without
+/// `cargo-deny` installed. Every failure is printed with the reason a reviewer needs.
+fn cmd_licences(root: &Path) -> Result<i32> {
+    let policy_path = root.join(paths::LICENCES);
+    let policy = supply::load_policy(&policy_path)?;
+    let metadata = supply::metadata(root)?;
+    let audit = supply::audit(&metadata, &policy)?;
+    let (allowed, denied, unknown) = audit.counts();
+    for package in audit.failures() {
+        println!(
+            "{:?}: {} {} — {}",
+            package.verdict, package.name, package.version, package.reason
+        );
+    }
+    println!(
+        "{} package(s): {allowed} allowed, {denied} denied, {unknown} unknown; policy {}",
+        audit.packages.len(),
+        paths::LICENCES
+    );
+    Ok(if audit.is_ok() { 0 } else { 1 })
+}
+
+/// Emit a deterministic CycloneDX SBOM for the resolved graph.
+fn cmd_sbom(root: &Path, write: bool) -> Result<i32> {
+    let policy = supply::load_policy(&root.join(paths::LICENCES))?;
+    let metadata = supply::metadata(root)?;
+    let audit = supply::audit(&metadata, &policy)?;
+    let sbom = supply::sbom(&metadata, &policy)?;
+    let components = sbom
+        .get("components")
+        .and_then(serde_json::Value::as_array)
+        .map(Vec::len)
+        .unwrap_or(0);
+    println!("CycloneDX 1.5, {components} component(s)");
+    if !audit.is_ok() {
+        println!(
+            "warning: {} package(s) fail the licence policy; the SBOM still records them",
+            audit.failures().count()
+        );
+    }
+    if !write {
+        println!("dry run: pass --write to write {}", paths::SBOM);
+        return Ok(0);
+    }
+    write_json(root, paths::SBOM, &sbom)?;
+    println!("wrote {}", paths::SBOM);
     Ok(0)
 }
 

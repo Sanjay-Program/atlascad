@@ -490,6 +490,36 @@
       "supersedes": [
         "t-platform-workspace-20261029-m11d"
       ]
+    },
+    {
+      "id": "t-cad-engineering-supply",
+      "target": "repo.cad-engineering",
+      "command": "cargo test --offline -p cad-engineering",
+      "outcome": "success",
+      "passed": 35,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-29",
+      "notes": "30 previous tests plus 5 for the release supply check: SPDX expressions tokenise (`MIT OR Apache-2.0`, legacy `MIT/Apache-2.0`, parenthesised AND, `WITH LLVM-exception`); an allowed expression passes and a denied token wins over an allowed one; an unknown or missing licence fails rather than passing; the audit separates workspace members, allow-listed, denied and banned crates and reports (2,2,0); and the SBOM is byte-identical across runs and records every package with a `pkg:cargo/name@version` purl. The live command reports 83 packages, all allowed, offline.",
+      "supersedes": [
+        "t-cad-engineering-20261025"
+      ]
+    },
+    {
+      "id": "t-platform-workspace-20261029-gate",
+      "target": "repo.platform",
+      "command": "./scripts/gate.sh",
+      "outcome": "success",
+      "passed": 284,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 6000,
+      "recorded_at": "2026-10-29",
+      "notes": "The committed gate run end to end: fmt, clippy --all-targets -D warnings (0 warnings), 284 workspace tests across 11 packages with 0 failures, the analytic corpus (8 ok / 3 known failure / 0 regressions), `atlas-eng validate` 0/0, `atlas-eng licences` 83 packages all allowed, the SBOM dry run (83 components), and the live simulation (31 HTTP assertions + 7 headless-browser assertions). Per package: cad-agent-api 13, cad-agent-geometry 24, cad-agent-runtime 16, cad-cli 10, cad-contract 55, cad-document 61, cad-engineering 35, cad-entitlements 10, cad-io 6, cad-kernel-truck 35, cad-studio 19.",
+      "supersedes": [
+        "t-platform-workspace-20261029-m11f"
+      ]
     }
   ]
 }

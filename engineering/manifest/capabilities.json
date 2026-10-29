@@ -474,6 +474,21 @@
         "crates/cad-kernel-truck/src/lib.rs::tests::revolve_on_the_axis_is_a_cylinder"
       ],
       "notes": "Full turn only: a partial sweep is an open shell and the document carries bodies only, so it is refused with a reason. A profile that straddles the axis is refused rather than producing a self-intersecting solid. The adapter uses truck's `rsweep`."
+    },
+    {
+      "id": "cap.engineering.release-gate",
+      "name": "Release gate, licence policy and SBOM",
+      "description": "One committed command checks formatting, lints, tests, the analytic corpus, manifest validity, every dependency's licence, the SBOM and a live simulation, then packages and re-verifies a deployable bundle.",
+      "provided_by": [
+        "module.cad-engineering"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "engineering/quality/tests.json#t-platform-workspace-20261029-gate",
+        "engineering/quality/builds.json#b-atlas-cad-bundle-20261029",
+        "docs/operations/release-process.md"
+      ],
+      "notes": "Runs offline. The licence policy fails closed on an unrecognised licence. CI wiring exists but has not run on a runner; signing, installers, an update channel and advisory scanning are outstanding."
     }
   ]
 }

@@ -176,6 +176,28 @@
       "recorded_at": "2026-10-29",
       "host": "Linux, 8 cores, 7 GB RAM, rustc 1.95.0",
       "notes": "Warm test profile after the revolve change: 11 packages, 273 tests, 0 failures, about 3.9 s wall. cargo fmt --all --check clean and cargo clippy --offline --workspace --all-targets -D warnings at 0 warnings the same run. peak RSS not collected. Not a cold-build timing."
+    },
+    {
+      "id": "b-atlas-cad-bundle-20261029",
+      "target": "repo.platform",
+      "command": "./scripts/package.sh",
+      "outcome": "success",
+      "duration_ms": 26130,
+      "peak_rss_kb": null,
+      "recorded_at": "2026-10-29",
+      "host": "Linux, 8 cores, 7 GB RAM, rustc 1.95.0",
+      "notes": "Release build + staging + tar + verification: atlas-cad-0.1.0-x86_64-unknown-linux-gnu.tar.gz is 3.1 MB. The script extracted it into a clean directory, verified SHA256SUMS, ran --help on atlas, cad-studio and atlas-eng, and built a 10x10x5 box STL with the packaged CLI. Signing and notarisation are not done."
+    },
+    {
+      "id": "b-platform-gate-20261029",
+      "target": "repo.platform",
+      "command": "./scripts/gate.sh",
+      "outcome": "success",
+      "duration_ms": 6000,
+      "peak_rss_kb": null,
+      "recorded_at": "2026-10-29",
+      "host": "Linux, 8 cores, 7 GB RAM, rustc 1.95.0",
+      "notes": "The full local gate: 284 tests, corpus, manifest validation, licence policy (83 packages), SBOM dry run, and the live simulation (31 HTTP + 7 browser assertions)."
     }
   ]
 }

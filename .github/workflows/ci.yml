@@ -1,0 +1,58 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: gate + package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned to the same channel as rust-toolchain.toml so CI and the recorded host agree.
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      # The gate is the same script a developer runs: fmt, clippy -D warnings, workspace tests,
+      # the analytic corpus, manifest validation, the dependency licence policy, the SBOM and the
+      # live HTTP simulation against the release binary.
+      - name: release gate
+        run: ./scripts/gate.sh
+
+      - name: build the deployable bundle
+        run: ./scripts/package.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlas-cad-bundle
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlas-cad-sbom
+          path: engineering/sbom/atlascad.cdx.json
+          if-no-files-found: error
+
+  advisories:
+    name: advisories and dependency sources
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+
+      # Licences are enforced by `atlas-eng licences` in the gate (the policy lives in the repo);
+      # this job watches RustSec advisories and dependency provenance, which need a network.
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans sources

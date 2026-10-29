@@ -74,6 +74,12 @@ Chrome.
 | fmt / clippy | clean, 0 warnings | `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -D warnings` |
 | Kernel corpus | 8 must-pass ok, 3 recorded known failures, **0 regressions** | `cargo run -p cad-kernel-truck --example corpus` |
 | Control-plane validation | 0 errors, 0 warnings | `atlas-eng validate` |
+| Full release gate, warm | **6 s**, all checks | `./scripts/gate.sh` |
+| Deployable bundle | 3.1 MB tarball, verified by extraction + checksums + smoke tests | `./scripts/package.sh` |
+| Dependency licence audit | 83 packages, 83 allowed, 0 denied, 0 unknown | `atlas-eng licences` |
+| CycloneDX SBOM | 83 components, byte-identical across runs | `atlas-eng sbom --write` |
+| Live HTTP simulation | **31 assertions**, including a `kill -9` recovery | `python3 scripts/simulate.py` |
+| Live browser smoke check | **7 assertions**, 0 console errors | `node scripts/browser-check.mjs <url>` |
 
 **What this says:** the performance and memory story is genuinely good for parts of a few hundred
 faces, and the error discipline is real. Neither is the problem.
@@ -116,10 +122,10 @@ faces, and the error discipline is real. Neither is the problem.
 | Large-model performance (10k+ faces) | **Unmeasured**; no tessellation resource budget | `docs/security-review.md` §3 |
 | Crash safety / recovery | **Delivered this cycle** for unsaved edits and unreadable files | §5 |
 | Named revisions / version history | **Absent** (M11f remainder) | `docs/tasks.md` |
-| Signed installers, update channel | **Absent** | no packaging in the repository |
+| Signed installers, update channel | **Partial**: a checksummed tarball is built and re-verified by extraction; there is no installer, code signing, notarisation or update channel | `./scripts/package.sh`, `docs/operations/release-process.md` §6 |
 | Licence management / billing | **Absent**: `cad-entitlements` is local policy, no provider | `docs/feature-matrix.md` |
 | Authentication, tenancy, audit log | **Absent**: loopback only, origin checks, no token | `docs/security-review.md` S-4 |
-| SBOM, advisory scanning, CI gate | **Absent**: no CI config, no `deny.toml`, tools not installed | S-1, S-2 |
+| SBOM, advisory scanning, CI gate | **Partial**: the gate, licence policy and deterministic SBOM are delivered and pass locally; CI config and `deny.toml` are added but have never run on a runner, and advisories are not scanned on this host | §5, `docs/operations/release-process.md` |
 | Support SLA, documentation, training | **Absent** | — |
 | Vendor viability, trademark, commercial terms | **Draft only**: `COMMERCIAL-LICENSE.md` is not a grant; no trademark search | `COMMERCIAL-LICENSE.md` |
 
@@ -200,7 +206,30 @@ Verified: 4 new document tests (offered, stale-and-deleted, corrupt-ignored, unr
 (12 000 → 24 000 → recovered 24 000), and a headless-Chrome run (banner text, discard, badge, zero
 console errors). Workspace **279 tests, 0 failed**, fmt and clippy clean.
 
-**Not** delivered: named revisions (M11f remainder), and every Critical/High finding above.
+**Also delivered in this cycle — the delivery gate:**
+
+* `scripts/gate.sh` runs the whole quality claim in one command: fmt, clippy with warnings denied, the
+  workspace tests, the analytic corpus, manifest validation, the licence policy, the SBOM check and the
+  live simulation. `--quick` skips only the simulation.
+* `atlas-eng licences` checks every dependency in the resolved graph against
+  `engineering/policy/licences.json`, **offline**, and fails closed: an unrecognised licence is a
+  failure, not a warning, and banned kernels are refused whatever their licence says. 83 packages, 83
+  allowed.
+* `atlas-eng sbom` emits a deterministic CycloneDX 1.5 SBOM (83 components, `pkg:cargo/…` purls,
+  licence expressions and verdicts) that is byte-identical across runs.
+* `scripts/package.sh` builds, stages and archives a deployable bundle
+  (`atlas-cad-0.1.0-x86_64-unknown-linux-gnu.tar.gz`, 3.1 MB) with the three binaries, the licence and
+  quality documents, the SBOM and `SHA256SUMS`, then extracts it into a clean directory, verifies the
+  checksums and smoke-tests the packaged binaries.
+* `scripts/simulate.py` drives the **real release server** through cut, join, undo/redo, a parameter
+  rebuild, save, restart, STL export and a `kill -9` recovery (31 analytic assertions), and
+  `scripts/browser-check.mjs` loads the live page in headless Chrome (7 assertions, zero console
+  errors).
+* `.github/workflows/ci.yml` and `deny.toml` add the advisory and provenance job. **The workflow has
+  not been executed on a runner**; only the gate it calls was run here.
+
+**Not** delivered: named revisions (M11f remainder), signing/notarisation/installers, an update
+channel, a support process, and every Critical/High product finding above.
 
 ---
 
@@ -211,12 +240,15 @@ engineer with this repository's existing discipline.
 
 ### P0 — Trustworthy delivery (2–4 weeks)
 
-1. CI gate: fmt, clippy `-D warnings`, workspace tests, corpus, `atlas-eng validate`, plus
-   `cargo-deny` advisories/bans/licenses and a generated SBOM.
-2. Signed installers for Linux, macOS and Windows; a versioned update channel.
-3. Named revisions and last-good recovery (finish M11f), including recovery from a corrupt file.
-4. Crash-report and log policy that never records geometry or project text (S-7).
-5. Commercial terms: signed agreement template, support policy, trademark search, price sheet.
+1. **Delivered:** the gate (fmt, clippy `-D warnings`, tests, corpus, manifests, licence policy, SBOM,
+   live simulation) and a verified bundle. **Outstanding:** the CI workflow has not run on a runner,
+   and advisories are not scanned on this host.
+2. **Partial:** deterministic tarball with checksums and smoke tests. **Outstanding:** installers for
+   Linux/macOS/Windows, code signing, notarisation, a versioned update channel.
+3. **Partial:** crash recovery for unsaved edits and unreadable files is delivered. **Outstanding:**
+   named revisions and retention of the last good on-disk revision.
+4. **Outstanding:** crash-report and log policy that never records geometry or project text (S-7).
+5. **Outstanding:** signed agreement template, support policy, trademark search, price sheet.
 
 **Exit:** a clean clone builds and gates in CI; an installer is signed and updatable; a crash cannot
 lose an edit; the legal and support paperwork exists.

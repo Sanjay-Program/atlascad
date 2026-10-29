@@ -1,0 +1,30 @@
+# cargo-deny policy for the advisory job.
+#
+# Licences are enforced by `atlas-eng licences` against engineering/policy/licences.json, so the
+# two checks cannot drift: this file covers advisories, banned crates and dependency provenance,
+# which need the network and therefore do not run in the local gate.
+
+[advisories]
+version = 2
+yanked = "deny"
+ignore = []
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+highlight = "all"
+
+# The licence policy's banned_crates list is duplicated here on purpose: `cargo-deny` is the second
+# lock on the same door, and it runs in CI where a new dependency would first appear.
+deny = [
+  { name = "opencascade" },
+  { name = "opencascade-sys" },
+  { name = "occt-sys" },
+  { name = "cadrum" },
+  { name = "cadrum-occt" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

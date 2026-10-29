@@ -29,6 +29,13 @@ pub const TEST_RECORDS: &str = "engineering/quality/tests.json";
 pub const BENCHMARKS: &str = "engineering/quality/benchmarks.json";
 pub const SECURITY: &str = "engineering/quality/security.json";
 
+/// The licence policy the release gate checks every dependency against.
+pub const LICENCES: &str = "engineering/policy/licences.json";
+/// Generated CycloneDX SBOMs.
+pub const SBOM_DIR: &str = "engineering/sbom";
+/// The SBOM file name for this version.
+pub const SBOM: &str = "engineering/sbom/atlascad.cdx.json";
+
 /// Every manifest the validator must be able to load.
 pub const ALL_FILES: &[&str] = &[
     WORKSPACE_POLICY,

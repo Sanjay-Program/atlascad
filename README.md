@@ -32,7 +32,7 @@ The project owner reports that development began about a year before the work wa
 
 ## Current platform status
 
-The root platform has a versioned shared contract, a Truck adapter, a headless consumer, an engineering control plane, a small agent platform, and a working local CAD application. The root-workspace test gate passes 273 tests across eleven packages on the recorded machine; startup, request latency, and export timings are in [`docs/performance-baseline.md`](docs/performance-baseline.md).
+The root platform has a versioned shared contract, a Truck adapter, a headless consumer, an engineering control plane, a small agent platform, and a working local CAD application. The root-workspace gate passes 284 tests across eleven packages on the recorded machine; startup, request latency, and export timings are in [`docs/performance-baseline.md`](docs/performance-baseline.md).
 
 Stage A of the CAD roadmap is **partially implemented**. `cad-studio` supports an ordered feature graph: rectangle, circle, regular-polygon, and drawn-polyline sketches; extrude features that start a body, join it with a kernel union, or remove material with a kernel difference (cut); full-turn revolve features that turn a sketch about one of its own axes; parameter and sketch-placement edits that rebuild every dependent feature; a per-feature rebuild cache so an unchanged or last-feature edit does not re-run the whole history; crash recovery that snapshots unsaved edits next to the project and restores them on the next start, including when the project file itself cannot be read; per-feature rebuild status with failure reporting; undo/redo; save, reopen, and binary STL export. A `.zcad` project written by any earlier schema opens through migration. It does **not** yet provide sketch constraints, dimensions, sweeps or lofts, partial revolves, fillets, multi-body, assemblies, drawings, STL import, or native neutral-format (STEP/IGES/DXF) interchange. Those remain planned work in [`docs/roadmap.md`](docs/roadmap.md).
 
@@ -46,7 +46,23 @@ The CADCraft and SolidCraft desktop applications are not wired to the shared con
 
 ## Build and verify
 
-Run these from the repository root:
+The whole gate — formatting, lints, tests, the analytic kernel corpus, manifest validation, the
+dependency licence policy, the SBOM check and a live simulation of the real release server — is one
+command:
+
+```sh
+./scripts/gate.sh          # ~6 s warm on the recorded host
+./scripts/gate.sh --quick  # skip the simulation while editing
+```
+
+To build a verified, deployable bundle (tarball with the three binaries, the licence and quality
+documents, a CycloneDX SBOM and `SHA256SUMS`):
+
+```sh
+./scripts/package.sh       # writes dist/atlas-cad-<version>-<target>.tar.gz
+```
+
+The individual commands, if you want them:
 
 ```sh
 cargo fmt --all --check
@@ -54,6 +70,10 @@ cargo clippy --offline --workspace --all-targets -j 2 -- -D warnings
 cargo test --offline --workspace -j 2
 cargo build --offline --workspace --all-targets -j 2
 ```
+
+The release process, including what is still missing before a commercial release (signing,
+notarisation, an update channel, advisory monitoring), is in
+[`docs/operations/release-process.md`](docs/operations/release-process.md).
 
 The offline commands require dependencies to have been fetched already. For a first build with network access, omit `--offline` or run `cargo fetch` first. The application workspaces are substantially larger than the root platform; their own build guidance is in each application's README and in `docs/build-and-test.md`.
 

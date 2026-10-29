@@ -861,7 +861,7 @@
       "name": "cad-engineering",
       "repository_id": "repo.cad-engineering",
       "language": "rust",
-      "responsibility": "Control plane: typed manifests, cross-validation, workspace observation, change detection, idempotent task synthesis and report rendering.",
+      "responsibility": "Engineering control plane: manifest cross-validation, workspace scan and change detection, task synthesis, integration report, dependency licence audit against the release policy, and a deterministic CycloneDX SBOM. All offline.",
       "boundaries": [
         "Read-only with respect to source repositories and the cargo target directory.",
         "Writes only engineering/state, engineering/reports and (when a new task is genuinely new) engineering/tasks/backlog.json.",
@@ -870,9 +870,13 @@
       "public_api": [
         "ManifestSet",
         "Scanner",
+        "atlas-eng licences",
+        "atlas-eng sbom",
         "diff",
-        "tasks",
-        "report"
+        "report",
+        "supply::audit",
+        "supply::sbom",
+        "tasks"
       ],
       "internal_dependencies": [],
       "external_dependencies": [
@@ -894,7 +898,9 @@
       "compat": "manifest schema v1",
       "evidence": [
         "docs/engineering-control-plane.md",
-        "engineering/quality/tests.json#t-cad-engineering-20261025"
+        "docs/operations/release-process.md",
+        "engineering/quality/tests.json#t-cad-engineering-20261025",
+        "engineering/sbom/atlascad.cdx.json"
       ]
     },
     {

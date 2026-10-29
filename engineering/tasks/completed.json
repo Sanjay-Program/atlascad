@@ -2197,6 +2197,83 @@
       ],
       "verified_on": "2026-10-29",
       "verified_host": "Linux, 8 cores, 7 GB RAM, rustc 1.95.0, debug and release builds"
+    },
+    {
+      "id": "task.p0.delivery-gate",
+      "title": "Release gate, licence policy, SBOM and a verified deployable bundle",
+      "rationale": "The production-readiness assessment found no automated gate at all: every quality claim was run by hand, no dependency licence was checked, no SBOM existed, and the only deployable artifact was whatever `cargo build` left in `target/`. A customer or a procurement review cannot rely on that. This slice makes the gate executable in one command, makes the licence policy fail closed on unknown licences, produces a deterministic SBOM, packages and re-verifies a bundle, and drives the real release binary through a live end-to-end simulation including a crash.",
+      "priority": "integration_blocker",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "One committed command runs fmt, clippy with warnings denied, the workspace tests, the analytic corpus, manifest validation, the licence policy, the SBOM check and the live simulation.",
+        "Every dependency's licence is checked against a policy that fails closed: an unrecognised licence is a failure, and banned kernels are refused whatever their licence says.",
+        "A deterministic CycloneDX SBOM of the resolved graph is generated offline and contains every package.",
+        "A deployable bundle is built, checksummed, archived, extracted into a clean directory and smoke-tested with the packaged binaries.",
+        "The live simulation drives the real release server through cut, join, undo/redo, a parameter rebuild, save, restart, STL export and a kill -9 recovery, and loads the built page in a browser when one exists."
+      ],
+      "inputs": [
+        "module.cad-engineering",
+        "module.cad-studio",
+        "module.cad-cli"
+      ],
+      "outputs": [
+        "scripts/gate.sh",
+        "scripts/package.sh",
+        "scripts/simulate.sh",
+        "scripts/simulate.py",
+        "scripts/browser-check.mjs",
+        "crates/cad-engineering/src/supply.rs",
+        "engineering/policy/licences.json",
+        "engineering/sbom/atlascad.cdx.json",
+        ".github/workflows/ci.yml",
+        "deny.toml",
+        "docs/operations/release-process.md"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "crates/cad-engineering/src/{lib,main,paths,supply}.rs",
+        "scripts/*",
+        "engineering/policy/licences.json"
+      ],
+      "required_tests": [
+        "./scripts/gate.sh",
+        "./scripts/package.sh",
+        "python3 scripts/simulate.py",
+        "node scripts/browser-check.mjs <url>"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "rollback": "Delete the scripts and the `supply` module; no product behaviour depends on them. The SBOM and policy files are generated/declarative artefacts, and the CI workflow is additive. The only source change is the new `atlas-eng licences` and `atlas-eng sbom` subcommands, which no other code calls.",
+      "source": "curated",
+      "trigger_digest": null,
+      "acceptance_results": [
+        "Met: `./scripts/gate.sh` ran end to end and passed: fmt clean, clippy 0 warnings, 284 tests, corpus 8 ok / 3 known failure / 0 regressions, manifests 0/0, licences 83/83 allowed, SBOM 83 components, simulation 31 HTTP + 7 browser assertions. `--quick` skips only the simulation.",
+        "Met: `atlas-eng licences` reads the resolved `cargo metadata` offline (host-platform filtered, because resolving every target needs crates that are not cached) and exits 1 on a denied or unknown token. Five unit tests cover legacy slash expressions, parenthesised AND, WITH exceptions, denied-over-allowed and missing licences; banned crates are denied whatever their licence.",
+        "Met: `atlas-eng sbom --write` produces `engineering/sbom/atlascad.cdx.json` (CycloneDX 1.5, 83 components, `pkg:cargo/\u2026` purls, licence expressions and the verdict), byte-identical across runs; a test asserts determinism on a fixture.",
+        "Met: `./scripts/package.sh` produced `atlas-cad-0.1.0-x86_64-unknown-linux-gnu.tar.gz` (3.1 MB), extracted it into a temporary directory, verified `SHA256SUMS`, ran `--help` on all three binaries and built a 10x10x5 STL with the packaged CLI.",
+        "Met: `scripts/simulate.py` (31 assertions) starts the release binary, cuts a circle, joins a plate (+11000 mm\u00b3 within 0.1), undoes and redoes, rebuilds at a new depth against the measured polygon area, saves, exports and re-parses the STL volume, restarts, then edits without saving, kill -9, restarts and asserts the recovered body before discarding. `scripts/browser-check.mjs` loaded the live page in headless Chrome with zero console errors."
+      ],
+      "contract_changes": [],
+      "limitations": [
+        "The GitHub Actions workflow has not been executed on a runner; only the gate it calls was run here.",
+        "No code signing, notarisation, installer package or update channel exists; the bundle is a tarball.",
+        "Advisory scanning (`cargo-deny`/`cargo-audit`) needs a network and is a CI-only job; it has not run yet.",
+        "The simulation requires python3, and the browser check requires Node and Chrome; both degrade with an explicit SKIP message.",
+        "The licence policy is a static allow list; a new dependency with a novel permissive licence fails until someone adds it deliberately, which is intended but does add friction.",
+        "MPL-2.0 is neither allowed nor denied, so it fails as unknown until a written decision exists.",
+        "The bundle is built for the host target only; there is no cross-build matrix."
+      ],
+      "evidence": [
+        "engineering/quality/tests.json#t-platform-workspace-20261029-gate (284 passed, gate passed)",
+        "engineering/quality/tests.json#t-cad-engineering-supply (35 passed)",
+        "engineering/quality/builds.json#b-atlas-cad-bundle-20261029 and #b-platform-gate-20261029",
+        "engineering/sbom/atlascad.cdx.json",
+        "docs/operations/release-process.md"
+      ],
+      "verified_on": "2026-10-29",
+      "verified_host": "Linux, 8 cores, 7 GB RAM, rustc 1.95.0"
     }
   ]
 }

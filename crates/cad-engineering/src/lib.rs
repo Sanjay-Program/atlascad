@@ -15,6 +15,8 @@
 //! * [`tasks`] — synthesises scanner tasks with ids derived from the observed value, and merges them
 //!   idempotently (an unchanged scan cannot duplicate a task).
 //! * [`report`] — renders the integration report from manifests + observations.
+//! * [`supply`] — checks every dependency's licence against the release policy and emits a
+//!   deterministic CycloneDX SBOM, offline.
 //!
 //! # What it deliberately does not do
 //!
@@ -32,6 +34,7 @@ pub mod model;
 pub mod paths;
 pub mod report;
 pub mod scan;
+pub mod supply;
 pub mod tasks;
 
 pub use manifest::{Diagnostics, ManifestSet, TaskStores};
