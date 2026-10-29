@@ -969,6 +969,7 @@
     renderParameters();
     renderTree();
     renderProperties();
+    renderRevisions();
     renderFailure(next.failure);
     renderRecovery(next.recovery);
     renderShare(next.share);
@@ -1136,9 +1137,14 @@
           minute: "2-digit",
         })
       : "an earlier session";
-    const text = recovery.file_unreadable
-      ? `The project file could not be read. Recovered unsaved changes from ${when}: save to replace the file with them.`
-      : `Recovered unsaved changes from ${when}. Save to keep them, or discard to go back to the file on disk.`;
+    // A backup is the previous save, not this session's edits, and the two mean very different
+    // things to a user deciding whether to save over the file.
+    const text =
+      recovery.source === "backup"
+        ? `The project file could not be read. Opened the previous saved copy from ${when}; save to rebuild the file with it.`
+        : recovery.file_unreadable
+          ? `The project file could not be read. Recovered unsaved changes from ${when}: save to replace the file with them.`
+          : `Recovered unsaved changes from ${when}. Save to keep them, or discard to go back to the file on disk.`;
     message.textContent = text;
     // There is nothing to go back to when the file itself is unreadable.
     discard.hidden = recovery.file_unreadable;
@@ -1151,6 +1157,90 @@
 
   async function discardRecovery() {
     await mutate("/api/recovery/discard", {}, "Discarded the recovered changes");
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // Named revisions
+  // ---------------------------------------------------------------------------------------
+
+  function formatRevisionTime(seconds) {
+    if (!seconds) return "unknown time";
+    return new Date(seconds * 1000).toLocaleString([], {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  // The panel and the palette both read the same payload list, so a revision created by any route
+  // shows up in both without a second source of truth.
+  function renderRevisions() {
+    const project = app.project;
+    const list = byId("revisions");
+    const label = byId("revisionsLabel");
+    list.textContent = "";
+    const revisions = project && Array.isArray(project.revisions) ? project.revisions : [];
+    label.textContent = `${revisions.length} saved`;
+    byId("addRevisionBtn").disabled = app.busy;
+    if (!revisions.length) {
+      list.append(element("li", "hint", "No revisions yet. Save one before a risky edit."));
+      return;
+    }
+    for (const revision of revisions) {
+      const row = document.createElement("li");
+      row.className = "revision-row";
+      const text = element("div", "revision-text");
+      text.append(
+        element("span", "revision-name", revision.name),
+        element(
+          "span",
+          "revision-meta",
+          `${formatRevisionTime(revision.created_at_unix)} · ${revision.features} features · rev ${revision.revision}`
+        )
+      );
+      const actions = element("div", "revision-actions");
+      const restore = document.createElement("button");
+      restore.type = "button";
+      restore.className = "button ghost small";
+      restore.textContent = "Restore";
+      restore.disabled = app.busy;
+      restore.dataset.revisionRestore = String(revision.id);
+      restore.addEventListener("click", () => restoreRevision(revision.id, revision.name));
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "link";
+      remove.textContent = "delete";
+      remove.disabled = app.busy;
+      remove.addEventListener("click", () => removeRevision(revision.id, revision.name));
+      actions.append(restore, remove);
+      row.append(text, actions);
+      list.append(row);
+    }
+  }
+
+  async function addRevision() {
+    const project = app.project;
+    if (!project) return;
+    const input = byId("revisionName");
+    let name = input.value.trim();
+    if (!name) {
+      // A default that cannot collide with an existing name, so the button always works.
+      name = `Revision ${(project.revisions ? project.revisions.length : 0) + 1}`;
+    }
+    const next = await mutate("/api/revision", { name }, `Saved revision “${name}”`);
+    if (next) {
+      input.value = "";
+      log(`Revision “${name}” recorded`);
+    }
+  }
+
+  async function restoreRevision(id, name) {
+    await mutate("/api/revision/restore", { id }, `Restored revision “${name}”`);
+  }
+
+  async function removeRevision(id, name) {
+    await mutate("/api/revision/remove", { id }, `Deleted revision “${name}”`);
   }
 
   // The share link is rendered from the server's payload, so it names the address this session was
@@ -1921,6 +2011,15 @@
       { label: "Undo", hint: "Ctrl Z", keywords: "history back", run: () => undo(), disabled: !project || project.history.undo === 0 },
       { label: "Redo", hint: "Ctrl Y", keywords: "history forward", run: () => redo(), disabled: !project || project.history.redo === 0 },
       { label: "Export binary STL", hint: "download", keywords: "export mesh stl", run: () => exportStl(), disabled: !project || project.features.length === 0 },
+      { label: "Save a named revision", hint: "snapshot", keywords: "revision snapshot named save checkpoint", run: () => addRevision(), disabled: !project },
+      ...(project && Array.isArray(project.revisions)
+        ? project.revisions.map((revision) => ({
+            label: `Restore revision “${revision.name}”`,
+            hint: formatRevisionTime(revision.created_at_unix),
+            keywords: `revision restore revert ${revision.name}`,
+            run: () => restoreRevision(revision.id, revision.name),
+          }))
+        : []),
       { label: "Fit model to view", hint: "F", keywords: "zoom frame camera", run: () => fit() },
       { label: "Toggle wireframe", hint: "W", keywords: "edges display", run: () => toggleWireframe() },
       { label: "Toggle grid", hint: "G", keywords: "floor display", run: () => toggleGrid() },
@@ -2136,6 +2235,13 @@
         }
       });
     }
+    byId("addRevisionBtn").addEventListener("click", addRevision);
+    byId("revisionName").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addRevision();
+      }
+    });
     byId("addSketchBtn").addEventListener("click", addSketch);
     byId("addFeatureBtn").addEventListener("click", addFeature);
     byId("newFeatureKind").addEventListener("change", () => {

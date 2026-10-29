@@ -200,6 +200,62 @@ try {
     );
   }
 
+  // Named revisions: record the current body, change it through the parameter panel, then restore
+  // the copy from the panel. This is the user-visible half of M11f, so it is driven as a user would.
+  const baselineVolume = await evaluate(
+    'document.getElementById("statusGeometry").textContent'
+  );
+  await evaluate(`(() => {
+    document.getElementById("revisionName").value = "browser baseline";
+    document.getElementById("addRevisionBtn").click();
+    return true;
+  })()`);
+  await waitFor(
+    'document.querySelectorAll("#revisions .revision-row").length === 1',
+    'the named revision to appear'
+  );
+  const revisionName = await evaluate(
+    'document.querySelector("#revisions .revision-name").textContent'
+  );
+  check(revisionName === 'browser baseline', `the revision is named ${revisionName}`);
+
+  // A parameter edit through the panel must change the measured body.
+  await evaluate(`(() => {
+    const input = document.getElementById("param-depth");
+    input.value = "12";
+    input.dispatchEvent(new Event("change"));
+    return true;
+  })()`);
+  await waitFor(
+    `document.getElementById("statusGeometry").textContent !== ${JSON.stringify(baselineVolume)}`,
+    'the thickened body'
+  );
+  check(true, 'the parameter edit reached the kernel');
+
+  // Restoring the copy brings the original measurement back, and the palette offers the same action.
+  await evaluate('document.querySelector("#revisions [data-revision-restore]").click()');
+  await waitFor(
+    `document.getElementById("statusGeometry").textContent === ${JSON.stringify(baselineVolume)}`,
+    'the restored body'
+  );
+  const restoredVolume = await evaluate(
+    'document.getElementById("statusGeometry").textContent'
+  );
+  check(
+    restoredVolume === baselineVolume,
+    `restore produced ${restoredVolume}, expected ${baselineVolume}`
+  );
+  const paletteHasRestore = await evaluate(`(() => {
+    document.getElementById("paletteBtn").click();
+    const input = document.getElementById("paletteInput");
+    input.value = "restore revision";
+    input.dispatchEvent(new Event("input"));
+    const labels = Array.from(document.querySelectorAll("#paletteList .palette-label"), (n) => n.textContent);
+    document.getElementById("paletteInput").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    return labels.some((label) => label.includes("Restore revision"));
+  })()`);
+  check(paletteHasRestore, 'the command palette does not offer the revision restore');
+
   // The arc-based sector is the M11e sketch entity, so its controls have to reach the API from the
   // page, not just exist in the markup. This runs last because it adds a third entity to the tree.
   await evaluate(`(() => {

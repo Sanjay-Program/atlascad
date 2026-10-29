@@ -237,6 +237,16 @@
           <span>Volume</span><span>—</span>
         </div>
       </section>
+      <section class="panel-section" id="revisionsSection">
+        <div class="section-head"><h2>Revisions</h2><span class="hint" id="revisionsLabel">0 saved</span></div>
+        <p class="hint">A revision is a named copy of the model you can come back to. Restoring one is a single undo away.</p>
+        <div class="field">
+          <label for="revisionName">Name</label>
+          <input id="revisionName" type="text" maxlength="80" placeholder="e.g. bracket v2" autocomplete="off">
+        </div>
+        <button type="button" id="addRevisionBtn" class="button wide">Save revision</button>
+        <ul id="revisions" class="revision-list" aria-live="polite"></ul>
+      </section>
       <section class="panel-section" id="shareSection" hidden>
         <div class="section-head"><h2>Share</h2><span class="hint">same network</span></div>
         <p class="hint">Anyone with this link can view and edit this document until this studio stops.</p>

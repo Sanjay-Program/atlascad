@@ -1258,6 +1258,148 @@ fn an_arc_sector_cuts_its_analytic_volume_and_survives_save_reopen_and_undo()
     Ok(())
 }
 
+/// Named revisions through the real HTTP surface: record two, edit between them, restore, undo the
+/// restore, save, and reopen with both copies still usable.
+#[test]
+fn a_named_revision_restores_its_copy_and_survives_save_and_reopen()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, path, handle) = fixture("revisions", [10.0, 10.0, 5.0])?;
+    let addr = handle.addr();
+
+    // 10 x 10 x 5 = 500 mm³ is the starting point, recorded as the first named copy.
+    let recorded = post(addr, "/api/revision", r#"{"name":"thin"}"#)?;
+    assert_eq!(recorded.status, 200, "{}", String::from_utf8_lossy(&recorded.body));
+    let payload = json(&recorded)?;
+    let revisions = payload["revisions"].as_array().ok_or("revisions")?;
+    assert_eq!(revisions.len(), 1);
+    assert_eq!(revisions[0]["name"], "thin");
+    assert_eq!(revisions[0]["features"], 1);
+    let thin_id = revisions[0]["id"].as_u64().ok_or("thin id")?;
+
+    // Make the body thicker and record that as a second copy.
+    let thickened = post(addr, "/api/parameter", r#"{"id":"depth","value":12}"#)?;
+    assert_eq!(thickened.status, 200);
+    assert!(
+        (json(&thickened)?["geometry"]["volume_mm3"]
+            .as_f64()
+            .ok_or("volume")?
+            - 1200.0)
+        .abs()
+            < 1e-6
+    );
+    let second = post(addr, "/api/revision", r#"{"name":"thick"}"#)?;
+    assert_eq!(second.status, 200);
+    assert_eq!(json(&second)?["revisions"].as_array().map(Vec::len), Some(2));
+
+    // A duplicate name and an empty name are refused, and the document keeps exactly two copies.
+    let duplicate = post(addr, "/api/revision", r#"{"name":"THIN"}"#)?;
+    assert_eq!(duplicate.status, 400);
+    assert!(
+        json(&duplicate)?["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("already exists")
+    );
+    let empty = post(addr, "/api/revision", r#"{"name":"   "}"#)?;
+    assert_eq!(empty.status, 400);
+
+    // Restoring the first copy brings the 5 mm depth back, and the restore is one undo away.
+    let restored = post(
+        addr,
+        "/api/revision/restore",
+        &format!(r#"{{"id":{thin_id}}}"#),
+    )?;
+    assert_eq!(restored.status, 200, "{}", String::from_utf8_lossy(&restored.body));
+    let payload = json(&restored)?;
+    assert!((payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")? - 500.0).abs() < 1e-6);
+    assert_eq!(payload["revisions"].as_array().map(Vec::len), Some(2));
+    let undone = post(addr, "/api/undo", "{}")?;
+    assert_eq!(undone.status, 200);
+    assert!(
+        (json(&undone)?["geometry"]["volume_mm3"]
+            .as_f64()
+            .ok_or("volume")?
+            - 1200.0)
+        .abs()
+            < 1e-6
+    );
+    let redone = post(addr, "/api/redo", "{}")?;
+    assert_eq!(redone.status, 200);
+    assert!((json(&redone)?["geometry"]["volume_mm3"].as_f64().ok_or("volume")? - 500.0).abs() < 1e-6);
+
+    // An unknown revision is a 404 with a typed error, not a silent no-op.
+    let unknown = post(addr, "/api/revision/restore", r#"{"id":999}"#)?;
+    assert_eq!(unknown.status, 404);
+    assert_eq!(json(&unknown)?["error"]["kind"], "unknown_revision");
+
+    let saved = post(addr, "/api/save", "{}")?;
+    assert_eq!(saved.status, 200);
+    drop(handle);
+
+    // The copies are persisted with the project, and restoring one after a reopen works.
+    let reopened = cad_document::Project::load(&path)?;
+    assert_eq!(reopened.revisions().len(), 2);
+    let reopened = start(reopened, path, 0)?;
+    let state = json(&request(reopened.addr(), "GET", "/api/state", &[], &[])?)?;
+    assert_eq!(state["revisions"].as_array().map(Vec::len), Some(2));
+    assert_eq!(state["revisions"][0]["name"], "thin");
+    let restored = post(
+        reopened.addr(),
+        "/api/revision/restore",
+        &format!(r#"{{"id":{thin_id}}}"#),
+    )?;
+    assert_eq!(restored.status, 200);
+    assert!(
+        (json(&restored)?["geometry"]["volume_mm3"]
+            .as_f64()
+            .ok_or("volume")?
+            - 500.0)
+        .abs()
+            < 1e-6
+    );
+
+    // Deleting a copy is immediate and typed, and it does not touch the geometry.
+    let second_id = state["revisions"][1]["id"].as_u64().ok_or("second id")?;
+    let removed = post(
+        reopened.addr(),
+        "/api/revision/remove",
+        &format!(r#"{{"id":{second_id}}}"#),
+    )?;
+    assert_eq!(removed.status, 200, "{}", String::from_utf8_lossy(&removed.body));
+    let payload = json(&removed)?;
+    assert_eq!(payload["revisions"].as_array().map(Vec::len), Some(1));
+    assert!((payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")? - 500.0).abs() < 1e-6);
+    Ok(())
+}
+
+/// A project file that cannot be read falls back to the previous good copy, and the studio reports
+/// which copy the session is running on rather than pretending the file was fine.
+#[test]
+fn a_damaged_project_reopens_the_previous_saved_copy() -> Result<(), Box<dyn std::error::Error>> {
+    let dir = TempDir::new()?;
+    let path = dir.path().join("damaged.zcad");
+    let mut project = default_project("damaged", [10.0, 10.0, 5.0])?;
+    project.save(&path)?;
+    // The next save keeps the 5 mm file as `damaged.zcad.backup` and writes 8 mm.
+    project.set_parameter("depth", 8.0)?;
+    project.save(&path)?;
+    std::fs::write(&path, b"{\"schema\": [not json")?;
+
+    let (recovered, info) = cad_document::open_with_recovery(&path)?;
+    let info = info.ok_or("the backup must be reported")?;
+    assert_eq!(info.source, cad_document::RecoverySource::Backup);
+    let handle = cad_studio::start_with_recovery(recovered, path, 0, Some(info))?;
+    let state = json(&request(handle.addr(), "GET", "/api/state", &[], &[])?)?;
+    assert_eq!(state["recovery"]["recovered"], true);
+    assert_eq!(state["recovery"]["file_unreadable"], true);
+    assert_eq!(state["recovery"]["source"], "backup");
+    assert!(
+        (state["geometry"]["volume_mm3"].as_f64().ok_or("volume")? - 500.0).abs() < 1e-6,
+        "the previous good copy is the 5 mm body"
+    );
+    Ok(())
+}
+
 /// Open edges of a mesh after merging vertices that share a position.
 ///
 /// An STL stores three independent vertices per triangle, so [`Mesh::open_edges`] on what the reader

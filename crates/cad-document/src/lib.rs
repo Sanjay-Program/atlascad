@@ -66,7 +66,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// * Schema 6 adds [`SketchProfile::Sector`], an arc-based closed profile. A schema-5 build refuses
 ///   the new profile kind, which would read as "invalid profile" rather than "newer schema", so the
 ///   version is bumped; a schema-5 file is migrated to 6 on load with no field changes.
-pub const PROJECT_SCHEMA: u32 = 6;
+/// * Schema 7 adds named revisions: a bounded list of named, timestamped copies of the editable
+///   history. A schema-6 reader would fail on the unknown `revisions` field as an invalid document,
+///   so the version is bumped; a schema-6 file is migrated to 7 on load with no field changes and
+///   starts with no revisions.
+pub const PROJECT_SCHEMA: u32 = 7;
 
 /// Smallest regular polygon the sketch model accepts.
 pub const MIN_POLYGON_SIDES: u32 = 3;
@@ -101,6 +105,12 @@ const MIN_ARC_SEGMENTS: usize = 2;
 /// Maximum accepted serialized project size, checked before parsing untrusted input.
 pub const MAX_PROJECT_BYTES: u64 = 64 * 1024 * 1024;
 
+/// Named revisions kept per project. Each one is a full copy of the history, so the bound is about
+/// file size: the oldest is dropped when a new revision would exceed it.
+pub const MAX_REVISIONS: usize = 32;
+/// Longest revision name, in characters, that the document accepts.
+pub const MAX_REVISION_NAME_CHARS: usize = 80;
+
 const MAX_UNDO: usize = 64;
 static TEMP_FILE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
@@ -117,6 +127,8 @@ pub enum ProjectError {
     UnknownParameter(String),
     #[error("unknown sketch {0}")]
     UnknownSketch(u64),
+    #[error("unknown revision {0}")]
+    UnknownRevision(u64),
     #[error("feature {feature} failed: {message}")]
     FeatureFailed { feature: u64, message: String },
     #[error("nothing to undo")]
@@ -331,6 +343,34 @@ struct Snapshot {
     next_entity: u64,
 }
 
+/// A named, timestamped copy of the editable history.
+///
+/// A revision stores the same four fields an undo snapshot does — parameters, sketches, features and
+/// the next entity id — and deliberately *not* the undo/redo stacks, the recovery state or the other
+/// revisions, so restoring one cannot resurrect a deleted revision or a stale history.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NamedRevision {
+    id: u64,
+    name: String,
+    created_at_unix: u64,
+    /// The document revision this copy was taken at, for display in the list.
+    revision: u64,
+    snapshot: Snapshot,
+}
+
+/// What the UI needs to list a named revision without carrying its geometry.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RevisionSummary {
+    pub id: u64,
+    pub name: String,
+    pub created_at_unix: u64,
+    /// The document revision the copy was taken at.
+    pub revision: u64,
+    pub sketches: usize,
+    pub features: usize,
+}
+
 /// The persistent project. Kernel handles are never stored here.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -347,6 +387,16 @@ pub struct Project {
     undo: Vec<Snapshot>,
     #[serde(default)]
     redo: Vec<Snapshot>,
+    #[serde(default)]
+    revisions: Vec<NamedRevision>,
+    #[serde(default = "first_revision_id")]
+    next_revision: u64,
+}
+
+/// First revision id. Named revisions have their own id space, separate from entity ids, because a
+/// revision is not geometry and must not shift sketch/feature numbering.
+const fn first_revision_id() -> u64 {
+    1
 }
 
 /// Geometry produced by evaluating the feature tree against a kernel.
@@ -635,6 +685,8 @@ impl Project {
             next_entity: 1,
             undo: Vec::new(),
             redo: Vec::new(),
+            revisions: Vec::new(),
+            next_revision: first_revision_id(),
         }
     }
 
@@ -669,6 +721,98 @@ impl Project {
 
     pub fn features(&self) -> &[Feature] {
         &self.features
+    }
+
+    /// Named revisions in the order they were recorded, oldest first.
+    pub fn revisions(&self) -> Vec<RevisionSummary> {
+        self.revisions
+            .iter()
+            .map(|revision| RevisionSummary {
+                id: revision.id,
+                name: revision.name.clone(),
+                created_at_unix: revision.created_at_unix,
+                revision: revision.revision,
+                sketches: revision.snapshot.sketches.len(),
+                features: revision.snapshot.features.len(),
+            })
+            .collect()
+    }
+
+    /// Record the current history under `name` and return the revision's id.
+    ///
+    /// The copy holds parameters, sketches and features — the editable history — so restoring it
+    /// later reproduces the model exactly, including which features had built. Undo/redo is *not*
+    /// copied: a revision is a saved state, not a history. Recording a revision is not itself an
+    /// undo step, because it changes no geometry; it does bump the document revision, so the file is
+    /// marked unsaved and the copy is not lost by closing the window.
+    ///
+    /// When [`MAX_REVISIONS`] copies exist the oldest is dropped. That is a stated retention rule,
+    /// not silent data loss: [`Project::revisions`] always shows what is kept.
+    pub fn add_revision(&mut self, name: &str) -> Result<u64, ProjectError> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err(ProjectError::Invalid(
+                "a revision needs a name; use something you will recognise later".into(),
+            ));
+        }
+        if name.chars().count() > MAX_REVISION_NAME_CHARS {
+            return Err(ProjectError::Invalid(format!(
+                "a revision name is limited to {MAX_REVISION_NAME_CHARS} characters"
+            )));
+        }
+        if self
+            .revisions
+            .iter()
+            .any(|revision| revision.name.eq_ignore_ascii_case(name))
+        {
+            return Err(ProjectError::Invalid(format!(
+                "a revision named `{name}` already exists; choose another name or restore it"
+            )));
+        }
+        if self.revisions.len() >= MAX_REVISIONS {
+            self.revisions.remove(0);
+        }
+        let id = self.next_revision;
+        self.next_revision = self
+            .next_revision
+            .checked_add(1)
+            .ok_or_else(|| ProjectError::Invalid("revision id space exhausted".into()))?;
+        self.revisions.push(NamedRevision {
+            id,
+            name: name.to_string(),
+            created_at_unix: unix_now(),
+            revision: self.revision.get(),
+            snapshot: self.snapshot(),
+        });
+        self.bump_revision()?;
+        Ok(id)
+    }
+
+    /// Replace the current history with the copy named by `id`.
+    ///
+    /// The current history is pushed onto the undo stack first, so a restore is always reversible
+    /// with one undo — including when the user restores the wrong revision by accident. The revision
+    /// list itself is untouched by a restore.
+    pub fn restore_revision(&mut self, id: u64) -> Result<(), ProjectError> {
+        let snapshot = self
+            .revisions
+            .iter()
+            .find(|revision| revision.id == id)
+            .map(|revision| revision.snapshot.clone())
+            .ok_or(ProjectError::UnknownRevision(id))?;
+        self.push_undo();
+        self.restore(snapshot);
+        self.bump_revision()
+    }
+
+    /// Delete a named revision. The geometry is unaffected.
+    pub fn remove_revision(&mut self, id: u64) -> Result<(), ProjectError> {
+        let before = self.revisions.len();
+        self.revisions.retain(|revision| revision.id != id);
+        if self.revisions.len() == before {
+            return Err(ProjectError::UnknownRevision(id));
+        }
+        self.bump_revision()
     }
 
     /// Number of undo snapshots available.
@@ -1632,15 +1776,16 @@ impl Project {
             .ok_or_else(|| ProjectError::Invalid("missing `schema`".into()))?;
         let schema = u32::try_from(schema).unwrap_or(u32::MAX);
         let value = match schema {
-            1 => migrate_v5_to_v6(migrate_v4_to_v5(migrate_v3_to_v4(migrate_v2_to_v3(
-                migrate_v1_to_v2(value)?,
+            1 => migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(migrate_v3_to_v4(
+                migrate_v2_to_v3(migrate_v1_to_v2(value)?)?,
             )?)?)?)?,
-            2 => migrate_v5_to_v6(migrate_v4_to_v5(migrate_v3_to_v4(migrate_v2_to_v3(
-                value,
+            2 => migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(migrate_v3_to_v4(
+                migrate_v2_to_v3(value)?,
             )?)?)?)?,
-            3 => migrate_v5_to_v6(migrate_v4_to_v5(migrate_v3_to_v4(value)?)?)?,
-            4 => migrate_v5_to_v6(migrate_v4_to_v5(value)?)?,
-            5 => migrate_v5_to_v6(value)?,
+            3 => migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(migrate_v3_to_v4(value)?)?)?)?,
+            4 => migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(value)?)?)?,
+            5 => migrate_v6_to_v7(migrate_v5_to_v6(value)?)?,
+            6 => migrate_v6_to_v7(value)?,
             PROJECT_SCHEMA => value,
             _ => {
                 return Err(ProjectError::UnsupportedSchema {
@@ -1700,12 +1845,64 @@ impl Project {
                 snapshot.next_entity,
             )?;
         }
+        if self.revisions.len() > MAX_REVISIONS {
+            return Err(ProjectError::Invalid(format!(
+                "project holds more than {MAX_REVISIONS} named revisions"
+            )));
+        }
+        if self.next_revision == 0 {
+            return Err(ProjectError::Invalid(
+                "next revision id must be positive".into(),
+            ));
+        }
+        let mut revision_names = std::collections::BTreeSet::new();
+        for revision in &self.revisions {
+            if revision.id == 0 || revision.id >= self.next_revision {
+                return Err(ProjectError::Invalid(format!(
+                    "named revision {} is outside the allocated revision ids",
+                    revision.id
+                )));
+            }
+            if revision.name.trim().is_empty()
+                || revision.name.chars().count() > MAX_REVISION_NAME_CHARS
+            {
+                return Err(ProjectError::Invalid(format!(
+                    "named revision {} has an empty or over-long name",
+                    revision.id
+                )));
+            }
+            if !revision_names.insert(revision.name.to_ascii_lowercase()) {
+                return Err(ProjectError::Invalid(format!(
+                    "revision name `{}` is used twice",
+                    revision.name
+                )));
+            }
+            if revision.revision == 0 {
+                return Err(ProjectError::Invalid(format!(
+                    "named revision {} records a zero document revision",
+                    revision.id
+                )));
+            }
+            // A revision can be restored, so its copy has to satisfy exactly the rules the live
+            // history does. A file that smuggled an invalid one in must not open.
+            validate_contents(
+                &revision.snapshot.parameters,
+                &revision.snapshot.sketches,
+                &revision.snapshot.features,
+                revision.snapshot.next_entity,
+            )?;
+        }
         Ok(())
     }
 
     pub fn save(&self, path: &Path) -> Result<(), ProjectError> {
         self.validate()?;
         let json = self.to_json()?;
+        // Keep the previous file as `<path>.backup` before replacing it, so a file that is later
+        // truncated by a full disk or edited by hand can still be recovered without a snapshot.
+        // Best effort on purpose: the atomic replace below is what protects this save, and a
+        // read-only or full directory must not turn a successful save into a failed one.
+        let _ = refresh_backup(path);
         atomic_replace(path, json.as_bytes())
     }
 
@@ -2140,6 +2337,20 @@ fn migrate_v5_to_v6(mut value: serde_json::Value) -> Result<serde_json::Value, P
     Ok(value)
 }
 
+/// Convert a schema-6 payload in place: only the version changes.
+///
+/// Schema 7 adds the optional `revisions` list and its `next_revision` counter, both defaulted, so a
+/// schema-6 file is already valid. The bump exists so a schema-6 build says "newer schema" for a
+/// project that carries revisions instead of failing on an unknown field. No file is rewritten by
+/// loading it.
+fn migrate_v6_to_v7(mut value: serde_json::Value) -> Result<serde_json::Value, ProjectError> {
+    let object = value
+        .as_object_mut()
+        .ok_or_else(|| ProjectError::Invalid("project JSON is not an object".into()))?;
+    object.insert("schema".into(), serde_json::json!(PROJECT_SCHEMA));
+    Ok(value)
+}
+
 /// A cut tool that reaches past every face of `body` that `depth_mm` would otherwise share.
 ///
 /// `None` means "no coincidence to break" — either the tool's far end stops inside the body, or the
@@ -2215,13 +2426,77 @@ struct LoadedRecovery {
     base_mtime_unix: Option<u64>,
 }
 
+/// Which copy a session was recovered from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecoverySource {
+    /// The unsaved-edit snapshot next to the project, written after the last edit.
+    Snapshot,
+    /// The previous good project file, kept as `<path>.backup` by the last successful save.
+    Backup,
+}
+
 /// What the application should say about a project it recovered instead of the file on disk.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RecoveryInfo {
-    /// When the snapshot was written, in seconds since the Unix epoch.
+    /// When the copy was written, in seconds since the Unix epoch.
     pub saved_at_unix: u64,
-    /// The project file could not be read, so the snapshot is the only copy of the document.
+    /// The project file could not be read, so this copy is the only one of the document.
     pub file_unreadable: bool,
+    /// Whether this came from an unsaved-edit snapshot or the previous good file.
+    pub source: RecoverySource,
+}
+
+/// Where the previous good copy of `path` lives: next to the project, so it moves with it.
+pub fn backup_path(path: &Path) -> PathBuf {
+    let mut name = path.as_os_str().to_owned();
+    name.push(".backup");
+    PathBuf::from(name)
+}
+
+/// Replace `<path>.backup` with the current contents of `path`, atomically if possible.
+///
+/// Returns `Ok(false)` when there is no file to copy yet. A backup is written through a temporary
+/// file and renamed, so a crash during the copy cannot leave a half-written backup in its place.
+fn refresh_backup(path: &Path) -> Result<bool, ProjectError> {
+    if !path.is_file() {
+        return Ok(false);
+    }
+    let backup = backup_path(path);
+    let parent = backup
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let name = backup
+        .file_name()
+        .ok_or_else(|| ProjectError::Invalid("backup path has no file name".into()))?;
+    let sequence = TEMP_FILE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let mut temp = PathBuf::from(parent);
+    temp.push(format!(
+        ".{}.tmp-{}-{sequence}",
+        name.to_string_lossy(),
+        std::process::id()
+    ));
+    std::fs::copy(path, &temp).map_err(|source| ProjectError::Io {
+        path: temp.display().to_string(),
+        message: source.to_string(),
+    })?;
+    let synced = std::fs::File::open(&temp).and_then(|file| file.sync_all());
+    if let Err(source) = synced {
+        let _ = std::fs::remove_file(&temp);
+        return Err(ProjectError::Io {
+            path: temp.display().to_string(),
+            message: source.to_string(),
+        });
+    }
+    if let Err(source) = std::fs::rename(&temp, &backup) {
+        let _ = std::fs::remove_file(&temp);
+        return Err(ProjectError::Io {
+            path: backup.display().to_string(),
+            message: source.to_string(),
+        });
+    }
+    Ok(true)
 }
 
 /// Where the unsaved-edit snapshot for `path` lives: next to the project, so it moves with it.
@@ -2279,6 +2554,7 @@ fn load_recovery(path: &Path) -> Result<Option<LoadedRecovery>, ProjectError> {
     let info = RecoveryInfo {
         saved_at_unix: file.saved_at_unix,
         file_unreadable: false,
+        source: RecoverySource::Snapshot,
     };
     Ok(Some(LoadedRecovery {
         project: file.project,
@@ -2324,7 +2600,22 @@ pub fn open_with_recovery(path: &Path) -> Result<(Project, Option<RecoveryInfo>)
                     ..recovered.info
                 }),
             )),
-            None => Err(error),
+            None => {
+                // No unsaved-edit snapshot. The previous good file is still worth opening: a
+                // truncated or hand-damaged project is exactly the case a backup exists for.
+                let backup = backup_path(path);
+                match Project::load(&backup) {
+                    Ok(project) => Ok((
+                        project,
+                        Some(RecoveryInfo {
+                            saved_at_unix: last_write_unix(&backup).unwrap_or(0),
+                            file_unreadable: true,
+                            source: RecoverySource::Backup,
+                        }),
+                    )),
+                    Err(_) => Err(error),
+                }
+            }
         },
     }
 }
@@ -3651,6 +3942,141 @@ mod tests {
         ));
         // Nothing was added by a refused profile.
         assert!(project.sketches().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn a_named_revision_restores_the_history_it_captured() -> TestResult {
+        let mut project = box_project()?;
+        project.set_parameter("depth", 12.0)?;
+        let thick = project.add_revision("thick")?;
+        project.set_parameter("depth", 4.0)?;
+
+        let mut kernel = BoxKernel::new();
+        assert!((project.evaluate(&mut kernel)?.volume_mm3 - 400.0).abs() < 1e-9);
+
+        // The revision's own summary says what it holds, without exposing the copy.
+        let summaries = project.revisions();
+        assert_eq!(summaries.len(), 1);
+        assert_eq!(summaries[0].id, thick);
+        assert_eq!(summaries[0].name, "thick");
+        assert_eq!(summaries[0].features, 1);
+        assert!(summaries[0].created_at_unix > 0);
+
+        project.restore_revision(thick)?;
+        let mut kernel = BoxKernel::new();
+        assert!(
+            (project.evaluate(&mut kernel)?.volume_mm3 - 1200.0).abs() < 1e-9,
+            "restoring must bring back the 12 mm depth"
+        );
+        // A restore is one undo away from where it started, so a mis-click is recoverable.
+        project.undo()?;
+        let mut kernel = BoxKernel::new();
+        assert!((project.evaluate(&mut kernel)?.volume_mm3 - 400.0).abs() < 1e-9);
+        // Undo restores history, not the revision list: the copy is still there.
+        assert_eq!(project.revisions().len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn revisions_are_named_and_bounded_and_survive_save_and_reopen() -> TestResult {
+        let dir = TempDir::new("revisions")?;
+        let mut project = box_project()?;
+        assert!(project.add_revision("  ").is_err());
+        let long = "x".repeat(MAX_REVISION_NAME_CHARS + 1);
+        assert!(project.add_revision(&long).is_err());
+        project.add_revision("first")?;
+        assert!(
+            project
+                .add_revision("FIRST")
+                .is_err_and(|error| error.to_string().contains("already exists")),
+            "a name has to be unambiguous, so it is compared case-insensitively"
+        );
+        project.set_parameter("depth", 9.0)?;
+        project.add_revision("second")?;
+
+        let path = dir.0.join("named.zcad");
+        project.save(&path)?;
+        let loaded = Project::load(&path)?;
+        assert_eq!(loaded.revisions(), project.revisions());
+        assert_eq!(loaded.schema, PROJECT_SCHEMA);
+
+        // The copy is usable after the round trip, not only the label.
+        let second = loaded.revisions()[1].id;
+        let mut loaded = loaded;
+        loaded.restore_revision(second)?;
+        let mut kernel = BoxKernel::new();
+        assert!((loaded.evaluate(&mut kernel)?.volume_mm3 - 900.0).abs() < 1e-9);
+        assert!(loaded.restore_revision(999).is_err());
+        assert!(loaded.remove_revision(second).is_ok());
+        assert_eq!(loaded.revisions().len(), 1);
+        assert!(loaded.remove_revision(second).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn only_the_newest_revisions_are_kept_at_the_bound() -> TestResult {
+        let mut project = box_project()?;
+        for index in 0..=MAX_REVISIONS {
+            project.add_revision(&format!("rev-{index}"))?;
+        }
+        let summaries = project.revisions();
+        assert_eq!(summaries.len(), MAX_REVISIONS);
+        assert_eq!(summaries[0].name, "rev-1");
+        assert_eq!(
+            summaries.last().map(|revision| revision.name.as_str()),
+            Some(format!("rev-{MAX_REVISIONS}").as_str())
+        );
+        // Ids stay monotonic; dropping the oldest never reuses one.
+        assert!(summaries.windows(2).all(|pair| pair[0].id < pair[1].id));
+        Ok(())
+    }
+
+    #[test]
+    fn a_schema_six_project_migrates_to_schema_seven() -> TestResult {
+        let project = box_project()?;
+        let mut value = serde_json::to_value(&project)
+            .map_err(|error| format!("serialize fixture: {error}"))?;
+        let object = value.as_object_mut().ok_or("project object")?;
+        object.insert("schema".into(), serde_json::json!(6));
+        object.remove("revisions");
+        object.remove("next_revision");
+        let bytes = serde_json::to_vec(&value)
+            .map_err(|error| format!("serialize legacy fixture: {error}"))?;
+
+        let loaded = Project::from_json(&bytes)?;
+        assert_eq!(loaded.schema, PROJECT_SCHEMA);
+        assert!(loaded.revisions().is_empty());
+        let mut kernel = BoxKernel::new();
+        assert!((loaded.evaluate(&mut kernel)?.volume_mm3 - 500.0).abs() < 1e-9);
+        Ok(())
+    }
+
+    #[test]
+    fn a_corrupt_project_opens_its_previous_good_copy() -> TestResult {
+        let dir = TempDir::new("backup")?;
+        let path = dir.0.join("bracket.zcad");
+        let mut project = box_project()?;
+        project.save(&path)?;
+        // The next save keeps the 5 mm version as the backup and writes the 8 mm one.
+        project.set_parameter("depth", 8.0)?;
+        project.save(&path)?;
+        assert!(backup_path(&path).is_file());
+
+        // Truncate the project the way a full disk or a kill mid-write would.
+        std::fs::write(&path, b"{\"schema\": 7, \"name\":")?;
+        let (recovered, info) = open_with_recovery(&path)?;
+        let info = info.ok_or("the backup must be reported as a recovery")?;
+        assert!(info.file_unreadable);
+        assert_eq!(info.source, RecoverySource::Backup);
+        assert!(info.saved_at_unix > 0);
+        assert!((recovered.parameter("depth")? - 5.0).abs() < 1e-12);
+        let mut kernel = BoxKernel::new();
+        assert!((recovered.evaluate(&mut kernel)?.volume_mm3 - 500.0).abs() < 1e-9);
+
+        // Saving the recovered document repairs the file, and the repaired file opens directly.
+        recovered.save(&path)?;
+        assert!((Project::load(&path)?.parameter("depth")? - 5.0).abs() < 1e-12);
         Ok(())
     }
 

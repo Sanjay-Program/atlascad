@@ -32,7 +32,8 @@ use cad_contract::ids::{DocumentId, EntityId};
 use cad_contract::kernel::Kernel;
 use cad_document::{
     BuildCache, ExtrudeOperation, FeatureFailure, FeatureKind, FeatureOutcome, FeatureReport,
-    Project, ProjectError, RecoveryInfo, RevolveAxis, SketchProfile, clear_recovery,
+    Project, ProjectError, RecoveryInfo, RecoverySource, RevisionSummary, RevolveAxis, SketchProfile,
+    clear_recovery,
 };
 use cad_kernel_truck::TruckKernel;
 use serde::{Deserialize, Serialize};
@@ -141,6 +142,7 @@ impl StudioError {
                 | ProjectError::UnknownSketch(_)
                 | ProjectError::UnsupportedSchema { .. }
                 | ProjectError::Document(_) => 400,
+                ProjectError::UnknownRevision(_) => 404,
                 ProjectError::NothingToUndo | ProjectError::NothingToRedo => 409,
                 ProjectError::Kernel(_) | ProjectError::FeatureFailed { .. } => 422,
                 ProjectError::Io { .. } => 500,
@@ -165,6 +167,7 @@ impl StudioError {
             StudioError::Project(ProjectError::NothingToRedo) => "nothing_to_redo",
             StudioError::Project(ProjectError::UnknownParameter(_)) => "unknown_parameter",
             StudioError::Project(ProjectError::UnknownSketch(_)) => "unknown_sketch",
+            StudioError::Project(ProjectError::UnknownRevision(_)) => "unknown_revision",
             StudioError::Project(ProjectError::FeatureFailed { .. }) => "feature_failed",
             StudioError::Project(_) => "invalid_project",
             StudioError::Kernel(_) => "kernel_failure",
@@ -286,6 +289,8 @@ struct RecoveryView {
     recovered: bool,
     saved_at_unix: Option<u64>,
     file_unreadable: bool,
+    /// `snapshot` for an unsaved-edit snapshot, `backup` for the previous good file.
+    source: Option<&'static str>,
     /// A snapshot write failed, so unsaved work is not currently protected. Shown, not swallowed.
     autosave_error: Option<String>,
 }
@@ -311,6 +316,8 @@ struct StatePayload {
     kernel: KernelView,
     history: HistoryView,
     recovery: RecoveryView,
+    /// Named copies of the history, oldest first. Empty until the user records one.
+    revisions: Vec<RevisionSummary>,
     /// Present only when the studio is shared beyond loopback; the UI offers it as a link.
     share: Option<ShareView>,
 }
@@ -528,8 +535,13 @@ impl StudioState {
                 recovered: self.recovered.is_some(),
                 saved_at_unix: self.recovered.map(|info| info.saved_at_unix),
                 file_unreadable: self.recovered.is_some_and(|info| info.file_unreadable),
+                source: self.recovered.map(|info| match info.source {
+                    RecoverySource::Snapshot => "snapshot",
+                    RecoverySource::Backup => "backup",
+                }),
                 autosave_error: self.autosave_error.clone(),
             },
+            revisions: self.project.revisions(),
             share: self.share.as_ref().map(|share| ShareView {
                 url: share.url.clone(),
             }),
@@ -581,6 +593,10 @@ impl StudioState {
             recovered: self.recovered.is_some(),
             saved_at_unix: self.recovered.map(|info| info.saved_at_unix),
             file_unreadable: self.recovered.is_some_and(|info| info.file_unreadable),
+            source: self.recovered.map(|info| match info.source {
+                RecoverySource::Snapshot => "snapshot",
+                RecoverySource::Backup => "backup",
+            }),
             autosave_error: self.autosave_error.clone(),
         }
     }
@@ -1119,6 +1135,33 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             }
             Err(error) => error_response(&error),
         },
+        "/api/revision" => match parse_body::<RevisionRequest>(request) {
+            Ok(body) => match with_state(state, |state| {
+                state.mutate(|project| project.add_revision(&body.name).map(|_| ()))
+            }) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/revision/restore" => match parse_body::<RevisionIdRequest>(request) {
+            Ok(body) => match with_state(state, |state| {
+                state.mutate(|project| project.restore_revision(body.id))
+            }) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/revision/remove" => match parse_body::<RevisionIdRequest>(request) {
+            Ok(body) => match with_state(state, |state| {
+                state.mutate(|project| project.remove_revision(body.id))
+            }) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
         "/api/undo" => match with_state(state, |state| state.mutate(Project::undo)) {
             Ok(payload) => to_json(200, &payload),
             Err(error) => error_response(&error),
@@ -1171,6 +1214,20 @@ struct ProfileRequest {
 struct OriginRequest {
     id: u64,
     origin: [f64; 2],
+}
+
+/// A name for a new named revision.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RevisionRequest {
+    name: String,
+}
+
+/// The revision a restore or a delete applies to.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RevisionIdRequest {
+    id: u64,
 }
 
 /// A new sketch. The profile is driven by the document's default parameters (`width`/`height`, or
