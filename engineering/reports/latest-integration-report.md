@@ -1,7 +1,7 @@
 # Atlas CAD — Integration Report
 
-**Generated:** 2026-10-29T05:35:32Z (unix 1793252132) · **Scanner:** cad-engineering/0.1.0
-**Last observation:** 2026-10-29T05:35:32Z · **Host:** linux/x86_64 · 8 CPUs
+**Generated:** 2026-10-29T14:12:47Z (unix 1793283167) · **Scanner:** cad-engineering/0.1.0
+**Last observation:** 2026-10-29T14:12:47Z · **Host:** linux/x86_64 · 8 CPUs
 
 > Generated file. Edit the manifests under `engineering/manifest/`, not this report.
 
@@ -18,18 +18,18 @@
 | — retired | 0 |
 | Modules | 34 |
 | Interfaces | 11 |
-| Capabilities — verified | 20 |
+| Capabilities — verified | 23 |
 | Capabilities — advertised only | 12 |
 | Capabilities — absent | 3 |
 | Agents — implemented | 1 |
 | Agents — active | 1 |
 | Tasks — proposed | 6 |
-| Tasks — ready | 44 |
+| Tasks — ready | 47 |
 | Tasks — in progress | 0 |
 | Tasks — blocked | 4 |
 | Tasks — needs review | 0 |
 | Tasks — failed | 0 |
-| Tasks — verified | 43 |
+| Tasks — verified | 45 |
 | Tasks — cancelled | 6 |
 
 ## 2. Repositories
@@ -72,8 +72,8 @@
 
 ## 4. Recorded evidence
 
-* Builds: **16** succeeded, **0** failed, **0** recorded as not run.
-* Tests: **35** runs succeeded, **0** failed, **1** not run — 677 tests passed, 0 failed, 2 skipped across the counted per-package records (workspace summaries and superseded records excluded; imported applications and corpus examples are included, so this is not a single-suite root-workspace total).
+* Builds: **18** succeeded, **0** failed, **0** recorded as not run.
+* Tests: **42** runs succeeded, **0** failed, **1** not run — 702 tests passed, 0 failed, 2 skipped across the counted per-package records (workspace summaries and superseded records excluded; imported applications and corpus examples are included, so this is not a single-suite root-workspace total).
 * Benchmarks: **22** recorded measurement(s).
 * Security: **8** open finding(s); **0/3** scans ran successfully.
   * S-1 — No advisory or dependency-policy scan is running (High, Blocked)
@@ -87,19 +87,11 @@
 
 ## 5. Changes
 
-2 change(s) detected against the previous observation.
-
-* **`repo.cad-document`** · FilesModified · 1 tracked file(s) changed against the previous fingerprint
-  * ~ src/lib.rs
-* **`repo.cad-studio`** · FilesModified · 6 tracked file(s) changed against the previous fingerprint
-  * ~ assets/app.css
-  * ~ assets/app.js
-  * ~ assets/index.html
-  * ~ src/lib.rs
-  * ~ src/main.rs
-  * ~ tests/http_api.rs
+No change detected against the previous observation. Stable ids were reproduced, so no new task was generated.
 
 ## 6. Tasks
+
+This scan inserted **0** task(s); **0** were already known and left untouched.
 
 Next unblocked tasks, in priority order:
 

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "observed_at_unix": 1793252132,
+  "observed_at_unix": 1793283167,
   "host": {
     "os": "linux",
     "arch": "x86_64",
@@ -291,15 +291,15 @@
       "git": null,
       "fingerprint": {
         "algorithm": "fnv1a64-pathv1",
-        "digest": "71878618cb04b210",
+        "digest": "ec4495d325d30511",
         "files": 2,
-        "bytes": 158397,
+        "bytes": 172070,
         "content_hashed": 2,
         "metadata_only": 0
       },
       "files": {
         "Cargo.toml": "54d71c55345c3370",
-        "src/lib.rs": "be8ffef50ab4e759"
+        "src/lib.rs": "ecf373b6c6f76b00"
       },
       "packages": [
         "cad-document@0.1.0"
@@ -316,23 +316,24 @@
       "git": null,
       "fingerprint": {
         "algorithm": "fnv1a64-pathv1",
-        "digest": "2c79326781c9d21c",
-        "files": 12,
-        "bytes": 164038,
-        "content_hashed": 12,
+        "digest": "061c91a24972270e",
+        "files": 13,
+        "bytes": 183644,
+        "content_hashed": 13,
         "metadata_only": 0
       },
       "files": {
         "Cargo.toml": "4f47f00b94ea5bd4",
         "src/diff.rs": "890dee50b4e5f423",
         "src/fingerprint.rs": "27686bc3bf1ff8b6",
-        "src/lib.rs": "bef418d2db1a6eac",
-        "src/main.rs": "2af6e58f3304f644",
+        "src/lib.rs": "acffad29baef38a8",
+        "src/main.rs": "6d439978fe7e3b4d",
         "src/manifest.rs": "b7666ab6efdf8a72",
         "src/model.rs": "1f3e752a12a0fe8a",
-        "src/paths.rs": "79c6360403cd67bd",
+        "src/paths.rs": "eb5b3c1338f8bb12",
         "src/report.rs": "4e5240ef734b287c",
         "src/scan.rs": "f4e9afdfe4164797",
+        "src/supply.rs": "ba851b849703dc07",
         "src/tasks.rs": "2f0fe3a28bef639a",
         "tests/pipeline.rs": "d6af89aa0ef4fc3e"
       },
@@ -434,23 +435,23 @@
       "git": null,
       "fingerprint": {
         "algorithm": "fnv1a64-pathv1",
-        "digest": "d75ebc5508e092c8",
+        "digest": "c37f3261f6093a3b",
         "files": 10,
-        "bytes": 240781,
+        "bytes": 274515,
         "content_hashed": 10,
         "metadata_only": 0
       },
       "files": {
         "Cargo.toml": "dda480361c413cb9",
-        "assets/app.css": "0b1184a3c58b65c4",
-        "assets/app.js": "e91e7f05982dbf33",
+        "assets/app.css": "584bd8cbc6de3dac",
+        "assets/app.js": "f11d6d4b56666c90",
         "assets/favicon.svg": "e264db094e2d0341",
-        "assets/index.html": "00b6dd6811b8d732",
+        "assets/index.html": "665e3cf714c0bdbc",
         "examples/rebuild_bench.rs": "dd1bdd790eaaa0fa",
-        "src/http.rs": "7a994e9624c4f42d",
-        "src/lib.rs": "db0d4fbf5d086d20",
-        "src/main.rs": "e59d960f2d72f3d5",
-        "tests/http_api.rs": "cba7184954f8b52a"
+        "src/http.rs": "75c48d3312f128ba",
+        "src/lib.rs": "eb7584d8b1862407",
+        "src/main.rs": "aacb73e618a046b7",
+        "tests/http_api.rs": "71ccc09ff3417b33"
       },
       "packages": [
         "cad-studio@0.1.0"

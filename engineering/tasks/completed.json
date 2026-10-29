@@ -2274,6 +2274,79 @@
       ],
       "verified_on": "2026-10-29",
       "verified_host": "Linux, 8 cores, 7 GB RAM, rustc 1.95.0"
+    },
+    {
+      "id": "task.m11e.sketch-entities",
+      "title": "Additional sketch entities: an arc-based sector profile",
+      "rationale": "Every sketch was a rectangle, circle, regular polygon or a straight-segment polyline, so a part with an arc could only be approximated by hand-drawn chords, and a lathe or boss profile could not express an arc at all. The arc is the missing entity; the segmented half of the requirement was already met by the drawn polyline, so duplicating it would have added a second spelling of one shape.",
+      "priority": "user_value",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "`SketchProfile` gains an arc-based variant that resolves to a closed polygon the existing profile validation accepts; the segmented half is already satisfied by `SketchProfile::Polyline`.",
+        "The profile is validated before the kernel sees it \u2014 at least 3 points, finite, no repeated consecutive point, non-zero area \u2014 on creation and on load.",
+        "Analytic area tests exist for an L-shape and a sector-shaped profile, asserted against the shoelace area.",
+        "A cut feature exercises at least one of the new profiles, so the new profile is not untested in the boolean path."
+      ],
+      "inputs": [
+        "module.cad-document",
+        "module.cad-studio"
+      ],
+      "outputs": [
+        "crates/cad-document/src/lib.rs",
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/assets/app.js",
+        "crates/cad-studio/assets/index.html"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "crates/cad-document/src/lib.rs",
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/tests/http_api.rs",
+        "crates/cad-studio/assets/app.js",
+        "crates/cad-studio/assets/index.html",
+        "docs/tasks.md",
+        "docs/feature-matrix.md"
+      ],
+      "required_tests": [
+        "cargo test --offline -p cad-document",
+        "cargo test --offline -p cad-studio",
+        "cargo test --offline --workspace -j 2",
+        "./scripts/gate.sh"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "rollback": "Remove `SketchProfile::Sector`, its arms in `sketch_segment_count`, `sketch_profile_mm`, `validate_profile_references` and `validate_contents`, and revert `PROJECT_SCHEMA` to 5 with `migrate_v5_to_v6` dropped. Only files containing a sector are affected, and no existing project ever gained one; a schema-6 file without a sector is byte-identical to schema 5 apart from the version field, so the rollback can read it after a one-line schema downgrade.",
+      "source": "curated",
+      "trigger_digest": null,
+      "acceptance_results": [
+        "Met for the arc: `SketchProfile::Sector { diameter_param, start_degrees, sweep_degrees }` resolves to the centre plus the tessellated arc, which `validate_profile` accepts. The segmented half was not re-added because `SketchProfile::Polyline` already exists and is tested; adding a second segment variant would have been a duplicate.",
+        "Met: `validate_sector` refuses a non-finite angle and a sweep outside (0, 360), and `validate_profile_references`/`validate_contents` run it when the sketch is created and when a file is loaded, before the same `validate_profile` gate every other profile goes through.",
+        "Met: `a_concave_polyline_resolves_its_analytic_area` asserts the L-shape's 500 mm\u00b2 shoelace area (pre-existing); `a_sector_resolves_an_arc_from_its_centre_with_its_analytic_area` asserts the sector's inscribed-polygon area to 1e-9 and that it is within 1% of the quarter disc.",
+        "Met: `an_arc_sector_cuts_its_analytic_volume_and_survives_save_reopen_and_undo` cuts a 10\u00d710\u00d75 plate with a quarter sector on the real Truck kernel and asserts the analytic volume to 1e-2 mm\u00b3, unchanged bounds, undo/redo, save/reopen and a watertight exported STL."
+      ],
+      "contract_changes": [
+        "`cad_document::SketchProfile::Sector` added; `PROJECT_SCHEMA` raised to 6 with an additive `migrate_v5_to_v6`.",
+        "Studio profile API body gained optional `start_degrees` and `sweep_degrees`; no route changed and no existing request body is invalid."
+      ],
+      "limitations": [
+        "The arc is a tolerance-bounded polygon, not an exact B-rep arc; at small radii the 24-facet circle floor leaves a quarter sector six chords, ~1.1% under the true quarter disc.",
+        "`sweep_degrees` must be strictly between 0 and 360: a full turn is refused with a message naming the circle profile, and a zero sweep has no area.",
+        "Angles are literal profile values, not parameters, because the parameter map holds positive lengths and a start angle of 0 is meaningful; changing an angle is a profile edit and does not appear in the parameter panel.",
+        "One arc per sketch. Mixing arcs and segments, tangent blends, splines and multiple entities per sketch are still absent; a sketch is one closed profile.",
+        "A sector whose arc crosses the revolve axis is refused by the same straddle check as any other profile.",
+        "Not benchmarked: the sector adds no measurement, and a 256-facet sector was not timed."
+      ],
+      "evidence": [
+        "crates/cad-document/src/lib.rs::tests::{a_sector_resolves_an_arc_from_its_centre_with_its_analytic_area, a_sectors_sweep_must_be_between_zero_and_a_full_turn, a_sector_survives_save_and_reopen, a_schema_five_project_migrates_to_schema_six}",
+        "crates/cad-studio/tests/http_api.rs::an_arc_sector_cuts_its_analytic_volume_and_survives_save_reopen_and_undo",
+        "scripts/browser-check.mjs (3 new assertions: the sector form opens, the tree gains a `sector` row, and selecting it restores the angles; 11 loopback + 13 shared, 0 console errors)",
+        "engineering/quality/tests.json#t-platform-workspace-20261029-m11e (291 passed, 0 failed)",
+        "engineering/manifest/capabilities.json#cap.document.arc-sector-profile"
+      ],
+      "verified_on": "2026-10-29",
+      "verified_host": "Linux, 8 cores, 7 GB RAM, rustc 1.95.0, debug and release builds"
     }
   ]
 }

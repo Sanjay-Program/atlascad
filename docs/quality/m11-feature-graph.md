@@ -136,13 +136,15 @@ win rather than assert one. See `docs/performance-baseline.md` §8.
 
 ## 7. Next tasks
 
-1. **Additional sketch entities.** Arcs and segmented profiles, with analytic area tests and at least
-   one cut that exercises them. Revolve now exists but can only turn the primitives and a drawn
-   polyline, so a lathe profile with a taper or a fillet is not expressible.
+1. ~~**Additional sketch entities** (M11e).~~ Delivered 2026-10-29 as the arc-sector profile, with an
+   analytic area test and a cut that exercises it; the segmented half was already the drawn polyline.
+   A lathe profile with a taper or a fillet is still a polyline of straight segments — there is no
+   second arc, tangent blend or entity graph within one sketch.
 2. **Cache memory measurement.** Measure peak RSS with 32 cached prefixes on a large-mesh project
    before deciding whether the bound or the `Arc<Mesh>` representation changes.
 3. **Named revisions and recovery snapshots** (M11f), the persistence piece collaboration and
    versioning need first.
 
 Closed since this document was written: cut through a verified difference (2026-10-28), the
-per-feature rebuild cache (2026-10-29) and full-turn revolve (2026-10-29, schema 5).
+per-feature rebuild cache (2026-10-29), full-turn revolve (2026-10-29, schema 5) and the arc-sector
+profile (2026-10-29, schema 6).

@@ -882,6 +882,42 @@
       "trigger_digest": "c89de798cacb077f"
     },
     {
+      "id": "task.scan.files-modified.repo-cad-document.ec4495d3",
+      "title": "repo.cad-document: 1 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 1 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-document"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ src/lib.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "ec4495d325d30511"
+    },
+    {
       "id": "task.scan.files-modified.repo-cad-document.f68b670a",
       "title": "repo.cad-document: 2 tracked file(s) changed against the previous fingerprint",
       "rationale": "Observed by the workspace scanner: 2 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
@@ -917,6 +953,45 @@
       "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
       "source": "scanner",
       "trigger_digest": "f68b670aee93c9ab"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-engineering.061c91a2",
+      "title": "repo.cad-engineering: 4 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 4 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-engineering"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ src/lib.rs",
+        "~ src/main.rs",
+        "~ src/paths.rs",
+        "+ src/supply.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "061c91a24972270e"
     },
     {
       "id": "task.scan.files-modified.repo-cad-engineering.2c793267",
@@ -1404,6 +1479,48 @@
       "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
       "source": "scanner",
       "trigger_digest": "a129ab5524da4b41"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-studio.c37f3261",
+      "title": "repo.cad-studio: 7 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 7 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "ready",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-studio"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ assets/app.css",
+        "~ assets/app.js",
+        "~ assets/index.html",
+        "~ src/http.rs",
+        "~ src/lib.rs",
+        "~ src/main.rs",
+        "~ tests/http_api.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "c37f3261f6093a3b"
     },
     {
       "id": "task.scan.files-modified.repo-cad-studio.d75ebc55",
