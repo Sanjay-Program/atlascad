@@ -65,12 +65,21 @@ cannot be read falls back to the snapshot instead of failing to open.
 doctest; fmt and clippy `-D warnings` clean. The record is `t-platform-workspace-20261029-gate`. The
 whole gate is now one command, `./scripts/gate.sh` (~6 s warm), which also runs the corpus, manifest
 validation, the dependency licence policy (83 packages, all allowed, offline), the SBOM dry run
-(CycloneDX 1.5, 83 components) and the live simulation. `./scripts/simulate.sh` drives the release
-server through cut, join, undo/redo, a parameter rebuild, save, restart, STL export and a `kill -9`
-recovery (31 assertions), drives the shipped `atlas` and `atlas-eng` binaries on real files (21
-assertions: STL volumes, a headless project edit/undo, manifest validation, the licence policy and a
-byte-identical SBOM) and loads the live page in headless Chrome (7 assertions, zero console errors). `./scripts/package.sh` produces and re-verifies the deployable bundle; see
-`docs/operations/release-process.md`.
+(CycloneDX 1.5, 83 components) and the live simulation. `./scripts/package.sh` produces and re-verifies
+the deployable bundle; see `docs/operations/release-process.md`.
+
+**Re-run 2026-10-29 after LAN sharing:** **286 tests passed, 0 failed, 0 skipped**, including one
+doctest; fmt and clippy `-D warnings` clean. The record is
+`t-platform-workspace-20261029-share`. The two new tests are in `cad-studio`: a shared studio answers
+401 without a token and with a wrong token, 200 with the token as a header or a query parameter, 401
+for a write without it, 403 for a write from a foreign origin, 403 for a `Host` naming another port,
+serves the page shell with `Referrer-Policy: no-referrer`, and reports the link the caller can copy;
+a loopback studio has no token, no share link and a `null` `share` in the payload. The live
+simulation grew to **56 HTTP/CLI assertions** (31 server, 21 CLI/control plane, 4 share: 401 without a
+token, the page served, the link in the payload, a token-bearing 10×10×20 = 2000 mm³ edit) and the
+headless-browser check to **8 assertions loopback + 10 shared** — the shared page shows the **Share**
+panel with its tokenised link, exports an STL with that token, and both runs end with zero console
+errors.
 
 `cad-studio` additionally passed manual browser checks in the bundled preview pane at both 392 px and
 wider viewports: parameter editing (including zero/oversized rejection), profile switching between

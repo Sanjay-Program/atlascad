@@ -121,6 +121,19 @@ byte-identical SBOM. `./scripts/package.sh` then produced
 verified `SHA256SUMS`, ran `--help` on all three packaged binaries and built a 10×10×5 STL with the
 packaged CLI. The CI workflow and `deny.toml` were added but have **not** run on a runner.
 
+### Dated run: 2026-10-29 (LAN sharing)
+
+`cargo test --offline --workspace -j 2` — **286 passed, 0 failed, 0 skipped**; fmt clean and clippy
+`-D warnings` at 0 warnings. The record is `t-platform-workspace-20261029-share`. Two new tests in
+`cad-studio` cover the sharing boundary: without a token and with a wrong token every `/api/*` call is
+`401 unauthorized`; the token is accepted as `X-Atlas-Token` and as `?token=`; a write without it is
+`401`; a write from a foreign origin is `403`; a `Host` naming another port is `403`; a token-bearing
+40×30×20 write measures 24000 mm³; the payload reports the copyable link; the page is served with
+`Referrer-Policy: no-referrer`; and a loopback studio has no token, no link and `share: null`. The
+live simulation grew to **56 HTTP/CLI assertions** (4 of them the share boundary) and the browser
+check to **8 loopback + 10 shared**, where the shared page renders the **Share** panel with its
+tokenised link, zero console errors in both runs.
+
 ## 3. What the tests actually assert
 
 * **Analytic values, not self-consistency:** 10×10×5 box = 500 mm³ ± 1e-6; union 1000 + 160 − 40 =

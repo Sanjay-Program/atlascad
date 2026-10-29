@@ -1418,10 +1418,15 @@ fn a_shared_studio_requires_its_token_and_keeps_the_same_origin_rule()
         },
     )?;
     let addr = handle.addr();
-    let token = handle.token().ok_or("a shared studio must have a token")?.to_string();
+    let token = handle
+        .token()
+        .ok_or("a shared studio must have a token")?
+        .to_string();
 
     // The share link names the advertised host, the real port and the token.
-    let share = handle.share_url().ok_or("a shared studio must have a share link")?;
+    let share = handle
+        .share_url()
+        .ok_or("a shared studio must have a share link")?;
     assert_eq!(
         share,
         format!("http://192.168.1.20:{}/?token={token}", addr.port())
@@ -1433,7 +1438,13 @@ fn a_shared_studio_requires_its_token_and_keeps_the_same_origin_rule()
     assert_eq!(missing.status, 401);
     assert_eq!(json(&missing)?["error"]["kind"], "unauthorized");
 
-    let wrong = request(addr, "GET", "/api/state", &[("x-atlas-token", "not-the-token")], &[])?;
+    let wrong = request(
+        addr,
+        "GET",
+        "/api/state",
+        &[("x-atlas-token", "not-the-token")],
+        &[],
+    )?;
     assert_eq!(wrong.status, 401);
     assert_eq!(json(&wrong)?["error"]["kind"], "unauthorized");
 
@@ -1441,7 +1452,11 @@ fn a_shared_studio_requires_its_token_and_keeps_the_same_origin_rule()
     let by_query = request(addr, "GET", &format!("/api/state?token={token}"), &[], &[])?;
     assert_eq!(by_query.status, 200);
     assert!(
-        (json(&by_query)?["geometry"]["volume_mm3"].as_f64().ok_or("volume")? - 12000.0).abs()
+        (json(&by_query)?["geometry"]["volume_mm3"]
+            .as_f64()
+            .ok_or("volume")?
+            - 12000.0)
+            .abs()
             < 1e-6
     );
 
@@ -1499,12 +1514,15 @@ fn a_shared_studio_requires_its_token_and_keeps_the_same_origin_rule()
         ],
         body.as_bytes(),
     )?;
-    assert_eq!(written.status, 200, "{}", String::from_utf8_lossy(&written.body));
+    assert_eq!(
+        written.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&written.body)
+    );
     let payload = json(&written)?;
     // 40 x 30 x 20 = 24000 mm3.
-    assert!(
-        (payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")? - 24000.0).abs() < 1e-6
-    );
+    assert!((payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")? - 24000.0).abs() < 1e-6);
 
     // A Host naming another port is not this studio, shared or not.
     let wrong_port = request_with_host(

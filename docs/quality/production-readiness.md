@@ -79,7 +79,7 @@ Chrome.
 | Dependency licence audit | 83 packages, 83 allowed, 0 denied, 0 unknown | `atlas-eng licences` |
 | CycloneDX SBOM | 83 components, byte-identical across runs | `atlas-eng sbom --write` |
 | Live simulation | **56 assertions**: 31 over HTTP (cut, join, undo/redo, rebuild, save, restart, STL, `kill -9` recovery), 21 driving the shipped `atlas`/`atlas-eng` on real files, 4 on the shared-session token boundary | `./scripts/simulate.sh` |
-| Live browser smoke check | **8 assertions** loopback + **9** shared (the Share panel), 0 console errors | `node scripts/browser-check.mjs <url>` |
+| Live browser smoke check | **8 assertions** loopback + **10** shared (the Share panel), 0 console errors | `node scripts/browser-check.mjs <url>` |
 
 **What this says:** the performance and memory story is genuinely good for parts of a few hundred
 faces, and the error discipline is real. Neither is the problem.
@@ -231,7 +231,7 @@ console errors). Workspace **279 tests, 0 failed**, fmt and clippy clean.
   `atlas` and `atlas-eng` binaries on real files (21 assertions: box and union STL volumes, a headless
   project edit and undo, manifest validation, the licence policy and a byte-identical SBOM), and a
   shared session's token boundary (4 assertions).
-  `scripts/browser-check.mjs` loads the live page in headless Chrome loopback and shared (8 + 9
+  `scripts/browser-check.mjs` loads the live page in headless Chrome loopback and shared (8 + 10
   assertions, zero console errors).
 * `.github/workflows/ci.yml` and `deny.toml` add the advisory and provenance job. **The workflow has
   not been executed on a runner**; only the gate it calls was run here.

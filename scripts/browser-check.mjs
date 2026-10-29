@@ -9,7 +9,7 @@
 // Exits 0 when every assertion holds, 1 otherwise. Skips (exit 0 with SKIP) when no Chrome is
 // installed, so the gate stays runnable on a host without a browser.
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 
 const TARGET = process.argv[2];
 if (!TARGET) {
@@ -182,6 +182,22 @@ try {
   );
   if (sharedTarget) {
     check(/token=/.test(share.value), 'the share panel does not carry the token');
+    // Export is the one download the page makes. Clicking the button and waiting for the download
+    // proves the page's own fetch carried the token — a plain anchor would have been a 401.
+    const downloads = `/tmp/atlas-browser-downloads-${process.pid}`;
+    mkdirSync(downloads, { recursive: true });
+    await send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: downloads });
+    await evaluate('document.getElementById("exportBtn").click()');
+    await waitFor(
+      `Array.from(document.querySelectorAll("#log li")).some((row) => row.textContent.includes("Exported binary STL"))`,
+      'the shared export',
+      10000
+    );
+    const sizes = readdirSync(downloads).map((name) => statSync(`${downloads}/${name}`).size);
+    check(
+      sizes.some((size) => size > 84),
+      `a shared session cannot export an STL with its token (${JSON.stringify(sizes)})`
+    );
   }
 
   check(consoleErrors.length === 0, `console errors: ${consoleErrors.join(' | ')}`);

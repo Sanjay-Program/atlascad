@@ -144,9 +144,41 @@ the same standard:
   the process does not linger after the server handle is dropped.
 
 Residual risks: **any local process or local browser page that can reach loopback can drive the
-studio while it runs** — there is no token or authentication, only origin checking. That is the
-accepted desktop trust model, not a multi-user one; do not expose the port through a tunnel and call
-it hosted. The app has no TLS, accounts, tenancy, or audit log. Import of untrusted CAD files is not
+studio while it runs** — on loopback there is no token or authentication, only origin checking. That
+is the accepted desktop trust model, not a multi-user one; do not expose the port through a tunnel
+and call it hosted. The app has no TLS, accounts, tenancy, or audit log.
+
+##### Sharing on the local network — added 2026-10-29
+
+`--share` (or any non-loopback `--host`) opts into a second trust model, and it was reviewed as a
+boundary change rather than a convenience flag:
+
+* **A token is mandatory, never optional.** A non-loopback bind always has a token: `--token`
+  (rejected below 16 characters) or a generated 128-bit value from two `RandomState` hashes. There is
+  no code path that binds a LAN interface without one.
+* **What is protected.** Every `/api/*` request — reads, writes, export, health — requires
+  `X-Atlas-Token` or `?token=`; a missing or wrong token is `401` before routing. The static page,
+  CSS, script and icon are served without a token because a browser cannot present one before it has
+  parsed the page, and they carry no document data.
+* **Comparison.** `tokens_match` compares the whole presented token in constant time and does not
+  early-return on length mismatch after the length check.
+* **Host and origin under sharing.** The `Host` must name the studio's port (the address a colleague
+  dialled cannot be known in advance); a write must still carry an `Origin` equal to the host it was
+  served from. DNS rebinding therefore cannot read the document without the token, which is the
+  defence that matters here.
+* **Leak surface.** The token lives in the URL, so it can appear in browser history, a copied link,
+  or a proxy log. The page is served with `Referrer-Policy: no-referrer` and the token is only put
+  in an `X-Atlas-Token` header by the app, never logged. There is no rotation, no revocation endpoint
+  and no audit trail: stopping the process revokes the link.
+* **No confidentiality on the wire.** Plain HTTP on a LAN; anyone who can sniff the segment can read
+  the document and the token. Not for hostile networks or the internet.
+* **One document, one history.** Sharing is not multi-user editing: two clients share one undo stack
+  and the last write wins. There is no per-client presence, locking or merge.
+* **Verified.** `a_shared_studio_requires_its_token_and_keeps_the_same_origin_rule` (401 without and
+  with a wrong token, header and query forms, 401 on an unauthenticated write, 403 on a foreign
+  origin, 403 on a `Host` naming another port, a token-bearing 24000 mm³ write, the link in the
+  payload, `Referrer-Policy` on the page) and `a_loopback_studio_has_no_token_and_no_share_link`;
+  plus the live simulation's 4 share assertions and a headless-browser run of a shared page, where the page exports an STL with its own token. Import of untrusted CAD files is not
 wired to the application at all; only the STL reader in `cad-io` exists, and it caps declared facet
 counts before allocation and refuses truncated input.
 

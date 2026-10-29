@@ -213,7 +213,9 @@ fn usage() {
     println!("  cad-studio --new PATH [--name NAME] [--size X,Y,Z] [--port PORT]");
     println!();
     println!("The studio binds 127.0.0.1 unless shared. `--share` binds 0.0.0.0 and prints a");
-    println!("tokenised link a colleague on the same network can open; `--advertise HOST` sets the");
+    println!(
+        "tokenised link a colleague on the same network can open; `--advertise HOST` sets the"
+    );
     println!("host in that link (a DNS name, for example). Anyone with the link can edit the open");
     println!("document until the studio stops; do not expose it to the internet.");
 }

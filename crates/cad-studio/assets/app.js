@@ -1525,21 +1525,43 @@
     if (ok) toast("Saved to the project file.");
   }
 
-  function exportStl() {
+  // The download goes through fetch so a shared session can present its token as a header. A plain
+  // anchor to /api/export/stl would be a 401 in a shared studio, which is exactly the case a user
+  // would hit first when a colleague exports.
+  async function exportStl() {
     const project = app.project;
     if (!project) return;
     if (project.failure) {
       toast(`Feature ${project.failure.feature} cannot rebuild, so the export would not match the model.`, true);
       return;
     }
-    const anchor = document.createElement("a");
-    anchor.href = "/api/export/stl";
-    anchor.download = `${project.name.replace(/[^A-Za-z0-9_-]+/g, "_") || "part"}.stl`;
-    document.body.append(anchor);
-    anchor.click();
-    anchor.remove();
-    log("Exported binary STL");
-    toast("STL download started.");
+    try {
+      const headers = new Headers();
+      if (shareToken) headers.set("x-atlas-token", shareToken);
+      const response = await fetch("/api/export/stl", { headers });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new ApiError(
+          payload && payload.error ? payload.error.message : `Export failed with status ${response.status}.`,
+          "export_failure",
+          response.status
+        );
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${project.name.replace(/[^A-Za-z0-9_-]+/g, "_") || "part"}.stl`;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      log("Exported binary STL");
+      toast("STL download started.");
+    } catch (error) {
+      toast(error.message, true);
+      log(`Export failed: ${error.message}`, "error");
+    }
   }
 
   async function setProfile(kind) {

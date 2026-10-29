@@ -520,6 +520,21 @@
       "supersedes": [
         "t-platform-workspace-20261029-m11f"
       ]
+    },
+    {
+      "id": "t-platform-workspace-20261029-share",
+      "target": "repo.platform",
+      "command": "./scripts/gate.sh",
+      "outcome": "success",
+      "passed": 286,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 6400,
+      "recorded_at": "2026-10-29",
+      "notes": "Gate after LAN sharing: fmt clean, clippy --all-targets -D warnings (0 warnings), 286 workspace tests across 11 packages with 0 failures (cad-studio 21: the two new share tests), corpus 8 ok / 3 known failure / 0 regressions, manifests 0/0, licences 83/83 allowed, SBOM 83 components, live simulation 56 HTTP/CLI assertions (31 server, 21 CLI/control plane, 4 share) and headless Chrome 8 assertions loopback + 10 shared. The share test proves 401 without and with a wrong token, 200 with the token as header or query, 401 for an unauthenticated write, 403 for a foreign origin and for a Host naming another port, a token-bearing 40x30x20 = 24000 mm3 write, the link in the payload, Referrer-Policy: no-referrer on the page, and a loopback studio with no token and a null share field.",
+      "supersedes": [
+        "t-platform-workspace-20261029-gate"
+      ]
     }
   ]
 }

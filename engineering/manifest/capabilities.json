@@ -489,6 +489,21 @@
         "docs/operations/release-process.md"
       ],
       "notes": "Runs offline. The licence policy fails closed on an unrecognised licence. CI wiring exists but has not run on a runner; signing, installers, an update channel and advisory scanning are outstanding."
+    },
+    {
+      "id": "cap.studio.share",
+      "name": "Token-gated LAN session sharing",
+      "description": "Expose one live studio session on the local network behind a 128-bit session token; the page shows the link, and every API call must present the token.",
+      "provided_by": [
+        "module.cad-studio"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "crates/cad-studio/tests/http_api.rs::a_shared_studio_requires_its_token_and_keeps_the_same_origin_rule",
+        "engineering/quality/tests.json#t-platform-workspace-20261029-share",
+        "docs/feature-matrix.md"
+      ],
+      "notes": "Opt-in only: the default bind is loopback with no token. A non-loopback bind always requires a token; the static page is served without one so the browser can present it. One document and one history are shared, so the last write wins; there is no account layer and the link dies with the process."
     }
   ]
 }
