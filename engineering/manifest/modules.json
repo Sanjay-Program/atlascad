@@ -809,14 +809,15 @@
       "name": "cad-kernel-truck",
       "repository_id": "repo.cad-kernel-truck",
       "language": "rust",
-      "responsibility": "Contract implementation over truck: extrude, union, intersection, tessellation with panic guard, volume-conservation guard and coplanar retry.",
+      "responsibility": "Contract implementation over truck: extrude, full-turn revolve, union, intersection, tessellation with panic guard, volume-conservation guard and coplanar retry.",
       "boundaries": [
         "Advertises only capabilities a test exercises.",
         "Refuses boolean difference with KernelError::Unsupported rather than returning a wrong solid.",
         "Namespaced handles: a handle from another instance is UnknownSolid."
       ],
       "public_api": [
-        "TruckKernel implementing cad_contract::Kernel"
+        "TruckKernel implementing cad_contract::Kernel",
+        "BuildCache-compatible Kernel::contains"
       ],
       "internal_dependencies": [
         "module.cad-contract"
@@ -832,6 +833,7 @@
       ],
       "provides": [
         "cap.kernel.extrude",
+        "cap.kernel.revolve",
         "cap.kernel.boolean.union",
         "cap.kernel.boolean.intersection",
         "cap.kernel.tessellate"
@@ -1192,23 +1194,34 @@
       "name": "cad-document",
       "repository_id": "repo.cad-document",
       "language": "rust",
-      "responsibility": "Local parametric project payload: stable sketch/feature IDs, named parameters, rectangle/circle/regular-polygon profiles, extrude evaluation, bounded undo/redo, schema-checked save/load with schema-1 migration, integrity validation and atomic replacement.",
+      "responsibility": "Local parametric project payload: stable sketch/feature IDs, named parameters, rectangle/circle/regular-polygon/polyline profiles, an ordered feature graph rebuilt through the kernel (new body, union join, difference cut, or a full-turn revolve about a sketch axis), a per-feature rebuild cache keyed by resolved inputs, crash-recovery snapshots of unsaved edits, bounded undo/redo, schema-checked save/load with schema 1-4 migration, integrity validation and atomic replacement.",
       "boundaries": [
-        "Kernel handles are runtime-only and never serialized.",
-        "Schema 2 supports one extrude of one sketch profile; it is not a general sketch solver or feature graph.",
+        "Kernel handles are runtime-only and never serialized; BuildCache holds them for the session only and is never persisted.",
+        "Schema 5 stores an ordered, linear, single-body history: the first feature starts the body and every later feature joins or cuts it. A feature is an extrude or a full-turn revolve. There is no multi-body graph or constraint solver.",
+        "A feature may only reference a sketch created before it; a forward reference or dependency cycle is refused on load and cannot be created.",
+        "A kernel failure is a reported result: the failing feature's ID and message are returned with the last good mesh, not an error that discards the document.",
         "Native project loads are limited to 64 MiB; unknown fields, invalid references and unsupported schemas are refused.",
         "Up to 64 undo and redo snapshots are persisted and validated.",
-        "A circle is represented by a tolerance-bounded polygon, and its volume is that polygon\u2019s volume."
+        "A circle is represented by a tolerance-bounded polygon, and its volume is that polygon\u2019s volume.",
+        "A recovery snapshot is a separate file (`<project>.recovery`); it never writes the project, is ignored when corrupt, and is deleted by a save or a discard."
       ],
       "public_api": [
-        "Project",
-        "Parameter",
-        "Sketch",
-        "SketchProfile",
-        "Feature",
+        "Build",
+        "BuildCache",
         "Evaluated",
+        "ExtrudeOperation",
+        "Feature",
+        "FeatureFailure",
+        "FeatureKind",
+        "FeatureOutcome",
+        "FeatureReport",
+        "MAX_PROJECT_BYTES",
+        "Parameter",
+        "Project",
         "ProjectError",
-        "MAX_PROJECT_BYTES"
+        "RevolveAxis",
+        "Sketch",
+        "SketchProfile"
       ],
       "internal_dependencies": [
         "module.cad-contract"
@@ -1221,13 +1234,18 @@
       "consumes": [
         "cap.contract.versioned-document",
         "cap.kernel.extrude",
-        "cap.kernel.tessellate"
+        "cap.kernel.revolve",
+        "cap.kernel.tessellate",
+        "cap.kernel.boolean.union",
+        "cap.kernel.boolean.difference",
+        "cap.kernel.transform"
       ],
       "provides": [
-        "cap.document.project-persistence"
+        "cap.document.project-persistence",
+        "cap.document.feature-graph"
       ],
       "tests": "passing",
-      "loc": 1668,
+      "loc": 3304,
       "files": 1,
       "performance_baseline": null,
       "migration": "keep",
@@ -1236,10 +1254,12 @@
         "module.cad-cli",
         "module.cad-studio"
       ],
-      "compat": "zcad schema 2 (loads schema 1); document header schema 2",
+      "compat": "zcad schema 5 (loads schemas 1-4); document header schema 2",
       "evidence": [
         "crates/cad-document/src/lib.rs",
-        "engineering/quality/tests.json#t-cad-document-schema2"
+        "engineering/quality/tests.json#t-cad-document-m11d",
+        "docs/architecture-decisions/0009-feature-graph.md",
+        "docs/performance-baseline.md section 9"
       ]
     },
     {
@@ -1335,12 +1355,13 @@
       "name": "cad-studio",
       "repository_id": "repo.cad-studio",
       "language": "rust + html/css/javascript (embedded assets)",
-      "responsibility": "Local-first application shell: project browser, named-parameter and profile editing, 3D WebGL viewport with orbit/pan/zoom/fit, wireframe, grid, face picking, command palette, light/dark theme, save and STL export.",
+      "responsibility": "Local-first HTTP API and single-page viewer: sketch creation, extrude and revolve features, parameter and placement edits, a session rebuild cache, autosave to a recovery snapshot with restore/discard, undo/redo, save, and binary STL export.",
       "boundaries": [
         "Binds 127.0.0.1 only; refuses foreign POST origins and non-JSON bodies.",
         "No endpoint accepts a filesystem path from the client; the project path is fixed at launch.",
         "Headers are capped at 16 KiB and JSON bodies at 1 MiB; connections are capped at 64.",
         "Single process, single project, no accounts, cloud, telemetry or collaboration.",
+        "A feature that cannot rebuild is shown with the kernel's message and export is refused; no placeholder geometry is drawn.",
         "The browser UI has no build step and no third-party JavaScript."
       ],
       "public_api": [
@@ -1362,10 +1383,13 @@
       ],
       "consumes": [
         "cap.contract.versioned-document",
+        "cap.document.feature-graph",
         "cap.document.project-persistence",
+        "cap.io.stl-export",
+        "cap.kernel.boolean.union",
         "cap.kernel.extrude",
-        "cap.kernel.tessellate",
-        "cap.io.stl-export"
+        "cap.kernel.revolve",
+        "cap.kernel.tessellate"
       ],
       "provides": [
         "cap.app.local-studio",
@@ -1375,16 +1399,18 @@
       "tests": "passing",
       "loc": 1284,
       "files": 3,
-      "performance_baseline": "10 ms start to health (5 runs, 7-16 ms); 2.66 ms GET /api/state (300 requests, p95 4.29 ms); 4.44 ms parameter rebuild (30 requests); 4.50 ms atomic save; 3.98 ms STL export on a 28-triangle part (bm-studio-*). The accept loop's 10 ms poll added 7.5 ms to the state median and was removed.",
+      "performance_baseline": "10 ms start to health (5 runs, 7-16 ms); 2.66 ms GET /api/state (300 requests, p95 4.29 ms); 4.44 ms parameter rebuild (30 requests); 4.50 ms atomic save; 3.98 ms STL export on a 28-triangle part (bm-studio-*). The accept loop's 10 ms poll added 7.5 ms to the state median and was removed. 2026-10-27, two-feature join: 31 ms start to health, 17.4 ms GET /api/state, 17.3 ms parameter rebuild (median of 20, max 17.9), 12.6 ms save, 16.8 ms STL export of the joined 72-triangle body (bm-studio-m11-*); every request rebuilds the whole graph and there is no per-feature cache.",
       "migration": "not_applicable",
       "integration_status": "verified",
       "consumers": [],
-      "compat": "zcad schema 2, contract v1",
+      "compat": "zcad schema 3 (schema 1 and 2 migrate), contract v1",
       "evidence": [
         "crates/cad-studio/src/lib.rs",
         "crates/cad-studio/tests/http_api.rs",
-        "engineering/quality/tests.json#t-cad-studio",
-        "docs/architecture-decisions/0008-local-first-app-shell-without-a-ui-toolkit.md"
+        "engineering/quality/tests.json#t-cad-studio-m11",
+        "engineering/quality/tests.json#t-cad-studio-browser-m11",
+        "docs/architecture-decisions/0009-feature-graph.md",
+        "docs/quality/m11-feature-graph.md"
       ]
     }
   ]

@@ -115,6 +115,11 @@ fn synthesize_one(change: &Change) -> Task {
             .to_string(),
         source: TaskSource::Scanner,
         trigger_digest: Some(change.digest.clone()),
+        acceptance_results: Vec::new(),
+        contract_changes: Vec::new(),
+        limitations: Vec::new(),
+        verified_on: None,
+        verified_host: None,
     }
 }
 

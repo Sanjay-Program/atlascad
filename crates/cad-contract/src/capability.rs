@@ -30,6 +30,9 @@ pub enum Capability {
     Chamfer,
     /// Hollowing / offset of a solid.
     Shell,
+    /// Rigid translation of a solid. Needed to place a tool that must overshoot its target, which
+    /// is how an exact through-cut is built without coincident faces.
+    Transform,
     /// Triangle tessellation of a solid.
     Tessellate,
     StepImport,
@@ -57,6 +60,7 @@ impl Capability {
         Capability::Fillet,
         Capability::Chamfer,
         Capability::Shell,
+        Capability::Transform,
         Capability::Tessellate,
         Capability::StepImport,
         Capability::StepExport,
@@ -86,6 +90,7 @@ impl Capability {
             Capability::Fillet => "fillet",
             Capability::Chamfer => "chamfer",
             Capability::Shell => "shell",
+            Capability::Transform => "transform",
             Capability::Tessellate => "tessellate",
             Capability::StepImport => "STEP import",
             Capability::StepExport => "STEP export",

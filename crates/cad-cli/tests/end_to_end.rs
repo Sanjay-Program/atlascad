@@ -190,9 +190,19 @@ fn the_summary_reports_only_the_capabilities_that_were_exercised() -> TestResult
         !capabilities.iter().any(|c| c == "fillet"),
         "fillet is not implemented and must not be advertised: {capabilities:?}"
     );
+    // Difference is advertised because it is measured correct through the adapter's repair
+    // (docs/kernel-comparison.md §4.2). This assertion used to say the opposite; it was inverted
+    // when the measurement changed, rather than removed.
     assert!(
-        !capabilities.iter().any(|c| c == "boolean difference"),
-        "difference returns a wrong solid through this path and must not be advertised"
+        capabilities.iter().any(|c| c == "boolean difference"),
+        "difference is verified and must be advertised: {capabilities:?}"
+    );
+    // Revolve is advertised because it is measured correct: see the analytic cylinder and annulus
+    // tests in cad-kernel-truck and the studio end-to-end revolve test. This assertion used to say
+    // the opposite; it was inverted when the capability landed, rather than removed.
+    assert!(
+        capabilities.iter().any(|c| c == "revolve"),
+        "revolve is verified and must be advertised: {capabilities:?}"
     );
     Ok(())
 }

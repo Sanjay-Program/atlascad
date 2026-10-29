@@ -15,6 +15,12 @@
     palette: { open: false, index: 0, items: [] },
     helpOpen: false,
     toastTimer: 0,
+    selected: null,
+    lastFailureKey: null,
+    lastRecoveryKey: null,
+    // Set while the user is drawing a closed polyline on the z = 0 plane. Points are in document
+    // units and in absolute coordinates; the created sketch uses origin [0, 0].
+    draw: null,
   };
 
   // ---------------------------------------------------------------------------------------
@@ -390,7 +396,10 @@
         if (!this.pointer || this.pointer.id !== event.pointerId) return;
         const wasClick = this.dragDistance < 4 && event.button === 0;
         this.pointer = null;
-        if (wasClick) this.pickAt(event.clientX, event.clientY);
+        if (!wasClick) return;
+        // While drawing, a click places a point instead of inspecting a face.
+        if (app.draw) addDrawPoint(event.clientX, event.clientY);
+        else this.pickAt(event.clientX, event.clientY);
       });
       canvas.addEventListener("pointercancel", () => {
         this.pointer = null;
@@ -579,6 +588,31 @@
         }
       }
 
+      // The loop being drawn, plus a closing preview once it has three points and a cross at each
+      // placed point. The document does not change until the loop is closed.
+      if (app.draw && app.draw.points.length) {
+        const scaleFactor = documentScale();
+        const points = app.draw.points.map(([x, y]) => [x * scaleFactor, y * scaleFactor]);
+        const ink = dark ? [0.36, 0.92, 0.72] : [0.03, 0.55, 0.36];
+        const closing = dark ? [0.24, 0.6, 0.5] : [0.4, 0.66, 0.58];
+        for (let index = 0; index + 1 < points.length; index += 1) {
+          add(
+            [points[index][0], points[index][1], 0.1],
+            [points[index + 1][0], points[index + 1][1], 0.1],
+            ink
+          );
+        }
+        if (points.length >= 3) {
+          const last = points[points.length - 1];
+          add([last[0], last[1], 0.1], [points[0][0], points[0][1], 0.1], closing);
+        }
+        const tick = Math.max(this.radius * 0.012, 0.05);
+        for (const point of points) {
+          add([point[0] - tick, point[1], 0.1], [point[0] + tick, point[1], 0.1], ink);
+          add([point[0], point[1] - tick, 0.1], [point[0], point[1] + tick, 0.1], ink);
+        }
+      }
+
       this.counts.scene = vertices.length / 6;
       this.upload(this.buffers.scene, new Float32Array(vertices));
     }
@@ -733,6 +767,31 @@
       }
     }
 
+    // The point under the cursor on the z = 0 drawing plane, in millimetres, or null when the
+    // view is edge-on to the plane (where the ray has no single intersection).
+    groundAt(clientX, clientY) {
+      const rect = this.canvas.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) return null;
+      const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
+      const ndcY = 1 - ((clientY - rect.top) / rect.height) * 2;
+      const eye = this.eye();
+      const forward = normalize(subtract(this.camera.target, eye));
+      let right = cross(forward, [0, 0, 1]);
+      if (lengthOf(right) < 0.001) right = [0, 1, 0];
+      right = normalize(right);
+      const up = normalize(cross(right, forward));
+      const aspect = rect.width / Math.max(rect.height, 1);
+      const tanHalf = Math.tan((50 * Math.PI) / 180 / 2);
+      const direction = normalize(add(
+        forward,
+        add(scale(right, ndcX * aspect * tanHalf), scale(up, ndcY * tanHalf))
+      ));
+      if (Math.abs(direction[2]) < 1e-9) return null;
+      const t = -eye[2] / direction[2];
+      if (!Number.isFinite(t) || t <= 1e-6) return null;
+      return [eye[0] + direction[0] * t, eye[1] + direction[1] * t];
+    }
+
     pickAt(clientX, clientY) {
       if (!this.mesh) {
         clearPick();
@@ -808,21 +867,68 @@
   // UI state rendering
   // ---------------------------------------------------------------------------------------
 
+  function sketchById(id) {
+    const project = app.project;
+    if (!project) return null;
+    return project.sketches.find((candidate) => candidate.id === id) || null;
+  }
+
+  function featureById(id) {
+    const project = app.project;
+    if (!project) return null;
+    return project.features.find((candidate) => candidate.id === id) || null;
+  }
+
+  // The selection resolved against the current payload, or null when it names nothing any more.
+  function selection() {
+    if (!app.selected) return null;
+    if (app.selected.kind === "sketch") {
+      const node = sketchById(app.selected.id);
+      return node ? { kind: "sketch", id: node.id, node } : null;
+    }
+    const node = featureById(app.selected.id);
+    return node ? { kind: "feature", id: node.id, node } : null;
+  }
+
+  // The sketch the profile and placement controls act on: the selected sketch, the sketch the
+  // selected feature consumes, or, with nothing selected, the sketch of the last feature.
   function activeSketch() {
     const project = app.project;
     if (!project || !project.sketches.length) return null;
+    const selected = selection();
+    if (selected) {
+      if (selected.kind === "sketch") return selected.node;
+      const sketch = sketchById(selected.node.sketch_id);
+      if (sketch) return sketch;
+    }
     const feature = project.features[project.features.length - 1];
     if (feature) {
-      const sketch = project.sketches.find((candidate) => candidate.id === feature.sketch_id);
+      const sketch = sketchById(feature.sketch_id);
       if (sketch) return sketch;
     }
     return project.sketches[0];
   }
 
-  function activeFeature() {
+  // The ordered history: sketches and features in creation order. For features that is also build
+  // order, because a feature is always allocated an ID after the sketch it consumes.
+  function historyEntries() {
     const project = app.project;
-    if (!project || !project.features.length) return null;
-    return project.features[project.features.length - 1];
+    if (!project) return [];
+    const entries = [
+      ...project.sketches.map((sketch) => ({ kind: "sketch", id: sketch.id, sketch })),
+      ...project.features.map((feature) => ({ kind: "feature", id: feature.id, feature })),
+    ];
+    entries.sort((a, b) => a.id - b.id);
+    return entries;
+  }
+
+  function select(kind, id) {
+    app.selected = { kind, id };
+    renderTree();
+    renderProperties();
+    syncProfileControls();
+    syncPlacementControls();
+    syncCreateControls();
   }
 
   function applyState(next) {
@@ -842,12 +948,23 @@
     byId("undoBtn").disabled = app.busy || next.history.undo === 0;
     byId("redoBtn").disabled = app.busy || next.history.redo === 0;
     byId("saveBtn").disabled = app.busy;
-    byId("exportBtn").disabled = app.busy || next.features.length === 0;
+    const exportable = next.features.length > 0 && !next.failure;
+    byId("exportBtn").disabled = app.busy || !exportable;
+    byId("exportBtn").title = next.failure
+      ? `Export is refused while feature ${next.failure.feature} cannot rebuild`
+      : "Export binary STL";
+
+    // A selection that names an undone entity is cleared rather than left dangling.
+    if (app.selected && !selection()) app.selected = null;
 
     renderParameters();
     renderTree();
     renderProperties();
+    renderFailure(next.failure);
+    renderRecovery(next.recovery);
     syncProfileControls();
+    syncPlacementControls();
+    syncCreateControls();
     updateGeometryStatus();
     clearPick();
     if (app.viewport) app.viewport.setModel(next);
@@ -928,35 +1045,233 @@
     const tree = byId("tree");
     const project = app.project;
     tree.textContent = "";
-    if (!project || (!project.sketches.length && !project.features.length)) {
-      tree.append(element("p", "hint", "The tree is empty."));
+    if (!project) return;
+    const entries = historyEntries();
+    if (!entries.length) {
+      tree.append(element("p", "hint", "The tree is empty. Add a sketch to start."));
       return;
     }
+    const selected = selection();
+    const unitScale = documentScale();
+    for (const entry of entries) {
+      const isSelected = Boolean(selected) && selected.kind === entry.kind && selected.id === entry.id;
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = `tree-item${isSelected ? " selected" : ""}`;
+      row.setAttribute("aria-pressed", String(isSelected));
+      row.addEventListener("click", () => select(entry.kind, entry.id));
+      const head = element("span", "tree-row");
+      if (entry.kind === "sketch") {
+        const sketch = entry.sketch;
+        head.append(
+          element("span", "tree-icon", "▱"),
+          element("span", "tree-label", `Sketch ${sketch.id}`),
+          element(
+            "span",
+            "tree-meta",
+            `origins ${formatNumber(sketch.origin[0])}, ${formatNumber(sketch.origin[1])}`
+          ),
+          element("span", "tree-badge", profileName(sketch.profile.kind))
+        );
+        row.title = `Sketch ${sketch.id}: ${profileName(sketch.profile.kind)}, ${sketch.segments} segments`;
+      } else {
+        const feature = entry.feature;
+        const label = feature.kind === "revolve" ? "Revolve" : "Extrude";
+        const detail =
+          feature.kind === "revolve"
+            ? feature.axis
+            : `${formatNumber(feature.depth_mm / unitScale)} ${project.units}`;
+        head.append(
+          element("span", "tree-icon", "▣"),
+          element("span", "tree-label", `${label} ${feature.id}`),
+          element("span", "tree-meta", `${feature.operation} · ${detail}`),
+          element("span", `tree-badge ${feature.status}`, feature.status)
+        );
+        row.title = `${label} ${feature.id} (${feature.operation}) from sketch ${feature.sketch_id}`;
+      }
+      row.append(head);
+      if (entry.kind === "feature" && entry.feature.message) {
+        row.append(element("span", "tree-message", entry.feature.message));
+      }
+      tree.append(row);
+    }
+  }
+
+  // One line per change of failure, so a rebuild that fails once is not re-announced on every later
+  // payload (a parameter edit re-renders the whole state).
+  // Unsaved work is protected by a snapshot next to the project file. Two things need saying: the
+  // session started from one, or a snapshot write is failing. Either is shown until it stops being
+  // true, and `recovered` is only cleared by saving or discarding, so the banner cannot lie.
+  function renderRecovery(recovery) {
+    const banner = byId("recoveryBanner");
+    const discard = byId("recoveryDiscard");
+    const message = byId("recoveryMessage");
+    if (!recovery || (!recovery.recovered && !recovery.autosave_error)) {
+      banner.hidden = true;
+      app.lastRecoveryKey = null;
+      return;
+    }
+    banner.hidden = false;
+    if (recovery.autosave_error) {
+      const text = `Unsaved changes are not protected: ${recovery.autosave_error}`;
+      message.textContent = text;
+      discard.hidden = !recovery.recovered;
+      if (app.lastRecoveryKey !== text) log(text, "error");
+      app.lastRecoveryKey = text;
+      return;
+    }
+    const when = recovery.saved_at_unix
+      ? new Date(recovery.saved_at_unix * 1000).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "an earlier session";
+    const text = recovery.file_unreadable
+      ? `The project file could not be read. Recovered unsaved changes from ${when}: save to replace the file with them.`
+      : `Recovered unsaved changes from ${when}. Save to keep them, or discard to go back to the file on disk.`;
+    message.textContent = text;
+    // There is nothing to go back to when the file itself is unreadable.
+    discard.hidden = recovery.file_unreadable;
+    if (app.lastRecoveryKey !== text) {
+      log(text);
+      toast("Recovered unsaved changes.");
+    }
+    app.lastRecoveryKey = text;
+  }
+
+  async function discardRecovery() {
+    await mutate("/api/recovery/discard", {}, "Discarded the recovered changes");
+  }
+
+  function renderFailure(failure) {
+    const banner = byId("failureBanner");
+    banner.hidden = !failure;
+    const key = failure ? `${failure.feature}:${failure.message}` : null;
+    if (failure) {
+      byId("failureMessage").textContent = `Feature ${failure.feature} could not rebuild: ${failure.message}`;
+      if (key !== app.lastFailureKey) {
+        log(`Feature ${failure.feature} failed: ${failure.message}`, "error");
+        toast(`Feature ${failure.feature} could not rebuild.`, true);
+      }
+    }
+    app.lastFailureKey = key;
+  }
+
+  function syncPlacementControls() {
+    const sketch = activeSketch();
+    const label = byId("placementLabel");
+    const x = byId("originX");
+    const y = byId("originY");
+    const button = byId("moveSketchBtn");
+    const disabled = app.busy || !sketch;
+    x.disabled = disabled;
+    y.disabled = disabled;
+    button.disabled = disabled;
+    if (!sketch) {
+      label.textContent = "no sketch";
+      return;
+    }
+    label.textContent = `sketch ${sketch.id}`;
+    if (document.activeElement !== x) x.value = String(sketch.origin[0]);
+    if (document.activeElement !== y) y.value = String(sketch.origin[1]);
+  }
+
+  function syncCreateControls() {
+    const project = app.project;
+    const kind = byId("newSketchKind").value;
+    byId("newSidesField").hidden = kind !== "regular_polygon";
+    byId("addSketchBtn").disabled = app.busy;
+    byId("addSketchBtn").textContent = kind === "polyline" ? "Draw polyline" : "Add sketch";
+
+    // An extrude and a revolve need different inputs, so only the relevant field is shown and the
+    // button names the operation it will actually perform.
+    const featureKind = byId("newFeatureKind").value;
+    let revolves = featureKind === "revolve";
+    byId("newDepthField").hidden = revolves;
+    byId("newAxisField").hidden = !revolves;
+    byId("addFeatureBtn").textContent = revolves ? "Add revolve" : "Add extrude";
+
+    const sketchSelect = byId("newFeatureSketch");
+    const chosenSketch = sketchSelect.value;
+    sketchSelect.textContent = "";
+    for (const sketch of project ? project.sketches : []) {
+      const option = document.createElement("option");
+      option.value = String(sketch.id);
+      option.textContent = `Sketch ${sketch.id} · ${profileName(sketch.profile.kind)}`;
+      sketchSelect.append(option);
+    }
+    const sketchIds = [...sketchSelect.options].map((option) => option.value);
+    // An explicit selection decides the extrude target; with nothing selected the form keeps
+    // whatever the user picked, and only falls back to the newest sketch when there is no choice.
     const active = activeSketch();
-    if (project.sketches.length) {
-      tree.append(element("div", "tree-group", "Sketches"));
-      for (const sketch of project.sketches) {
-        const row = element("div", "tree-item");
-        row.append(element("span", "tree-icon", "▱"));
-        row.append(element("span", "", `Sketch ${sketch.id}`));
-        row.append(element("span", "tree-meta", profileName(sketch.profile.kind)));
-        if (active && sketch.id === active.id) {
-          row.setAttribute("aria-current", "true");
-          row.style.color = "var(--text)";
-        }
-        tree.append(row);
-      }
+    if (active && selection()) sketchSelect.value = String(active.id);
+    else if (sketchIds.includes(chosenSketch)) sketchSelect.value = chosenSketch;
+    else if (active) sketchSelect.value = String(active.id);
+    sketchSelect.disabled = app.busy || !sketchIds.length;
+
+    const depthSelect = byId("newFeatureDepth");
+    const chosenDepth = depthSelect.value;
+    depthSelect.textContent = "";
+    for (const parameter of project ? project.parameters : []) {
+      const option = document.createElement("option");
+      option.value = parameter.id;
+      option.textContent = `${parameter.id} (${formatNumber(parameter.value)})`;
+      depthSelect.append(option);
     }
-    if (project.features.length) {
-      tree.append(element("div", "tree-group", "Features"));
-      for (const feature of project.features) {
-        const row = element("div", "tree-item");
-        row.append(element("span", "tree-icon", "▣"));
-        row.append(element("span", "", `Extrude ${feature.id}`));
-        row.append(element("span", "tree-meta", `${formatNumber(feature.depth_mm / documentScale())} ${project.units}`));
-        tree.append(row);
-      }
+    const depthIds = [...depthSelect.options].map((option) => option.value);
+    if (depthIds.includes(chosenDepth)) depthSelect.value = chosenDepth;
+    else if (depthIds.includes("depth")) depthSelect.value = "depth";
+    depthSelect.disabled = app.busy || !depthIds.length;
+
+    // At any point in the history only one class of operation is legal, so the control keeps only
+    // the available choices; the document refuses anything else.
+    const hasBody = Boolean(project && project.features.length);
+    const operationSelect = byId("newFeatureOperation");
+    // Rebuild the options from scratch so the unavailable ones are not selectable. Cut is offered
+    // only when the kernel advertises boolean difference, because a cut on a kernel without it has
+    // no geometry behind the button. The truck adapter advertises it: a cut whose tool overshoots
+    // the body is exact (verified analytically and through this API).
+    const capabilities = project && project.kernel ? project.kernel.capabilities : [];
+    const supportsDifference = capabilities.includes("boolean difference");
+    const supportsRevolve = capabilities.includes("revolve");
+    const revolveOption = byId("newFeatureKind").querySelector('option[value="revolve"]');
+    // A kind the kernel cannot build is not offered, the same rule the cut operation follows.
+    revolveOption.disabled = !supportsRevolve;
+    if (!supportsRevolve && revolves) {
+      byId("newFeatureKind").value = "extrude";
+      revolves = false;
+      byId("newDepthField").hidden = false;
+      byId("newAxisField").hidden = true;
+      byId("addFeatureBtn").textContent = "Add extrude";
     }
+    operationSelect.replaceChildren();
+    const newBody = document.createElement("option");
+    newBody.value = "new_body";
+    newBody.textContent = "New body";
+    const join = document.createElement("option");
+    join.value = "join";
+    join.textContent = "Join";
+    operationSelect.append(newBody);
+    if (hasBody) {
+      operationSelect.append(join);
+      if (supportsDifference) {
+        const cut = document.createElement("option");
+        cut.value = "cut";
+        cut.textContent = "Cut";
+        operationSelect.append(cut);
+      }
+      if (![...operationSelect.options].some((option) => option.value === operationSelect.value)) {
+        operationSelect.value = "join";
+      }
+      byId("createHint").textContent = supportsDifference
+        ? "This project has one body; a new feature joins it or cuts from it."
+        : "This project has one body; a new feature joins it. Cut is unavailable because the active kernel does not advertise boolean difference.";
+    } else {
+      byId("createHint").textContent =
+        "The first feature starts the body; later features join it. A revolve turns the sketch a full turn about one of its own axes.";
+    }
+    operationSelect.disabled = app.busy;
+    byId("addFeatureBtn").disabled = app.busy || !sketchIds.length;
   }
 
   function profileName(kind) {
@@ -975,15 +1290,57 @@
     const bounds = project.bounds;
     const unitScale = documentScale();
     const size = bounds ? subtract(bounds.max, bounds.min).map((value) => value / unitScale) : null;
-    const feature = activeFeature();
     const rows = [
       ["Volume", `${formatNumber(geometry.volume_mm3 / (unitScale * unitScale * unitScale))} ${project.units}³`],
       ["Surface", `${formatNumber(geometry.surface_area_mm2 / (unitScale * unitScale))} ${project.units}²`],
       ["Triangles", String(geometry.triangles)],
       ["Vertices", String(geometry.vertices)],
       ["Bounding box", size ? `${formatNumber(size[0])} × ${formatNumber(size[1])} × ${formatNumber(size[2])}` : "—"],
+      ["Rebuild", project.failure ? `stopped at feature ${project.failure.feature}` : "all features built"],
     ];
-    if (feature) rows.push(["Extrude depth", `${formatNumber(feature.depth_mm / unitScale)} ${project.units}`]);
+    const selected = selection();
+    if (selected && selected.kind === "sketch") {
+      const sketch = selected.node;
+      rows.push(
+        ["Selected", `Sketch ${sketch.id}`],
+        ["Profile", profileName(sketch.profile.kind)],
+        ["Origin", `${formatNumber(sketch.origin[0])}, ${formatNumber(sketch.origin[1])} ${project.units}`],
+        ["Segments", String(sketch.segments)]
+      );
+      if (sketch.profile.kind === "polyline" && Array.isArray(sketch.profile.points)) {
+        rows.push([
+          "Loop",
+          sketch.profile.points
+            .map((point) => `(${formatNumber(point[0])}, ${formatNumber(point[1])})`)
+            .join(" "),
+        ]);
+      }
+    } else if (selected && selected.kind === "feature") {
+      const feature = selected.node;
+      rows.push(
+        ["Selected", `${feature.kind === "revolve" ? "Revolve" : "Extrude"} ${feature.id}`],
+        ["Operation", feature.operation],
+        ["Status", feature.status],
+        ["Sketch", String(feature.sketch_id)]
+      );
+      if (feature.kind === "revolve") {
+        rows.push(["Axis", feature.axis], ["Turn", "full revolution"]);
+      } else {
+        rows.push(
+          ["Depth parameter", feature.depth_param],
+          ["Depth", `${formatNumber(feature.depth_mm / unitScale)} ${project.units}`]
+        );
+      }
+      if (typeof feature.volume_mm3 === "number") {
+        rows.push([
+          "Volume after",
+          `${formatNumber(feature.volume_mm3 / (unitScale * unitScale * unitScale))} ${project.units}³`,
+        ]);
+      }
+      if (feature.message) rows.push(["Message", feature.message]);
+    } else {
+      rows.push(["Selected", "nothing — click a tree row"]);
+    }
     for (const [label, value] of rows) {
       container.append(element("span", "", label), element("span", "", value));
     }
@@ -1005,7 +1362,8 @@
     const project = app.project;
     if (!project) return;
     const unitScale = documentScale();
-    byId("statusGeometry").textContent = `${project.geometry.triangles} tri · ${formatNumber(project.geometry.volume_mm3 / (unitScale * unitScale * unitScale))} ${project.units}³`;
+    const stale = project.failure ? " · last good rebuild" : "";
+    byId("statusGeometry").textContent = `${project.geometry.triangles} tri · ${formatNumber(project.geometry.volume_mm3 / (unitScale * unitScale * unitScale))} ${project.units}³${stale}`;
     const notice = byId("viewportNotice");
     if (!app.viewport || !app.viewport.fallback) {
       notice.hidden = project.geometry.triangles > 0;
@@ -1020,20 +1378,25 @@
     const segments = byId("segmentsLabel");
     if (!sketch) {
       select.disabled = true;
+      byId("sidesInput").disabled = true;
       sidesField.hidden = true;
-      segments.textContent = "";
+      segments.textContent = "no sketch";
       return;
     }
     select.disabled = app.busy;
+    byId("sidesInput").disabled = app.busy;
     select.value = sketch.profile.kind;
     const isPolygon = sketch.profile.kind === "regular_polygon";
     sidesField.hidden = !isPolygon;
     if (isPolygon) byId("sidesInput").value = String(sketch.profile.sides);
-    segments.textContent = `${sketch.segments} segments`;
+    segments.textContent = `sketch ${sketch.id} · ${sketch.segments} segments`;
     if (sketch.profile.kind === "rectangle") {
       hint.textContent = "A rectangle is sized by width × height.";
     } else if (sketch.profile.kind === "circle") {
       hint.textContent = "A circle is approximated by a tolerance-bounded polygon.";
+    } else if (sketch.profile.kind === "polyline") {
+      hint.textContent =
+        "A drawn polyline can be replaced by a rectangle, circle, or polygon; draw another to change the loop.";
     } else {
       hint.textContent = "A regular polygon is circumscribed by the diameter.";
     }
@@ -1071,13 +1434,18 @@
       byId("undoBtn").disabled = value || app.project.history.undo === 0;
       byId("redoBtn").disabled = value || app.project.history.redo === 0;
       byId("saveBtn").disabled = value;
-      byId("exportBtn").disabled = value || app.project.features.length === 0;
+      const exportable = app.project.features.length > 0 && !app.project.failure;
+      byId("exportBtn").disabled = value || !exportable;
       byId("profileKind").disabled = value;
     }
+    syncCreateControls();
+    syncPlacementControls();
   }
 
+  // Returns the new state payload on success and null on failure, so a caller that needs to follow
+  // up (selecting the entity it just created) can use the result without re-fetching it.
   async function mutate(path, body, label) {
-    if (app.busy) return false;
+    if (app.busy) return null;
     setBusy(true);
     setStatus("Rebuilding geometry…", "busy");
     try {
@@ -1090,7 +1458,7 @@
       setStatus("Ready", "");
       log(label);
       toast(label);
-      return true;
+      return next;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setStatus(message, "error");
@@ -1101,7 +1469,7 @@
       } catch (refreshError) {
         // The server may have stopped; the message already says so.
       }
-      return false;
+      return null;
     } finally {
       setBusy(false);
     }
@@ -1123,6 +1491,10 @@
   function exportStl() {
     const project = app.project;
     if (!project) return;
+    if (project.failure) {
+      toast(`Feature ${project.failure.feature} cannot rebuild, so the export would not match the model.`, true);
+      return;
+    }
     const anchor = document.createElement("a");
     anchor.href = "/api/export/stl";
     anchor.download = `${project.name.replace(/[^A-Za-z0-9_-]+/g, "_") || "part"}.stl`;
@@ -1152,6 +1524,255 @@
       return;
     }
     await mutate("/api/sketch/profile", body, `Profile changed to ${profileName(kind)}`);
+  }
+
+  function newestId(list) {
+    let newest = null;
+    for (const item of list) {
+      if (newest === null || item.id > newest) newest = item.id;
+    }
+    return newest;
+  }
+
+  // The entity just created is the one with the largest ID, because IDs are allocated in order.
+  function selectNewest(kind, payload) {
+    const list = kind === "sketch" ? payload.sketches : payload.features;
+    const id = newestId(list);
+    if (id !== null) select(kind, id);
+  }
+
+  function originFrom(xId, yId) {
+    const x = Number(byId(xId).value);
+    const y = Number(byId(yId).value);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return [x, y];
+  }
+
+  async function addSketch() {
+    const kind = byId("newSketchKind").value;
+    if (kind === "polyline") {
+      startDrawing();
+      return;
+    }
+    const origin = originFrom("newOriginX", "newOriginY");
+    if (!origin) {
+      toast("A sketch origin needs two finite numbers.", true);
+      return;
+    }
+    const body = { kind, origin };
+    if (kind === "regular_polygon") {
+      const sides = Number(byId("newSidesInput").value);
+      if (!Number.isInteger(sides) || sides < 3 || sides > 256) {
+        toast("A polygon needs an integer side count from 3 to 256.", true);
+        return;
+      }
+      body.sides = sides;
+    }
+    const next = await mutate("/api/sketch", body, `Sketch added (${profileName(kind)})`);
+    if (next) selectNewest("sketch", next);
+  }
+
+  async function addFeature() {
+    const project = app.project;
+    if (!project || !project.sketches.length) {
+      toast("Add a sketch before building a feature from it.", true);
+      return;
+    }
+    const sketchId = Number(byId("newFeatureSketch").value);
+    const kind = byId("newFeatureKind").value;
+    const operation = byId("newFeatureOperation").value;
+    if (!Number.isInteger(sketchId) || sketchId <= 0) {
+      toast("Pick a sketch first.", true);
+      return;
+    }
+    const action = operation === "join" ? "Join" : operation === "cut" ? "Cut" : "New body";
+    if (kind === "revolve") {
+      const axis = byId("newFeatureAxis").value;
+      const next = await mutate(
+        "/api/feature/revolve",
+        { sketch_id: sketchId, operation, axis },
+        `${action} revolve added`
+      );
+      if (next) selectNewest("feature", next);
+      return;
+    }
+    const depthParam = byId("newFeatureDepth").value;
+    if (!depthParam) {
+      toast("Pick a depth parameter first.", true);
+      return;
+    }
+    const next = await mutate(
+      "/api/feature/extrude",
+      { sketch_id: sketchId, depth_param: depthParam, operation },
+      `${action} extrude added`
+    );
+    if (next) selectNewest("feature", next);
+  }
+
+  async function moveSketch() {
+    const sketch = activeSketch();
+    if (!sketch) {
+      toast("Select a sketch to move.", true);
+      return;
+    }
+    const origin = originFrom("originX", "originY");
+    if (!origin) {
+      toast("A sketch origin needs two finite numbers.", true);
+      return;
+    }
+    if (origin[0] === sketch.origin[0] && origin[1] === sketch.origin[1]) return;
+    await mutate(
+      "/api/sketch/origin",
+      { id: sketch.id, origin },
+      `Sketch ${sketch.id} moved to ${formatNumber(origin[0])}, ${formatNumber(origin[1])}`
+    );
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // Polyline drawing
+  // ---------------------------------------------------------------------------------------
+
+  function updateDrawBar() {
+    const bar = byId("drawBar");
+    bar.hidden = !app.draw;
+    if (!app.draw) return;
+    const count = app.draw.points.length;
+    const frozen = app.busy || app.draw.submitting;
+    byId("drawCount").textContent = `${count} point${count === 1 ? "" : "s"}`;
+    byId("drawUndoPoint").disabled = frozen || count === 0;
+    byId("drawClose").disabled = frozen || count < 3;
+    byId("drawCancel").disabled = frozen;
+  }
+
+  function refreshDraft() {
+    updateDrawBar();
+    byId("viewport").classList.toggle("drawing", Boolean(app.draw));
+    if (!app.viewport) return;
+    app.viewport.uploadSceneLines();
+    app.viewport.requestFrame();
+  }
+
+  function startDrawing() {
+    if (app.busy) return;
+    if (app.draw) {
+      setStatus("A polyline is already being drawn; close it or press Esc first.", "");
+      return;
+    }
+    app.draw = { points: [], submitting: false };
+    clearPick();
+    // On a narrow layout the project drawer covers the viewport; drawing needs it out of the way.
+    closeDrawers();
+    refreshDraft();
+    setStatus("Click the z = 0 grid plane to place polyline points.", "busy");
+    log("Polyline drawing started");
+    byId("viewport").focus({ preventScroll: true });
+  }
+
+  function endDrawing() {
+    app.draw = null;
+    refreshDraft();
+    setStatus("Ready", "");
+  }
+
+  function cancelDrawing() {
+    if (!app.draw) return;
+    const dropped = app.draw.points.length;
+    endDrawing();
+    log(
+      dropped
+        ? `Polyline drawing cancelled (${dropped} points discarded)`
+        : "Polyline drawing cancelled"
+    );
+  }
+
+  function undoDrawPoint() {
+    if (!app.draw || app.draw.submitting || !app.draw.points.length) return;
+    app.draw.points.pop();
+    const count = app.draw.points.length;
+    refreshDraft();
+    setStatus(`Point removed; ${count} point${count === 1 ? "" : "s"} placed.`, "");
+  }
+
+  function roundDocument(value) {
+    return Math.round(value * 1000) / 1000;
+  }
+
+  function addDrawPoint(clientX, clientY) {
+    if (!app.draw || app.draw.submitting) return;
+    const ground = app.viewport ? app.viewport.groundAt(clientX, clientY) : null;
+    if (!ground) {
+      toast("That view is edge-on to the drawing plane. Orbit or use the top view, then click again.", true);
+      return;
+    }
+    const scaleFactor = documentScale();
+    const point = [roundDocument(ground[0] / scaleFactor), roundDocument(ground[1] / scaleFactor)];
+    const last = app.draw.points[app.draw.points.length - 1];
+    // A repeated click would be a zero-length segment, which the document refuses.
+    if (last && last[0] === point[0] && last[1] === point[1]) return;
+    app.draw.points.push(point);
+    refreshDraft();
+    setStatus(
+      `Point ${app.draw.points.length} at ${formatNumber(point[0])}, ${formatNumber(point[1])} — Enter closes the loop.`,
+      ""
+    );
+  }
+
+  async function finishDrawing() {
+    if (!app.draw || app.draw.submitting) return;
+    if (app.draw.points.length < 3) {
+      toast("A closed loop needs at least three points.", true);
+      return;
+    }
+    const points = app.draw.points.slice();
+    // The points are absolute document coordinates, so the sketch origin stays at 0.
+    app.draw.submitting = true;
+    refreshDraft();
+    const next = await mutate(
+      "/api/sketch",
+      { kind: "polyline", origin: [0, 0], points },
+      `Sketch added (polyline, ${points.length} points)`
+    );
+    if (!next) {
+      // The request failed; the loop stays on screen so the user can retry or adjust it.
+      if (app.draw) {
+        app.draw.submitting = false;
+        refreshDraft();
+      }
+      return;
+    }
+    endDrawing();
+    selectNewest("sketch", next);
+  }
+
+  // The palette drives the panel controls so both routes share one code path.
+  async function createSketch(kind) {
+    byId("newSketchKind").value = kind;
+    byId("newSidesField").hidden = kind !== "regular_polygon";
+    await addSketch();
+  }
+
+  async function extrudeSketch(operation) {
+    const sketch = activeSketch();
+    if (sketch) byId("newFeatureSketch").value = String(sketch.id);
+    byId("newFeatureKind").value = "extrude";
+    byId("newFeatureOperation").value = operation;
+    await addFeature();
+  }
+
+  async function revolveSketch(operation) {
+    const sketch = activeSketch();
+    if (sketch) byId("newFeatureSketch").value = String(sketch.id);
+    byId("newFeatureKind").value = "revolve";
+    byId("newFeatureOperation").value = operation;
+    await addFeature();
+  }
+
+  function locateFailure() {
+    const project = app.project;
+    if (!project || !project.failure) return;
+    select("feature", project.failure.feature);
+    const row = byId("tree").querySelector(".tree-item.selected");
+    if (row) row.scrollIntoView({ block: "nearest" });
   }
 
   function toggleWireframe() {
@@ -1203,6 +1824,15 @@
       { label: "Profile: rectangle", hint: "box", keywords: "sketch shape box rectangle", run: () => setProfile("rectangle") },
       { label: "Profile: circle", hint: "disc", keywords: "sketch shape circle cylinder disc", run: () => setProfile("circle") },
       { label: "Profile: regular polygon", hint: "prism", keywords: "sketch shape polygon prism nut", run: () => setProfile("regular_polygon") },
+      { label: "New sketch: rectangle", hint: "create", keywords: "add create sketch rectangle box", run: () => createSketch("rectangle") },
+      { label: "New sketch: circle", hint: "create", keywords: "add create sketch circle cylinder disc", run: () => createSketch("circle") },
+      { label: "New sketch: regular polygon", hint: "create", keywords: "add create sketch polygon prism nut", run: () => createSketch("regular_polygon") },
+      { label: "New sketch: polyline (draw in the viewport)", hint: "draw", keywords: "add create sketch polyline path draw freeform bracket", run: () => createSketch("polyline") },
+      { label: "Extrude the selected sketch as a new body", hint: "solid", keywords: "add create extrude solid new body feature", run: () => extrudeSketch("new_body") },
+      { label: "Extrude the selected sketch as a join", hint: "union", keywords: "add create extrude join union boolean feature", run: () => extrudeSketch("join") },
+      { label: "Extrude the selected sketch as a cut", hint: "difference", keywords: "add create extrude cut difference boolean feature", run: () => extrudeSketch("cut") },
+      { label: "Revolve the selected sketch as a new body", hint: "turn", keywords: "add create revolve lathe turn axis solid new body feature", run: () => revolveSketch("new_body") },
+      { label: "Revolve the selected sketch as a join", hint: "union", keywords: "add create revolve lathe turn axis join union boolean feature", run: () => revolveSketch("join") },
       { label: "Toggle light/dark theme", hint: "appearance", keywords: "theme dark light", run: () => toggleTheme() },
       { label: "Keyboard shortcuts", hint: "?", keywords: "help keys", run: () => openHelp() },
     ];
@@ -1345,6 +1975,7 @@
     byId("undoBtn").addEventListener("click", undo);
     byId("redoBtn").addEventListener("click", redo);
     byId("saveBtn").addEventListener("click", save);
+    byId("recoveryDiscard").addEventListener("click", discardRecovery);
     byId("exportBtn").addEventListener("click", exportStl);
     byId("paletteBtn").addEventListener("click", openPalette);
     byId("themeBtn").addEventListener("click", toggleTheme);
@@ -1385,6 +2016,60 @@
     byId("sidesInput").addEventListener("blur", () => {
       if (byId("profileKind").value === "regular_polygon") setProfile("regular_polygon");
     });
+    byId("addSketchBtn").addEventListener("click", addSketch);
+    byId("addFeatureBtn").addEventListener("click", addFeature);
+    byId("newFeatureKind").addEventListener("change", () => {
+      const revolves = byId("newFeatureKind").value === "revolve";
+      byId("newDepthField").hidden = revolves;
+      byId("newAxisField").hidden = !revolves;
+      byId("addFeatureBtn").textContent = revolves ? "Add revolve" : "Add extrude";
+    });
+    byId("moveSketchBtn").addEventListener("click", moveSketch);
+    byId("drawUndoPoint").addEventListener("click", undoDrawPoint);
+    byId("drawClose").addEventListener("click", finishDrawing);
+    byId("drawCancel").addEventListener("click", cancelDrawing);
+    byId("failureLocate").addEventListener("click", locateFailure);
+    byId("newSketchKind").addEventListener("change", () => {
+      const kind = byId("newSketchKind").value;
+      byId("newSidesField").hidden = kind !== "regular_polygon";
+      byId("addSketchBtn").textContent = kind === "polyline" ? "Draw polyline" : "Add sketch";
+      if (kind === "regular_polygon") byId("newSidesInput").focus();
+    });
+    // Enter walks the creation form: X, then Y, then submit.
+    byId("newOriginX").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        byId("newOriginY").focus();
+      }
+    });
+    byId("newOriginY").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addSketch();
+      }
+    });
+    byId("newSidesInput").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addSketch();
+      }
+    });
+    byId("originX").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        byId("originY").focus();
+      }
+    });
+    byId("originY").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        moveSketch();
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        const sketch = activeSketch();
+        if (sketch) byId("originY").value = String(sketch.origin[1]);
+      }
+    });
     byId("paletteInput").addEventListener("input", (event) => {
       app.palette.index = 0;
       renderPalette(event.target.value);
@@ -1424,9 +2109,18 @@
       if (event.key === "Escape") {
         if (app.palette.open) closePalette();
         if (app.helpOpen) closeHelp();
+        if (app.draw) cancelDrawing();
         closeDrawers();
         if (app.viewport && app.viewport.pick) clearPick();
         return;
+      }
+      if (event.key === "Enter" && app.draw && !typing) {
+        // Let a focused button run its own action instead of closing the loop twice.
+        if (!(target instanceof HTMLElement && target.tagName === "BUTTON")) {
+          event.preventDefault();
+          finishDrawing();
+          return;
+        }
       }
       if (app.palette.open) return;
       if (typing) return;

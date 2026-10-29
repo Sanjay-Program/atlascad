@@ -116,6 +116,11 @@ impl TaskStatus {
 
 /// Priority follows the order fixed by the engineering brief: risk to data and security first,
 /// optional optimisation last.
+///
+/// `user_value` and `measurement` are part of the vocabulary `docs/tasks.md` defines and the task
+/// manifests already used; they were missing here, so `validate` refused every manifest that named
+/// them. Adding them is the fix — renaming the manifests to fit the code would have rewritten a
+/// documented vocabulary to match an incomplete enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskPriority {
@@ -124,6 +129,8 @@ pub enum TaskPriority {
     IntegrationBlocker,
     InterfaceCompatibility,
     RequiredFeature,
+    UserValue,
+    Measurement,
     Performance,
     Refactor,
 }
@@ -591,6 +598,22 @@ pub struct Task {
     /// For scanner tasks: the observed value that triggered the task. Re-running an unchanged scan
     /// reproduces this digest, which is what makes task generation idempotent.
     pub trigger_digest: Option<String>,
+    /// Closure notes, in the order of `acceptance_criteria`. A criterion may be recorded as met,
+    /// partially met or deviated from; "partially met" is a real outcome and is kept rather than
+    /// rounded up to a pass.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub acceptance_results: Vec<String>,
+    /// Contract, interface or schema changes the task made, so a consumer can see what moved.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub contract_changes: Vec<String>,
+    /// What the task does not do. Recorded next to the evidence so a limit is not read as an omission.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub limitations: Vec<String>,
+    /// When the recorded evidence was last reproduced, and on what.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verified_on: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verified_host: Option<String>,
 }
 
 // ---------------------------------------------------------------------------------------------

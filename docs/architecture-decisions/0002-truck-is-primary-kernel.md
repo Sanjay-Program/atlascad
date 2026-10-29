@@ -16,6 +16,11 @@ Six kernels were available. Two facts dominated the decision:
    * every boolean between solids with coplanar, overlapping faces returns no result, at three model
      scales, across a tolerance sweep, for both common construction styles;
    * a difference returns a solid whose volume is *larger* than the target's (1053 mm³ from a
+   * **Resolved 2026-10-28:** the volume was wrong because the walls of the cavity were wound
+     outward, not because the geometry was wrong. The adapter now gives each shell the sign its
+     nesting depth requires, the analytic cut fixtures pass exactly, and `BooleanDifference` is
+     advertised (`docs/kernel-comparison.md` §4.2). The decision recorded here — truck as the
+     primary kernel, reached through an adapter — is unchanged.
      1000 mm³ plate), i.e. malformed topology;
    * a third chained union panics inside `intersection_curve` (*"tolerance must be no less than 1e-6"*).
 

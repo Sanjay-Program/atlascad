@@ -240,6 +240,256 @@
         "t-platform-workspace-20261025"
       ],
       "summary": true
+    },
+    {
+      "id": "t-cad-feature-graph",
+      "target": "repo.cad-document",
+      "command": "cargo test --offline -p cad-document -j 2",
+      "outcome": "success",
+      "passed": 36,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 90,
+      "recorded_at": "2026-10-27",
+      "notes": "9 new tests over the 27 recorded for schema 2: an ordered two-feature history builds both extrudes and exactly one union with an analytic volume; a shared parameter rebuilds every dependent feature; a two-feature project round-trips through save and reopen; a join is refused when the kernel does not advertise BooleanUnion; a second body or a join without a body is refused; a failing join names its feature ID and keeps the last good mesh; loading refuses a feature that consumes a sketch created after it and dangling references; schema-2 features gain an explicit operation on load; undo removes the joined feature and its geometry together. The 27 earlier tests (analytic circle and polygon volumes, profile validation, migration, size limits, corrupt input, atomic save, undo/redo) still pass.",
+      "supersedes": [
+        "t-cad-document-schema2"
+      ]
+    },
+    {
+      "id": "t-cad-studio-m11",
+      "target": "repo.cad-studio",
+      "command": "cargo test --offline -p cad-studio -j 2",
+      "outcome": "success",
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 210,
+      "recorded_at": "2026-10-27",
+      "notes": "2 unit tests plus 11 HTTP integration tests against a real loopback server. The 3 new tests: a second sketch extruded as a join reaches the truck kernel and survives save and reopen with the joined volume; a feature that cannot rebuild is reported by ID with its message while the last good mesh stays renderable; the creation endpoints refuse unknown sketch IDs, an extrude on a missing sketch, a join before a body exists and a profile with impossible parameters. The 8 earlier tests (renderable state, parameter edit/undo/redo/save/reopen, STL parse-back, circle and polygon profiles, Host/Origin/media-type/body-limit refusals, unknown fields) still pass.",
+      "supersedes": [
+        "t-cad-studio"
+      ]
+    },
+    {
+      "id": "t-cad-studio-browser-m11",
+      "target": "repo.cad-studio",
+      "command": "node target/studio-qa/drive.mjs http://127.0.0.1:7611 (installed Chrome, headless, over the DevTools protocol)",
+      "outcome": "success",
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 12000,
+      "recorded_at": "2026-10-27",
+      "notes": "One browser-driven workflow run, counted as 7 assertions, not 7 cargo tests: create a rectangle sketch, extrude a new body, create a second sketch, move its origin, extrude a join, edit the shared depth parameter, save, reopen and export STL. Assertions read the rendered model tree, the properties panel, the viewport triangle count and the exported file; console errors and failed requests are collected and must stay empty. The palette commands (new sketch, extrude, join, save, export) were checked in a second run. Evidence: docs/quality/m11-feature-graph.md."
+    },
+    {
+      "id": "t-platform-workspace-20261027",
+      "target": "repo.platform",
+      "command": "cargo test --offline --workspace -j 2",
+      "outcome": "success",
+      "passed": 239,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 2390,
+      "recorded_at": "2026-10-27",
+      "notes": "239 tests across 11 workspace packages, including 1 doc test, with fmt and clippy --all-targets -D warnings clean: cad-agent-api 13, cad-agent-geometry 24 (12 unit + 12 integration), cad-agent-runtime 16, cad-cli 10 (9 end-to-end + 1 project workflow), cad-contract 55 (54 unit + 1 doc test), cad-document 36, cad-engineering 30 (4 unit + 26 integration), cad-entitlements 10, cad-io 6, cad-kernel-truck 26 and cad-studio 13 (2 unit + 11 HTTP integration). 12 more than the 227 of 2026-10-25, all of them in cad-document (+9) and cad-studio (+3); no earlier test was removed or skipped. Workspace-wide summary; it duplicates the per-package records and is excluded from summed totals.",
+      "supersedes": [
+        "t-platform-workspace-20261025-final"
+      ],
+      "summary": true
+    },
+    {
+      "id": "t-cad-document-m11c",
+      "target": "repo.cad-document",
+      "command": "cargo test --offline -p cad-document",
+      "outcome": "success",
+      "passed": 51,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-29",
+      "notes": "2026-10-29, supersedes t-cad-feature-graph (36). Seven new tests cover the per-feature rebuild cache: an unchanged history issues no extrude and no boolean; editing the last feature's own parameter rebuilds exactly one extrude and one union; editing an earlier feature invalidates every later prefix; a failing feature is reported identically through the cache and is not cached; deleting the running body from a fresh kernel instance discards the cache instead of adopting stale handles; clear releases every handle; and a cached build equals an uncached build in reports and mesh.",
+      "supersedes": [
+        "t-cad-feature-graph"
+      ]
+    },
+    {
+      "id": "t-cad-kernel-truck-m11c",
+      "target": "repo.cad-kernel-truck",
+      "command": "cargo test --offline -p cad-kernel-truck",
+      "outcome": "success",
+      "passed": 31,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 210,
+      "recorded_at": "2026-10-29",
+      "notes": "29 previous tests plus 2 for the new diagnostics: operations_are_counted asserts the extrude, boolean and tessellate counters track calls, and contains_answers_for_issued_and_released_handles asserts the handle query a session cache uses. The capability, analytic-volume, orientation and cancellation tests all still pass, so the counters changed no behaviour.",
+      "supersedes": [
+        "t-cad-kernel-truck"
+      ]
+    },
+    {
+      "id": "t-platform-workspace-20261029",
+      "target": "repo.platform",
+      "command": "cargo test --offline --workspace -j 2",
+      "outcome": "success",
+      "passed": 261,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 3500,
+      "recorded_at": "2026-10-29",
+      "notes": "261 tests across 11 workspace packages, including 1 doc test, with fmt and clippy --all-targets -D warnings clean: cad-agent-api 13, cad-agent-geometry 24 (12 unit + 12 integration), cad-agent-runtime 16, cad-cli 10 (9 end-to-end + 1 project workflow), cad-contract 55 (54 unit + 1 doc test), cad-document 51, cad-engineering 30 (4 unit + 26 integration), cad-entitlements 10, cad-io 6, cad-kernel-truck 31 and cad-studio 15 (2 unit + 13 HTTP integration). 22 more than the 239 of 2026-10-27: cad-document +15, cad-kernel-truck +5 and cad-studio +2 since that run. No earlier test was removed or skipped. Workspace-wide summary; it duplicates the per-package records and is excluded from summed totals.",
+      "supersedes": [
+        "t-platform-workspace-20261027"
+      ],
+      "summary": true
+    },
+    {
+      "id": "t-cad-kernel-truck-m11d",
+      "target": "repo.cad-kernel-truck",
+      "command": "cargo test --offline -p cad-kernel-truck",
+      "outcome": "success",
+      "passed": 35,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-29",
+      "notes": "31 previous tests plus 4 for revolve: a closed rectangle turned a full turn about the Y axis measures the analytic cylinder volume and stays watertight; an offset rectangle measures the analytic annulus volume; a partial sweep is refused with an explanation rather than returned as an open shell; and a profile that straddles the axis is refused because it is not a solid of revolution. All 35 tests pass, so advertising the new capability changed no existing behaviour. Corpus still 8 must-pass ok, 3 known-failure, 0 regressions.",
+      "supersedes": [
+        "t-cad-kernel-truck-m11c"
+      ]
+    },
+    {
+      "id": "t-cad-document-m11d",
+      "target": "repo.cad-document",
+      "command": "cargo test --offline -p cad-document",
+      "outcome": "success",
+      "passed": 57,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-29",
+      "notes": "51 previous tests plus 6 for revolve: a revolve feature resolves its sketch axis to a point and direction in millimetres; a revolve on a kernel that does not advertise Revolve fails the feature by ID rather than silently skipping it; a straddling profile fails with the kernel's message; schema 4 loads through migration with its extrude-only history intact and schema 5 round-trips a revolve; an edited revolve axis invalidates only the prefixes that read it; and a cached revolve build does not revolve again.",
+      "supersedes": [
+        "t-cad-document-m11c"
+      ]
+    },
+    {
+      "id": "t-cad-studio-m11d",
+      "target": "repo.cad-studio",
+      "command": "cargo test --offline -p cad-studio",
+      "outcome": "success",
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-29",
+      "notes": "13 previous tests plus 4: an annulus built over HTTP matches the analytic volume within 2%, survives save/reopen byte-for-byte, exports a watertight STL and reports its axis; a profile across the revolve axis is a failed feature with the kernel's reason and export refused; the revolve endpoint refuses an unknown axis and an unknown sketch; and the capability gate hides the revolve command on a kernel that does not advertise it.",
+      "supersedes": [
+        "t-cad-studio-m11"
+      ]
+    },
+    {
+      "id": "t-cad-cli-m11d",
+      "target": "repo.cad-cli",
+      "command": "cargo test --offline -p cad-cli",
+      "outcome": "success",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-29",
+      "notes": "Unchanged count, one assertion inverted: the summary test that asserted revolve is not advertised now asserts it is, because the adapter measures it. Kept as an assertion rather than deleted so the claim stays tested in both directions.",
+      "supersedes": [
+        "t-cad-cli"
+      ]
+    },
+    {
+      "id": "t-platform-workspace-20261029-m11d",
+      "target": "repo.platform",
+      "command": "cargo test --offline --workspace -j 2",
+      "outcome": "success",
+      "passed": 273,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 3900,
+      "recorded_at": "2026-10-29",
+      "notes": "273 tests across 11 workspace packages, including 1 doc test, with cargo fmt --all --check clean and cargo clippy --offline --workspace --all-targets -D warnings at 0 warnings in the same cycle: cad-agent-api 13, cad-agent-geometry 24 (12 unit + 12 integration), cad-agent-runtime 16, cad-cli 10, cad-contract 55 (54 unit + 1 doc test), cad-document 57, cad-engineering 30 (4 unit + 26 integration), cad-entitlements 10, cad-io 6, cad-kernel-truck 35 and cad-studio 17 (2 unit + 15 HTTP integration). 12 more than the 261 of the same day: cad-kernel-truck +4, cad-document +6 and cad-studio +2. No earlier test was removed or skipped; the one changed assertion (revolve advertised) was inverted with the capability. Workspace-wide summary; it duplicates the per-package records.",
+      "supersedes": [
+        "t-platform-workspace-20261029"
+      ]
+    },
+    {
+      "id": "t-cad-studio-browser-m11d",
+      "target": "repo.cad-studio",
+      "command": "node target/studio-qa/revolve.mjs <url>",
+      "outcome": "success",
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-29",
+      "notes": "Headless Chrome over the DevTools protocol against the built binary, assertions on the real DOM: the Revolve option is enabled because the adapter advertises the capability; choosing it hides the depth field, shows the axis field and relabels the button `Add revolve`; a revolve of the default 10x10 rectangle about the sketch's vertical axis adds a `Revolve 2` row with badge `built` and meta `new body . vertical axis`; the properties panel reads `Turn: full revolution` and `Volume after 3,133.72 mm3` (analytic pi*10^2*10 = 3,141.59, 0.25% low because the mesh is an inscribed polygon); export is enabled; save then reload brings the same row back. Zero console errors and zero exceptions. These are browser assertions, not cargo tests.",
+      "supersedes": []
+    },
+    {
+      "id": "t-cad-document-m11f",
+      "target": "repo.cad-document",
+      "command": "cargo test --offline -p cad-document",
+      "outcome": "success",
+      "passed": 61,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-29",
+      "notes": "57 previous tests plus 4 for unsaved-edit recovery: an edit that was never saved is offered from its snapshot while the project file stays untouched; a snapshot superseded by a later save is deleted rather than offered; a corrupt snapshot is ignored instead of blocking the project; and a truncated project file falls back to its snapshot with `file_unreadable` set. Staleness is decided by the file version the snapshot was taken from, not by a clock, so a save and the next edit in the same second cannot mis-order them.",
+      "supersedes": [
+        "t-cad-document-m11d"
+      ]
+    },
+    {
+      "id": "t-cad-studio-m11f",
+      "target": "repo.cad-studio",
+      "command": "cargo test --offline -p cad-studio",
+      "outcome": "success",
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-29",
+      "notes": "17 previous tests plus 2 over a real socket: an unsaved parameter edit survives a dropped server handle (the crash stand-in), is offered on restart, reports `recovered: true` and `dirty: true`, and is promoted by a save that removes the snapshot; and `POST /api/recovery/discard` returns to the file body, clears the flag and deletes the snapshot. The project file is asserted unchanged throughout.",
+      "supersedes": [
+        "t-cad-studio-m11d"
+      ]
+    },
+    {
+      "id": "t-cad-studio-browser-m11f",
+      "target": "repo.cad-studio",
+      "command": "node target/studio-qa/recovery.mjs <url>",
+      "outcome": "success",
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-29",
+      "notes": "Headless Chrome over CDP against a release server started from a recovery snapshot, 9 DOM assertions: the banner is visible with `Recovered unsaved changes from \u2026`; the discard button is shown; the badge reads `unsaved`; the body is the recovered 800 mm3 rather than the file's 500; discard hides the banner, restores 500 mm3 and the `saved` badge; a later edit does not re-show the recovery banner; saving clears the badge; zero console errors. Browser assertions, not cargo tests.",
+      "supersedes": []
+    },
+    {
+      "id": "t-platform-workspace-20261029-m11f",
+      "target": "repo.platform",
+      "command": "cargo test --offline --workspace -j 2",
+      "outcome": "success",
+      "passed": 279,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 4000,
+      "recorded_at": "2026-10-29",
+      "notes": "279 tests across 11 packages, 0 failed, with fmt clean and clippy --all-targets -D warnings at 0 warnings: cad-agent-api 13, cad-agent-geometry 24, cad-agent-runtime 16, cad-cli 10, cad-contract 55, cad-document 61, cad-engineering 30, cad-entitlements 10, cad-io 6, cad-kernel-truck 35, cad-studio 19. Six more than the 273 of the revolve cycle: cad-document +4 and cad-studio +2, all for crash recovery. Corpus unchanged at 8 ok / 3 known failure / 0 regressions; atlas-eng validate 0 errors, 0 warnings.",
+      "supersedes": [
+        "t-platform-workspace-20261029-m11d"
+      ]
     }
   ]
 }

@@ -143,6 +143,39 @@
       "notes": "Warm no-op build after fmt, clippy -D warnings and the 226-test run: 0.085 s wall, 39 MB peak RSS. Proves the final tree still builds all targets; it is not a cold-build timing.",
       "target": "repo.platform",
       "host": "i3-1125G4, 4C/8T, 7.4 GB RAM, Fedora 43, rustc 1.94.0"
+    },
+    {
+      "id": "b-platform-workspace-20261027",
+      "target": "repo.platform",
+      "command": "cargo test --offline --workspace -j 2",
+      "outcome": "success",
+      "duration_ms": 2390,
+      "peak_rss_kb": 133640,
+      "recorded_at": "2026-10-27",
+      "host": "i3-1125G4, 4C/8T, 7.4 GB RAM, Fedora 43, rustc 1.94.0",
+      "notes": "Warm test profile after the feature-graph change: /usr/bin/time WALL=2.39 s, MAXRSS=133,640 KB, 11 packages, 239 tests, 0 failures. cargo fmt --all --check clean and cargo clippy --offline --workspace --all-targets -D warnings finished with 0 warnings in the same cycle. Not a cold-build timing."
+    },
+    {
+      "id": "b-cad-studio-m11",
+      "target": "repo.cad-studio",
+      "command": "cargo build --offline -p cad-studio -j 2",
+      "outcome": "success",
+      "duration_ms": 4100,
+      "peak_rss_kb": null,
+      "recorded_at": "2026-10-27",
+      "host": "i3-1125G4, 4C/8T, 7.4 GB RAM, Fedora 43, rustc 1.94.0",
+      "notes": "Incremental debug rebuild of the studio after the new sketch/feature endpoints: about 4 s, assets are compiled in with include_str! so no separate asset step exists. peak RSS not collected for this run."
+    },
+    {
+      "id": "b-platform-workspace-20261029-m11d",
+      "target": "repo.platform",
+      "command": "cargo test --offline --workspace -j 2",
+      "outcome": "success",
+      "duration_ms": 3900,
+      "peak_rss_kb": null,
+      "recorded_at": "2026-10-29",
+      "host": "Linux, 8 cores, 7 GB RAM, rustc 1.95.0",
+      "notes": "Warm test profile after the revolve change: 11 packages, 273 tests, 0 failures, about 3.9 s wall. cargo fmt --all --check clean and cargo clippy --offline --workspace --all-targets -D warnings at 0 warnings the same run. peak RSS not collected. Not a cold-build timing."
     }
   ]
 }

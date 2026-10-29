@@ -48,7 +48,7 @@ Source of truth: `apps/cadcraft/README.md` "What works today" table plus the cra
 |---|---|---|
 | Sketch + constraint solver | Shipped | `crates/sketch`, 23 681 LOC |
 | Parametric timeline, feature history, incremental rebuild | Shipped | only changed features recompute |
-| Extrude, revolve, sweep, loft, fillet, chamfer, shell, draft, holes, threads, patterns, mirror, split, combine | Shipped | in SolidCraft's kernel/engine; **not** in the new adapter beyond extrude |
+| Extrude, revolve, sweep, loft, fillet, chamfer, shell, draft, holes, threads, patterns, mirror, split, combine | Shipped | in SolidCraft's kernel/engine; **not** in the new adapter beyond extrude and full-turn revolve |
 | Assemblies, joints, motion, interference, mass properties | Shipped | |
 | Sheet metal (flanges, hems, fold/unfold, flat patterns) | Shipped | |
 | STEP, IGES, 3MF, STL, OBJ, glTF, URDF | Shipped | via `crates/io` + patched `truck-stepio` |
@@ -75,12 +75,12 @@ Verified on this machine (2026-10-22).
 | Truck adapter: extrude | **Shipped (verified here)** | 148 753 boxes/s, exact volume |
 | Truck adapter: boolean union | **Shipped (verified here)** | 1120 mm³ ± 0.004 |
 | Truck adapter: boolean intersection | **Shipped (verified here)** | 40 mm³ |
-| Truck adapter: boolean **difference** | **Blocked (kernel defect)** | returns 1053 mm³ for an 840 mm³ cut; refused by capability gate |
+| Truck adapter: boolean **difference** | **Shipped (verified here)** | coplanar, piercing and contained cuts now pass the analytic corpus; the adapter advertises `BooleanDifference` and the document refuses a cut when it is absent |
 | Truck adapter: boolean **chains** (3+ operands) | **Blocked (kernel panic)** | third union panics inside truck; caught as `Internal` |
 | Coplanar-face booleans without a workaround | **Partial** | fails; a ~1e-4 mm tool nudge makes them work (100/100 unions needed it) |
 | Panic containment | **Shipped (verified here)** | real panic converted to `Internal` |
 | Cancellation / timeouts | **Shipped (verified here)** | `Budget` with a deadline and a cancellation token on every operation; timeout, cancellation and "the instance survives" are tested (`t-cad-kernel-truck`) |
-| Analytic boolean correctness corpus | **Shipped (verified here)** | 10 fixtures with a pass/fail table and an exit-code regression gate (`t-cad-kernel-truck-corpus`): 8 ok, 2 recorded known failures, 3 difference cases recorded unsupported |
+| Analytic boolean correctness corpus | **Shipped (verified here)** | 11 fixtures with a pass/fail table and an exit-code regression gate (`t-cad-kernel-truck-corpus`): 8 ok, 3 recorded known failures, 0 regressions, 0 unexpected passes. Both coplanar-free cut fixtures are exact (delta 0); the coplanar cut is a recorded known failure. |
 | WASM target for the contract/adapter | **Absent / unverified** | no WASM build performed |
 | STL read/write shared by CLI and app | **Shipped (verified here)** | `cad-io`: binary STL byte writer and validating reader, round-trip and malformed-input tests; not part of the `Kernel` trait |
 | STEP through the contract | **Planned** | truck-stepio is available; not wired |
@@ -106,29 +106,37 @@ Verified on this machine (2026-10-22).
 | Scheduled or isolated agent execution | **Absent** | the registry is synchronous and in-process; process isolation for third-party agents is recorded as the strategy, not implemented |
 | Agents in either desktop application | **Absent** | neither app depends on the runtime yet |
 
-## 3c. Atlas Studio — the local application added 2026-10-25
+## 3c. Atlas Studio — the local application added 2026-10-25, extended 2026-10-29
 
 Verified on this machine by `cargo test -p cad-studio` (HTTP integration tests) and by exercising the
-running app in a browser at 392 px and full width.
+running app in a browser at 392 px and full width; the multi-feature workflow is recorded in
+`docs/quality/m11-feature-graph.md`.
 
 | Capability | Status | Evidence / limit |
 |---|---|---|
 | Local project create/open/save as versioned `.zcad` JSON | **Shipped (verified here)** | `Project::save`/`load`, CLI `--new`/`--file`, API `/api/save`; save is atomic via a temporary file |
-| Rectangle, circle, regular-polygon sketch profiles | **Shipped (verified here)** | profile switch API and UI; polygon sides 3–64; profile validation rejects degenerate loops |
-| Named parameters (width, height, depth) with re-evaluation | **Shipped (verified here)** | dependency-aware parameter map; 0.1–10,000 mm bounds; invalid values rejected with a typed error |
-| Single extrusion feature | **Shipped (verified here)** | through `cad-kernel-truck`; no booleans, revolve, loft, fillet, or multi-body |
-| Feature tree and selection | **Shipped (verified here)** | sketch + feature nodes, click to select, properties follow selection |
+| Rectangle, circle, regular-polygon and drawn-polyline sketch profiles | **Shipped (verified here)** | profile switch API and UI; polygon sides 3–256; a drawn loop is 3–256 points and is validated (finite, no repeated consecutive point, non-zero area) before it reaches the kernel |
+| Named parameters (width, height, depth) with re-evaluation | **Shipped (verified here)** | dependency-aware parameter map; 0.1–10,000 mm bounds; invalid values rejected with a typed error; an edit rebuilds every dependent feature |
+| Ordered feature graph: multiple sketches, extrudes and revolves with stable IDs | **Shipped (verified here)** | `.zcad` schema 5; a feature may only reference an earlier sketch; schema-1/2/3/4 migration on load |
+| Incremental rebuild (`BuildCache`) | **Shipped (verified here)** | the body after each feature prefix is cached by resolved inputs; an unchanged request does no kernel work and an edit re-runs only the features that read it. Session-scoped, never persisted; a shared parameter still invalidates every feature that reads it (`docs/performance-baseline.md` §9) |
+| Extrude as `new_body`, `join` (union) or `cut` (difference) | **Shipped (verified here)** | cut through `Kernel::boolean(Difference)`; refused with a stated reason if the kernel does not advertise it; a plate minus a coplanar tool measures the analytic cut volume; the same capability gate and failure reporting the join uses |
+| Full-turn revolve about a sketch axis | **Shipped (verified here)** | `Kernel::revolve` through truck's `rsweep`; a rectangle on the axis measures the analytic cylinder (150.796 mm³) and an offset rectangle the analytic annulus (113.097 mm³), both watertight; a partial turn, an unknown axis and a profile crossing the axis are refused with a reason; save/reopen and STL export covered over HTTP |
+| Feature tree and selection | **Shipped (verified here)** | ordered sketch + feature rows with operation, depth and `built`/`failed`/`pending` status; click to select, properties follow selection |
+| Feature failure reporting | **Shipped (verified here)** | the failing feature is named with the kernel message, the last good mesh stays renderable, and export is refused while the history does not rebuild |
 | 3D viewport: orbit, zoom, pan, fit, front/top/right views | **Shipped (verified here)** | WebGL 1, per-face highlight; frame/grid/wireframe toggles |
 | Face picking and inspection | **Shipped (verified here)** | ray-cast against the tessellation; hit point, normal, and Z readout in the status bar |
 | Undo / redo | **Shipped (verified here)** | bounded snapshot history in the document; UI buttons, shortcuts, and palette commands |
+| Crash recovery for unsaved edits | **Shipped (verified here)** | `<file>.recovery` snapshot written atomically after every edit; restored on start when it belongs to the current file version, with a banner and a discard action; a corrupt snapshot is ignored and a truncated project file falls back to the snapshot; `kill -9` measured before and after |
+| Named revisions / version history | **Absent** | the snapshot is the last unsaved edit, not a named history; M11f remainder |
 | Command palette | **Shipped (verified here)** | project, sketch, view, parameter, theme, and help commands; disabled commands are visibly disabled, not fake |
 | STL export | **Shipped (verified here)** | `/api/export/stl` through `cad-io`, validated mesh before writing |
 | Light/dark theme, responsive drawers, keyboard help | **Shipped (verified here)** | persisted theme choice; inspectors accessible below 980 px |
 | Diagnostics log and typed API errors | **Shipped (verified here)** | request failures carry codes (`invalid_request`, `invalid_parameter`, `not_found`, `export_failure`, …) |
 | Sketch constraints, dimensions, arcs/splines | **Absent** | Stage A remainder |
-| Multiple features, booleans, revolve | **Absent** | Stage A/B remainder |
+| Sweep, loft, partial revolve, arbitrary-axis revolve, fillet, chamfer, shell, patterns | **Absent** | extrude, cut and full-turn revolve are implemented and verified; the others are later milestones |
+| Multiple bodies / assemblies | **Absent** | a second `new_body` is refused by design; Stage B |
 | STL/STEP/IGES/DXF import | **Absent** | `cad-io` can read binary STL, but no application importer is wired |
-| Assemblies, drawings, mass properties UI, materials | **Absent** | later milestones |
+| Drawings, mass-property UI, materials | **Absent** | later milestones |
 | Autosave, crash recovery, file dialogs | **Absent** | save is explicit; the project path is a command-line argument |
 | Accounts, cloud sync, collaboration, telemetry | **Absent** | no network calls beyond the loopback browser connection |
 | Native desktop shell | **Absent** | see ADR-0008 |
@@ -156,7 +164,7 @@ running app in a browser at 392 px and full width.
 3. **"Runs in the browser."** The source and CI suggest it; no WASM build was performed here.
 4. **"AI can model anything."** The command surface is bounded; failure modes and limits were not
    characterised.
-5. **"Booleans work."** Union/intersection do; **difference and boolean chains do not** through the
+5. **"Booleans work."** Union, intersection and (now) difference do; **boolean chains do not** through the
    shared adapter. The corpus records two further failures — tangent contact and coordinates near
    1e6 mm — that the feature matrix previously did not know about.
 6. **"Zero dependencies on native code."** True for truck, false for `acadrust`-based DWG or anything

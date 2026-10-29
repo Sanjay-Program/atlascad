@@ -23,7 +23,10 @@ mod http;
 use cad_contract::capability::KernelInfo;
 use cad_contract::ids::{DocumentId, EntityId};
 use cad_contract::kernel::Kernel;
-use cad_document::{Evaluated, Project, ProjectError, SketchProfile};
+use cad_document::{
+    BuildCache, ExtrudeOperation, FeatureFailure, FeatureKind, FeatureOutcome, FeatureReport,
+    Project, ProjectError, RecoveryInfo, RevolveAxis, SketchProfile, clear_recovery,
+};
 use cad_kernel_truck::TruckKernel;
 use serde::{Deserialize, Serialize};
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -126,7 +129,7 @@ impl StudioError {
                 | ProjectError::UnsupportedSchema { .. }
                 | ProjectError::Document(_) => 400,
                 ProjectError::NothingToUndo | ProjectError::NothingToRedo => 409,
-                ProjectError::Kernel(_) => 422,
+                ProjectError::Kernel(_) | ProjectError::FeatureFailed { .. } => 422,
                 ProjectError::Io { .. } => 500,
             },
             StudioError::Stl(_) | StudioError::Io(_) | StudioError::Lock | StudioError::Bind(_) => {
@@ -148,6 +151,7 @@ impl StudioError {
             StudioError::Project(ProjectError::NothingToRedo) => "nothing_to_redo",
             StudioError::Project(ProjectError::UnknownParameter(_)) => "unknown_parameter",
             StudioError::Project(ProjectError::UnknownSketch(_)) => "unknown_sketch",
+            StudioError::Project(ProjectError::FeatureFailed { .. }) => "feature_failed",
             StudioError::Project(_) => "invalid_project",
             StudioError::Kernel(_) => "kernel_failure",
             StudioError::Stl(_) => "export_failure",
@@ -178,8 +182,39 @@ struct SketchView {
 struct FeatureView {
     id: u64,
     sketch_id: u64,
-    depth_param: String,
-    depth_mm: f64,
+    /// `extrude` or `revolve`.
+    kind: &'static str,
+    /// For an extrude: the parameter that drives its depth.
+    depth_param: Option<String>,
+    /// For an extrude: that depth in millimetres.
+    depth_mm: Option<f64>,
+    /// For a revolve: `vertical` or `horizontal`, the sketch axis it turns about.
+    axis: Option<&'static str>,
+    /// `new_body`, `join`, or `cut`, in build order.
+    operation: &'static str,
+    /// `built`, `failed`, or `pending` when an earlier feature failed first.
+    status: &'static str,
+    /// Volume after this feature rebuilt, when it did.
+    volume_mm3: Option<f64>,
+    /// The kernel's message when this feature could not rebuild.
+    message: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct FailureView {
+    feature: u64,
+    message: String,
+}
+
+/// One rebuild of the whole history, in the form the payload needs it.
+struct Rebuild {
+    /// The mesh of the last feature that rebuilt, or nothing when no feature did.
+    mesh: Option<cad_contract::mesh::Mesh>,
+    /// One entry per attempted feature, in build order.
+    reports: Vec<FeatureReport>,
+    /// The feature that stopped the rebuild, if any.
+    failure: Option<FeatureFailure>,
+    kernel: KernelInfo,
 }
 
 #[derive(Debug, Serialize)]
@@ -215,6 +250,19 @@ struct HistoryView {
     redo: usize,
 }
 
+/// The unsaved-edit snapshot this session is running on top of.
+///
+/// `recovered` stays true until the user saves (which promotes the snapshot to the project file) or
+/// discards it, so a client can keep the warning visible for exactly as long as it is true.
+#[derive(Debug, Serialize)]
+struct RecoveryView {
+    recovered: bool,
+    saved_at_unix: Option<u64>,
+    file_unreadable: bool,
+    /// A snapshot write failed, so unsaved work is not currently protected. Shown, not swallowed.
+    autosave_error: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 struct StatePayload {
     schema: u32,
@@ -231,8 +279,11 @@ struct StatePayload {
     outline: Option<Vec<[f64; 2]>>,
     bounds: Option<BoundsView>,
     geometry: GeometryView,
+    /// The first feature that could not rebuild. The mesh above is the last one that did.
+    failure: Option<FailureView>,
     kernel: KernelView,
     history: HistoryView,
+    recovery: RecoveryView,
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -244,39 +295,68 @@ struct StudioState {
     path: PathBuf,
     /// Revision at the last successful save or load. `dirty` is a conservative comparison.
     saved_revision: u64,
+    /// The one kernel instance this session builds with. It stays alive so cached solids stay
+    /// valid: a handle is only meaningful to the kernel that issued it.
+    kernel: TruckKernel,
+    /// Per-feature rebuild results keyed by the resolved inputs of their prefix. Owns every solid
+    /// it hands out, which is why nothing below releases a `build.solid`.
+    cache: BuildCache,
+    /// Set when the session started from an unsaved-edit snapshot, cleared by save or discard.
+    recovered: Option<RecoveryInfo>,
+    /// The last autosave failure, if any. A failed snapshot must be visible rather than silent.
+    autosave_error: Option<String>,
 }
 
 impl StudioState {
-    fn new(project: Project, path: PathBuf) -> Result<Self, StudioError> {
+    fn new(
+        project: Project,
+        path: PathBuf,
+        recovered: Option<RecoveryInfo>,
+    ) -> Result<Self, StudioError> {
         project.validate()?;
-        let state = StudioState {
-            saved_revision: project.revision.get(),
+        let saved_revision = project.revision.get();
+        let mut state = StudioState {
+            saved_revision,
             project,
             path,
+            kernel: TruckKernel::new(),
+            cache: BuildCache::new(),
+            recovered,
+            autosave_error: None,
         };
         // Evaluate once at startup so a broken project is refused before a URL is printed.
         let _ = state.payload()?;
         Ok(state)
     }
 
-    fn snapshot(&self) -> Result<(Option<cad_contract::mesh::Mesh>, KernelInfo), StudioError> {
-        let mut kernel = TruckKernel::new();
-        let info = kernel.info();
-        if self.project.features().is_empty() {
-            return Ok((None, info));
-        }
-        let Evaluated {
-            mesh,
-            solid,
-            volume_mm3: _,
-            triangles: _,
-        } = self.project.evaluate(&mut kernel)?;
-        kernel.release(solid);
-        Ok((Some(mesh), info))
+    /// Rebuild the history and hand back only the parts the UI may see.
+    ///
+    /// A failing feature is part of the result, not an error: the browser shows the feature tree
+    /// with that feature marked and the mesh of the last feature that did rebuild.
+    ///
+    /// Features whose resolved inputs are unchanged since the last rebuild come from
+    /// [`BuildCache`] instead of the kernel, so editing the last parameter of a long history does
+    /// not re-extrude or re-union the features before it.
+    fn rebuild(&mut self) -> Result<Rebuild, StudioError> {
+        let info = self.kernel.info();
+        let build = self
+            .project
+            .build_with_cache(&mut self.kernel, &mut self.cache)?;
+        Ok(Rebuild {
+            mesh: build.mesh,
+            reports: build.reports,
+            failure: build.failed,
+            kernel: info,
+        })
     }
 
-    fn payload(&self) -> Result<StatePayload, StudioError> {
-        let (mesh, info) = self.snapshot()?;
+    fn payload(&mut self) -> Result<StatePayload, StudioError> {
+        let Rebuild {
+            mesh,
+            reports,
+            failure,
+            kernel: info,
+        } = self.rebuild()?;
         let unit = self.project.header.units;
 
         let parameters = self
@@ -301,11 +381,36 @@ impl StudioState {
 
         let mut features = Vec::with_capacity(self.project.features().len());
         for feature in self.project.features() {
+            let (status, volume_mm3, message) = match reports
+                .iter()
+                .find(|report| report.id == feature.id)
+                .map(|report| &report.outcome)
+            {
+                Some(FeatureOutcome::Built { volume_mm3, .. }) => {
+                    ("built", Some(*volume_mm3), None)
+                }
+                Some(FeatureOutcome::Failed { message }) => ("failed", None, Some(message.clone())),
+                None => ("pending", None, None),
+            };
+            let (depth_param, depth_mm, axis) = match &feature.kind {
+                FeatureKind::Extrude { depth_param } => (
+                    Some(depth_param.clone()),
+                    Some(unit.to_mm(self.project.parameter(depth_param)?)),
+                    None,
+                ),
+                FeatureKind::Revolve { axis } => (None, None, Some(axis.label())),
+            };
             features.push(FeatureView {
                 id: feature.id.get(),
                 sketch_id: feature.sketch_id.get(),
-                depth_param: feature.depth_param.clone(),
-                depth_mm: unit.to_mm(self.project.parameter(&feature.depth_param)?),
+                kind: feature.kind.label(),
+                depth_param,
+                depth_mm,
+                axis,
+                operation: feature.operation.label(),
+                status,
+                volume_mm3,
+                message,
             });
         }
 
@@ -360,7 +465,8 @@ impl StudioState {
                 .as_str()
                 .unwrap_or("millimeter")
                 .to_string(),
-            dirty: self.project.revision.get() != self.saved_revision,
+            // A recovered session is dirty by definition: the file on disk is not what is on screen.
+            dirty: self.recovered.is_some() || self.project.revision.get() != self.saved_revision,
             parameters,
             sketches,
             features,
@@ -368,6 +474,10 @@ impl StudioState {
             outline,
             bounds,
             geometry,
+            failure: failure.map(|failure| FailureView {
+                feature: failure.id.get(),
+                message: failure.message,
+            }),
             kernel: KernelView {
                 name: info.name,
                 version: info.version,
@@ -380,6 +490,12 @@ impl StudioState {
             history: HistoryView {
                 undo: self.project.undo_depth(),
                 redo: self.project.redo_depth(),
+            },
+            recovery: RecoveryView {
+                recovered: self.recovered.is_some(),
+                saved_at_unix: self.recovered.map(|info| info.saved_at_unix),
+                file_unreadable: self.recovered.is_some_and(|info| info.file_unreadable),
+                autosave_error: self.autosave_error.clone(),
             },
         })
     }
@@ -397,31 +513,87 @@ impl StudioState {
             self.project = backup;
             return Err(StudioError::Project(error));
         }
-        match self.payload() {
-            Ok(payload) => Ok(payload),
+        // Evaluate first: a mutation that cannot rebuild is rolled back, and nothing that was
+        // rolled back may be written to the snapshot.
+        let payload = match self.payload() {
+            Ok(payload) => payload,
             Err(error) => {
                 self.project = backup;
-                Err(error)
+                return Err(error);
             }
+        };
+        self.autosave();
+        let mut payload = payload;
+        payload.recovery = self.recovery_view();
+        Ok(payload)
+    }
+
+    /// Keep the unsaved edit in a recovery snapshot, next to the project file.
+    ///
+    /// A failure is recorded and reported in the state payload rather than failing the edit: a
+    /// read-only directory must not make the application unusable, but it must not silently pretend
+    /// the work is protected either.
+    fn autosave(&mut self) {
+        match self.project.save_recovery(&self.path) {
+            Ok(_) => self.autosave_error = None,
+            Err(error) => self.autosave_error = Some(error.to_string()),
+        }
+    }
+
+    fn recovery_view(&self) -> RecoveryView {
+        RecoveryView {
+            recovered: self.recovered.is_some(),
+            saved_at_unix: self.recovered.map(|info| info.saved_at_unix),
+            file_unreadable: self.recovered.is_some_and(|info| info.file_unreadable),
+            autosave_error: self.autosave_error.clone(),
         }
     }
 
     fn save(&mut self) -> Result<StatePayload, StudioError> {
         self.project.save(&self.path)?;
         self.saved_revision = self.project.revision.get();
+        // The project file is now the newest copy, so the snapshot would only be a stale offer on
+        // the next start. Failing to remove it is reported, not ignored.
+        clear_recovery(&self.path)?;
+        self.recovered = None;
+        self.autosave_error = None;
         self.payload()
     }
 
-    fn stl(&self) -> Result<(Vec<u8>, String), StudioError> {
+    /// Throw away the recovered state and go back to the project file on disk.
+    ///
+    /// This is the escape hatch the recovery banner needs: a user who does not want the unsaved
+    /// edit must not have to delete a file by hand.
+    fn discard_recovery(&mut self) -> Result<StatePayload, StudioError> {
+        let project = Project::load(&self.path)?;
+        self.project = project;
+        self.saved_revision = self.project.revision.get();
+        self.cache.clear(&mut self.kernel);
+        clear_recovery(&self.path)?;
+        self.recovered = None;
+        self.autosave_error = None;
+        self.payload()
+    }
+
+    fn stl(&mut self) -> Result<(Vec<u8>, String), StudioError> {
         if self.project.features().is_empty() {
             return Err(StudioError::BadRequest(
                 "this project has no solid to export".into(),
             ));
         }
-        let mut kernel = TruckKernel::new();
-        let evaluated = self.project.evaluate(&mut kernel)?;
-        kernel.release(evaluated.solid);
-        let bytes = cad_io::stl_bytes(&evaluated.mesh)?;
+        let build = self
+            .project
+            .build_with_cache(&mut self.kernel, &mut self.cache)?;
+        if let Some(failure) = build.failed {
+            return Err(StudioError::BadRequest(format!(
+                "feature {} cannot be rebuilt, so the export would not match the model: {}",
+                failure.id, failure.message
+            )));
+        }
+        let mesh = build
+            .mesh
+            .ok_or_else(|| StudioError::BadRequest("this project has no solid to export".into()))?;
+        let bytes = cad_io::stl_bytes(&mesh)?;
         Ok((bytes, export_name(&self.project.name)))
     }
 }
@@ -490,7 +662,20 @@ impl Drop for StudioHandle {
 /// Returns once the listener is bound and the initial project has evaluated. A failed evaluation is
 /// returned here rather than after the user has opened a page that cannot render.
 pub fn start(project: Project, path: PathBuf, port: u16) -> Result<StudioHandle, StudioError> {
-    let state = StudioState::new(project, path)?;
+    start_with_recovery(project, path, port, None)
+}
+
+/// Start the studio on a project recovered from an unsaved-edit snapshot.
+///
+/// `recovered` is reported through `/api/state` until the user saves or discards, so the client can
+/// warn that the document on screen is not what the file on disk holds.
+pub fn start_with_recovery(
+    project: Project,
+    path: PathBuf,
+    port: u16,
+    recovered: Option<RecoveryInfo>,
+) -> Result<StudioHandle, StudioError> {
+    let state = StudioState::new(project, path, recovered)?;
     let listener = TcpListener::bind(("127.0.0.1", port)).map_err(StudioError::Bind)?;
     let addr = listener.local_addr().map_err(StudioError::Bind)?;
     let state = Arc::new(Mutex::new(state));
@@ -687,6 +872,76 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             }
             Err(error) => error_response(&error),
         },
+        "/api/sketch" => match parse_body::<NewSketchRequest>(request) {
+            Ok(body) => {
+                let profile = match profile_from_parts(&body.kind, body.sides, body.points, None) {
+                    Ok(profile) => profile,
+                    Err(error) => return error_response(&error),
+                };
+                let origin = body.origin.unwrap_or([0.0, 0.0]);
+                match with_state(state, |state| {
+                    state.mutate(|project| project.add_sketch(profile, origin).map(|_| ()))
+                }) {
+                    Ok(payload) => to_json(200, &payload),
+                    Err(error) => error_response(&error),
+                }
+            }
+            Err(error) => error_response(&error),
+        },
+        "/api/feature/extrude" => match parse_body::<NewFeatureRequest>(request) {
+            Ok(body) => {
+                let operation = match operation_for(&body.operation) {
+                    Ok(operation) => operation,
+                    Err(error) => return error_response(&error),
+                };
+                let sketch_id = match EntityId::new(body.sketch_id) {
+                    Ok(id) => id,
+                    Err(error) => {
+                        return error_response(&StudioError::BadRequest(error.to_string()));
+                    }
+                };
+                match with_state(state, |state| {
+                    state.mutate(|project| {
+                        project
+                            .add_extrude_feature(sketch_id, &body.depth_param, operation)
+                            .map(|_| ())
+                    })
+                }) {
+                    Ok(payload) => to_json(200, &payload),
+                    Err(error) => error_response(&error),
+                }
+            }
+            Err(error) => error_response(&error),
+        },
+        "/api/feature/revolve" => match parse_body::<NewRevolveRequest>(request) {
+            Ok(body) => {
+                let operation = match operation_for(&body.operation) {
+                    Ok(operation) => operation,
+                    Err(error) => return error_response(&error),
+                };
+                let axis = match axis_for(&body.axis) {
+                    Ok(axis) => axis,
+                    Err(error) => return error_response(&error),
+                };
+                let sketch_id = match EntityId::new(body.sketch_id) {
+                    Ok(id) => id,
+                    Err(error) => {
+                        return error_response(&StudioError::BadRequest(error.to_string()));
+                    }
+                };
+                match with_state(state, |state| {
+                    state.mutate(|project| {
+                        project
+                            .add_revolve_feature(sketch_id, axis, operation)
+                            .map(|_| ())
+                    })
+                }) {
+                    Ok(payload) => to_json(200, &payload),
+                    Err(error) => error_response(&error),
+                }
+            }
+            Err(error) => error_response(&error),
+        },
         "/api/undo" => match with_state(state, |state| state.mutate(Project::undo)) {
             Ok(payload) => to_json(200, &payload),
             Err(error) => error_response(&error),
@@ -696,6 +951,10 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             Err(error) => error_response(&error),
         },
         "/api/save" => match with_state(state, |state| state.save()) {
+            Ok(payload) => to_json(200, &payload),
+            Err(error) => error_response(&error),
+        },
+        "/api/recovery/discard" => match with_state(state, |state| state.discard_recovery()) {
             Ok(payload) => to_json(200, &payload),
             Err(error) => error_response(&error),
         },
@@ -717,6 +976,10 @@ struct ProfileRequest {
     kind: String,
     #[serde(default)]
     sides: Option<u32>,
+    /// A drawn loop, in document units, relative to the sketch origin. Required for `polyline` and
+    /// refused for every other kind, so a request cannot silently discard a drawn profile.
+    #[serde(default)]
+    points: Option<Vec<[f64; 2]>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -726,11 +989,102 @@ struct OriginRequest {
     origin: [f64; 2],
 }
 
+/// A new sketch. The profile is driven by the document's default parameters (`width`/`height`, or
+/// `diameter`), which is why the shape is all this request needs to carry.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NewSketchRequest {
+    kind: String,
+    #[serde(default)]
+    origin: Option<[f64; 2]>,
+    #[serde(default)]
+    sides: Option<u32>,
+    /// A drawn loop, in document units, relative to `origin`. Required for `polyline`.
+    #[serde(default)]
+    points: Option<Vec<[f64; 2]>>,
+}
+
+/// A new extrude. `operation` decides whether it starts the body or joins the one built so far; the
+/// document refuses the wrong one for the position in history, so nothing here has to guess.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NewFeatureRequest {
+    sketch_id: u64,
+    #[serde(default = "default_depth_param")]
+    depth_param: String,
+    operation: String,
+}
+
+fn default_depth_param() -> String {
+    "depth".to_string()
+}
+
+/// A new revolve. It has no depth: the tool is the sketch turned a full turn about one of the
+/// sketch's own axes, so the axis is the only extra input.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NewRevolveRequest {
+    sketch_id: u64,
+    operation: String,
+    #[serde(default = "default_axis")]
+    axis: String,
+}
+
+fn default_axis() -> String {
+    "vertical".to_string()
+}
+
+fn axis_for(name: &str) -> Result<RevolveAxis, StudioError> {
+    match name.trim().to_ascii_lowercase().as_str() {
+        "vertical" | "y" => Ok(RevolveAxis::Vertical),
+        "horizontal" | "x" => Ok(RevolveAxis::Horizontal),
+        other => Err(StudioError::BadRequest(format!(
+            "unknown revolve axis `{other}`; expected vertical or horizontal"
+        ))),
+    }
+}
+
+fn operation_for(name: &str) -> Result<ExtrudeOperation, StudioError> {
+    match name.trim().to_ascii_lowercase().as_str() {
+        "new_body" | "new" | "body" => Ok(ExtrudeOperation::NewBody),
+        "join" | "union" => Ok(ExtrudeOperation::Join),
+        "cut" | "difference" => Ok(ExtrudeOperation::Cut),
+        other => Err(StudioError::BadRequest(format!(
+            "unknown operation `{other}`; expected new_body, join, or cut"
+        ))),
+    }
+}
+
 fn profile_for(
     request: &ProfileRequest,
     current: Option<&SketchProfile>,
 ) -> Result<SketchProfile, StudioError> {
-    let kind = request.kind.trim().to_ascii_lowercase();
+    profile_from_parts(
+        &request.kind,
+        request.sides,
+        request.points.clone(),
+        current,
+    )
+}
+
+/// Build a profile from the shape name the API accepts.
+///
+/// `current` is the profile being replaced, so an edit keeps the parameter names the document
+/// already uses; a new sketch gets the document's default ones.
+fn profile_from_parts(
+    kind: &str,
+    sides: Option<u32>,
+    points: Option<Vec<[f64; 2]>>,
+    current: Option<&SketchProfile>,
+) -> Result<SketchProfile, StudioError> {
+    let kind = kind.trim().to_ascii_lowercase();
+    // A loop is only meaningful for a polyline; sending one with another kind is a caller bug that
+    // would otherwise look like a successful profile change.
+    if points.is_some() && kind != "polyline" && kind != "path" && kind != "draw" {
+        return Err(StudioError::BadRequest(format!(
+            "`points` is only valid for a polyline profile, not `{kind}`"
+        )));
+    }
     match kind.as_str() {
         "rectangle" | "box" => {
             let (width_param, height_param) = match current {
@@ -749,16 +1103,23 @@ fn profile_for(
             diameter_param: "diameter".to_string(),
         }),
         "regular_polygon" | "polygon" | "prism" => {
-            let sides = request
-                .sides
+            let sides = sides
                 .ok_or_else(|| StudioError::BadRequest("a polygon needs a `sides` value".into()))?;
             Ok(SketchProfile::RegularPolygon {
                 diameter_param: "diameter".to_string(),
                 sides,
             })
         }
+        "polyline" | "path" | "draw" => {
+            let points = points.ok_or_else(|| {
+                StudioError::BadRequest(
+                    "a polyline needs a `points` array of at least three [x, y] pairs".into(),
+                )
+            })?;
+            Ok(SketchProfile::Polyline { points })
+        }
         other => Err(StudioError::BadRequest(format!(
-            "unknown profile `{other}`; expected rectangle, circle, or regular_polygon"
+            "unknown profile `{other}`; expected rectangle, circle, regular_polygon, or polyline"
         ))),
     }
 }

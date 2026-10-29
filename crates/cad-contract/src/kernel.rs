@@ -151,6 +151,49 @@ pub trait Kernel {
     /// Combine two solids. Neither input is consumed.
     fn boolean(&mut self, op: BooleanOp, a: SolidId, b: SolidId) -> Result<SolidId>;
 
+    /// Move a solid by `delta_mm` without rotating it. `solid` is not consumed.
+    ///
+    /// This exists for more than convenience: a tool that must cut *through* a body has to
+    /// overshoot it, and [`extrude`](Kernel::extrude) always starts at z = 0, so a tool built for a
+    /// body whose faces are at z = 0 and z = h always shares a plane with that body. Coincident
+    /// faces are the case boolean operations handle worst (see `docs/kernel-comparison.md` §4.1),
+    /// so a through-cut is built by extruding an over-long tool and translating it to straddle the
+    /// body. A kernel that cannot move a solid therefore cannot build an exact cut, and says so by
+    /// not advertising [`Capability::Transform`].
+    ///
+    /// The default implementation reports the capability as unsupported, so a kernel that has not
+    /// implemented it cannot silently accept a translation and ignore it.
+    fn translate(&mut self, _solid: SolidId, _delta_mm: [f64; 3]) -> Result<SolidId> {
+        Err(KernelError::Unsupported {
+            capability: Capability::Transform,
+        })
+    }
+
+    /// Revolve a closed profile a full turn about an axis lying in the profile's own plane.
+    ///
+    /// `axis_origin_mm` is a point on the axis in the profile's coordinate system and
+    /// `axis_direction_mm` its direction in the same plane; the direction need not be normalized.
+    /// `angle_rad` is currently required to be a full turn: a partial revolve produces an open
+    /// shell, which is not a solid, and the contract has no way to represent one. An adapter that
+    /// cannot produce a closed solid must return [`KernelError::Invalid`] rather than a shell.
+    ///
+    /// The result must be the analytic solid of revolution: a rectangle that shares the axis
+    /// revolved a full turn is a cylinder, and one that does not is an annulus.
+    ///
+    /// The default implementation reports the capability as unsupported, so a kernel that has not
+    /// implemented it cannot silently accept the call.
+    fn revolve(
+        &mut self,
+        _profile: &[[f64; 2]],
+        _axis_origin_mm: [f64; 2],
+        _axis_direction_mm: [f64; 2],
+        _angle_rad: f64,
+    ) -> Result<SolidId> {
+        Err(KernelError::Unsupported {
+            capability: Capability::Revolve,
+        })
+    }
+
     /// Tessellate a solid with chord tolerance `chord_tol_mm`.
     ///
     /// The mesh must satisfy [`Mesh::validate`]. An adapter that cannot produce a valid mesh
@@ -159,6 +202,16 @@ pub trait Kernel {
 
     /// Release a solid. Releasing an unknown handle is not an error (idempotent cleanup).
     fn release(&mut self, solid: SolidId);
+
+    /// Can this kernel still resolve `solid`?
+    ///
+    /// `None` — the default — means the adapter cannot answer, so a caller must assume the handle is
+    /// valid and let the adapter reject it if it is not. `Some(false)` exists for session caches: a
+    /// cache that outlives one kernel instance otherwise adopts handles the next instance never
+    /// issued, and the failure surfaces later as a confusing `UnknownSolid` on an unrelated feature.
+    fn contains(&self, _solid: SolidId) -> Option<bool> {
+        None
+    }
 
     /// Volume in mm³, measured from a tessellation at the default chord tolerance.
     ///

@@ -165,6 +165,11 @@ fn sample_task() -> Task {
         rollback: "revert".to_string(),
         source: TaskSource::Curated,
         trigger_digest: None,
+        acceptance_results: Vec::new(),
+        contract_changes: Vec::new(),
+        limitations: Vec::new(),
+        verified_on: None,
+        verified_host: None,
     }
 }
 

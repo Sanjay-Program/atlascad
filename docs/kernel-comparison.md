@@ -52,11 +52,12 @@ Legend: **V** verified by execution · **R** read from source · **—** not pre
 | Solid primitives | **V** (extruded prisms) | R | R | R | R | R |
 | Boolean union | **V** — 1120 mm³ for a 1000+160−40 fixture, 0.0037 mm³ error; corpus: partial overlap passes | R | R | R | R | R |
 | Boolean intersection | **V** — 40 mm³ for a 2×2×10 overlap; corpus: thin wall and near-degenerate sliver pass | R | R | R | R | R |
-| Boolean difference | **V — DOES NOT WORK** (§4.2) | ? | ? | ? | ? | ? |
+| Boolean difference | **V** — exact for a tool that overshoots the body (§4.2); coincident faces remain a recorded limitation | ? | ? | ? | ? | ? |
 | Boolean chains (3+ operands) | **V — fails at the third union** (§4.3) | ? | ? | ? | ? | ? |
 | Coplanar-face booleans | **V — fails without a nudge** (§4.1) | R | R | R | R | R |
 | Extrude | **V** — 148 753 boxes/s, exact analytic volume | R | R | R | R | R |
-| Revolution / sweep / loft | — in the adapter; R in SolidCraft's kernel | R | R | R | R | R |
+| Revolution (full turn) | **V** — truck's `rsweep`; a rectangle on the axis measures 150.796 mm³ against π·4²·3 within 0.05, an offset rectangle 113.097 mm³ against π·(4²−2²)·3, both watertight; a partial turn and a profile crossing the axis are refused | R | R | R | R | R |
+| Sweep / loft | — in the adapter; R in SolidCraft's kernel | R | R | R | R | R |
 | Fillet / chamfer | — in the adapter; **R + shipped** in SolidCraft's kernel (own implementation) | R | R | R | R | R |
 | Shell / offset | — in the adapter; R in SolidCraft | R | R | R | R | R |
 | Tessellation | **V** — valid, watertight (0 open edges), outward-oriented, correct volume, 12 tris for a box at 0.01 mm. Requires the adapter's weld + orientation repair; the raw output was per-face and had an inward cap (ADR-0005) | R | R | R | R | R |
@@ -83,9 +84,12 @@ makes the binary exit non-zero.
 | `intersection_near_degenerate_sliver` | analytic | **ok** |
 | `union_tangent_contact` | analytic | **known failure** — the tangent case does not produce a solid |
 | `intersection_large_coordinates` | analytic (coords near 1e6 mm) | **known failure** — the kernel loses precision at that scale |
-| `union_difference_*` (3 fixtures) | — | **unsupported** — the kernel does not advertise difference (§4.2) |
+| `difference_piercing_cut` | 84 000 mm³ / 22 400 mm² | **ok** — delta 0 |
+| `difference_contained_void` | 184 000 mm³ / 32 800 mm² | **ok** — delta 0 |
+| `difference_coplanar_cut` | 84 000 mm³ / 22 400 mm² | **known failure** — volume 84 000.18, area 25 600, not watertight (§4.2) |
 
-Measured: **8 ok, 2 known failures, 0 regressions, 0 unexpected passes**, exit code 0.
+Measured: **8 ok, 3 known failures, 0 regressions, 0 unexpected passes**, exit code 0. The two cut
+fixtures that pass are exact rather than close: their reported delta is 0.000e0.
 
 Two things are worth stating plainly. First, the two known failures were **not known before the
 corpus existed**: tangent contact and large-coordinate intersection were invisible to the
@@ -139,27 +143,63 @@ nudge is not enough when the operands also share a y extent — which is why the
 incommensurate per axis. Cost: the result's volume moves by ~0.004 mm³ on a 1120 mm³ part (benchmark),
 and **100 of 100** unions needed this retry.
 
-### 4.2 Difference returns a solid that is not the difference
+### 4.2 Difference: the defect was winding, and it is repaired
+
+This section previously said difference "returns a solid that is not the difference" and was the reason the
+adapter refused the capability. That conclusion was drawn from a volume measurement of **truck's raw
+output**, and it was half right: the volume really was wrong. What the measurement did not establish is
+*why*, and the reason turns out to be orientation, not geometry.
 
 A 10×10×10 mm plate with a 4×4×10 mm tool removed. Analytic answer: **840 mm³**.
 
-| Case | Reported volume |
-|---|---|
-| Coplanar tool (with nudge) | **1053.326 mm³** |
-| Piercing tool (no coplanar faces) | **1053.333 mm³** |
-| Void (**expected 904**) | 1000.000 (outer) **+ 117.333** (inner shell, should be **−96**) |
+| Case | Raw truck output | After this adapter's repair |
+|---|---|---|
+| Piercing tool (no coincident faces) | 1053.333 mm³, 10 face patches | **840.000 mm³**, 22 400 mm² for a 100 mm plate |
+| Coplanar tool (with nudge) | 1053.326 mm³ | 84 000.18 mm³ (membrane, §4.2.2) |
+| Contained void (expected 904) | outer 1000 + inner **+**117.333 | **184 000.000 mm³** for the 100 mm fixture |
 
-Per-shell measurement (`examples/probe6`) shows the outer shell is exactly 1000 mm³ and the inner
-shell is reported with the **wrong orientation and wrong magnitude**, so the enclosed volume is
-larger than the target's. A cut that *adds* volume is not a cut.
+The piercing case makes the diagnosis visible: the result has exactly the **10 face patches a through-cut
+should have**, and its volume is `840 + 2 × 106.667`. That 106.667 is precisely the contribution of the four
+hole walls — counted with the wrong sign. The cut's *topology* was right all along; the walls of the cavity
+were wound inward.
 
-This is precisely the invariant SolidCraft's `boolean_guard` enforces — its own comment says *"a join
-never loses volume and a cut never gains any … a wrong result that looks right is worse than an
-error"*. The published crates have no such guard.
+Two repairs are needed, and both are in the adapter:
 
-**Decision:** the adapter does **not advertise** `BooleanDifference` and refuses the call with
-`KernelError::Unsupported`. Union and intersection are verified against analytic volumes and are
-advertised, with a conservation guard that refuses a result which violates the bound.
+1. **Local consistency.** Neighbouring triangles must traverse a shared edge in opposite directions. A
+   breadth-first pass over shared edges already existed and already fixes the through-cut.
+2. **Shell sign by nesting depth.** A cavity must be wound *inward*, so the enclosed volume is
+   `outer − cavity`, not `outer + cavity`. A single whole-mesh flip cannot express that, because the outer
+   shell is already correct. Each connected shell's nesting depth is measured by ray parity — a point taken
+   from the shell, tested against every other shell — and shells at odd depth are flipped. Without this,
+   the contained-void fixture measured 216 000 mm³ (200 000 + 16 000) and the conservation guard refused it.
+
+With both repairs, both coplanar-free fixtures report a delta of **0.000e0** against analytic values, and
+`BooleanDifference` is advertised.
+
+#### 4.2.1 How the application builds a cut
+
+`extrude` always starts at the z = 0 sketch plane, so a tool built for a body spanning z 0…h always shares a
+plane with that body — every cut would be a coplanar cut. The contract therefore gained
+`Capability::Transform` and `Kernel::translate`, and `cad-document` builds each cut tool with
+`CUT_OVERSHOOT_MM` (0.01 mm) of overshoot on whichever faces would coincide, inside a *bounding box* check
+so a pocket that ends inside the body is not extended at all. The extra material lies outside the body, so
+it changes nothing, and the operation is ordinary: the end-to-end HTTP test measures 255.000 mm³ for a
+through-cut, exactly.
+
+#### 4.2.2 What is still not exact
+
+A caller that hands `Kernel::boolean` two operands with a coincident face still gets the coplanar retry,
+because truck returns no result without it. The retry translates the tool by ~1e-4 mm and translates the
+result back, which is why a membrane one nudge thick remains on the shared face:
+
+* volume: 84 000.18 mm³ against 84 000 analytic (2 ppm);
+* area: 25 600 mm² against 22 400, because the hole is blind by 1.1e-4 mm and the membrane is real surface;
+* watertightness: **8 hairline sliver edges** at one hole corner, so that mesh is not a closed manifold.
+
+The fixture `difference_coplanar_cut` is recorded as a **known failure** with these numbers rather than
+promoted, and the application avoids the case entirely by overshooting. Also guarded: a difference that
+removes everything is refused with a message, because there is no mesh for "nothing" and the retry would
+otherwise return a shell as thick as its own nudge (measured 0.008 mm³ for a plate cut by its own profile).
 
 ### 4.3 Chains fail
 
@@ -245,5 +285,6 @@ lacks, and every second kernel multiplies the test surface.
   **evidence-based for truck and repository-based for the alternatives**, and says so.
 * The 75/76 oracle figure is SolidCraft's claim, not a re-run.
 * WASM viability is unverified for every candidate.
-* Difference and boolean chains are **unavailable** through the adapter, and the root cause is in
-  the kernel layer, not the adapter.
+* Boolean chains are **unavailable** through the adapter (the third union panics inside truck). Difference
+  is available and exact for a tool that overshoots the body; operands with coincident faces remain a
+  recorded, measured limitation (§4.2.2), and the root cause is in the kernel layer, not the adapter.

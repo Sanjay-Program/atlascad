@@ -32,9 +32,9 @@ The project owner reports that development began about a year before the work wa
 
 ## Current platform status
 
-The root platform has a versioned shared contract, a Truck adapter, a headless consumer, an engineering control plane, a small agent platform, and a working local CAD application. The root-workspace test gate passes 227 tests across eleven packages on the recorded machine; startup, request latency, and export timings are in [`docs/performance-baseline.md`](docs/performance-baseline.md).
+The root platform has a versioned shared contract, a Truck adapter, a headless consumer, an engineering control plane, a small agent platform, and a working local CAD application. The root-workspace test gate passes 273 tests across eleven packages on the recorded machine; startup, request latency, and export timings are in [`docs/performance-baseline.md`](docs/performance-baseline.md).
 
-Stage A of the CAD roadmap is **partially implemented**. `cad-studio` supports rectangle, circle, and regular-polygon sketches; a single extrusion feature; parameter editing with dependency-aware re-evaluation; undo/redo; save, reopen, and binary STL export. It does **not** yet provide sketch constraints, multiple features, booleans, revolve, assemblies, drawings, STL import, or native neutral-format (STEP/IGES/DXF) interchange. Those remain planned work in [`docs/roadmap.md`](docs/roadmap.md).
+Stage A of the CAD roadmap is **partially implemented**. `cad-studio` supports an ordered feature graph: rectangle, circle, regular-polygon, and drawn-polyline sketches; extrude features that start a body, join it with a kernel union, or remove material with a kernel difference (cut); full-turn revolve features that turn a sketch about one of its own axes; parameter and sketch-placement edits that rebuild every dependent feature; a per-feature rebuild cache so an unchanged or last-feature edit does not re-run the whole history; crash recovery that snapshots unsaved edits next to the project and restores them on the next start, including when the project file itself cannot be read; per-feature rebuild status with failure reporting; undo/redo; save, reopen, and binary STL export. A `.zcad` project written by any earlier schema opens through migration. It does **not** yet provide sketch constraints, dimensions, sweeps or lofts, partial revolves, fillets, multi-body, assemblies, drawings, STL import, or native neutral-format (STEP/IGES/DXF) interchange. Those remain planned work in [`docs/roadmap.md`](docs/roadmap.md).
 
 The CADCraft and SolidCraft desktop applications are not wired to the shared contract. The root adapter advertises only the capabilities its tests exercise. Known kernel limitations and measured behavior are documented in `docs/kernel-comparison.md` and `docs/performance-baseline.md`.
 
@@ -75,21 +75,23 @@ cargo run -p cad-studio -- --new model.zcad
 cargo run -p cad-studio -- --file model.zcad --port 7600
 ```
 
-The server binds `127.0.0.1` only, rejects foreign `Host` and `Origin` headers, caps request bodies at 1 MiB, and makes no network calls or telemetry requests. Projects are plain JSON in the versioned `.zcad` format; binary STL export uses `cad-io` and is validated before it is written. Sketch profiles are millimetres and extrusion is limited to 0.1–10,000 mm.
+The server binds `127.0.0.1` only, rejects foreign `Host` and `Origin` headers, caps request bodies at 1 MiB, and makes no network calls or telemetry requests. Projects are plain JSON in the versioned `.zcad` format (schema 5; schema 1, 2, 3 and 4 files migrate on load); binary STL export uses `cad-io` and is validated before it is written. Sketch profiles are in millimetres and extrusion is limited to 0.1–10,000 mm. The first feature starts the body and later features join or cut it, where a feature is an extrude or a full turn of the sketch about one of its own axes; a feature that cannot rebuild is marked with the kernel's message and blocks export instead of writing a file that no longer matches the model. Rebuilds are cached per feature, so an unchanged request does no kernel work and an edit re-runs only the features that read it.
 
 | Shortcut | Action |
 | --- | --- |
 | `Ctrl/Cmd+S` | Save |
-| `Ctrl/Cmd+Z` / `Shift+Ctrl/Cmd+Z` | Undo / redo |
+| `Ctrl/Cmd+Z` / `Shift+Ctrl/Cmd+Z` or `Ctrl/Cmd+Y` | Undo / redo |
 | `Ctrl/Cmd+K` | Command palette |
 | `F` | Frame model |
-| `E` | Focus the extrusion height |
-| `1` / `2` / `3` | Rectangle / circle / polygon sketch |
-| `G` | Toggle the grid |
-| `T` | Toggle theme |
+| `W` / `G` | Toggle wireframe / grid |
+| `1` / `2` / `3` / `4` | Front / top / right / isometric view |
 | `?` | Shortcut help |
+| `Esc` | Close a panel or the palette |
 
-Mouse: drag to orbit, wheel to zoom, right-drag to pan, click a solid face to select and measure it.
+Mouse: drag to orbit, shift-drag to pan, wheel to zoom, click a solid face to select and measure it.
+All creation commands (new sketch, extrude as new body, extrude as join, save, export) are in the
+command palette; the model tree is the ordered history and selecting a row drives the properties
+panel.
 
 ### Engineering tools
 

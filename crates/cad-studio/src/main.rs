@@ -6,7 +6,7 @@
 //! cad-studio --file part.zcad --port 7600
 //! ```
 
-use cad_studio::{DEFAULT_PORT, default_project, start};
+use cad_studio::{DEFAULT_PORT, default_project, start_with_recovery};
 use std::path::PathBuf;
 
 fn main() {
@@ -84,6 +84,7 @@ fn run() -> Result<(), String> {
     let path = file
         .ok_or_else(|| "a project file is required: `cad-studio --file part.zcad`".to_string())?;
 
+    let mut recovered = None;
     let project = if path.exists() {
         if create {
             return Err(format!(
@@ -91,8 +92,12 @@ fn run() -> Result<(), String> {
                 path.display()
             ));
         }
-        cad_document::Project::load(&path)
-            .map_err(|error| format!("{}: {error}", path.display()))?
+        // Prefer an unsaved-edit snapshot that is newer than the file, and fall back to it when the
+        // file itself cannot be read. The state payload reports which of those happened.
+        let (project, info) = cad_document::open_with_recovery(&path)
+            .map_err(|error| format!("{}: {error}", path.display()))?;
+        recovered = info;
+        project
     } else {
         if !create {
             return Err(format!(
@@ -108,9 +113,20 @@ fn run() -> Result<(), String> {
         project
     };
 
-    let handle = start(project, path.clone(), port).map_err(|error| error.to_string())?;
+    let handle = start_with_recovery(project, path.clone(), port, recovered)
+        .map_err(|error| error.to_string())?;
     println!("Atlas CAD Studio");
     println!("  file: {}", path.display());
+    if let Some(info) = recovered {
+        println!(
+            "  recovered: unsaved changes from the recovery snapshot{}",
+            if info.file_unreadable {
+                " (the project file could not be read)"
+            } else {
+                ""
+            }
+        );
+    }
     println!("  url:  {}", handle.url());
     println!("  stop: Ctrl+C");
     println!();

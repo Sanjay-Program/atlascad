@@ -147,7 +147,7 @@ fn state_is_a_complete_renderable_payload() -> Result<(), Box<dyn std::error::Er
     );
     let state = json(&response)?;
     assert_eq!(state["name"], "bracket");
-    assert_eq!(state["schema"], 2);
+    assert_eq!(state["schema"], cad_document::PROJECT_SCHEMA);
     assert_eq!(state["file"], path.display().to_string());
     assert_eq!(state["units"], "mm");
     assert_eq!(state["dirty"], false);
@@ -161,6 +161,23 @@ fn state_is_a_complete_renderable_payload() -> Result<(), Box<dyn std::error::Er
         12
     );
     assert_eq!(state["outline"].as_array().ok_or("outline")?.len(), 4);
+    // The history is rendered from these fields: every sketch and feature, in build order, with the
+    // operation and the rebuild outcome of each feature.
+    assert_eq!(
+        state["sketches"][0]["profile"]["kind"], "rectangle",
+        "the tree names the profile of every sketch"
+    );
+    assert_eq!(state["features"][0]["operation"], "new body");
+    assert_eq!(state["features"][0]["status"], "built");
+    assert!(
+        (state["features"][0]["volume_mm3"]
+            .as_f64()
+            .ok_or("volume")?
+            - 500.0)
+            .abs()
+            < 1e-6
+    );
+    assert!(state["failure"].is_null());
     assert!(
         state["parameters"]
             .as_array()
@@ -429,6 +446,365 @@ fn an_empty_project_reports_nothing_to_undo() -> Result<(), Box<dyn std::error::
     Ok(())
 }
 
+/// The M11 workflow end to end: add a second sketch, move it so the two bodies overlap, join it into
+/// the first through the real Truck kernel, then save and reopen the project.
+#[test]
+fn a_join_extrudes_a_second_sketch_into_the_body_and_survives_save_and_reopen()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, path, handle) = fixture("joined", [10.0, 10.0, 5.0])?;
+    let addr = handle.addr();
+
+    // The fixture is one 10 x 10 x 5 rectangle extruded as a new body.
+    let initial = json(&request(addr, "GET", "/api/state", &[], &[])?)?;
+    let volume = initial["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!((volume - 500.0).abs() < 1e-6, "fixture volume {volume}");
+    assert_eq!(initial["features"][0]["operation"], "new body");
+    assert_eq!(initial["features"][0]["status"], "built");
+
+    let added = post(
+        addr,
+        "/api/sketch",
+        r#"{"kind":"rectangle","origin":[0,0]}"#,
+    )?;
+    assert_eq!(added.status, 200);
+    let payload = json(&added)?;
+    let sketches = payload["sketches"].as_array().ok_or("sketches")?;
+    assert_eq!(sketches.len(), 2);
+    let second = sketches[1]["id"].as_u64().ok_or("second sketch id")?;
+    assert_eq!(sketches[1]["profile"]["kind"], "rectangle");
+    assert_eq!(sketches[1]["segments"], 4);
+    // A new sketch is a document change, not a rebuild: the body is untouched.
+    let volume = payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!(
+        (volume - 500.0).abs() < 1e-6,
+        "volume after a sketch {volume}"
+    );
+
+    // Move the second sketch so the two 10 x 10 footprints overlap by 2 x 2 mm.
+    let moved = post(
+        addr,
+        "/api/sketch/origin",
+        &format!(r#"{{"id":{second},"origin":[8,8]}}"#),
+    )?;
+    assert_eq!(moved.status, 200);
+    let payload = json(&moved)?;
+    assert_eq!(
+        payload["sketches"][1]["origin"],
+        serde_json::json!([8.0, 8.0])
+    );
+
+    // The body already exists, so a second new body is refused and says so.
+    let second_body = post(
+        addr,
+        "/api/feature/extrude",
+        &format!(r#"{{"sketch_id":{second},"operation":"new_body"}}"#),
+    )?;
+    assert_eq!(second_body.status, 400);
+    assert!(
+        json(&second_body)?["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("join")
+    );
+
+    let joined = post(
+        addr,
+        "/api/feature/extrude",
+        &format!(r#"{{"sketch_id":{second},"operation":"join"}}"#),
+    )?;
+    assert_eq!(joined.status, 200);
+    let payload = json(&joined)?;
+    // Two 10 x 10 x 5 boxes overlapping 2 x 2 over their full height: 500 + 500 - 2*2*5 = 980 mm³.
+    let volume = payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!((volume - 980.0).abs() < 1.0, "joined volume {volume}");
+    let features = payload["features"].as_array().ok_or("features")?;
+    assert_eq!(features.len(), 2);
+    assert_eq!(features[0]["operation"], "new body");
+    assert_eq!(features[0]["status"], "built");
+    assert_eq!(features[1]["operation"], "join");
+    assert_eq!(features[1]["status"], "built");
+    assert_eq!(features[1]["sketch_id"].as_u64(), Some(second));
+    assert!(features[1]["message"].is_null());
+    assert!(payload["failure"].is_null());
+    // The joined body spans both footprints.
+    for (axis, expected) in [(0, 18.0), (1, 18.0), (2, 5.0)] {
+        let max = payload["bounds"]["max"][axis].as_f64().ok_or("bound")?;
+        assert!((max - expected).abs() < 1e-3, "bound {axis} was {max}");
+    }
+
+    let saved = post(addr, "/api/save", "{}")?;
+    assert_eq!(saved.status, 200);
+    drop(handle);
+
+    // Reopen from the file: the ordered history and the joined solid come back through the kernel.
+    let reopened = cad_document::Project::load(&path)?;
+    assert_eq!(reopened.sketches().len(), 2);
+    assert_eq!(reopened.features().len(), 2);
+    let reopened = start(reopened, path, 0)?;
+    let state = json(&request(reopened.addr(), "GET", "/api/state", &[], &[])?)?;
+    let volume = state["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!((volume - 980.0).abs() < 1.0, "reopened volume {volume}");
+    assert_eq!(state["features"][1]["operation"], "join");
+    assert_eq!(state["features"][1]["status"], "built");
+    assert_eq!(
+        state["sketches"][1]["origin"],
+        serde_json::json!([8.0, 8.0])
+    );
+
+    // The export is the joined solid, not a placeholder mesh.
+    let exported = request(reopened.addr(), "GET", "/api/export/stl", &[], &[])?;
+    assert_eq!(exported.status, 200);
+    let mesh = cad_io::read_stl_binary(&exported.body)?;
+    assert!(
+        (mesh.signed_volume().abs() - 980.0).abs() < 1.0,
+        "exported volume {}",
+        mesh.signed_volume()
+    );
+    Ok(())
+}
+
+/// A feature that cannot rebuild is a reported result, not a lost model: the last good mesh stays,
+/// the feature is named with the kernel's message, export is refused, and undo removes the feature.
+#[test]
+fn a_feature_that_cannot_rebuild_is_reported_and_keeps_the_last_good_mesh()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("unbuildable", [10.0, 10.0, 5.0])?;
+    let addr = handle.addr();
+
+    let added = post(
+        addr,
+        "/api/sketch",
+        r#"{"kind":"rectangle","origin":[0,0]}"#,
+    )?;
+    let payload = json(&added)?;
+    let second = payload["sketches"][1]["id"].as_u64().ok_or("id")?;
+
+    // 1e9 mm from the origin is finite, so the document accepts it, but Truck cannot attach a plane
+    // to the resulting wire and the extrude fails. That measured limit (docs/kernel-comparison.md)
+    // is the one reachable way to make a feature fail through this API, and it drives exactly the
+    // path the UI has to show.
+    let moved = post(
+        addr,
+        "/api/sketch/origin",
+        &format!(r#"{{"id":{second},"origin":[1000000000,1000000000]}}"#),
+    )?;
+    assert_eq!(moved.status, 200);
+
+    let joined = post(
+        addr,
+        "/api/feature/extrude",
+        &format!(r#"{{"sketch_id":{second},"operation":"join"}}"#),
+    )?;
+    // Accepted: the feature belongs to the history and its failure is part of the payload.
+    assert_eq!(joined.status, 200);
+    let payload = json(&joined)?;
+    let features = payload["features"].as_array().ok_or("features")?;
+    assert_eq!(features.len(), 2);
+    assert_eq!(features[0]["status"], "built");
+    assert_eq!(features[1]["status"], "failed");
+    assert!(features[1]["volume_mm3"].is_null());
+    let message = features[1]["message"].as_str().ok_or("message")?;
+    assert!(message.contains("extrude failed"), "{message}");
+    assert_eq!(
+        payload["failure"]["feature"].as_u64(),
+        features[1]["id"].as_u64()
+    );
+
+    // The geometry is the last feature that rebuilt: the 10 x 10 x 5 body, not the failed join.
+    let volume = payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!((volume - 500.0).abs() < 1e-6, "kept volume {volume}");
+
+    // An export would not match the model, so it is refused and names the feature.
+    let refused = request(addr, "GET", "/api/export/stl", &[], &[])?;
+    assert_eq!(refused.status, 400);
+    assert!(
+        json(&refused)?["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("cannot be rebuilt")
+    );
+
+    // Undo removes the failing feature and the rebuild is clean again.
+    let undone = post(addr, "/api/undo", "{}")?;
+    assert_eq!(undone.status, 200);
+    let payload = json(&undone)?;
+    assert_eq!(payload["features"].as_array().ok_or("features")?.len(), 1);
+    assert!(payload["failure"].is_null());
+    let volume = payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!((volume - 500.0).abs() < 1e-6, "volume after undo {volume}");
+    Ok(())
+}
+
+/// The creation endpoints validate their inputs the way the rest of the API does.
+#[test]
+fn the_creation_endpoints_refuse_impossible_requests() -> Result<(), Box<dyn std::error::Error>> {
+    let dir = TempDir::new()?;
+    let path = dir.path().join("create.zcad");
+    let mut project = cad_document::Project::new(
+        "create",
+        cad_contract::ids::DocumentId::new(1),
+        cad_contract::units::Unit::Millimeter,
+    );
+    // Give the project a body so that `cut` is a meaningful request rather than a "no body" error.
+    let sketch_id = project.add_rectangle_sketch("width", "height", [0.0, 0.0])?;
+    project.add_extrude(sketch_id, "depth")?;
+    project.save(&path)?;
+    let sketch_id = project
+        .sketches()
+        .last()
+        .ok_or("the fixture sketch must exist")?
+        .id
+        .get();
+    let handle = start(project.clone(), path, 0)?;
+    let addr = handle.addr();
+
+    let unknown_shape = post(addr, "/api/sketch", r#"{"kind":"teapot"}"#)?;
+    assert_eq!(unknown_shape.status, 400);
+    assert!(
+        json(&unknown_shape)?["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("unknown profile")
+    );
+
+    let missing_sides = post(addr, "/api/sketch", r#"{"kind":"regular_polygon"}"#)?;
+    assert_eq!(missing_sides.status, 400);
+
+    let extra_field = post(addr, "/api/sketch", r#"{"kind":"circle","radius":4}"#)?;
+    assert_eq!(extra_field.status, 400);
+    assert_eq!(json(&extra_field)?["error"]["kind"], "invalid_json");
+
+    // The kernel now advertises boolean difference, so the UI offers Cut and the list must say so:
+    // the control is driven by this capability list, not by a hard-coded assumption.
+    let before_cut = json(&request(addr, "GET", "/api/state", &[], &[])?)?;
+    assert!(
+        before_cut["kernel"]["capabilities"]
+            .as_array()
+            .ok_or("capabilities")?
+            .iter()
+            .any(|capability| capability.as_str() == Some("boolean difference")),
+        "the UI decides whether to offer Cut from this list, so it must claim a verified difference"
+    );
+
+    // A cut of the body by its own sketch removes everything. The request is well-formed history,
+    // so it is accepted; the rebuild reports by feature ID whatever the kernel says, and the failure
+    // must never be a silently returned sliver.
+    let cut = post(
+        addr,
+        "/api/feature/extrude",
+        &format!(
+            r#"{{"sketch_id":{}, "operation":"cut", "depth_param":"depth"}}"#,
+            sketch_id
+        ),
+    )?;
+    assert_eq!(cut.status, 200, "{}", String::from_utf8_lossy(&cut.body));
+    let state = json(&cut)?;
+    let features = state["features"].as_array().ok_or("features")?;
+    assert_eq!(features.len(), 2);
+    assert_eq!(features[1]["operation"], "cut");
+    assert_eq!(
+        features[1]["status"], "failed",
+        "a cut that removes the whole body must be reported, not built: {state}"
+    );
+    assert_eq!(state["failure"]["feature"], features[1]["id"]);
+
+    // An unknown operation is still refused as a bad request.
+    let unknown_operation = post(
+        addr,
+        "/api/feature/extrude",
+        &format!(
+            r#"{{"sketch_id":{}, "operation":"slice", "depth_param":"depth"}}"#,
+            sketch_id
+        ),
+    )?;
+    assert_eq!(unknown_operation.status, 400);
+    assert!(
+        json(&unknown_operation)?["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("unknown operation")
+    );
+
+    // A cut before any body exists is refused with a "body" reason, not "unknown operation".
+    let mut empty_project = cad_document::Project::new(
+        "empty-cut",
+        cad_contract::ids::DocumentId::new(2),
+        cad_contract::units::Unit::Millimeter,
+    );
+    let empty_sketch = empty_project.add_rectangle_sketch("width", "height", [0.0, 0.0])?;
+    let empty_path = dir.path().join("empty.zcad");
+    empty_project.save(&empty_path)?;
+    let empty_handle = start(empty_project.clone(), empty_path, 0)?;
+    let empty_addr = empty_handle.addr();
+    // A cut or join before any body exists is refused with a "body" reason, not "unknown
+    // operation": the request is well-formed and the history is the problem.
+    let empty_sketch_id = empty_sketch.get();
+    for op_name in ["cut", "join"] {
+        let refused = post(
+            empty_addr,
+            "/api/feature/extrude",
+            &format!(
+                r#"{{"sketch_id":{}, "operation":"{}", "depth_param":"depth"}}"#,
+                empty_sketch_id, op_name
+            ),
+        )?;
+        assert_eq!(refused.status, 400);
+        let message = json(&refused)?
+            .get("error")
+            .and_then(|error| error.get("message"))
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default()
+            .to_owned();
+        assert!(
+            message.contains("body"),
+            "expected a body reason for {op_name}: {message:?}"
+        );
+    }
+
+    let unknown_sketch = post(
+        addr,
+        "/api/feature/extrude",
+        r#"{"sketch_id":7,"operation":"new_body"}"#,
+    )?;
+    assert_eq!(unknown_sketch.status, 400);
+    assert_eq!(json(&unknown_sketch)?["error"]["kind"], "unknown_sketch");
+
+    let added = post(addr, "/api/sketch", r#"{"kind":"circle","origin":[0,0]}"#)?;
+    assert_eq!(added.status, 200);
+    let payload = json(&added)?;
+    // The fixture already has the rectangle that starts the body; the new sketch is the newest one.
+    let sketches = payload["sketches"].as_array().ok_or("sketches")?;
+    let newest = sketches.last().ok_or("a sketch was added")?;
+    assert_eq!(newest["profile"]["kind"], "circle");
+    assert_eq!(newest["profile"]["diameter_param"], "diameter");
+
+    // A document carries one body, so a second `new_body` is refused rather than silently
+    // replacing the first.
+    let newest_id = newest["id"].as_u64().ok_or("newest sketch id")?;
+    let second_body = post(
+        addr,
+        "/api/feature/extrude",
+        &format!(r#"{{"sketch_id":{newest_id}, "operation":"new_body", "depth_param":"depth"}}"#),
+    )?;
+    assert_eq!(second_body.status, 400);
+    assert!(
+        json(&second_body)?["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("already has a body")
+    );
+
+    // An unknown depth parameter is refused by the document before the kernel is asked to build.
+    let unknown_depth = post(
+        addr,
+        "/api/feature/extrude",
+        &format!(r#"{{"sketch_id":{newest_id}, "operation":"join", "depth_param":"thickness"}}"#),
+    )?;
+    assert_eq!(unknown_depth.status, 400);
+    assert_eq!(json(&unknown_depth)?["error"]["kind"], "unknown_parameter");
+    Ok(())
+}
+
 #[test]
 fn an_unknown_sketch_or_profile_is_a_clear_user_error() -> Result<(), Box<dyn std::error::Error>> {
     let (_dir, _path, handle) = fixture("errors", [10.0, 10.0, 5.0])?;
@@ -459,5 +835,560 @@ fn an_unknown_sketch_or_profile_is_a_clear_user_error() -> Result<(), Box<dyn st
             .unwrap_or_default()
             .contains("sides")
     );
+
+    // A polyline without a loop, and a loop sent with a parameter-driven shape, are both refused.
+    let no_points = post(addr, "/api/sketch", r#"{"kind":"polyline"}"#)?;
+    assert_eq!(no_points.status, 400);
+    assert!(
+        json(&no_points)?["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("points")
+    );
+
+    let stray_points = post(
+        addr,
+        "/api/sketch",
+        r#"{"kind":"rectangle","points":[[0,0],[10,0],[10,10]]}"#,
+    )?;
+    assert_eq!(stray_points.status, 400);
+    assert!(
+        json(&stray_points)?["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("only valid for a polyline")
+    );
+    Ok(())
+}
+
+/// The drawn-polyline workflow end to end on the real Truck kernel: a concave L-shaped loop created
+/// through the API as a new body, edited by replacing the loop, undone, saved, reopened, exported.
+#[test]
+fn a_drawn_polyline_extrudes_saves_reopens_and_exports() -> Result<(), Box<dyn std::error::Error>> {
+    let dir = TempDir::new()?;
+    let path = dir.path().join("drawn.zcad");
+    let project = cad_document::Project::new(
+        "drawn",
+        cad_contract::ids::DocumentId::new(1),
+        cad_contract::units::Unit::Millimeter,
+    );
+    project.save(&path)?;
+    let handle = start(project, path.clone(), 0)?;
+    let addr = handle.addr();
+
+    // The L-shaped loop: 30 x 30 footprint with a 20 x 20 corner removed, area 500 mm².
+    let l_profile = "[[0,0],[30,0],[30,10],[10,10],[10,30],[0,30]]";
+    let added = post(
+        addr,
+        "/api/sketch",
+        &format!(r#"{{"kind":"polyline","origin":[0,0],"points":{l_profile}}}"#),
+    )?;
+    assert_eq!(added.status, 200);
+    let payload = json(&added)?;
+    let sketch = payload["sketches"][0].clone();
+    let sketch_id = sketch["id"].as_u64().ok_or("sketch id")?;
+    assert_eq!(sketch["profile"]["kind"], "polyline");
+    assert_eq!(sketch["segments"], 6);
+    assert_eq!(
+        sketch["profile"]["points"]
+            .as_array()
+            .ok_or("points")?
+            .len(),
+        6
+    );
+    // A sketch alone has no solid: the mesh is empty until a feature consumes it.
+    assert_eq!(payload["geometry"]["triangles"], 0);
+
+    // A two-point loop is refused before it becomes a sketch.
+    let too_few = post(
+        addr,
+        "/api/sketch",
+        r#"{"kind":"polyline","points":[[0,0],[10,0]]}"#,
+    )?;
+    assert_eq!(too_few.status, 400);
+    assert!(
+        json(&too_few)?["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("between 3 and")
+    );
+
+    let body = post(
+        addr,
+        "/api/feature/extrude",
+        &format!(r#"{{"sketch_id":{sketch_id},"operation":"new_body","depth_param":"depth"}}"#),
+    )?;
+    assert_eq!(body.status, 200);
+    let payload = json(&body)?;
+    // 500 mm² x 5 mm = 2500 mm³, the analytic volume of the L-shaped prism.
+    let volume = payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!((volume - 2500.0).abs() < 1.0, "drawn volume {volume}");
+    assert_eq!(payload["features"][0]["status"], "built");
+    assert_eq!(payload["features"][0]["operation"], "new body");
+    assert!(payload["failure"].is_null());
+    for (axis, expected) in [(0, 30.0), (1, 30.0), (2, 5.0)] {
+        let max = payload["bounds"]["max"][axis].as_f64().ok_or("bound")?;
+        assert!((max - expected).abs() < 1e-3, "bound {axis} was {max}");
+    }
+
+    // Replacing the loop with a 10 x 10 square rebuilds the feature to 100 x 5 = 500 mm³.
+    let smaller = post(
+        addr,
+        "/api/sketch/profile",
+        &format!(
+            r#"{{"id":{sketch_id},"kind":"polyline","points":[[0,0],[10,0],[10,10],[0,10]]}}"#
+        ),
+    )?;
+    assert_eq!(smaller.status, 200);
+    let payload = json(&smaller)?;
+    let volume = payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!((volume - 500.0).abs() < 1.0, "edited volume {volume}");
+    assert_eq!(payload["sketches"][0]["segments"], 4);
+
+    // Undo restores the L-shaped body and its loop together.
+    let undone = post(addr, "/api/undo", "{}")?;
+    assert_eq!(undone.status, 200);
+    let payload = json(&undone)?;
+    let volume = payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!((volume - 2500.0).abs() < 1.0, "volume after undo {volume}");
+    assert_eq!(payload["sketches"][0]["segments"], 6);
+
+    let saved = post(addr, "/api/save", "{}")?;
+    assert_eq!(saved.status, 200);
+    drop(handle);
+
+    // Reopen from disk: schema 4, the drawn loop, and the same analytic volume.
+    let reopened = cad_document::Project::load(&path)?;
+    assert_eq!(reopened.schema, cad_document::PROJECT_SCHEMA);
+    let mut kernel = cad_kernel_truck::TruckKernel::new();
+    let build = reopened.build(&mut kernel)?;
+    assert!(build.is_complete());
+    let reopened_volume = build.mesh.ok_or("reopened mesh")?.signed_volume();
+    assert!(
+        (reopened_volume - 2500.0).abs() < 1.0,
+        "reopened {reopened_volume}"
+    );
+    let reopened = start(reopened, path, 0)?;
+    let state = json(&request(reopened.addr(), "GET", "/api/state", &[], &[])?)?;
+    assert_eq!(state["sketches"][0]["profile"]["kind"], "polyline");
+    assert_eq!(
+        state["sketches"][0]["profile"]["points"]
+            .as_array()
+            .ok_or("points")?
+            .len(),
+        6
+    );
+    assert!(
+        state["geometry"]["triangles"].as_u64().unwrap_or(0) > 0,
+        "the reopened drawn body must tessellate"
+    );
+
+    // The export is the drawn solid, not a placeholder mesh.
+    let exported = request(reopened.addr(), "GET", "/api/export/stl", &[], &[])?;
+    assert_eq!(exported.status, 200);
+    let mesh = cad_io::read_stl_binary(&exported.body)?;
+    assert!(
+        (mesh.signed_volume().abs() - 2500.0).abs() < 1.0,
+        "exported volume {}",
+        mesh.signed_volume()
+    );
+    Ok(())
+}
+
+/// A cut removes exactly the analytic volume it should, and the whole history survives save,
+/// reopen, export and undo.
+///
+/// The numbers are the point of this test. The cut's depth equals the body's thickness, so the
+/// tool's top and bottom faces are coincident with the body's — the case that made every earlier
+/// difference measurement wrong. The document builds the tool with `CUT_OVERSHOOT_MM` of extra
+/// length, so the assertion is the analytic 255 mm³ to a thousandth of a millimetre, not "close".
+#[test]
+fn a_cut_removes_the_analytic_volume_and_survives_save_reopen_and_undo()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, path, handle) = fixture("cut", [10.0, 10.0, 5.0])?;
+    let addr = handle.addr();
+
+    // The fixture is one 10 x 10 x 5 rectangle extruded as a new body: 500 mm³.
+    let initial = json(&request(addr, "GET", "/api/state", &[], &[])?)?;
+    let volume = initial["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!((volume - 500.0).abs() < 1e-6, "fixture volume {volume}");
+
+    // A second 10 x 10 sketch, moved so it covers x,y in 3..13: 7 x 7 of it lies inside the body.
+    let added = post(
+        addr,
+        "/api/sketch",
+        r#"{"kind":"rectangle","origin":[3,3]}"#,
+    )?;
+    assert_eq!(added.status, 200);
+    let payload = json(&added)?;
+    let second = payload["sketches"][1]["id"]
+        .as_u64()
+        .ok_or("second sketch id")?;
+
+    let cut = post(
+        addr,
+        "/api/feature/extrude",
+        &format!(r#"{{"sketch_id":{second},"operation":"cut"}}"#),
+    )?;
+    assert_eq!(cut.status, 200, "{}", String::from_utf8_lossy(&cut.body));
+    let payload = json(&cut)?;
+    // 500 mm³ less a 7 x 7 x 5 through-cut (245 mm³) = 255 mm³.
+    let volume = payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!(
+        (volume - 255.0).abs() < 1e-3,
+        "cut volume {volume}, analytic 255"
+    );
+    let features = payload["features"].as_array().ok_or("features")?;
+    assert_eq!(features.len(), 2);
+    assert_eq!(features[1]["operation"], "cut");
+    assert_eq!(features[1]["status"], "built");
+    assert!(features[1]["message"].is_null());
+    assert!(payload["failure"].is_null());
+    // The body is the same block: a cut cannot move or grow it.
+    for (axis, expected) in [(0, 10.0), (1, 10.0), (2, 5.0)] {
+        let max = payload["bounds"]["max"][axis].as_f64().ok_or("bound")?;
+        let min = payload["bounds"]["min"][axis].as_f64().ok_or("bound")?;
+        assert!((max - expected).abs() < 1e-3, "max {axis} was {max}");
+        assert!(min.abs() < 1e-3, "min {axis} was {min}");
+    }
+
+    // Undo removes the cut feature and its geometry together, leaving the original block.
+    let undone = post(addr, "/api/undo", "{}")?;
+    assert_eq!(undone.status, 200);
+    let payload = json(&undone)?;
+    let volume = payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!((volume - 500.0).abs() < 1e-6, "volume after undo {volume}");
+    assert_eq!(payload["features"].as_array().map(Vec::len), Some(1));
+
+    // Redo puts it back, then save and reopen from disk: history and solid both return.
+    let redone = post(addr, "/api/redo", "{}")?;
+    assert_eq!(redone.status, 200);
+    let volume = json(&redone)?["geometry"]["volume_mm3"]
+        .as_f64()
+        .ok_or("volume")?;
+    assert!((volume - 255.0).abs() < 1e-3, "volume after redo {volume}");
+
+    let saved = post(addr, "/api/save", "{}")?;
+    assert_eq!(saved.status, 200);
+    drop(handle);
+
+    let reopened = cad_document::Project::load(&path)?;
+    assert_eq!(reopened.features().len(), 2);
+    let reopened = start(reopened, path, 0)?;
+    let state = json(&request(reopened.addr(), "GET", "/api/state", &[], &[])?)?;
+    let volume = state["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!(
+        (volume - 255.0).abs() < 1e-3,
+        "reopened cut volume {volume}"
+    );
+    assert_eq!(state["features"][1]["operation"], "cut");
+    assert_eq!(state["features"][1]["status"], "built");
+
+    // The export is the cut solid, not a placeholder mesh, and it is watertight: a through-cut
+    // whose tessellation had open edges would sail through a volume-only assertion.
+    let exported = request(reopened.addr(), "GET", "/api/export/stl", &[], &[])?;
+    assert_eq!(exported.status, 200);
+    let mesh = cad_io::read_stl_binary(&exported.body)?;
+    assert!(
+        (mesh.signed_volume().abs() - 255.0).abs() < 1e-3,
+        "exported volume {}",
+        mesh.signed_volume()
+    );
+    assert_eq!(
+        welded_open_edges(&mesh),
+        0,
+        "an exported solid must be a closed manifold"
+    );
+    Ok(())
+}
+
+/// Open edges of a mesh after merging vertices that share a position.
+///
+/// An STL stores three independent vertices per triangle, so [`Mesh::open_edges`] on what the reader
+/// returns is not a watertightness measure — every edge of every triangle is unpaired by
+/// construction. The writer emits the kernel's already-welded mesh, so equal positions survive the
+/// f64 -> f32 -> f64 round trip as equal bit patterns, which makes exact keying correct here rather
+/// than merely convenient.
+fn welded_open_edges(mesh: &cad_contract::mesh::Mesh) -> usize {
+    let mut key_of: BTreeMap<[u64; 3], u32> = BTreeMap::new();
+    let mut remap: Vec<u32> = Vec::with_capacity(mesh.positions.len());
+    for position in &mesh.positions {
+        let key = [
+            position[0].to_bits(),
+            position[1].to_bits(),
+            position[2].to_bits(),
+        ];
+        let next = u32::try_from(key_of.len()).unwrap_or(u32::MAX);
+        let index = *key_of.entry(key).or_insert(next);
+        remap.push(index);
+    }
+    let mut edges: BTreeMap<(u32, u32), i32> = BTreeMap::new();
+    for tri in &mesh.triangles {
+        let (Some(a), Some(b), Some(c)) = (
+            remap.get(tri[0] as usize),
+            remap.get(tri[1] as usize),
+            remap.get(tri[2] as usize),
+        ) else {
+            continue;
+        };
+        for (from, to) in [(*a, *b), (*b, *c), (*c, *a)] {
+            let key = if from <= to { (from, to) } else { (to, from) };
+            let direction = if from <= to { 1 } else { -1 };
+            *edges.entry(key).or_insert(0) += direction;
+        }
+    }
+    edges.values().filter(|count| **count != 0).count()
+}
+
+/// A revolve turns a profile a full turn about one of the sketch's own axes, and the result is the
+/// analytic solid of revolution — an annulus for a rectangle offset from the axis.
+///
+/// The volume assertion is a **band**, not an exact value, and the band is stated rather than hidden:
+/// the document tessellates at a 0.05 mm chord tolerance, so a radius-4 cylinder is an inscribed
+/// prism and its volume is below `π(R² − r²)h` by the polygon's sagitta error (~1.6%, about 1.9 mm³
+/// here). The adapter's own tests at its finest tolerance assert the analytic value to 0.05 mm³; this
+/// test asserts that the *application* path reaches the same geometry, with exact bounds and a
+/// watertight export.
+#[test]
+fn a_revolve_builds_the_analytic_annulus_and_survives_save_reopen_and_undo()
+-> Result<(), Box<dyn std::error::Error>> {
+    let dir = TempDir::new()?;
+    let path = dir.path().join("annulus.zcad");
+    let mut project = cad_document::Project::new(
+        "annulus",
+        cad_contract::ids::DocumentId::new(2),
+        cad_contract::units::Unit::Millimeter,
+    );
+    // A 2 x 3 rectangle from x = 2 to x = 4, so a full turn about the sketch's vertical axis gives
+    // outer radius 4, inner radius 2, height 3.
+    let sketch = project.add_polyline_sketch(
+        vec![[2.0, 0.0], [4.0, 0.0], [4.0, 3.0], [2.0, 3.0]],
+        [0.0, 0.0],
+    )?;
+    project.add_revolve(sketch, cad_document::RevolveAxis::Vertical)?;
+    project.save(&path)?;
+    let handle = start(project, path.clone(), 0)?;
+    let addr = handle.addr();
+
+    let state = json(&request(addr, "GET", "/api/state", &[], &[])?)?;
+    assert_eq!(state["schema"], cad_document::PROJECT_SCHEMA);
+    assert_eq!(state["features"][0]["kind"], "revolve");
+    assert_eq!(state["features"][0]["axis"], "vertical axis");
+    assert_eq!(state["features"][0]["operation"], "new body");
+    assert_eq!(state["features"][0]["status"], "built");
+    assert!(state["features"][0]["depth_mm"].is_null());
+    assert!(state["failure"].is_null());
+
+    let analytic = std::f64::consts::PI * (16.0 - 4.0) * 3.0;
+    let volume = state["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!(
+        volume > analytic * 0.98 && volume <= analytic + 1e-6,
+        "annulus volume {volume}, analytic {analytic}"
+    );
+
+    // The turned solid is centred on the axis: the sweep of a 2..4 profile reaches ±4 in the fully
+    // revolved direction and stays 0..3 along the axis. Bounds come from the tessellation, so the
+    // radial extents are an inscribed polygon of the circle — never past the analytic radius, and
+    // within the chord tolerance of it. The axial extents are planar caps and must be exact.
+    for (axis, expected_min, expected_max, tolerance) in [
+        (0, -4.0, 4.0, 1e-2),
+        (1, 0.0, 3.0, 1e-6),
+        (2, -4.0, 4.0, 1e-2),
+    ] {
+        let min = state["bounds"]["min"][axis].as_f64().ok_or("bound")?;
+        let max = state["bounds"]["max"][axis].as_f64().ok_or("bound")?;
+        assert!(
+            min >= expected_min - 1e-9
+                && max <= expected_max + 1e-9
+                && (min - expected_min).abs() < tolerance
+                && (max - expected_max).abs() < tolerance,
+            "axis {axis}: {min}..{max}, expected {expected_min}..{expected_max}"
+        );
+    }
+
+    let saved = post(addr, "/api/save", "{}")?;
+    assert_eq!(saved.status, 200);
+    drop(handle);
+
+    // Reopen from disk: the feature, its axis and the same solid come back.
+    let reopened = start(cad_document::Project::load(&path)?, path.clone(), 0)?;
+    let state = json(&request(reopened.addr(), "GET", "/api/state", &[], &[])?)?;
+    let reopened_volume = state["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!(
+        (reopened_volume - volume).abs() < 1e-9,
+        "reopened {reopened_volume}, was {volume}"
+    );
+    assert_eq!(state["features"][0]["axis"], "vertical axis");
+
+    // The export is the turned solid and it is watertight: a volume-only assertion would pass on a
+    // mesh with a torn seam along the sweep.
+    let exported = request(reopened.addr(), "GET", "/api/export/stl", &[], &[])?;
+    assert_eq!(exported.status, 200);
+    let mesh = cad_io::read_stl_binary(&exported.body)?;
+    assert!(
+        (mesh.signed_volume().abs() - volume).abs() < 0.01,
+        "exported volume {}, model {volume}",
+        mesh.signed_volume()
+    );
+    assert_eq!(
+        welded_open_edges(&mesh),
+        0,
+        "a revolved annulus must export as a closed surface"
+    );
+    Ok(())
+}
+
+/// A profile that straddles the revolve axis is not a solid of revolution, and the application says
+/// so as a failed feature with the kernel's reason, blocks export, and leaves the document intact.
+#[test]
+fn a_revolve_across_its_axis_is_a_failed_feature_not_a_geometry()
+-> Result<(), Box<dyn std::error::Error>> {
+    let dir = TempDir::new()?;
+    let path = dir.path().join("crossing.zcad");
+    let mut project = cad_document::Project::new(
+        "crossing",
+        cad_contract::ids::DocumentId::new(3),
+        cad_contract::units::Unit::Millimeter,
+    );
+    // x from -2 to 4: it crosses the vertical axis, so sweeping it would intersect itself.
+    let sketch = project.add_polyline_sketch(
+        vec![[-2.0, 0.0], [4.0, 0.0], [4.0, 3.0], [-2.0, 3.0]],
+        [0.0, 0.0],
+    )?;
+    project.add_revolve(sketch, cad_document::RevolveAxis::Vertical)?;
+    project.save(&path)?;
+    let handle = start(project, path.clone(), 0)?;
+    let addr = handle.addr();
+
+    let state = json(&request(addr, "GET", "/api/state", &[], &[])?)?;
+    assert_eq!(state["features"][0]["status"], "failed");
+    let message = state["features"][0]["message"]
+        .as_str()
+        .ok_or("failed feature message")?;
+    assert!(message.contains("crosses"), "{message}");
+    assert_eq!(state["failure"]["feature"], state["features"][0]["id"]);
+    assert_eq!(state["geometry"]["triangles"], 0);
+
+    let export = request(addr, "GET", "/api/export/stl", &[], &[])?;
+    assert_eq!(export.status, 400);
+    let error = json(&export)?;
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("cannot be rebuilt"),
+        "export must explain why it refused"
+    );
+    Ok(())
+}
+
+/// The measured data-loss defect this test closes: an edit that was never saved used to disappear
+/// when the process died. The studio now keeps a snapshot next to the project file, offers it on the
+/// next start, marks the session dirty, and lets the user promote it with a save or throw it away.
+#[test]
+fn an_unsaved_edit_survives_a_crash_and_can_be_saved_or_discarded()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, path, handle) = fixture("recovery", [10.0, 10.0, 5.0])?;
+    let addr = handle.addr();
+
+    // 10 x 10 x 5 = 500 mm3. The edit below is never saved.
+    let edited = post(addr, "/api/parameter", r#"{"id":"depth","value":8.0}"#)?;
+    assert_eq!(
+        edited.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&edited.body)
+    );
+    let payload = json(&edited)?;
+    assert!((payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")? - 800.0).abs() < 1e-6);
+    assert_eq!(payload["recovery"]["recovered"], false);
+    assert!(payload["recovery"]["autosave_error"].is_null());
+    assert!(
+        cad_document::recovery_path(&path).exists(),
+        "an edit must leave a recovery snapshot behind"
+    );
+
+    // The process dies here: no save, no shutdown, no chance to write anything else.
+    drop(handle);
+
+    // The project file is still the last explicit save; the snapshot holds the edit.
+    let on_disk = cad_document::Project::load(&path)?;
+    let depth = on_disk
+        .parameters()
+        .iter()
+        .find(|parameter| parameter.id == "depth")
+        .map(|parameter| parameter.value);
+    assert_eq!(depth, Some(5.0), "the snapshot must not rewrite the file");
+
+    let (recovered, info) = cad_document::open_with_recovery(&path)?;
+    let info = info.ok_or("the unsaved edit must survive the crash")?;
+    assert!(!info.file_unreadable);
+
+    let handle = cad_studio::start_with_recovery(recovered, path.clone(), 0, Some(info))?;
+    let addr = handle.addr();
+    let state = json(&request(addr, "GET", "/api/state", &[], &[])?)?;
+    assert_eq!(state["recovery"]["recovered"], true);
+    assert_eq!(state["recovery"]["file_unreadable"], false);
+    assert_eq!(
+        state["dirty"], true,
+        "a recovered session is unsaved by definition"
+    );
+    assert!(
+        (state["geometry"]["volume_mm3"].as_f64().ok_or("volume")? - 800.0).abs() < 1e-6,
+        "the recovered session must show the edit, not the file"
+    );
+
+    // Save promotes the snapshot, and the snapshot is removed only after the file is written.
+    let saved = post(addr, "/api/save", "{}")?;
+    assert_eq!(saved.status, 200);
+    let saved = json(&saved)?;
+    assert_eq!(saved["recovery"]["recovered"], false);
+    assert_eq!(saved["dirty"], false);
+    assert!(
+        !cad_document::recovery_path(&path).exists(),
+        "a save consumes the snapshot"
+    );
+    let reopened = cad_document::Project::load(&path)?;
+    let depth = reopened
+        .parameters()
+        .iter()
+        .find(|parameter| parameter.id == "depth")
+        .map(|parameter| parameter.value);
+    assert_eq!(depth, Some(8.0));
+    Ok(())
+}
+
+#[test]
+fn a_recovered_session_can_be_discarded_back_to_the_file() -> Result<(), Box<dyn std::error::Error>>
+{
+    let (dir, path, handle) = fixture("discard", [10.0, 10.0, 5.0])?;
+    let addr = handle.addr();
+    post(addr, "/api/parameter", r#"{"id":"depth","value":8.0}"#)?;
+    drop(handle);
+
+    let (recovered, info) = cad_document::open_with_recovery(&path)?;
+    let info = info.ok_or("recovery")?;
+    let handle = cad_studio::start_with_recovery(recovered, path.clone(), 0, Some(info))?;
+    let addr = handle.addr();
+
+    let discarded = post(addr, "/api/recovery/discard", "{}")?;
+    assert_eq!(
+        discarded.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&discarded.body)
+    );
+    let payload = json(&discarded)?;
+    assert_eq!(payload["recovery"]["recovered"], false);
+    assert_eq!(payload["dirty"], false);
+    assert!(
+        (payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")? - 500.0).abs() < 1e-6,
+        "discard must go back to the saved body"
+    );
+    assert!(!cad_document::recovery_path(&path).exists());
+    // The file itself was never modified by any of this.
+    let on_disk = cad_document::Project::load(&path)?;
+    assert_eq!(on_disk.features().len(), 1);
+    drop(dir);
     Ok(())
 }

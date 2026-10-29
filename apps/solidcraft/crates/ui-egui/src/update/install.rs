@@ -31,7 +31,7 @@ use super::{FetchError, InstallKind, Release};
 /// The minisign public key releases are signed with (the base64 line of `minisign.pub`), or None
 /// while the project has no update signing key: then the SHA-256 check over HTTPS is what
 /// guards an update. See docs/releasing.md, "Update signing".
-pub const PUBLIC_KEY: Option<&str> = None;
+pub const PUBLIC_KEY: Option<&str> = Some("RWR36khhKXv/n7nMFlOUzpv0kXR8gbGF7azAOIqGUbt9k4X6YOy+cT/3");
 
 /// The checksum list every release carries, and its signature.
 pub const SUMS: &str = "SHA256SUMS.txt";

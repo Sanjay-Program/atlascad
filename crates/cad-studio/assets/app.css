@@ -505,6 +505,58 @@ kbd {
   background: var(--border);
 }
 
+#viewport.drawing {
+  cursor: crosshair;
+}
+
+/* ---------- polyline drawing ---------- */
+
+.draw-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 44px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+  white-space: nowrap;
+}
+
+.draw-title {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.draw-count {
+  color: var(--text-dim);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.draw-bar .button {
+  padding: 3px 9px;
+  font-size: 11px;
+}
+
+.draw-hint {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+@media (max-width: 1180px) {
+  .draw-hint {
+    display: none;
+  }
+}
+
 .axis-gizmo {
   position: absolute;
   right: 16px;
@@ -828,6 +880,126 @@ kbd {
   border-radius: 999px;
   background-clip: padding-box;
   background-color: var(--border-strong);
+}
+
+/* ---------- model tree, creation controls, failure banner ---------- */
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.field-row .field {
+  grid-template-columns: 30px minmax(0, 1fr);
+}
+
+.button.wide {
+  width: 100%;
+  margin-bottom: 9px;
+}
+
+/* A tree row is a button so a row can select the entity it names. */
+.tree-item {
+  display: block;
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.tree-item.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.tree-item .tree-badge {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--panel-hover);
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.tree-item .tree-badge.built {
+  background: rgba(86, 211, 100, 0.14);
+  color: var(--success);
+}
+
+.tree-item .tree-badge.failed {
+  background: rgba(255, 123, 114, 0.14);
+  color: var(--danger);
+}
+
+.tree-item .tree-message {
+  display: block;
+  margin: 2px 0 4px 23px;
+  color: var(--danger);
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.failure-banner {
+  position: absolute;
+  top: 64px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 11px;
+  border: 1px solid color-mix(in srgb, var(--danger) 42%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(10px);
+}
+
+.failure-banner .failure-icon {
+  display: grid;
+  place-content: center;
+  flex: none;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: rgba(255, 123, 114, 0.16);
+  color: var(--danger);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.failure-banner .failure-message {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+/* A recovered snapshot is a warning, not a failure: it sits below the failure banner and uses the
+   accent colour so the two can never be mistaken for each other. */
+.recovery-banner {
+  top: auto;
+  bottom: 56px;
+  border-color: color-mix(in srgb, var(--accent) 52%, transparent);
+}
+
+.recovery-banner .failure-icon {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
 }
 
 /* ---------- responsive ---------- */

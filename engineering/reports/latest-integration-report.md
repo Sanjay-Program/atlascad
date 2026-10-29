@@ -1,7 +1,7 @@
 # Atlas CAD — Integration Report
 
-**Generated:** 2026-10-25T08:46:56Z (unix 1792918016) · **Scanner:** cad-engineering/0.1.0
-**Last observation:** 2026-10-25T08:46:56Z · **Host:** linux/x86_64 · 8 CPUs
+**Generated:** 2026-10-29T05:35:32Z (unix 1793252132) · **Scanner:** cad-engineering/0.1.0
+**Last observation:** 2026-10-29T05:35:32Z · **Host:** linux/x86_64 · 8 CPUs
 
 > Generated file. Edit the manifests under `engineering/manifest/`, not this report.
 
@@ -18,18 +18,18 @@
 | — retired | 0 |
 | Modules | 34 |
 | Interfaces | 11 |
-| Capabilities — verified | 16 |
-| Capabilities — advertised only | 13 |
+| Capabilities — verified | 20 |
+| Capabilities — advertised only | 12 |
 | Capabilities — absent | 3 |
 | Agents — implemented | 1 |
 | Agents — active | 1 |
 | Tasks — proposed | 6 |
-| Tasks — ready | 28 |
+| Tasks — ready | 44 |
 | Tasks — in progress | 0 |
 | Tasks — blocked | 4 |
 | Tasks — needs review | 0 |
 | Tasks — failed | 0 |
-| Tasks — verified | 35 |
+| Tasks — verified | 43 |
 | Tasks — cancelled | 6 |
 
 ## 2. Repositories
@@ -72,9 +72,9 @@
 
 ## 4. Recorded evidence
 
-* Builds: **13** succeeded, **0** failed, **0** recorded as not run.
-* Tests: **18** runs succeeded, **0** failed, **1** not run — 319 tests passed, 0 failed, 2 skipped across the counted per-package records (workspace summaries and superseded records excluded; imported applications and corpus examples are included, so this is not a single-suite root-workspace total).
-* Benchmarks: **14** recorded measurement(s).
+* Builds: **16** succeeded, **0** failed, **0** recorded as not run.
+* Tests: **35** runs succeeded, **0** failed, **1** not run — 677 tests passed, 0 failed, 2 skipped across the counted per-package records (workspace summaries and superseded records excluded; imported applications and corpus examples are included, so this is not a single-suite root-workspace total).
+* Benchmarks: **22** recorded measurement(s).
 * Security: **8** open finding(s); **0/3** scans ran successfully.
   * S-1 — No advisory or dependency-policy scan is running (High, Blocked)
   * S-2 — LGPL OpenCASCADE is one cargo add away from the shipping binary (High, NeedsReview)
@@ -87,11 +87,19 @@
 
 ## 5. Changes
 
-No change detected against the previous observation. Stable ids were reproduced, so no new task was generated.
+2 change(s) detected against the previous observation.
+
+* **`repo.cad-document`** · FilesModified · 1 tracked file(s) changed against the previous fingerprint
+  * ~ src/lib.rs
+* **`repo.cad-studio`** · FilesModified · 6 tracked file(s) changed against the previous fingerprint
+  * ~ assets/app.css
+  * ~ assets/app.js
+  * ~ assets/index.html
+  * ~ src/lib.rs
+  * ~ src/main.rs
+  * ~ tests/http_api.rs
 
 ## 6. Tasks
-
-This scan inserted **0** task(s); **0** were already known and left untouched.
 
 Next unblocked tasks, in priority order:
 
@@ -102,13 +110,13 @@ Next unblocked tasks, in priority order:
 | `task.scan.repo-discovered.repo-cad-studio.87b6c2b6` | IntegrationBlocker | Medium | repo.cad-studio: `crates/cad-studio` was not observed in the previous scan |
 | `task.scan.working-tree-dirty.repo-solidcraft.f4311c36` | IntegrationBlocker | Medium | repo.solidcraft: 7 uncommitted path(s) appeared |
 | `task.scan.files-modified.repo-cad-agent-api.21bae687` | InterfaceCompatibility | Low | repo.cad-agent-api: 1 tracked file(s) changed against the previous fingerprint |
+| `task.scan.files-modified.repo-cad-agent-geometry.d2aef8bb` | InterfaceCompatibility | Low | repo.cad-agent-geometry: 1 tracked file(s) changed against the previous fingerprint |
 | `task.scan.files-modified.repo-cad-agent-geometry.ef9ee2f2` | InterfaceCompatibility | Low | repo.cad-agent-geometry: 2 tracked file(s) changed against the previous fingerprint |
 | `task.scan.files-modified.repo-cad-agent-runtime.ceadb347` | InterfaceCompatibility | Low | repo.cad-agent-runtime: 1 tracked file(s) changed against the previous fingerprint |
+| `task.scan.files-modified.repo-cad-cli.0e46e3c8` | InterfaceCompatibility | Low | repo.cad-cli: 1 tracked file(s) changed against the previous fingerprint |
 | `task.scan.files-modified.repo-cad-cli.7e15d190` | InterfaceCompatibility | Low | repo.cad-cli: 4 tracked file(s) changed against the previous fingerprint |
 | `task.scan.files-modified.repo-cad-cli.937c6904` | InterfaceCompatibility | Low | repo.cad-cli: 5 tracked file(s) changed against the previous fingerprint |
-| `task.scan.files-modified.repo-cad-contract.3364b835` | InterfaceCompatibility | Low | repo.cad-contract: 2 tracked file(s) changed against the previous fingerprint |
-| `task.scan.files-modified.repo-cad-contract.e01cacea` | InterfaceCompatibility | Low | repo.cad-contract: 2 tracked file(s) changed against the previous fingerprint |
-| `task.scan.files-modified.repo-cad-document.1ef5200f` | InterfaceCompatibility | Low | repo.cad-document: 1 tracked file(s) changed against the previous fingerprint |
+| `task.scan.files-modified.repo-cad-cli.b97fe8de` | InterfaceCompatibility | Low | repo.cad-cli: 1 tracked file(s) changed against the previous fingerprint |
 
 ## 7. Claims that are not yet verified
 
@@ -119,7 +127,6 @@ Next unblocked tasks, in priority order:
 * Capability `cap.document.2d` is advertised by module.cadcraft.doc but no test is recorded against it.
 * Capability `cap.document.parametric` is advertised by module.solidcraft.doc but no test is recorded against it.
 * Capability `cap.3d.sketch` is advertised by module.solidcraft.sketch but no test is recorded against it.
-* Capability `cap.kernel.boolean.difference` is advertised by module.solidcraft.kernel but no test is recorded against it.
 * Capability `cap.kernel.fillet` is advertised by module.solidcraft.kernel but no test is recorded against it.
 * Capability `cap.io.step` is advertised by module.solidcraft.io but no test is recorded against it.
 * Capability `cap.io.mesh` is advertised by module.solidcraft.io but no test is recorded against it.

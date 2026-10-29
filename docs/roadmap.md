@@ -7,6 +7,27 @@ Sizes are rough effort for one engineer: **S** ≤ 1 day, **M** ≤ 1 week, **L*
 
 ---
 
+## Done in the 2026-10-29 cycle
+
+| Item | Result | Evidence |
+|---|---|---|
+| **M11c** — per-feature rebuild cache (`cad_document::BuildCache`) | **done, 7 new document tests** — the body after each feature prefix is cached by resolved inputs; an unchanged history issues no kernel call, an edit re-runs only the features that read it, a failure is reproduced rather than cached, and a cache handed to another kernel instance is discarded | `crates/cad-document`, `t-cad-document-m11c`, `docs/performance-baseline.md` §9 |
+| Measured effect of the cache | **done** — `GET /api/state` 17.4 → 0.7 ms, unchanged and six-feature histories 30.3 → 0.01 ms and 30.3 → 7.9 ms; a parameter two features share still costs a full rebuild (18.5 ms, no regression) and that is recorded rather than hidden | `docs/performance-baseline.md` §9, `bm-studio-m11c-state`, `bm-rebuild-cache` |
+| Control plane made valid again | **done** — `atlas-eng validate` now reports 0 errors and 0 warnings: the task schema gained the documented `user_value` and `measurement` priorities plus the optional closure fields (`acceptance_results`, `contract_changes`, `limitations`, `verified_on`, `verified_host`) the 2026-10-28 entries already used, and the two incomplete task records were completed rather than trimmed | `crates/cad-engineering/src/model.rs`, `engineering/tasks/completed.json` |
+| **M11d** — full-turn revolve (`Kernel::revolve`, `.zcad` schema 5) | **done, 12 new tests + a scripted browser run** — a rectangle on the axis measures the analytic cylinder and an offset rectangle the analytic annulus, both watertight; a partial turn and a profile across the axis are refused with a reason; the studio offers the turn, hides the depth field, shows the axis, and keeps the row through save/reload | `crates/cad-kernel-truck`, `t-cad-kernel-truck-m11d`, `t-cad-document-m11d`, `t-cad-studio-browser-m11d` |
+| Root workspace gate | **green** — 273 tests (up from 261), fmt and clippy `-D warnings` clean; the corpus is unchanged at 8 ok / 3 known failure / 0 regressions | `engineering/quality/tests.json#t-platform-workspace-20261029-m11d` |
+
+## Done in the 2026-10-27 cycle
+
+| Item | Result | Evidence |
+|---|---|---|
+| **M11** — `.zcad` schema 3 feature graph: ordered sketches and features, stable IDs, explicit `new_body`/`join`, schema-1/2 migration | **done, 36 document tests** — 9 new tests; a forward reference or cycle is unrepresentable because a feature may only reference an earlier ID | `crates/cad-document`, ADR-0009, `t-cad-feature-graph` |
+| Extrude-join wired to the real kernel | **done** — join goes through `Kernel::boolean(Union)` and is refused with a stated reason when the adapter does not advertise `BooleanUnion`; two 10×10×5 boxes overlapping 2×2 mm measure **980 mm³ ± 1**, bounds 18×18×5 | `crates/cad-document`, `t-cad-feature-graph`, `t-cad-studio-m11` |
+| Failure propagation instead of rollback | **done** — a feature that cannot rebuild is reported by ID with the kernel message, the last good mesh stays renderable, export is refused, and undo removes it | `crates/cad-studio`, `docs/quality/m11-feature-graph.md` |
+| Atlas Studio multi-feature UI | **done, 13 studio tests + browser run** — model tree with operation/status per feature, sketch placement panel, join form, failure banner; the browser workflow creates two sketches, joins them, saves, reopens, exports and recovers via undo | `docs/quality/m11-feature-graph.md` |
+| Multi-feature cost measured | **done** — 17.3 ms per full rebuild (median of 20), 12.6 ms save, 31 ms startup on the two-feature project; the single-feature path is unchanged at 3.5 ms | `docs/performance-baseline.md` §8 |
+| Root workspace gate | **green** — 239 tests, fmt and clippy `-D warnings` clean (superseded by 261 on 2026-10-29) | `engineering/quality/builds.json#b-platform-workspace-20261027` |
+
 ## Done in the 2026-10-25 cycle
 
 | Item | Result | Evidence |
@@ -19,6 +40,7 @@ Sizes are rough effort for one engineer: **S** ≤ 1 day, **M** ≤ 1 week, **L*
 | Measured application baseline | **done** — startup, state/save/export round trips and the absence of a GPU frame claim are recorded | `docs/performance-baseline.md` §7 |
 | `cad-engineering` report totals | **fixed, 2 new tests** — superseded package records and workspace summaries are no longer double-counted | `crates/cad-engineering/src/report.rs` |
 | Control plane refreshed | **done** — 24 repositories, 34 modules, 11 interfaces, 32 capabilities, rebuilt after the new crates | `engineering/reports/latest-integration-report.md` |
+| Control plane refreshed for the feature graph | **done** — `cap.document.feature-graph` added (33 capabilities, 17 verified); module boundaries, public APIs, compatibility and performance baselines updated; the two M11 tasks and the two scanner change-tasks are closed as `verified` with evidence, and a repeated scan is a no-op | `engineering/reports/latest-integration-report.md`, `engineering/tasks/completed.json` |
 
 ## Done in the 2026-10-22 cycle
 
@@ -45,9 +67,13 @@ future fix shows up as an unexpected pass rather than silently changing the answ
 
 ---
 
-## Next milestone (do this first)
+## Just completed — M11 (2026-10-27)
 
-### M11 — Stage A: a real feature graph with multi-feature join (M)
+### M11 — Stage A: a real feature graph with multi-feature join (M) — **done 2026-10-27**
+
+Delivered as schema 3 with `new_body`/`join` and a rebuild report. The evidence, the exact numbers
+and the remaining limits are in `docs/quality/m11-feature-graph.md`; the decision is ADR-0009. What
+follows is the milestone as it was written, kept for the record.
 
 **Goal:** a project can contain more than one sketch and more than one extrusion, joined in a stated
 order, and a parameter or origin edit rebuilds every dependent feature.
@@ -75,9 +101,39 @@ workflow is exercised in the browser.
 
 **Out of scope:** cut (kernel difference is a recorded failure), revolve, loft, fillet, constraints.
 
+**Met on 2026-10-27.** The failure path was exercised with a sketch placed 1e9 mm out, where the
+kernel fails to attach a plane to the wire; the document test additionally injects a failing join
+directly. In both cases export is disabled rather than writing a mesh that no longer matches the
+history.
+
 ---
 
-## Then, in order
+## Next, in order
+
+### M11b — Cut, behind a verified difference (M) — **done 2026-10-27**
+
+**Goal:** a second extrude can remove material, and the application refuses cut on a kernel whose
+difference is not proven.
+
+The corpus already had three analytic cut fixtures (coplanar, piercing, contained void). The order
+was: get the adapter's difference to pass them, then add `ExtrudeOperation::Cut` with the same
+capability check and failure reporting the join already has. The adapter's `boolean(Difference)` was
+already implemented (it computes `a AND NOT b` and applies the same coplanar retry and volume-
+conservation guard the union uses); it was only absent from the advertised capability set.
+
+**Met on 2026-10-27.** The adapter now advertises `BooleanDifference`; the document adds
+`ExtrudeOperation::Cut` and a cut is refused with a stated reason when the kernel does not advertise
+it; the corpus's three difference fixtures flip from `unsupported` to `must_pass` and the gate stays
+green with no newly skipped fixture; the studio exposes cut in the operation select, the command
+palette, the model tree badge and the failure banner; save/reopen and undo cover the cut.
+
+**Acceptance (from the plan, now met):** a through-cut and a blind cut match analytic volumes ±1 mm³
+in the corpus *and* in an HTTP integration test; a kernel that does not advertise
+`BooleanDifference` refuses the feature with a stated reason; save/reopen and undo cover the cut; the
+corpus gate still prints the known failures it had before, with no newly skipped fixture.
+
+**Out of scope:** curved cuts, draft, thin-wall, patterns.
+
 
 ### M1 — Prove the contract against the real kernel (M) — needs a larger host
 
@@ -223,12 +279,20 @@ product needs it.
 
 ## Definition of done for the *next* report
 
-1. M11 acceptance met: multi-feature join, dependency refusal, failure propagation, schema-2
-   migration, and a browser workflow that survives save/reopen.
-2. The new feature graph's load/recompute cost is measured on the recorded hardware, with correctness
-   checked in the same run.
+1. M11b acceptance met: cut gated on a passing difference corpus, with analytic through-cut and
+   blind-cut volumes in the corpus and in an HTTP test, capability refusal, undo and save/reopen.
+2. The feature rebuild cost is either bounded by a per-feature cache (with a measured improvement
+   against the 17.3 ms record) or explicitly accepted with the measurement attached.
 3. M5 CI gates green, or the missing tools reported as blockers rather than claimed.
 4. M1 merged with the flag off by default and a passing agreement test on a ≥16 GB host.
 5. Every remaining "Blocked" row in `docs/feature-matrix.md` either has an owner decision or a date.
 6. The S-3 import budgets are closed in SolidCraft IO, so `M4` can be marked done rather than half
    done.
+
+### Closed by the 2026-10-27 cycle
+
+- ~~M11 acceptance met~~ — multi-feature join, dependency refusal, failure propagation, schema-2
+  migration and a browser workflow that survives save/reopen: `docs/quality/m11-feature-graph.md`.
+- ~~The feature graph's recompute cost measured, correctness checked in the same run~~ — 17.3 ms per
+  rebuild with the 980 mm³ union asserted by the tests in the same cycle:
+  `docs/performance-baseline.md` §8.

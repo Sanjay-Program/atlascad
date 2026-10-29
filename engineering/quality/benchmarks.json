@@ -95,51 +95,131 @@
       "id": "bm-studio-startup",
       "name": "studio start to first healthy /api/health",
       "metric": "wall time, median of 5 runs",
-  "value": 10.0,
-  "unit": "ms",
-  "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
-  "recorded_at": "2026-10-25",
-  "notes": "Median of five launches (7, 7, 10, 14, 16 ms), 1 ms poll interval. Includes project load, validation, one kernel evaluation and the bind. Replaces an earlier 1.14 s reading that was dominated by the poll interval, not startup."
+      "value": 10.0,
+      "unit": "ms",
+      "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
+      "recorded_at": "2026-10-25",
+      "notes": "Median of five launches (7, 7, 10, 14, 16 ms), 1 ms poll interval. Includes project load, validation, one kernel evaluation and the bind. Replaces an earlier 1.14 s reading that was dominated by the poll interval, not startup."
     },
     {
       "id": "bm-studio-state",
       "name": "GET /api/state",
       "metric": "mean wall time, 30 requests",
-  "value": 2.66,
-  "unit": "ms",
-  "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
-  "recorded_at": "2026-10-25",
-  "notes": "Median of 300 requests (p95 4.29 ms, max 27 ms), Python http.client, one new loopback connection per request. 2,278-byte JSON for a 28-triangle octagonal prism. The same client measured 10.22 ms before the accept loop stopped polling with a 10 ms sleep: 3.8x lower."
+      "value": 2.66,
+      "unit": "ms",
+      "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
+      "recorded_at": "2026-10-25",
+      "notes": "Median of 300 requests (p95 4.29 ms, max 27 ms), Python http.client, one new loopback connection per request. 2,278-byte JSON for a 28-triangle octagonal prism. The same client measured 10.22 ms before the accept loop stopped polling with a 10 ms sleep: 3.8x lower."
     },
     {
       "id": "bm-studio-parameter",
       "name": "POST /api/parameter (rebuild + full state)",
       "metric": "mean wall time, 30 requests",
-  "value": 4.44,
-  "unit": "ms",
-  "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
-  "recorded_at": "2026-10-25",
-  "notes": "Median of 30 requests (p95 5.53 ms), alternating depth 10/11 mm, one kernel extrude and tessellation per request, 2,278-byte response. Python http.client, new connection each time."
+      "value": 4.44,
+      "unit": "ms",
+      "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
+      "recorded_at": "2026-10-25",
+      "notes": "Median of 30 requests (p95 5.53 ms), alternating depth 10/11 mm, one kernel extrude and tessellation per request, 2,278-byte response. Python http.client, new connection each time."
     },
     {
       "id": "bm-studio-save",
       "name": "POST /api/save (atomic project write + state)",
       "metric": "wall time",
-  "value": 4.5,
-  "unit": "ms",
-  "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
-  "recorded_at": "2026-10-25",
-  "notes": "Median of 10 requests on the same 28-triangle project. fsync and directory sync are part of the save path; Python http.client, new connection each time."
+      "value": 4.5,
+      "unit": "ms",
+      "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
+      "recorded_at": "2026-10-25",
+      "notes": "Median of 10 requests on the same 28-triangle project. fsync and directory sync are part of the save path; Python http.client, new connection each time."
     },
     {
       "id": "bm-studio-stl-export",
       "name": "GET /api/export/stl",
       "metric": "wall time",
-  "value": 3.98,
-  "unit": "ms",
-  "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
-  "recorded_at": "2026-10-25",
-  "notes": "Median of 10 requests: 1,484-byte binary STL, 28 triangles, parsed back and checked by the CLI test suite. Python http.client, new connection each time."
+      "value": 3.98,
+      "unit": "ms",
+      "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
+      "recorded_at": "2026-10-25",
+      "notes": "Median of 10 requests: 1,484-byte binary STL, 28 triangles, parsed back and checked by the CLI test suite. Python http.client, new connection each time."
+    },
+    {
+      "id": "bm-studio-m11-rebuild",
+      "name": "POST /api/parameter and GET /api/state (rebuild + tessellate a 2-sketch, 2-feature join)",
+      "metric": "median wall time, 20 requests",
+      "value": 17.3,
+      "unit": "ms",
+      "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
+      "recorded_at": "2026-10-27",
+      "notes": "Median 17.3 ms, max 17.9 ms over 20 alternating depth values on a project of rectangle + extrude + rectangle + extrude-join. The same project answered GET /api/state in 17.4 ms median. The recorded single-feature baseline on this host was 4.44 ms (bm-studio-parameter), so one boolean feature costs about 4x the request: every request rebuilds the whole graph and re-tessellates it. Correctness was checked in the same session (analytic union volume asserted by t-cad-feature-graph and t-cad-studio-m11). Harness: target/studio-qa/measure.sh."
+    },
+    {
+      "id": "bm-studio-m11-single-feature-state",
+      "name": "GET /api/state before the join feature exists (1 feature)",
+      "metric": "wall time",
+      "value": 3.5,
+      "unit": "ms",
+      "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
+      "recorded_at": "2026-10-27",
+      "notes": "Same process, same project, measured immediately before the join was created: 3.5 ms against 17.4 ms after the join. The growth is the boolean plus the larger mesh, not a regression in the single-feature path."
+    },
+    {
+      "id": "bm-studio-m11-startup",
+      "name": "cad-studio process start to first /api/health answer",
+      "metric": "wall time",
+      "value": 31,
+      "unit": "ms",
+      "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
+      "recorded_at": "2026-10-27",
+      "notes": "Polling every 10 ms against a freshly started debug binary with --new and a 10x10x5 mm project; three consecutive runs measured 34, 31 and 31 ms. Excludes browser start-up and first paint, which are not measured here."
+    },
+    {
+      "id": "bm-studio-m11-save",
+      "name": "POST /api/save (atomic write of the 2-feature project)",
+      "metric": "wall time",
+      "value": 12.6,
+      "unit": "ms",
+      "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
+      "recorded_at": "2026-10-27",
+      "notes": "Single request on the joined project, including temp-file write, fsync, rename and directory sync. The 2026-10-25 single-feature record was 4.5 ms, so the larger payload (two sketches, two features, cached mesh) roughly doubles the cost; 12.6 ms is still far below any interactive threshold."
+    },
+    {
+      "id": "bm-studio-m11-create",
+      "name": "POST /api/sketch and POST /api/sketch/origin",
+      "metric": "wall time",
+      "value": 2.2,
+      "unit": "ms",
+      "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
+      "recorded_at": "2026-10-27",
+      "notes": "Sketch creation 2.2 ms; moving an existing sketch origin 1.7 ms (rebuild included, both bodies still build). Both are single requests on new connections."
+    },
+    {
+      "id": "bm-studio-m11-export",
+      "name": "GET /api/export/stl (joined solid)",
+      "metric": "wall time",
+      "value": 16.8,
+      "unit": "ms",
+      "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.94.0",
+      "recorded_at": "2026-10-27",
+      "notes": "Single request: rebuild, tessellate and write the binary STL of the joined body. Grows with the mesh rather than with the feature count, since the mesh is cached after a rebuild."
+    },
+    {
+      "id": "bm-studio-m11c-state",
+      "name": "GET /api/state, unchanged two-feature history, per-feature cache",
+      "metric": "wall time, median of 20",
+      "value": 0.7,
+      "unit": "ms",
+      "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.95.0",
+      "recorded_at": "2026-10-29",
+      "notes": "Same project and client conventions as bm-studio-m11-rebuild, whose 17.4 ms this replaces: since the studio keeps a BuildCache, a repeat request reuses every prefix and only clones the mesh. 0.6–0.9 ms median and 1.1 ms max over three runs of target/studio-qa/measure-cache.sh. An edit of a parameter both features read is 18.5 ms median, i.e. a full rebuild as before (+2% measured in-process)."
+    },
+    {
+      "id": "bm-rebuild-cache",
+      "name": "six-feature history rebuild, cold versus cached after editing only the last feature",
+      "metric": "wall time, median of 20",
+      "value": 7.88,
+      "unit": "ms",
+      "host": "i3-1125G4, release, single thread",
+      "recorded_at": "2026-10-29",
+      "notes": "1 new-body extrude + 5 joins, last feature's depth on `diameter`: cold 30.32 ms (6 extrudes, 5 unions), cached 7.88 ms (1 extrude, 1 union), unchanged history 0.01 ms. Volumes 1500.080 and 1720.080 mm³ unchanged. Harness: cargo run --release -p cad-studio --example rebuild_bench, three warm-up rebuilds discarded, a unique parameter value before every sample."
     }
   ]
 }

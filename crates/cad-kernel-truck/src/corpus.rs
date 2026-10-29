@@ -168,6 +168,25 @@ fn build_rotated_box(kernel: &mut dyn Kernel) -> Result<SolidId, KernelError> {
     kernel.extrude(&profile, 5.0)
 }
 
+/// A concave L-shaped footprint extruded 5 mm: a prism no rectangle fixture can describe.
+///
+/// This is the kernel half of the drawn-polyline feature: the document passes a validated loop to
+/// the adapter, and this fixture proves the adapter builds the prism the loop describes rather
+/// than only boxes and circles. The loop is counter-clockwise, so the solid must be outward-facing.
+fn build_polyline_l_bracket(kernel: &mut dyn Kernel) -> Result<SolidId, KernelError> {
+    // footprint = 30 x 10 arm + 10 x 20 upright = 500 mm²; volume = 500 * 5 = 2500 mm³.
+    // area = 2 * 500 (caps) + 120 (perimeter) * 5 = 1000 + 600 = 1600 mm².
+    let profile = vec![
+        [0.0, 0.0],
+        [30.0, 0.0],
+        [30.0, 10.0],
+        [10.0, 10.0],
+        [10.0, 30.0],
+        [0.0, 30.0],
+    ];
+    kernel.extrude(&profile, 5.0)
+}
+
 /// Two boxes overlapping by 2 x 2 mm over their full height — the fixture `docs/` quotes as 1120.
 fn build_union_partial_overlap(kernel: &mut dyn Kernel) -> Result<SolidId, KernelError> {
     let a = extrude_rect(kernel, 10.0, 10.0, [0.0, 0.0], 10.0)?;
@@ -256,37 +275,42 @@ fn build_coplanar_cut(kernel: &mut dyn Kernel) -> Result<SolidId, KernelError> {
     Ok(cut)
 }
 
-/// The same plate minus a 40 x 40 x 30 block that exits through the top face.
+/// The same plate minus a 40 x 40 block that **straddles** it, so no face is coincident.
 ///
-/// `extrude` always starts at z = 0, so the block's bottom is coplanar with the plate's bottom and
-/// only the top differs from the coplanar fixture — which is the case that actually pierces.
+/// This is the product's cut: a tool that overshoots the body on both sides. `extrude` always starts
+/// at z = 0, so the tool is extruded longer than the plate and translated down; that `translate`
+/// call is the whole reason the exactness is achievable, and it is why the contract has a
+/// `Transform` capability rather than leaving placement to the caller's arithmetic.
+///
+/// The previous version of this fixture extruded a 30 mm tool from z = 0, which is still coplanar
+/// with the plate's bottom face — so it did not test a piercing cut at all, it tested the coplanar
+/// one twice.
 fn build_piercing_cut(kernel: &mut dyn Kernel) -> Result<SolidId, KernelError> {
     let plate = extrude_rect(kernel, 100.0, 100.0, [0.0, 0.0], 10.0)?;
+    // Spans z -5..25, through a plate spanning z 0..10.
     let tool = extrude_rect(kernel, 40.0, 40.0, [30.0, 30.0], 30.0)?;
+    let tool = kernel.translate(tool, [0.0, 0.0, -5.0])?;
     let cut = kernel.boolean(cad_contract::kernel::BooleanOp::Difference, plate, tool)?;
     kernel.release(plate);
     kernel.release(tool);
-    // Same analytic result as the coplanar cut: 84000 mm³ / 22400 mm².
+    // volume = 100000 - 16000 = 84000 mm³.
+    // area   = 24000 (plate) - 2 * 1600 (openings) + 4 * (40 * 10) (hole walls) = 22400 mm².
     Ok(cut)
 }
 
 /// A plate with a 40 x 40 x 10 cavity floating inside it, touching no outer face.
 ///
-/// Building this needs geometry that does **not** contain the z = 0 plane (the plate is
-/// extruded both upwards and downwards, and the tool likewise), which is only reachable by
-/// unioning an upward extrusion with a downward one.
+/// The previous version built the plate by unioning an upward and a downward extrusion, which share
+/// their whole z = 0 footprint — so the *fixture* hit the coplanar defect before the difference it
+/// meant to test ever ran, and reported "union produced no result". Translating one extrusion is
+/// both simpler and sufficient: the plate is extruded 20 mm and moved down 10, the tool 10 mm and
+/// moved down 5, so neither body contains the z = 0 plane and nothing is coincident.
 fn build_contained_void(kernel: &mut dyn Kernel) -> Result<SolidId, KernelError> {
-    let plate_up = extrude_rect(kernel, 100.0, 100.0, [0.0, 0.0], 10.0)?;
-    let plate_down = extrude_rect(kernel, 100.0, 100.0, [0.0, 0.0], -10.0)?;
-    let plate = kernel.boolean(cad_contract::kernel::BooleanOp::Union, plate_up, plate_down)?;
-    kernel.release(plate_up);
-    kernel.release(plate_down);
+    let plate = extrude_rect(kernel, 100.0, 100.0, [0.0, 0.0], 20.0)?;
+    let plate = kernel.translate(plate, [0.0, 0.0, -10.0])?;
 
-    let tool_up = extrude_rect(kernel, 40.0, 40.0, [30.0, 30.0], 5.0)?;
-    let tool_down = extrude_rect(kernel, 40.0, 40.0, [30.0, 30.0], -5.0)?;
-    let tool = kernel.boolean(cad_contract::kernel::BooleanOp::Union, tool_up, tool_down)?;
-    kernel.release(tool_up);
-    kernel.release(tool_down);
+    let tool = extrude_rect(kernel, 40.0, 40.0, [30.0, 30.0], 10.0)?;
+    let tool = kernel.translate(tool, [0.0, 0.0, -5.0])?;
 
     let voided = kernel.boolean(cad_contract::kernel::BooleanOp::Difference, plate, tool)?;
     kernel.release(plate);
@@ -320,6 +344,17 @@ pub const FIXTURES: &[Fixture] = &[
         area_mm2: 400.0,
         area_tolerance_mm2: 1e-6,
         build: build_rotated_box,
+    },
+    Fixture {
+        id: "polyline_l_bracket",
+        description: "concave L-shaped drawn profile (500 mm²) extruded 5 mm",
+        capability: Capability::Extrude,
+        expectation: Expectation::MustPass,
+        volume_mm3: 2500.0,
+        volume_tolerance_mm3: 1e-6,
+        area_mm2: 1600.0,
+        area_tolerance_mm2: 1e-6,
+        build: build_polyline_l_bracket,
     },
     Fixture {
         id: "union_partial_overlap",
@@ -390,29 +425,36 @@ pub const FIXTURES: &[Fixture] = &[
         id: "difference_coplanar_cut",
         description: "40x40 through-cut with coplanar top and bottom faces",
         capability: Capability::BooleanDifference,
-        expectation: Expectation::Unsupported,
+        // Recorded as a known failure with its measurements, not skipped: the volume is right to
+        // 0.18 mm³ but the coplanar retry's nudge leaves a 1.1e-4 mm membrane on the shared face,
+        // and truck's tessellation of that membrane carries hairline sliver edges, so the mesh is
+        // not watertight. The application never builds a cut this way — it overshoots the tool —
+        // so this records the limitation of the raw boolean contract instead of hiding it.
+        expectation: Expectation::KnownFailure,
         volume_mm3: 84_000.0,
-        volume_tolerance_mm3: 10.0,
+        volume_tolerance_mm3: 1.0,
         area_mm2: 22_400.0,
-        area_tolerance_mm2: 10.0,
+        area_tolerance_mm2: 1.0,
         build: build_coplanar_cut,
     },
     Fixture {
         id: "difference_piercing_cut",
-        description: "40x40 block piercing through the plate's top face",
+        description: "40x40 block straddling the plate, so no faces are coincident",
         capability: Capability::BooleanDifference,
-        expectation: Expectation::Unsupported,
+        expectation: Expectation::MustPass,
         volume_mm3: 84_000.0,
-        volume_tolerance_mm3: 10.0,
+        // Tight on purpose: this is the cut the application builds, so it has to be exact rather
+        // than merely close. 1 mm³ on 84 000 is 12 ppm.
+        volume_tolerance_mm3: 1.0,
         area_mm2: 22_400.0,
-        area_tolerance_mm2: 10.0,
+        area_tolerance_mm2: 1.0,
         build: build_piercing_cut,
     },
     Fixture {
         id: "difference_contained_void",
         description: "40x40x10 cavity floating inside a 100x100x20 plate",
         capability: Capability::BooleanDifference,
-        expectation: Expectation::Unsupported,
+        expectation: Expectation::MustPass,
         volume_mm3: 184_000.0,
         volume_tolerance_mm3: 10.0,
         area_mm2: 32_800.0,
@@ -720,7 +762,7 @@ mod tests {
     use crate::TruckKernel;
     use cad_contract::capability::Capability;
     use cad_contract::error::KernelError;
-    use cad_contract::kernel::{BooleanOp, Kernel};
+    use cad_contract::kernel::Kernel;
 
     #[test]
     fn the_fixture_set_covers_every_required_case() {
@@ -734,6 +776,7 @@ mod tests {
             "intersection_thin_wall",
             "intersection_large_coordinates",
             "non_axis_aligned_box",
+            "polyline_l_bracket",
         ] {
             assert!(
                 ids.contains(&required),
@@ -795,10 +838,11 @@ mod tests {
         kernel.release(solid);
     }
 
-    /// Difference is recorded, never skipped: on the truck adapter every difference fixture must
-    /// appear in the report with an `UNSUPPORTED` result rather than being absent.
+    /// Difference is measured, never skipped: all three cut fixtures appear in the report, the two
+    /// that avoid coincident faces must be exact, and the coplanar one is recorded with its
+    /// measurement rather than dropped.
     #[test]
-    fn difference_is_recorded_as_unsupported_not_skipped() {
+    fn difference_is_measured_not_skipped() {
         let report = run_all(&mut [(
             "truck",
             &mut TruckKernel::new() as &mut dyn cad_contract::kernel::Kernel,
@@ -813,16 +857,34 @@ mod tests {
             3,
             "all three cut fixtures must appear"
         );
-        for row in difference_rows {
+
+        // The two fixtures that build their tool without coincident faces are exact, to the stated
+        // tolerance. This is the measurement that justifies advertising `BooleanDifference`.
+        for id in ["difference_piercing_cut", "difference_contained_void"] {
+            let row = difference_rows
+                .iter()
+                .find(|row| row.fixture.id == id)
+                .filter(|row| row.verdict == Verdict::Ok);
+            assert!(row.is_some(), "{id} did not pass: {:?}", report.render());
+            let row = report.rows.iter().find(|row| row.fixture.id == id);
+            let Some(row) = row else { continue };
             assert!(
-                matches!(row.status, Status::Unsupported { .. }),
-                "{} was not recorded as unsupported: {:?}",
-                row.fixture.id,
+                matches!(&row.status, Status::Pass(m) if m.open_edges == 0),
+                "{id} must be watertight: {:?}",
                 row.status
             );
-            assert_eq!(row.verdict, Verdict::Ok);
         }
-        assert_eq!(report.exit_code(), 0, "unsupported is not a regression");
+
+        // The coplanar case is a recorded limitation with a number attached, not a hidden skip.
+        let coplanar = report
+            .rows
+            .iter()
+            .find(|row| row.fixture.id == "difference_coplanar_cut");
+        let Some(coplanar) = coplanar else {
+            return;
+        };
+        assert_eq!(coplanar.verdict, Verdict::KnownFailure);
+        assert_eq!(report.exit_code(), 0, "a known failure is not a regression");
     }
 
     /// The full corpus on the truck adapter: everything the adapter advertises must pass, and the
@@ -853,17 +915,18 @@ mod tests {
     /// what the corpus records rather than a failure.
     #[test]
     fn an_unadvertised_operation_refuses_with_unsupported() {
-        let mut kernel = TruckKernel::new();
+        let kernel = TruckKernel::new();
+        // Fillets are in the contract but not implemented by this adapter, so they must refuse
+        // rather than attempt them. (Difference used to be the example here, then revolve; both are
+        // now advertised because both are measured correct.)
         assert_eq!(
-            kernel.boolean(
-                BooleanOp::Difference,
-                cad_contract::kernel::SolidId::from_raw(1),
-                cad_contract::kernel::SolidId::from_raw(2)
-            ),
+            kernel.require(Capability::Fillet),
             Err(KernelError::Unsupported {
-                capability: Capability::BooleanDifference
+                capability: Capability::Fillet
             })
         );
+        assert!(kernel.require(Capability::BooleanDifference).is_ok());
+        assert!(kernel.require(Capability::Revolve).is_ok());
     }
 
     /// The profile validator the corpus depends on rejects the degenerate input it should.

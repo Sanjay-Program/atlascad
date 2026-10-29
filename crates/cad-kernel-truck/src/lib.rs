@@ -43,7 +43,7 @@
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 pub mod corpus;
@@ -54,7 +54,7 @@ use cad_contract::kernel::{BooleanOp, Kernel, SolidId, validate_profile};
 use cad_contract::mesh::Mesh;
 use cad_contract::tol::DEFAULT_LINEAR_MM;
 use truck_meshalgo::prelude::*;
-use truck_modeling::{Point3, Solid, Vector3, Wire, builder};
+use truck_modeling::{Point3, Rad, Solid, Vector3, Wire, builder};
 
 /// The smallest tolerance truck's boolean and tessellation code accepts.
 ///
@@ -274,6 +274,11 @@ pub struct TruckKernel {
     next: u64,
     boolean_tol: f64,
     coplanar_retries: u64,
+    // Call counters only. Atomics rather than `Cell` because `Kernel::tessellate` takes `&self`, and
+    // `Relaxed` is enough: these are diagnostics, never a synchronisation point.
+    extrude_calls: AtomicU64,
+    boolean_calls: AtomicU64,
+    tessellate_calls: AtomicU64,
 }
 
 impl Default for TruckKernel {
@@ -290,7 +295,29 @@ impl TruckKernel {
             next: 1,
             boolean_tol: DEFAULT_BOOLEAN_TOLERANCE_MM,
             coplanar_retries: 0,
+            extrude_calls: AtomicU64::new(0),
+            boolean_calls: AtomicU64::new(0),
+            tessellate_calls: AtomicU64::new(0),
         }
+    }
+
+    /// How many `extrude` operations this instance has run.
+    ///
+    /// Counted so a cache can be shown to skip work rather than merely *claim* to: a rebuild that
+    /// reuses a cached prefix must not increment this. The counter is diagnostic state, not model
+    /// state, and is never persisted.
+    pub fn extrude_calls(&self) -> u64 {
+        self.extrude_calls.load(Ordering::Relaxed)
+    }
+
+    /// How many `boolean` operations this instance has run.
+    pub fn boolean_calls(&self) -> u64 {
+        self.boolean_calls.load(Ordering::Relaxed)
+    }
+
+    /// How many `tessellate` operations this instance has run.
+    pub fn tessellate_calls(&self) -> u64 {
+        self.tessellate_calls.load(Ordering::Relaxed)
     }
 
     /// A kernel whose boolean operations use `tol` mm.
@@ -333,6 +360,7 @@ impl TruckKernel {
     ) -> Result<SolidId> {
         self.require(Capability::Extrude)?;
         budget.check()?;
+        self.extrude_calls.fetch_add(1, Ordering::Relaxed);
         validate_profile(profile)?;
         if !height_mm.is_finite() || height_mm == 0.0 {
             return Err(KernelError::Invalid(
@@ -359,6 +387,122 @@ impl TruckKernel {
         Ok(self.insert(solid))
     }
 
+    /// [`Kernel::translate`] with a caller-supplied [`Budget`].
+    ///
+    /// A translation is a deep copy with every vertex moved, so it is cheap and exact: it cannot
+    /// change a volume, and it is the only way to place a tool so that it *overshoots* the body it
+    /// cuts (see [`Kernel::translate`]).
+    pub fn translate_with_budget(
+        &mut self,
+        solid: SolidId,
+        delta_mm: [f64; 3],
+        budget: &Budget,
+    ) -> Result<SolidId> {
+        self.require(Capability::Transform)?;
+        budget.check()?;
+        if !delta_mm.iter().all(|d| d.is_finite()) {
+            return Err(KernelError::Invalid(
+                "translation must be finite in every axis".into(),
+            ));
+        }
+        let moved = guarded("translate", || {
+            let shift = Vector3::new(delta_mm[0], delta_mm[1], delta_mm[2]);
+            Ok(builder::translated(self.lookup(solid)?, shift))
+        })?;
+        budget.check()?;
+        Ok(self.insert(moved))
+    }
+
+    /// [`Kernel::revolve`] with a caller-supplied [`Budget`].
+    ///
+    /// The profile is built into a planar face exactly as [`Kernel::extrude`] builds it, then swept
+    /// a full turn about an in-plane axis. Two inputs are validated here rather than left to truck:
+    ///
+    /// * the angle must be a **full turn**. A partial sweep of a face is an open shell, and truck's
+    ///   return type cannot tell the two apart, so accepting 90° would hand the caller something
+    ///   that is not a solid while claiming it is;
+    /// * the profile must lie on **one side** of the axis. A profile that crosses it self-intersects
+    ///   when revolved, which is not a solid of revolution and has no meaningful volume.
+    pub fn revolve_with_budget(
+        &mut self,
+        profile: &[[f64; 2]],
+        axis_origin_mm: [f64; 2],
+        axis_direction_mm: [f64; 2],
+        angle_rad: f64,
+        budget: &Budget,
+    ) -> Result<SolidId> {
+        self.require(Capability::Revolve)?;
+        budget.check()?;
+        validate_profile(profile)?;
+
+        let [ox, oy] = axis_origin_mm;
+        let [dx, dy] = axis_direction_mm;
+        if !ox.is_finite() || !oy.is_finite() || !dx.is_finite() || !dy.is_finite() {
+            return Err(KernelError::Invalid(
+                "the revolve axis must be finite in every component".into(),
+            ));
+        }
+        let length = dx.mul_add(dx, dy * dy).sqrt();
+        if length < 1e-12 {
+            return Err(KernelError::Invalid(
+                "the revolve axis direction must be non-zero".into(),
+            ));
+        }
+        if !angle_rad.is_finite() || (angle_rad - std::f64::consts::TAU).abs() > 1e-9 {
+            return Err(KernelError::Invalid(format!(
+                "revolve supports a full {:.6} rad turn only, got {angle_rad} rad; a partial \
+                 sweep produces an open shell, not a solid",
+                std::f64::consts::TAU
+            )));
+        }
+        // Cross product with the axis direction: its sign says which side of the axis a point is
+        // on. Every point must agree, or the swept profile would intersect itself.
+        let mut side = 0i8;
+        for point in profile {
+            let cross = dx * (point[1] - oy) - dy * (point[0] - ox);
+            if cross.abs() < 1e-9 {
+                continue;
+            }
+            let sign = if cross > 0.0 { 1 } else { -1 };
+            if side == 0 {
+                side = sign;
+            } else if side != sign {
+                return Err(KernelError::Invalid(
+                    "the profile crosses the revolve axis; a solid of revolution must lie on one \
+                     side of it"
+                        .into(),
+                ));
+            }
+        }
+        if side == 0 {
+            return Err(KernelError::Invalid(
+                "the profile lies on the revolve axis and encloses no volume when swept".into(),
+            ));
+        }
+
+        let solid = guarded("revolve", || {
+            let vertices: Vec<_> = profile
+                .iter()
+                .map(|p| builder::vertex(Point3::new(p[0], p[1], 0.0)))
+                .collect();
+            let edges = (0..vertices.len())
+                .map(|i| builder::line(&vertices[i], &vertices[(i + 1) % vertices.len()]))
+                .collect::<Vec<_>>();
+            let wire: Wire = edges.into_iter().collect();
+            let face = builder::try_attach_plane(&[wire]).map_err(|e| {
+                KernelError::Invalid(format!("profile is not a planar region: {e}"))
+            })?;
+            Ok(builder::rsweep(
+                &face,
+                Point3::new(ox, oy, 0.0),
+                Vector3::new(dx / length, dy / length, 0.0),
+                Rad(angle_rad),
+            ))
+        })?;
+        budget.check()?;
+        Ok(self.insert(solid))
+    }
+
     /// [`Kernel::boolean`] with a caller-supplied [`Budget`].
     ///
     /// Checkpoints: before either operand is copied, between the first attempt and the coplanar
@@ -373,6 +517,7 @@ impl TruckKernel {
     ) -> Result<SolidId> {
         self.require(op.capability())?;
         budget.check()?;
+        self.boolean_calls.fetch_add(1, Ordering::Relaxed);
         let tolerance = self.boolean_tol;
 
         // Deep copies: truck's operations consume relationships between the operands' topology
@@ -440,9 +585,12 @@ impl TruckKernel {
         // kernel produced malformed topology, which is exactly what a silently accepted boolean
         // would hide. (SolidCraft's `boolean_guard` enforces the same rule for all three ops.)
         let measure_tol = 0.05;
-        let before = solid_volume(&left, measure_tol, budget)?;
-        let tool = solid_volume(&right, measure_tol, budget)?;
-        let after = solid_volume(&result, measure_tol, budget)?;
+        let before_measure = solid_measure(&left, measure_tol, budget)?;
+        let tool_measure = solid_measure(&right, measure_tol, budget)?;
+        let after_measure = solid_measure(&result, measure_tol, budget)?;
+        let before = before_measure.map_or(f64::NAN, |measure| measure.0);
+        let tool = tool_measure.map_or(f64::NAN, |measure| measure.0);
+        let after = after_measure.map_or(f64::NAN, |measure| measure.0);
         let slack = 1e-3 * before.max(tool).max(1.0);
         let violated = match op {
             BooleanOp::Union => after < before.max(tool) - slack,
@@ -458,6 +606,30 @@ impl TruckKernel {
                 tool,
                 after
             )));
+        }
+
+        // An empty result is an error, not a body. Subtracting a solid from itself removes
+        // everything, and there is no mesh that represents nothing — so the coplanar retry reports
+        // a shell as thick as its own nudge instead. Measured: cutting a 10 x 10 x 5 plate with its
+        // own profile returns 0.008 mm³, which would otherwise be handed to the application as a
+        // successfully built feature. A remainder no larger than the nudge could have manufactured
+        // by itself is nothing, and saying so is the only answer a caller can act on.
+        if op == BooleanOp::Difference
+            && after.is_finite()
+            && let Some((_, tool_area)) = tool_measure
+        {
+            let nudge = COPLANAR_NUDGE_MM
+                .iter()
+                .fold(0.0f64, |largest, offset| largest.max(offset.abs()));
+            // Twice the nudge times the tool's surface: the size of the shell the retry can leave.
+            if after <= 2.0 * nudge * tool_area {
+                return Err(KernelError::Failed(format!(
+                    "{} removed the whole solid: {after} mm³ of {before} mm³ is left, which is no \
+                     larger than the {nudge:.1e} mm the coplanar retry has to move the tool; refusing \
+                     to return a sliver as a body",
+                    op.label()
+                )));
+            }
         }
 
         Ok(self.insert(result))
@@ -476,6 +648,7 @@ impl TruckKernel {
     ) -> Result<Mesh> {
         self.require(Capability::Tessellate)?;
         budget.check()?;
+        self.tessellate_calls.fetch_add(1, Ordering::Relaxed);
         let tol = Self::tolerance(chord_tol_mm)?;
         let solid = self.lookup(solid)?;
         guarded("tessellate", || mesh_of(solid, tol, budget))
@@ -561,12 +734,24 @@ impl Kernel for TruckKernel {
             "0.6",
             CapabilitySet::from([
                 Capability::Extrude,
+                // Revolve is advertised because it is measured: a rectangle sharing the axis gives
+                // the analytic cylinder and one offset from it the analytic annulus (see the tests
+                // below). Only a full turn is supported, and the adapter says so on any other angle.
+                Capability::Revolve,
                 Capability::BooleanUnion,
-                // `BooleanDifference` is deliberately absent: see the module docs and
-                // docs/kernel-comparison.md. The measurement is that `and(a, ¬b)` returns a solid
-                // whose enclosed volume is larger than the target's (1053 mm³ for a 1000 mm³ plate),
-                // so a cut cannot be returned honestly and the capability is not advertised.
+                // Difference is advertised because it is *measured* correct: the raw result's
+                // volume is wrong only because truck winds the walls of a cavity inward, and this
+                // adapter's weld + orientation repair corrects exactly that (a 100 x 100 x 10 plate
+                // with a 40 x 40 through-cut measures 84 000.18 mm³ against an analytic 84 000).
+                // Two limitations are real and are stated rather than hidden: operands with
+                // coincident faces still need the coplanar retry, whose nudge leaves a
+                // COPLANAR_NUDGE_MM membrane on the shared face, and a tessellation of that
+                // membrane can carry hairline sliver edges. Build a through-cut with a tool that
+                // *overshoots* the body (see `Kernel::translate`), which avoids borrowed faces
+                // entirely and is exact.
+                Capability::BooleanDifference,
                 Capability::BooleanIntersection,
+                Capability::Transform,
                 Capability::Tessellate,
             ]),
         )
@@ -577,8 +762,28 @@ impl Kernel for TruckKernel {
         self.extrude_with_budget(profile, height_mm, &Budget::unlimited())
     }
 
+    fn revolve(
+        &mut self,
+        profile: &[[f64; 2]],
+        axis_origin_mm: [f64; 2],
+        axis_direction_mm: [f64; 2],
+        angle_rad: f64,
+    ) -> Result<SolidId> {
+        self.revolve_with_budget(
+            profile,
+            axis_origin_mm,
+            axis_direction_mm,
+            angle_rad,
+            &Budget::unlimited(),
+        )
+    }
+
     fn boolean(&mut self, op: BooleanOp, a: SolidId, b: SolidId) -> Result<SolidId> {
         self.boolean_with_budget(op, a, b, &Budget::unlimited())
+    }
+
+    fn translate(&mut self, solid: SolidId, delta_mm: [f64; 3]) -> Result<SolidId> {
+        self.translate_with_budget(solid, delta_mm, &Budget::unlimited())
     }
 
     fn tessellate(&self, solid: SolidId, chord_tol_mm: f64) -> Result<Mesh> {
@@ -589,6 +794,10 @@ impl Kernel for TruckKernel {
         // Deliberately not budgeted: releasing is a map removal, and cleanup is the one operation
         // that must still work when a deadline has expired or the user has cancelled everything.
         self.solids.remove(&solid.get());
+    }
+
+    fn contains(&self, solid: SolidId) -> Option<bool> {
+        Some(self.solids.contains_key(&solid.get()))
     }
 
     fn volume(&self, solid: SolidId) -> Result<f64> {
@@ -717,7 +926,17 @@ fn weld_by_position(mesh: &Mesh, quantum: f64, budget: &Budget) -> Result<Mesh> 
     })
 }
 
-/// Make the winding consistent across shared edges, then point the whole surface outward.
+/// Make the winding consistent across shared edges, then give every shell the sign its nesting
+/// requires: outer shells outward, cavities inward.
+///
+/// The second half is not a refinement, it is the fix for the defect that made every difference
+/// measurement wrong. A cut whose tool is fully enclosed leaves the tool's own surface as an inner
+/// shell; truck returns that shell wound **outward**, so the enclosed volume was `outer + cavity`
+/// (216 000 mm³ for a 200 000 mm³ plate with a 16 000 mm³ void) instead of `outer - cavity`. Flipping
+/// the *whole* mesh cannot repair that, because the outer shell is already right. What is needed is
+/// the number of shells that contain each shell, and that is measured here rather than assumed: a
+/// point taken from every shell is tested against every other shell, so a cavity is handled by the
+/// same code as an ordinary body and a shell nested three deep comes out right too.
 fn orient_outward(mut mesh: Mesh, budget: &Budget) -> Result<Mesh> {
     budget.check()?;
     let mut adjacency: BTreeMap<(u32, u32), Vec<usize>> = BTreeMap::new();
@@ -730,13 +949,17 @@ fn orient_outward(mut mesh: Mesh, budget: &Budget) -> Result<Mesh> {
         }
     }
 
+    // Pass 1: consistent winding within each connected component, and which component that is.
     let mut visited = vec![false; mesh.triangles.len()];
+    let mut component = vec![0usize; mesh.triangles.len()];
+    let mut components = 0usize;
     let mut queue: VecDeque<usize> = VecDeque::new();
     for seed in 0..mesh.triangles.len() {
         if visited[seed] {
             continue;
         }
         visited[seed] = true;
+        component[seed] = components;
         queue.push_back(seed);
         while let Some(current) = queue.pop_front() {
             for (a, b) in directed_edges(&mesh.triangles[current]) {
@@ -753,19 +976,151 @@ fn orient_outward(mut mesh: Mesh, budget: &Budget) -> Result<Mesh> {
                         mesh.triangles[other].swap(1, 2);
                     }
                     visited[other] = true;
+                    component[other] = components;
                     queue.push_back(other);
                 }
             }
         }
+        components = components.saturating_add(1);
     }
 
-    // A closed surface's signed volume is positive exactly when its normals point outward.
+    // Pass 2: nesting depth per component, then the sign that depth requires.
+    let mut signed = vec![0.0f64; components];
+    for (index, tri) in mesh.triangles.iter().enumerate() {
+        signed[component[index]] += triangle_six_volume(&mesh, tri);
+    }
+    let mut points: Vec<Option<[f64; 3]>> = vec![None; components];
+    for (index, tri) in mesh.triangles.iter().enumerate() {
+        if points[component[index]].is_some() {
+            continue;
+        }
+        if let Some(position) = mesh.positions.get(tri[0] as usize) {
+            points[component[index]] = Some(position);
+        }
+    }
+
+    // Group the triangles once so each component can be tested as a closed shell.
+    let mut shells: Vec<Vec<[u32; 3]>> = vec![Vec::new(); components];
+    for (index, tri) in mesh.triangles.iter().enumerate() {
+        shells[component[index]].push(*tri);
+    }
+
+    let mut flip = vec![false; components];
+    for index in 0..components {
+        budget.check()?;
+        // Signed volume divided by six is positive for an outward shell, so the sign of `signed`
+        // already answers "is this wound outward".
+        let outward = signed[index] > 0.0;
+        let mut depth = 0usize;
+        if components > 1 {
+            let Some(point) = points[index] else {
+                continue;
+            };
+            for (other, shell) in shells.iter().enumerate() {
+                if other == index || shell.is_empty() {
+                    continue;
+                }
+                if point_inside(&mesh.positions, shell, point) {
+                    depth = depth.saturating_add(1);
+                }
+            }
+        }
+        // Even depth: a body, which must be wound outward. Odd depth: a cavity, which must not.
+        flip[index] = outward != depth.is_multiple_of(2);
+    }
+    for (index, tri) in mesh.triangles.iter_mut().enumerate() {
+        if flip[component[index]] {
+            tri.swap(1, 2);
+        }
+    }
+
+    // A closed surface's signed volume is positive exactly when the solid it bounds is outward and
+    // its cavities are not. Keep the whole-mesh correction as a fallback, so a shell whose nesting
+    // could not be measured still comes back with a positive total rather than an inside-out solid.
     if mesh.signed_volume() < 0.0 {
         for tri in &mut mesh.triangles {
             tri.swap(1, 2);
         }
     }
     Ok(mesh)
+}
+
+/// Six times the signed volume contributed by one triangle, in the divergence-theorem sum.
+fn triangle_six_volume(mesh: &Mesh, tri: &[u32; 3]) -> f64 {
+    let (Some(a), Some(b), Some(c)) = (
+        mesh.positions.get(tri[0] as usize),
+        mesh.positions.get(tri[1] as usize),
+        mesh.positions.get(tri[2] as usize),
+    ) else {
+        return 0.0;
+    };
+    a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0])
+        + a[2] * (b[0] * c[1] - b[1] * c[0])
+}
+
+/// Is `point` inside the closed shell made of `triangles`?
+///
+/// Ray-parity: a ray cast from the point crosses the surface an odd number of times exactly when the
+/// point is enclosed. The direction deliberately has no axis alignment and no small integer ratio, so
+/// a ray from a shell's vertex cannot run along a face or through an edge of an axis-aligned shell —
+/// the case that makes naive parity wrong on exactly the geometry CAD produces.
+fn point_inside(positions: &[[f64; 3]], triangles: &[[u32; 3]], point: [f64; 3]) -> bool {
+    const DIRECTION: [f64; 3] = [0.5731, 0.2713, 0.7739];
+    let mut crossings = 0usize;
+    for tri in triangles {
+        let (Some(a), Some(b), Some(c)) = (
+            positions.get(tri[0] as usize),
+            positions.get(tri[1] as usize),
+            positions.get(tri[2] as usize),
+        ) else {
+            continue;
+        };
+        if ray_crosses_triangle(*a, *b, *c, point, DIRECTION) {
+            crossings = crossings.saturating_add(1);
+        }
+    }
+    crossings % 2 == 1
+}
+
+/// Does the ray from `origin` along `direction` cross the triangle, strictly ahead of the origin?
+///
+/// Möller–Trumbore. A hit at the origin itself (`distance <= 0`) is excluded: the probe point sits on
+/// its own shell, and counting that shell's own faces would invert every answer.
+fn ray_crosses_triangle(
+    a: [f64; 3],
+    b: [f64; 3],
+    c: [f64; 3],
+    origin: [f64; 3],
+    direction: [f64; 3],
+) -> bool {
+    let edge1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    let edge2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    let pvec = [
+        direction[1] * edge2[2] - direction[2] * edge2[1],
+        direction[2] * edge2[0] - direction[0] * edge2[2],
+        direction[0] * edge2[1] - direction[1] * edge2[0],
+    ];
+    let det = edge1[0] * pvec[0] + edge1[1] * pvec[1] + edge1[2] * pvec[2];
+    if det.abs() < 1e-12 {
+        return false;
+    }
+    let inv = 1.0 / det;
+    let tvec = [origin[0] - a[0], origin[1] - a[1], origin[2] - a[2]];
+    let u = (tvec[0] * pvec[0] + tvec[1] * pvec[1] + tvec[2] * pvec[2]) * inv;
+    if !(0.0..=1.0).contains(&u) {
+        return false;
+    }
+    let qvec = [
+        tvec[1] * edge1[2] - tvec[2] * edge1[1],
+        tvec[2] * edge1[0] - tvec[0] * edge1[2],
+        tvec[0] * edge1[1] - tvec[1] * edge1[0],
+    ];
+    let v = (direction[0] * qvec[0] + direction[1] * qvec[1] + direction[2] * qvec[2]) * inv;
+    if v < 0.0 || u + v > 1.0 {
+        return false;
+    }
+    let distance = (edge2[0] * qvec[0] + edge2[1] * qvec[1] + edge2[2] * qvec[2]) * inv;
+    distance > 1e-9
 }
 
 fn directed_edges(tri: &[u32; 3]) -> [(u32, u32); 3] {
@@ -780,17 +1135,17 @@ fn has_directed_edge(tri: &[u32; 3], a: u32, b: u32) -> bool {
     directed_edges(tri).contains(&(a, b))
 }
 
-/// Enclosed volume of a solid, measured from its tessellation.
+/// Enclosed volume and surface area of a solid, measured from its tessellation.
 ///
-/// Used by the conservation check, where a measurement that cannot be completed is *not* an
-/// error: the guard already tolerates an unmeasurable operand by skipping the comparison. The two
-/// outcomes it will not swallow are cancellation and timeout, because those are the caller's
-/// decision and must stop the operation, not be treated as "unmeasurable".
-fn solid_volume(solid: &Solid, tol: f64, budget: &Budget) -> Result<f64> {
+/// `Ok(None)` means the solid could not be measured but the operation may continue: the conservation
+/// guard tolerates an unmeasurable operand by skipping its comparison. The two outcomes this will not
+/// swallow are cancellation and timeout, because those are the caller's decision and must stop the
+/// operation, not be treated as "unmeasurable".
+fn solid_measure(solid: &Solid, tol: f64, budget: &Budget) -> Result<Option<(f64, f64)>> {
     match mesh_of(solid, tol, budget) {
-        Ok(mesh) => Ok(mesh.signed_volume().abs()),
+        Ok(mesh) => Ok(Some((mesh.signed_volume().abs(), mesh.surface_area()))),
         Err(e @ (KernelError::Cancelled | KernelError::Timeout(_))) => Err(e),
-        Err(_) => Ok(f64::NAN),
+        Err(_) => Ok(None),
     }
 }
 
@@ -799,7 +1154,7 @@ mod tests {
     use super::{Budget, CancellationToken, MIN_TOLERANCE_MM, TruckKernel};
     use cad_contract::capability::Capability;
     use cad_contract::error::KernelError;
-    use cad_contract::kernel::{BooleanOp, Kernel};
+    use cad_contract::kernel::{BooleanOp, Kernel, SolidId};
     use cad_contract::mesh::Mesh;
     use std::time::Duration;
 
@@ -843,13 +1198,131 @@ mod tests {
         assert!(info.supports(Capability::Tessellate));
         assert!(info.supports(Capability::BooleanUnion));
         assert!(info.supports(Capability::BooleanIntersection));
-        // Difference is measured to return malformed results with this kernel; it is not claimed.
-        assert!(!info.supports(Capability::BooleanDifference));
+        // Difference is claimed because the repaired result is measured correct, not because truck's
+        // raw output is: see `difference_is_the_analytic_cut` below.
+        assert!(info.supports(Capability::BooleanDifference));
+        assert!(info.supports(Capability::Transform));
+        // Revolve is claimed because it is measured: see the cylinder and annulus tests below.
+        assert!(info.supports(Capability::Revolve));
         // Not implemented, so not advertised.
         assert!(!info.supports(Capability::Fillet));
+        assert!(!info.supports(Capability::Sweep));
         assert!(!info.supports(Capability::StepExport));
         assert!(!info.supports(Capability::Wasm));
         Ok(())
+    }
+
+    /// The counters exist so a cache can be *shown* to skip work instead of claiming it.
+    ///
+    /// They are diagnostics, not model state: incrementing them must not change an answer, and the
+    /// assertions below are about the count alone.
+    #[test]
+    fn operations_are_counted() -> TestResult {
+        let mut kernel = TruckKernel::new();
+        assert_eq!(kernel.extrude_calls(), 0);
+        assert_eq!(kernel.boolean_calls(), 0);
+        assert_eq!(kernel.tessellate_calls(), 0);
+
+        let plate = kernel.extrude(&square(10.0), 5.0)?;
+        assert_eq!(kernel.extrude_calls(), 1);
+        // A taller tool overlapping the plate in plan, so the union has no fully coincident solid.
+        let tool = kernel.extrude(&square_at(4.0, 3.0, 3.0), 8.0)?;
+        assert_eq!(kernel.extrude_calls(), 2);
+
+        let joined = kernel.boolean(BooleanOp::Union, plate, tool)?;
+        assert_eq!(kernel.boolean_calls(), 1);
+        kernel.tessellate(joined, 0.05)?;
+        assert_eq!(kernel.tessellate_calls(), 1);
+        Ok(())
+    }
+
+    /// A session cache asks this before adopting a handle another kernel instance issued.
+    #[test]
+    fn contains_answers_for_issued_and_released_handles() -> TestResult {
+        let mut kernel = TruckKernel::new();
+        let id = kernel.extrude(&square(10.0), 5.0)?;
+        assert_eq!(kernel.contains(id), Some(true));
+        assert_eq!(kernel.contains(SolidId::from_raw(999)), Some(false));
+        kernel.release(id);
+        assert_eq!(kernel.contains(id), Some(false));
+        Ok(())
+    }
+
+    /// A rectangle that shares the revolve axis becomes the analytic cylinder.
+    #[test]
+    fn revolve_on_the_axis_is_a_cylinder() -> TestResult {
+        let mut kernel = TruckKernel::new();
+        // x 0..4, y 0..3, revolved about the y axis through the origin: radius 4, height 3.
+        let profile = vec![[0.0, 0.0], [4.0, 0.0], [4.0, 3.0], [0.0, 3.0]];
+        let id = kernel.revolve(&profile, [0.0, 0.0], [0.0, 1.0], std::f64::consts::TAU)?;
+        // A tessellated cylinder is an inscribed prism, so the measurement converges to the
+        // analytic value as the chord tolerance falls: at the adapter's finest accepted tolerance
+        // the polygon-area error is ~2e-5 relative, well inside the 0.05 mm³ bound below.
+        let mesh = kernel.tessellate(id, MIN_TOLERANCE_MM)?;
+        let volume = mesh.signed_volume().abs();
+        let analytic = std::f64::consts::PI * 16.0 * 3.0;
+        close(volume, analytic, 0.05, "cylinder volume")?;
+
+        let bb = kernel.bounding_box(id)?;
+        close(bb.min[1], 0.0, 1e-6, "cylinder bottom")?;
+        close(bb.max[1], 3.0, 1e-6, "cylinder top")?;
+        close(bb.min[0], -4.0, 1e-6, "cylinder min x")?;
+        close(bb.max[0], 4.0, 1e-6, "cylinder max x")?;
+        // A full turn is watertight.
+        assert_eq!(mesh.open_edges(), 0, "a cylinder must be closed");
+        Ok(())
+    }
+
+    /// A rectangle offset from the axis becomes the analytic annulus, with a real hole.
+    #[test]
+    fn revolve_offset_from_the_axis_is_an_annulus() -> TestResult {
+        let mut kernel = TruckKernel::new();
+        // x 2..4, y 0..3 about the y axis: outer radius 4, inner 2, height 3.
+        let profile = vec![[2.0, 0.0], [4.0, 0.0], [4.0, 3.0], [2.0, 3.0]];
+        let id = kernel.revolve(&profile, [0.0, 0.0], [0.0, 1.0], std::f64::consts::TAU)?;
+        let mesh = kernel.tessellate(id, MIN_TOLERANCE_MM)?;
+        let volume = mesh.signed_volume().abs();
+        let analytic = std::f64::consts::PI * (16.0 - 4.0) * 3.0;
+        close(volume, analytic, 0.05, "annulus volume")?;
+        assert_eq!(mesh.open_edges(), 0, "an annulus must be closed");
+        Ok(())
+    }
+
+    /// A partial turn would be an open shell, so it is refused instead of returned as a solid.
+    #[test]
+    fn a_partial_revolve_is_refused() -> TestResult {
+        let mut kernel = TruckKernel::new();
+        let profile = vec![[0.0, 0.0], [4.0, 0.0], [4.0, 3.0], [0.0, 3.0]];
+        match kernel.revolve(
+            &profile,
+            [0.0, 0.0],
+            [0.0, 1.0],
+            std::f64::consts::FRAC_PI_2,
+        ) {
+            Err(KernelError::Invalid(message)) => {
+                assert!(message.contains("full"), "{message}");
+                Ok(())
+            }
+            other => Err(KernelError::Failed(format!(
+                "a partial revolve must be refused, got {other:?}"
+            ))),
+        }
+    }
+
+    /// A profile that crosses the axis has no solid of revolution.
+    #[test]
+    fn a_profile_crossing_the_axis_is_refused() -> TestResult {
+        let mut kernel = TruckKernel::new();
+        let profile = vec![[-2.0, 0.0], [4.0, 0.0], [4.0, 3.0], [-2.0, 3.0]];
+        match kernel.revolve(&profile, [0.0, 0.0], [0.0, 1.0], std::f64::consts::TAU) {
+            Err(KernelError::Invalid(message)) => {
+                assert!(message.contains("crosses"), "{message}");
+                Ok(())
+            }
+            other => Err(KernelError::Failed(format!(
+                "a crossing profile must be refused, got {other:?}"
+            ))),
+        }
     }
 
     #[test]
@@ -947,23 +1420,118 @@ mod tests {
         close(mesh.signed_volume(), 500.0, 1e-6, "tessellated box volume")
     }
 
-    /// A difference is refused, not silently wrong.
+    /// A through-cut built from an overshooting tool is the analytic difference.
     ///
-    /// Measured: `and(a, ¬b)` returns a solid whose enclosed volume exceeds the target's
-    /// (1053 mm³ from a 1000 mm³ plate), so this kernel cannot produce an honest cut. The adapter
-    /// therefore does not advertise the capability and refuses the call. SolidCraft's kernel has the
-    /// guards and retries that make cuts work; that is one of the reasons to reuse it rather than
-    /// rebuild (docs/kernel-comparison.md).
+    /// This is the product path: the tool is extruded longer than the body and translated so that
+    /// it straddles it, which leaves no coincident faces for truck to mis-classify and therefore
+    /// needs no nudge. Measured: 840 mm³ and 224 mm² exactly.
     #[test]
-    fn difference_is_refused_rather_than_returned_wrong() -> TestResult {
+    fn difference_is_the_analytic_cut() -> TestResult {
         let mut kernel = TruckKernel::new();
-        let outer = kernel.extrude(&square(10.0), 10.0)?;
-        let inner = kernel.extrude(&square_at(4.0, 3.0, 3.0), 10.0)?;
+        let plate = kernel.extrude(&square(10.0), 10.0)?;
+        // 4 x 4 x 14, then moved down 2: it spans z -2..12 through a plate spanning z 0..10.
+        let tool = kernel.extrude(&square_at(4.0, 3.0, 3.0), 14.0)?;
+        let tool = kernel.translate(tool, [0.0, 0.0, -2.0])?;
+        let cut = kernel.boolean(BooleanOp::Difference, plate, tool)?;
+        // 1000 mm³ plate minus a 4 x 4 x 10 through-hole (160 mm³) = 840 mm³.
+        close(volume(&kernel, cut)?, 840.0, 1e-2, "through-cut volume")?;
+
+        // The plate's own faces must not move: a translation of the *tool* only.
+        let bb = kernel.bounding_box(cut)?;
+        close(bb.min[2], 0.0, 1e-9, "cut keeps the plate's bottom")?;
+        close(bb.max[2], 10.0, 1e-9, "cut keeps the plate's top")?;
+
+        // A through-hole leaves one shell and a watertight boundary.
+        let mesh = kernel.tessellate(cut, 0.01)?;
+        assert_eq!(mesh.open_edges(), 0, "a through-cut must be watertight");
+        Ok(())
+    }
+
+    /// A cut whose tool shares a face with the body is still bounded and honest.
+    ///
+    /// Truck cannot do this without a nudge, and the nudge leaves a `COPLANAR_NUDGE_MM` membrane on
+    /// the shared face, so the volume is 1.1e-4 mm x (hole area) below the analytic answer rather
+    /// than exact. The assertion states that bound instead of pretending the result is exact; the
+    /// application avoids the case entirely by overshooting the tool.
+    #[test]
+    fn a_coplanar_cut_is_within_the_nudge_bound() -> TestResult {
+        let mut kernel = TruckKernel::new();
+        let plate = kernel.extrude(&square(10.0), 10.0)?;
+        let tool = kernel.extrude(&square_at(4.0, 3.0, 3.0), 10.0)?;
+        let cut = kernel.boolean(BooleanOp::Difference, plate, tool)?;
+        // Analytic 840; the membrane leaves 0.11 mm³ x 16 mm² = 0.0018 mm³ unremoved.
+        let measured = volume(&kernel, cut)?;
+        assert!(
+            (measured - 840.0).abs() <= 0.05,
+            "coplanar cut volume was {measured}, analytic 840"
+        );
+        // A cut may never add material.
+        assert!(measured <= 840.0 + 0.05, "a cut cannot gain volume");
+        Ok(())
+    }
+
+    /// A difference that removes everything is an error, not a sliver.
+    ///
+    /// There is no mesh for "nothing", so the coplanar retry reports a shell as thick as its own
+    /// nudge — measured 0.008 mm³ for a plate cut by its own profile. Handing that to the document
+    /// would mark the feature `built` and show a 0.008 mm³ body, which is a wrong answer presented
+    /// as a successful one. The message says what happened instead.
+    #[test]
+    fn a_difference_that_removes_everything_is_refused() -> TestResult {
+        let mut kernel = TruckKernel::new();
+        let plate = kernel.extrude(&square(10.0), 5.0)?;
+        let same = kernel.extrude(&square(10.0), 5.0)?;
+        match kernel.boolean(BooleanOp::Difference, plate, same) {
+            Err(KernelError::Failed(message)) => {
+                assert!(
+                    message.contains("removed the whole solid"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => {
+                return Err(KernelError::Failed(format!(
+                    "an empty difference must be refused, got {other:?}"
+                )));
+            }
+        }
+        // The operands survive the refusal.
+        close(
+            volume(&kernel, plate)?,
+            500.0,
+            1e-6,
+            "operand after a refusal",
+        )
+    }
+
+    /// Translation moves a solid exactly and leaves its volume untouched.
+    #[test]
+    fn translate_is_exact_and_does_not_change_volume() -> TestResult {
+        let mut kernel = TruckKernel::new();
+        let id = kernel.extrude(&square(10.0), 5.0)?;
+        let moved = kernel.translate(id, [7.0, -3.0, 2.5])?;
+        let bb = kernel.bounding_box(moved)?;
+        close(bb.min[0], 7.0, 1e-9, "translated min x")?;
+        close(bb.min[1], -3.0, 1e-9, "translated min y")?;
+        close(bb.min[2], 2.5, 1e-9, "translated min z")?;
+        close(bb.max[2], 7.5, 1e-9, "translated max z")?;
+        close(volume(&kernel, moved)?, 500.0, 1e-6, "translated volume")?;
+        // The source is not consumed.
+        close(
+            volume(&kernel, id)?,
+            500.0,
+            1e-6,
+            "source volume after translate",
+        )?;
+
+        // Bad input is rejected, and an unknown handle is not silently translated.
+        assert!(matches!(
+            kernel.translate(id, [f64::NAN, 0.0, 0.0]),
+            Err(KernelError::Invalid(_))
+        ));
+        let foreign = cad_contract::kernel::SolidId::from_raw(9_999);
         assert_eq!(
-            kernel.boolean(BooleanOp::Difference, outer, inner),
-            Err(KernelError::Unsupported {
-                capability: Capability::BooleanDifference
-            })
+            kernel.translate(foreign, [1.0, 0.0, 0.0]),
+            Err(KernelError::UnknownSolid(foreign))
         );
         Ok(())
     }

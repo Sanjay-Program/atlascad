@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "observed_at_unix": 1792918016,
+  "observed_at_unix": 1793252132,
   "host": {
     "os": "linux",
     "arch": "x86_64",
@@ -177,15 +177,15 @@
       "git": null,
       "fingerprint": {
         "algorithm": "fnv1a64-pathv1",
-        "digest": "ef9ee2f2f090d451",
+        "digest": "d2aef8bbad7e26f5",
         "files": 3,
-        "bytes": 64353,
+        "bytes": 65237,
         "content_hashed": 3,
         "metadata_only": 0
       },
       "files": {
         "Cargo.toml": "7f23683b02eca70a",
-        "src/lib.rs": "f11a63f7d8d85f35",
+        "src/lib.rs": "7224aab3fd75d989",
         "tests/integration.rs": "81f139b654bd718a"
       },
       "packages": [
@@ -230,9 +230,9 @@
       "git": null,
       "fingerprint": {
         "algorithm": "fnv1a64-pathv1",
-        "digest": "7e15d190f6e6ed6b",
+        "digest": "0e46e3c8f721a6c8",
         "files": 5,
-        "bytes": 32278,
+        "bytes": 32941,
         "content_hashed": 5,
         "metadata_only": 0
       },
@@ -240,7 +240,7 @@
         "Cargo.toml": "38bb2df399f6593e",
         "src/lib.rs": "8127dac2ea3ecaf8",
         "src/main.rs": "c2bf6ad393a808c1",
-        "tests/end_to_end.rs": "831c598448f15c02",
+        "tests/end_to_end.rs": "5be76fda958b405b",
         "tests/project_workflow.rs": "32a0b3ae86cd9616"
       },
       "packages": [
@@ -258,19 +258,19 @@
       "git": null,
       "fingerprint": {
         "algorithm": "fnv1a64-pathv1",
-        "digest": "3364b835c9c6593d",
+        "digest": "fd0c5f3c55de2e79",
         "files": 10,
-        "bytes": 70582,
+        "bytes": 73707,
         "content_hashed": 10,
         "metadata_only": 0
       },
       "files": {
         "Cargo.toml": "e4fdb39886ffaa42",
-        "src/capability.rs": "c52678ec02bff3a5",
+        "src/capability.rs": "badf3b5597016d9a",
         "src/document.rs": "4f2e9e597c0656aa",
         "src/error.rs": "baf5ce35478f815c",
         "src/ids.rs": "1816bd9fc3d94c79",
-        "src/kernel.rs": "92520e09f5b2f024",
+        "src/kernel.rs": "321505483ca92b02",
         "src/lib.rs": "88af5ff6e9e170d2",
         "src/mesh.rs": "b9b15b8bbf21ca0f",
         "src/tol.rs": "e71dde4de06e8b83",
@@ -291,15 +291,15 @@
       "git": null,
       "fingerprint": {
         "algorithm": "fnv1a64-pathv1",
-        "digest": "f68b670aee93c9ab",
+        "digest": "71878618cb04b210",
         "files": 2,
-        "bytes": 59651,
+        "bytes": 158397,
         "content_hashed": 2,
         "metadata_only": 0
       },
       "files": {
         "Cargo.toml": "54d71c55345c3370",
-        "src/lib.rs": "8b827c76dab18ecd"
+        "src/lib.rs": "be8ffef50ab4e759"
       },
       "packages": [
         "cad-document@0.1.0"
@@ -316,9 +316,9 @@
       "git": null,
       "fingerprint": {
         "algorithm": "fnv1a64-pathv1",
-        "digest": "3d2a1ddd941b90db",
+        "digest": "2c79326781c9d21c",
         "files": 12,
-        "bytes": 162322,
+        "bytes": 164038,
         "content_hashed": 12,
         "metadata_only": 0
       },
@@ -329,12 +329,12 @@
         "src/lib.rs": "bef418d2db1a6eac",
         "src/main.rs": "2af6e58f3304f644",
         "src/manifest.rs": "b7666ab6efdf8a72",
-        "src/model.rs": "d10a63fefd5451be",
+        "src/model.rs": "1f3e752a12a0fe8a",
         "src/paths.rs": "79c6360403cd67bd",
         "src/report.rs": "4e5240ef734b287c",
         "src/scan.rs": "f4e9afdfe4164797",
-        "src/tasks.rs": "b35db5d2f474360b",
-        "tests/pipeline.rs": "d9df6c66143f474b"
+        "src/tasks.rs": "2f0fe3a28bef639a",
+        "tests/pipeline.rs": "d6af89aa0ef4fc3e"
       },
       "packages": [
         "cad-engineering@0.1.0"
@@ -401,10 +401,10 @@
       "git": null,
       "fingerprint": {
         "algorithm": "fnv1a64-pathv1",
-        "digest": "45698718e62007fe",
-        "files": 9,
-        "bytes": 113964,
-        "content_hashed": 9,
+        "digest": "1cc00ad0a5004052",
+        "files": 10,
+        "bytes": 148887,
+        "content_hashed": 10,
         "metadata_only": 0
       },
       "files": {
@@ -415,8 +415,9 @@
         "examples/probe.rs": "8140413531b9d5fc",
         "examples/probe5.rs": "763559622650b38e",
         "examples/probe6.rs": "d8a60c0038582fe2",
-        "src/corpus.rs": "d7770c63b1753e8e",
-        "src/lib.rs": "b73dfab06b374b9e"
+        "examples/probe7.rs": "b7319da515d40633",
+        "src/corpus.rs": "c7eab674df10d768",
+        "src/lib.rs": "a7aaea5e96c0d6be"
       },
       "packages": [
         "cad-kernel-truck@0.1.0"
@@ -433,22 +434,23 @@
       "git": null,
       "fingerprint": {
         "algorithm": "fnv1a64-pathv1",
-        "digest": "e4595ed80481e573",
-        "files": 9,
-        "bytes": 140050,
-        "content_hashed": 9,
+        "digest": "d75ebc5508e092c8",
+        "files": 10,
+        "bytes": 240781,
+        "content_hashed": 10,
         "metadata_only": 0
       },
       "files": {
         "Cargo.toml": "dda480361c413cb9",
-        "assets/app.css": "82a4e0bb71a1607e",
-        "assets/app.js": "6a9c10cc68118f44",
+        "assets/app.css": "0b1184a3c58b65c4",
+        "assets/app.js": "e91e7f05982dbf33",
         "assets/favicon.svg": "e264db094e2d0341",
-        "assets/index.html": "df9a43f988f14933",
+        "assets/index.html": "00b6dd6811b8d732",
+        "examples/rebuild_bench.rs": "dd1bdd790eaaa0fa",
         "src/http.rs": "7a994e9624c4f42d",
-        "src/lib.rs": "e864a5daf3d3caa4",
-        "src/main.rs": "be72cbcaf2db24dc",
-        "tests/http_api.rs": "faf0476e32e3dce4"
+        "src/lib.rs": "db0d4fbf5d086d20",
+        "src/main.rs": "e59d960f2d72f3d5",
+        "tests/http_api.rs": "cba7184954f8b52a"
       },
       "packages": [
         "cad-studio@0.1.0"
@@ -5205,10 +5207,10 @@
       "git": null,
       "fingerprint": {
         "algorithm": "fnv1a64-pathv1",
-        "digest": "5e9463676bab562e",
-        "files": 2246,
-        "bytes": 95162564,
-        "content_hashed": 2242,
+        "digest": "a4811410e5420b1a",
+        "files": 2247,
+        "bytes": 95162690,
+        "content_hashed": 2243,
         "metadata_only": 4
       },
       "files": {
@@ -6726,7 +6728,7 @@
         "crates/ui-egui/src/ui_kit/text.rs": "92c9ae4ce6ac4152",
         "crates/ui-egui/src/ui_kit_guard_tests.rs": "7d5c23fe6d8cc457",
         "crates/ui-egui/src/update.rs": "f7200adb5bec78b5",
-        "crates/ui-egui/src/update/install.rs": "29db2624fc62f697",
+        "crates/ui-egui/src/update/install.rs": "a1cedaff2498ae15",
         "crates/ui-egui/src/update/install_tests.rs": "73e714ebb0669b4c",
         "crates/ui-egui/src/update/tests.rs": "2fecc5f5a51136f5",
         "crates/ui-egui/src/view_home_tests.rs": "7c54f706c0c59815",
@@ -7061,6 +7063,7 @@
         "packaging/web/package.sh": "14fffcfa9eba6254",
         "packaging/windows/check-icon.ps1": "ceac58da3a18ed42",
         "packaging/windows/package.ps1": "5050d462e7001d43",
+        "rust-toolchain.toml": "eb6883eee27f7d94",
         "rustfmt.toml": "62a195fe0cd0cbb3",
         "scripts/ci/affected.py": "cbccc310703b57fc",
         "scripts/ci/build-jobs.sh": "6c79f1297e80ff3e",
@@ -7479,7 +7482,8 @@
         "xtask@0.18.3"
       ],
       "notes": [
-        "no Git metadata; identity relies on the content fingerprint"
+        "no Git metadata; identity relies on the content fingerprint",
+        "pins a toolchain with rust-toolchain(.toml); cargo is invoked from the workspace root so rustup cannot start a toolchain download"
       ]
     },
     {

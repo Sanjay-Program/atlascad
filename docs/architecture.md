@@ -3,8 +3,9 @@
 **Status:** the contract, the truck adapter, the engineering control plane, a headless consumer
 (`cad-cli`), the project payload (`cad-document`), the shared STL codec (`cad-io`), the local
 application (`cad-studio`) and the agent platform (`cad-agent-api`, `cad-agent-runtime`,
-`cad-agent-geometry`) are **implemented, compiling and tested** (227 tests across eleven root
-workspace packages, verified 2026-10-25). The two imported desktop applications (CADCraft and
+`cad-agent-geometry`) are **implemented, compiling and tested** (273 tests across eleven root
+workspace packages, verified 2026-10-29; the project payload carries an ordered feature graph that
+includes extrude, cut and full-turn revolve, ADR-0009). The two imported desktop applications (CADCraft and
 SolidCraft) are **not yet wired to the contract**; the root workspace ships its own local
 application instead, described in §5d.
 
@@ -133,12 +134,15 @@ integration.
 ## 5b. Defined and tested: the project payload and its consumers
 
 * **`cad-document`** is the versioned `.zcad` project payload: stable document and entity IDs, named
-  millimetre parameters, a rectangle/circle/regular-polygon sketch, one extrude feature, bounded
-  undo/redo (64 snapshots), validating load, atomic save and schema-1 migration. It depends on
-  `cad-contract` for `DocumentHeader`, `EntityId`, `Unit`, tolerance and the kernel trait, and on no
-  adapter. Its tests cover analytic circle and polygon volume, profile validation, migration, the
-  64 MiB read limit, corrupt input and save/reopen equivalence. It is deliberately **one sketch and
-  one feature**, not a general feature graph; see §6.
+  millimetre parameters, an **ordered feature graph** of rectangle/circle/regular-polygon sketches
+  and extrude features (`new_body` or `join`), bounded undo/redo (64 snapshots), validating load,
+  atomic save, and schema 1 → 2 → 3 migration. It depends on `cad-contract` for `DocumentHeader`,
+  `EntityId`, `Unit`, tolerance and the kernel trait, and on no adapter. `Project::build` walks the
+  history in order, feeds the running solid into `Kernel::boolean(Union)` for a join, and returns a
+  per-feature report plus the last good mesh rather than an error when a feature fails. Its tests
+  cover analytic circle, polygon and two-feature union volumes, dependency refusal, failure
+  propagation, migration, the 64 MiB read limit, corrupt input and save/reopen equivalence. The
+  graph is **linear and single-body**; see §6 and ADR-0009.
 * **`cad-io`** is the shared binary-STL codec used by both the CLI and the application: a 50-byte
   facet layout, exact declared-count handling before allocation, a validating reader and a closed,
   outward mesh check before writing. STL carries no unit field, so a document header must accompany
@@ -221,10 +225,10 @@ a new egui tree.
 browser (assets/index.html, app.css, app.js)
   │  loopback HTTP/1.1, JSON, same-origin checks
   ▼
-cad-studio  ──  cad-document (parameters, sketch, feature, undo, .zcad)
+cad-studio  ──  cad-document (parameters, feature graph, undo, .zcad)
   │                 │
   │                 └── cad-contract (header, ids, units, kernel trait)
-  ├── cad-kernel-truck  (extrude + tessellate)
+  ├── cad-kernel-truck  (extrude + union + tessellate)
   └── cad-io            (validated binary STL)
 ```
 
@@ -235,13 +239,19 @@ cad-studio  ──  cad-document (parameters, sketch, feature, undo, .zcad)
   connections. Responses send `no-store`, `nosniff`, `no-referrer`, `X-Frame-Options: DENY` and a
   `default-src 'self'` CSP. There is no authentication because the listener is loopback-only and
   single-user; binding anywhere else is not implemented, and the port must not be tunneled.
-* **Document mutation is serialized.** The server owns one `Project` behind a mutex; every mutating
-  route goes through the same path that snapshots undo history, re-evaluates through the kernel and
-  returns the complete render state. A rejected parameter or profile leaves the project unchanged.
+* **Document mutation is serialized.** The server owns one `Project`, one kernel instance and one
+  `BuildCache` behind a mutex; every mutating route goes through the same path that snapshots undo
+  history, re-evaluates through the kernel and returns the complete render state. A rejected
+  parameter or profile leaves the project unchanged. Because the kernel outlives a request, cached
+  solids stay valid across requests; the cache is keyed by the resolved inputs of each feature prefix,
+  so an edit invalidates exactly the features that read it.
 * **UI.** One HTML document, CSS custom properties for light/dark, and a dependency-free module that
-  parses the mesh into WebGL 1 buffers, ray-casts faces for selection, and exposes a feature tree,
-  parameter panel, status bar, command palette and keyboard help. The narrow layout turns both
-  side panels into drawers instead of hiding them. The browser is a renderer and input surface; all
+  parses the mesh into WebGL 1 buffers, ray-casts faces for selection, and exposes the ordered model
+  tree (one row per sketch and feature, with operation, depth and rebuild status), a sketch-placement
+  panel, a parameter panel, the status bar, the command palette and keyboard help. A feature that
+  cannot rebuild is marked in the tree with the kernel's message, shown in a banner, and disables
+  export rather than letting the file drift from the history. The narrow layout turns both side
+  panels into drawers instead of hiding them. The browser is a renderer and input surface; all
   document and geometry logic stays in Rust.
 * **Persistence.** Save is explicit (`Ctrl/Cmd+S` or the palette) and goes through
   `Project::save`, which writes a sibling temporary file, syncs it and renames atomically. Autosave,
@@ -260,10 +270,21 @@ cad-studio  ──  cad-document (parameters, sketch, feature, undo, .zcad)
 3. **No cloud service, collaboration, or WASM target.** Atlas Studio listens on loopback only. There
    is no account, sync, hosted storage, or multi-user editing. `wasm32-unknown-unknown` is not
    installed on this machine and no WASM build was attempted; neither is claimed.
-4. **The document payload is one sketch and one feature.** `.zcad` schema 2 persists a header, named
-   parameters, one sketch (rectangle, circle or regular polygon) and one extrusion. There is no
-   feature graph, no constraint solver, no boolean feature, no assembly and no drawing. The header
-   and payload schema are versioned independently, and schema 1 files migrate on load.
+4. **The feature graph is linear and single-body.** `.zcad` schema 5 persists a header, named
+   parameters, an ordered list of sketches and features with stable IDs, where the first feature
+   starts the body and every later one is a join (union into the body) or a cut (difference out of
+   the body) through the kernel's booleans. A feature is an extrude along +Z by a parameter, or a
+   full-turn revolve of the sketch about one of its own axes; a partial revolve is refused because it
+   would be an open shell, and a profile that crosses the axis is refused because it has no solid of
+   revolution. There is no sweep, loft, fillet, pattern, arbitrary-axis revolve, multi-body,
+   constraint solver, assembly or drawing. A per-feature
+   `BuildCache` keeps the body after each function prefix, so an unchanged request does no kernel work
+   and an edit re-runs only the features that read it; it is session state, never persisted, and
+   `Project::build` remains the uncached path. The header and payload schema are versioned
+   independently, and schema 1, 2, 3 and 4 files migrate on load without being rewritten on disk. An
+   unsaved edit is snapshotted to a separate `<project>.recovery` file after each change, so a crash
+   loses no work and a corrupt project file can still be recovered; the snapshot never writes the
+   project, and saving or discarding removes it.
 5. **The agent runtime is in-process and single-owner.** The registry is a plain struct with `&mut
    self` methods, so one host owns it at a time, calls are synchronous, and a long operation blocks
    the calling thread. There is no scheduler, no queue, no process isolation for third-party agents,
@@ -271,8 +292,8 @@ cad-studio  ──  cad-document (parameters, sketch, feature, undo, .zcad)
 6. **Only one agent exists.** The runtime's guarantees are proven against one agent and the
    registry's own test doubles. The other three planned agents are declared but not implemented.
 7. **The application is not a full CAD product.** It has no constraints, dimensions, arcs/splines,
-   multiple features, booleans, revolve, assemblies, drawings, STEP/IGES/DXF import, mass-property
-   UI, autosave, or crash recovery. The verified workflow is exactly what §5d and
+   sweep, loft, partial revolve, fillet, chamfer, shell, patterns, multi-body, assemblies, drawings,
+   STEP/IGES/DXF import, autosave, or crash recovery. The verified workflow is exactly what §5d and
    `docs/feature-matrix.md` §3c list, and nothing more.
 
 ## 7. Crate dependency rules (to keep the graph acyclic)

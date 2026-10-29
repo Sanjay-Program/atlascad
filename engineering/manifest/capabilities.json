@@ -117,7 +117,7 @@
       ],
       "verification": "verified",
       "evidence": [
-        "engineering/quality/tests.json#t-cad-kernel-truck",
+        "engineering/quality/tests.json#t-cad-kernel-truck-m11d",
         "engineering/quality/benchmarks.json#bm-extrude (50,000 mm3 exact)"
       ],
       "notes": "Analytic volume asserted, not self-consistency."
@@ -156,13 +156,16 @@
       "name": "Boolean difference",
       "description": "Subtract one solid from another.",
       "provided_by": [
+        "module.cad-kernel-truck",
         "module.solidcraft.kernel"
       ],
-      "verification": "advertised",
+      "verification": "verified",
       "evidence": [
-        "docs/kernel-comparison.md section 4.2"
+        "crates/cad-kernel-truck/examples/corpus: difference_piercing_cut 84000 mm3 / 22400 mm2 (delta 0), difference_contained_void 184000 mm3 / 32800 mm2 (delta 0)",
+        "cad-kernel-truck::tests::difference_is_the_analytic_cut",
+        "crates/cad-studio/tests/http_api.rs::a_cut_removes_the_analytic_volume_and_survives_save_reopen_and_undo (255 mm3 exact through save, reopen, undo and STL export)"
       ],
-      "notes": "The published truck path returns a solid with the wrong volume (1053.3 mm3 vs 840 analytic), so the experimental adapter refuses it. SolidCraft's production kernel has its own guarded implementation, but its test suite was not run here."
+      "notes": "Advertised and verified through the truck adapter. The earlier claim that difference returns a wrong solid (1053.3 mm3 for an 840 analytic cut) measured truck's *raw* output; that output is wrong only because the cavity walls are wound inward, and the adapter's weld + orientation repair corrects it, so the volume was never rebuilt wrong. Two defects remain and are stated: (1) operands with coincident faces need the coplanar retry, whose nudge leaves a 1.1e-4 mm membrane and a non-watertight tessellation (corpus fixture difference_coplanar_cut is a recorded known failure); (2) a difference that removes everything is refused rather than returned as a sliver. The application avoids (1) by building every cut tool with CUT_OVERSHOOT_MM of overshoot."
     },
     {
       "id": "cap.kernel.fillet",
@@ -191,7 +194,7 @@
         "engineering/quality/benchmarks.json#bm-tessellate",
         "cad-kernel-truck::tests::tessellation_is_a_closed_outward_manifold"
       ],
-      "notes": "Verified for planar boxes only. Curved-surface tessellation was not measured. Per-face vertices are welded and the winding is made consistent outward on the way out: before that repair a box cap was wound inward and the mesh reported 8 open edges. The studio also tessellates circle-derived polygons; those are still planar profiles, so no curved-surface claim is added."
+      "notes": "Verified for planar boxes and for boolean results. Per-face vertices are welded and the winding is made consistent outward on the way out: before that repair a box cap was wound inward and the mesh reported 8 open edges. Each connected shell is then given the sign its nesting depth requires, so a cavity is wound inward and subtracts its volume instead of adding it \u2014 without that, a cut enclosing a void reported outer + cavity (216000 mm3 instead of 184000). Curved-surface tessellation was not measured."
     },
     {
       "id": "cap.io.step",
@@ -359,17 +362,32 @@
     {
       "id": "cap.document.project-persistence",
       "name": "Local parametric project persistence",
-      "description": "Create, validate, save, reopen, edit, recompute and export a parameterized project with rectangle, circle or regular-polygon sketches, an extrude, and stable entity IDs.",
+      "description": "Local parametric project payload that saves atomically, reopens across schema versions, and survives a crash: an unsaved edit is kept in a recovery snapshot next to the file and offered on the next start, including when the file cannot be read.",
       "provided_by": [
         "module.cad-document"
       ],
       "verification": "verified",
       "evidence": [
-        "engineering/quality/tests.json#t-cad-document-schema2",
-        "crates/cad-studio/tests/http_api.rs",
-        "crates/cad-cli/tests/end_to_end.rs"
+        "engineering/quality/tests.json#t-cad-document-m11f",
+        "engineering/quality/tests.json#t-cad-studio-m11f",
+        "engineering/quality/tests.json#t-cad-studio-browser-m11f"
       ],
-      "notes": "Schema 2 stores an explicit profile and migrates schema 1 on load. Saves sync a sibling temporary file before atomic rename; load validates live state and up to 64 history snapshots and rejects files over 64 MiB. Undo/redo survives separate CLI invocations and studio requests."
+      "notes": "Saves are atomic (temp file, fsync, rename) and the snapshot is a separate file, so an autosave never writes the project. A superseded snapshot is deleted and a corrupt one ignored. Named revisions are not implemented."
+    },
+    {
+      "id": "cap.document.feature-graph",
+      "name": "Ordered feature graph with union join",
+      "description": "Ordered sketches and features with stable IDs; a feature may only consume earlier geometry, the history rebuilds sequentially through the kernel with a per-prefix cache, and a feature may start a body, join it, or cut it with a boolean.",
+      "provided_by": [
+        "module.cad-document"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-document-m11d",
+        "engineering/quality/tests.json#t-cad-studio-m11d (980 mm3 joined volume over HTTP, save/reopen and STL parse-back)",
+        "docs/architecture-decisions/0009-feature-graph.md"
+      ],
+      "notes": "Linear and single-body: a second new_body is refused, and cut is gated on a passing difference corpus. A failed feature is reported by ID and the last good mesh is kept. Each built prefix is cached under a hash of its resolved inputs, bounded at 32 entries."
     },
     {
       "id": "cap.entitlements.policy",
@@ -387,17 +405,18 @@
     {
       "id": "cap.app.local-studio",
       "name": "Local-first CAD studio",
-      "description": "Open a project, edit named parameters and the sketch profile, rebuild geometry, undo/redo, inspect faces, save atomically and export STL in a desktop browser session served from 127.0.0.1.",
+      "description": "Open a project, edit named parameters and the sketch profile, place sketches, extrude as a new body or a join, see each feature's rebuild status, undo/redo, inspect faces, save atomically and export STL in a desktop browser session served from 127.0.0.1.",
       "provided_by": [
         "module.cad-studio"
       ],
       "verification": "verified",
       "evidence": [
-        "engineering/quality/tests.json#t-cad-studio",
+        "engineering/quality/tests.json#t-cad-studio-m11",
+        "engineering/quality/tests.json#t-cad-studio-browser-m11",
         "crates/cad-studio/tests/http_api.rs",
-        "browser exercise: parameter 40 -> 20 rebuilt 6,000 mm3; circle and octagon rebuilds matched analytic volumes; save wrote schema 2; face pick returned X/Y/Z and normal"
+        "docs/quality/m11-feature-graph.md"
       ],
-      "notes": "No accounts, cloud, collaboration or telemetry. The listener is loopback-only and every POST requires a same-origin Origin. It is one project per process, not a multi-user service."
+      "notes": "No accounts, cloud, collaboration or telemetry. The listener is loopback-only and every POST requires a same-origin Origin. It is one project per process, not a multi-user service. A feature that cannot rebuild is marked in the tree and blocks export."
     },
     {
       "id": "cap.ui.viewport-3d",
@@ -425,6 +444,36 @@
         "browser exercise: Ctrl+K listed 19 connected commands; running \u201cProfile: circle\u201d changed the project profile and rebuilt 92 triangles"
       ],
       "notes": "Every entry invokes the same API or UI function as its button; there are no placeholder commands."
+    },
+    {
+      "id": "cap.kernel.transform",
+      "name": "Rigid translation",
+      "description": "Move a solid by a delta without rotating it.",
+      "provided_by": [
+        "module.cad-kernel-truck"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "cad-kernel-truck::tests::translate_is_exact_and_does_not_change_volume",
+        "crates/cad-document/src/lib.rs CUT_OVERSHOOT_MM: a cut builds an overshooting tool with this"
+      ],
+      "notes": "Added as a contract capability because an exact through-cut needs a tool that overshoots the body, and extrude always starts at z = 0, so a tool built for a body spanning z 0..h always shares a plane with it."
+    },
+    {
+      "id": "cap.kernel.revolve",
+      "name": "Revolve",
+      "description": "Turn a validated planar profile a full revolution about one of its sketch axes, producing a solid of revolution.",
+      "provided_by": [
+        "module.cad-kernel-truck",
+        "module.kernel.truck"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-kernel-truck-m11d (analytic cylinder and annulus volumes, watertight meshes)",
+        "engineering/quality/tests.json#t-cad-studio-m11d (annulus over HTTP, save/reopen, watertight STL export)",
+        "crates/cad-kernel-truck/src/lib.rs::tests::revolve_on_the_axis_is_a_cylinder"
+      ],
+      "notes": "Full turn only: a partial sweep is an open shell and the document carries bodies only, so it is refused with a reason. A profile that straddles the axis is refused rather than producing a self-intersecting solid. The adapter uses truck's `rsweep`."
     }
   ]
 }

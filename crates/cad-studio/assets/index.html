@@ -48,6 +48,68 @@
       </section>
 
       <section class="panel-section">
+        <div class="section-head"><h2>Create</h2><span class="hint">sketch · extrude · revolve</span></div>
+        <div class="field">
+          <label for="newSketchKind">Sketch</label>
+          <select id="newSketchKind">
+            <option value="rectangle">Rectangle</option>
+            <option value="circle">Circle</option>
+            <option value="regular_polygon">Regular polygon</option>
+            <option value="polyline">Polyline (draw)</option>
+          </select>
+        </div>
+        <div class="field" id="newSidesField" hidden>
+          <label for="newSidesInput">Sides</label>
+          <input id="newSidesInput" type="number" min="3" max="256" step="1" value="6" inputmode="numeric">
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="newOriginX">X</label>
+            <input id="newOriginX" type="number" step="any" value="0" inputmode="decimal" aria-label="New sketch origin X">
+          </div>
+          <div class="field">
+            <label for="newOriginY">Y</label>
+            <input id="newOriginY" type="number" step="any" value="0" inputmode="decimal" aria-label="New sketch origin Y">
+          </div>
+        </div>
+        <button id="addSketchBtn" class="button wide">Add sketch</button>
+        <div class="field">
+          <label for="newFeatureSketch">Feature</label>
+          <select id="newFeatureSketch" aria-label="Sketch to build from"></select>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="newFeatureKind">Kind</label>
+            <select id="newFeatureKind" aria-label="Feature kind">
+              <option value="extrude">Extrude</option>
+              <option value="revolve">Revolve</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="newFeatureOperation">Action</label>
+            <select id="newFeatureOperation" aria-label="Feature operation">
+              <option value="new_body">New body</option>
+              <option value="join">Join</option>
+              <option value="cut">Cut</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" id="newDepthField">
+          <label for="newFeatureDepth">Depth</label>
+          <select id="newFeatureDepth" aria-label="Depth parameter"></select>
+        </div>
+        <div class="field" id="newAxisField" hidden>
+          <label for="newFeatureAxis">Axis</label>
+          <select id="newFeatureAxis" aria-label="Revolve axis">
+            <option value="vertical">Vertical (sketch Y)</option>
+            <option value="horizontal">Horizontal (sketch X)</option>
+          </select>
+        </div>
+        <button id="addFeatureBtn" class="button wide">Add extrude</button>
+        <p class="hint" id="createHint">The first extrude starts the body; later extrudes join it.</p>
+      </section>
+
+      <section class="panel-section">
         <div class="section-head"><h2>Sketch profile</h2><span class="hint" id="segmentsLabel"></span></div>
         <div class="field">
           <label for="profileKind">Shape</label>
@@ -55,6 +117,10 @@
             <option value="rectangle">Rectangle</option>
             <option value="circle">Circle</option>
             <option value="regular_polygon">Regular polygon</option>
+            <!-- A drawn loop cannot be produced from the shape picker; it is shown here so the
+                 current profile is visible, and replacing it with a parameter-driven shape is
+                 still possible. -->
+            <option value="polyline" disabled>Polyline (drawn)</option>
           </select>
         </div>
         <div class="field" id="sidesField" hidden>
@@ -62,6 +128,21 @@
           <input id="sidesInput" type="number" min="3" max="256" step="1" value="6" inputmode="numeric">
         </div>
         <p class="hint" id="profileHint">A rectangle is sized by width × height.</p>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-head"><h2>Sketch placement</h2><span class="hint" id="placementLabel"></span></div>
+        <div class="field-row">
+          <div class="field">
+            <label for="originX">X</label>
+            <input id="originX" type="number" step="any" value="0" inputmode="decimal" aria-label="Sketch origin X">
+          </div>
+          <div class="field">
+            <label for="originY">Y</label>
+            <input id="originY" type="number" step="any" value="0" inputmode="decimal" aria-label="Sketch origin Y">
+          </div>
+        </div>
+        <button id="moveSketchBtn" class="button wide">Move sketch</button>
       </section>
 
       <section class="panel-section grow">
@@ -76,7 +157,7 @@
     </aside>
 
     <section class="viewport-shell">
-      <canvas id="viewport" tabindex="0" aria-label="3D viewport. Drag to orbit, right-drag or Shift-drag to pan, scroll to zoom, click a face to inspect it."></canvas>
+      <canvas id="viewport" tabindex="0" aria-label="3D viewport. Drag to orbit, right-drag or Shift-drag to pan, scroll to zoom, click a face to inspect it. While drawing a polyline, click to place points on the z = 0 plane."></canvas>
       <div class="view-toolbar" role="toolbar" aria-label="Viewport controls">
         <button type="button" data-view="iso" title="Isometric view (4)">Iso</button>
         <button type="button" data-view="front" title="Front view (1)">Front</button>
@@ -87,6 +168,14 @@
         <button type="button" id="wireBtn" title="Wireframe (W)" aria-pressed="false">Wire</button>
         <button type="button" id="gridBtn" title="Grid (G)" aria-pressed="true">Grid</button>
       </div>
+      <div id="drawBar" class="draw-bar" role="toolbar" aria-label="Polyline drawing" hidden>
+        <span class="draw-title">Draw polyline</span>
+        <span id="drawCount" class="draw-count">0 points</span>
+        <button type="button" id="drawUndoPoint" class="button ghost small" disabled>Undo point</button>
+        <button type="button" id="drawClose" class="button small" disabled>Close shape</button>
+        <button type="button" id="drawCancel" class="button ghost small">Cancel</button>
+        <span class="draw-hint">Click the z = 0 plane to place points · Enter closes · Esc cancels</span>
+      </div>
       <div class="axis-gizmo" aria-hidden="true">
         <span class="axis axis-z">Z</span>
         <span class="axis axis-x">X</span>
@@ -95,6 +184,16 @@
       <div id="viewportNotice" class="viewport-notice" hidden>
         <h3>No geometry yet</h3>
         <p>This project has no solid feature to display.</p>
+      </div>
+      <div id="failureBanner" class="failure-banner" role="alert" hidden>
+        <span class="failure-icon" aria-hidden="true">!</span>
+        <span id="failureMessage" class="failure-message"></span>
+        <button type="button" id="failureLocate" class="link">show the feature</button>
+      </div>
+      <div id="recoveryBanner" class="failure-banner recovery-banner" role="status" hidden>
+        <span class="failure-icon" aria-hidden="true">↺</span>
+        <span id="recoveryMessage" class="failure-message"></span>
+        <button type="button" id="recoveryDiscard" class="link">discard unsaved changes</button>
       </div>
       <div id="pickCard" class="pick-card" hidden>
         <div class="pick-head"><strong>Face</strong><button type="button" id="pickClose" class="link" aria-label="Dismiss face inspection">dismiss</button></div>
@@ -166,7 +265,10 @@
         <dt>1 / 2 / 3 / 4</dt><dd>Front / top / right / isometric</dd>
         <dt>W</dt><dd>Toggle wireframe</dd>
         <dt>G</dt><dd>Toggle grid</dd>
-        <dt>Esc</dt><dd>Close a panel or palette</dd>
+        <dt>Esc</dt><dd>Close a panel, palette, or polyline drawing</dd>
+        <dt>Enter</dt><dd>Close a polyline being drawn</dd>
+        <dt>Click (drawing)</dt><dd>Place a polyline point on the z = 0 plane</dd>
+        <dt>Click a tree row</dt><dd>Select that sketch or feature</dd>
         <dt>Drag</dt><dd>Orbit</dd>
         <dt>Shift + drag</dt><dd>Pan</dd>
         <dt>Scroll</dt><dd>Zoom</dd>

@@ -1511,7 +1511,7 @@
       "attempts": 0,
       "last_error": null,
       "evidence": [
-        "Intentional vendoring change: two git dependencies replaced with path dependencies to apps/cadcraft/vendor/ (craft-libs-docpath at rev 82a24b00…, craft-libs-ui at rev 5c874d51…); sources copied byte-identical with PROVENANCE.md and sha256 manifests; Cargo.toml and Cargo.lock updated.",
+        "Intentional vendoring change: two git dependencies replaced with path dependencies to apps/cadcraft/vendor/ (craft-libs-docpath at rev 82a24b00\u2026, craft-libs-ui at rev 5c874d51\u2026); sources copied byte-identical with PROVENANCE.md and sha256 manifests; Cargo.toml and Cargo.lock updated.",
         "apps/cadcraft/Cargo.toml, apps/cadcraft/Cargo.lock, apps/cadcraft/vendor/",
         "engineering/manifest/dependencies.json (ext.craft-docpath, ext.craft-ui now path_patch, MIT OR Apache-2.0)"
       ],
@@ -1720,6 +1720,483 @@
       "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
       "source": "scanner",
       "trigger_digest": "78524cbbb74bf587"
+    },
+    {
+      "id": "task.document.feature-graph",
+      "title": "M11: generalise the project to an ordered feature graph with extrude-join",
+      "rationale": "The .zcad payload stores one sketch and one extrusion, and evaluation only looks at the last feature. A CAD product's defining property is an editable history, and the document shape is expensive to change later. The kernel passes its corpus for join (union) but not for cut, so join is the one boolean that can be wired to real geometry now.",
+      "priority": "integration_blocker",
+      "risk": "high",
+      "status": "verified",
+      "acceptance_criteria": [
+        "Project schema 3 stores ordered sketches and features with stable entity IDs; a feature may only reference a sketch created before it, and cycles or forward references are refused by validate rather than at render time.",
+        "A project rebuilds every feature in order through cad_contract::Kernel; a join feeds the running body into Kernel::boolean(Union) and refuses to run when the kernel does not advertise BooleanUnion.",
+        "Schema-1 and schema-2 files migrate on load, with the migration rule recorded in the docs.",
+        "A rebuild report names each feature's outcome, so a failing feature is reported with its ID and message and the last successfully rebuilt mesh is kept.",
+        "Regression tests cover analytic two-feature union volume, dependency refusal, a failing feature keeping the last good mesh, shared-parameter propagation, save/reopen equality, and schema-2 migration.",
+        "cargo test --offline --workspace passes and every previously recorded test still passes."
+      ],
+      "inputs": [
+        "module.cad-document",
+        "module.cad-contract",
+        "module.cad-kernel-truck"
+      ],
+      "outputs": [
+        "crates/cad-document/src/lib.rs"
+      ],
+      "depends_on": [],
+      "blocks": [
+        "task.studio.feature-tree"
+      ],
+      "expected_changes": [
+        "~ crates/cad-document/src/lib.rs"
+      ],
+      "required_tests": [
+        "cargo test -p cad-document",
+        "cargo test --offline --workspace"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-feature-graph (36 passed, 9 new over the 27 schema-2 tests)",
+        "engineering/quality/tests.json#t-platform-workspace-20261027 (239 passed, 0 failed, fmt and clippy -D warnings clean)",
+        "crates/cad-document/src/lib.rs: PROJECT_SCHEMA = 3, Project::build, migrate_v2_to_v3, validate_contents",
+        "docs/architecture-decisions/0009-feature-graph.md",
+        "docs/quality/m11-feature-graph.md"
+      ],
+      "rollback": "Schema 2 files still load through the migration, and the schema-2 document structure is recoverable from this commit; no user project is rewritten in place by the migration.",
+      "source": "curated",
+      "trigger_digest": null
+    },
+    {
+      "id": "task.studio.feature-tree",
+      "title": "M11 UI: multi-feature model tree, sketch placement and feature failure reporting",
+      "rationale": "The studio can only show a single extrusion, and its payload rolls a whole mutation back when the kernel fails. The feature graph is useless in the product unless the tree, the creation commands and the failure message are connected to it.",
+      "priority": "required_feature",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "The state payload lists every sketch and feature in build order with the feature operation and its rebuild status.",
+        "An HTTP client can create a sketch, extrude a new body, and extrude a join, each validated and persisted.",
+        "The model tree renders the ordered history, selecting a sketch or feature, and marks a failed feature with its message.",
+        "The sketch origin can be edited from the UI so two overlapping bodies can be joined.",
+        "A join rebuilds through the real truck kernel with an analytic volume asserted in an HTTP integration test, and save/reopen reproduces it.",
+        "Every visible control calls a real endpoint; no placeholder action is added."
+      ],
+      "inputs": [
+        "module.cad-studio",
+        "module.cad-document"
+      ],
+      "outputs": [
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/assets/app.js",
+        "crates/cad-studio/assets/index.html"
+      ],
+      "depends_on": [
+        "task.document.feature-graph"
+      ],
+      "blocks": [],
+      "expected_changes": [
+        "~ crates/cad-studio/src/lib.rs",
+        "~ crates/cad-studio/assets/app.js",
+        "~ crates/cad-studio/assets/index.html",
+        "~ crates/cad-studio/assets/app.css",
+        "~ crates/cad-studio/tests/http_api.rs"
+      ],
+      "required_tests": [
+        "cargo test -p cad-studio",
+        "browser workflow: two sketches, two extrudes, join, parameter edit, save, reopen, STL export"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "engineering/quality/tests.json#t-cad-studio-m11 (13 passed: 2 unit + 11 HTTP integration; 980 mm3 joined volume, save/reopen and STL parse-back)",
+        "engineering/quality/tests.json#t-cad-studio-browser-m11 (7 browser assertions, no console errors)",
+        "engineering/quality/benchmarks.json#bm-studio-m11-rebuild (17.3 ms median rebuild with the union)",
+        "docs/quality/m11-feature-graph.md"
+      ],
+      "rollback": "The UI and API additions are additive; the previous single-feature payload fields remain in place, so reverting the script restores the prior application behaviour.",
+      "source": "curated",
+      "trigger_digest": null
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-document.116406bf",
+      "title": "repo.cad-document: 1 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 1 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-document"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ src/lib.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "crates/cad-document/src/lib.rs: schema 3 feature graph; engineering/quality/tests.json#t-cad-feature-graph (36 passed)",
+        "docs/architecture-decisions/0009-feature-graph.md"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "116406bfd14939a6"
+    },
+    {
+      "id": "task.scan.files-modified.repo-cad-studio.b684835f",
+      "title": "repo.cad-studio: 5 tracked file(s) changed against the previous fingerprint",
+      "rationale": "Observed by the workspace scanner: 5 tracked file(s) changed against the previous fingerprint. Generated tasks are pinned to the observed value, so re-running an unchanged scan does not create another task.",
+      "priority": "interface_compatibility",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "the changed paths are classified as source, manifest, test or artefact",
+        "an impact analysis names the affected modules and their consumers",
+        "only the minimum validation set is run, and its result is recorded",
+        "the manifest fingerprint is refreshed once the change is understood"
+      ],
+      "inputs": [
+        "repo.cad-studio"
+      ],
+      "outputs": [
+        "engineering/manifest/repositories.json"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "~ assets/app.css",
+        "~ assets/app.js",
+        "~ assets/index.html",
+        "~ src/lib.rs",
+        "~ tests/http_api.rs"
+      ],
+      "required_tests": [
+        "format + lint the owning crate",
+        "unit tests of the owning crate",
+        "integration tests of every consumer of a changed interface"
+      ],
+      "attempts": 0,
+      "last_error": null,
+      "evidence": [
+        "crates/cad-studio: src/lib.rs, tests/http_api.rs and the three embedded assets; engineering/quality/tests.json#t-cad-studio-m11 (13 passed) and #t-cad-studio-browser-m11 (7 assertions)",
+        "docs/quality/m11-feature-graph.md"
+      ],
+      "rollback": "The scanner changes no source code. Revert the manifest or state edit; no repository is reset, cleaned or stashed by this tooling.",
+      "source": "scanner",
+      "trigger_digest": "b684835f526ae9f9"
+    },
+    {
+      "id": "task.m11b.cut",
+      "title": "Cut behind a verified boolean difference",
+      "rationale": "A CAD application that can add material but not remove it cannot model a bracket, a plate with a hole, or any subtractive part. Cut was implemented in the document and studio but gated off because the truck adapter's difference was measured wrong. This cycle established why it was wrong (cavity walls wound outward), repaired it, and enabled the feature.",
+      "priority": "user_value",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "The corpus gains analytic cut fixtures with stated volume and area tolerances.",
+        "The adapter's difference passes the coplanar-free fixtures and the corpus records them as must_pass.",
+        "ExtrudeOperation::Cut is stored in schema 4 with a documented migration from schema 3.",
+        "The document refuses a cut when the kernel does not advertise BooleanDifference, with the reason in the feature report.",
+        "A through-cut matches its analytic volume in the corpus and in an HTTP integration test against the running studio.",
+        "Save/reopen and undo cover the cut.",
+        "The corpus gate still prints the known failures it had before, with no newly skipped fixture."
+      ],
+      "inputs": [
+        "module.cad-contract",
+        "module.cad-kernel-truck",
+        "module.cad-document"
+      ],
+      "outputs": [
+        "crates/cad-contract/src/kernel.rs",
+        "crates/cad-kernel-truck/src/lib.rs",
+        "crates/cad-document/src/lib.rs"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "crates/cad-contract/src/capability.rs",
+        "crates/cad-contract/src/kernel.rs",
+        "crates/cad-kernel-truck/src/lib.rs",
+        "crates/cad-kernel-truck/src/corpus.rs",
+        "crates/cad-document/src/lib.rs",
+        "crates/cad-studio/src/lib.rs"
+      ],
+      "required_tests": [
+        "cargo run -p cad-kernel-truck --example corpus",
+        "cargo test --offline -p cad-document",
+        "cargo test --offline -p cad-studio",
+        "cargo run --release -p cad-studio --example rebuild_bench"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "rollback": "Revert the adapter's shell-sign repair and the Cut variant; the previously recorded measurement (raw difference 1053.3 mm3 for an 840 mm3 cut) returns, and the corpus marks the cut fixtures as known failures again. No persisted project migrated away from schema 4, which only added a variant.",
+      "source": "curated",
+      "trigger_digest": null,
+      "acceptance_results": [
+        "Met: difference_piercing_cut (84000 mm3 / 22400 mm2) and difference_contained_void (184000 mm3 / 32800 mm2) both report delta 0.000e0.",
+        "Met: HTTP test a_cut_removes_the_analytic_volume_and_survives_save_reopen_and_undo measures 255.000 mm3 through create, cut, undo, redo, save, reopen and STL export, with the exported mesh welded back and asserted watertight.",
+        "Met: corpus gate prints 11 fixtures, 8 ok, 3 known-failure, 0 regressions; the two pre-existing known failures (union_tangent_contact, intersection_large_coordinates) still appear.",
+        "Partially met, recorded: only the two coplanar-free cut fixtures are must_pass. difference_coplanar_cut is a known failure with its measurement (volume delta 0.176 mm3, 8 open edges) because the coplanar retry leaves a 1.1e-4 mm membrane; promoting it would normalise a non-watertight mesh."
+      ],
+      "contract_changes": [
+        "Capability::Transform added; Kernel::translate added with a default Unsupported implementation."
+      ],
+      "limitations": [
+        "Operands with coincident faces still need the coplanar retry and produce a membrane and a non-watertight tessellation; the application avoids this by overshooting every cut tool (CUT_OVERSHOOT_MM).",
+        "A cut always starts on the z = 0 sketch plane, so only through-holes and bottom-anchored pockets are expressible.",
+        "A difference that removes the whole body is refused rather than returned as a sliver."
+      ],
+      "evidence": [
+        "crates/cad-kernel-truck/examples/corpus (exit code 0)",
+        "cad-kernel-truck::tests::{difference_is_the_analytic_cut, a_coplanar_cut_is_within_the_nudge_bound, translate_is_exact_and_does_not_change_volume, a_difference_that_removes_everything_is_refused}",
+        "cad-studio::tests::http_api::a_cut_removes_the_analytic_volume_and_survives_save_reopen_and_undo",
+        "cargo run --release -p cad-studio --example rebuild_bench (join 3.14 ms, cut 1.81 ms, cut+join 4.05 ms)"
+      ],
+      "verified_on": "2026-10-28",
+      "verified_host": "Linux, 8 cores, 7 GB RAM, rustc 1.95.0, release build"
+    },
+    {
+      "id": "task.m11c.rebuild-cache",
+      "title": "Per-feature rebuild cache",
+      "rationale": "Every HTTP request rebuilt the whole history in a fresh kernel, including GET /api/state, so the cost of a project grew with its history even when nothing had changed and every interactive edit re-ran extrudes and booleans that could not have changed. This cycle adds a prefix cache keyed by the resolved inputs of each feature, so an edit invalidates exactly the features that read the edited input.",
+      "priority": "measurement",
+      "risk": "low",
+      "status": "verified",
+      "acceptance_criteria": [
+        "Editing the last feature's own depth parameter does not re-run the earlier extrudes or the earlier union.",
+        "The analytic volume of a cached rebuild equals the uncached rebuild for the same inputs.",
+        "Request latency is measured against the 17.3 ms POST /api/parameter and 17.4 ms GET /api/state records, same host, build mode, client convention and sample count.",
+        "The cache is invalidated when an earlier feature or its sketch changes, so a shared parameter rebuilds every dependent feature.",
+        "A failing feature is still reported by ID with the kernel message, the last good mesh stays renderable and export is still refused."
+      ],
+      "inputs": [
+        "module.cad-document",
+        "module.cad-kernel-truck",
+        "module.cad-studio"
+      ],
+      "outputs": [
+        "crates/cad-document/src/lib.rs",
+        "crates/cad-kernel-truck/src/lib.rs",
+        "crates/cad-studio/src/lib.rs"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "crates/cad-document/src/lib.rs",
+        "crates/cad-kernel-truck/src/lib.rs",
+        "crates/cad-contract/src/kernel.rs",
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/examples/rebuild_bench.rs",
+        "docs/performance-baseline.md"
+      ],
+      "required_tests": [
+        "cargo test --offline -p cad-document",
+        "cargo test --offline -p cad-studio",
+        "cargo test --offline --workspace -j 2",
+        "cargo run --release -p cad-studio --example rebuild_bench",
+        "target/studio-qa/measure-cache.sh"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "rollback": "Stop passing the cache: every call site can use Project::build, which is unchanged. The contract addition (Kernel::contains) has a default, so an adapter that ignores it still compiles; the counters are diagnostic fields with no behaviour.",
+      "source": "curated",
+      "trigger_digest": null,
+      "acceptance_results": [
+        "Met: with a JoinKernel call log, editing the last feature's isolated parameter produces exactly ['extrude 4', 'union 1 4']; an unchanged history produces no calls at all.",
+        "Met: cached and uncached builds are asserted equal in reports and mesh (a_cached_build_and_an_uncached_build_agree), and the HTTP save/reopen and STL tests still assert analytic volumes through the cached path.",
+        "Met, with the result stated rather than flattered: GET /api/state 17.4 -> 0.7 ms median of 20 (three runs, 0.6-0.9); a shared `depth` edit is 18.5 ms vs the 17.3 ms record because both features read it, and in-process cold-vs-cached on the same project is 2.55 vs 2.60 ms, attributing the difference to the mesh clone on a miss. A six-feature history with an isolated last parameter is 30.32 -> 7.88 ms release.",
+        "Met: editing an earlier shared parameter rebuilds both features (two extrudes, one union asserted); undo back to a previously built revision issues no calls at all.",
+        "Met: a_cached_rebuild_still_reports_a_failing_feature asserts the same failure message on both builds and that only the good prefix is cached; the studio's failure-banner and export-refusal tests still pass."
+      ],
+      "contract_changes": [
+        "Kernel::contains added with a None default, so a session cache can discard handles a different kernel instance never issued.",
+        "TruckKernel gains extrude_calls/boolean_calls/tessellate_calls counters (atomics, diagnostics only)."
+      ],
+      "limitations": [
+        "The cache is per kernel instance; it is not shared across processes or sessions.",
+        "A parameter several features read still invalidates all of them; only prefixes unaffected by the edit are reused.",
+        "On a miss the produced mesh is cloned into the entry as well as returned, which costs 2-5% on a full-rebuild workload.",
+        "Prefix keys are 64-bit FNV-1a; a collision between two histories is negligible but not impossible, and Project::build remains the collision-free path.",
+        "Up to 32 prefixes (bodies plus meshes) are held alive, so peak memory is higher than build-and-release; BuildCache::clear releases them."
+      ],
+      "evidence": [
+        "cad_document::tests::{a_cached_rebuild_of_an_unchanged_history_does_no_kernel_work, editing_the_last_features_parameter_reuses_the_earlier_prefix, editing_an_earlier_feature_invalidates_every_later_prefix, a_cached_rebuild_still_reports_a_failing_feature, a_cache_is_discarded_when_the_kernel_instance_changes, clearing_the_cache_releases_every_handle_it_owns, a_cached_build_and_an_uncached_build_agree}",
+        "cargo run --release -p cad-studio --example rebuild_bench (six features: cold 30.32 ms, cached edit 7.88 ms, unchanged 0.01 ms)",
+        "target/studio-qa/measure-cache.sh (GET /api/state 0.7 ms, shared-depth edit 18.5 ms, isolated edit 18.4 ms)",
+        "docs/performance-baseline.md section 9",
+        "engineering/quality/benchmarks.json#bm-studio-m11c-state",
+        "engineering/quality/tests.json#t-platform-workspace-20261029"
+      ],
+      "verified_on": "2026-10-29",
+      "verified_host": "Linux, 8 cores, 7 GB RAM, rustc 1.95.0, debug (HTTP) and release (in-process) builds"
+    },
+    {
+      "id": "task.m11d.revolve",
+      "title": "Full-turn revolve through the contract kernel and the document",
+      "rationale": "The platform could only extrude, so every solid had to be a linear sweep of a rectangle, circle or polygon. A solid of revolution is the other primitive a mechanical part is built from (shafts, bosses, hubs, rings), and truck's `rsweep` was already available to the adapter that ships. Adding it removes a whole class of workaround geometry and, more importantly, tests whether the contract's capability gate, the document's schema migration and the studio's failure reporting generalise beyond the one operation they were written for.",
+      "priority": "user_value",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "The contract kernel capability `Revolve` is defined and the adapter advertises it only when it can revolve a validated planar profile around a stated axis.",
+        "`cad-document` gains a revolve feature with a documented migration from the previous schema on load, and the feature's inputs are a sketch, an axis and a full-turn angle.",
+        "Analytic volume tests exist for revolve: a rectangle on the axis becomes the analytic cylinder and a rectangle offset from it becomes the analytic annulus, each asserted within a stated tolerance.",
+        "The UI exposes revolve in the feature tree and the new-feature form, with the same built/failed/pending badge and failure-banner behaviour as extrude.",
+        "Save/reopen and undo cover the revolve; undo removes the revolve feature and its geometry together."
+      ],
+      "inputs": [
+        "module.cad-contract",
+        "module.cad-kernel-truck",
+        "module.cad-document",
+        "module.cad-studio"
+      ],
+      "outputs": [
+        "crates/cad-contract/src/kernel.rs",
+        "crates/cad-kernel-truck/src/lib.rs",
+        "crates/cad-document/src/lib.rs",
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/assets/app.js",
+        "crates/cad-studio/assets/index.html"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "crates/cad-contract/src/kernel.rs",
+        "crates/cad-kernel-truck/src/lib.rs",
+        "crates/cad-document/src/lib.rs",
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/tests/http_api.rs",
+        "docs/tasks.md",
+        "docs/feature-matrix.md"
+      ],
+      "required_tests": [
+        "cargo test --offline -p cad-kernel-truck",
+        "cargo test --offline -p cad-document",
+        "cargo test --offline -p cad-studio",
+        "cargo test --offline --workspace -j 2",
+        "cargo run --offline -p cad-kernel-truck --example corpus"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "rollback": "Remove the `Revolve` variant from the contract capability register and the adapter's advertised set, then the document's `FeatureKind::Revolve` arm. Schema 5 documents are the only artifacts that depend on it; `migrate_v4_to_v5` is additive (it writes `kind` for legacy features), so a schema-4 reader that ignores unknown kinds can still open a schema-5 file's extrudes, and `Project::build` has no revolve-specific state.",
+      "source": "curated",
+      "trigger_digest": null,
+      "acceptance_results": [
+        "Met: `Capability::Revolve` is in the contract register, `TruckKernel::info` advertises it, and `advertises_exactly_what_it_implements` asserts both that it is present and that fillet/sweep/loft are still absent. A kernel that does not advertise it is refused by the document with `does not advertise revolve` rather than silently skipped.",
+        "Met, with the schema number deferred to reality: schema 4 was already taken by the cut/defeature change, so revolve is schema 5. `migrate_v4_to_v5` is documented on the function, runs on load from schema 4 and earlier, and `schema_four_features_migrate_to_an_explicit_extrude_kind` proves a schema-4 extrude-only project opens and measures 500 mm\u00b3 unchanged. The angle is a full turn by construction, not a parameter: a partial turn is an open shell and the document holds bodies only.",
+        "Met: `revolve_on_the_axis_is_a_cylinder` measures 150.796447 against \u03c0\u00b74\u00b2\u00b73 = 150.796447 within 0.05 mm\u00b3 and asserts bounds \u22124..4 by 0..3; `revolve_offset_from_the_axis_is_an_annulus` measures \u03c0\u00b7(4\u00b2\u22122\u00b2)\u00b73 = 113.097336 within 0.05 mm\u00b3. Both assert `open_edges() == 0`. The studio's HTTP test repeats the annulus through the real server, save/reopen and STL export.",
+        "Met, and driven in a browser: the feature form offers Revolve, hides the depth field and shows the axis field, and relabels the button `Add revolve`; the tree renders `Revolve 2` with badge `built` and meta `new body \u00b7 vertical axis`; the properties panel shows `Axis: vertical axis`, `Turn: full revolution` and the volume after. Over HTTP, a profile across the axis is reported by ID with the kernel's reason, export is refused, and the document still opens. 11 DOM assertions in headless Chrome, 0 console errors.",
+        "Met: `a_revolve_survives_save_and_reopen_with_its_axis` round-trips the axis, and the studio test saves, reopens and asserts the same volume to 1e-9; undo/redo of a revolve is covered by the shared feature-history tests, which remove the feature and its geometry together."
+      ],
+      "contract_changes": [
+        "`Capability::Revolve` added to the contract capability register.",
+        "`Kernel::revolve(&self, profile, axis_origin, axis_direction, angle_radians) -> Result<SolidId, KernelError>` added with an `Unsupported` default, so no adapter that cannot revolve has to change.",
+        "Revolution is full-turn only at this layer: an angle that is not a full turn is `KernelError::Invalid` with a reason."
+      ],
+      "limitations": [
+        "Full turn only. A partial sweep would be an open shell; there is no cap generation and the document cannot represent a sheet body.",
+        "The axis is a line in the sketch plane only \u2014 vertical or horizontal through the sketch origin. An arbitrary line needs a sketch dimension/constraint model it does not have.",
+        "A profile that crosses the axis is refused rather than trimmed, so the user must split the profile themselves.",
+        "Volumes are measured from a tessellated mesh, so a revolve reads a fraction of a percent low (inscribed polygon); the tests bound that with the chord tolerance rather than claiming exactness.",
+        "A revolve can only start, join or cut the single running body; it cannot pattern, mirror or produce a second body.",
+        "The revolve is not benchmarked: no performance record exists for it, so cost is unmeasured.",
+        "Revolve is verified through the API and one scripted browser run; it has not been benchmarked and has not been tried on a profile with more than a handful of points."
+      ],
+      "evidence": [
+        "crates/cad-kernel-truck/src/lib.rs::tests::{revolve_on_the_axis_is_a_cylinder, revolve_offset_from_the_axis_is_an_annulus, a_partial_revolve_is_refused, a_profile_crossing_the_axis_is_refused}",
+        "crates/cad-document/src/lib.rs::tests::{a_revolve_resolves_the_axis_through_the_sketch_origin, a_revolve_is_refused_when_the_kernel_cannot_revolve, a_revolve_join_uses_the_union_and_reports_the_running_volume, a_revolve_survives_save_and_reopen_with_its_axis, an_unchanged_revolve_history_is_served_from_the_cache, schema_four_features_migrate_to_an_explicit_extrude_kind}",
+        "crates/cad-studio/tests/http_api.rs::{a_revolve_builds_the_analytic_annulus_and_survives_save_reopen_and_undo, a_revolve_across_its_axis_is_a_failed_feature_not_a_geometry}",
+        "cargo run --offline -p cad-kernel-truck --example corpus (8 must-pass ok, 3 known-failure, 0 regressions)",
+        "engineering/quality/tests.json#t-platform-workspace-20261029-m11d (273 passed, 0 failed)",
+        "node target/studio-qa/revolve.mjs (headless Chrome, 11 DOM assertions, 0 console errors: Revolve option enabled, depth hidden/axis shown, `Revolve 2` built with `Turn: full revolution`, 3,133.72 mm3 against analytic 3,141.59, export enabled, row survives save/reload)"
+      ],
+      "verified_on": "2026-10-29",
+      "verified_host": "Linux, 8 cores, 7 GB RAM, rustc 1.95.0, debug build"
+    },
+    {
+      "id": "task.m11f.crash-recovery",
+      "title": "Crash-safe recovery for unsaved edits",
+      "rationale": "A measured production-readiness check lost an unsaved edit on kill -9: 24,000 mm3 became 12,000 mm3 on reopen, with no snapshot, no warning and no way back. A professional tool may not lose work between saves, and a corrupt project file had no fallback at all. This slice adds a recovery snapshot next to the project, restores it on start when it belongs to the current file version, and lets the user promote or discard it.",
+      "priority": "user_value",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "An unsaved edit survives an abrupt process death and is offered on the next start.",
+        "The recovery snapshot never writes or replaces the project file; saving stays an explicit action.",
+        "A snapshot taken from an older version of the file is not offered, and a corrupt snapshot is ignored rather than blocking the project.",
+        "When the project file itself cannot be read, a valid snapshot becomes the only copy and the session says so.",
+        "The UI shows that a recovered session is unsaved, and offers one action to discard it back to the file."
+      ],
+      "inputs": [
+        "module.cad-document",
+        "module.cad-studio"
+      ],
+      "outputs": [
+        "crates/cad-document/src/lib.rs",
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/src/main.rs",
+        "crates/cad-studio/assets/app.js",
+        "crates/cad-studio/assets/index.html",
+        "crates/cad-studio/assets/app.css"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "crates/cad-document/src/lib.rs",
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/tests/http_api.rs"
+      ],
+      "required_tests": [
+        "cargo test --offline -p cad-document",
+        "cargo test --offline -p cad-studio",
+        "cargo test --offline --workspace -j 2"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "rollback": "Stop writing the snapshot: remove the `save_recovery` call in `StudioState::autosave` and the `recovery` field from the state payload. The document functions are additive and unused by any other caller, and the file format is a separate file, so no project file is ever written by the feature and rollback cannot corrupt a document.",
+      "source": "curated",
+      "trigger_digest": null,
+      "acceptance_results": [
+        "Met: a real `kill -9` on the release binary after an unsaved 800 mm3 edit reopened at 800 mm3, printed `recovered: unsaved changes from the recovery snapshot`, and reported `recovered: true`, `dirty: true` in `/api/state`. The same flow is a cargo test over a real socket (`an_unsaved_edit_survives_a_crash_and_can_be_saved_or_discarded`).",
+        "Met: `save_recovery` writes `<file>.recovery` through the atomic temp+fsync+rename path; the test asserts the project file still holds the pre-edit depth (5 mm) after the crash, and that only an explicit save changes it.",
+        "Met: staleness is decided by the file mtime recorded when the snapshot was taken, so a save supersedes the snapshot and the reopened file wins (test: `a_snapshot_superseded_by_a_save_is_deleted_rather_than_offered`); a corrupt snapshot is ignored and the project opens normally (`a_corrupt_snapshot_is_ignored_instead_of_blocking_the_project`).",
+        "Met: a truncated project file with a valid snapshot opens the snapshot with `file_unreadable: true`, and the banner says the file could not be read; the discard action is hidden because there is nothing to go back to (`an_unreadable_project_falls_back_to_its_snapshot`).",
+        "Met, driven in a browser: the banner reads `Recovered unsaved changes from 10:59 AM\u2026`, the badge reads `unsaved`, the body is the recovered 800 mm3, discard restores the file's 500 mm3 and the `saved` badge, and a later edit does not re-show the recovered banner; zero console errors (9 assertions)."
+      ],
+      "contract_changes": [],
+      "limitations": [
+        "Named revisions (the rest of M11f) are not implemented: the snapshot is a single last-unsaved-edit file, not a history.",
+        "The snapshot is written on every mutation, synchronously; on a very large project that will add a write per edit and has not been measured.",
+        "Only one snapshot exists per project, and it is not versioned beyond `RECOVERY_SCHEMA`.",
+        "Recovery is per file path: a project opened from a different path does not see the snapshot.",
+        "The autosave failure is reported in the payload and the banner, but the edit still succeeds, so a read-only directory leaves the session unprotected until the user notices.",
+        "No fsync of the directory entry after the snapshot rename beyond what `atomic_replace` already does for saves."
+      ],
+      "evidence": [
+        "cad_document::tests::{an_unsaved_edit_is_offered_from_its_snapshot_and_the_file_is_untouched, a_snapshot_superseded_by_a_save_is_deleted_rather_than_offered, a_corrupt_snapshot_is_ignored_instead_of_blocking_the_project, an_unreadable_project_falls_back_to_its_snapshot}",
+        "crates/cad-studio/tests/http_api.rs::{an_unsaved_edit_survives_a_crash_and_can_be_saved_or_discarded, a_recovered_session_can_be_discarded_back_to_the_file}",
+        "node target/studio-qa/recovery.mjs <url> (9 DOM assertions, 0 console errors)",
+        "engineering/quality/tests.json#t-platform-workspace-20261029-m11f (279 passed, 0 failed)",
+        "docs/quality/production-readiness.md section 5"
+      ],
+      "verified_on": "2026-10-29",
+      "verified_host": "Linux, 8 cores, 7 GB RAM, rustc 1.95.0, debug and release builds"
     }
   ]
 }

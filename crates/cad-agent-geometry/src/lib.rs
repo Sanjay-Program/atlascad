@@ -841,21 +841,27 @@ mod tests {
         Ok(())
     }
 
-    /// The kernel's boolean difference is not advertised, and the agent says so rather than
-    /// pretending it worked.
+    /// A difference goes through the agent and reports the analytic volume.
+    ///
+    /// This test previously asserted the opposite — that difference was refused as unsupported —
+    /// because the kernel did not advertise it. That refusal was removed when the kernel's result was
+    /// measured correct (`docs/kernel-comparison.md` §4.2), so the assertion is inverted here rather
+    /// than deleted: the capability is now real, and the volume is what proves it.
     #[test]
-    fn an_unsupported_boolean_is_reported_as_invalid_input() -> TestResult {
+    fn a_difference_is_built_and_reports_its_analytic_volume() -> TestResult {
         let agent = GeometryAgent::new(CancellationToken::new())?;
         let ctx = context(PermissionSet::new());
         let a = agent.run(
             &ctx,
             json!({"op": "extrude", "profile": square(10.0), "height_mm": 10.0}),
         )?;
+        // The same 10 x 10 x 10 box, moved 5 mm along x, so the removal is exactly half of it.
+        let shifted = json!([[5.0, 0.0], [15.0, 0.0], [15.0, 10.0], [5.0, 10.0]]);
         let b = agent.run(
             &ctx,
-            json!({"op": "extrude", "profile": square(10.0), "height_mm": 10.0}),
+            json!({"op": "extrude", "profile": shifted, "height_mm": 10.0}),
         )?;
-        let error = match agent.run(
+        let cut = agent.run(
             &ctx,
             json!({
                 "op": "boolean",
@@ -863,11 +869,17 @@ mod tests {
                 "a": a["solid"],
                 "b": b["solid"]
             }),
-        ) {
-            Ok(_) => return Err(AgentError::InvalidInput("should have failed".into())),
-            Err(error) => error,
-        };
-        assert!(matches!(error, AgentError::InvalidInput(_)), "{error}");
+        )?;
+        // 10 x 10 x 10 less the 5 x 10 x 10 half that `b` covers = 500 mm³. A boolean replies with
+        // the handle only, so the measurement is its own op — the same path a caller would use.
+        let measured = agent.run(&ctx, json!({"op": "volume", "solid": cut["solid"]}))?;
+        let volume = measured["volume_mm3"]
+            .as_f64()
+            .ok_or_else(|| AgentError::InvalidInput("no volume reported".into()))?;
+        assert!(
+            (volume - 500.0).abs() < 0.5,
+            "difference volume was {volume}, analytic 500"
+        );
         Ok(())
     }
 

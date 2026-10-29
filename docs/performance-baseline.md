@@ -113,7 +113,8 @@ cost of this hardware: a single crate build, not a micro-benchmark.
 | Benchmark | `./target/release/examples/bench --iters 5` | exit 0, volumes within 1 mm³ of analytic |
 | Boolean failure matrix | `cargo run --release -p cad-kernel-truck --example probe` | coplanar rows FAILED, others OK |
 | Coplanar retry threshold | `... --example probe5` | 1e-6 FAILED, 1e-5…1e-2 OK |
-| Difference defect | `... --example probe6` | difference 1053.3 vs 840; inner shell +117.3 |
+| Difference diagnosis | `... --example probe6` | raw difference 1053.3 vs analytic 840; inner shell reported **+**117.3. Resolved: the cavity walls were wound outward, and the adapter's shell-sign repair fixes it — the repaired fixtures are exact (docs/kernel-comparison.md §4.2) |
+| Cut rebuild cost | `cargo run --release -p cad-studio --example rebuild_bench` | box+join 3.14 ms, box+cut **1.81 ms**, box+cut+join 4.05 ms (rebuild only; median of 20 on this host) |
 | Chain limit | `... --example chain` | union 1 OK, union 2 Internal error |
 
 Determinism: no random seeds, no time-of-day input, no network. The only variability is scheduling.
@@ -176,3 +177,97 @@ representative rendering workload, which is the same limitation recorded in §5 
 Startup includes document parse/recompute and snapshot construction. The document uses six undo
 snapshots for a freshly created project (sketch creation, extrude, parameter edits), which is visible
 in the API's `history` count; this is by design, not a leak.
+
+## 8. Feature-graph rebuild — 2026-10-27
+
+**Measured:** debug build, same host, same client conventions as §7. Project: 10 × 10 × 5 mm
+rectangle → `new_body` extrude → second 10 × 10 mm rectangle moved to (8, 8) → `join` extrude, i.e.
+two sketches, two features and one kernel union producing a 72-triangle, 980 mm³ body. Harness:
+`target/studio-qa/measure.sh`; 20 samples per workload after five discarded warm-up requests.
+
+| Workload | Result | Same workload before the join |
+|---|---|---|
+| Process start → `/api/health` | 31–34 ms (median 31 ms), 10 ms poll | — |
+| `GET /api/state` | **17.4 ms median** of 20 | 3.5 ms |
+| `POST /api/parameter` (rebuild both features + union) | **17.3 ms median**, 17.9 ms max | 4.44 ms single-feature baseline (§7) |
+| `POST /api/save` (atomic write of the two-feature project) | 12.6 ms | 4.5 ms |
+| `POST /api/sketch` / `POST /api/sketch/origin` | 2.2 ms / 1.7 ms | — |
+| `GET /api/export/stl` (joined solid) | 16.8 ms | 3.98 ms |
+
+**What the numbers say.** Every request rebuilds the whole history and re-tessellates it; there is no
+per-feature cache. The union plus the larger mesh takes the request from ~3.5 ms to ~17 ms. That is
+inside an interactive budget, so no optimisation was attempted — the measurement exists so the next
+change can show a regression or a win rather than claim one. Correctness in the same session: the
+tests assert the analytic 980 mm³ union (±1), the 18 × 18 × 5 bounds and the STL parse-back, and the
+browser run reads 980 mm³ / 72 triangles from the live DOM.
+
+**Not claimed:** any GPU frame time (same limitation as §7), cold-start from a cleared build cache,
+release-build figures, or behaviour above two features — the two-feature workload is the only one
+measured.
+
+**Superseded for request cost by §9 (2026-10-29).** These figures describe the whole-history rebuild
+that every request performed before the per-feature cache existed; the request path now reuses cached
+prefixes, and §9 measures the same workloads before and after.
+
+## 9. Per-feature rebuild cache — 2026-10-29
+
+**What changed.** Every request used to rebuild the whole history in a fresh kernel: every extrude,
+every boolean and the final tessellation, even when nothing had changed since the previous request.
+`cad_document::BuildCache` now keeps the body after each prefix of the history, keyed by a hash of that
+prefix's resolved inputs, and the studio holds one kernel and one cache for the session.
+
+Two harnesses measured it, because they answer different questions:
+
+* `target/studio-qa/measure-cache.sh` — the real HTTP API, debug build, 20 samples after warm-up, same
+  host and client conventions as §8, so the numbers are comparable with the 17.3 ms record. Each
+  parameter sample uses a **unique value**, so no sample can be served from an entry an earlier sample
+  created.
+* `cargo run --release -p cad-studio --example rebuild_bench` — in-process, release build, three
+  warm-up rebuilds discarded, median of 20, cold and cached measured against the *same* project object
+  in the same process, which is the only way to attribute overhead.
+
+### 9.1 HTTP request latency (debug build)
+
+Same two-feature project as §8 (10 × 10 × 5 block, second 10 × 10 sketch at (8, 8), join) for the first
+two rows; a third feature whose depth reads `diameter` is added for the third row.
+
+| Workload | Before (§8) | After, median of 20 | Max after |
+|---|---|---|---|
+| `GET /api/state`, unchanged history | 17.4 ms | **0.7 ms** (0.6–0.9 over three runs) | 1.1 ms |
+| `POST /api/parameter` on `depth`, both features read it, unique value each sample | 17.3 ms | 18.5 ms | 20.8 ms |
+| `POST /api/parameter` on `diameter`, read only by the last of three features | — (a full 3-feature rebuild) | 17.4–18.7 ms | 34.7 ms |
+
+The middle row is the honest one: when both features read the parameter, both prefixes are invalidated
+and the cache cannot help. It also must not hurt, and it does not beyond a few percent — the in-process
+measurement below attributes that cost.
+
+### 9.2 Rebuild cost, cold versus cached (release build)
+
+Same process, same project, median of 20; the "cached, last edited" column changes a parameter only the
+last feature reads before every sample.
+
+| History | Cold rebuild | Cached, unchanged | Cached, last feature edited | Volume |
+|---|---|---|---|---|
+| join (2 features) | 2.55 ms | 0.00 ms | 2.35 ms | 755.011 → 1 087.213 mm³ |
+| cut (2 features) | 1.61 ms | 0.00 ms | 1.55 ms | 255.000 → 367.200 mm³ |
+| cut + join (3 features) | 3.04 ms | 0.00 ms | 3.12 ms | 755.000 → 1 087.200 mm³ |
+| **6 features** (1 body + 5 joins) | **30.32 ms** | 0.01 ms | **7.88 ms** | 1 500.080 → 1 720.080 mm³ |
+
+**What the numbers say.** The two- and three-feature histories are dominated by the boolean itself, so
+saving one extrude is within noise (and the two-feature join case is 0.05 ms *slower*, which is the
+mesh-clone cost on a miss). The six-feature history is where the cache pays: a cold rebuild runs six
+extrudes and five unions, an edit of the last feature runs one extrude and one union, and the rebuild
+drops from 30.3 ms to 7.9 ms. An unchanged history costs a mesh clone per prefix plus the payload
+serialisation, measured at 0.01 ms here and 0.7 ms through HTTP in debug.
+
+**Correctness in the same session.** The analytic volumes are unchanged and are asserted in
+`crates/cad-document/src/lib.rs` (cached against uncached reports and mesh, edits of the first and last
+feature, failure propagation, undo back to a cached revision, a cache handed to a different kernel
+instance) and in `crates/cad-studio/tests/http_api.rs` (13 real-socket tests, including save/reopen and
+STL parse-back through the cached path). The kernel-call log asserts that an unchanged rebuild issues
+**no** extrude and **no** boolean call.
+
+**Not claimed:** any speedup for a parameter that several features share, a multi-process or cross-session
+cache, a release-build HTTP figure (§9.1 is debug, to stay comparable with §8), memory above 32 cached
+prefixes (the bound is enforced by release, not measured), or hash-collision resistance beyond 64-bit
+FNV-1a.
