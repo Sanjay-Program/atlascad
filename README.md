@@ -32,7 +32,7 @@ The project owner reports that development began about a year before the work wa
 
 ## Current platform status
 
-The root platform has a versioned shared contract, a Truck adapter, a headless consumer, an engineering control plane, a small agent platform, and a working local CAD application. The root-workspace gate passes 284 tests across eleven packages on the recorded machine; startup, request latency, and export timings are in [`docs/performance-baseline.md`](docs/performance-baseline.md).
+The root platform has a versioned shared contract, a Truck adapter, a headless consumer, an engineering control plane, a small agent platform, and a working local CAD application. The root-workspace gate passes 286 tests across eleven packages on the recorded machine; startup, request latency, and export timings are in [`docs/performance-baseline.md`](docs/performance-baseline.md).
 
 Stage A of the CAD roadmap is **partially implemented**. `cad-studio` supports an ordered feature graph: rectangle, circle, regular-polygon, and drawn-polyline sketches; extrude features that start a body, join it with a kernel union, or remove material with a kernel difference (cut); full-turn revolve features that turn a sketch about one of its own axes; parameter and sketch-placement edits that rebuild every dependent feature; a per-feature rebuild cache so an unchanged or last-feature edit does not re-run the whole history; crash recovery that snapshots unsaved edits next to the project and restores them on the next start, including when the project file itself cannot be read; per-feature rebuild status with failure reporting; undo/redo; save, reopen, and binary STL export. A `.zcad` project written by any earlier schema opens through migration. It does **not** yet provide sketch constraints, dimensions, sweeps or lofts, partial revolves, fillets, multi-body, assemblies, drawings, STL import, or native neutral-format (STEP/IGES/DXF) interchange. Those remain planned work in [`docs/roadmap.md`](docs/roadmap.md).
 
@@ -43,6 +43,45 @@ The CADCraft and SolidCraft desktop applications are not wired to the shared con
 - Rust toolchain compatible with the workspace `rust-version` and edition in `Cargo.toml` (the recorded baseline used Rust 1.94).
 - A working C/C++ build toolchain may be needed by native dependencies.
 - Disk space for Cargo dependencies and build artifacts. Build output is written under `target/` and is ignored by Git.
+
+## Run it on your laptop
+
+```sh
+cargo build --release -p cad-studio -p cad-cli -p cad-engineering -j 2
+
+# Create a project and open the studio. It prints the URL to open.
+./target/release/cad-studio --new ~/bracket.zcad --name bracket --size 40,30,10
+```
+
+Open the printed `http://127.0.0.1:7519` in a browser. Then, in the page:
+
+1. **Create** — *Add sketch* (rectangle, circle, polygon or drawn polyline) with an origin.
+2. **Build** — pick the sketch, choose *extrude* or *revolve* and an operation (`new body`, `join`,
+   `cut`), then *Add extrude*/*Add revolve*.
+3. **Edit** — change a value under **Parameters** (or move a sketch under **Sketch placement**); the
+   whole history rebuilds and the viewport, tree, properties and volume update together.
+4. **Inspect** — drag to orbit, shift-drag to pan, scroll to zoom, click a face to read its position
+   and normal; `Iso`/`Front`/`Top`/`Right`, `Fit`, `Wire`, `Grid` are in the viewport toolbar.
+5. **Save / export** — `Ctrl/Cmd+S` writes the `.zcad` file; *Export STL* downloads a binary STL.
+
+Reopen a project later with `./target/release/cad-studio --file ~/bracket.zcad`. Unsaved edits are
+snapshotted next to the file, so a crash or `kill -9` reopens with the work restored and a banner to
+keep or discard it. `--port 7600` picks another port.
+
+### Share a session with a colleague
+
+```sh
+./target/release/cad-studio --file ~/bracket.zcad --share
+#   url:   http://127.0.0.1:7519/?token=<generated>
+#   share: http://192.168.1.20:7519/?token=<generated>
+```
+
+Send the `share:` link. Anyone on the same network who opens it can **view and edit** the open
+document until the studio stops (the page shows a **Share** panel with the link to copy). The token is
+required on every API call and is generated per session; `--token <32+ chars>` fixes one,
+`--advertise name.local` sets the host in the link, and `--host 0.0.0.0` does the same as `--share`
+without changing the printed host. Loopback-only use is unchanged: no token, no link. Do not expose
+the port to the internet — this is a LAN convenience, not a hosted service.
 
 ## Build and verify
 

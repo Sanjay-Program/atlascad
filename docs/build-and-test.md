@@ -61,6 +61,17 @@ now reopens at 800 mm³, prints `recovered: unsaved changes from the recovery sn
 target/studio-qa/recovery.mjs <url>`, 9 DOM assertions, zero console errors). A project file that
 cannot be read falls back to the snapshot instead of failing to open.
 
+**Re-run 2026-10-29 after the delivery gate:** **284 tests passed, 0 failed, 0 skipped**, including one
+doctest; fmt and clippy `-D warnings` clean. The record is `t-platform-workspace-20261029-gate`. The
+whole gate is now one command, `./scripts/gate.sh` (~6 s warm), which also runs the corpus, manifest
+validation, the dependency licence policy (83 packages, all allowed, offline), the SBOM dry run
+(CycloneDX 1.5, 83 components) and the live simulation. `./scripts/simulate.sh` drives the release
+server through cut, join, undo/redo, a parameter rebuild, save, restart, STL export and a `kill -9`
+recovery (31 assertions), drives the shipped `atlas` and `atlas-eng` binaries on real files (21
+assertions: STL volumes, a headless project edit/undo, manifest validation, the licence policy and a
+byte-identical SBOM) and loads the live page in headless Chrome (7 assertions, zero console errors). `./scripts/package.sh` produces and re-verifies the deployable bundle; see
+`docs/operations/release-process.md`.
+
 `cad-studio` additionally passed manual browser checks in the bundled preview pane at both 392 px and
 wider viewports: parameter editing (including zero/oversized rejection), profile switching between
 rectangle, circle and polygon, polygon side changes, undo/redo, save, face picking with measurement,
@@ -305,25 +316,42 @@ jq -r '.packages[] | select((.license // "UNKNOWN") | test("GPL|MPL|CDDL|SSPL|UN
 ```
 
 A combined notice bundle for distribution can be generated from the same data (name, version, licence,
-repository) — that is roadmap item R-3 in `docs/roadmap.md`, and it is **not** done yet.
+repository) — that is roadmap item R-3 in `docs/roadmap.md`, and it is **not** done yet for the two
+application workspaces.
+
+The **root workspace** is covered by two offline commands instead of this inventory:
+
+```sh
+cargo run -q -p cad-engineering --bin atlas-eng -- licences   # 83 packages, policy-checked
+cargo run -q -p cad-engineering --bin atlas-eng -- sbom --write
+```
+
+`licences` fails closed: a licence that is denied **or that the policy does not recognise** fails, and
+a banned kernel is refused whatever its licence says. `sbom --write` emits a deterministic CycloneDX
+1.5 SBOM to `engineering/sbom/atlascad.cdx.json`, which `./scripts/package.sh` ships.
 
 ## 7. Continuous integration
 
-Neither application's CI was executed here. For the new crates, the minimum gate is:
+The root workspace now has one gate and one workflow:
 
-```yaml
-- run: cargo fmt --all --check
-- run: cargo clippy --release --all-targets -- -D warnings
-- run: cargo test --release -p cad-contract -p cad-kernel-truck
-- run: cargo run --release -p cad-kernel-truck --example bench -- --iters 5
+```sh
+./scripts/gate.sh          # fmt, clippy -D warnings, tests, corpus, manifests, licences, SBOM, live sim
+./scripts/package.sh       # build, stage, archive, extract, checksum-check and smoke-test the bundle
 ```
 
-The last step is a **correctness gate**, not just a performance one: it exits non-zero when the
-boolean volume is more than 1 mm³ from the analytic 1120 mm³.
+`.github/workflows/ci.yml` runs the gate, packages and uploads the bundle and the SBOM, and a second
+job runs `cargo-deny check advisories bans sources` with the policy in `deny.toml`. **The workflow has
+not been executed on a runner** — it was written on a host that cannot run GitHub Actions, and the
+gate it calls is the one that was run and recorded here (`engineering/quality/tests.json`,
+`t-platform-workspace-20261029-gate`).
 
-Do **not** add `cargo build --workspace` to CI on a machine like this one; it will exceed memory. On a
-CI runner with ≥16 GB and ≥8 cores the whole-workspace build is reasonable and is what the apps' own
-workflows do.
+Neither application's CI was executed here. For the new crates, the gate above supersedes the earlier
+four-line snippet; it also builds the kernel corpus rather than the single bench fixture, and the
+corpus exits non-zero on a regression *or* an unexpected pass.
+
+Do **not** add `cargo build --workspace` to CI on a machine like this one; it will exceed memory. The
+gate builds `--all-targets`, which is what needs memory here; on a runner with ≥16 GB and ≥8 cores the
+whole-workspace build is reasonable and is what the apps' own workflows do.
 
 ## 8. Known build problems and their status
 

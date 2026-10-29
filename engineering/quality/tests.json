@@ -516,7 +516,7 @@
       "skipped": 0,
       "duration_ms": 6000,
       "recorded_at": "2026-10-29",
-      "notes": "The committed gate run end to end: fmt, clippy --all-targets -D warnings (0 warnings), 284 workspace tests across 11 packages with 0 failures, the analytic corpus (8 ok / 3 known failure / 0 regressions), `atlas-eng validate` 0/0, `atlas-eng licences` 83 packages all allowed, the SBOM dry run (83 components), and the live simulation (31 HTTP assertions + 7 headless-browser assertions). Per package: cad-agent-api 13, cad-agent-geometry 24, cad-agent-runtime 16, cad-cli 10, cad-contract 55, cad-document 61, cad-engineering 35, cad-entitlements 10, cad-io 6, cad-kernel-truck 35, cad-studio 19.",
+      "notes": "The committed gate run end to end: fmt, clippy --all-targets -D warnings (0 warnings), 284 workspace tests across 11 packages with 0 failures, the analytic corpus (8 ok / 3 known failure / 0 regressions), `atlas-eng validate` 0/0, `atlas-eng licences` 83 packages all allowed, the SBOM dry run (83 components), and the live simulation (52 assertions: 31 HTTP, 21 CLI/control-plane, plus 7 headless-browser). Per package: cad-agent-api 13, cad-agent-geometry 24, cad-agent-runtime 16, cad-cli 10, cad-contract 55, cad-document 61, cad-engineering 35, cad-entitlements 10, cad-io 6, cad-kernel-truck 35, cad-studio 19.",
       "supersedes": [
         "t-platform-workspace-20261029-m11f"
       ]

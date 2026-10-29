@@ -130,6 +130,7 @@ running app in a browser at 392 px and full width; the multi-feature workflow is
 | Named revisions / version history | **Absent** | the snapshot is the last unsaved edit, not a named history; M11f remainder |
 | Command palette | **Shipped (verified here)** | project, sketch, view, parameter, theme, and help commands; disabled commands are visibly disabled, not fake |
 | STL export | **Shipped (verified here)** | `/api/export/stl` through `cad-io`, validated mesh before writing |
+| Sharing one live session on the local network | **Shipped (verified here)** | `--share`/`--host` binds the LAN interface with a generated or supplied 128-bit token; every `/api/*` call must present it (`X-Atlas-Token` or `?token=`), the page offers the link under **Share**, and the token is compared without an early-exit. Covered by HTTP tests (401 without/with a wrong token, query and header forms, a token-bearing edit) and a headless-browser run of a shared page; no account, no concurrent merge — whoever writes last wins |
 | Light/dark theme, responsive drawers, keyboard help | **Shipped (verified here)** | persisted theme choice; inspectors accessible below 980 px |
 | Diagnostics log and typed API errors | **Shipped (verified here)** | request failures carry codes (`invalid_request`, `invalid_parameter`, `not_found`, `export_failure`, …) |
 | Sketch constraints, dimensions, arcs/splines | **Absent** | Stage A remainder |
@@ -137,8 +138,8 @@ running app in a browser at 392 px and full width; the multi-feature workflow is
 | Multiple bodies / assemblies | **Absent** | a second `new_body` is refused by design; Stage B |
 | STL/STEP/IGES/DXF import | **Absent** | `cad-io` can read binary STL, but no application importer is wired |
 | Drawings, mass-property UI, materials | **Absent** | later milestones |
-| Autosave, crash recovery, file dialogs | **Absent** | save is explicit; the project path is a command-line argument |
-| Accounts, cloud sync, collaboration, telemetry | **Absent** | no network calls beyond the loopback browser connection |
+| Native file dialogs / document picker | **Absent** | save is explicit and the project path is a command-line argument; unsaved edits are snapshotted and recovered automatically |
+| Accounts, cloud sync, telemetry | **Absent** | no outbound network call; `--share` serves one session on the local network behind a token and stops when the process stops |
 | Native desktop shell | **Absent** | see ADR-0008 |
 
 ## 4. Platform capabilities (brief §16–§19)

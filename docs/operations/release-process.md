@@ -31,8 +31,12 @@ The gate runs, in order and offline:
    unrecognised** licence fails: "not looked at" is how copyleft reaches a proprietary binary.
 7. `atlas-eng sbom` (dry run) — the SBOM can be generated from the resolved graph.
 8. `scripts/simulate.sh` — the real release server driven over HTTP through cut, join, undo/redo,
-   parameter rebuild, save, restart, STL export and a `kill -9` recovery, then the live page loaded in
-   headless Chrome (skipped with a message when no browser exists).
+   parameter rebuild, save, restart, STL export and a `kill -9` recovery (31 assertions), the shipped
+   `atlas` and `atlas-eng` binaries driven on real files (21 assertions: box and union STL volumes, a
+   project edit/undo, manifest validation, the licence policy, a byte-identical SBOM), and a shared
+   studio's token boundary (4 assertions: 401 without a token, the page served, the link in the
+   payload, a token-bearing edit), then the live page loaded in headless Chrome loopback and shared
+   (8 + 9 assertions, skipped with a message when no browser exists).
 
 CI (`.github/workflows/ci.yml`) runs the same gate, then packages and uploads the bundle and SBOM, and
 runs `cargo-deny` for advisories, banned crates and dependency sources. **The workflow has not been

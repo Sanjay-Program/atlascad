@@ -6,15 +6,22 @@
 //!
 //! # Trust boundary
 //!
-//! * the listener binds `127.0.0.1` only, never a public interface;
-//! * request headers are capped at 16 KiB and JSON bodies at 1 MiB;
+//! By default the listener binds `127.0.0.1` only, never a public interface. Sharing is opt-in and
+//! changes that in exactly one way:
+//!
+//! * [`ShareOptions`] can bind another interface (typically `0.0.0.0` on a local network). A
+//!   non-loopback bind always requires a token — supplied or generated — and every `/api/*` request
+//!   must present it as `X-Atlas-Token` or `?token=`. Static assets are served so the page can load;
+//!   they carry no data.
+//! * otherwise: request headers are capped at 16 KiB and JSON bodies at 1 MiB;
 //! * every `POST` must carry a same-origin `Origin` and a JSON content type, so another site cannot
 //!   drive the model through the user's browser;
 //! * no endpoint accepts a filesystem path from the client — the project path is fixed at launch;
 //! * the only file written is the project itself and the only export is STL returned in the response.
 //!
-//! This is a desktop-grade local trust model, not a multi-tenant web service. Do not expose the port
-//! through a tunnel and call it hosted.
+//! A share link grants full edit access to the open document to anyone who holds it. This is still a
+//! local-first tool, not a multi-tenant service: do not expose it through a tunnel or a public port
+//! and call it hosted.
 
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -29,7 +36,7 @@ use cad_document::{
 };
 use cad_kernel_truck::TruckKernel;
 use serde::{Deserialize, Serialize};
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -56,6 +63,8 @@ pub enum StudioError {
     Io(String),
     BadRequest(String),
     Forbidden,
+    /// Sharing is on and the request did not present the session token.
+    Unauthorized,
     NotFound,
     MethodNotAllowed,
     UnsupportedMediaType,
@@ -74,6 +83,9 @@ impl std::fmt::Display for StudioError {
             StudioError::Io(message) => write!(f, "I/O: {message}"),
             StudioError::BadRequest(message) => write!(f, "{message}"),
             StudioError::Forbidden => f.write_str("request is not from this studio's origin"),
+            StudioError::Unauthorized => {
+                f.write_str("this studio is shared; the request needs its access token")
+            }
             StudioError::NotFound => f.write_str("not found"),
             StudioError::MethodNotAllowed => f.write_str("method not allowed"),
             StudioError::UnsupportedMediaType => f.write_str("expected application/json"),
@@ -117,6 +129,7 @@ impl StudioError {
         match self {
             StudioError::BadRequest(_) | StudioError::Json(_) => 400,
             StudioError::Forbidden => 403,
+            StudioError::Unauthorized => 401,
             StudioError::NotFound => 404,
             StudioError::MethodNotAllowed => 405,
             StudioError::PayloadTooLarge => 413,
@@ -143,6 +156,7 @@ impl StudioError {
             StudioError::BadRequest(_) => "bad_request",
             StudioError::Json(_) => "invalid_json",
             StudioError::Forbidden => "forbidden_origin",
+            StudioError::Unauthorized => "unauthorized",
             StudioError::NotFound => "not_found",
             StudioError::MethodNotAllowed => "method_not_allowed",
             StudioError::UnsupportedMediaType => "unsupported_media_type",
@@ -250,6 +264,19 @@ struct HistoryView {
     redo: usize,
 }
 
+/// The link a colleague can open while this studio is running. Absent unless sharing is on.
+#[derive(Debug, Serialize, Clone)]
+struct ShareView {
+    url: String,
+}
+
+/// How a shared session proves a caller may read and write the document.
+#[derive(Debug, Clone)]
+struct ShareAccess {
+    token: String,
+    url: String,
+}
+
 /// The unsaved-edit snapshot this session is running on top of.
 ///
 /// `recovered` stays true until the user saves (which promotes the snapshot to the project file) or
@@ -284,6 +311,8 @@ struct StatePayload {
     kernel: KernelView,
     history: HistoryView,
     recovery: RecoveryView,
+    /// Present only when the studio is shared beyond loopback; the UI offers it as a link.
+    share: Option<ShareView>,
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -305,6 +334,9 @@ struct StudioState {
     recovered: Option<RecoveryInfo>,
     /// The last autosave failure, if any. A failed snapshot must be visible rather than silent.
     autosave_error: Option<String>,
+    /// Set when the studio is reached over a non-loopback interface. Every API call must then carry
+    /// its token; set once, before the accept loop starts, and only read afterwards.
+    share: Option<ShareAccess>,
 }
 
 impl StudioState {
@@ -323,6 +355,7 @@ impl StudioState {
             cache: BuildCache::new(),
             recovered,
             autosave_error: None,
+            share: None,
         };
         // Evaluate once at startup so a broken project is refused before a URL is printed.
         let _ = state.payload()?;
@@ -497,6 +530,9 @@ impl StudioState {
                 file_unreadable: self.recovered.is_some_and(|info| info.file_unreadable),
                 autosave_error: self.autosave_error.clone(),
             },
+            share: self.share.as_ref().map(|share| ShareView {
+                url: share.url.clone(),
+            }),
         })
     }
 
@@ -620,22 +656,69 @@ fn export_name(name: &str) -> String {
 // Public lifecycle
 // ---------------------------------------------------------------------------------------------
 
+/// How the studio is exposed beyond its default loopback binding.
+///
+/// Default is loopback with no token. A non-loopback `bind` is a share: it always requires a token,
+/// and a caller that omits one gets a generated 128-bit session token reported by
+/// [`StudioHandle::share_url`].
+#[derive(Debug, Clone, Default)]
+pub struct ShareOptions {
+    /// The interface to bind. `None` keeps `127.0.0.1`.
+    pub bind: Option<IpAddr>,
+    /// A token to require. `None` generates one for the session. Shorter than 16 characters is
+    /// refused rather than accepted as weak.
+    pub token: Option<String>,
+    /// The host (an IP or a name) a colleague should use. `None` falls back to the bound address.
+    pub host: Option<String>,
+}
+
 /// A running studio. Dropping it stops the listener and joins the accept thread.
 pub struct StudioHandle {
     addr: SocketAddr,
+    /// Present when the session is shared: the token every API call must present.
+    token: Option<String>,
+    /// The host to advertise in the share link.
+    host: String,
     shutdown: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
 }
 
 impl StudioHandle {
-    /// The loopback address the studio is listening on.
+    /// The address the studio is listening on.
     pub fn addr(&self) -> SocketAddr {
         self.addr
     }
 
-    /// The URL to open in a browser.
+    /// The URL to open in a browser on this machine.
+    ///
+    /// A shared studio includes its token, because the page cannot call the API without it.
     pub fn url(&self) -> String {
-        format!("http://{}", self.addr)
+        let host = match self.addr.ip() {
+            IpAddr::V4(v4) if v4.is_unspecified() => "127.0.0.1".to_string(),
+            IpAddr::V6(v6) if v6.is_unspecified() => "127.0.0.1".to_string(),
+            ip => ip.to_string(),
+        };
+        match &self.token {
+            Some(token) => format!("http://{host}:{}/?token={token}", self.addr.port()),
+            None => format!("http://{host}:{}", self.addr.port()),
+        }
+    }
+
+    /// The link to send a colleague, or `None` when the studio is loopback-only.
+    ///
+    /// Anyone with this link can read **and edit** the open document until the studio stops.
+    pub fn share_url(&self) -> Option<String> {
+        let token = self.token.as_ref()?;
+        Some(format!(
+            "http://{}:{}/?token={token}",
+            self.host,
+            self.addr.port()
+        ))
+    }
+
+    /// The session token, when shared. Printed once at startup and never logged.
+    pub fn token(&self) -> Option<&str> {
+        self.token.as_deref()
     }
 
     /// Stop accepting connections and join the accept thread.
@@ -675,9 +758,45 @@ pub fn start_with_recovery(
     port: u16,
     recovered: Option<RecoveryInfo>,
 ) -> Result<StudioHandle, StudioError> {
-    let state = StudioState::new(project, path, recovered)?;
-    let listener = TcpListener::bind(("127.0.0.1", port)).map_err(StudioError::Bind)?;
+    start_with_options(project, path, port, recovered, ShareOptions::default())
+}
+
+/// Start the studio with an explicit exposure policy.
+///
+/// Loopback (the default) needs no token. Any other bind is a shared session and always requires
+/// one: `options.token`, or a generated 128-bit token reported by [`StudioHandle::share_url`].
+/// Binding happens before the accept loop, and the project is validated before the port opens.
+pub fn start_with_options(
+    project: Project,
+    path: PathBuf,
+    port: u16,
+    recovered: Option<RecoveryInfo>,
+    options: ShareOptions,
+) -> Result<StudioHandle, StudioError> {
+    let mut state = StudioState::new(project, path, recovered)?;
+    let bind = options.bind.unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST));
+    let shared = !bind.is_loopback();
+    let token = if shared {
+        let token = options.token.unwrap_or_else(new_share_token);
+        if token.len() < 16 {
+            return Err(StudioError::BadRequest(
+                "a share token must be at least 16 characters".into(),
+            ));
+        }
+        Some(token)
+    } else {
+        None
+    };
+
+    let listener = TcpListener::bind((bind, port)).map_err(StudioError::Bind)?;
     let addr = listener.local_addr().map_err(StudioError::Bind)?;
+    let host = options.host.unwrap_or_else(|| advertise_host(bind));
+    if let Some(token) = &token {
+        state.share = Some(ShareAccess {
+            token: token.clone(),
+            url: format!("http://{host}:{}/?token={token}", addr.port()),
+        });
+    }
     let state = Arc::new(Mutex::new(state));
     let shutdown = Arc::new(AtomicBool::new(false));
     let connections = Arc::new(AtomicUsize::new(0));
@@ -700,9 +819,44 @@ pub fn start_with_recovery(
 
     Ok(StudioHandle {
         addr,
+        token,
+        host,
         shutdown,
         thread: Some(thread),
     })
+}
+
+/// The host to advertise when the caller did not name one.
+fn advertise_host(bind: IpAddr) -> String {
+    match bind {
+        IpAddr::V4(v4) if v4.is_unspecified() => "127.0.0.1".to_string(),
+        IpAddr::V6(v6) if v6.is_unspecified() => "127.0.0.1".to_string(),
+        other => other.to_string(),
+    }
+}
+
+/// A 128-bit session token.
+///
+/// `RandomState` is seeded from the operating system's entropy, so two hashes of distinct inputs
+/// give independent 64-bit outputs without pulling a random-number crate into the trust boundary.
+fn new_share_token() -> String {
+    use std::collections::hash_map::RandomState;
+    use std::hash::{BuildHasher, Hasher};
+    let state = RandomState::new();
+    let mut token = String::with_capacity(32);
+    for round in 0u8..2 {
+        let mut hasher = state.build_hasher();
+        hasher.write_u8(round);
+        hasher.write_u32(std::process::id());
+        hasher.write_u128(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|elapsed| elapsed.as_nanos())
+                .unwrap_or(0),
+        );
+        token.push_str(&format!("{:016x}", hasher.finish()));
+    }
+    token
 }
 
 fn accept_loop(
@@ -784,12 +938,28 @@ fn handle_connection(mut stream: TcpStream, state: &Arc<Mutex<StudioState>>, por
 }
 
 fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) -> http::Response {
+    let share = match state.lock() {
+        Ok(state) => state.share.clone(),
+        Err(_) => return error_response(&StudioError::Lock),
+    };
+    let shared = share.is_some();
     // A browser resolving an attacker-controlled name to 127.0.0.1 still sends that name in `Host`.
-    // Refusing anything but the studio's own loopback host is what stops DNS-rebinding reads.
-    if let Err(error) = require_loopback_host(request, port) {
+    // On loopback, refusing anything but the studio's own host is what stops DNS-rebinding reads.
+    // A shared studio is protected by its token instead, so it accepts the address it was reached on.
+    if let Err(error) = require_host(request, port, shared) {
         return error_response(&error);
     }
-    match (request.method.as_str(), request.path.as_str()) {
+    let path = path_only(&request.path);
+    // The page itself, its CSS and its script carry no document data. Everything under /api/ does,
+    // so a shared studio requires the token there and nowhere else — otherwise the browser could not
+    // even load the page that is allowed to present the token.
+    if let Some(share) = &share
+        && path.starts_with("/api/")
+        && let Err(error) = require_share_token(request, share)
+    {
+        return error_response(&error);
+    }
+    match (request.method.as_str(), path) {
         ("GET", "/") => asset(INDEX_HTML, "text/html; charset=utf-8"),
         ("GET", "/app.css") => asset(APP_CSS, "text/css; charset=utf-8"),
         ("GET", "/app.js") => asset(APP_JS, "text/javascript; charset=utf-8"),
@@ -811,7 +981,7 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
             Err(error) => error_response(&error),
         },
         ("POST", path) if path.starts_with("/api/") => {
-            match require_same_origin(request, port).and_then(|()| require_json(request)) {
+            match require_same_origin(request, port, shared).and_then(|()| require_json(request)) {
                 Ok(()) => post_route(state, request),
                 Err(error) => error_response(&error),
             }
@@ -823,7 +993,7 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
 }
 
 fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http::Response {
-    match request.path.as_str() {
+    match path_only(&request.path) {
         "/api/parameter" => match parse_body::<ParameterRequest>(request) {
             Ok(body) => match with_state(state, |state| {
                 state.mutate(|project| project.set_parameter(&body.id, body.value))
@@ -1124,12 +1294,60 @@ fn profile_from_parts(
     }
 }
 
-fn require_loopback_host(request: &http::Request, port: u16) -> Result<(), StudioError> {
+fn path_only(path: &str) -> &str {
+    path.split('?').next().unwrap_or(path)
+}
+
+/// A query parameter, unescaped only in the sense this server needs: share tokens are hex.
+fn query_param<'a>(path: &'a str, name: &str) -> Option<&'a str> {
+    let (_, query) = path.split_once('?')?;
+    query.split('&').find_map(|pair| {
+        let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+        (key == name && !value.is_empty()).then_some(value)
+    })
+}
+
+/// Compare without leaking the position of the first mismatch through an early return.
+fn tokens_match(presented: &str, expected: &str) -> bool {
+    let (presented, expected) = (presented.as_bytes(), expected.as_bytes());
+    if presented.len() != expected.len() {
+        return false;
+    }
+    let mut difference = 0u8;
+    for (left, right) in presented.iter().zip(expected) {
+        difference |= left ^ right;
+    }
+    difference == 0
+}
+
+fn require_share_token(request: &http::Request, share: &ShareAccess) -> Result<(), StudioError> {
+    let presented = request
+        .header("x-atlas-token")
+        .map(str::trim)
+        .filter(|token| !token.is_empty())
+        .or_else(|| query_param(&request.path, "token"))
+        .ok_or(StudioError::Unauthorized)?;
+    if tokens_match(presented, &share.token) {
+        Ok(())
+    } else {
+        Err(StudioError::Unauthorized)
+    }
+}
+
+fn require_host(request: &http::Request, port: u16, shared: bool) -> Result<(), StudioError> {
     let host = request
         .header("host")
         .ok_or(StudioError::Forbidden)?
         .trim()
         .to_ascii_lowercase();
+    if shared {
+        // The address a colleague's browser used is unknown to the server; the port is not.
+        return if host.ends_with(&format!(":{port}")) {
+            Ok(())
+        } else {
+            Err(StudioError::Forbidden)
+        };
+    }
     let allowed = [format!("127.0.0.1:{port}"), format!("localhost:{port}")];
     if allowed.iter().any(|candidate| candidate == &host) {
         Ok(())
@@ -1138,12 +1356,29 @@ fn require_loopback_host(request: &http::Request, port: u16) -> Result<(), Studi
     }
 }
 
-fn require_same_origin(request: &http::Request, port: u16) -> Result<(), StudioError> {
+fn require_same_origin(
+    request: &http::Request,
+    port: u16,
+    shared: bool,
+) -> Result<(), StudioError> {
     let origin = request
         .header("origin")
         .ok_or(StudioError::Forbidden)?
         .trim()
         .to_ascii_lowercase();
+    if shared {
+        // The page was reached at some address:port; a form post must come from that same origin.
+        let host = request
+            .header("host")
+            .ok_or(StudioError::Forbidden)?
+            .trim()
+            .to_ascii_lowercase();
+        return if origin == format!("http://{host}") {
+            Ok(())
+        } else {
+            Err(StudioError::Forbidden)
+        };
+    }
     let allowed = [
         format!("http://127.0.0.1:{port}"),
         format!("http://localhost:{port}"),
@@ -1186,7 +1421,9 @@ fn with_state<T>(
 }
 
 fn asset(body: &str, content_type: &'static str) -> http::Response {
+    // A share link carries its token in the query string; never hand that URL to another origin.
     http::Response::new(200, "OK", content_type, body.as_bytes().to_vec())
+        .with_header("Referrer-Policy", "no-referrer")
 }
 
 fn to_json<T: Serialize>(status: u16, payload: &T) -> http::Response {

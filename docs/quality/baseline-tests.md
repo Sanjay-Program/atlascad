@@ -106,6 +106,21 @@ binary was run as well: an unsaved edit (10×10×8 = 800 mm³) reopened at 800 m
 `dirty` set, where before the change the same sequence reopened at the saved 500 mm³. The recovery
 banner and the discard path were driven in headless Chrome (9 assertions, 0 console errors).
 
+### Dated run: 2026-10-29 (delivery gate)
+
+`./scripts/gate.sh` — **284 passed, 0 failed, 0 skipped** in 11 packages, then the analytic corpus (8
+ok / 3 known-failure / 0 regressions), `atlas-eng validate` (0 errors, 0 warnings across 14 manifests),
+the licence policy (83 packages, 83 allowed, offline), the SBOM dry run (CycloneDX 1.5, 83
+components), and the live simulation (52 assertions: 31 HTTP, 21 driving the shipped `atlas` and `atlas-eng`
+binaries, plus 7 in headless Chrome) — all in
+about 6 s warm. Five more than the 279 of the crash-recovery run, all in `cad-engineering`: SPDX
+expression tokenisation (`OR`, legacy `/`, parenthesised `AND`, `WITH`), a denied token beating an
+allowed one, unknown or missing licences failing closed, the audit's package separation, and a
+byte-identical SBOM. `./scripts/package.sh` then produced
+`dist/atlas-cad-0.1.0-x86_64-unknown-linux-gnu.tar.gz` (3.1 MB), extracted it into a clean directory,
+verified `SHA256SUMS`, ran `--help` on all three packaged binaries and built a 10×10×5 STL with the
+packaged CLI. The CI workflow and `deny.toml` were added but have **not** run on a runner.
+
 ## 3. What the tests actually assert
 
 * **Analytic values, not self-consistency:** 10×10×5 box = 500 mm³ ± 1e-6; union 1000 + 160 − 40 =

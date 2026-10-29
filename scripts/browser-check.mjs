@@ -171,6 +171,19 @@ try {
   const exportEnabled = await evaluate('!document.getElementById("exportBtn").disabled');
   check(exportEnabled, 'export is enabled for a built body');
 
+  // A shared session shows a copyable link; a loopback session must not show one at all.
+  const sharedTarget = /[?&]token=/.test(TARGET);
+  const share = await evaluate(
+    '({ hidden: document.getElementById("shareSection").hidden, value: document.getElementById("shareLink").value })'
+  );
+  check(
+    share.hidden === !sharedTarget,
+    `the share panel is ${share.hidden ? 'hidden' : 'shown'} for a ${sharedTarget ? 'shared' : 'loopback'} page`
+  );
+  if (sharedTarget) {
+    check(/token=/.test(share.value), 'the share panel does not carry the token');
+  }
+
   check(consoleErrors.length === 0, `console errors: ${consoleErrors.join(' | ')}`);
 
   console.log(`==> browser check passed (${passed} assertions)`);

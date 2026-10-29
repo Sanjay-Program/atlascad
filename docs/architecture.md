@@ -232,13 +232,18 @@ cad-studio  ──  cad-document (parameters, feature graph, undo, .zcad)
   └── cad-io            (validated binary STL)
 ```
 
-* **Transport and trust boundary.** A `std::net::TcpListener` on `127.0.0.1` only. Every request's
-  `Host` must be the studio's own loopback host and port, and every `POST` must carry a same-origin
-  `Origin` and `application/json`; foreign or empty hosts are refused before routing (tested). Header
-  limit 16 KiB, body limit 1 MiB, read timeout 5 s, write timeout 10 s, at most 64 concurrent
-  connections. Responses send `no-store`, `nosniff`, `no-referrer`, `X-Frame-Options: DENY` and a
-  `default-src 'self'` CSP. There is no authentication because the listener is loopback-only and
-  single-user; binding anywhere else is not implemented, and the port must not be tunneled.
+* **Transport and trust boundary.** A `std::net::TcpListener` on `127.0.0.1` by default. Every
+  request's `Host` must be the studio's own loopback host and port, and every `POST` must carry a
+  same-origin `Origin` and `application/json`; foreign or empty hosts are refused before routing
+  (tested). Header limit 16 KiB, body limit 1 MiB, read timeout 5 s, write timeout 10 s, at most 64
+  concurrent connections. Responses send `no-store`, `nosniff`, `no-referrer`, `X-Frame-Options: DENY`
+  and a `default-src 'self'` CSP.
+  **Sharing is opt-in and token-gated:** `--share`, or any non-loopback `--host`, binds the LAN
+  interface and always requires a 128-bit session token on every `/api/*` request (header or query);
+  the static page is served without one so the browser can present it. The `Host` check then accepts
+  any host naming the studio's port, because the address a colleague dialled is not known in advance,
+  and the token is what authorises the call. There is no account layer, and the link grants full edit
+  access until the process stops. The port must not be exposed to the internet.
 * **Document mutation is serialized.** The server owns one `Project`, one kernel instance and one
   `BuildCache` behind a mutex; every mutating route goes through the same path that snapshots undo
   history, re-evaluates through the kernel and returns the complete render state. A rejected
@@ -267,8 +272,10 @@ cad-studio  ──  cad-document (parameters, feature graph, undo, .zcad)
 2. **Three application surfaces now exist.** CADCraft and SolidCraft still have separate `ui-egui`
    trees (egui 0.36 + wgpu 30); Atlas Studio is a browser surface over a Rust server. There is no
    shared component library between them and no measured reason to merge them yet.
-3. **No cloud service, collaboration, or WASM target.** Atlas Studio listens on loopback only. There
-   is no account, sync, hosted storage, or multi-user editing. `wasm32-unknown-unknown` is not
+3. **No cloud service, collaboration, or WASM target.** Atlas Studio listens on loopback by default;
+   `--share` exposes one session on the local network behind a session token. There is no account,
+   sync, hosted storage, or concurrent multi-user editing (a share is one document, one history, and
+   whichever client last wrote wins). `wasm32-unknown-unknown` is not
    installed on this machine and no WASM build was attempted; neither is claimed.
 4. **The feature graph is linear and single-body.** `.zcad` schema 5 persists a header, named
    parameters, an ordered list of sketches and features with stable IDs, where the first feature

@@ -197,7 +197,7 @@
       "peak_rss_kb": null,
       "recorded_at": "2026-10-29",
       "host": "Linux, 8 cores, 7 GB RAM, rustc 1.95.0",
-      "notes": "The full local gate: 284 tests, corpus, manifest validation, licence policy (83 packages), SBOM dry run, and the live simulation (31 HTTP + 7 browser assertions)."
+      "notes": "The full local gate: 284 tests, corpus, manifest validation, licence policy (83 packages), SBOM dry run, and the live simulation (52 assertions: 31 HTTP, 21 CLI/control-plane, plus 7 browser)."
     }
   ]
 }

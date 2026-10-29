@@ -29,6 +29,8 @@ import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BINARY = ROOT / "target" / "release" / "cad-studio"
+CLI = ROOT / "target" / "release" / "atlas"
+ENGINEERING = ROOT / "target" / "release" / "atlas-eng"
 KEEP = "--keep" in sys.argv
 
 passed = 0
@@ -47,7 +49,7 @@ def free_port() -> int:
         return sock.getsockname()[1]
 
 
-def start(port: int, *arguments: str) -> subprocess.Popen:
+def start(port: int, *arguments: str, token: str | None = None) -> subprocess.Popen:
     process = subprocess.Popen(
         [str(BINARY), *arguments, "--port", str(port)],
         stdout=subprocess.PIPE,
@@ -60,7 +62,8 @@ def start(port: int, *arguments: str) -> subprocess.Popen:
             output = process.stdout.read() if process.stdout else ""
             raise AssertionError(f"cad-studio exited during startup: {output.strip()}")
         try:
-            request(port, "GET", "/api/health")
+            headers = [("x-atlas-token", token)] if token else None
+            request(port, "GET", "/api/health", headers=headers)
             return process
         except (urllib.error.URLError, ConnectionError, OSError):
             time.sleep(0.05)
@@ -81,7 +84,7 @@ def stop(process: subprocess.Popen, hard: bool = False) -> None:
         process.wait(timeout=5)
 
 
-def request(port: int, method: str, path: str, body=None):
+def request(port: int, method: str, path: str, body=None, headers=None):
     data = None if body is None else json.dumps(body).encode()
     req = urllib.request.Request(
         f"http://127.0.0.1:{port}{path}", data=data, method=method
@@ -90,6 +93,8 @@ def request(port: int, method: str, path: str, body=None):
     if data is not None:
         req.add_header("Origin", f"http://127.0.0.1:{port}")
         req.add_header("Content-Type", "application/json")
+    for name, value in headers or ():
+        req.add_header(name, value)
     with urllib.request.urlopen(req, timeout=30) as response:
         raw = response.read()
     if raw[:1] in (b"{", b"["):
@@ -121,11 +126,135 @@ def stl_volume_and_triangles(payload: bytes) -> tuple[float, int]:
     return abs(total), count
 
 
-def main() -> int:
-    if not BINARY.exists():
+def run(*arguments: str) -> str:
+    """Run a shipped CLI and fail with its own output when it does not succeed."""
+    result = subprocess.run(arguments, capture_output=True, text=True)
+    if result.returncode != 0:
         raise AssertionError(
-            f"{BINARY} is missing; run `cargo build --release -p cad-studio` first"
+            f"{arguments[0]} {arguments[1:]} failed ({result.returncode}): "
+            f"{result.stderr.strip() or result.stdout.strip()}"
         )
+    return result.stdout
+
+
+def stl_file_volume(path: pathlib.Path) -> tuple[float, int]:
+    return stl_volume_and_triangles(path.read_bytes())
+
+
+def cli_simulation(work: pathlib.Path) -> int:
+    """Drive the two headless binaries the bundle ships, on files in a scratch directory."""
+    before = passed
+    out = work / "cli"
+    out.mkdir()
+
+    capabilities = run(str(CLI), "capabilities")
+    for capability in ("extrude", "revolve", "boolean union", "boolean difference"):
+        check(
+            f"capability: {capability}" in capabilities,
+            f"the CLI does not advertise {capability}:\n{capabilities}",
+        )
+
+    box = out / "box.stl"
+    run(str(CLI), "box", "--size", "10,10,5", "--out", str(box))
+    box_volume, box_triangles = stl_file_volume(box)
+    check(abs(box_volume - 500.0) < 1e-6, f"the CLI box is 500 mm3, got {box_volume}")
+    check(box_triangles == 12, f"a box is 12 triangles, got {box_triangles}")
+
+    # Two 10 x 10 x 5 boxes offset by (8, 8): 1000 - 2 x 2 x 5 = 980 mm3.
+    union = out / "union.stl"
+    run(
+        str(CLI), "union", "--a", "10,10,5", "--b", "10,10,5", "--offset", "8,8,0",
+        "--out", str(union),
+    )
+    union_volume, union_triangles = stl_file_volume(union)
+    check(abs(union_volume - 980.0) < 0.5, f"the CLI union is ~980 mm3, got {union_volume}")
+    check(union_triangles > 12, "the union has more facets than one box")
+
+    project = out / "cli.zcad"
+    run(str(CLI), "project", "new", "--file", str(project), "--size", "40,30,10")
+    exported = out / "40x30x10.stl"
+    run(str(CLI), "project", "export", "--file", str(project), "--out", str(exported))
+    volume_10, _ = stl_file_volume(exported)
+    check(abs(volume_10 - 12000.0) < 1e-6, f"a 40x30x10 project is 12000 mm3, got {volume_10}")
+
+    set_output = run(
+        str(CLI), "project", "set", "--file", str(project), "--param", "depth", "--value", "20"
+    )
+    check("\"volume_mm3\": 24000" in set_output, f"depth 20 does not double the body:\n{set_output}")
+    run(str(CLI), "project", "export", "--file", str(project), "--out", str(exported))
+    volume_20, _ = stl_file_volume(exported)
+    check(abs(volume_20 - 24000.0) < 1e-6, f"the 20 mm export is 24000 mm3, got {volume_20}")
+
+    undone = run(str(CLI), "project", "undo", "--file", str(project))
+    check("\"volume_mm3\": 12000" in undone, f"undo does not restore the 10 mm body:\n{undone}")
+
+    validation = run(str(ENGINEERING), "validate", "--root", str(ROOT))
+    check("0 error(s)" in validation, f"manifest validation does not pass:\n{validation}")
+    licences = run(str(ENGINEERING), "licences", "--root", str(ROOT))
+    check("0 denied, 0 unknown" in licences, f"the licence policy does not pass:\n{licences}")
+    first = run(str(ENGINEERING), "sbom", "--root", str(ROOT))
+    second = run(str(ENGINEERING), "sbom", "--root", str(ROOT))
+    check("CycloneDX 1.5" in first, "the SBOM is not CycloneDX 1.5")
+    check(first == second, "the SBOM is not byte-identical across runs")
+    report = run(str(ENGINEERING), "report", "--root", str(ROOT))
+    check(len(report) > 1000, "the engineering report is empty")
+
+    print(f"==> CLI + control-plane simulation passed ({passed - before} assertions)")
+    return passed - before
+
+
+def share_simulation(work: pathlib.Path) -> int:
+    """A shared studio must refuse everything without its token and serve everything with it."""
+    before = passed
+    project = work / "shared.zcad"
+    port = free_port()
+    token = "simulationtoken0123456789abcdef"
+    print(f"==> sharing against {BINARY} on 0.0.0.0:{port}")
+    process = start(
+        port,
+        "--new", str(project), "--name", "shared", "--size", "10,10,5",
+        "--share", "--token", token, "--advertise", "127.0.0.1",
+        token=token,
+    )
+    try:
+        try:
+            request(port, "GET", "/api/state")
+            check(False, "a shared studio served the document without a token")
+        except urllib.error.HTTPError as error:
+            check(error.code == 401, f"a shared studio answered {error.code}, not 401")
+
+        page = request(port, "GET", "/")
+        check(b"Atlas" in page, "a shared studio does not serve its page")
+
+        state = request(port, "GET", "/api/state", headers=[("x-atlas-token", token)])
+        check(
+            state["share"]["url"] == f"http://127.0.0.1:{port}/?token={token}",
+            f"the share link is {state['share']['url']}",
+        )
+        edited = request(
+            port,
+            "POST",
+            "/api/parameter",
+            {"id": "depth", "value": 20.0},
+            headers=[("x-atlas-token", token)],
+        )
+        check(
+            abs(edited["geometry"]["volume_mm3"] - 2000.0) < 1e-6,
+            f"a token-bearing edit is 2000 mm3, got {edited['geometry']['volume_mm3']}",
+        )
+    finally:
+        stop(process)
+    print(f"==> share simulation passed ({passed - before} assertions)")
+    return passed - before
+
+
+def main() -> int:
+    for binary in (BINARY, CLI, ENGINEERING):
+        if not binary.exists():
+            raise AssertionError(
+                f"{binary} is missing; run "
+                "`cargo build --release -p cad-studio -p cad-cli -p cad-engineering` first"
+            )
     work = pathlib.Path(tempfile.mkdtemp(prefix="atlas-sim-"))
     project = work / "part.zcad"
     port = free_port()
@@ -273,6 +402,9 @@ def main() -> int:
         stop(process)
 
     print(f"==> HTTP simulation passed ({passed} assertions)")
+    cli_simulation(work)
+    share_simulation(work)
+    print(f"==> simulation passed ({passed} assertions in total)")
     if KEEP:
         print(f"    kept {work}")
     else:

@@ -4,9 +4,11 @@
 //! cad-studio --file part.zcad
 //! cad-studio --new part.zcad --name bracket --size 40,30,10
 //! cad-studio --file part.zcad --port 7600
+//! cad-studio --file part.zcad --share
 //! ```
 
-use cad_studio::{DEFAULT_PORT, default_project, start_with_recovery};
+use cad_studio::{DEFAULT_PORT, ShareOptions, default_project, start_with_options};
+use std::net::{IpAddr, Ipv4Addr, UdpSocket};
 use std::path::PathBuf;
 
 fn main() {
@@ -26,6 +28,10 @@ fn run() -> Result<(), String> {
     let mut name: Option<String> = None;
     let mut size = [40.0f64, 30.0, 10.0];
     let mut port = DEFAULT_PORT;
+    let mut share = false;
+    let mut bind: Option<IpAddr> = None;
+    let mut advertise: Option<String> = None;
+    let mut token: Option<String> = None;
 
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
@@ -69,6 +75,35 @@ fn run() -> Result<(), String> {
                     return Err("port 0 is reserved for tests; choose a real port".into());
                 }
             }
+            "--share" => share = true,
+            "--advertise" => {
+                let value = arguments
+                    .next()
+                    .ok_or_else(|| "`--advertise` needs a host".to_string())?;
+                if value.trim().is_empty() {
+                    return Err("`--advertise` needs a host".into());
+                }
+                advertise = Some(value.trim().to_string());
+            }
+            "--host" => {
+                let value = arguments
+                    .next()
+                    .ok_or_else(|| "`--host` needs an IP address".to_string())?;
+                bind = Some(
+                    value
+                        .parse::<IpAddr>()
+                        .map_err(|_| format!("`--host {value}` is not an IP address"))?,
+                );
+            }
+            "--token" => {
+                let value = arguments
+                    .next()
+                    .ok_or_else(|| "`--token` needs a value".to_string())?;
+                if value.len() < 16 {
+                    return Err("`--token` must be at least 16 characters".into());
+                }
+                token = Some(value);
+            }
             "--help" | "-h" => {
                 usage();
                 return Ok(());
@@ -83,6 +118,24 @@ fn run() -> Result<(), String> {
 
     let path = file
         .ok_or_else(|| "a project file is required: `cad-studio --file part.zcad`".to_string())?;
+
+    if share && bind.is_none() {
+        bind = Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED));
+    }
+    let shared = bind.is_some_and(|ip| !ip.is_loopback());
+    if token.is_some() && !shared {
+        return Err("`--token` only applies to a shared studio; add `--share` or `--host`".into());
+    }
+    let advertised = if shared {
+        advertise.or_else(|| share_host(bind))
+    } else {
+        None
+    };
+    if shared && advertised.is_none() {
+        eprintln!(
+            "cad-studio: no network address found; pass `--host <this machine's IP>` so the share link is usable"
+        );
+    }
 
     let mut recovered = None;
     let project = if path.exists() {
@@ -113,8 +166,18 @@ fn run() -> Result<(), String> {
         project
     };
 
-    let handle = start_with_recovery(project, path.clone(), port, recovered)
-        .map_err(|error| error.to_string())?;
+    let handle = start_with_options(
+        project,
+        path.clone(),
+        port,
+        recovered,
+        ShareOptions {
+            bind,
+            token,
+            host: advertised,
+        },
+    )
+    .map_err(|error| error.to_string())?;
     println!("Atlas CAD Studio");
     println!("  file: {}", path.display());
     if let Some(info) = recovered {
@@ -128,6 +191,10 @@ fn run() -> Result<(), String> {
         );
     }
     println!("  url:  {}", handle.url());
+    if let Some(share_url) = handle.share_url() {
+        println!("  share: {share_url}");
+        println!("         anyone with this link can view and edit until you stop the studio");
+    }
     println!("  stop: Ctrl+C");
     println!();
 
@@ -140,10 +207,37 @@ fn usage() {
     println!("cad-studio {}", env!("CARGO_PKG_VERSION"));
     println!();
     println!("USAGE:");
-    println!("  cad-studio --file PATH [--port PORT]");
+    println!(
+        "  cad-studio --file PATH [--port PORT] [--share] [--host IP] [--advertise HOST] [--token TOKEN]"
+    );
     println!("  cad-studio --new PATH [--name NAME] [--size X,Y,Z] [--port PORT]");
     println!();
-    println!("The studio binds 127.0.0.1 only. Geometry stays on this machine.");
+    println!("The studio binds 127.0.0.1 unless shared. `--share` binds 0.0.0.0 and prints a");
+    println!("tokenised link a colleague on the same network can open; `--advertise HOST` sets the");
+    println!("host in that link (a DNS name, for example). Anyone with the link can edit the open");
+    println!("document until the studio stops; do not expose it to the internet.");
+}
+
+/// The host to advertise for a shared session: the explicit `--host`, or this machine's address on
+/// the interface the default route uses.
+fn share_host(bind: Option<IpAddr>) -> Option<String> {
+    match bind {
+        Some(ip) if !ip.is_unspecified() => Some(ip.to_string()),
+        _ => lan_address().map(|ip| ip.to_string()),
+    }
+}
+
+/// This host's outbound address, without sending a packet (a UDP connect only consults the routing
+/// table). `None` when there is no route, in which case the bound address is advertised instead.
+fn lan_address() -> Option<IpAddr> {
+    let socket = UdpSocket::bind("0.0.0.0:0").ok()?;
+    socket.connect("192.0.2.1:9").ok()?;
+    let ip = socket.local_addr().ok()?.ip();
+    if ip.is_loopback() || ip.is_unspecified() {
+        None
+    } else {
+        Some(ip)
+    }
 }
 
 fn parse_triple(value: &str) -> Result<[f64; 3], String> {

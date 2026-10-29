@@ -45,7 +45,7 @@ step "SBOM (dry run: fails if the graph cannot be read)"
 cargo run --offline -q -p cad-engineering --bin atlas-eng -- sbom
 
 if [ "$QUICK" -eq 0 ]; then
-  step "live HTTP simulation against the release binary"
+  step "live simulation: HTTP server, CLI, control plane and browser"
   ./scripts/simulate.sh
 else
   step "live HTTP simulation (skipped: --quick)"

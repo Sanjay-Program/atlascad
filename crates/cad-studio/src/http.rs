@@ -41,6 +41,8 @@ impl From<std::io::Error> for HttpError {
 #[derive(Debug)]
 pub struct Request {
     pub method: String,
+    /// The origin-form target **with** its query string, if any. Routing strips the query; the
+    /// share token is read from it, so it must survive parsing.
     pub path: String,
     pub headers: BTreeMap<String, String>,
     pub body: Vec<u8>,
@@ -156,7 +158,7 @@ pub fn read_request(stream: &mut TcpStream) -> Result<Request, HttpError> {
             "only origin-form request targets are accepted".into(),
         ));
     }
-    let path = target.split('?').next().unwrap_or(target).to_string();
+    let path = target.to_string();
 
     let mut headers = BTreeMap::new();
     for line in lines {

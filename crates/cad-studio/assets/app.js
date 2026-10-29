@@ -93,10 +93,19 @@
     }
   }
 
+  // A shared studio hands out a tokenised link. The page keeps the token and presents it as a
+  // header; it is never copied into another URL or into the activity log.
+  const shareToken = (() => {
+    const token = new URLSearchParams(window.location.search).get("token");
+    return token && token.length >= 16 ? token : null;
+  })();
+
   async function api(path, options = {}) {
+    const headers = new Headers(options.headers || {});
+    if (shareToken) headers.set("x-atlas-token", shareToken);
     let response;
     try {
-      response = await fetch(path, options);
+      response = await fetch(path, { ...options, headers });
     } catch (error) {
       throw new ApiError("The studio server is not reachable.", "offline", 0);
     }
@@ -962,6 +971,7 @@
     renderProperties();
     renderFailure(next.failure);
     renderRecovery(next.recovery);
+    renderShare(next.share);
     syncProfileControls();
     syncPlacementControls();
     syncCreateControls();
@@ -1141,6 +1151,33 @@
 
   async function discardRecovery() {
     await mutate("/api/recovery/discard", {}, "Discarded the recovered changes");
+  }
+
+  // The share link is rendered from the server's payload, so it names the address this session was
+  // started on rather than whatever the local browser happens to be using.
+  let shareLink = null;
+
+  function renderShare(share) {
+    const section = byId("shareSection");
+    shareLink = share && share.url ? share.url : null;
+    section.hidden = !shareLink;
+    if (!shareLink) return;
+    const input = byId("shareLink");
+    if (input.value !== shareLink) input.value = shareLink;
+  }
+
+  async function copyShareLink() {
+    if (!shareLink) return;
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      toast("Share link copied. Anyone with it can edit until you stop the studio.");
+      log("Share link copied.");
+    } catch (error) {
+      const input = byId("shareLink");
+      input.focus();
+      input.select();
+      toast("Select the link and copy it.", true);
+    }
   }
 
   function renderFailure(failure) {
@@ -1975,6 +2012,7 @@
     byId("undoBtn").addEventListener("click", undo);
     byId("redoBtn").addEventListener("click", redo);
     byId("saveBtn").addEventListener("click", save);
+    byId("copyShareBtn").addEventListener("click", copyShareLink);
     byId("recoveryDiscard").addEventListener("click", discardRecovery);
     byId("exportBtn").addEventListener("click", exportStl);
     byId("paletteBtn").addEventListener("click", openPalette);

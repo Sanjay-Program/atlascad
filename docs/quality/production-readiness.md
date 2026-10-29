@@ -70,7 +70,7 @@ Chrome.
 | `GET /api/export/stl`, 1 020 triangles | 0.5 ms, 51 KB | release server |
 | Server resident memory, 256-vertex body | 7.2 MB | `ps -o rss=` |
 | `atlas box --size 10,10,5 --out part.stl` | < 10 ms, 4.5 MB RSS, 684-byte STL, 12 triangles | release CLI |
-| Workspace tests | **279 passed, 0 failed** | `cargo test --offline --workspace -j 2` |
+| Workspace tests | **286 passed, 0 failed** | `cargo test --offline --workspace -j 2` |
 | fmt / clippy | clean, 0 warnings | `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -D warnings` |
 | Kernel corpus | 8 must-pass ok, 3 recorded known failures, **0 regressions** | `cargo run -p cad-kernel-truck --example corpus` |
 | Control-plane validation | 0 errors, 0 warnings | `atlas-eng validate` |
@@ -78,8 +78,8 @@ Chrome.
 | Deployable bundle | 3.1 MB tarball, verified by extraction + checksums + smoke tests | `./scripts/package.sh` |
 | Dependency licence audit | 83 packages, 83 allowed, 0 denied, 0 unknown | `atlas-eng licences` |
 | CycloneDX SBOM | 83 components, byte-identical across runs | `atlas-eng sbom --write` |
-| Live HTTP simulation | **31 assertions**, including a `kill -9` recovery | `python3 scripts/simulate.py` |
-| Live browser smoke check | **7 assertions**, 0 console errors | `node scripts/browser-check.mjs <url>` |
+| Live simulation | **56 assertions**: 31 over HTTP (cut, join, undo/redo, rebuild, save, restart, STL, `kill -9` recovery), 21 driving the shipped `atlas`/`atlas-eng` on real files, 4 on the shared-session token boundary | `./scripts/simulate.sh` |
+| Live browser smoke check | **8 assertions** loopback + **9** shared (the Share panel), 0 console errors | `node scripts/browser-check.mjs <url>` |
 
 **What this says:** the performance and memory story is genuinely good for parts of a few hundred
 faces, and the error discipline is real. Neither is the problem.
@@ -210,7 +210,7 @@ console errors). Workspace **279 tests, 0 failed**, fmt and clippy clean.
 
 * `scripts/gate.sh` runs the whole quality claim in one command: fmt, clippy with warnings denied, the
   workspace tests, the analytic corpus, manifest validation, the licence policy, the SBOM check and the
-  live simulation. `--quick` skips only the simulation.
+  live simulation (HTTP, both CLIs, and the browser when one is installed). `--quick` skips only the simulation.
 * `atlas-eng licences` checks every dependency in the resolved graph against
   `engineering/policy/licences.json`, **offline**, and fails closed: an unrecognised licence is a
   failure, not a warning, and banned kernels are refused whatever their licence says. 83 packages, 83
@@ -221,10 +221,18 @@ console errors). Workspace **279 tests, 0 failed**, fmt and clippy clean.
   (`atlas-cad-0.1.0-x86_64-unknown-linux-gnu.tar.gz`, 3.1 MB) with the three binaries, the licence and
   quality documents, the SBOM and `SHA256SUMS`, then extracts it into a clean directory, verifies the
   checksums and smoke-tests the packaged binaries.
+* **LAN sharing, token-gated.** `--share` binds the local interface and every `/api/*` call must
+  present a 128-bit session token (header or query); the page shows a **Share** panel with the link,
+  and loopback use is unchanged. Tokens are compared without an early-exit, the page sends
+  `Referrer-Policy: no-referrer`, and a shared write still has to be same-origin. This is one document
+  shared live, not multi-user editing: last write wins, and stopping the process revokes the link.
 * `scripts/simulate.py` drives the **real release server** through cut, join, undo/redo, a parameter
-  rebuild, save, restart, STL export and a `kill -9` recovery (31 analytic assertions), and
-  `scripts/browser-check.mjs` loads the live page in headless Chrome (7 assertions, zero console
-  errors).
+  rebuild, save, restart, STL export and a `kill -9` recovery (31 analytic assertions), the shipped
+  `atlas` and `atlas-eng` binaries on real files (21 assertions: box and union STL volumes, a headless
+  project edit and undo, manifest validation, the licence policy and a byte-identical SBOM), and a
+  shared session's token boundary (4 assertions).
+  `scripts/browser-check.mjs` loads the live page in headless Chrome loopback and shared (8 + 9
+  assertions, zero console errors).
 * `.github/workflows/ci.yml` and `deny.toml` add the advisory and provenance job. **The workflow has
   not been executed on a runner**; only the gate it calls was run here.
 

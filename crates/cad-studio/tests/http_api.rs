@@ -1392,3 +1392,141 @@ fn a_recovered_session_can_be_discarded_back_to_the_file() -> Result<(), Box<dyn
     drop(dir);
     Ok(())
 }
+
+/// Sharing binds a non-loopback interface, so every API call must present the session token. The
+/// page itself may load without it: it carries no document data, and the browser needs the page in
+/// order to present the token at all.
+#[test]
+fn a_shared_studio_requires_its_token_and_keeps_the_same_origin_rule()
+-> Result<(), Box<dyn std::error::Error>> {
+    use cad_studio::{ShareOptions, start_with_options};
+    use std::net::{IpAddr, Ipv4Addr};
+
+    let dir = TempDir::new()?;
+    let path = dir.path().join("shared.zcad");
+    let project = default_project("shared", [40.0, 30.0, 10.0])?;
+    project.save(&path)?;
+    let handle = start_with_options(
+        project,
+        path.clone(),
+        0,
+        None,
+        ShareOptions {
+            bind: Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)),
+            token: Some("0123456789abcdef0123456789abcdef".into()),
+            host: Some("192.168.1.20".into()),
+        },
+    )?;
+    let addr = handle.addr();
+    let token = handle.token().ok_or("a shared studio must have a token")?.to_string();
+
+    // The share link names the advertised host, the real port and the token.
+    let share = handle.share_url().ok_or("a shared studio must have a share link")?;
+    assert_eq!(
+        share,
+        format!("http://192.168.1.20:{}/?token={token}", addr.port())
+    );
+    assert!(handle.url().ends_with(&format!("/?token={token}")));
+
+    // Reading the document without a token is refused, with the reason and the right status.
+    let missing = request(addr, "GET", "/api/state", &[], &[])?;
+    assert_eq!(missing.status, 401);
+    assert_eq!(json(&missing)?["error"]["kind"], "unauthorized");
+
+    let wrong = request(addr, "GET", "/api/state", &[("x-atlas-token", "not-the-token")], &[])?;
+    assert_eq!(wrong.status, 401);
+    assert_eq!(json(&wrong)?["error"]["kind"], "unauthorized");
+
+    // The query form is what the page opened from the share link uses on its first request.
+    let by_query = request(addr, "GET", &format!("/api/state?token={token}"), &[], &[])?;
+    assert_eq!(by_query.status, 200);
+    assert!(
+        (json(&by_query)?["geometry"]["volume_mm3"].as_f64().ok_or("volume")? - 12000.0).abs()
+            < 1e-6
+    );
+
+    let by_header = request(addr, "GET", "/api/state", &[("x-atlas-token", &token)], &[])?;
+    assert_eq!(by_header.status, 200);
+    // The payload tells the client what to offer for copying.
+    assert_eq!(json(&by_header)?["share"]["url"], share);
+
+    // The page shell loads so the token can be presented; it must not leak the URL to other origins.
+    let page = request(addr, "GET", "/", &[], &[])?;
+    assert_eq!(page.status, 200);
+    assert_eq!(
+        page.headers.get("referrer-policy").map(String::as_str),
+        Some("no-referrer")
+    );
+
+    // A write needs both the token and a same-origin request. `Host` is the address the browser
+    // dialled, exactly as a colleague's browser would send it.
+    let page_host = format!("127.0.0.1:{}", addr.port());
+    let origin = format!("http://{page_host}");
+    let body = r#"{"id":"depth","value":20}"#;
+    let no_token = request_with_host(
+        addr,
+        &page_host,
+        "POST",
+        "/api/parameter",
+        &[("origin", &origin), ("content-type", "application/json")],
+        body.as_bytes(),
+    )?;
+    assert_eq!(no_token.status, 401);
+
+    let bad_origin = request_with_host(
+        addr,
+        &page_host,
+        "POST",
+        "/api/parameter",
+        &[
+            ("x-atlas-token", &token),
+            ("origin", "http://evil.example"),
+            ("content-type", "application/json"),
+        ],
+        body.as_bytes(),
+    )?;
+    assert_eq!(bad_origin.status, 403);
+
+    let written = request_with_host(
+        addr,
+        &page_host,
+        "POST",
+        "/api/parameter",
+        &[
+            ("x-atlas-token", &token),
+            ("origin", &origin),
+            ("content-type", "application/json"),
+        ],
+        body.as_bytes(),
+    )?;
+    assert_eq!(written.status, 200, "{}", String::from_utf8_lossy(&written.body));
+    let payload = json(&written)?;
+    // 40 x 30 x 20 = 24000 mm3.
+    assert!(
+        (payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")? - 24000.0).abs() < 1e-6
+    );
+
+    // A Host naming another port is not this studio, shared or not.
+    let wrong_port = request_with_host(
+        addr,
+        "127.0.0.1:9999",
+        "GET",
+        "/api/state",
+        &[("x-atlas-token", &token)],
+        &[],
+    )?;
+    assert_eq!(wrong_port.status, 403);
+    drop(dir);
+    Ok(())
+}
+
+/// A loopback studio stays token-free, so the desktop workflow needs no credentials.
+#[test]
+fn a_loopback_studio_has_no_token_and_no_share_link() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("local", [10.0, 10.0, 5.0])?;
+    assert!(handle.token().is_none());
+    assert!(handle.share_url().is_none());
+    let state = json(&request(handle.addr(), "GET", "/api/state", &[], &[])?)?;
+    assert_eq!(state["share"], serde_json::Value::Null);
+    Ok(())
+}
