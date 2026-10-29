@@ -1580,6 +1580,9 @@
       byId("exportBtn").disabled = value || !exportable;
       byId("profileKind").disabled = value;
     }
+    // Revision rows are built inside `applyState`, which runs while the app is still busy, so their
+    // buttons would otherwise stay disabled until the next mutation.
+    renderRevisions();
     syncCreateControls();
     syncPlacementControls();
   }
