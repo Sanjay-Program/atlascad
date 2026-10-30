@@ -437,6 +437,83 @@ the list. This is exactly what the browser assertion exists to catch.
 
 ---
 
+### M11g — Sketch plane height and extrude direction (M)
+
+**Goal:** a sketch can sit on a horizontal plane above z = 0 and an extrude can sweep down from it, so
+a pocket can start on a top face and a boss can sit on one.
+
+**Why this order:** every feature started on the z = 0 plane, so a part could only grow upward from a
+single level. That is the recorded M11b limitation ("every cut starts on the z = 0 sketch plane, so a
+cut is a bottom-anchored pocket or a through-hole"), and it sits in front of patterns, mirrors, holes
+and every industry workspace. It is a dependency, not a polish item.
+
+**Status:** verified 2026-10-30 · **Priority:** user_value · **Risk:** medium · **Depends on:** M11b,
+M11c · **Evidence:** `engineering/tasks/completed.json#task.m11g.sketch-plane-and-direction`,
+`engineering/quality/tests.json#t-platform-workspace-20261030`.
+
+**Delivered:**
+
+1. `.zcad` **schema 8**. `Sketch.plane_z` is the height of the sketch plane in document units, and
+   `FeatureKind::Extrude` gains `direction` (`up`/`down`). Both fields are defaulted, so a schema-7
+   file is already valid and migrates by version alone; the bump exists so a schema-7 build reports
+   "newer schema" rather than failing on an unknown field.
+2. The kernel sweep always starts at z = 0, so the tool is extruded there and then **translated** to
+   its plane (`place_on_plane`). A kernel that does not advertise `Transform` refuses a raised plane
+   with a stated reason instead of silently building at z = 0.
+3. A **downward** extrude resolves to a negative depth. That is what makes a top-face pocket
+   expressible without a negative parameter: the parameter map holds positive lengths, so the
+   direction is an explicit input rather than a sign.
+4. A join whose tool sits exactly on a body face would be the kernel's coplanar case. The tool is
+   moved `JOIN_OVERLAP_MM` (0.01 mm) **into** the body instead, where the extra material is already
+   present, so the union's volume is unchanged. The adjustment is skipped unless the profile lies
+   inside the body's footprint, because a tool that overhangs the body has material outside it and
+   moving the face there would add or drop a sliver. That guard is why the pre-existing partial-
+   overlap join still measures 980 mm³; the first implementation shrank the tool instead and measured
+   978.08 mm³, a real 1.9 mm³ error found by the existing test.
+5. A cut tool's overshoot now accounts for the plane: the tool spans `[plane + min(depth,0),
+   plane + max(depth,0)]`, so a through-hole swept down from a top face has both faces coincident and
+   is still exact.
+6. The plane is part of the rebuild-cache key, so moving a sketch to another height rebuilds exactly
+   the prefixes that read it; `set_sketch_placement` applies coordinates and height as one undoable
+   transaction.
+7. Studio: a **Plane Z** field on both the create form and the placement panel, an **Direction**
+   selector (Up +Z / Down −Z) for extrudes, `plane_z` and `direction` in `/api/state`, and `plane` /
+   `direction` accepted by `/api/sketch` and `/api/feature/extrude`. An unknown direction is a `400`
+   that names itself.
+
+**Measured / asserted** (real Truck kernel, over the real HTTP surface):
+
+* a blind pocket on plane 3 of a 20 × 20 × 5 plate removes the inscribed-polygon area × 2 mm, the
+  plate keeps its bounds, undo returns 2000 mm³, redo restores it, save/reopen preserves the plane and
+  the exported solid is watertight (0 open edges);
+* a top-face boss on plane 5 adds area × 5 mm and raises the bound to z = 10, and its export is
+  watertight;
+* a downward through-hole from plane 5 removes area × 5 mm exactly, with both tool faces coincident
+  with the body's;
+* document-level: an inch plane reaches the kernel as 12.7 mm, a signed direction resolves to ±5, a
+  kernel without `Transform` fails with the capability named, moving the plane invalidates the cache,
+  placing a sketch is one undo step, a non-finite plane is refused, and a schema-7 file loads at
+  schema 8 with plane 0 / direction up.
+
+**Measured cost** (`docs/performance-baseline.md` §11): a two-feature plate plus raised boss rebuilds
+cold in **4.80 ms** (cached edit 4.41 ms) against **2.65 ms** for a same-size join at z = 0.
+
+**Recorded limitations, not claimed away:**
+
+1. Planes are **horizontal only**. A tilted or face-aligned plane is not representable, so a feature
+   can be raised or lowered but not reoriented.
+2. One body per project. A boss is a union into the body, not a separate component, so no assembly.
+3. The join overlap only applies inside the body's footprint; an overhanging boss is joined as drawn
+   and may hit the kernel's coplanar behaviour, which the feature reports if it fails.
+4. A cut whose tool would remove the whole body is still refused.
+5. The plane height is a literal number, not a parameter, so it is not in the parameter panel.
+6. Only the two-feature raised-plane workload is benchmarked.
+
+**Out of scope, and still out:** patterns, mirrors, holes/threads, fillets, multiple bodies, tilted
+planes, sketches on a selected face of the body.
+
+---
+
 ## 2. The correctness and kernel work (higher engineering value)
 
 ### M2 — Correctness corpus for booleans (M) — highest engineering value — partially delivered
@@ -625,9 +702,9 @@ graph, constraints, named revisions and recovery snapshots. M11 generalizes the 
 list; this milestone continues afterward with named revisions, recovery snapshots and additional sketch
 entities. Continue to refuse unknown fields and newer schemas rather than silently discard data.
 
-**Status:** in progress (schema 3 shipped; M11f named revisions and M11e sketch entities are the next
-pieces) · **Priority:** user_value · **Risk:** medium · **Depends on:** M11e, M11f · **Blocks:** anything
-that needs collaboration, versioning or SaaS.
+**Status:** in progress (schema 8 shipped: feature graph, named revisions, recovery, arc sectors,
+sketch planes and extrude direction) · **Priority:** user_value · **Risk:** medium · **Depends on:**
+M11e, M11f, M11g · **Blocks:** anything that needs collaboration, versioning or SaaS.
 
 **Acceptance criteria:** the schema expansion steps above, each with its own acceptance criteria in the
 feature tasks. The format must continue to refuse unknown fields (`serde(deny_unknown_fields)`) and newer

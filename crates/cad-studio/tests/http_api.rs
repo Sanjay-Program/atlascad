@@ -1258,6 +1258,257 @@ fn an_arc_sector_cuts_its_analytic_volume_and_survives_save_reopen_and_undo()
     Ok(())
 }
 
+/// The area of the polygon a circle sketch resolves to: `facets` chords at `radius`.
+///
+/// The document tessellates a circle at the document tolerance, so the analytic volume of a pocket or
+/// a boss is the polygon's, not the disc's. Asserting the polygon value ties the number to the
+/// geometry the document actually handed the kernel; the disc comparison below only says the
+/// polygon is a circle approximation.
+fn polygon_area(facets: u64, radius: f64) -> f64 {
+    0.5 * facets as f64 * radius * radius * (std::f64::consts::TAU / facets as f64).sin()
+}
+
+/// A pocket on a raised sketch plane: the sketch sits inside the plate and its tool sweeps up through
+/// the top face, so the plate loses exactly the swept volume and keeps its outer bounds.
+#[test]
+fn a_blind_pocket_from_a_raised_plane_removes_its_analytic_volume()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, path, handle) = fixture("pocket", [20.0, 20.0, 5.0])?;
+    let addr = handle.addr();
+
+    let initial = json(&request(addr, "GET", "/api/state", &[], &[])?)?;
+    let volume = initial["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!((volume - 2000.0).abs() < 1e-6, "fixture volume {volume}");
+
+    // A 10 mm circle at the plate's centre, on the plane z = 3, swept up 5 mm: the tool spans
+    // z = 3..8, so it opens through the z = 5 top face and leaves a 2 mm deep pocket.
+    let added = post(
+        addr,
+        "/api/sketch",
+        r#"{"kind":"circle","origin":[10,10],"plane":3}"#,
+    )?;
+    assert_eq!(
+        added.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&added.body)
+    );
+    let payload = json(&added)?;
+    let sketch = &payload["sketches"][1];
+    assert_eq!(sketch["plane_z"], 3.0);
+    let sketch_id = sketch["id"].as_u64().ok_or("sketch id")?;
+    let facets = sketch["segments"].as_u64().ok_or("segments")?;
+    assert!(
+        facets >= 24,
+        "a 10 mm circle needs at least the 24-facet floor"
+    );
+
+    let cut = post(
+        addr,
+        "/api/feature/extrude",
+        &format!(r#"{{"sketch_id":{sketch_id},"operation":"cut"}}"#),
+    )?;
+    assert_eq!(cut.status, 200, "{}", String::from_utf8_lossy(&cut.body));
+    let payload = json(&cut)?;
+    let analytic = 2000.0 - polygon_area(facets, 5.0) * 2.0;
+    let volume = payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!(
+        (volume - analytic).abs() < 1e-2,
+        "pocket volume {volume}, analytic {analytic}"
+    );
+    assert_eq!(payload["features"][1]["operation"], "cut");
+    assert_eq!(payload["features"][1]["direction"], "up");
+    assert_eq!(payload["features"][1]["status"], "built");
+    assert!(payload["failure"].is_null());
+    // The pocket is blind: the plate is still 20 x 20 x 5, it did not grow or shrink.
+    for (axis, expected) in [(0, 20.0), (1, 20.0), (2, 5.0)] {
+        let max = payload["bounds"]["max"][axis].as_f64().ok_or("bound")?;
+        assert!((max - expected).abs() < 1e-3, "max {axis} was {max}");
+        let min = payload["bounds"]["min"][axis].as_f64().ok_or("bound")?;
+        assert!(min.abs() < 1e-3, "min {axis} was {min}");
+    }
+
+    // Undo removes the pocket and its feature together; redo restores the same measurement.
+    let undone = post(addr, "/api/undo", "{}")?;
+    assert_eq!(undone.status, 200);
+    assert!(
+        (json(&undone)?["geometry"]["volume_mm3"]
+            .as_f64()
+            .ok_or("volume")?
+            - 2000.0)
+            .abs()
+            < 1e-6
+    );
+    let redone = post(addr, "/api/redo", "{}")?;
+    assert_eq!(redone.status, 200);
+    let volume = json(&redone)?["geometry"]["volume_mm3"]
+        .as_f64()
+        .ok_or("volume")?;
+    assert!(
+        (volume - analytic).abs() < 1e-2,
+        "volume after redo {volume}"
+    );
+
+    // The plane survives save and reopen, and the exported solid is watertight.
+    let saved = post(addr, "/api/save", "{}")?;
+    assert_eq!(saved.status, 200);
+    drop(handle);
+    let reopened = cad_document::Project::load(&path)?;
+    let reopened = start(reopened, path, 0)?;
+    let state = json(&request(reopened.addr(), "GET", "/api/state", &[], &[])?)?;
+    assert_eq!(state["sketches"][1]["plane_z"], 3.0);
+    assert_eq!(state["features"][1]["direction"], "up");
+    let volume = state["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!(
+        (volume - analytic).abs() < 1e-2,
+        "reopened pocket volume {volume}, analytic {analytic}"
+    );
+    let exported = request(reopened.addr(), "GET", "/api/export/stl", &[], &[])?;
+    assert_eq!(exported.status, 200);
+    let mesh = cad_io::read_stl_binary(&exported.body)?;
+    assert_eq!(
+        welded_open_edges(&mesh),
+        0,
+        "a pocketed solid must export as a closed manifold"
+    );
+    Ok(())
+}
+
+/// A boss on the top face: the sketch sits on z = 5 and sweeps up, so the body gains exactly the
+/// swept volume. This is the case that shares a face with the body, and it must be exact.
+#[test]
+fn a_boss_on_the_top_face_is_joined_exactly() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, path, handle) = fixture("boss", [20.0, 20.0, 5.0])?;
+    let addr = handle.addr();
+
+    let added = post(
+        addr,
+        "/api/sketch",
+        r#"{"kind":"circle","origin":[10,10],"plane":5}"#,
+    )?;
+    assert_eq!(added.status, 200);
+    let payload = json(&added)?;
+    assert_eq!(payload["sketches"][1]["plane_z"], 5.0);
+    let sketch_id = payload["sketches"][1]["id"].as_u64().ok_or("id")?;
+    let facets = payload["sketches"][1]["segments"]
+        .as_u64()
+        .ok_or("segments")?;
+
+    let joined = post(
+        addr,
+        "/api/feature/extrude",
+        &format!(r#"{{"sketch_id":{sketch_id},"operation":"join"}}"#),
+    )?;
+    assert_eq!(
+        joined.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&joined.body)
+    );
+    let payload = json(&joined)?;
+    let analytic = 2000.0 + polygon_area(facets, 5.0) * 5.0;
+    let volume = payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!(
+        (volume - analytic).abs() < 1e-2,
+        "boss volume {volume}, analytic {analytic}"
+    );
+    assert_eq!(payload["features"][1]["operation"], "join");
+    assert_eq!(payload["features"][1]["status"], "built");
+    assert!(payload["failure"].is_null());
+    // The boss is 5 mm tall on a 5 mm plate.
+    let max_z = payload["bounds"]["max"][2].as_f64().ok_or("z")?;
+    assert!((max_z - 10.0).abs() < 1e-3, "top of the boss was {max_z}");
+
+    // Save and reopen preserves the plane and the measurement, and the export is watertight.
+    let saved = post(addr, "/api/save", "{}")?;
+    assert_eq!(saved.status, 200);
+    drop(handle);
+    let reopened = cad_document::Project::load(&path)?;
+    let reopened = start(reopened, path, 0)?;
+    let state = json(&request(reopened.addr(), "GET", "/api/state", &[], &[])?)?;
+    assert_eq!(state["sketches"][1]["plane_z"], 5.0);
+    let volume = state["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!(
+        (volume - analytic).abs() < 1e-2,
+        "reopened boss volume {volume}, analytic {analytic}"
+    );
+    let exported = request(reopened.addr(), "GET", "/api/export/stl", &[], &[])?;
+    assert_eq!(exported.status, 200);
+    let mesh = cad_io::read_stl_binary(&exported.body)?;
+    assert!(
+        (mesh.signed_volume().abs() - analytic).abs() < 1e-2,
+        "exported volume {}",
+        mesh.signed_volume()
+    );
+    assert_eq!(welded_open_edges(&mesh), 0, "a boss must export watertight");
+    Ok(())
+}
+
+/// A through-hole drilled down from the top face: the sketch is placed on z = 5, sweeps down the
+/// full 5 mm plate, so both of the tool's faces are coincident with the body's and the cut has to be
+/// exact rather than a hairline membrane.
+#[test]
+fn a_through_hole_swept_down_from_the_top_face_is_exact() -> Result<(), Box<dyn std::error::Error>>
+{
+    let (_dir, _path, handle) = fixture("through", [20.0, 20.0, 5.0])?;
+    let addr = handle.addr();
+
+    let added = post(
+        addr,
+        "/api/sketch",
+        r#"{"kind":"circle","origin":[10,10],"plane":5}"#,
+    )?;
+    assert_eq!(added.status, 200);
+    let payload = json(&added)?;
+    let sketch_id = payload["sketches"][1]["id"].as_u64().ok_or("id")?;
+    let facets = payload["sketches"][1]["segments"]
+        .as_u64()
+        .ok_or("segments")?;
+
+    let cut = post(
+        addr,
+        "/api/feature/extrude",
+        &format!(r#"{{"sketch_id":{sketch_id},"operation":"cut","direction":"down"}}"#),
+    )?;
+    assert_eq!(cut.status, 200, "{}", String::from_utf8_lossy(&cut.body));
+    let payload = json(&cut)?;
+    assert_eq!(payload["features"][1]["direction"], "down");
+    assert_eq!(payload["features"][1]["status"], "built");
+    let analytic = 2000.0 - polygon_area(facets, 5.0) * 5.0;
+    let volume = payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!(
+        (volume - analytic).abs() < 1e-2,
+        "through-hole volume {volume}, analytic {analytic}"
+    );
+    // A hole does not move the plate.
+    for (axis, expected) in [(0, 20.0), (1, 20.0), (2, 5.0)] {
+        let max = payload["bounds"]["max"][axis].as_f64().ok_or("bound")?;
+        assert!((max - expected).abs() < 1e-3, "max {axis} was {max}");
+    }
+
+    // Bad placement and direction inputs are refused by name rather than silently defaulted.
+    let bad_plane = post(
+        addr,
+        "/api/sketch",
+        r#"{"kind":"rectangle","plane":"high"}"#,
+    )?;
+    assert_eq!(bad_plane.status, 400);
+    let bad_direction = post(
+        addr,
+        "/api/feature/extrude",
+        &format!(r#"{{"sketch_id":{sketch_id},"operation":"cut","direction":"sideways"}}"#),
+    )?;
+    assert_eq!(bad_direction.status, 400);
+    assert!(
+        json(&bad_direction)?["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("direction"),
+        "an unknown direction must name itself"
+    );
+    Ok(())
+}
+
 /// Named revisions through the real HTTP surface: record two, edit between them, restore, undo the
 /// restore, save, and reopen with both copies still usable.
 #[test]

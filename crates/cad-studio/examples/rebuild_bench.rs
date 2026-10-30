@@ -189,6 +189,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         long.add_extrude_feature(sketch, depth_param, ExtrudeOperation::Join)?;
     }
 
+    // A boss on a raised sketch plane: the second sketch sits on the block's top face and sweeps up,
+    // so this workload includes the plane translation and the join overlap adjustment that a
+    // coincident face needs. The circle is 5 mm across, well inside the 10 x 10 block.
+    let mut boss = Project::box_part(
+        "boss",
+        DocumentId::new(5),
+        Unit::Millimeter,
+        [10.0, 10.0, 5.0],
+    )?;
+    boss.set_parameter("diameter", 5.0)?;
+    let sketch = boss.add_sketch_on_plane(
+        cad_document::SketchProfile::Circle {
+            diameter_param: "diameter".into(),
+        },
+        [5.0, 5.0],
+        5.0,
+    )?;
+    boss.add_extrude_feature_in_direction(
+        sketch,
+        "depth",
+        ExtrudeOperation::Join,
+        cad_document::ExtrudeDirection::Up,
+    )?;
+
     println!(
         "{:<34} {:>10} {:>10}   volume",
         "workload", "cold (ms)", "cached ms"
@@ -200,6 +224,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ("cut (2 features)", &cut, "depth"),
         ("cut+join (3 features)", &mixed, "depth"),
         ("join, last feature isolated", &isolated, "diameter"),
+        ("boss on a raised plane (2)", &boss, "depth"),
         ("6 features, last isolated", &long, "diameter"),
     ] {
         let (cold, cold_volume) = time_cold(project, samples)?;

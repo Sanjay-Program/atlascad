@@ -82,6 +82,10 @@
             <label for="newOriginY">Y</label>
             <input id="newOriginY" type="number" step="any" value="0" inputmode="decimal" aria-label="New sketch origin Y">
           </div>
+          <div class="field">
+            <label for="newOriginZ">Plane Z</label>
+            <input id="newOriginZ" type="number" step="any" value="0" inputmode="decimal" aria-label="New sketch plane height">
+          </div>
         </div>
         <button id="addSketchBtn" class="button wide">Add sketch</button>
         <div class="field">
@@ -108,6 +112,13 @@
         <div class="field" id="newDepthField">
           <label for="newFeatureDepth">Depth</label>
           <select id="newFeatureDepth" aria-label="Depth parameter"></select>
+        </div>
+        <div class="field" id="newDirectionField">
+          <label for="newFeatureDirection">Direction</label>
+          <select id="newFeatureDirection" aria-label="Extrude direction">
+            <option value="up">Up (+Z)</option>
+            <option value="down">Down (−Z)</option>
+          </select>
         </div>
         <div class="field" id="newAxisField" hidden>
           <label for="newFeatureAxis">Axis</label>
@@ -163,8 +174,12 @@
             <label for="originY">Y</label>
             <input id="originY" type="number" step="any" value="0" inputmode="decimal" aria-label="Sketch origin Y">
           </div>
+          <div class="field">
+            <label for="originZ">Plane Z</label>
+            <input id="originZ" type="number" step="any" value="0" inputmode="decimal" aria-label="Sketch plane height">
+          </div>
         </div>
-        <button id="moveSketchBtn" class="button wide">Move sketch</button>
+        <button id="moveSketchBtn" class="button wide">Place sketch</button>
       </section>
 
       <section class="panel-section grow">

@@ -372,7 +372,7 @@
         "engineering/quality/tests.json#t-cad-studio-m11f",
         "engineering/quality/tests.json#t-cad-studio-browser-m11f"
       ],
-      "notes": "Saves are atomic (temp file, fsync, rename) and the snapshot is a separate file, so an autosave never writes the project. A superseded snapshot is deleted and a corrupt one ignored. Named revisions are not implemented."
+      "notes": "Saves are atomic (temp file, fsync, rename) and the snapshot is a separate file, so an autosave never writes the project. A superseded snapshot is deleted and a corrupt one ignored. Named revisions and the last-good-file backup are implemented (cap.document.named-revisions); the payload is at schema 8."
     },
     {
       "id": "cap.document.feature-graph",
@@ -387,7 +387,7 @@
         "engineering/quality/tests.json#t-cad-studio-m11d (980 mm3 joined volume over HTTP, save/reopen and STL parse-back)",
         "docs/architecture-decisions/0009-feature-graph.md"
       ],
-      "notes": "Linear and single-body: a second new_body is refused, and cut is gated on a passing difference corpus. A failed feature is reported by ID and the last good mesh is kept. Each built prefix is cached under a hash of its resolved inputs, bounded at 32 entries."
+      "notes": "Linear and single-body: a second new_body is refused. A failed feature is reported by ID and the last good mesh is kept. Each built prefix is cached under a hash of its resolved inputs, bounded at 32 entries. A sketch carries a plane height and an extrude a direction (schema 8), so a feature can start above z = 0 and sweep down; the tool is translated after the sweep and the plane is part of the cache key."
     },
     {
       "id": "cap.entitlements.policy",
@@ -537,6 +537,24 @@
         "docs/feature-matrix.md"
       ],
       "notes": "Opt-in only: the default bind is loopback with no token. A non-loopback bind always requires a token; the static page is served without one so the browser can present it. One document and one history are shared, so the last write wins; there is no account layer and the link dies with the process."
+    },
+    {
+      "id": "cap.document.sketch-plane",
+      "name": "Sketch plane height and extrude direction",
+      "description": "A sketch is placed on a horizontal plane at a height above z = 0 and an extrude sweeps up or down from it, so a pocket can start on a top face and a boss can sit on one.",
+      "provided_by": [
+        "module.cad-document",
+        "module.cad-studio"
+      ],
+      "verification": "verified",
+      "evidence": [
+        "crates/cad-studio/tests/http_api.rs::a_blind_pocket_from_a_raised_plane_removes_its_analytic_volume",
+        "crates/cad-studio/tests/http_api.rs::a_boss_on_the_top_face_is_joined_exactly",
+        "crates/cad-studio/tests/http_api.rs::a_through_hole_swept_down_from_the_top_face_is_exact",
+        "engineering/quality/tests.json#t-platform-workspace-20261030",
+        "engineering/quality/benchmarks.json#bm-rebuild-boss-plane"
+      ],
+      "notes": "The kernel sweep always starts at z = 0, so the tool is extruded there and translated; a kernel without Transform refuses a raised plane with a stated reason. A join whose tool sits exactly on a body face is moved JOIN_OVERLAP_MM into the body, which is volume-neutral only while the profile lies inside the body's footprint; an overhanging boss is joined as drawn and the kernel's own result is reported. Planes are horizontal only: no tilted or arbitrary sketch plane, and no multiple bodies."
     }
   ]
 }

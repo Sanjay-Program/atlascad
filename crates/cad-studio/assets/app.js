@@ -1289,18 +1289,21 @@
     const label = byId("placementLabel");
     const x = byId("originX");
     const y = byId("originY");
+    const z = byId("originZ");
     const button = byId("moveSketchBtn");
     const disabled = app.busy || !sketch;
     x.disabled = disabled;
     y.disabled = disabled;
+    z.disabled = disabled;
     button.disabled = disabled;
     if (!sketch) {
       label.textContent = "no sketch";
       return;
     }
-    label.textContent = `sketch ${sketch.id}`;
+    label.textContent = `sketch ${sketch.id} · plane ${formatNumber(sketch.plane_z || 0)}`;
     if (document.activeElement !== x) x.value = String(sketch.origin[0]);
     if (document.activeElement !== y) y.value = String(sketch.origin[1]);
+    if (document.activeElement !== z) z.value = String(sketch.plane_z || 0);
   }
 
   function syncCreateControls() {
@@ -1316,6 +1319,7 @@
     const featureKind = byId("newFeatureKind").value;
     let revolves = featureKind === "revolve";
     byId("newDepthField").hidden = revolves;
+    byId("newDirectionField").hidden = revolves;
     byId("newAxisField").hidden = !revolves;
     byId("addFeatureBtn").textContent = revolves ? "Add revolve" : "Add extrude";
 
@@ -1433,6 +1437,7 @@
         ["Selected", `Sketch ${sketch.id}`],
         ["Profile", profileName(sketch.profile.kind)],
         ["Origin", `${formatNumber(sketch.origin[0])}, ${formatNumber(sketch.origin[1])} ${project.units}`],
+        ["Plane", `${formatNumber(sketch.plane_z || 0)} ${project.units}`],
         ["Segments", String(sketch.segments)]
       );
       if (sketch.profile.kind === "polyline" && Array.isArray(sketch.profile.points)) {
@@ -1456,7 +1461,8 @@
       } else {
         rows.push(
           ["Depth parameter", feature.depth_param],
-          ["Depth", `${formatNumber(feature.depth_mm / unitScale)} ${project.units}`]
+          ["Depth", `${formatNumber(feature.depth_mm / unitScale)} ${project.units}`],
+          ["Direction", feature.direction === "down" ? "down (−Z)" : "up (+Z)"]
         );
       }
       if (typeof feature.volume_mm3 === "number") {
@@ -1746,7 +1752,12 @@
       toast("A sketch origin needs two finite numbers.", true);
       return;
     }
-    const body = { kind, origin };
+    const plane = Number(byId("newOriginZ").value);
+    if (!Number.isFinite(plane)) {
+      toast("A sketch plane needs a finite height.", true);
+      return;
+    }
+    const body = { kind, origin, plane };
     if (kind === "regular_polygon") {
       const sides = Number(byId("newSidesInput").value);
       if (!Number.isInteger(sides) || sides < 3 || sides > 256) {
@@ -1801,10 +1812,11 @@
       toast("Pick a depth parameter first.", true);
       return;
     }
+    const direction = byId("newFeatureDirection").value;
     const next = await mutate(
       "/api/feature/extrude",
-      { sketch_id: sketchId, depth_param: depthParam, operation },
-      `${action} extrude added`
+      { sketch_id: sketchId, depth_param: depthParam, operation, direction },
+      `${action} extrude added (${direction === "down" ? "down" : "up"})`
     );
     if (next) selectNewest("feature", next);
   }
@@ -1820,11 +1832,20 @@
       toast("A sketch origin needs two finite numbers.", true);
       return;
     }
-    if (origin[0] === sketch.origin[0] && origin[1] === sketch.origin[1]) return;
+    const plane = Number(byId("originZ").value);
+    if (!Number.isFinite(plane)) {
+      toast("A sketch plane needs a finite height.", true);
+      return;
+    }
+    const unchanged =
+      origin[0] === sketch.origin[0] &&
+      origin[1] === sketch.origin[1] &&
+      plane === (sketch.plane_z || 0);
+    if (unchanged) return;
     await mutate(
       "/api/sketch/origin",
-      { id: sketch.id, origin },
-      `Sketch ${sketch.id} moved to ${formatNumber(origin[0])}, ${formatNumber(origin[1])}`
+      { id: sketch.id, origin, plane },
+      `Sketch ${sketch.id} placed at ${formatNumber(origin[0])}, ${formatNumber(origin[1])}, plane ${formatNumber(plane)}`
     );
   }
 

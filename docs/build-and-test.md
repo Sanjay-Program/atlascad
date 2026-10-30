@@ -3,7 +3,29 @@
 **Historical sections below record runs from 2026-10-21 and 2026-10-22 unless marked otherwise.**
 Results are copied from the actual output, not summarised from expectation.
 
-## Current platform workspace baseline — 2026-10-25
+## Current platform workspace baseline — 2026-10-30
+
+Same eleven-package root workspace, same three commands:
+
+```sh
+cargo fmt --all --check
+cargo clippy --offline --workspace --all-targets -j 2 -- -D warnings
+cargo test --offline --workspace -j 2
+./scripts/gate.sh --quick          # the above plus the corpus, manifest, licence and SBOM steps
+node scripts/browser-check.mjs http://127.0.0.1:7788   # against a running studio
+```
+
+Results: **309 tests passed, 0 failed** (298 before this cycle), fmt and clippy `-D warnings` clean.
+`cad-document` holds 78 of them (70 before) and `cad-studio` 25 HTTP integration tests (22 before).
+The browser check passed **20 assertions** on a 10 × 10 × 5 project served from
+`target/debug/cad-studio --new … --size 10,10,5`: it creates a circle sketch on plane 5, asserts the
+placement field, the placement label and the properties pane, joins an upward boss and reads about
+597 mm³ from the live page with zero console errors.
+
+Record: `engineering/quality/tests.json#t-platform-workspace-20261030`. Measurement:
+`engineering/quality/benchmarks.json#bm-rebuild-boss-plane` and `docs/performance-baseline.md` §11.
+
+## Platform workspace baseline — 2026-10-25
 
 The eleven-package root workspace (including `cad-io` and `cad-studio`) passes the same gates:
 

@@ -604,7 +604,7 @@
       "skipped": 0,
       "duration_ms": 0,
       "recorded_at": "2026-10-29",
-      "notes": "Headless Chrome over CDP against the release server, 4 new DOM assertions: the Revisions panel records `browser baseline` and shows the row with its name; a depth edit through the parameter panel changes the measured body; clicking Restore returns the original measurement; and the command palette offers `Restore revision “browser baseline”`. The whole run is now 15 assertions loopback and 17 shared, zero console errors. The first attempt timed out because revision buttons were rendered disabled while the app was busy; setBusy now re-renders the list.",
+      "notes": "Headless Chrome over CDP against the release server, 4 new DOM assertions: the Revisions panel records `browser baseline` and shows the row with its name; a depth edit through the parameter panel changes the measured body; clicking Restore returns the original measurement; and the command palette offers `Restore revision \u201cbrowser baseline\u201d`. The whole run is now 15 assertions loopback and 17 shared, zero console errors. The first attempt timed out because revision buttons were rendered disabled while the app was busy; setBusy now re-renders the list.",
       "supersedes": []
     },
     {
@@ -651,6 +651,18 @@
       "supersedes": [
         "t-platform-workspace-20261029-gate"
       ]
+    },
+    {
+      "id": "t-platform-workspace-20261030",
+      "target": "repo.cad-document",
+      "command": "cargo test --offline --workspace -j 2",
+      "outcome": "success",
+      "passed": 309,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-30",
+      "notes": "Eleven-package root workspace, 309 tests including doctests, 0 failed. cad-document 78 (70 before this cycle; 8 new: raised-plane translation, signed direction, inch plane conversion, no-transform refusal, cache invalidation on a plane move, one-step placement undo, non-finite plane refusal, schema-7 migration). cad-studio HTTP integration 25 (22 before; 3 new analytic tests against the real Truck kernel: blind pocket on a raised plane, boss joined on the top face, through-hole swept down from the top face; the pre-existing partial-overlap join still measures 980 mm3). clippy --workspace --all-targets -D warnings clean, cargo fmt --check clean."
     }
   ]
 }

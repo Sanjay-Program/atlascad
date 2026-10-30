@@ -301,6 +301,71 @@ try {
     `the sector profile panel shows ${JSON.stringify(sectorProfile)}`
   );
 
+  // M11g — a sketch on a raised plane and a boss joined onto the top face. The page has to send the
+  // plane height and the extrude direction, and both panels have to show what the document stored.
+  // The plate is 10 x 10 x 5, so a 5 mm circle at (5,5) on plane 5 is an inscribed boss.
+  await evaluate(`(() => {
+    const diameter = document.getElementById("param-diameter");
+    diameter.value = "5";
+    diameter.dispatchEvent(new Event("change"));
+    return true;
+  })()`);
+  await waitFor('!document.getElementById("saveBtn").disabled', 'the diameter edit');
+  await evaluate(`(() => {
+    const kind = document.getElementById("newSketchKind");
+    kind.value = "circle";
+    kind.dispatchEvent(new Event("change"));
+    document.getElementById("newOriginX").value = "5";
+    document.getElementById("newOriginY").value = "5";
+    document.getElementById("newOriginZ").value = "5";
+    return true;
+  })()`);
+  await evaluate('document.getElementById("addSketchBtn").click()');
+  await waitFor(
+    'document.querySelectorAll("#tree .tree-item").length === 4',
+    'the raised sketch'
+  );
+  const placement = await evaluate(`(() => {
+    document.querySelectorAll("#tree .tree-item")[3].click();
+    return {
+      plane: document.getElementById("originZ").value,
+      label: document.getElementById("placementLabel").textContent,
+      properties: document.getElementById("properties").textContent,
+    };
+  })()`);
+  check(placement.plane === '5', `the placement field shows plane ${placement.plane}`);
+  check(/plane 5/.test(placement.label), `the placement label is ${placement.label}`);
+  check(
+    placement.properties.includes('Plane'),
+    `the sketch properties do not report its plane: ${placement.properties.slice(-120)}`
+  );
+
+  await evaluate(`(() => {
+    const operation = document.getElementById("newFeatureOperation");
+    operation.value = "join";
+    operation.dispatchEvent(new Event("change"));
+    document.getElementById("newFeatureDirection").value = "up";
+    document.getElementById("addFeatureBtn").click();
+    return true;
+  })()`);
+  await waitFor(
+    'document.querySelectorAll("#tree .tree-item").length === 5',
+    'the boss feature'
+  );
+  const boss = await evaluate(`({
+    properties: document.getElementById("properties").textContent,
+    volume: document.getElementById("statusGeometry").textContent,
+  })`);
+  check(
+    boss.properties.includes('up (+Z)'),
+    `the extrude panel does not show its direction: ${boss.properties.slice(-160)}`
+  );
+  const bossVolume = Number((boss.volume.match(/([0-9.]+)\s*mm/) || [])[1]);
+  check(
+    bossVolume > 590 && bossVolume < 610,
+    `the boss volume is ${boss.volume}, expected about 597 mm³`
+  );
+
   check(consoleErrors.length === 0, `console errors: ${consoleErrors.join(' | ')}`);
 
   console.log(`==> browser check passed (${passed} assertions)`);

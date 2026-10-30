@@ -7,6 +7,22 @@ Sizes are rough effort for one engineer: **S** ≤ 1 day, **M** ≤ 1 week, **L*
 
 ---
 
+## Done in the 2026-10-30 cycle
+
+| Item | Result | Evidence |
+|---|---|---|
+| **M11g** — sketch plane height and extrude direction (`.zcad` schema 8) | **done, 8 document tests + 3 analytic HTTP tests + 4 browser assertions + 1 measurement** — a sketch sits on a horizontal plane at any height and an extrude sweeps up or down from it, so a pocket can start on a top face and a boss can sit on one. A blind pocket, a downward through-hole and a top-face boss each match the analytic inscribed-polygon volume to 1e-2 mm³ over HTTP against the real Truck kernel, and both raised-plane exports are watertight. A join tool that sits exactly on a body face is moved 0.01 mm into the body, which is volume-neutral only inside the body's footprint, so an overhanging join is left exactly as it was. | `crates/cad-document`, `crates/cad-studio`, `engineering/quality/tests.json#t-platform-workspace-20261030`, `benchmarks.json#bm-rebuild-boss-plane`, `docs/performance-baseline.md` §11 |
+| Measured cost of a raised plane | **done** — a two-feature plate plus top-face boss rebuilds cold in **4.80 ms** (cached edit 4.41 ms) against **2.65 ms** for a same-size join at z = 0; the volume is the analytic 597.057 mm³ | `docs/performance-baseline.md` §11 |
+| Root workspace gate | **green** — 309 tests (up from 298), fmt and clippy `-D warnings` clean; the browser check grew to 20 assertions and the HTTP suite to 25 | `engineering/quality/tests.json#t-platform-workspace-20261030` |
+| Research and platform documents requested by the 2026-10-30 brief | **written, with status separated from proposal** — capability matrix, industry-toolset roadmap, API/plugin compatibility, system requirements, feature implementation status | `docs/research/CAD_CAPABILITY_MATRIX.md`, `docs/research/INDUSTRY_TOOLSETS.md`, `docs/research/API_AND_PLUGIN_COMPATIBILITY.md`, `docs/platform/SYSTEM_REQUIREMENTS.md`, `docs/roadmap/FEATURE_IMPLEMENTATION_STATUS.md` |
+
+**Not done this cycle, and not implied by the table above:** any 2D drafting entity, pattern, fillet,
+sweep, loft, assembly, drawing, STEP/DXF import or export, industry workspace, AI layer, cloud
+billing, or enterprise capability. Those remain absent as listed in `docs/feature-matrix.md` and
+`docs/roadmap/FEATURE_IMPLEMENTATION_STATUS.md`.
+
+---
+
 ## Done in the 2026-10-29 cycle
 
 | Item | Result | Evidence |

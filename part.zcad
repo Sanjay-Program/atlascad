@@ -1,0 +1,191 @@
+{
+  "schema": 7,
+  "header": {
+    "schema": 2,
+    "document": 1,
+    "units": "millimeter",
+    "tolerance": {
+      "linear_mm": 0.05,
+      "angular_rad": 0.005
+    }
+  },
+  "revision": 6,
+  "name": "bracket",
+  "parameters": [
+    {
+      "id": "width",
+      "value": 40.0
+    },
+    {
+      "id": "height",
+      "value": 30.0
+    },
+    {
+      "id": "depth",
+      "value": 10.0
+    },
+    {
+      "id": "diameter",
+      "value": 10.0
+    }
+  ],
+  "sketches": [
+    {
+      "id": 1,
+      "origin": [
+        0.0,
+        0.0
+      ],
+      "profile": {
+        "kind": "rectangle",
+        "width_param": "width",
+        "height_param": "height"
+      }
+    }
+  ],
+  "features": [
+    {
+      "id": 2,
+      "sketch_id": 1,
+      "operation": "new_body",
+      "kind": {
+        "type": "extrude",
+        "depth_param": "depth"
+      }
+    }
+  ],
+  "next_entity": 3,
+  "undo": [
+    {
+      "parameters": [
+        {
+          "id": "width",
+          "value": 10.0
+        },
+        {
+          "id": "height",
+          "value": 10.0
+        },
+        {
+          "id": "depth",
+          "value": 5.0
+        },
+        {
+          "id": "diameter",
+          "value": 10.0
+        }
+      ],
+      "sketches": [],
+      "features": [],
+      "next_entity": 1
+    },
+    {
+      "parameters": [
+        {
+          "id": "width",
+          "value": 40.0
+        },
+        {
+          "id": "height",
+          "value": 10.0
+        },
+        {
+          "id": "depth",
+          "value": 5.0
+        },
+        {
+          "id": "diameter",
+          "value": 10.0
+        }
+      ],
+      "sketches": [],
+      "features": [],
+      "next_entity": 1
+    },
+    {
+      "parameters": [
+        {
+          "id": "width",
+          "value": 40.0
+        },
+        {
+          "id": "height",
+          "value": 30.0
+        },
+        {
+          "id": "depth",
+          "value": 5.0
+        },
+        {
+          "id": "diameter",
+          "value": 10.0
+        }
+      ],
+      "sketches": [],
+      "features": [],
+      "next_entity": 1
+    },
+    {
+      "parameters": [
+        {
+          "id": "width",
+          "value": 40.0
+        },
+        {
+          "id": "height",
+          "value": 30.0
+        },
+        {
+          "id": "depth",
+          "value": 10.0
+        },
+        {
+          "id": "diameter",
+          "value": 10.0
+        }
+      ],
+      "sketches": [],
+      "features": [],
+      "next_entity": 1
+    },
+    {
+      "parameters": [
+        {
+          "id": "width",
+          "value": 40.0
+        },
+        {
+          "id": "height",
+          "value": 30.0
+        },
+        {
+          "id": "depth",
+          "value": 10.0
+        },
+        {
+          "id": "diameter",
+          "value": 10.0
+        }
+      ],
+      "sketches": [
+        {
+          "id": 1,
+          "origin": [
+            0.0,
+            0.0
+          ],
+          "profile": {
+            "kind": "rectangle",
+            "width_param": "width",
+            "height_param": "height"
+          }
+        }
+      ],
+      "features": [],
+      "next_entity": 2
+    }
+  ],
+  "redo": [],
+  "revisions": [],
+  "next_revision": 1
+}

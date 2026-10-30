@@ -229,7 +229,7 @@
       "unit": "ms",
       "host": "i3-1125G4, debug build, loopback, Fedora 43, rustc 1.95.0",
       "recorded_at": "2026-10-29",
-      "notes": "Same project and client conventions as bm-studio-m11-rebuild, whose 17.4 ms this replaces: since the studio keeps a BuildCache, a repeat request reuses every prefix and only clones the mesh. 0.6–0.9 ms median and 1.1 ms max over three runs of target/studio-qa/measure-cache.sh. An edit of a parameter both features read is 18.5 ms median, i.e. a full rebuild as before (+2% measured in-process)."
+      "notes": "Same project and client conventions as bm-studio-m11-rebuild, whose 17.4 ms this replaces: since the studio keeps a BuildCache, a repeat request reuses every prefix and only clones the mesh. 0.6\u20130.9 ms median and 1.1 ms max over three runs of target/studio-qa/measure-cache.sh. An edit of a parameter both features read is 18.5 ms median, i.e. a full rebuild as before (+2% measured in-process)."
     },
     {
       "id": "bm-rebuild-cache",
@@ -239,7 +239,17 @@
       "unit": "ms",
       "host": "i3-1125G4, release, single thread",
       "recorded_at": "2026-10-29",
-      "notes": "1 new-body extrude + 5 joins, last feature's depth on `diameter`: cold 30.32 ms (6 extrudes, 5 unions), cached 7.88 ms (1 extrude, 1 union), unchanged history 0.01 ms. Volumes 1500.080 and 1720.080 mm³ unchanged. Harness: cargo run --release -p cad-studio --example rebuild_bench, three warm-up rebuilds discarded, a unique parameter value before every sample."
+      "notes": "1 new-body extrude + 5 joins, last feature's depth on `diameter`: cold 30.32 ms (6 extrudes, 5 unions), cached 7.88 ms (1 extrude, 1 union), unchanged history 0.01 ms. Volumes 1500.080 and 1720.080 mm\u00b3 unchanged. Harness: cargo run --release -p cad-studio --example rebuild_bench, three warm-up rebuilds discarded, a unique parameter value before every sample."
+    },
+    {
+      "id": "bm-rebuild-boss-plane",
+      "name": "rebuild a 10x10x5 plate plus a 5 mm boss on a raised sketch plane",
+      "metric": "median rebuild time, cold and cached, 20 samples after 3 discarded warm-ups",
+      "value": 4.8,
+      "unit": "ms cold (4.41 ms cached edit of the last feature)",
+      "host": "i3-1125G4, release, single thread",
+      "recorded_at": "2026-10-30",
+      "notes": "Harness: cargo run --release -p cad-studio --example rebuild_bench. The boss sketch sits on the plate's top face (plane 5) and sweeps up 5 mm; volume 597.057 mm3 = 500 plate + the 24-facet polygon area of a 5 mm circle x 5, matching the analytic value. Same run: plain two-feature join 2.65 ms cold, cut 1.50 ms, six-feature history 32.77 ms cold / 8.81 ms cached edit, unchanged history 0.00-0.01 ms. The raised plane costs about 2 ms over a same-size join because it adds a translate and a face-coincident union. Recorded in docs/performance-baseline.md section 11. Rebuild times only; not comparable to the request-level figures that include serialisation and the response write."
     }
   ]
 }

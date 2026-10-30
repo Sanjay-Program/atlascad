@@ -70,7 +70,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 ///   history. A schema-6 reader would fail on the unknown `revisions` field as an invalid document,
 ///   so the version is bumped; a schema-6 file is migrated to 7 on load with no field changes and
 ///   starts with no revisions.
-pub const PROJECT_SCHEMA: u32 = 7;
+/// * Schema 8 gives a sketch a plane height, so a part is not limited to the z = 0 plane, and gives
+///   an extrude a direction. Both fields are defaulted, so a schema-7 file is already valid; the
+///   version is bumped because a schema-7 reader would refuse the new sketch field as an invalid
+///   document rather than report a newer schema.
+pub const PROJECT_SCHEMA: u32 = 8;
 
 /// Smallest regular polygon the sketch model accepts.
 pub const MIN_POLYGON_SIDES: u32 = 3;
@@ -98,6 +102,21 @@ pub const MAX_POLYLINE_POINTS: usize = 256;
 /// manufacturing process this application targets. A through-cut's volume is therefore exact; a
 /// pocket whose end is inside the body is not extended at all, so it is exact too.
 pub const CUT_OVERSHOOT_MM: f64 = 1e-2;
+
+/// How far, in millimetres, a join tool is moved into the body it joins when a face of each would
+/// otherwise be coincident.
+///
+/// A union whose operands share a face is the kernel's known weak case (see
+/// `docs/kernel-comparison.md` §4): the corpus records tangent contact as a failure. Placing a boss
+/// on a body's top or bottom face produces exactly that, which is why a sketch plane above z = 0
+/// would otherwise be unusable for the one workflow it exists to enable.
+///
+/// The adjustment moves the coincident face **into** the body instead of out of it, so the extra
+/// material is already present and the union's volume is unchanged. It is deliberately smaller than
+/// the 0.05 mm document tolerance and ten times the boolean tolerance, so it breaks the coincidence
+/// reliably without moving the visible face.
+pub const JOIN_OVERLAP_MM: f64 = 1e-2;
+
 const MIN_CIRCLE_SEGMENTS: usize = 24;
 const MAX_CIRCLE_SEGMENTS: usize = 256;
 /// Fewest facets an arc may be approximated by: two, so a sector is never a single chord.
@@ -215,13 +234,55 @@ impl SketchProfile {
     }
 }
 
-/// A closed profile in the XY plane, positioned by `origin`, in document units.
+/// A closed profile in a horizontal plane, positioned by `origin` and `plane_z`, in document units.
+///
+/// A sketch plane is parallel to the world XY plane at height `plane_z`. One plane height is enough
+/// to place a boss on a top face or to start a pocket below one; a tilted or arbitrary plane is not
+/// part of the document, and a feature therefore never claims to build on one.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Sketch {
     pub id: EntityId,
     pub origin: [f64; 2],
+    /// Height of the sketch plane above z = 0, in document units. Defaults to 0 for a schema-7
+    /// file, which could only sketch on the world plane.
+    #[serde(default)]
+    pub plane_z: f64,
     pub profile: SketchProfile,
+}
+
+/// Which way an extrusion is swept from its sketch plane.
+///
+/// The depth parameter is a length, and the parameter map holds positive lengths, so the direction
+/// is a separate, explicit input rather than a sign the document would have to infer from a
+/// negative parameter. `Down` is what makes a pocket on a top face expressible: the sketch is
+/// placed on that face and the tool is swept into the body.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExtrudeDirection {
+    /// Sweep towards +Z from the sketch plane.
+    #[default]
+    Up,
+    /// Sweep towards -Z from the sketch plane.
+    Down,
+}
+
+impl ExtrudeDirection {
+    /// Label used in reports and the model tree.
+    pub const fn label(self) -> &'static str {
+        match self {
+            ExtrudeDirection::Up => "up",
+            ExtrudeDirection::Down => "down",
+        }
+    }
+
+    /// `+1` for up, `-1` for down: the sign applied to a resolved depth.
+    pub const fn sign(self) -> f64 {
+        match self {
+            ExtrudeDirection::Up => 1.0,
+            ExtrudeDirection::Down => -1.0,
+        }
+    }
 }
 
 /// What an extrude does to the body built by the earlier features.
@@ -298,8 +359,13 @@ impl RevolveAxis {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum FeatureKind {
-    /// Sweep the profile along +Z by `depth_param`, in document units.
-    Extrude { depth_param: String },
+    /// Sweep the profile by `depth_param`, in document units, in `direction` from the sketch plane.
+    Extrude {
+        depth_param: String,
+        /// Defaults to `up` for a schema-7 file, which could only extrude towards +Z.
+        #[serde(default)]
+        direction: ExtrudeDirection,
+    },
     /// Sweep the profile a full turn about `axis`, producing a solid of revolution.
     ///
     /// A full turn is the only mode: a partial sweep is an open shell, which is not a body, and the
@@ -616,17 +682,20 @@ fn prefix_hash(
         hash = hash_u64(hash, point[1].to_bits());
     }
     match action {
-        ResolvedAction::Extrude { depth_mm } => {
+        ResolvedAction::Extrude { depth_mm, plane_mm } => {
             hash = hash_u64(hash, depth_mm.to_bits());
+            hash = hash_u64(hash, plane_mm.to_bits());
         }
         ResolvedAction::Revolve {
             axis_origin_mm,
             axis_direction_mm,
+            plane_mm,
         } => {
             hash = hash_u64(hash, axis_origin_mm[0].to_bits());
             hash = hash_u64(hash, axis_origin_mm[1].to_bits());
             hash = hash_u64(hash, axis_direction_mm[0].to_bits());
             hash = hash_u64(hash, axis_direction_mm[1].to_bits());
+            hash = hash_u64(hash, plane_mm.to_bits());
         }
     }
     hash_u64(hash, tolerance_mm.to_bits())
@@ -638,11 +707,16 @@ fn prefix_hash(
 #[derive(Debug, Clone, PartialEq)]
 enum ResolvedAction {
     Extrude {
+        /// Signed depth: negative when the feature sweeps down from its sketch plane.
         depth_mm: f64,
+        /// Height of the sketch plane above z = 0.
+        plane_mm: f64,
     },
     Revolve {
         axis_origin_mm: [f64; 2],
         axis_direction_mm: [f64; 2],
+        /// Height of the sketch plane above z = 0.
+        plane_mm: f64,
     },
 }
 
@@ -971,21 +1045,36 @@ impl Project {
         )
     }
 
-    /// Add a sketch with an arbitrary validated profile.
+    /// Add a sketch with an arbitrary validated profile on the z = 0 plane.
     pub fn add_sketch(
         &mut self,
         profile: SketchProfile,
         origin: [f64; 2],
     ) -> Result<EntityId, ProjectError> {
+        self.add_sketch_on_plane(profile, origin, 0.0)
+    }
+
+    /// Add a sketch on a plane at `plane_z` document units above z = 0.
+    ///
+    /// The plane height is validated before the sketch is added, so a non-finite height never
+    /// becomes part of the document.
+    pub fn add_sketch_on_plane(
+        &mut self,
+        profile: SketchProfile,
+        origin: [f64; 2],
+        plane_z: f64,
+    ) -> Result<EntityId, ProjectError> {
         self.validate_profile_references(&profile)?;
         if !origin[0].is_finite() || !origin[1].is_finite() {
             return Err(ProjectError::Invalid("sketch origin must be finite".into()));
         }
+        validate_plane_z(plane_z)?;
         self.push_undo();
         let id = self.allocate_entity()?;
         self.sketches.push(Sketch {
             id,
             origin,
+            plane_z,
             profile,
         });
         self.bump_revision()?;
@@ -1023,9 +1112,40 @@ impl Project {
         sketch_id: EntityId,
         origin: [f64; 2],
     ) -> Result<(), ProjectError> {
+        let plane_z = self
+            .sketch(sketch_id)
+            .map(|sketch| sketch.plane_z)
+            .ok_or(ProjectError::UnknownSketch(sketch_id.get()))?;
+        self.set_sketch_placement(sketch_id, origin, plane_z)
+    }
+
+    /// Move a sketch to a new plane height, keeping its XY origin. Geometry is rebuilt from it.
+    pub fn set_sketch_plane(
+        &mut self,
+        sketch_id: EntityId,
+        plane_z: f64,
+    ) -> Result<(), ProjectError> {
+        let origin = self
+            .sketch(sketch_id)
+            .map(|sketch| sketch.origin)
+            .ok_or(ProjectError::UnknownSketch(sketch_id.get()))?;
+        self.set_sketch_placement(sketch_id, origin, plane_z)
+    }
+
+    /// Place a sketch in one step: an XY origin and a plane height, as one undoable edit.
+    ///
+    /// One transaction rather than two, so a single "place sketch" action is one undo away and a
+    /// half-applied move cannot exist.
+    pub fn set_sketch_placement(
+        &mut self,
+        sketch_id: EntityId,
+        origin: [f64; 2],
+        plane_z: f64,
+    ) -> Result<(), ProjectError> {
         if !origin[0].is_finite() || !origin[1].is_finite() {
             return Err(ProjectError::Invalid("sketch origin must be finite".into()));
         }
+        validate_plane_z(plane_z)?;
         if !self.sketches.iter().any(|sketch| sketch.id == sketch_id) {
             return Err(ProjectError::UnknownSketch(sketch_id.get()));
         }
@@ -1036,6 +1156,7 @@ impl Project {
             .find(|sketch| sketch.id == sketch_id)
             .ok_or(ProjectError::UnknownSketch(sketch_id.get()))?;
         sketch.origin = origin;
+        sketch.plane_z = plane_z;
         self.bump_revision()
     }
 
@@ -1113,12 +1234,32 @@ impl Project {
         depth_param: &str,
         operation: ExtrudeOperation,
     ) -> Result<EntityId, ProjectError> {
+        self.add_extrude_feature_in_direction(
+            sketch_id,
+            depth_param,
+            operation,
+            ExtrudeDirection::Up,
+        )
+    }
+
+    /// Append an extrude with an explicit sweep direction.
+    ///
+    /// Everything `add_extrude_feature` documents applies; the only difference is which way the
+    /// tool is swept from the sketch plane. `Down` is how a pocket is cut into a top face.
+    pub fn add_extrude_feature_in_direction(
+        &mut self,
+        sketch_id: EntityId,
+        depth_param: &str,
+        operation: ExtrudeOperation,
+        direction: ExtrudeDirection,
+    ) -> Result<EntityId, ProjectError> {
         let _ = self.parameter(depth_param)?;
         self.append_feature(
             sketch_id,
             operation,
             FeatureKind::Extrude {
                 depth_param: depth_param.to_string(),
+                direction,
             },
         )
     }
@@ -1566,18 +1707,26 @@ impl Project {
         // in the same frame: the sketch's local axis line placed at the origin.
         let ox = unit.to_mm(sketch.origin[0]);
         let oy = unit.to_mm(sketch.origin[1]);
+        // The sketch plane, in millimetres. The profile itself is resolved in the plane's own 2D
+        // coordinates, so the height is applied to the tool afterwards rather than to the points.
+        let plane_mm = unit.to_mm(sketch.plane_z);
         let action = match &feature.kind {
-            FeatureKind::Extrude { depth_param } => ResolvedAction::Extrude {
+            FeatureKind::Extrude {
+                depth_param,
+                direction,
+            } => ResolvedAction::Extrude {
                 depth_mm: unit.to_mm(
                     self.parameter(depth_param)
                         .map_err(|error| error.to_string())?,
-                ),
+                ) * direction.sign(),
+                plane_mm,
             },
             FeatureKind::Revolve { axis } => {
                 let (origin, direction) = axis.line();
                 ResolvedAction::Revolve {
                     axis_origin_mm: [ox + unit.to_mm(origin[0]), oy + unit.to_mm(origin[1])],
                     axis_direction_mm: direction,
+                    plane_mm,
                 }
             }
         };
@@ -1600,13 +1749,17 @@ impl Project {
         body: Option<SolidId>,
         release_superseded: bool,
     ) -> Result<RebuiltFeature, String> {
-        let swept = match action {
-            ResolvedAction::Extrude { depth_mm } => kernel
-                .extrude(profile, *depth_mm)
-                .map_err(|error| format!("extrude failed: {error}"))?,
+        let (swept, plane_mm) = match action {
+            ResolvedAction::Extrude { depth_mm, plane_mm } => (
+                kernel
+                    .extrude(profile, *depth_mm)
+                    .map_err(|error| format!("extrude failed: {error}"))?,
+                *plane_mm,
+            ),
             ResolvedAction::Revolve {
                 axis_origin_mm,
                 axis_direction_mm,
+                plane_mm,
             } => {
                 if !kernel.supports(cad_contract::capability::Capability::Revolve) {
                     return Err(
@@ -1614,16 +1767,20 @@ impl Project {
                             .into(),
                     );
                 }
-                kernel
+                let turned = kernel
                     .revolve(
                         profile,
                         *axis_origin_mm,
                         *axis_direction_mm,
                         std::f64::consts::TAU,
                     )
-                    .map_err(|error| format!("revolve failed: {error}"))?
+                    .map_err(|error| format!("revolve failed: {error}"))?;
+                (turned, *plane_mm)
             }
         };
+        // Both kinds are built on the world plane and then moved, because every kernel sweep starts
+        // at z = 0 and the contract has no plane argument.
+        let swept = place_on_plane(kernel, swept, plane_mm)?;
 
         let (next, superseded): (SolidId, Option<SolidId>) = match (feature.operation, body) {
             (ExtrudeOperation::NewBody, None) => (swept, None),
@@ -1645,13 +1802,30 @@ impl Project {
                             .into(),
                     );
                 }
-                match kernel.boolean(cad_contract::kernel::BooleanOp::Union, running, swept) {
+                // A boss that sits on a face of the body shares that face with it, which is the
+                // coplanar case the kernel handles worst. The tool is moved into the body by
+                // JOIN_OVERLAP_MM instead, where the extra material is already present. A revolved
+                // tool is used as drawn; if it is coplanar the failure is reported, not hidden.
+                let tool = match action {
+                    ResolvedAction::Extrude { depth_mm, plane_mm } => {
+                        match overlapping_join_tool(kernel, profile, *depth_mm, *plane_mm, running)
+                        {
+                            Some(tool) => {
+                                kernel.release(swept);
+                                tool
+                            }
+                            None => swept,
+                        }
+                    }
+                    ResolvedAction::Revolve { .. } => swept,
+                };
+                match kernel.boolean(cad_contract::kernel::BooleanOp::Union, running, tool) {
                     Ok(joined) => {
-                        kernel.release(swept);
+                        kernel.release(tool);
                         (joined, Some(running))
                     }
                     Err(error) => {
-                        kernel.release(swept);
+                        kernel.release(tool);
                         return Err(format!("join failed: {error}"));
                     }
                 }
@@ -1678,8 +1852,8 @@ impl Project {
                 // drawn and may hit the kernel's coplanar limitation. That is reported by the
                 // feature if it happens rather than hidden.
                 let tool = match action {
-                    ResolvedAction::Extrude { depth_mm } => {
-                        match overshooting_tool(kernel, profile, *depth_mm, running) {
+                    ResolvedAction::Extrude { depth_mm, plane_mm } => {
+                        match overshooting_tool(kernel, profile, *depth_mm, *plane_mm, running) {
                             Some(tool) => {
                                 kernel.release(swept);
                                 tool
@@ -1776,18 +1950,21 @@ impl Project {
             .ok_or_else(|| ProjectError::Invalid("missing `schema`".into()))?;
         let schema = u32::try_from(schema).unwrap_or(u32::MAX);
         let value = match schema {
-            1 => migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(migrate_v3_to_v4(
-                migrate_v2_to_v3(migrate_v1_to_v2(value)?)?,
+            1 => migrate_v7_to_v8(migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(
+                migrate_v3_to_v4(migrate_v2_to_v3(migrate_v1_to_v2(value)?)?)?,
             )?)?)?)?,
-            2 => migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(migrate_v3_to_v4(
-                migrate_v2_to_v3(value)?,
+            2 => migrate_v7_to_v8(migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(
+                migrate_v3_to_v4(migrate_v2_to_v3(value)?)?,
             )?)?)?)?,
-            3 => migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(migrate_v3_to_v4(
+            3 => migrate_v7_to_v8(migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(
+                migrate_v3_to_v4(value)?,
+            )?)?)?)?,
+            4 => migrate_v7_to_v8(migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(
                 value,
             )?)?)?)?,
-            4 => migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(value)?)?)?,
-            5 => migrate_v6_to_v7(migrate_v5_to_v6(value)?)?,
-            6 => migrate_v6_to_v7(value)?,
+            5 => migrate_v7_to_v8(migrate_v6_to_v7(migrate_v5_to_v6(value)?)?)?,
+            6 => migrate_v7_to_v8(migrate_v6_to_v7(value)?)?,
+            7 => migrate_v7_to_v8(value)?,
             PROJECT_SCHEMA => value,
             _ => {
                 return Err(ProjectError::UnsupportedSchema {
@@ -2049,6 +2226,12 @@ fn validate_contents(
                 sketch.id
             )));
         }
+        if !sketch.plane_z.is_finite() {
+            return Err(ProjectError::Invalid(format!(
+                "sketch {} plane height must be finite",
+                sketch.id
+            )));
+        }
     }
     for (index, feature) in features.iter().enumerate() {
         if !entity_ids.insert(feature.id) {
@@ -2095,7 +2278,7 @@ fn validate_contents(
                 feature.id, sketch.id
             )));
         }
-        if let FeatureKind::Extrude { depth_param } = &feature.kind
+        if let FeatureKind::Extrude { depth_param, .. } = &feature.kind
             && !parameter_ids.contains(depth_param.as_str())
         {
             return Err(ProjectError::UnknownParameter(depth_param.clone()));
@@ -2353,6 +2536,21 @@ fn migrate_v6_to_v7(mut value: serde_json::Value) -> Result<serde_json::Value, P
     Ok(value)
 }
 
+/// Convert a schema-7 payload in place: only the version changes.
+///
+/// Schema 8 adds a sketch's `plane_z` and an extrude's `direction`, both defaulted, so a schema-7
+/// file is already a valid schema-8 file: every sketch it holds is on the world plane and every
+/// extrude sweeps up, which is all schema 7 could express. The bump exists so a schema-7 build says
+/// "newer schema" for a project that uses a raised plane instead of failing on an unknown field. No
+/// file is rewritten by loading it.
+fn migrate_v7_to_v8(mut value: serde_json::Value) -> Result<serde_json::Value, ProjectError> {
+    let object = value
+        .as_object_mut()
+        .ok_or_else(|| ProjectError::Invalid("project JSON is not an object".into()))?;
+    object.insert("schema".into(), serde_json::json!(PROJECT_SCHEMA));
+    Ok(value)
+}
+
 /// A cut tool that reaches past every face of `body` that `depth_mm` would otherwise share.
 ///
 /// `None` means "no coincidence to break" — either the tool's far end stops inside the body, or the
@@ -2364,15 +2562,17 @@ fn overshooting_tool<K: Kernel>(
     kernel: &mut K,
     profile: &[[f64; 2]],
     depth_mm: f64,
+    plane_mm: f64,
     body: SolidId,
 ) -> Option<SolidId> {
     if !kernel.supports(cad_contract::capability::Capability::Transform) {
         return None;
     }
     let bounds = kernel.bounding_box(body).ok()?;
-    // The tool as drawn spans `[lo, hi]` on z, because a profile lies on the z = 0 sketch plane.
-    let mut lo = depth_mm.min(0.0);
-    let mut hi = depth_mm.max(0.0);
+    // The tool as drawn spans `[lo, hi]` on z: from the sketch plane, which the profile is drawn on,
+    // in the direction the feature sweeps. `depth_mm` carries the sign, so `min`/`max` handle both.
+    let mut lo = plane_mm + depth_mm.min(0.0);
+    let mut hi = plane_mm + depth_mm.max(0.0);
     let coincidence = CUT_OVERSHOOT_MM * 0.5;
     let mut extended = false;
     if (lo - bounds.min[2]).abs() <= coincidence {
@@ -2392,12 +2592,138 @@ fn overshooting_tool<K: Kernel>(
     }
     let tool = kernel.extrude(profile, height).ok()?;
     match kernel.translate(tool, [0.0, 0.0, lo]) {
-        Ok(moved) => Some(moved),
+        Ok(moved) => {
+            kernel.release(tool);
+            Some(moved)
+        }
         Err(_) => {
             kernel.release(tool);
             None
         }
     }
+}
+
+/// A join tool moved so that it does not share a face with the body it joins.
+///
+/// A boss placed on a body's top face shares that face, which is exactly the coplanar case the
+/// corpus records as a failure. The tool is therefore adjusted by [`JOIN_OVERLAP_MM`] in the one
+/// direction that cannot change the union:
+///
+/// * a tool that sits **on** the body's top face has its bottom moved down into the body;
+/// * a tool that sits **under** the body's bottom face has its top moved up into it;
+/// * a tool that reaches a face from the inside has that face pulled back, which removes only
+///   material that already lies inside the body.
+///
+/// Every one of those is only volume-neutral while the tool lies **inside the body's footprint**: a
+/// tool that overhangs the body has material outside it, and moving its face there would add or drop
+/// that sliver. The adjustment is therefore skipped unless the profile's bounding box is inside the
+/// body's, which leaves an overhanging join exactly as it was before this helper existed — the
+/// kernel then either unions it or reports why it could not.
+///
+/// `None` means there was no coincidence to break, the tool overhangs the body, or the kernel cannot
+/// move a solid; the caller then joins the tool exactly as drawn and any coplanar defect is the
+/// feature's reported result rather than something hidden here.
+fn overlapping_join_tool<K: Kernel>(
+    kernel: &mut K,
+    profile: &[[f64; 2]],
+    depth_mm: f64,
+    plane_mm: f64,
+    body: SolidId,
+) -> Option<SolidId> {
+    if !kernel.supports(cad_contract::capability::Capability::Transform) {
+        return None;
+    }
+    let bounds = kernel.bounding_box(body).ok()?;
+    let mut lo = plane_mm + depth_mm.min(0.0);
+    let mut hi = plane_mm + depth_mm.max(0.0);
+    let coincident_xy = profile.iter().all(|point| {
+        point[0] >= bounds.min[0] - 1e-9
+            && point[0] <= bounds.max[0] + 1e-9
+            && point[1] >= bounds.min[1] - 1e-9
+            && point[1] <= bounds.max[1] + 1e-9
+    });
+    if !coincident_xy {
+        return None;
+    }
+    let coincidence = JOIN_OVERLAP_MM * 0.5;
+    let mut adjusted = false;
+    if (hi - bounds.max[2]).abs() <= coincidence {
+        hi -= JOIN_OVERLAP_MM;
+        adjusted = true;
+    }
+    if (lo - bounds.max[2]).abs() <= coincidence {
+        lo -= JOIN_OVERLAP_MM;
+        adjusted = true;
+    }
+    if (lo - bounds.min[2]).abs() <= coincidence {
+        lo += JOIN_OVERLAP_MM;
+        adjusted = true;
+    }
+    if (hi - bounds.min[2]).abs() <= coincidence {
+        hi += JOIN_OVERLAP_MM;
+        adjusted = true;
+    }
+    if !adjusted {
+        return None;
+    }
+    let height = hi - lo;
+    if !height.is_finite() || height <= 0.0 {
+        return None;
+    }
+    let tool = kernel.extrude(profile, height).ok()?;
+    match kernel.translate(tool, [0.0, 0.0, lo]) {
+        Ok(moved) => {
+            kernel.release(tool);
+            Some(moved)
+        }
+        Err(_) => {
+            kernel.release(tool);
+            None
+        }
+    }
+}
+
+/// Move a tool from the world plane to its sketch's plane height.
+///
+/// A kernel sweep always starts at z = 0, so a sketch above that plane is built there and then
+/// moved. A kernel that cannot translate cannot place a sketch off the world plane and says so
+/// instead of silently building the feature at z = 0.
+fn place_on_plane<K: Kernel>(
+    kernel: &mut K,
+    solid: SolidId,
+    plane_mm: f64,
+) -> Result<SolidId, String> {
+    if plane_mm == 0.0 {
+        return Ok(solid);
+    }
+    if !kernel.supports(cad_contract::capability::Capability::Transform) {
+        kernel.release(solid);
+        return Err(
+            "the kernel does not advertise transform, so a sketch above the z = 0 plane cannot be \
+             placed"
+                .into(),
+        );
+    }
+    match kernel.translate(solid, [0.0, 0.0, plane_mm]) {
+        Ok(moved) => {
+            kernel.release(solid);
+            Ok(moved)
+        }
+        Err(error) => {
+            kernel.release(solid);
+            Err(format!("placing the sketch plane failed: {error}"))
+        }
+    }
+}
+
+/// A sketch plane height must be a finite number of document units.
+fn validate_plane_z(plane_z: f64) -> Result<(), ProjectError> {
+    if !plane_z.is_finite() {
+        return Err(ProjectError::Invalid(
+            "sketch plane height must be a finite number of document units".into(),
+        ));
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -3452,6 +3778,9 @@ mod tests {
                     Capability::Extrude,
                     Capability::Tessellate,
                     Capability::BooleanUnion,
+                    // A sketch can sit on a raised plane, which the document expresses as a
+                    // translation of the tool after the sweep.
+                    Capability::Transform,
                 ]),
             )
         }
@@ -3507,6 +3836,23 @@ mod tests {
                 .get(&solid.get())
                 .ok_or(KernelError::UnknownSolid(solid))?;
             Ok(BoxKernel::box_mesh([1.0, 1.0, volume]))
+        }
+
+        fn translate(
+            &mut self,
+            solid: SolidId,
+            delta_mm: [f64; 3],
+        ) -> cad_contract::Result<SolidId> {
+            let volume = *self
+                .volumes
+                .get(&solid.get())
+                .ok_or(KernelError::UnknownSolid(solid))?;
+            self.calls
+                .push(format!("translate {} {}", solid.get(), delta_mm[2]));
+            let id = self.next;
+            self.next += 1;
+            self.volumes.insert(id, volume);
+            Ok(SolidId::from_raw(id))
         }
 
         fn release(&mut self, solid: SolidId) {
@@ -3570,6 +3916,211 @@ mod tests {
             "second feature: {second:?}"
         );
         kernel.release(build.solid.ok_or("solid")?);
+        Ok(())
+    }
+
+    /// The M11g sketch plane and extrude direction: the document must place the tool at the height
+    /// its sketch declares, sweep it the way the feature says, and keep both in the file.
+    fn raised_project(plane_z: f64, direction: ExtrudeDirection) -> Result<Project, ProjectError> {
+        let mut project = Project::new("raised", DocumentId::new(1), Unit::Millimeter);
+        let sketch = project.add_sketch_on_plane(
+            SketchProfile::Rectangle {
+                width_param: "width".into(),
+                height_param: "height".into(),
+            },
+            [2.0, 3.0],
+            plane_z,
+        )?;
+        project.add_extrude_feature_in_direction(
+            sketch,
+            "depth",
+            ExtrudeOperation::NewBody,
+            direction,
+        )?;
+        Ok(project)
+    }
+
+    #[test]
+    fn a_raised_sketch_plane_is_applied_as_a_translation_of_the_tool() -> TestResult {
+        let project = raised_project(5.0, ExtrudeDirection::Up)?;
+        let mut kernel = JoinKernel::new();
+        let build = project.build(&mut kernel)?;
+        assert!(build.is_complete(), "{:?}", build.failed);
+        assert!(
+            kernel.calls.iter().any(|call| call == "translate 1 5"),
+            "calls: {:?}",
+            kernel.calls
+        );
+        // The profile is still resolved in its own plane: the height is not baked into the points.
+        assert_eq!(
+            project.sketch_profile_mm(&project.sketches()[0])?,
+            vec![[2.0, 3.0], [12.0, 3.0], [12.0, 13.0], [2.0, 13.0]]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn an_extrude_direction_resolves_to_a_signed_depth() -> TestResult {
+        for (direction, expected) in [(ExtrudeDirection::Up, 5.0), (ExtrudeDirection::Down, -5.0)] {
+            let project = raised_project(2.5, direction)?;
+            let feature = project.features()[0].clone();
+            let (_, action) = project
+                .resolve_feature(&feature)
+                .map_err(|message| -> Box<dyn std::error::Error> { message.into() })?;
+            match action {
+                ResolvedAction::Extrude { depth_mm, plane_mm } => {
+                    assert!(
+                        (depth_mm - expected).abs() < 1e-12,
+                        "{direction:?} resolved to {depth_mm}"
+                    );
+                    assert!((plane_mm - 2.5).abs() < 1e-12, "plane {plane_mm}");
+                }
+                other => return Err(format!("expected an extrude, got {other:?}").into()),
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn an_inch_sketch_plane_is_converted_before_it_is_applied() -> TestResult {
+        let mut project = Project::new("inch-plane", DocumentId::new(1), Unit::Inch);
+        let sketch = project.add_sketch_on_plane(
+            SketchProfile::Rectangle {
+                width_param: "width".into(),
+                height_param: "height".into(),
+            },
+            [0.0, 0.0],
+            0.5,
+        )?;
+        project.add_extrude_feature(sketch, "depth", ExtrudeOperation::NewBody)?;
+        let mut kernel = JoinKernel::new();
+        assert!(project.build(&mut kernel)?.is_complete());
+        assert!(
+            kernel.calls.iter().any(|call| call == "translate 1 12.7"),
+            "0.5 in must reach the kernel as 12.7 mm; calls: {:?}",
+            kernel.calls
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_kernel_without_transform_refuses_a_raised_sketch_plane() -> TestResult {
+        let project = raised_project(5.0, ExtrudeDirection::Up)?;
+        // BoxKernel advertises extrude and tessellation only: it cannot place a tool above z = 0.
+        let mut kernel = BoxKernel::new();
+        let build = project.build(&mut kernel)?;
+        let failure = build.failed.ok_or("a raised plane must fail here")?;
+        assert!(
+            failure.message.contains("transform"),
+            "message: {}",
+            failure.message
+        );
+        assert!(build.mesh.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn moving_a_sketch_to_another_plane_invalidates_the_cache() -> TestResult {
+        let mut project = box_project()?;
+        let id = project.sketches()[0].id;
+        let mut kernel = JoinKernel::new();
+        let mut cache = BuildCache::new();
+        project.build_with_cache(&mut kernel, &mut cache)?;
+        let extrudes = |kernel: &JoinKernel| {
+            kernel
+                .calls
+                .iter()
+                .filter(|call| call.starts_with("extrude"))
+                .count()
+        };
+        let before = extrudes(&kernel);
+
+        project.set_sketch_plane(id, 4.0)?;
+        project.build_with_cache(&mut kernel, &mut cache)?;
+        assert_eq!(
+            extrudes(&kernel),
+            before + 1,
+            "the plane is part of the resolved inputs; calls: {:?}",
+            kernel.calls
+        );
+        assert!(
+            kernel.calls.iter().any(|call| call.ends_with(" 4")),
+            "the tool must move to the new plane: {:?}",
+            kernel.calls
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn placing_a_sketch_on_a_plane_is_one_undo_step() -> TestResult {
+        let mut project = box_project()?;
+        let id = project.sketches()[0].id;
+        let depth = project.undo_depth();
+        project.set_sketch_placement(id, [2.0, 3.0], 7.0)?;
+        assert_eq!(project.undo_depth(), depth + 1);
+        let sketch = project.sketch(id).ok_or("sketch")?;
+        assert_eq!(sketch.origin, [2.0, 3.0]);
+        assert!((sketch.plane_z - 7.0).abs() < 1e-12);
+
+        project.undo()?;
+        let sketch = project.sketch(id).ok_or("sketch")?;
+        assert_eq!(sketch.origin, [0.0, 0.0]);
+        assert!(sketch.plane_z.abs() < 1e-12);
+        Ok(())
+    }
+
+    #[test]
+    fn a_non_finite_plane_is_refused_and_changes_nothing() -> TestResult {
+        let mut project = box_project()?;
+        let id = project.sketches()[0].id;
+        let profile = SketchProfile::Rectangle {
+            width_param: "width".into(),
+            height_param: "height".into(),
+        };
+        assert!(matches!(
+            project.add_sketch_on_plane(profile.clone(), [0.0, 0.0], f64::NAN),
+            Err(ProjectError::Invalid(message)) if message.contains("plane")
+        ));
+        assert!(matches!(
+            project.set_sketch_plane(id, f64::INFINITY),
+            Err(ProjectError::Invalid(message)) if message.contains("plane")
+        ));
+        assert!(project.sketch(id).ok_or("sketch")?.plane_z.abs() < 1e-12);
+        assert_eq!(project.sketches().len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn a_schema_seven_project_loads_on_the_world_plane_with_upward_extrudes() -> TestResult {
+        let project = box_project()?;
+        let mut value =
+            serde_json::to_value(&project).map_err(|error| format!("serialize: {error}"))?;
+        value["schema"] = serde_json::json!(7);
+        // What schema 7 actually wrote: no plane height on a sketch and no direction on an extrude.
+        for sketch in value["sketches"].as_array_mut().ok_or("sketches")? {
+            sketch.as_object_mut().ok_or("sketch")?.remove("plane_z");
+        }
+        for feature in value["features"].as_array_mut().ok_or("features")? {
+            let kind = feature
+                .get_mut("kind")
+                .and_then(serde_json::Value::as_object_mut)
+                .ok_or("kind")?;
+            kind.remove("direction");
+        }
+        let bytes = serde_json::to_vec(&value).map_err(|error| format!("serialize: {error}"))?;
+
+        let loaded = Project::from_json(&bytes)?;
+        assert_eq!(loaded.schema, PROJECT_SCHEMA);
+        assert!(loaded.sketches()[0].plane_z.abs() < 1e-12);
+        assert_eq!(
+            loaded.features()[0].kind,
+            FeatureKind::Extrude {
+                depth_param: "depth".into(),
+                direction: ExtrudeDirection::Up,
+            }
+        );
+        let mut kernel = BoxKernel::new();
+        assert!((loaded.evaluate(&mut kernel)?.volume_mm3 - 500.0).abs() < 1e-9);
         Ok(())
     }
 
@@ -4467,7 +5018,8 @@ mod tests {
         assert_eq!(
             loaded.features()[0].kind,
             FeatureKind::Extrude {
-                depth_param: "depth".into()
+                depth_param: "depth".into(),
+                direction: ExtrudeDirection::Up,
             }
         );
         let mut kernel = BoxKernel::new();

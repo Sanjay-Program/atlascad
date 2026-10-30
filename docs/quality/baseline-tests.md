@@ -7,6 +7,7 @@
 
 | Id | Command | Passed | Failed | Skipped | Notes |
 |---|---|---:|---:|---:|---|
+| `t-platform-workspace-20261030` | `cargo test --offline --workspace -j 2` | 309 | 0 | 0 | **2026-10-30** — the whole root workspace including doctests. `cad-document` 78 (8 new: raised-plane translation, signed direction, inch plane, no-transform refusal, cache invalidation on a plane move, one-step placement undo, non-finite plane refusal, schema-7 → 8 migration) and `cad-studio` HTTP 25 (3 new analytic tests against the real Truck kernel: blind pocket on a raised plane, top-face boss, downward through-hole; all within 1e-2 mm³ of the inscribed-polygon analytic value, watertight exports). clippy `-D warnings` and fmt clean. |
 | `t-cad-contract` | `cargo test --release -p cad-contract` | 55 | 0 | 0 | 54 unit + 1 doc test |
 | `t-cad-kernel-truck-m11d` | `cargo test --offline -p cad-kernel-truck` | 35 | 0 | 0 | analytic extrude and revolve volumes, capability advertisement, manifold orientation, cancellation and deadlines; supersedes `t-cad-kernel-truck` (26) and `t-cad-kernel-truck-m11c` (31) |
 | `t-cad-kernel-truck-corpus` | `cargo run -p cad-kernel-truck --example corpus` | 8 | 0 | 3 | the analytic boolean corpus: 11 fixtures, 8 ok, 3 recorded known failures (tangent contact, intersection near 1e6 mm, coplanar cut), 0 regressions, exit code 0 |

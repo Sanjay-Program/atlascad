@@ -304,3 +304,37 @@ change the reuse that makes an undo cheap. It is now a recorded ceiling rather t
 **Not claimed:** memory for histories longer than 32 features (the bound discards older prefixes, and
 beyond it the retained window is still the 32 newest), B-rep memory separately from mesh memory, or
 behaviour under a different allocator or on another platform.
+
+## 11. Sketch plane height and extrude direction — 2026-10-30
+
+A sketch can now sit on a horizontal plane above z = 0 and an extrude can sweep down from it. That
+adds two kernel calls per raised feature that a z = 0 feature does not make: a `translate` to place
+the tool, and — when a join tool sits exactly on a body face — a second `extrude` of a tool that is
+`JOIN_OVERLAP_MM` longer, so the union is not the kernel's coplanar case.
+
+**Method.** `cargo run --release -p cad-studio --example rebuild_bench`, the same harness as §9:
+release build, single thread, three warm-up rebuilds discarded, 20 timed samples, median reported. The
+new workload is a 10 × 10 × 5 plate plus a 5 mm circle sketched on its top face (plane 5) and swept up
+5 mm as a join. Its measured volume is 597.057 mm³, exactly 500 mm³ plus the 24-facet inscribed polygon
+area of the circle × 5 mm, so the number is the analytic one and not a self-comparison.
+
+| Workload | Cold rebuild | Cached edit of the last feature | Volume |
+|---|---:|---:|---:|
+| join (2 features, plane 0) | 2.65 ms | 2.60 ms | 755.011 mm³ |
+| cut (2 features, plane 0) | 1.50 ms | 1.61 ms | 255.000 mm³ |
+| cut + join (3 features, plane 0) | 3.14 ms | 3.51 ms | 755.000 mm³ |
+| **boss on a raised plane (2 features)** | **4.80 ms** | **4.41 ms** | **597.057 mm³** |
+| 6 features, last isolated | 32.77 ms | 8.81 ms | 1 500.080 mm³ |
+| any workload, unchanged history | (unchanged) | 0.00–0.01 ms | — |
+
+**What the numbers say.** A raised-plane boss costs about 2.1 ms more than a same-size join at
+z = 0 (4.80 ms against 2.65 ms), which is the translate plus the face-overlap union. It is inside the
+same interactive budget as every other two-feature edit measured here, so no optimisation was
+attempted. The unchanged-history column confirms the cache still turns a repeat request into no kernel
+work.
+
+**Not claimed:** any figure at larger scale or for a long history of raised features (only the
+two-feature case was measured); the cost of an overhanging boss, which skips the overlap adjustment;
+HTTP request-level latency for a raised-plane feature (the tests exercise it over HTTP, but only the
+in-process rebuild was timed). As in §9 these are rebuild times and are not comparable to the
+request-level figures that include serialisation and the response write.

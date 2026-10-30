@@ -2400,7 +2400,7 @@
         "Met: `Project` persists `revisions` and `next_revision` under schema 7; `a_named_revision_restores_the_history_it_captured` and `revisions_are_named_and_bounded_and_survive_save_and_reopen` cover record, restore, save/reopen and delete. A revision copies parameters/sketches/features only, so it cannot resurrect a deleted copy or a stale undo stack.",
         "Met: names are trimmed, non-empty, at most 80 characters and unique case-insensitively; ids are a separate space; `restore_revision` pushes the current history onto the undo stack first, and the test undoes the restore back to 1200 mm3. Over HTTP an unknown id is 404 unknown_revision.",
         "Met: `save` copies the previous file to `<path>.backup` through a temporary file and a rename; `a_corrupt_project_opens_its_previous_good_copy` truncates the file and opens the 5 mm backup with `source: Backup`, then repairs it by saving. `a_damaged_project_reopens_the_previous_saved_copy` asserts the same over HTTP, including `recovery.source: backup` in /api/state.",
-        "Met and browser-driven: the Revisions panel records `browser baseline`, a parameter edit changes the body, Restore returns the original measurement, and the palette offers `Restore revision “browser baseline”` (4 new assertions, 15 loopback + 17 shared, zero console errors)."
+        "Met and browser-driven: the Revisions panel records `browser baseline`, a parameter edit changes the body, Restore returns the original measurement, and the palette offers `Restore revision \u201cbrowser baseline\u201d` (4 new assertions, 15 loopback + 17 shared, zero console errors)."
       ],
       "contract_changes": [
         "`PROJECT_SCHEMA` raised to 7 with an additive `migrate_v6_to_v7`.",
@@ -2424,6 +2424,93 @@
       ],
       "verified_on": "2026-10-29",
       "verified_host": "Linux, 8 cores, 7 GB RAM, rustc 1.95.0, debug and release builds"
+    },
+    {
+      "id": "task.m11g.sketch-plane-and-direction",
+      "title": "Sketch plane height and extrude direction",
+      "rationale": "Every feature started on the z = 0 plane, so a part could only grow upward from one level: a pocket in a top face, a boss on one, and any multi-level part were unrepresentable. The recorded limitation ('every cut starts on the z = 0 sketch plane') sat directly in front of patterns, mirrors and every industry workspace, so it is the next dependency-ordered step.",
+      "priority": "user_value",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "A sketch stores a plane height in document units, is validated on creation and on load, and survives save/reopen.",
+        "An extrude sweeps up or down from the sketch plane, and the resolved depth is signed accordingly.",
+        "A pocket on a raised plane and a boss on a top face match their analytic polygon volumes over HTTP against the real truck kernel.",
+        "A join whose tool sits exactly on a body face does not rely on the kernel's coplanar retry, and an existing partial-overlap join is unchanged.",
+        "A kernel without the transform capability refuses a raised plane with a stated reason rather than building at z = 0.",
+        "The plane is part of the rebuild-cache key, and placing a sketch is one undo step.",
+        "A schema-7 project loads as schema 8 with every sketch on the world plane and every extrude upward.",
+        "The studio page sends the plane and the direction and shows both, verified in a headless browser."
+      ],
+      "inputs": [
+        "module.cad-document",
+        "module.cad-studio",
+        "module.cad-kernel-truck"
+      ],
+      "outputs": [
+        "crates/cad-document/src/lib.rs",
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/assets/app.js",
+        "crates/cad-studio/assets/index.html",
+        "crates/cad-studio/tests/http_api.rs",
+        "crates/cad-studio/examples/rebuild_bench.rs",
+        "scripts/browser-check.mjs"
+      ],
+      "depends_on": [
+        "task.m11b.cut",
+        "task.m11c.rebuild-cache"
+      ],
+      "blocks": [],
+      "expected_changes": [
+        "crates/cad-document/src/lib.rs",
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/assets/app.js",
+        "crates/cad-studio/assets/index.html",
+        "crates/cad-studio/tests/http_api.rs",
+        "docs/feature-matrix.md",
+        "docs/tasks.md"
+      ],
+      "required_tests": [
+        "cargo test --offline --workspace -j 2",
+        "cargo clippy --offline --workspace --all-targets -- -D warnings",
+        "cargo fmt --all --check",
+        "node scripts/browser-check.mjs <running studio>"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "rollback": "Revert PROJECT_SCHEMA to 7, drop `Sketch.plane_z`, `ExtrudeDirection` and the `direction` field, the `place_on_plane` / `overlapping_join_tool` helpers, the studio `plane` and `direction` request fields and payload fields, and the two panel rows. A schema-8 file that uses a raised plane or a downward extrude must be exported first: a schema-7 build reports it as a newer schema, not as geometry.",
+      "source": "curated",
+      "trigger_digest": null,
+      "acceptance_results": [
+        "Met: `Sketch.plane_z` is defaulted, validated by `validate_plane_z` on creation, on placement and on load, and round-trips through save/reopen (asserted over HTTP).",
+        "Met: `ExtrudeDirection` resolves to a signed depth in `resolve_feature`; `an_extrude_direction_resolves_to_a_signed_depth` asserts +5 and -5 with the plane preserved.",
+        "Met: a blind pocket on plane 3 removes the polygon area x 2 mm (2000 mm3 plate), a through-hole swept down from plane 5 removes area x 5 mm, and a boss joined on plane 5 adds area x 5 mm; all three are exact to 1e-2 mm3 against the real Truck kernel over HTTP, and the boss and pocket exports are watertight (0 open edges).",
+        "Met: `overlapping_join_tool` moves a tool that sits on a body face JOIN_OVERLAP_MM into the body only when the profile lies inside the body's footprint; the pre-existing partial-overlap join test still measures 980 mm3, because an overhanging tool is left as drawn.",
+        "Met: `place_on_plane` refuses with 'does not advertise transform'; `a_kernel_without_transform_refuses_a_raised_sketch_plane` asserts the failure message and that no mesh is produced.",
+        "Met: the plane is hashed into the prefix key (`moving_a_sketch_to_another_plane_invalidates_the_cache` counts a new extrude and a translate to the new height); `set_sketch_placement` pushes one undo snapshot and `placing_a_sketch_on_a_plane_is_one_undo_step` undoes both coordinates and the height together.",
+        "Met: `a_schema_seven_project_loads_on_the_world_plane_with_upward_extrudes` strips the schema-8 fields, loads at schema 8, asserts plane 0 / direction up and evaluates 500 mm3.",
+        "Met: `node scripts/browser-check.mjs` (20 assertions) creates a circle sketch on plane 5, asserts the placement field, the placement label and the properties pane, adds an upward join and reads about 597 mm3 from the live page with zero console errors."
+      ],
+      "contract_changes": [],
+      "limitations": [
+        "Sketch planes are horizontal only. A tilted or face-aligned sketch plane is not representable, so a feature can be raised or lowered but not reoriented.",
+        "One body per project. A boss is a union into the body, not a separate component, so an assembly of components is still absent.",
+        "A join that sits exactly on a body face is only made coplanar-free when the profile lies inside the body's footprint; an overhanging boss is joined as drawn and may inherit the kernel's coplanar behaviour, which the feature reports if it fails.",
+        "A cut whose tool contains the whole body is still refused; a downward extrude deep enough to pass through the body is a normal through-hole and is exact.",
+        "The plane height is a literal number of document units, not a parameter, so it does not appear in the parameter panel (the parameter map holds positive lengths and a plane of 0 is meaningful).",
+        "No measurement of the raised-plane path at larger scale: the only benchmark is a two-feature plate plus boss (4.80 ms cold)."
+      ],
+      "evidence": [
+        "crates/cad-document/src/lib.rs (schema 8, `ExtrudeDirection`, `add_sketch_on_plane`, `set_sketch_placement`, `place_on_plane`, `overlapping_join_tool`, `JOIN_OVERLAP_MM`)",
+        "crates/cad-studio/tests/http_api.rs::a_blind_pocket_from_a_raised_plane_removes_its_analytic_volume",
+        "crates/cad-studio/tests/http_api.rs::a_boss_on_the_top_face_is_joined_exactly",
+        "crates/cad-studio/tests/http_api.rs::a_through_hole_swept_down_from_the_top_face_is_exact",
+        "engineering/quality/tests.json#t-platform-workspace-20261030 (309 passed, 0 failed)",
+        "engineering/quality/benchmarks.json#bm-rebuild-boss-plane",
+        "docs/performance-baseline.md section 11"
+      ],
+      "verified_on": "2026-10-30",
+      "verified_host": "linux/x86_64, i3-1125G4, 7.4 GB RAM, integrated graphics"
     }
   ]
 }

@@ -31,9 +31,9 @@ use cad_contract::capability::KernelInfo;
 use cad_contract::ids::{DocumentId, EntityId};
 use cad_contract::kernel::Kernel;
 use cad_document::{
-    BuildCache, ExtrudeOperation, FeatureFailure, FeatureKind, FeatureOutcome, FeatureReport,
-    Project, ProjectError, RecoveryInfo, RecoverySource, RevisionSummary, RevolveAxis,
-    SketchProfile, clear_recovery,
+    BuildCache, ExtrudeDirection, ExtrudeOperation, FeatureFailure, FeatureKind, FeatureOutcome,
+    FeatureReport, Project, ProjectError, RecoveryInfo, RecoverySource, RevisionSummary,
+    RevolveAxis, SketchProfile, clear_recovery,
 };
 use cad_kernel_truck::TruckKernel;
 use serde::{Deserialize, Serialize};
@@ -191,6 +191,8 @@ struct ParameterView {
 struct SketchView {
     id: u64,
     origin: [f64; 2],
+    /// Height of the sketch plane above z = 0, in document units.
+    plane_z: f64,
     profile: SketchProfile,
     segments: usize,
 }
@@ -207,6 +209,8 @@ struct FeatureView {
     depth_mm: Option<f64>,
     /// For a revolve: `vertical` or `horizontal`, the sketch axis it turns about.
     axis: Option<&'static str>,
+    /// For an extrude: `up` or `down`, the way it sweeps from its sketch plane.
+    direction: Option<&'static str>,
     /// `new_body`, `join`, or `cut`, in build order.
     operation: &'static str,
     /// `built`, `failed`, or `pending` when an earlier feature failed first.
@@ -414,6 +418,7 @@ impl StudioState {
             sketches.push(SketchView {
                 id: sketch.id.get(),
                 origin: sketch.origin,
+                plane_z: sketch.plane_z,
                 profile: sketch.profile.clone(),
                 segments: self.project.sketch_segment_count(sketch)?,
             });
@@ -432,13 +437,17 @@ impl StudioState {
                 Some(FeatureOutcome::Failed { message }) => ("failed", None, Some(message.clone())),
                 None => ("pending", None, None),
             };
-            let (depth_param, depth_mm, axis) = match &feature.kind {
-                FeatureKind::Extrude { depth_param } => (
+            let (depth_param, depth_mm, axis, direction) = match &feature.kind {
+                FeatureKind::Extrude {
+                    depth_param,
+                    direction,
+                } => (
                     Some(depth_param.clone()),
                     Some(unit.to_mm(self.project.parameter(depth_param)?)),
                     None,
+                    Some(direction.label()),
                 ),
-                FeatureKind::Revolve { axis } => (None, None, Some(axis.label())),
+                FeatureKind::Revolve { axis } => (None, None, Some(axis.label()), None),
             };
             features.push(FeatureView {
                 id: feature.id.get(),
@@ -447,6 +456,7 @@ impl StudioState {
                 depth_param,
                 depth_mm,
                 axis,
+                direction,
                 operation: feature.operation.label(),
                 status,
                 volume_mm3,
@@ -1050,7 +1060,12 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                     }
                 };
                 match with_state(state, |state| {
-                    state.mutate(|project| project.set_sketch_origin(id, body.origin))
+                    // One placement request covers the XY origin and, when present, the plane height,
+                    // so a single click is a single undo step.
+                    state.mutate(|project| match body.plane {
+                        Some(plane_z) => project.set_sketch_placement(id, body.origin, plane_z),
+                        None => project.set_sketch_origin(id, body.origin),
+                    })
                 }) {
                     Ok(payload) => to_json(200, &payload),
                     Err(error) => error_response(&error),
@@ -1072,8 +1087,13 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                     Err(error) => return error_response(&error),
                 };
                 let origin = body.origin.unwrap_or([0.0, 0.0]);
+                let plane_z = body.plane.unwrap_or(0.0);
                 match with_state(state, |state| {
-                    state.mutate(|project| project.add_sketch(profile, origin).map(|_| ()))
+                    state.mutate(|project| {
+                        project
+                            .add_sketch_on_plane(profile, origin, plane_z)
+                            .map(|_| ())
+                    })
                 }) {
                     Ok(payload) => to_json(200, &payload),
                     Err(error) => error_response(&error),
@@ -1087,6 +1107,10 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                     Ok(operation) => operation,
                     Err(error) => return error_response(&error),
                 };
+                let direction = match direction_for(&body.direction) {
+                    Ok(direction) => direction,
+                    Err(error) => return error_response(&error),
+                };
                 let sketch_id = match EntityId::new(body.sketch_id) {
                     Ok(id) => id,
                     Err(error) => {
@@ -1096,7 +1120,12 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                 match with_state(state, |state| {
                     state.mutate(|project| {
                         project
-                            .add_extrude_feature(sketch_id, &body.depth_param, operation)
+                            .add_extrude_feature_in_direction(
+                                sketch_id,
+                                &body.depth_param,
+                                operation,
+                                direction,
+                            )
                             .map(|_| ())
                     })
                 }) {
@@ -1214,6 +1243,10 @@ struct ProfileRequest {
 struct OriginRequest {
     id: u64,
     origin: [f64; 2],
+    /// Plane height, in document units. Absent keeps the sketch on the plane it already has, which
+    /// is what an older client sends.
+    #[serde(default)]
+    plane: Option<f64>,
 }
 
 /// A name for a new named revision.
@@ -1238,6 +1271,9 @@ struct NewSketchRequest {
     kind: String,
     #[serde(default)]
     origin: Option<[f64; 2]>,
+    /// Plane height, in document units. Defaults to 0, the world plane.
+    #[serde(default)]
+    plane: Option<f64>,
     #[serde(default)]
     sides: Option<u32>,
     /// A drawn loop, in document units, relative to `origin`. Required for `polyline`.
@@ -1260,10 +1296,27 @@ struct NewFeatureRequest {
     #[serde(default = "default_depth_param")]
     depth_param: String,
     operation: String,
+    /// `up` or `down`. Defaults to `up`, which is what a schema-7 extrude did.
+    #[serde(default = "default_direction")]
+    direction: String,
 }
 
 fn default_depth_param() -> String {
     "depth".to_string()
+}
+
+fn default_direction() -> String {
+    "up".to_string()
+}
+
+fn direction_for(name: &str) -> Result<ExtrudeDirection, StudioError> {
+    match name.trim().to_ascii_lowercase().as_str() {
+        "up" | "+z" | "+1" => Ok(ExtrudeDirection::Up),
+        "down" | "-z" | "-1" => Ok(ExtrudeDirection::Down),
+        other => Err(StudioError::BadRequest(format!(
+            "unknown extrude direction `{other}`; expected up or down"
+        ))),
+    }
 }
 
 /// A new revolve. It has no depth: the tool is the sketch turned a full turn about one of the
