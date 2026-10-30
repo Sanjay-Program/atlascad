@@ -979,6 +979,7 @@
     updateGeometryStatus();
     clearPick();
     if (app.viewport) app.viewport.setModel(next);
+    refreshDrawing();
   }
 
   function renderParameters() {
@@ -1662,19 +1663,532 @@
         );
       }
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `${project.name.replace(/[^A-Za-z0-9_-]+/g, "_") || "part"}.stl`;
-      document.body.append(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, `${project.name.replace(/[^A-Za-z0-9_-]+/g, "_") || "part"}.stl`);
       log("Exported binary STL");
       toast("STL download started.");
     } catch (error) {
       toast(error.message, true);
       log(`Export failed: ${error.message}`, "error");
+    }
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // The plan drawing is a separate document from the model, so it is fetched on its own. Two
+  // properties matter here: a failed feature must not blank the drawing (drafting never touches the
+  // kernel), and a slow response must not overwrite a newer one, hence the request counter.
+  let drawingRequest = 0;
+
+  // The editor's own state. It is deliberately small: which tool is armed, the points of the shape
+  // being drawn, which entity is selected, and which layer new geometry goes on.
+  const drawState = { tool: "select", points: [], selected: null, layer: null };
+
+  async function refreshDrawing() {
+    const request = ++drawingRequest;
+    try {
+      const draft = await api("/api/draft");
+      if (request !== drawingRequest) return;
+      applyDrawing(draft);
+    } catch (error) {
+      if (request !== drawingRequest) return;
+      const preview = byId("drawingPreview");
+      preview.textContent = "";
+      preview.append(element("span", "hint", `The drawing could not be built: ${error.message}`));
+      byId("drawingEntities").textContent = "—";
+      byId("downloadDxfBtn").disabled = true;
+      byId("plotPdfBtn").disabled = true;
+      return;
+    }
+  }
+
+  // Replace the drawing with the server's copy. The server is the authority: an edit is only real
+  // once it has been accepted, so the panel never shows geometry the document does not hold.
+  function applyDrawing(draft) {
+    app.drawing = draft;
+    if (!drawState.layer || !(draft.layers || []).some((layer) => layer.name === drawState.layer)) {
+      const layers = draft.layers || [];
+      // Prefer the layer the plan is on, then any layer that accepts geometry, so a new line does not
+      // land on layer 0 while the outline is somewhere else.
+      const preferred = layers.find((layer) => layer.name === "OUTLINE" && layer.visible !== false && !layer.locked)
+        || layers.find((layer) => layer.visible !== false && !layer.locked)
+        || layers[0];
+      drawState.layer = preferred ? preferred.name : null;
+    }
+    if (drawState.selected && !(draft.entities || []).some((entity) => entity.id === drawState.selected)) {
+      drawState.selected = null;
+    }
+    renderDrawing(draft);
+  }
+
+  async function drawingMutate(path, body, label) {
+    if (app.busy) return null;
+    setBusy(true);
+    try {
+      const payload = await api(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {}),
+      });
+      applyDrawing(payload);
+      if (label) {
+        log(label);
+        toast(label);
+      }
+      return payload;
+    } catch (error) {
+      toast(error.message, true);
+      log(error.message, "error");
+      return null;
+    } finally {
+      setBusy(false);
+      // The panel was rendered while the app was busy, so its buttons are re-enabled here.
+      if (app.drawing) syncDrawingControls();
+    }
+  }
+
+  function drawingPath(entity) {
+    const kind = entity.kind;
+    switch (kind.kind) {
+      case "line":
+        return `M ${kind.start[0]} ${kind.start[1]} L ${kind.end[0]} ${kind.end[1]}`;
+      case "polyline": {
+        const d = kind.points.map((p, i) => `${i ? "L" : "M"} ${p[0]} ${p[1]}`).join(" ");
+        return kind.closed && kind.points.length > 2 ? `${d} Z` : d;
+      }
+      case "circle":
+        return `M ${kind.center[0] - kind.radius} ${kind.center[1]} a ${kind.radius} ${kind.radius} 0 1 0 ${2 * kind.radius} 0 a ${kind.radius} ${kind.radius} 0 1 0 ${-2 * kind.radius} 0`;
+      case "arc": {
+        const sweep = ((kind.end_degrees - kind.start_degrees) % 360 + 360) % 360;
+        const [cx, cy] = kind.center;
+        const a0 = (kind.start_degrees * Math.PI) / 180;
+        const a1 = (kind.end_degrees * Math.PI) / 180;
+        const sx = cx + kind.radius * Math.cos(a0);
+        const sy = cy + kind.radius * Math.sin(a0);
+        const ex = cx + kind.radius * Math.cos(a1);
+        const ey = cy + kind.radius * Math.sin(a1);
+        // The group is mirrored in y, so a counter-clockwise arc is sweep-flag 0.
+        return `M ${sx} ${sy} A ${kind.radius} ${kind.radius} 0 ${sweep > 180 ? 1 : 0} 0 ${ex} ${ey}`;
+      }
+      default:
+        return null;
+    }
+  }
+
+  const SVG_NS = "http://www.w3.org/2000/svg";
+
+  function svgNode(name, attributes) {
+    const node = document.createElementNS(SVG_NS, name);
+    for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, String(value));
+    return node;
+  }
+
+  // The lines and value of a dimension, in model units, so the editor and the plot agree.
+  function dimensionGeometry(kind) {
+    const [sx, sy] = kind.start;
+    const [ex, ey] = kind.end;
+    const dx = ex - sx;
+    const dy = ey - sy;
+    const length = Math.hypot(dx, dy) || 1e-9;
+    const nx = -dy / length;
+    const ny = dx / length;
+    const a = [sx + nx * kind.offset, sy + ny * kind.offset];
+    const b = [ex + nx * kind.offset, ey + ny * kind.offset];
+    const tick = Math.max(length * 0.02, 0.5);
+    return {
+      lines: [
+        [kind.start, a],
+        [kind.end, b],
+        [a, b],
+        [[a[0] - tick, a[1] - tick], [a[0] + tick, a[1] + tick]],
+        [[b[0] - tick, b[1] - tick], [b[0] + tick, b[1] + tick]],
+      ],
+      mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2],
+      value: kind.text || formatNumber(length),
+    };
+  }
+
+  function renderDrawing(draft) {
+    const preview = byId("drawingPreview");
+    preview.textContent = "";
+    const entities = Array.isArray(draft.entities) ? draft.entities : [];
+    const layers = Array.isArray(draft.layers) ? draft.layers : [];
+    byId("drawingLabel").textContent = `${draft.unit} · ${draft.source === "file" ? "saved" : "plan"}`;
+    byId("drawingEntities").textContent = `${entities.length}`;
+    byId("drawingLayers").textContent = layers.length ? layers.map((l) => l.name).join(", ") : "—";
+    byId("drawingLength").textContent = `${formatNumber(draft.total_length)} ${draft.unit}`;
+    byId("drawingSource").textContent = draft.source === "file"
+      ? `${draft.file ? draft.file.split(/[\\/]/).pop() : "file"}${draft.dirty ? " (unsaved)" : ""}`
+      : "model (live)";
+    byId("drawingHint").textContent = draft.source === "file"
+      ? "Saved beside the project. The model no longer changes it — edit it here and save again."
+      : "Follows the model until you draw on it or save it, then it is yours.";
+    syncDrawingControls();
+
+    const bounds = draft.bounds;
+    if (!entities.length || !Array.isArray(bounds)) {
+      byId("drawingExtents").textContent = "—";
+      preview.append(element("span", "hint", "This drawing is empty. Pick a tool and click to draw."));
+      return;
+    }
+
+    const [minX, minY, maxX, maxY] = bounds;
+    const width = Math.max(maxX - minX, 1e-9);
+    const height = Math.max(maxY - minY, 1e-9);
+    const unitSize = Math.max(width, height);
+    const pad = unitSize * 0.08;
+    byId("drawingExtents").textContent = `${formatNumber(width)} × ${formatNumber(height)} ${draft.unit}`;
+
+    const svg = svgNode("svg", {
+      // The document is y-up and SVG is y-down, so the geometry group is mirrored and the viewBox
+      // covers the mirrored range. Text is placed in a second, upright group.
+      viewBox: `${minX - pad} ${-maxY - pad} ${width + pad * 2} ${height + pad * 2}`,
+      preserveAspectRatio: "xMidYMid meet",
+      role: "application",
+      "aria-label": `Drawing of ${draft.name}`,
+      class: drawState.tool === "select" ? "select-mode" : "",
+    });
+    const flip = svgNode("g", { transform: "scale(1,-1)" });
+    const upright = svgNode("g", {});
+
+    for (const entity of entities) {
+      const layer = layers.find((l) => l.name === entity.layer);
+      if (layer && layer.visible === false) continue;
+      const selected = drawState.selected === entity.id;
+      const kind = entity.kind;
+      if (kind.kind === "text") {
+        const node = svgNode("text", {
+          x: kind.at[0],
+          y: -kind.at[1],
+          "font-size": Math.max(kind.height, unitSize * 0.02),
+          "data-entity-id": entity.id,
+          class: "drawing-text",
+          fill: selected ? "var(--warning)" : "",
+        });
+        node.textContent = kind.value;
+        upright.append(node);
+        continue;
+      }
+      if (kind.kind === "dimension") {
+        const geometry = dimensionGeometry(kind);
+        for (const [from, to] of geometry.lines) {
+          flip.append(svgNode("path", {
+            d: `M ${from[0]} ${from[1]} L ${to[0]} ${to[1]}`,
+            "data-entity-id": entity.id,
+            class: `drawing-dimension${selected ? " selected" : ""}`,
+          }));
+        }
+        const label = svgNode("text", {
+          x: geometry.mid[0],
+          y: -geometry.mid[1],
+          "font-size": Math.max(unitSize * 0.035, 1e-6),
+          "text-anchor": "middle",
+          "data-entity-id": entity.id,
+          class: "drawing-text",
+        });
+        label.textContent = geometry.value;
+        upright.append(label);
+        continue;
+      }
+      if (kind.kind === "point") {
+        flip.append(svgNode("circle", {
+          cx: kind.at[0],
+          cy: kind.at[1],
+          r: unitSize * 0.01,
+          "data-entity-id": entity.id,
+          class: "drawing-point",
+        }));
+        continue;
+      }
+      const d = drawingPath(entity);
+      if (!d) continue;
+      flip.append(svgNode("path", {
+        d,
+        "data-entity-id": entity.id,
+        class: `drawing-entity${selected ? " selected" : ""}`,
+      }));
+    }
+
+    // The shape being drawn: its points and the segments between them.
+    if (drawState.points.length) {
+      const d = drawState.points.map((p, i) => `${i ? "L" : "M"} ${p[0]} ${p[1]}`).join(" ");
+      if (drawState.points.length > 1) flip.append(svgNode("path", { d, class: "drawing-overlay" }));
+      for (const point of drawState.points) {
+        flip.append(svgNode("circle", {
+          cx: point[0],
+          cy: point[1],
+          r: unitSize * 0.012,
+          class: "drawing-overlay-point",
+        }));
+      }
+    }
+
+    svg.append(flip, upright);
+    preview.append(svg);
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // Drawing editor
+  // ---------------------------------------------------------------------------------------
+
+  function drawingLayer(name) {
+    const draft = app.drawing;
+    if (!draft || !Array.isArray(draft.layers)) return null;
+    return draft.layers.find((layer) => layer.name === name) || null;
+  }
+
+  function syncDrawingControls() {
+    const draft = app.drawing;
+    const entities = draft && Array.isArray(draft.entities) ? draft.entities : [];
+    const layers = draft && Array.isArray(draft.layers) ? draft.layers : [];
+    for (const button of document.querySelectorAll(".draw-tools [data-tool]")) {
+      button.setAttribute("aria-pressed", String(button.dataset.tool === drawState.tool));
+    }
+    const select = byId("layerSelect");
+    const names = layers.map((layer) => layer.name);
+    const same = select.options.length === names.length
+      && names.every((name, index) => select.options[index].value === name);
+    if (!same) {
+      select.textContent = "";
+      for (const layer of layers) {
+        const option = document.createElement("option");
+        option.value = layer.name;
+        option.textContent = layer.visible === false ? `${layer.name} (off)` : layer.name;
+        select.append(option);
+      }
+    }
+    const current = drawState.layer || (names.length ? names[0] : null);
+    if (current) select.value = current;
+    const layer = drawingLayer(current);
+    const visible = byId("layerVisibleBtn");
+    visible.textContent = layer && layer.visible === false ? "Off" : "On";
+    visible.setAttribute("aria-pressed", String(Boolean(layer) && layer.visible !== false));
+    const locked = byId("layerLockBtn");
+    locked.textContent = layer && layer.locked ? "Locked" : "Unlocked";
+    locked.setAttribute("aria-pressed", String(Boolean(layer) && layer.locked));
+    byId("polylineActions").hidden = drawState.tool !== "polyline" || drawState.points.length === 0;
+    byId("saveDrawingBtn").disabled = app.busy || !draft;
+    byId("downloadDxfBtn").disabled = app.busy || entities.length === 0;
+    byId("plotPdfBtn").disabled = app.busy || entities.length === 0;
+    byId("drawUndoBtn").disabled = app.busy || !draft || !draft.undo;
+    byId("drawDeleteBtn").disabled = app.busy || drawState.selected === null;
+    const selected = drawState.selected === null
+      ? null
+      : entities.find((entity) => entity.id === drawState.selected) || null;
+    byId("drawingSelection").textContent = selected
+      ? `#${selected.id} ${selected.kind.kind}`
+      : "nothing";
+  }
+
+  // Screen → model. The viewBox is mirrored in y and letterboxed by `xMidYMid meet`, so the scale and
+  // offsets are measured rather than assumed: a wrong mapping would place geometry somewhere the
+  // user did not click, which is worse than refusing to draw.
+  function modelPointFromEvent(svg, event) {
+    const box = svg.viewBox.baseVal;
+    const rect = svg.getBoundingClientRect();
+    if (box.width <= 0 || box.height <= 0 || rect.width <= 0 || rect.height <= 0) return null;
+    const scale = Math.min(rect.width / box.width, rect.height / box.height);
+    const offsetX = rect.left + (rect.width - box.width * scale) / 2;
+    const offsetY = rect.top + (rect.height - box.height * scale) / 2;
+    const viewX = box.x + (event.clientX - offsetX) / scale;
+    const viewY = box.y + (event.clientY - offsetY) / scale;
+    const round = (value) => Math.round(value * 1000) / 1000;
+    return [round(viewX), round(-viewY)];
+  }
+
+  function setDrawTool(tool) {
+    drawState.tool = tool;
+    drawState.points = [];
+    renderDrawing(app.drawing || { entities: [], layers: [], bounds: null, unit: "mm" });
+    if (tool !== "select") setStatus(`${tool} tool: click in the drawing`, "");
+  }
+
+  async function placeDrawingPoint(point) {
+    if (!drawState.layer) {
+      toast("This drawing has no layer to draw on.", true);
+      return;
+    }
+    const tool = drawState.tool;
+    if (tool === "point") {
+      await drawingMutate("/api/draft/entity", {
+        layer: drawState.layer,
+        kind: { kind: "point", at: point },
+      }, "Point added");
+      return;
+    }
+    if (tool === "text") {
+      const value = byId("drawText").value.trim();
+      if (!value) {
+        toast("Type the text in the Text field first.", true);
+        return;
+      }
+      await drawingMutate("/api/draft/entity", {
+        layer: drawState.layer,
+        kind: { kind: "text", at: point, height: 3.5, value },
+      }, "Text added");
+      return;
+    }
+    if (tool === "dimension") {
+      drawState.points.push(point);
+      if (drawState.points.length < 2) {
+        renderDrawing(app.drawing);
+        return;
+      }
+      const [start, end] = drawState.points;
+      drawState.points = [];
+      const length = Math.hypot(end[0] - start[0], end[1] - start[1]);
+      await drawingMutate("/api/draft/entity", {
+        layer: drawState.layer,
+        kind: { kind: "dimension", start, end, offset: Math.max(length * 0.15, 0.5), text: null },
+      }, "Dimension added");
+      return;
+    }
+    if (tool === "polyline") {
+      drawState.points.push(point);
+      renderDrawing(app.drawing);
+      return;
+    }
+    // Line and circle both take two clicks.
+    drawState.points.push(point);
+    if (drawState.points.length < 2) {
+      renderDrawing(app.drawing);
+      return;
+    }
+    const [first, second] = drawState.points;
+    drawState.points = [];
+    if (tool === "line") {
+      await drawingMutate("/api/draft/entity", {
+        layer: drawState.layer,
+        kind: { kind: "line", start: first, end: second },
+      }, "Line added");
+    } else if (tool === "circle") {
+      const radius = Math.hypot(second[0] - first[0], second[1] - first[1]);
+      if (!(radius > 0)) {
+        toast("A circle needs a point away from its centre.", true);
+        renderDrawing(app.drawing);
+        return;
+      }
+      await drawingMutate("/api/draft/entity", {
+        layer: drawState.layer,
+        kind: { kind: "circle", center: first, radius: Math.round(radius * 1000) / 1000 },
+      }, "Circle added");
+    }
+  }
+
+  async function finishPolyline(closed) {
+    if (drawState.points.length < 2) {
+      toast("A polyline needs at least two points.", true);
+      return;
+    }
+    const points = drawState.points;
+    drawState.points = [];
+    await drawingMutate("/api/draft/entity", {
+      layer: drawState.layer,
+      kind: { kind: "polyline", points, closed },
+    }, closed ? "Closed polyline added" : "Polyline added");
+  }
+
+  async function deleteSelected() {
+    if (drawState.selected === null) {
+      toast("Select an entity first.", true);
+      return;
+    }
+    const id = drawState.selected;
+    drawState.selected = null;
+    await drawingMutate("/api/draft/remove", { id }, `Entity ${id} deleted`);
+  }
+
+  async function setLayerFlag(flag, value) {
+    const name = byId("layerSelect").value;
+    if (!name) return;
+    await drawingMutate("/api/draft/layer", { name, [flag]: value }, null);
+  }
+
+  async function addLayer() {
+    const input = byId("layerName");
+    const name = input.value.trim();
+    if (!name) {
+      toast("A layer needs a name.", true);
+      return;
+    }
+    const payload = await drawingMutate("/api/draft/layer", { name, color: 7 }, `Layer ${name} added`);
+    if (payload) {
+      input.value = "";
+      drawState.layer = name;
+      renderDrawing(payload);
+    }
+  }
+
+  async function saveDrawing() {
+    const payload = await drawingMutate("/api/draft/save", {}, null);
+    if (payload) {
+      log(`Drawing saved to ${payload.file}`);
+      toast("Drawing saved beside the project.");
+    }
+  }
+
+  async function plotPdf() {
+    const params = new URLSearchParams();
+    params.set("paper", byId("sheetPaper").value);
+    params.set("orientation", byId("sheetOrientation").value);
+    const scale = byId("sheetScale").value.trim();
+    if (scale) params.set("scale", scale);
+    for (const [id, name] of [["sheetTitle", "title"], ["sheetNumber", "number"], ["sheetAuthor", "author"]]) {
+      const value = byId(id).value.trim();
+      if (value) params.set(name, value);
+    }
+    try {
+      const headers = new Headers();
+      if (shareToken) headers.set("x-atlas-token", shareToken);
+      const response = await fetch(`/api/export/pdf?${params.toString()}`, { headers });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new ApiError(
+          payload && payload.error ? payload.error.message : `Plot failed with status ${response.status}.`,
+          "export_failure",
+          response.status
+        );
+      }
+      const blob = await response.blob();
+      const stem = app.project ? app.project.name : "drawing";
+      downloadBlob(blob, `${stem.replace(/[^A-Za-z0-9_-]+/g, "_") || "drawing"}-${byId("sheetPaper").value.toLowerCase()}.pdf`);
+      log("Plotted a PDF sheet");
+      toast("PDF download started.");
+    } catch (error) {
+      toast(error.message, true);
+      log(`Plot failed: ${error.message}`, "error");
+    }
+  }
+
+  async function exportDxf() {
+    try {
+      const headers = new Headers();
+      if (shareToken) headers.set("x-atlas-token", shareToken);
+      const response = await fetch("/api/export/dxf", { headers });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new ApiError(
+          payload && payload.error ? payload.error.message : `Export failed with status ${response.status}.`,
+          "export_failure",
+          response.status
+        );
+      }
+      const blob = await response.blob();
+      const stem = app.project ? app.project.name : "drawing";
+      downloadBlob(blob, `${stem.replace(/[^A-Za-z0-9_-]+/g, "_") || "drawing"}-plan.dxf`);
+      log("Exported DXF R12 plan");
+      toast("DXF download started.");
+    } catch (error) {
+      toast(error.message, true);
+      log(`DXF export failed: ${error.message}`, "error");
     }
   }
 
@@ -2035,6 +2549,13 @@
       { label: "Undo", hint: "Ctrl Z", keywords: "history back", run: () => undo(), disabled: !project || project.history.undo === 0 },
       { label: "Redo", hint: "Ctrl Y", keywords: "history forward", run: () => redo(), disabled: !project || project.history.redo === 0 },
       { label: "Export binary STL", hint: "download", keywords: "export mesh stl", run: () => exportStl(), disabled: !project || project.features.length === 0 },
+      { label: "Export plan drawing as DXF", hint: "download", keywords: "export draft drawing dxf plan 2d", run: () => exportDxf(), disabled: !project },
+      { label: "Plot the drawing as a PDF sheet", hint: "print", keywords: "plot print pdf sheet paper a3", run: () => plotPdf(), disabled: !project },
+      { label: "Save the drawing beside the project", hint: ".zdraft", keywords: "drawing save zdraft draft", run: () => saveDrawing(), disabled: !project },
+      { label: "Drawing: undo", hint: "", keywords: "drawing draft undo", run: () => drawingMutate("/api/draft/undo", {}, "Drawing undone"), disabled: !project },
+      { label: "Drawing tool: line", hint: "2 clicks", keywords: "draw line", run: () => setDrawTool("line"), disabled: !project },
+      { label: "Drawing tool: circle", hint: "centre, edge", keywords: "draw circle hole", run: () => setDrawTool("circle"), disabled: !project },
+      { label: "Drawing tool: dimension", hint: "2 clicks", keywords: "draw dimension measure", run: () => setDrawTool("dimension"), disabled: !project },
       { label: "Save a named revision", hint: "snapshot", keywords: "revision snapshot named save checkpoint", run: () => addRevision(), disabled: !project },
       ...(project && Array.isArray(project.revisions)
         ? project.revisions.map((revision) => ({
@@ -2208,6 +2729,56 @@
     byId("copyShareBtn").addEventListener("click", copyShareLink);
     byId("recoveryDiscard").addEventListener("click", discardRecovery);
     byId("exportBtn").addEventListener("click", exportStl);
+    byId("downloadDxfBtn").addEventListener("click", exportDxf);
+    for (const button of document.querySelectorAll(".draw-tools [data-tool]")) {
+      button.addEventListener("click", () => setDrawTool(button.dataset.tool));
+    }
+    byId("drawingPreview").addEventListener("click", (event) => {
+      const svg = byId("drawingPreview").querySelector("svg");
+      if (!svg || !app.drawing) return;
+      if (drawState.tool === "select") {
+        const target = event.target;
+        const node = target && typeof target.closest === "function"
+          ? target.closest("[data-entity-id]")
+          : null;
+        drawState.selected = node ? Number(node.dataset.entityId) : null;
+        renderDrawing(app.drawing);
+        return;
+      }
+      const point = modelPointFromEvent(svg, event);
+      if (point) placeDrawingPoint(point);
+    });
+    byId("polylineFinishBtn").addEventListener("click", () => finishPolyline(false));
+    byId("polylineCloseBtn").addEventListener("click", () => finishPolyline(true));
+    byId("polylineCancelBtn").addEventListener("click", () => {
+      drawState.points = [];
+      renderDrawing(app.drawing);
+    });
+    byId("drawUndoBtn").addEventListener("click", () =>
+      drawingMutate("/api/draft/undo", {}, "Drawing undone")
+    );
+    byId("drawDeleteBtn").addEventListener("click", deleteSelected);
+    byId("layerSelect").addEventListener("change", () => {
+      drawState.layer = byId("layerSelect").value;
+      syncDrawingControls();
+    });
+    byId("layerVisibleBtn").addEventListener("click", () => {
+      const layer = drawingLayer(byId("layerSelect").value);
+      setLayerFlag("visible", !(layer && layer.visible !== false));
+    });
+    byId("layerLockBtn").addEventListener("click", () => {
+      const layer = drawingLayer(byId("layerSelect").value);
+      setLayerFlag("locked", !(layer && layer.locked));
+    });
+    byId("addLayerBtn").addEventListener("click", addLayer);
+    byId("layerName").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addLayer();
+      }
+    });
+    byId("saveDrawingBtn").addEventListener("click", saveDrawing);
+    byId("plotPdfBtn").addEventListener("click", plotPdf);
     byId("paletteBtn").addEventListener("click", openPalette);
     byId("themeBtn").addEventListener("click", toggleTheme);
     byId("fitBtn").addEventListener("click", fit);

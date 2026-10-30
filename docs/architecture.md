@@ -277,11 +277,12 @@ cad-studio  ──  cad-document (parameters, feature graph, undo, .zcad)
    sync, hosted storage, or concurrent multi-user editing (a share is one document, one history, and
    whichever client last wrote wins). `wasm32-unknown-unknown` is not
    installed on this machine and no WASM build was attempted; neither is claimed.
-4. **The feature graph is linear and single-body.** `.zcad` schema 7 persists a header, named
+4. **The feature graph is linear and single-body.** `.zcad` schema 8 persists a header, named
    parameters, an ordered list of sketches and features with stable IDs, where the first feature
    starts the body and every later one is a join (union into the body) or a cut (difference out of
-   the body) through the kernel's booleans. A feature is an extrude along +Z by a parameter, or a
-   full-turn revolve of the sketch about one of its own axes; a partial revolve is refused because it
+   the body) through the kernel's booleans. A feature is an extrude by a parameter, swept up or down
+   from its sketch's horizontal plane at any height above z = 0, or a full-turn revolve of the sketch
+   about one of its own axes; a partial revolve is refused because it
    would be an open shell, and a profile that crosses the axis is refused because it has no solid of
    revolution. A sketch profile is a rectangle, circle, regular polygon, drawn polyline or arc sector;
    there is only one closed profile per sketch, not an entity graph. There is no sweep, loft, fillet,

@@ -70,7 +70,7 @@ Chrome.
 | `GET /api/export/stl`, 1 020 triangles | 0.5 ms, 51 KB | release server |
 | Server resident memory, 256-vertex body | 7.2 MB | `ps -o rss=` |
 | `atlas box --size 10,10,5 --out part.stl` | < 10 ms, 4.5 MB RSS, 684-byte STL, 12 triangles | release CLI |
-| Workspace tests | **298 passed, 0 failed** | `cargo test --offline --workspace -j 2` |
+| Workspace tests | **309 passed, 0 failed** | `cargo test --offline --workspace -j 2` |
 | fmt / clippy | clean, 0 warnings | `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -D warnings` |
 | Kernel corpus | 8 must-pass ok, 3 recorded known failures, **0 regressions** | `cargo run -p cad-kernel-truck --example corpus` |
 | Control-plane validation | 0 errors, 0 warnings | `atlas-eng validate` |
@@ -111,13 +111,15 @@ faces, and the error discipline is real. Neither is the problem.
 |---|---|---|
 | Reliable B-rep booleans on real parts | **Fails**: contained union, tangent contact, 3+ chains, large coordinates | §2.1, `docs/kernel-comparison.md` §4 |
 | STEP AP203/214/242 import **and** export | **Absent** | no implementation in `crates/` |
-| IGES / DXF / native-neutral interchange | **Absent** | same |
+| IGES / STEP-adjacent neutral interchange | **Absent** | same |
+| DXF **read and write** of a 2D drawing | **Present for a plan drawing** (2026-10-30): layers, point/line/circle/arc/polyline, R12 out and in, unsupported types reported | `crates/cad-drafting`, `t-platform-drafting-20261030`. Not a drafting editor and not a supplier-file corpus |
 | Constraint-driven sketches with dimensions | **Absent**: rectangle, circle, regular polygon, drawn polyline; parameters are document-level | `docs/feature-matrix.md` §3c |
 | Fillets, chamfers, shells, drafts | **Absent** | `Capability` enum lists them; the adapter advertises none |
 | Patterns, mirror, split, combine | **Absent** | same |
 | Multi-body parts | **Absent**: a second `new_body` is refused by design | `cad-document` |
 | Assemblies, mates, interference | **Absent** | — |
-| Drawings, GD&T, BOM | **Absent** | — |
+| Drawing sheets: dimensions, text, title block, scale, PDF plot | **Absent** | the drawing document and DXF exchange exist; the sheet and the plot do not |
+| GD&T, BOM, balloons | **Absent** | — |
 | Mass properties from exact geometry | **Absent** (mesh volume only) | `Capability::MassProperties` unimplemented |
 | Large-model performance (10k+ faces) | **Unmeasured**; no tessellation resource budget | `docs/security-review.md` §3 |
 | Crash safety / recovery | **Delivered this cycle** for unsaved edits and unreadable files | §5 |

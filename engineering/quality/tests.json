@@ -663,6 +663,30 @@
       "duration_ms": 0,
       "recorded_at": "2026-10-30",
       "notes": "Eleven-package root workspace, 309 tests including doctests, 0 failed. cad-document 78 (70 before this cycle; 8 new: raised-plane translation, signed direction, inch plane conversion, no-transform refusal, cache invalidation on a plane move, one-step placement undo, non-finite plane refusal, schema-7 migration). cad-studio HTTP integration 25 (22 before; 3 new analytic tests against the real Truck kernel: blind pocket on a raised plane, boss joined on the top face, through-hole swept down from the top face; the pre-existing partial-overlap join still measures 980 mm3). clippy --workspace --all-targets -D warnings clean, cargo fmt --check clean."
+    },
+    {
+      "id": "t-platform-drafting-20261030",
+      "target": "repo.cad-drafting",
+      "command": "cargo test --offline --workspace -j 2",
+      "outcome": "success",
+      "passed": 339,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-30",
+      "notes": "Twelve-package root workspace, 339 tests including doctests, 0 failed. New cad-drafting crate 25 tests (13 document: layers, validation, undo, save/load, schema and size refusals, R12 structure; 12 DXF reader: every entity type, POLYLINE/SEQEND, LWPOLYLINE, layer colour/off/lock, $INSUNITS, skipped-type counts, writer-reader byte-identical round trip, malformed input, size cap, no undo history on import). cad-cli draft_workflow 3 (1 new: a hand-written inch DXF imports, saves, re-exports and re-reads identically, with TEXT reported as skipped). cad-studio http_api 27. clippy --workspace --all-targets -D warnings clean, cargo fmt --check clean. Live simulation 56 assertions; headless browser 24 assertions loopback and 27 shared, zero console errors."
+    },
+    {
+      "id": "t-platform-editor-20261030",
+      "target": "repo.cad-drafting",
+      "command": "cargo test --offline --workspace -j 2",
+      "outcome": "success",
+      "passed": 359,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-30",
+      "notes": "Twelve-package root workspace, 359 tests including doctests, 0 failed (339 before the editor cycle). cad-drafting 59 (42 document/reader + 17 new: sheet layout, fit search, hidden-layer plotting, title block fields, text and dimension primitives, PDF structure, xref offsets, escaping, page sizes). cad-studio http_api 29 (2 new: the editable drawing document incl. undo/redo and the sidecar save; the PDF sheet incl. MediaBox, title block, fit and refusals). cad-cli draft_workflow 4 (1 new: atlas sheet writes a named A4 PDF and refuses an impossible scale and an unknown paper). fmt and clippy -D warnings clean. Full gate green: corpus 8 ok / 3 known / 0 regressions, licences 84/84, SBOM, 56 live simulation assertions, browser 27 loopback / 31 shared, zero console errors. A plotted A3 sheet was rendered with pdftoppm and inspected; pdftotext extracts every title-block field."
     }
   ]
 }

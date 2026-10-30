@@ -1,7 +1,7 @@
 # Atlas CAD — Integration Report
 
-**Generated:** 2026-10-29T14:51:54Z (unix 1793285514) · **Scanner:** cad-engineering/0.1.0
-**Last observation:** 2026-10-29T14:51:54Z · **Host:** linux/x86_64 · 8 CPUs
+**Generated:** 2026-10-30T03:35:40Z (unix 1793331340) · **Scanner:** cad-engineering/0.1.0
+**Last observation:** 2026-10-30T03:35:40Z · **Host:** linux/x86_64 · 8 CPUs
 
 > Generated file. Edit the manifests under `engineering/manifest/`, not this report.
 
@@ -18,18 +18,18 @@
 | — retired | 0 |
 | Modules | 34 |
 | Interfaces | 11 |
-| Capabilities — verified | 24 |
+| Capabilities — verified | 25 |
 | Capabilities — advertised only | 12 |
 | Capabilities — absent | 3 |
 | Agents — implemented | 1 |
 | Agents — active | 1 |
 | Tasks — proposed | 6 |
-| Tasks — ready | 49 |
+| Tasks — ready | 51 |
 | Tasks — in progress | 0 |
 | Tasks — blocked | 4 |
 | Tasks — needs review | 0 |
 | Tasks — failed | 0 |
-| Tasks — verified | 46 |
+| Tasks — verified | 47 |
 | Tasks — cancelled | 6 |
 
 ## 2. Repositories
@@ -73,8 +73,8 @@
 ## 4. Recorded evidence
 
 * Builds: **18** succeeded, **0** failed, **0** recorded as not run.
-* Tests: **46** runs succeeded, **0** failed, **1** not run — 722 tests passed, 0 failed, 2 skipped across the counted per-package records (workspace summaries and superseded records excluded; imported applications and corpus examples are included, so this is not a single-suite root-workspace total).
-* Benchmarks: **24** recorded measurement(s).
+* Tests: **47** runs succeeded, **0** failed, **1** not run — 1031 tests passed, 0 failed, 2 skipped across the counted per-package records (workspace summaries and superseded records excluded; imported applications and corpus examples are included, so this is not a single-suite root-workspace total).
+* Benchmarks: **25** recorded measurement(s).
 * Security: **8** open finding(s); **0/3** scans ran successfully.
   * S-1 — No advisory or dependency-policy scan is running (High, Blocked)
   * S-2 — LGPL OpenCASCADE is one cargo add away from the shipping binary (High, NeedsReview)
@@ -91,17 +91,14 @@
 
 * **`repo.cad-document`** · FilesModified · 1 tracked file(s) changed against the previous fingerprint
   * ~ src/lib.rs
-* **`repo.cad-studio`** · FilesModified · 6 tracked file(s) changed against the previous fingerprint
-  * ~ assets/app.css
+* **`repo.cad-studio`** · FilesModified · 5 tracked file(s) changed against the previous fingerprint
   * ~ assets/app.js
   * ~ assets/index.html
-  * + examples/cache_memory.rs
+  * ~ examples/rebuild_bench.rs
   * ~ src/lib.rs
   * ~ tests/http_api.rs
 
 ## 6. Tasks
-
-This scan inserted **2** task(s); **0** were already known and left untouched.
 
 Next unblocked tasks, in priority order:
 

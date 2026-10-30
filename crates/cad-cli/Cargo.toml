@@ -11,6 +11,7 @@ publish.workspace = true
 cad-contract.workspace = true
 cad-kernel-truck.workspace = true
 cad-document.workspace = true
+cad-drafting.workspace = true
 cad-io.workspace = true
 thiserror.workspace = true
 serde.workspace = true

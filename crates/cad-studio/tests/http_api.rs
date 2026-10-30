@@ -2122,3 +2122,293 @@ fn a_loopback_studio_has_no_token_and_no_share_link() -> Result<(), Box<dyn std:
     assert_eq!(state["share"], serde_json::Value::Null);
     Ok(())
 }
+
+#[test]
+fn the_plan_drawing_follows_the_model_and_exports_a_dxf_another_program_can_open()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("plan", [40.0, 30.0, 10.0])?;
+    let addr = handle.addr();
+
+    let draft = request(addr, "GET", "/api/draft", &[], &[])?;
+    assert_eq!(draft.status, 200);
+    assert_eq!(
+        draft.headers.get("content-type").map(String::as_str),
+        Some("application/json; charset=utf-8")
+    );
+    let payload = json(&draft)?;
+    assert_eq!(payload["name"], "plan plan");
+    assert_eq!(payload["unit"], "mm");
+    assert_eq!(payload["layers"].as_array().map(Vec::len), Some(2));
+    assert_eq!(payload["entities"].as_array().map(Vec::len), Some(1));
+    // A 40 x 30 plan rectangle: one closed four-point loop, 140 mm around.
+    let entity = &payload["entities"][0];
+    assert_eq!(entity["layer"], "OUTLINE");
+    assert_eq!(entity["kind"]["kind"], "polyline");
+    assert_eq!(entity["kind"]["closed"], true);
+    assert_eq!(
+        entity["kind"]["points"],
+        serde_json::json!([[0.0, 0.0], [40.0, 0.0], [40.0, 30.0], [0.0, 30.0]])
+    );
+    assert_eq!(payload["bounds"], serde_json::json!([0.0, 0.0, 40.0, 30.0]));
+    assert!((payload["total_length"].as_f64().ok_or("length")? - 140.0).abs() < 1e-9);
+
+    // The export is the same drawing as a file, named after the project.
+    let dxf = request(addr, "GET", "/api/export/dxf", &[], &[])?;
+    assert_eq!(dxf.status, 200);
+    assert_eq!(
+        dxf.headers.get("content-type").map(String::as_str),
+        Some("application/dxf")
+    );
+    let disposition = dxf
+        .headers
+        .get("content-disposition")
+        .ok_or("no content-disposition")?;
+    assert!(
+        disposition.contains("filename=\"plan-plan.dxf\""),
+        "{disposition}"
+    );
+    let text = String::from_utf8(dxf.body)?;
+    assert!(text.starts_with("0\nSECTION\n"));
+    assert!(text.contains("$ACADVER\n1\nAC1009\n"));
+    assert!(text.contains("$INSUNITS\n70\n4\n"));
+    assert!(text.contains("$EXTMAX\n10\n40\n20\n30\n"));
+    assert!(text.contains("\n8\nOUTLINE\n"));
+    assert_eq!(text.matches("\n0\nLINE\n").count(), 4);
+    // Nothing may leak between files: the DXF ends with EOF, not with leftover state.
+    assert!(text.trim_end().ends_with("0\nEOF"));
+
+    // Editing the model changes the plan, so the drawing is derived rather than cached.
+    let edit = post(addr, "/api/parameter", r#"{"id":"width","value":60}"#)?;
+    assert_eq!(edit.status, 200);
+    let payload = json(&request(addr, "GET", "/api/draft", &[], &[])?)?;
+    assert_eq!(payload["bounds"], serde_json::json!([0.0, 0.0, 60.0, 30.0]));
+    assert!((payload["total_length"].as_f64().ok_or("length")? - 180.0).abs() < 1e-9);
+    Ok(())
+}
+
+#[test]
+fn a_shared_studio_protects_the_drawing_and_its_dxf_like_every_other_route()
+-> Result<(), Box<dyn std::error::Error>> {
+    use cad_studio::{ShareOptions, start_with_options};
+    use std::net::{IpAddr, Ipv4Addr};
+
+    let dir = TempDir::new()?;
+    let path = dir.path().join("shared-plan.zcad");
+    let project = default_project("shared-plan", [20.0, 10.0, 5.0])?;
+    project.save(&path)?;
+    let handle = start_with_options(
+        project,
+        path.clone(),
+        0,
+        None,
+        ShareOptions {
+            bind: Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)),
+            token: Some("0123456789abcdef0123456789abcdef".into()),
+            host: Some("192.168.1.20".into()),
+        },
+    )?;
+    let addr = handle.addr();
+    let token = handle
+        .token()
+        .ok_or("shared studio needs a token")?
+        .to_string();
+
+    // A plan is document data: it must not be readable without the token.
+    let hidden = request(addr, "GET", "/api/draft", &[], &[])?;
+    assert_eq!(hidden.status, 401);
+    let hidden_dxf = request(addr, "GET", "/api/export/dxf", &[], &[])?;
+    assert_eq!(hidden_dxf.status, 401);
+
+    let shown = request(addr, "GET", "/api/draft", &[("x-atlas-token", &token)], &[])?;
+    assert_eq!(shown.status, 200);
+    assert_eq!(
+        json(&shown)?["bounds"],
+        serde_json::json!([0.0, 0.0, 20.0, 10.0])
+    );
+    // The download link a phone or a colleague clicks carries the token in the query.
+    let downloaded = request(
+        addr,
+        "GET",
+        &format!("/api/export/dxf?token={token}"),
+        &[],
+        &[],
+    )?;
+    assert_eq!(downloaded.status, 200);
+    assert!(String::from_utf8(downloaded.body)?.contains("$EXTMAX\n10\n20\n20\n10\n"));
+    Ok(())
+}
+
+#[test]
+fn the_drawing_is_an_editable_document_of_its_own() -> Result<(), Box<dyn std::error::Error>> {
+    let (dir, _path, handle) = fixture("edited", [40.0, 30.0, 10.0])?;
+    let addr = handle.addr();
+
+    // A fresh project's drawing is generated from the sketch and says so.
+    let payload = json(&request(addr, "GET", "/api/draft", &[], &[])?)?;
+    assert_eq!(payload["source"], "model");
+    assert!(payload["file"].is_null());
+    assert_eq!(payload["dirty"], false);
+    assert_eq!(payload["entities"].as_array().map(Vec::len), Some(1));
+
+    // Draw a hole on the outline layer.
+    let added = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"OUTLINE","kind":{"kind":"circle","center":[20,15],"radius":5}}"#,
+    )?;
+    assert_eq!(added.status, 200);
+    let payload = json(&added)?;
+    assert_eq!(payload["entities"].as_array().map(Vec::len), Some(2));
+    assert_eq!(payload["dirty"], true);
+    let circle = payload["entities"][1]["id"].as_u64().ok_or("circle id")?;
+
+    // Geometry the document refuses is refused here too, with the document's own reason.
+    let bad = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"OUTLINE","kind":{"kind":"circle","center":[0,0],"radius":0}}"#,
+    )?;
+    assert_eq!(bad.status, 400);
+    assert!(
+        json(&bad)?["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("radius"),
+        "the refusal names the radius"
+    );
+    // An unknown entity type is a bad request, not a panic or a silent no-op.
+    let unknown = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"OUTLINE","kind":{"kind":"spline","through":[[0,0],[1,1]]}}"#,
+    )?;
+    assert_eq!(unknown.status, 400);
+
+    // A new layer, then a removal and an undo that brings the geometry back.
+    let layered = post(addr, "/api/draft/layer", r#"{"name":"NOTES","color":3}"#)?;
+    assert_eq!(layered.status, 200);
+    assert_eq!(json(&layered)?["layers"].as_array().map(Vec::len), Some(3));
+    let removed = post(addr, "/api/draft/remove", &format!(r#"{{"id":{circle}}}"#))?;
+    assert_eq!(removed.status, 200);
+    assert_eq!(
+        json(&removed)?["entities"].as_array().map(Vec::len),
+        Some(1)
+    );
+    let undone = post(addr, "/api/draft/undo", "{}")?;
+    assert_eq!(undone.status, 200);
+    let payload = json(&undone)?;
+    assert_eq!(payload["entities"].as_array().map(Vec::len), Some(2));
+    // Two edits remain undoable: the circle and the layer. Removing it was undone.
+    assert_eq!(payload["undo"].as_u64(), Some(2));
+    let redone = post(addr, "/api/draft/redo", "{}")?;
+    assert_eq!(json(&redone)?["entities"].as_array().map(Vec::len), Some(1));
+
+    // Saving writes a .zdraft beside the project, and from then on the drawing is a file.
+    let saved = post(addr, "/api/draft/save", "{}")?;
+    assert_eq!(saved.status, 200);
+    let payload = json(&saved)?;
+    assert_eq!(payload["source"], "file");
+    assert_eq!(payload["dirty"], false);
+    let file = payload["file"].as_str().ok_or("drawing file")?;
+    assert_eq!(std::path::Path::new(file), dir.path().join("edited.zdraft"));
+    assert!(std::path::Path::new(file).is_file());
+
+    // A model edit no longer overwrites a drawing that has been saved.
+    let edit = post(addr, "/api/parameter", r#"{"id":"width","value":60}"#)?;
+    assert_eq!(edit.status, 200);
+    let payload = json(&request(addr, "GET", "/api/draft", &[], &[])?)?;
+    assert_eq!(payload["source"], "file");
+    assert_eq!(payload["bounds"], serde_json::json!([0.0, 0.0, 40.0, 30.0]));
+
+    // The DXF carries what was saved: the outline and the layer that was added.
+    let dxf = String::from_utf8(request(addr, "GET", "/api/export/dxf", &[], &[])?.body)?;
+    assert!(dxf.contains("\n2\nNOTES\n"), "{dxf}");
+    assert!(dxf.trim_end().ends_with("0\nEOF"));
+    Ok(())
+}
+
+#[test]
+fn a_drawing_plots_to_a_pdf_sheet_with_a_title_block() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("plot", [40.0, 30.0, 10.0])?;
+    let addr = handle.addr();
+
+    let pdf = request(
+        addr,
+        "GET",
+        "/api/export/pdf?paper=A4&orientation=landscape&scale=1&title=Bracket%20plate&number=AC-1001&author=Atlas&notes=DO%20NOT%20SCALE",
+        &[],
+        &[],
+    )?;
+    assert_eq!(pdf.status, 200);
+    assert_eq!(
+        pdf.headers.get("content-type").map(String::as_str),
+        Some("application/pdf")
+    );
+    assert!(
+        pdf.headers
+            .get("content-disposition")
+            .is_some_and(|value| value.contains("plot-a4.pdf")),
+        "named after the project and the paper"
+    );
+    let text = String::from_utf8(pdf.body)?;
+    assert!(text.starts_with("%PDF-1.4\n"));
+    assert!(text.trim_end().ends_with("%%EOF"));
+    // A4 landscape in points, so a reader opens the page at the size it was plotted at.
+    assert!(
+        text.contains("/MediaBox [0 0 841.89 595.276]"),
+        "{text:.300}"
+    );
+    for expected in [
+        "(Bracket plate) Tj",
+        "(AC-1001) Tj",
+        "(Atlas) Tj",
+        "(1:1) Tj",
+        "(DO NOT SCALE) Tj",
+        "(40) Tj",
+        "(30) Tj",
+    ] {
+        assert!(text.contains(expected), "missing {expected}");
+    }
+    // Every text run is inside a text object, so no reader can silently drop one.
+    assert_eq!(text.matches("Tj").count(), text.matches("BT ").count());
+
+    // `fit` reduces a drawing that is larger than the page instead of clipping it.
+    let fitted = request(
+        addr,
+        "GET",
+        "/api/export/pdf?paper=A4&orientation=portrait&scale=fit",
+        &[],
+        &[],
+    )?;
+    assert_eq!(fitted.status, 200);
+    assert!(String::from_utf8(fitted.body)?.contains("(1:1) Tj"));
+
+    // An unknown paper, an unknown orientation and a scale that cannot fit are refusals with a reason.
+    let bad_paper = request(addr, "GET", "/api/export/pdf?paper=B2", &[], &[])?;
+    assert_eq!(bad_paper.status, 400);
+    assert!(
+        json(&bad_paper)?["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("A4"),
+        "the message lists the paper sizes"
+    );
+    let bad_orientation = request(
+        addr,
+        "GET",
+        "/api/export/pdf?orientation=sideways",
+        &[],
+        &[],
+    )?;
+    assert_eq!(bad_orientation.status, 400);
+    let too_large = request(addr, "GET", "/api/export/pdf?paper=A4&scale=0.1", &[], &[])?;
+    assert_eq!(too_large.status, 400);
+    assert!(
+        json(&too_large)?["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("does not fit"),
+        "a scale that does not fit says so"
+    );
+    Ok(())
+}

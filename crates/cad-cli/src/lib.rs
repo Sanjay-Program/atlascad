@@ -28,6 +28,7 @@ use cad_contract::mesh::Mesh;
 use cad_contract::tol::Tolerance;
 use cad_contract::units::Unit;
 use cad_document::{Evaluated, Project, ProjectError};
+use cad_drafting::{Draft, DraftError, PlanError};
 use cad_kernel_truck::TruckKernel;
 use serde::Serialize;
 use std::path::Path;
@@ -52,6 +53,12 @@ pub enum CliError {
     Input(String),
     #[error("project: {0}")]
     Project(#[from] ProjectError),
+    #[error("drafting: {0}")]
+    Drafting(#[from] DraftError),
+    #[error("plan: {0}")]
+    Plan(#[from] PlanError),
+    #[error("sheet: {0}")]
+    Sheet(#[from] cad_drafting::PlotError),
 }
 
 /// An axis-aligned box request. Coordinates are in the document's unit; the kernel always receives
@@ -296,4 +303,211 @@ pub fn write_stl_binary(mesh: &Mesh, path: &Path) -> Result<usize, CliError> {
 /// Read back a binary STL as a mesh. The format carries no units; the header next to it does.
 pub fn read_stl_binary(bytes: &[u8]) -> Result<Mesh, CliError> {
     Ok(cad_io::read_stl_binary(bytes)?)
+}
+
+/// A drafting document's summary, printed by `atlas draft` and `atlas dxf`.
+#[derive(Debug, Clone, Serialize)]
+pub struct DraftSummary {
+    pub file: String,
+    pub name: String,
+    pub unit: String,
+    pub layers: usize,
+    pub entities: usize,
+    /// `[min_x, min_y, max_x, max_y]` in the drawing's unit, or null when the drawing is empty.
+    pub bounds: Option<[f64; 4]>,
+    /// Sum of every entity's length — a quick check that nothing was silently dropped.
+    pub total_length: f64,
+    pub dxf: Option<String>,
+    pub stl: Option<String>,
+}
+
+/// Outline a project's plan view, in millimetres.
+///
+/// The profile of the feature that built the body is the plan outline of a single-body part: it is
+/// what the part occupies looking straight down. The profile is always in document units, so it is
+/// converted to millimetres here and the drawing is millimetre-native regardless of the project's
+/// units — a drawing that silently mixed inches and millimetres would be worse than no drawing.
+pub fn plan_outline(project: &Project) -> Result<Vec<[f64; 2]>, CliError> {
+    Ok(cad_drafting::plan_outline(project)?)
+}
+
+/// Build a millimetre plan-view drawing of a project: one closed outline on layer `OUTLINE`.
+pub fn draft_plan_view(project: &Project) -> Result<Draft, CliError> {
+    Ok(cad_drafting::plan_draft(project)?)
+}
+
+/// Load a `.zdraft` and report what it holds without changing it.
+pub fn draft_summary(path: &Path) -> Result<DraftSummary, CliError> {
+    let draft = Draft::load(path)?;
+    Ok(summary_of(&draft, path, None))
+}
+
+/// Write a drawing as DXF (R12, `AC1009`), returning the summary that includes the output path.
+pub fn draft_to_dxf(from: &Path, out: &Path) -> Result<DraftSummary, CliError> {
+    let draft = Draft::load(from)?;
+    let dxf = draft.to_dxf();
+    std::fs::write(out, dxf.as_bytes()).map_err(|source| CliError::Io {
+        path: out.display().to_string(),
+        source,
+    })?;
+    Ok(summary_of(&draft, from, Some(out)))
+}
+
+/// Save a drawing and, if `out` is given, export it to DXF in the same call.
+pub fn write_draft(
+    draft: &Draft,
+    save: Option<&Path>,
+    dxf_out: Option<&Path>,
+) -> Result<DraftSummary, CliError> {
+    if let Some(path) = save {
+        draft.save(path)?;
+    }
+    if let Some(path) = dxf_out {
+        std::fs::write(path, draft.to_dxf().as_bytes()).map_err(|source| CliError::Io {
+            path: path.display().to_string(),
+            source,
+        })?;
+    }
+    let label = save.or(dxf_out).unwrap_or_else(|| Path::new(""));
+    let mut summary = summary_of(draft, label, dxf_out);
+    // `summary_of` reports the DXF when asked; report the saved drawing too so a caller that only
+    // asked for `--save` still sees where it went.
+    if let Some(path) = save {
+        summary.file = path.display().to_string();
+    }
+    Ok(summary)
+}
+
+/// What a DXF import read, with the entity types it could not represent named.
+#[derive(Debug, Clone, Serialize)]
+pub struct DxfImportSummary {
+    pub source: String,
+    /// The unit the file stated, or `null` when it stated none and millimetres were assumed.
+    pub declared_unit: Option<String>,
+    pub draft: DraftSummary,
+    /// Entity types this reader does not model, with how often each appeared. An import with a
+    /// non-empty list is a partial drawing, and says so rather than looking complete.
+    pub skipped: Vec<Skipped>, // serialised as `[{ "kind", "count" }]`
+}
+
+/// One unread entity type and its count.
+#[derive(Debug, Clone, Serialize)]
+pub struct Skipped {
+    pub kind: String,
+    pub count: usize,
+}
+
+/// Read a DXF file into a drawing, saving it as `.zdraft` and/or writing a normalised DXF.
+///
+/// The name of the drawing comes from the file stem, because a DXF R12 has no dependable title.
+pub fn import_dxf(
+    from: &Path,
+    save: Option<&Path>,
+    out: Option<&Path>,
+) -> Result<DxfImportSummary, CliError> {
+    let text = std::fs::read_to_string(from).map_err(|source| CliError::Io {
+        path: from.display().to_string(),
+        source,
+    })?;
+    let name = from
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or("drawing");
+    let imported = cad_drafting::from_dxf(name, DocumentId::new(1), &text)?;
+    let summary = write_draft(&imported.draft, save, out)?;
+    Ok(DxfImportSummary {
+        source: from.display().to_string(),
+        declared_unit: imported
+            .report
+            .declared_unit
+            .map(|unit| unit.symbol().to_string()),
+        skipped: imported
+            .report
+            .skipped
+            .iter()
+            .map(|(kind, count)| Skipped {
+                kind: kind.clone(),
+                count: *count,
+            })
+            .collect(),
+        draft: summary,
+    })
+}
+
+/// A plotted sheet's summary, printed by `atlas sheet`.
+#[derive(Debug, Clone, Serialize)]
+pub struct SheetSummary {
+    pub file: String,
+    /// `project` when the drawing was generated from a `.zcad`, `drawing` when it was read from a
+    /// `.zdraft`.
+    pub source: &'static str,
+    pub paper: String,
+    pub orientation: String,
+    pub scale: String,
+    /// `[width, height]` in millimetres.
+    pub page_mm: [f64; 2],
+    pub lines: usize,
+    pub texts: usize,
+    pub pdf: Option<String>,
+}
+
+/// Load a drawing from either document: a `.zdraft` is opened as itself, a project is drafted to
+/// its plan first. Deciding by extension keeps `atlas sheet` usable on both without a flag that
+/// only repeats the file name.
+fn load_drawing(path: &Path) -> Result<(Draft, &'static str), CliError> {
+    if path.extension().and_then(|extension| extension.to_str()) == Some("zdraft") {
+        Ok((Draft::load(path)?, "drawing"))
+    } else {
+        let project = Project::load(path)?;
+        Ok((draft_plan_view(&project)?, "project"))
+    }
+}
+
+/// Lay a drawing out on a sheet and write the page as PDF.
+pub fn plot_sheet(
+    from: &Path,
+    sheet: &cad_drafting::Sheet,
+    out: &Path,
+) -> Result<SheetSummary, CliError> {
+    let (draft, source) = load_drawing(from)?;
+    // An untitled sheet takes the drawing's name rather than printing a blank TITLE row.
+    let mut sheet = sheet.clone();
+    if sheet.title.trim().is_empty() {
+        sheet.title = draft.name.clone();
+    }
+    let plot = sheet.plot(&draft)?;
+    let pdf = cad_drafting::to_pdf(&plot, &draft.name);
+    std::fs::write(out, pdf.as_bytes()).map_err(|source| CliError::Io {
+        path: out.display().to_string(),
+        source,
+    })?;
+    Ok(SheetSummary {
+        file: from.display().to_string(),
+        source,
+        paper: sheet.paper.label().to_string(),
+        orientation: match sheet.orientation {
+            cad_drafting::Orientation::Portrait => "portrait",
+            cad_drafting::Orientation::Landscape => "landscape",
+        }
+        .to_string(),
+        scale: plot.scale_label(),
+        page_mm: [plot.page_mm.0, plot.page_mm.1],
+        lines: plot.lines.len(),
+        texts: plot.texts.len(),
+        pdf: Some(out.display().to_string()),
+    })
+}
+
+fn summary_of(draft: &Draft, file: &Path, dxf: Option<&Path>) -> DraftSummary {
+    DraftSummary {
+        file: file.display().to_string(),
+        name: draft.name.clone(),
+        unit: draft.header.units.symbol().to_string(),
+        layers: draft.layers().len(),
+        entities: draft.entities().len(),
+        bounds: draft.bounds(),
+        total_length: draft.total_length(),
+        dxf: dxf.map(|p| p.display().to_string()),
+        stl: None,
+    }
 }

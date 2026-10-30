@@ -54,6 +54,70 @@ These are the feature milestones that extend Atlas Studio's `.zcad` project work
 in the order the roadmap records, with the acceptance criteria already written for each, and notes on
 what evidence must exist before the task can be claimed done.
 
+### M12 — 2D drafting: drawing document, DXF read/write and the plan panel (M/L)
+
+**Goal:** a user can look at a drawing of the part, exchange it with another CAD program in both
+directions, and trust that nothing was silently left behind.
+
+**Why this, after the M11g cycle:** the 2026-10-30 brief asks for every tool a CAD product has, and
+solid modelling alone cannot carry a sale while the kernel's recorded failures (a boss fully inside a
+plate, tangent contact, three-operand chains, coplanar difference) stand. Drafting is the one
+workflow that does not touch the kernel, so it can be built and verified here without pretending the
+boolean defects are fixed. It is also the half of a CAD product a buyer checks second — after the
+model, they open a drawing and send a DXF.
+
+**Status:** verified · **Priority:** user_value · **Risk:** medium · **Verified:** 2026-10-30
+
+**Delivered:**
+
+1. `crates/cad-drafting`: a `.zdraft` drawing with layers (ACI colour, visibility, lock, plotted line
+   weight) and point, line, circle, arc and polyline entities. Every entity is validated on entry
+   (finite coordinates, positive radius, two distinct endpoints, at least two distinct polyline
+   points, at most 4,096 of them). Undo and redo cover layers and geometry together and are bounded at
+   64 snapshots. Persistence refuses unknown fields, newer schemas and files over 32 MiB before
+   parsing.
+2. DXF **output** as R12 (`AC1009`): header with `$ACADVER`, `$INSUNITS` and analytic `$EXTMIN`/
+   `$EXTMAX`, the `LTYPE` and `LAYER` tables (a hidden layer is written as a negative colour, which is
+   how DXF says "off"), the entities, `EOF`. R12 has no `LWPOLYLINE`, so a polyline is written as its
+   segments; that reduction is stated in the crate docs rather than hidden.
+3. DXF **input** (`from_dxf`): the layer table with colour, off and locked state, `$INSUNITS`
+   (`None` when the file does not state a unit, and then millimetres are used and *reported*), and
+   `LINE`, `CIRCLE`, `ARC`, `POINT`, `POLYLINE` (through `VERTEX`/`SEQEND`) and `LWPOLYLINE`. Anything
+   else — `TEXT`, `MTEXT`, `DIMENSION`, `HATCH`, blocks, splines, ellipses — is counted by type in
+   `ImportReport::skipped` and printed by the CLI, because a partial drawing that looks complete is
+   worse than a refusal. Malformed input fails with the offending group named.
+4. Studio: `/api/draft` returns the plan built from the sketch (name, unit, layers, entities, bounds,
+   total length) and `/api/export/dxf` returns the file. Both sit behind the same token gate as every
+   other `/api/*` route. The **Drawing** panel renders the outline as SVG, shows entity/layer counts,
+   extents and length, and downloads the DXF through `fetch` so a shared session presents its token;
+   the top bar gained an **Export DXF** button and the palette an "Export plan drawing as DXF"
+   command.
+5. CLI: `atlas draft` (project → plan), `atlas dxf` (drawing → DXF), `atlas dxf-import`
+   (DXF → drawing/DXF, with the skipped list in the JSON summary and on stderr).
+
+**Evidence:** 25 `cad-drafting` tests (13 document, 12 reader — including every entity type, an
+imported inch file, a locked/off layer, the skipped-type report, malformed input and a
+writer→reader→writer byte-identical round trip); a three-process CLI test that imports a hand-written
+inch DXF, saves it, re-exports it and re-reads it identically; the HTTP suite at 27 tests including
+the token gate on both new routes; the headless browser at 24 loopback / 27 shared assertions, which
+now waits for the plan SVG and downloads a `.dxf` in a shared session; full gate green with 339 tests
+(`t-platform-drafting-20261030`).
+
+**Recorded limitations, not claimed away:**
+
+1. There is no drawing **editor**: the studio previews and exchanges the plan of the model; it cannot
+   draw, dimension, annotate or edit a sheet.
+2. One plan outline per project, from the sketch. A multi-feature part does not get a projected view
+   per face.
+3. No drawing sheets, title block, scale or PDF plot, and no DWG. A drawing cannot be plotted to a
+   page yet.
+4. The reader accepts a narrower set than DXF allows; unsupported types are reported, not imported.
+   There is no corpus of real vendor files, so compatibility is proven against hand-written fixtures
+   and this crate's own output, not against a supplier's drawings.
+5. A 3D `POLYLINE`'s z coordinate is dropped: the document is 2D.
+6. Line weight is document data only; R12 has no line-weight table, so it does not reach the file.
+7. No performance measurement of import or drafting on a large drawing.
+
 ### M11b — Cut, behind a verified difference (M)
 
 **Goal:** a second extrude can remove material, and the application refuses cut on a kernel whose
@@ -864,17 +928,27 @@ The machine-readable task files are:
 If the goal of the next cycle is to keep the application moving while the higher-value kernel and governance
 work waits on a larger host and an owner decision, the ordered slice is:
 
-1. **A second named agent plus a CLI host (M9)** — the runtime is exercised only by tests today; a host
+1. **Pattern and mirror features (M11h, proposed)** — the sketch plane removed the blocker; a linear and
+   a circular pattern plus a feature mirror are the next modelling capability in dependency order, and
+   they must replay the *feature* rather than the body, or a pattern of holes is impossible. Acceptance
+   must state analytic volumes for the disjoint, overlapping and cut cases and a cache key that
+   includes the pattern.
+2. **Multi-body document (proposed)** — a feature targets a named body and a project holds a list of
+   bodies. This is the shared change behind mechanical parts, assemblies, BIM and plant, and it is
+   larger than any single workspace feature, so it should be scoped before an industry workspace is
+   started (`docs/research/INDUSTRY_TOOLSETS.md` §4).
+3. **A second named agent plus a CLI host (M9)** — the runtime is exercised only by tests today; a host
    and a second permission profile would make the platform claim honest.
-2. **Import budgets and cancellation outside the adapter (M4 remaining)** — SolidCraft's IO crates
+4. **Import budgets and cancellation outside the adapter (M4 remaining)** — SolidCraft's IO crates
    still have no file-size or entity-count limits, which is security finding S-3.
-3. **A larger host for M1/M2 and the SolidCraft suite** — the contract has never described the kernel
+5. **A larger host for M1/M2 and the SolidCraft suite** — the contract has never described the kernel
    that `apps/solidcraft` actually ships, because its tests need more RAM than this machine has.
 
 Closed in earlier cycles, kept here so the ordering is not rewritten after the fact: M11b cut (2026-10-28),
 M11c per-feature rebuild cache (2026-10-29), M11d revolve (2026-10-29), M11e arc sector profile
-(2026-10-29), M11f named revisions and last-good-file backup (2026-10-29), the cache memory
-measurement (2026-10-29, `docs/performance-baseline.md` §10).
+(2026-10-29), M11f named revisions and last-good-file backup (2026-10-29), M11g sketch plane and
+extrude direction (2026-10-30), the cache memory measurement (2026-10-29,
+`docs/performance-baseline.md` §10).
 
 If the goal of the next cycle is to make the contract honest about the real kernel, the slice is:
 

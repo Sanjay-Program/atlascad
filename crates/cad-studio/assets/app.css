@@ -325,6 +325,161 @@ kbd {
   gap: 3px 10px;
 }
 
+.drawing-preview {
+  display: grid;
+  place-items: center;
+  min-height: 96px;
+  margin: 0 0 10px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--canvas);
+}
+
+.drawing-preview svg {
+  display: block;
+  width: 100%;
+  height: 190px;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.drawing-preview svg.select-mode {
+  cursor: default;
+}
+
+.drawing-entity.selected {
+  stroke: var(--warning);
+  stroke-width: 2.5;
+}
+
+.drawing-overlay-point {
+  fill: var(--accent-strong);
+  pointer-events: none;
+}
+
+.drawing-overlay {
+  fill: none;
+  stroke: var(--accent-strong);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.drawing-text {
+  fill: var(--text-dim);
+  font-family: var(--mono, ui-monospace, monospace);
+  pointer-events: none;
+}
+
+.drawing-dimension {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.draw-tools {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.tool-button {
+  padding: 5px 2px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-raised);
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.tool-button:hover {
+  background: var(--panel-hover);
+  color: var(--text);
+}
+
+.tool-button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.drawing-text-input {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-raised);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.field-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.field-row > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.sheet-options {
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+}
+
+.sheet-options summary {
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.sheet-grid {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.sheet-grid label {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.sheet-grid input,
+.sheet-grid select {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--panel-raised);
+  color: var(--text);
+  font-size: 11px;
+}
+
+.drawing-entity {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.drawing-point {
+  fill: var(--accent-strong);
+}
+
 .truncate {
   overflow: hidden;
   text-overflow: ellipsis;

@@ -12,6 +12,7 @@ members = [
     "crates/cad-entitlements",
     "crates/cad-io",
     "crates/cad-studio",
+    "crates/cad-drafting",
 ]
 # The reference and kernel checkouts are independent repositories with their own histories and
 # manifests. Without this, this workspace root would claim any nested package whose manifest has no
@@ -35,6 +36,7 @@ cad-document = { path = "crates/cad-document" }
 cad-entitlements = { path = "crates/cad-entitlements" }
 cad-io = { path = "crates/cad-io" }
 cad-studio = { path = "crates/cad-studio" }
+cad-drafting = { path = "crates/cad-drafting" }
 
 # Same pinned versions the SolidCraft kernel uses, so measurements describe the
 # kernel this platform actually ships rather than a different release.

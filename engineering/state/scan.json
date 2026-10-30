@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "observed_at_unix": 1793285514,
+  "observed_at_unix": 1793331340,
   "host": {
     "os": "linux",
     "arch": "x86_64",
@@ -291,15 +291,15 @@
       "git": null,
       "fingerprint": {
         "algorithm": "fnv1a64-pathv1",
-        "digest": "3d1a46bc440764f3",
+        "digest": "2181cc66b930ec3d",
         "files": 2,
-        "bytes": 190359,
+        "bytes": 212678,
         "content_hashed": 2,
         "metadata_only": 0
       },
       "files": {
         "Cargo.toml": "54d71c55345c3370",
-        "src/lib.rs": "ea1fde12b1c285c4"
+        "src/lib.rs": "c1c4cbe98908b51d"
       },
       "packages": [
         "cad-document@0.1.0"
@@ -435,24 +435,24 @@
       "git": null,
       "fingerprint": {
         "algorithm": "fnv1a64-pathv1",
-        "digest": "16305a46383a8e53",
+        "digest": "5699783fc31e23c9",
         "files": 11,
-        "bytes": 293375,
+        "bytes": 308163,
         "content_hashed": 11,
         "metadata_only": 0
       },
       "files": {
         "Cargo.toml": "dda480361c413cb9",
         "assets/app.css": "9d677170ed99b21d",
-        "assets/app.js": "b7276edc0cfd0e7a",
+        "assets/app.js": "d9fd585c79ed509b",
         "assets/favicon.svg": "e264db094e2d0341",
-        "assets/index.html": "b4637991f7870f9f",
+        "assets/index.html": "d00fb3f81cff8b6b",
         "examples/cache_memory.rs": "367d50c4560e8d33",
-        "examples/rebuild_bench.rs": "dd1bdd790eaaa0fa",
+        "examples/rebuild_bench.rs": "39ca2efb6975737c",
         "src/http.rs": "75c48d3312f128ba",
-        "src/lib.rs": "4e1decd8ac6e0938",
+        "src/lib.rs": "b747eb236ebff3f2",
         "src/main.rs": "aacb73e618a046b7",
-        "tests/http_api.rs": "f8d450659ba17748"
+        "tests/http_api.rs": "ecc8fabd7ad944f9"
       },
       "packages": [
         "cad-studio@0.1.0"

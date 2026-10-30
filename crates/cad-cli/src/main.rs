@@ -4,13 +4,18 @@
 //! atlas capabilities
 //! atlas box   --size 10,10,5 [--unit mm] [--tol 0.05] [--out box.stl] [--header box.json]
 //! atlas union --a 10,10,10 --b 4,4,10 [--offset 8,8,0] [--unit mm] [--tol 0.05] [--out u.stl]
+//! atlas draft --file part.zcad [--save part.zdraft] [--out part.dxf]
+//! atlas dxf   --from sheet.zdraft --out sheet.dxf
+//! atlas dxf-import --from sheet.dxf [--save sheet.zdraft] [--out sheet.dxf]
+//! atlas sheet --file part.zcad --pdf part.pdf [--paper A3] [--scale fit|N]
 //! ```
 //!
 //! The summary is printed to stdout as JSON; progress and file writes go to stderr, so a caller can
 //! pipe stdout into another tool.
 
 use cad_cli::{
-    BoxSpec, Built, CliError, build_box, build_union, evaluate_project, write_stl_binary,
+    BoxSpec, Built, CliError, build_box, build_union, draft_plan_view, draft_summary, draft_to_dxf,
+    evaluate_project, import_dxf, plot_sheet, write_draft, write_stl_binary,
 };
 use cad_contract::ids::DocumentId;
 use cad_contract::kernel::Kernel;
@@ -41,6 +46,10 @@ fn run() -> Result<i32, CliError> {
         "box" => cmd_box(&rest),
         "union" => cmd_union(&rest),
         "project" => cmd_project(&rest),
+        "draft" => cmd_draft(&rest),
+        "dxf" => cmd_dxf(&rest),
+        "dxf-import" => cmd_dxf_import(&rest),
+        "sheet" => cmd_sheet(&rest),
         "help" | "--help" | "-h" => {
             usage();
             Ok(0)
@@ -67,9 +76,22 @@ fn usage() {
     println!("  atlas project undo --file PATH");
     println!("  atlas project redo --file PATH");
     println!("  atlas project export --file PATH --out STL");
+    println!("  atlas draft --file PROJECT.zcad [--save DRAWING.zdraft] [--out DRAWING.dxf]");
+    println!("  atlas dxf   --from DRAWING.zdraft --out DRAWING.dxf");
+    println!("  atlas dxf-import --from DRAWING.dxf [--save DRAWING.zdraft] [--out DRAWING.dxf]");
+    println!(
+        "  atlas sheet --file PROJECT.zcad|DRAWING.zdraft --pdf SHEET.pdf [--paper A3] [--scale fit|N]"
+    );
+    println!(
+        "              [--orientation landscape|portrait] [--title T] [--number N] [--revision R]"
+    );
+    println!(
+        "              [--author A] [--date D] [--notes N] [--margin MM] [--dimensions on|off]"
+    );
     println!();
     println!("Geometry is modelled in millimetres; --unit describes the values you typed.");
     println!("STL carries no units, so write --header next to it when the unit matters.");
+    println!("DXF is written as R12 (AC1009) in the drawing's own unit.");
 }
 
 fn cmd_capabilities() -> Result<i32, CliError> {
@@ -271,6 +293,175 @@ fn cmd_project_export(arguments: &[String]) -> Result<i32, CliError> {
         evaluated.volume_mm3
     );
     Ok(0)
+}
+
+/// `atlas draft --file part.zcad [--save part.zdraft] [--out part.dxf]`
+///
+/// Builds the plan-view drawing of a project (the profile the body was extruded from, in
+/// millimetres), optionally saves it as a native `.zdraft` and optionally exports DXF in the same
+/// run. At least one output is required: a command that computed a drawing and wrote nothing would
+/// silently look like success.
+fn cmd_draft(arguments: &[String]) -> Result<i32, CliError> {
+    let flags = Flags::parse(arguments)?;
+    let file = Path::new(flags.require("--file")?);
+    // Check the kind of file before loading it: a `.zdraft` parsed as a project fails on schema
+    // validation with a message about sketches, which hides the real mistake.
+    if file.extension().and_then(|e| e.to_str()) == Some("zdraft") {
+        return Err(CliError::Input(format!(
+            "`{}` is a drawing, not a project; use `atlas dxf --from {0} --out sheet.dxf`",
+            file.display()
+        )));
+    }
+    let project = Project::load(file)?;
+    let save = flags.get("--save").map(PathBuf::from);
+    let out = flags.get("--out").map(PathBuf::from);
+    if save.is_none() && out.is_none() {
+        return Err(CliError::Input(
+            "pass `--save part.zdraft`, `--out part.dxf`, or both".into(),
+        ));
+    }
+    let draft = draft_plan_view(&project)?;
+    let summary = write_draft(&draft, save.as_deref(), out.as_deref())?;
+    print_json(&summary)?;
+    eprintln!(
+        "wrote {} ({} entities on {} layers, {} mm of geometry)",
+        summary.file, summary.entities, summary.layers, summary.total_length
+    );
+    Ok(0)
+}
+
+/// `atlas dxf --from sheet.zdraft --out sheet.dxf`
+fn cmd_dxf(arguments: &[String]) -> Result<i32, CliError> {
+    let flags = Flags::parse(arguments)?;
+    let from = PathBuf::from(flags.require("--from")?);
+    let out = PathBuf::from(flags.require("--out")?);
+    let summary = draft_to_dxf(&from, &out)?;
+    print_json(&summary)?;
+    let described = draft_summary(&from)?;
+    eprintln!(
+        "wrote {} from {} ({} entities, {} layers)",
+        out.display(),
+        from.display(),
+        described.entities,
+        described.layers
+    );
+    Ok(0)
+}
+
+/// `atlas dxf-import --from sheet.dxf [--save sheet.zdraft] [--out normalised.dxf]`
+///
+/// Reads a DXF written elsewhere. Anything this model cannot represent is printed in the summary's
+/// `skipped` list rather than disappearing, so a caller can decide whether a partial drawing is
+/// acceptable before it relies on one.
+fn cmd_dxf_import(arguments: &[String]) -> Result<i32, CliError> {
+    let flags = Flags::parse(arguments)?;
+    let from = PathBuf::from(flags.require("--from")?);
+    let save = flags.get("--save").map(PathBuf::from);
+    let out = flags.get("--out").map(PathBuf::from);
+    if save.is_none() && out.is_none() {
+        return Err(CliError::Input(
+            "pass `--save sheet.zdraft`, `--out sheet.dxf`, or both".into(),
+        ));
+    }
+    let summary = import_dxf(&from, save.as_deref(), out.as_deref())?;
+    print_json(&summary)?;
+    let skipped: usize = summary.skipped.iter().map(|entry| entry.count).sum();
+    if skipped > 0 {
+        let kinds: Vec<String> = summary
+            .skipped
+            .iter()
+            .map(|entry| format!("{} x{}", entry.kind, entry.count))
+            .collect();
+        eprintln!(
+            "read {} of {} entities; {} entit(ies) not represented: {}",
+            summary.draft.entities,
+            summary.draft.entities + skipped,
+            skipped,
+            kinds.join(", ")
+        );
+    } else {
+        eprintln!(
+            "read {} entities on {} layers from {}",
+            summary.draft.entities,
+            summary.draft.layers,
+            from.display()
+        );
+    }
+    Ok(0)
+}
+
+/// `atlas sheet --file part.zcad --pdf part.pdf [--paper A3] [--scale fit|N] ...`
+///
+/// The default scale is `fit`: a standard ratio (1:1, 1:2, 1:5 …) chosen so the drawing fills the
+/// page. An explicit `--scale 2` means 1:2 and is refused when the drawing does not fit, naming the
+/// smallest standard scale that does.
+fn cmd_sheet(arguments: &[String]) -> Result<i32, CliError> {
+    let flags = Flags::parse(arguments)?;
+    let from = PathBuf::from(flags.require("--file")?);
+    let out = PathBuf::from(flags.require("--pdf")?);
+
+    let mut sheet = cad_drafting::Sheet::new(flags.get("--title").unwrap_or_default());
+    sheet.scale = None;
+    if let Some(paper) = flags.get("--paper") {
+        sheet.paper = cad_drafting::PaperSize::parse(paper).ok_or_else(|| {
+            CliError::Input(format!(
+                "`{paper}` is not a paper size; use A4, A3, A2, A1, A0 or Letter"
+            ))
+        })?;
+    }
+    if let Some(orientation) = flags.get("--orientation") {
+        sheet.orientation = cad_drafting::Orientation::parse(orientation).ok_or_else(|| {
+            CliError::Input(format!(
+                "`{orientation}` is not an orientation; use landscape or portrait"
+            ))
+        })?;
+    }
+    if let Some(scale) = flags.get("--scale")
+        && !scale.eq_ignore_ascii_case("fit")
+    {
+        let value: f64 = scale
+            .parse()
+            .map_err(|_| CliError::Input(format!("scale `{scale}` is not a number")))?;
+        sheet.scale = Some(value);
+    }
+    if let Some(margin) = flags.get("--margin") {
+        sheet.margin_mm = margin
+            .parse()
+            .map_err(|_| CliError::Input(format!("margin `{margin}` is not a number")))?;
+    }
+    for (name, field) in [
+        ("--number", &mut sheet.number),
+        ("--revision", &mut sheet.revision),
+        ("--author", &mut sheet.author),
+        ("--date", &mut sheet.date),
+        ("--notes", &mut sheet.notes),
+    ] {
+        if let Some(value) = flags.get(name) {
+            *field = value.to_string();
+        }
+    }
+    if let Some(dimensions) = flags.get("--dimensions") {
+        sheet.dimensions = !matches!(dimensions, "off" | "0" | "false" | "no");
+    }
+
+    let summary = plot_sheet(&from, &sheet, &out)?;
+    print_json(&summary)?;
+    eprintln!(
+        "wrote {} ({} at {}, {} lines, {} texts)",
+        out.display(),
+        summary.paper,
+        summary.scale,
+        summary.lines,
+        summary.texts
+    );
+    Ok(0)
+}
+
+fn print_json<T: serde::Serialize>(value: &T) -> Result<(), CliError> {
+    let json = serde_json::to_string_pretty(value)
+        .map_err(|error| CliError::Input(format!("cannot serialise the summary: {error}")))?;
+    println!("{json}");
+    Ok(())
 }
 
 fn emit(built: &Built, flags: &Flags) -> Result<i32, CliError> {

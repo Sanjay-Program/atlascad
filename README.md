@@ -11,6 +11,7 @@ The root Rust workspace is the actively developed integration surface. The appli
 | `crates/cad-contract` | Shared units, IDs, tolerances, capabilities, errors, mesh and document-header types, and the kernel trait. |
 | `crates/cad-kernel-truck` | Adapter implementing the shared kernel contract with Truck geometry crates. |
 | `crates/cad-document` | Document and revision primitives. |
+| `crates/cad-drafting` | 2D drawing document: layers, point/line/circle/arc/polyline/text/dimension entities, undo, versioned `.zdraft` save/load, DXF R12 reading and writing, sheet layout (A4–A0, Letter) with a title block, and a vector PDF plotter. |
 | `crates/cad-cli` | Headless command-line client for exercising the document and geometry path and exporting STL. |
 | `crates/cad-io` | Validated binary STL reading and writing shared by the CLI and the application. |
 | `crates/cad-studio` | Atlas Studio: the local-first CAD application, its HTTP API, and its browser workspace (WebGL viewport, feature tree, parameters, command palette). |
@@ -32,9 +33,9 @@ The project owner reports that development began about a year before the work wa
 
 ## Current platform status
 
-The root platform has a versioned shared contract, a Truck adapter, a headless consumer, an engineering control plane, a small agent platform, and a working local CAD application. The root-workspace gate passes 286 tests across eleven packages on the recorded machine; startup, request latency, and export timings are in [`docs/performance-baseline.md`](docs/performance-baseline.md).
+The root platform has a versioned shared contract, a Truck adapter, a headless consumer, an engineering control plane, a small agent platform, and a working local CAD application. The root-workspace gate passes 359 tests across twelve packages on the recorded machine; startup, request latency, and export timings are in [`docs/performance-baseline.md`](docs/performance-baseline.md).
 
-Stage A of the CAD roadmap is **partially implemented**. `cad-studio` supports an ordered feature graph: rectangle, circle, regular-polygon, and drawn-polyline sketches; extrude features that start a body, join it with a kernel union, or remove material with a kernel difference (cut); full-turn revolve features that turn a sketch about one of its own axes; parameter and sketch-placement edits that rebuild every dependent feature; a per-feature rebuild cache so an unchanged or last-feature edit does not re-run the whole history; crash recovery that snapshots unsaved edits next to the project and restores them on the next start, including when the project file itself cannot be read; per-feature rebuild status with failure reporting; undo/redo; save, reopen, and binary STL export. A `.zcad` project written by any earlier schema opens through migration. It does **not** yet provide sketch constraints, dimensions, sweeps or lofts, partial revolves, fillets, multi-body, assemblies, drawings, STL import, or native neutral-format (STEP/IGES/DXF) interchange. Those remain planned work in [`docs/roadmap.md`](docs/roadmap.md).
+Stage A of the CAD roadmap is **partially implemented**. `cad-studio` supports an ordered feature graph: rectangle, circle, regular-polygon, drawn-polyline and arc-sector sketches, each on a horizontal plane at any height; extrude features that start a body, join it with a kernel union, or remove material with a kernel difference (cut), swept up or down from their sketch plane; full-turn revolve features that turn a sketch about one of its own axes; parameter and sketch-placement edits that rebuild every dependent feature; a per-feature rebuild cache so an unchanged or last-feature edit does not re-run the whole history; crash recovery that snapshots unsaved edits next to the project and restores them on the next start, including when the project file itself cannot be read; per-feature rebuild status with failure reporting; undo/redo; save, reopen, and binary STL export. A `.zcad` project written by any earlier schema opens through migration. Alongside the model, the studio has a **drawing editor**: a plan of the sketch you can draw on (line, circle, polyline, point, dimension, text) with layers, undo, save to a `.zdraft` beside the project, DXF R12 download, and **plot to a PDF sheet** on A4–A0 or Letter with a title block and overall dimensions. `cad-drafting` also reads a DXF written by another program (layers, colours, off/locked state, units, polylines and text, with unsupported entity types counted rather than dropped). It does **not** yet provide sketch constraints, dimensions *in the sketch*, sweeps or lofts, partial revolves, fillets, multi-body, assemblies, projected/section views, GD&T, a BOM, STL import, or STEP/IGES interchange; DXF and PDF are the only formats it writes or reads. Those remain planned work in [`docs/roadmap.md`](docs/roadmap.md).
 
 The CADCraft and SolidCraft desktop applications are not wired to the shared contract. The root adapter advertises only the capabilities its tests exercise. Known kernel limitations and measured behavior are documented in `docs/kernel-comparison.md` and `docs/performance-baseline.md`.
 
@@ -121,6 +122,9 @@ The offline commands require dependencies to have been fetched already. For a fi
 ```sh
 cargo run -p cad-cli -- box --size 10,10,5 --out box.stl --header box.json
 cargo run -p cad-cli -- union --a 10,10,10 --b 4,4,10 --offset 8,8,0 --out union.stl
+cargo run -p cad-cli -- draft --file part.zcad --save part-plan.zdraft --out part-plan.dxf
+cargo run -p cad-cli -- dxf-import --from supplier.dxf --save supplier.zdraft --out normalised.dxf
+cargo run -p cad-cli -- sheet --file part.zcad --pdf part-a3.pdf --paper A3 --title "Bracket plate" --number AC-1001
 ```
 
 See `cargo run -p cad-cli -- --help` for the current command syntax. STL files and JSON headers produced by these examples are written to the current directory.
@@ -134,13 +138,13 @@ cargo run -p cad-studio -- --new model.zcad
 cargo run -p cad-studio -- --file model.zcad --port 7600
 ```
 
-The server binds `127.0.0.1` only, rejects foreign `Host` and `Origin` headers, caps request bodies at 1 MiB, and makes no network calls or telemetry requests. Projects are plain JSON in the versioned `.zcad` format (schema 5; schema 1, 2, 3 and 4 files migrate on load); binary STL export uses `cad-io` and is validated before it is written. Sketch profiles are in millimetres and extrusion is limited to 0.1–10,000 mm. The first feature starts the body and later features join or cut it, where a feature is an extrude or a full turn of the sketch about one of its own axes; a feature that cannot rebuild is marked with the kernel's message and blocks export instead of writing a file that no longer matches the model. Rebuilds are cached per feature, so an unchanged request does no kernel work and an edit re-runs only the features that read it.
+The server binds `127.0.0.1` only, rejects foreign `Host` and `Origin` headers, caps request bodies at 1 MiB, and makes no network calls or telemetry requests. Projects are plain JSON in the versioned `.zcad` format (schema 8; earlier schemas migrate on load); binary STL export uses `cad-io` and is validated before it is written. Sketch profiles are in millimetres and extrusion is limited to 0.1–10,000 mm. The first feature starts the body and later features join or cut it, where a feature is an extrude or a full turn of the sketch about one of its own axes; a feature that cannot rebuild is marked with the kernel's message and blocks export instead of writing a file that no longer matches the model. Rebuilds are cached per feature, so an unchanged request does no kernel work and an edit re-runs only the features that read it. The **Drawing** panel is an editor: arm Line, Circle, Poly, Point, Dim or Text, click in the plan, and each shape is validated and added by the drawing document; undo, delete, layers (on/off, locked) and **Save drawing** write a `.zdraft` beside the project. **DXF** downloads R12, and **Plot PDF** lays the drawing out on a titled sheet (paper, orientation, scale or `fit`, title, number, author). The panel says whether it is showing the generated plan (`model (live)`, which follows the sketch) or a saved drawing (`file`), which the model no longer overwrites. Drawing never touches the kernel, so it still works when a feature fails to rebuild.
 
 | Shortcut | Action |
 | --- | --- |
 | `Ctrl/Cmd+S` | Save |
 | `Ctrl/Cmd+Z` / `Shift+Ctrl/Cmd+Z` or `Ctrl/Cmd+Y` | Undo / redo |
-| `Ctrl/Cmd+K` | Command palette |
+| `Ctrl/Cmd+K` | Command palette (includes the drawing tools, save drawing and plot PDF) |
 | `F` | Frame model |
 | `W` / `G` | Toggle wireframe / grid |
 | `1` / `2` / `3` / `4` | Front / top / right / isometric view |
@@ -171,7 +175,9 @@ Read `docs/engineering-control-plane.md` before editing the curated manifests or
 - [`docs/repository-audit.md`](docs/repository-audit.md) and [`docs/integration/repository-catalog.md`](docs/integration/repository-catalog.md) describe the inspected source checkouts.
 - [`docs/license-inventory.md`](docs/license-inventory.md) and [`docs/integration/license-audit.md`](docs/integration/license-audit.md) record license findings and constraints.
 - [`docs/build-and-test.md`](docs/build-and-test.md), [`docs/quality/`](docs/quality/), and `engineering/quality/` contain dated build, test, and benchmark evidence.
-- [`docs/research/`](docs/research/) contains the local competitor, feature, and user-needs research.
+- [`docs/research/`](docs/research/) contains the local competitor, feature, and user-needs research, including [`CAD_CAPABILITY_MATRIX.md`](docs/research/CAD_CAPABILITY_MATRIX.md), [`INDUSTRY_TOOLSETS.md`](docs/research/INDUSTRY_TOOLSETS.md) and [`API_AND_PLUGIN_COMPATIBILITY.md`](docs/research/API_AND_PLUGIN_COMPATIBILITY.md).
+- [`docs/platform/SYSTEM_REQUIREMENTS.md`](docs/platform/SYSTEM_REQUIREMENTS.md) records the verified minimum, recommended and advanced tiers, the platform support status, and the profiles and diagnostics utility that do **not** exist yet.
+- [`docs/roadmap/FEATURE_IMPLEMENTATION_STATUS.md`](docs/roadmap/FEATURE_IMPLEMENTATION_STATUS.md) is the per-feature status ladder: what is verified end to end, what is measured, and what is only researched or planned.
 - [`docs/business/commercial-readiness.md`](docs/business/commercial-readiness.md) records the market position, pricing hypothesis, and staged sellable-release plan; [`docs/business/packaging-and-deployment.md`](docs/business/packaging-and-deployment.md) records the measured SolidCraft build spike, the verified reference-part/STEP evidence, the packaging and signing blockers, and the ordered deployable gate. Neither is legal or financial advice.
 
 Research and measurement claims are scoped to the cited local records and their dates. A recorded result is not a guarantee for another machine or a later revision.

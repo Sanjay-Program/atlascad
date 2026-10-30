@@ -104,7 +104,10 @@ feature ID and message, and undoable like any other change.
 - **schema 6 → 7:** only the version changes (`migrate_v6_to_v7`). Schema 7 adds the optional
   `revisions` list and `next_revision` counter, both defaulted; a schema-6 file starts with no
   revisions and means exactly what it did before.
-- **schema 7:** parsed directly.
+- **schema 7 → 8:** only the version changes (`migrate_v7_to_v8`). Schema 8 adds a sketch's
+  `plane_z` and an extrude's `direction`, both defaulted, so a schema-7 file lands with every sketch
+  on the world plane and every extrude sweeping up — exactly what schema 7 could express.
+- **schema 8:** parsed directly.
 - Anything newer is refused with `UnsupportedSchema { found, supported }`.
 
 Migration happens in memory on load; **no file is rewritten unless the user saves**, and the

@@ -35,6 +35,7 @@ use cad_document::{
     FeatureReport, Project, ProjectError, RecoveryInfo, RecoverySource, RevisionSummary,
     RevolveAxis, SketchProfile, clear_recovery,
 };
+use cad_drafting::Draft;
 use cad_kernel_truck::TruckKernel;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
@@ -60,6 +61,11 @@ pub enum StudioError {
     Project(ProjectError),
     Kernel(cad_contract::error::KernelError),
     Stl(cad_io::StlError),
+    Drafting(cad_drafting::PlanError),
+    /// A drawing operation (edit, save, plot) failed; the drawing is its own document.
+    DrawingDoc(cad_drafting::DraftError),
+    /// A sheet could not be laid out: empty drawing, a scale that does not fit, a bad field.
+    Sheet(cad_drafting::PlotError),
     Json(String),
     Io(String),
     BadRequest(String),
@@ -80,6 +86,9 @@ impl std::fmt::Display for StudioError {
             StudioError::Project(error) => write!(f, "project: {error}"),
             StudioError::Kernel(error) => write!(f, "kernel: {error}"),
             StudioError::Stl(error) => write!(f, "STL: {error}"),
+            StudioError::Drafting(error) => write!(f, "drawing: {error}"),
+            StudioError::DrawingDoc(error) => write!(f, "drawing: {error}"),
+            StudioError::Sheet(error) => write!(f, "sheet: {error}"),
             StudioError::Json(message) => write!(f, "JSON: {message}"),
             StudioError::Io(message) => write!(f, "I/O: {message}"),
             StudioError::BadRequest(message) => write!(f, "{message}"),
@@ -119,6 +128,24 @@ impl From<cad_io::StlError> for StudioError {
     }
 }
 
+impl From<cad_drafting::PlanError> for StudioError {
+    fn from(error: cad_drafting::PlanError) -> Self {
+        StudioError::Drafting(error)
+    }
+}
+
+impl From<cad_drafting::DraftError> for StudioError {
+    fn from(error: cad_drafting::DraftError) -> Self {
+        StudioError::DrawingDoc(error)
+    }
+}
+
+impl From<cad_drafting::PlotError> for StudioError {
+    fn from(error: cad_drafting::PlotError) -> Self {
+        StudioError::Sheet(error)
+    }
+}
+
 impl From<serde_json::Error> for StudioError {
     fn from(error: serde_json::Error) -> Self {
         StudioError::Json(error.to_string())
@@ -147,6 +174,9 @@ impl StudioError {
                 ProjectError::Kernel(_) | ProjectError::FeatureFailed { .. } => 422,
                 ProjectError::Io { .. } => 500,
             },
+            // A plan can only fail because the project it describes is invalid, which the same
+            // request would report as a 400 for any other endpoint.
+            StudioError::Drafting(_) | StudioError::DrawingDoc(_) | StudioError::Sheet(_) => 400,
             StudioError::Stl(_) | StudioError::Io(_) | StudioError::Lock | StudioError::Bind(_) => {
                 500
             }
@@ -172,6 +202,8 @@ impl StudioError {
             StudioError::Project(_) => "invalid_project",
             StudioError::Kernel(_) => "kernel_failure",
             StudioError::Stl(_) => "export_failure",
+            StudioError::Drafting(_) | StudioError::DrawingDoc(_) => "drawing_failure",
+            StudioError::Sheet(_) => "sheet_failure",
             StudioError::Io(_) | StudioError::Lock | StudioError::Bind(_) => "internal_error",
         }
     }
@@ -299,6 +331,26 @@ struct RecoveryView {
     autosave_error: Option<String>,
 }
 
+/// The drawing the panel shows and edits, ready for the SVG preview and for DXF/PDF export.
+#[derive(Debug, Serialize)]
+struct DraftView {
+    name: String,
+    unit: String,
+    layers: Vec<cad_drafting::Layer>,
+    entities: Vec<cad_drafting::Entity>,
+    /// `[min_x, min_y, max_x, max_y]`, or null for an empty drawing.
+    bounds: Option<[f64; 4]>,
+    total_length: f64,
+    /// `model` while the plan is generated from the sketch, `file` once it is (or was saved as) a
+    /// `.zdraft` beside the project. The distinction matters: a `model` drawing follows the model,
+    /// a `file` drawing does not.
+    source: &'static str,
+    file: Option<String>,
+    dirty: bool,
+    undo: usize,
+    redo: usize,
+}
+
 #[derive(Debug, Serialize)]
 struct StatePayload {
     schema: u32,
@@ -348,6 +400,16 @@ struct StudioState {
     /// Set when the studio is reached over a non-loopback interface. Every API call must then carry
     /// its token; set once, before the accept loop starts, and only read afterwards.
     share: Option<ShareAccess>,
+    /// The drawing the panel shows. `None` until it is first needed, because a project that is only
+    /// modelled never pays for a drawing it does not look at.
+    drawing: Option<Draft>,
+    /// Where the drawing lives when it is a file of its own (`<project stem>.zdraft`).
+    drawing_file: Option<PathBuf>,
+    /// Set by any drawing edit. A drawing generated from the model is regenerated when the model
+    /// changes *unless* this is set: once a user has drawn on it, the drawing is theirs.
+    drawing_edited: bool,
+    /// The project revision the generated drawing was derived from.
+    drawing_revision: u64,
 }
 
 impl StudioState {
@@ -367,6 +429,10 @@ impl StudioState {
             recovered,
             autosave_error: None,
             share: None,
+            drawing: None,
+            drawing_file: None,
+            drawing_edited: false,
+            drawing_revision: 0,
         };
         // Evaluate once at startup so a broken project is refused before a URL is printed.
         let _ = state.payload()?;
@@ -637,6 +703,194 @@ impl StudioState {
         self.payload()
     }
 
+    /// Where this project's drawing is saved: the project's own stem with a `.zdraft` extension.
+    ///
+    /// A drawing is a document in its own right, so it lives in its own file. The project and the
+    /// drawing can then be saved, opened and handed over independently, and a drawing is not a
+    /// schema change to `.zcad`.
+    fn drawing_path(&self) -> PathBuf {
+        self.path.with_extension("zdraft")
+    }
+
+    /// Make sure the drawing exists and is not stale.
+    ///
+    /// A drawing generated from the model is regenerated when the model's revision changes, so the
+    /// panel follows an edit to the sketch. The moment the user draws on it, or saves it, it becomes
+    /// an independent document and the model no longer overwrites it — which is what a drafter
+    /// expects, and the payload says which of the two the panel is showing.
+    fn ensure_drawing(&mut self) -> Result<(), StudioError> {
+        let revision = self.project.revision.get();
+        let stale = match (
+            &self.drawing,
+            self.drawing_file.as_ref(),
+            self.drawing_edited,
+        ) {
+            (None, _, _) => true,
+            // A generated drawing follows the model until it is edited or saved.
+            (Some(_), None, false) => self.drawing_revision != revision,
+            _ => false,
+        };
+        if !stale {
+            return Ok(());
+        }
+        if let Some(path) = self.drawing_file.clone() {
+            self.drawing = Some(Draft::load(&path)?);
+        } else {
+            let sidecar = self.drawing_path();
+            if sidecar.is_file() && !self.drawing_edited {
+                self.drawing = Some(Draft::load(&sidecar)?);
+                self.drawing_file = Some(sidecar);
+            } else {
+                self.drawing = Some(cad_drafting::plan_draft(&self.project)?);
+                self.drawing_file = None;
+            }
+        }
+        self.drawing_revision = revision;
+        Ok(())
+    }
+
+    fn drawing_mut(&mut self) -> Result<&mut Draft, StudioError> {
+        self.ensure_drawing()?;
+        self.drawing
+            .as_mut()
+            .ok_or_else(|| StudioError::BadRequest("the drawing is unavailable".into()))
+    }
+
+    fn draft_payload(&mut self) -> Result<DraftView, StudioError> {
+        self.ensure_drawing()?;
+        let draft = self
+            .drawing
+            .as_ref()
+            .ok_or_else(|| StudioError::BadRequest("the drawing is unavailable".into()))?;
+        Ok(DraftView {
+            name: draft.name.clone(),
+            unit: draft.header.units.symbol().to_string(),
+            layers: draft.layers().to_vec(),
+            entities: draft.entities().to_vec(),
+            bounds: draft.bounds(),
+            total_length: draft.total_length(),
+            source: if self.drawing_file.is_some() {
+                "file"
+            } else {
+                "model"
+            },
+            file: self
+                .drawing_file
+                .as_ref()
+                .map(|path| path.display().to_string()),
+            dirty: self.drawing_edited,
+            undo: draft.undo_depth(),
+            redo: draft.redo_depth(),
+        })
+    }
+
+    /// Add an entity the user drew. Validation is the drawing's, not this endpoint's: a radius of
+    /// zero or a polyline of one point is refused by the document with its own message.
+    fn drawing_add(
+        &mut self,
+        layer: &str,
+        kind: cad_drafting::EntityKind,
+    ) -> Result<DraftView, StudioError> {
+        self.drawing_mut()?.add_entity(layer, kind)?;
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
+    fn drawing_remove(&mut self, id: EntityId) -> Result<DraftView, StudioError> {
+        self.drawing_mut()?.remove_entity(id)?;
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
+    /// Create a layer, or change the colour, visibility or lock of an existing one.
+    fn drawing_layer(&mut self, request: &DrawingLayerRequest) -> Result<DraftView, StudioError> {
+        {
+            let draft = self.drawing_mut()?;
+            if draft.layer(&request.name).is_none() {
+                let color = request.color.unwrap_or(7);
+                draft.add_layer(&request.name, color)?;
+            }
+            if let Some(color) = request.color
+                && draft
+                    .layer(&request.name)
+                    .is_some_and(|layer| layer.color != color)
+            {
+                draft.set_layer_color(&request.name, color)?;
+            }
+            if let Some(visible) = request.visible
+                && draft
+                    .layer(&request.name)
+                    .is_some_and(|layer| layer.visible != visible)
+            {
+                draft.set_layer_visible(&request.name, visible)?;
+            }
+            if let Some(locked) = request.locked
+                && draft
+                    .layer(&request.name)
+                    .is_some_and(|layer| layer.locked != locked)
+            {
+                draft.set_layer_locked(&request.name, locked)?;
+            }
+        }
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
+    fn drawing_undo(&mut self) -> Result<DraftView, StudioError> {
+        self.drawing_mut()?.undo()?;
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
+    fn drawing_redo(&mut self) -> Result<DraftView, StudioError> {
+        self.drawing_mut()?.redo()?;
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
+    /// Write the drawing to its sidecar file. From then on it is a file, not a generated plan.
+    fn drawing_save(&mut self) -> Result<DraftView, StudioError> {
+        let path = self.drawing_path();
+        {
+            let draft = self.drawing_mut()?;
+            draft.save(&path)?;
+        }
+        self.drawing_file = Some(path);
+        self.drawing_edited = false;
+        self.draft_payload()
+    }
+
+    fn dxf(&mut self) -> Result<(Vec<u8>, String), StudioError> {
+        self.ensure_drawing()?;
+        let draft = self
+            .drawing
+            .as_ref()
+            .ok_or_else(|| StudioError::BadRequest("the drawing is unavailable".into()))?;
+        Ok((
+            draft.to_dxf().into_bytes(),
+            format!("{}-plan.dxf", export_stem(&self.project.name)),
+        ))
+    }
+
+    /// Lay the drawing out on a sheet and serialise the page as PDF.
+    fn pdf(&mut self, sheet: cad_drafting::Sheet) -> Result<(Vec<u8>, String), StudioError> {
+        self.ensure_drawing()?;
+        let draft = self
+            .drawing
+            .as_ref()
+            .ok_or_else(|| StudioError::BadRequest("the drawing is unavailable".into()))?;
+        let plot = sheet.plot(draft)?;
+        let pdf = cad_drafting::to_pdf(&plot, &draft.name);
+        Ok((
+            pdf.into_bytes(),
+            format!(
+                "{}-{}.pdf",
+                export_stem(&self.project.name),
+                sheet.paper.label().to_ascii_lowercase()
+            ),
+        ))
+    }
+
     fn stl(&mut self) -> Result<(Vec<u8>, String), StudioError> {
         if self.project.features().is_empty() {
             return Err(StudioError::BadRequest(
@@ -661,6 +915,11 @@ impl StudioState {
 }
 
 fn export_name(name: &str) -> String {
+    format!("{}.stl", export_stem(name))
+}
+
+/// A file-system-safe stem for the project name, shared by every export.
+fn export_stem(name: &str) -> String {
     let mut stem: String = name
         .chars()
         .map(|character| {
@@ -675,7 +934,7 @@ fn export_name(name: &str) -> String {
     if stem.is_empty() {
         stem.push_str("part");
     }
-    format!("{stem}.stl")
+    stem
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1006,6 +1265,35 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
                 ),
             Err(error) => error_response(&error),
         },
+        ("GET", "/api/draft") => match with_state(state, |state| state.draft_payload()) {
+            Ok(payload) => to_json(200, &payload),
+            Err(error) => error_response(&error),
+        },
+        ("GET", "/api/export/pdf") => {
+            let query = request.path.clone();
+            match with_state(state, |state| {
+                // The sheet's title defaults to the project's name, which only the state knows.
+                let title =
+                    query_text(&query, "title").unwrap_or_else(|| state.project.name.clone());
+                let sheet = sheet_from_query(&query, title)?;
+                state.pdf(sheet)
+            }) {
+                Ok((bytes, filename)) => http::Response::new(200, "OK", "application/pdf", bytes)
+                    .with_header(
+                        "Content-Disposition",
+                        format!("attachment; filename=\"{filename}\""),
+                    ),
+                Err(error) => error_response(&error),
+            }
+        }
+        ("GET", "/api/export/dxf") => match with_state(state, |state| state.dxf()) {
+            Ok((bytes, filename)) => http::Response::new(200, "OK", "application/dxf", bytes)
+                .with_header(
+                    "Content-Disposition",
+                    format!("attachment; filename=\"{filename}\""),
+                ),
+            Err(error) => error_response(&error),
+        },
         ("POST", path) if path.starts_with("/api/") => {
             match require_same_origin(request, port, shared).and_then(|()| require_json(request)) {
                 Ok(()) => post_route(state, request),
@@ -1164,6 +1452,47 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             }
             Err(error) => error_response(&error),
         },
+        "/api/draft/entity" => match parse_body::<DrawingEntityRequest>(request) {
+            Ok(body) => match serde_json::from_value::<cad_drafting::EntityKind>(body.kind) {
+                Ok(kind) => match with_state(state, |state| state.drawing_add(&body.layer, kind)) {
+                    Ok(payload) => to_json(200, &payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&StudioError::BadRequest(format!(
+                    "the entity is not a drawing entity: {error}"
+                ))),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/remove" => match parse_body::<DrawingRemoveRequest>(request) {
+            Ok(body) => match EntityId::new(body.id) {
+                Ok(id) => match with_state(state, |state| state.drawing_remove(id)) {
+                    Ok(payload) => to_json(200, &payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&StudioError::BadRequest(error.to_string())),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/layer" => match parse_body::<DrawingLayerRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_layer(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/undo" => match with_state(state, StudioState::drawing_undo) {
+            Ok(payload) => to_json(200, &payload),
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/redo" => match with_state(state, StudioState::drawing_redo) {
+            Ok(payload) => to_json(200, &payload),
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/save" => match with_state(state, StudioState::drawing_save) {
+            Ok(payload) => to_json(200, &payload),
+            Err(error) => error_response(&error),
+        },
         "/api/revision" => match parse_body::<RevisionRequest>(request) {
             Ok(body) => match with_state(state, |state| {
                 state.mutate(|project| project.add_revision(&body.name).map(|_| ()))
@@ -1247,6 +1576,30 @@ struct OriginRequest {
     /// is what an older client sends.
     #[serde(default)]
     plane: Option<f64>,
+}
+
+/// An entity the user drew in the Drawing panel. `kind` is the drawing document's own tagged form, so
+/// the server validates it with the same code that guards a loaded file.
+#[derive(Debug, Deserialize)]
+struct DrawingEntityRequest {
+    layer: String,
+    kind: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+struct DrawingRemoveRequest {
+    id: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct DrawingLayerRequest {
+    name: String,
+    #[serde(default)]
+    color: Option<u8>,
+    #[serde(default)]
+    visible: Option<bool>,
+    #[serde(default)]
+    locked: Option<bool>,
 }
 
 /// A name for a new named revision.
@@ -1457,6 +1810,101 @@ fn query_param<'a>(path: &'a str, name: &str) -> Option<&'a str> {
         let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
         (key == name && !value.is_empty()).then_some(value)
     })
+}
+
+/// A query parameter decoded for a title block: `%20` and `+` become spaces, `%XX` a byte.
+fn query_text(path: &str, name: &str) -> Option<String> {
+    let raw = query_param(path, name)?;
+    let bytes = raw.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'%' if index + 3 <= bytes.len() => {
+                let hex = std::str::from_utf8(&bytes[index + 1..index + 3]).ok();
+                match hex.and_then(|digits| u8::from_str_radix(digits, 16).ok()) {
+                    Some(value) => {
+                        out.push(value);
+                        index += 3;
+                    }
+                    None => {
+                        out.push(b'%');
+                        index += 1;
+                    }
+                }
+            }
+            b'+' => {
+                out.push(b' ');
+                index += 1;
+            }
+            byte => {
+                out.push(byte);
+                index += 1;
+            }
+        }
+    }
+    Some(String::from_utf8_lossy(&out).into_owned())
+}
+
+/// The sheet named by the query string of `/api/export/pdf`.
+///
+/// Every field is optional and defaults to the sheet in `cad_drafting`: A3 landscape at 1:1 with the
+/// project's own name. `scale=fit` asks for a standard scale chosen to fill the page, which is what a
+/// user who does not know the model's size needs; `scale=2` is 1:2.
+fn sheet_from_query(path: &str, title: String) -> Result<cad_drafting::Sheet, StudioError> {
+    let mut sheet = cad_drafting::Sheet::new(title);
+    if let Some(paper) = query_text(path, "paper") {
+        sheet.paper = cad_drafting::PaperSize::parse(&paper).ok_or_else(|| {
+            StudioError::BadRequest(format!(
+                "`{paper}` is not a paper size; use A4, A3, A2, A1, A0 or Letter"
+            ))
+        })?;
+    }
+    if let Some(orientation) = query_text(path, "orientation") {
+        sheet.orientation = cad_drafting::Orientation::parse(&orientation).ok_or_else(|| {
+            StudioError::BadRequest(format!(
+                "`{orientation}` is not an orientation; use portrait or landscape"
+            ))
+        })?;
+    }
+    match query_text(path, "scale") {
+        Some(value) if value.eq_ignore_ascii_case("fit") => sheet.scale = None,
+        Some(value) => {
+            let scale: f64 = value.parse().map_err(|_| {
+                StudioError::BadRequest(format!(
+                    "scale `{value}` is not a number; use 1 for 1:1, 2 for 1:2, or `fit`"
+                ))
+            })?;
+            if !scale.is_finite() || scale <= 0.0 {
+                return Err(StudioError::BadRequest(
+                    "the sheet scale must be a positive number".into(),
+                ));
+            }
+            sheet.scale = Some(scale);
+        }
+        None => {}
+    }
+    for (name, field) in [
+        ("number", &mut sheet.number),
+        ("revision", &mut sheet.revision),
+        ("author", &mut sheet.author),
+        ("date", &mut sheet.date),
+        ("notes", &mut sheet.notes),
+    ] {
+        if let Some(value) = query_text(path, name) {
+            *field = value;
+        }
+    }
+    if let Some(margin) = query_text(path, "margin") {
+        sheet.margin_mm = margin.parse().map_err(|_| {
+            StudioError::BadRequest(format!("margin `{margin}` is not a number of millimetres"))
+        })?;
+    }
+    if let Some(dimensions) = query_text(path, "dimensions") {
+        sheet.dimensions = !matches!(dimensions.as_str(), "0" | "false" | "no");
+    }
+    sheet.validate()?;
+    Ok(sheet)
 }
 
 /// Compare without leaking the position of the first mismatch through an early return.

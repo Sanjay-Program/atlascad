@@ -2511,6 +2511,187 @@
       ],
       "verified_on": "2026-10-30",
       "verified_host": "linux/x86_64, i3-1125G4, 7.4 GB RAM, integrated graphics"
+    },
+    {
+      "id": "task.m12.drafting-document",
+      "title": "2D drafting: a drawing document, DXF read/write and the plan panel",
+      "rationale": "The 2026-10-30 brief asks for every CAD tool, and the measured state says the product cannot be sold on solid modelling alone: a buyer also opens a drawing, exchanges it and checks it against the model. Drafting is also the one workflow that does not depend on the kernel, so it can be built and verified on this host while the boolean defects remain recorded. This is the first slice of the drafted plan: model and exchange format first, because a drawing that cannot be saved and opened elsewhere is not a drawing.",
+      "priority": "user_value",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "A .zdraft drawing holds layers (ACI colour, visibility, lock, line weight) and point, line, circle, arc and polyline entities, every entity validated before it enters the document.",
+        "The drawing saves, reopens and refuses unknown fields, newer schemas and oversized input before parsing.",
+        "Undo and redo cover layers and geometry together and are bounded.",
+        "DXF R12 output carries header extents, the LTYPE and LAYER tables, entities and EOF, and re-exporting a drawing is byte-identical.",
+        "A DXF written by another program imports: layer table, colours including an off layer, the locked flag, $INSUNITS and polyline vertices through SEQEND.",
+        "Entity types this model cannot represent are counted by type and reported, never dropped silently.",
+        "Malformed DXF fails with the offending group named rather than importing a partial drawing that looks complete.",
+        "The studio shows the plan drawing, its entity/layer counts, extents and length, and downloads the DXF through the same token gate as every other route.",
+        "A feature that fails to rebuild does not blank the plan drawing, because drafting does not read the kernel."
+      ],
+      "inputs": [
+        "module.cad-drafting",
+        "module.cad-studio",
+        "module.cad-cli"
+      ],
+      "outputs": [
+        "crates/cad-drafting/src/lib.rs",
+        "crates/cad-drafting/src/dxf.rs",
+        "crates/cad-cli/src/lib.rs",
+        "crates/cad-cli/src/main.rs",
+        "crates/cad-cli/tests/draft_workflow.rs",
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/assets/app.js",
+        "crates/cad-studio/assets/app.css",
+        "crates/cad-studio/assets/index.html",
+        "crates/cad-studio/tests/http_api.rs",
+        "scripts/browser-check.mjs"
+      ],
+      "depends_on": [],
+      "blocks": [],
+      "expected_changes": [
+        "crates/cad-drafting/src/lib.rs",
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/assets/app.js",
+        "crates/cad-studio/assets/index.html",
+        "docs/feature-matrix.md",
+        "docs/tasks.md"
+      ],
+      "required_tests": [
+        "cargo test --offline --workspace -j 2",
+        "cargo clippy --offline --workspace --all-targets -- -D warnings",
+        "cargo fmt --all --check",
+        "node scripts/browser-check.mjs <running studio>"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "rollback": "Delete crates/cad-drafting, its workspace member and cad-cli/cad-studio dependencies; remove the /api/draft and /api/export/dxf routes, the drawing panel and its CSS; drop the `dxf-import` CLI command. No .zcad schema changes, so existing projects are unaffected.",
+      "source": "curated",
+      "trigger_digest": null,
+      "acceptance_results": [
+        "Met: 13 document tests cover layers, entity validation, undo/redo, save/load, unknown fields, newer schemas and DXF structure; every entity kind is validated before insertion.",
+        "Met: the drawing round-trips through save and load, a load refuses an entity on a missing layer, and the 32 MiB cap is checked before parsing.",
+        "Met: undo/redo restores layers and geometry together; the history is bounded at 64 snapshots.",
+        "Met: the R12 writer emits header extents, $INSUNITS, the LTYPE and LAYER tables and EOF; the 40 x 30 mm plan exports four LINE segments with extents 0,0-40,30, and re-exporting is byte-identical (CLI test).",
+        "Met: the reader is tested against hand-written files for every entity type, POLYLINE through SEQEND, LWPOLYLINE, the layer table with a negative colour and the locked flag, and $INSUNITS = 1 (inches) and 0 (unitless, reported as None).",
+        "Met: TEXT and DIMENSION are counted in ImportReport.skipped and printed by the CLI as `TEXT x1`; an import with a non-empty list is a partial drawing and says so.",
+        "Met: an odd line count, a non-numeric group code, a circle without a radius, a non-numeric coordinate and a file over the cap each fail with the offending group named.",
+        "Met: /api/draft returns name, unit, layers, entities, bounds and total length; the panel renders the outline as SVG, shows the counts and downloads /api/export/dxf through fetch with the session token. A shared studio returns 401 without the token for both routes (HTTP test) and the headless browser downloads a .dxf in a shared session.",
+        "Met: the plan is built from the sketch, not the mesh, so a failed feature leaves it intact; drafting never calls the kernel.",
+        "Extended on 2026-10-30 by task.m12b.drawing-editor-and-sheets: the drawing is now editable in the page, and it plots to a PDF sheet with a title block and overall dimensions."
+      ],
+      "contract_changes": [],
+      "limitations": [
+        "The drawing is one plan view per project, generated from the sketch outline. There is no projected view per face, no section and no detail view.",
+        "DXF is R12 (AC1009) and the reader accepts a narrower set than the format allows: MTEXT, DIMENSION, HATCH, blocks/INSERT, splines and ellipses are counted as skipped, not read. A dimension is written exploded into lines and text, so it is not editable as a dimension in another program.",
+        "No DWG, no STEP/IGES. DXF and PDF are the only exchange formats.",
+        "The reader drops the z coordinate of a 3D POLYLINE because the document is 2D; elevations are not represented.",
+        "Line weight is document data only: R12 has no line-weight table, so it is not in the exported file.",
+        "No measurement of import or drafting cost on a large drawing."
+      ],
+      "evidence": [
+        "crates/cad-drafting/src/lib.rs (drawing document, layers, entities, undo, save/load, DXF R12 writer)",
+        "crates/cad-drafting/src/dxf.rs (DXF reader with ImportReport.skipped)",
+        "crates/cad-cli/tests/draft_workflow.rs::a_drawing_from_another_program_opens_and_re_exports_its_geometry",
+        "crates/cad-studio/tests/http_api.rs::the_plan_drawing_follows_the_model_and_exports_a_dxf_another_program_can_open",
+        "crates/cad-studio/tests/http_api.rs::a_shared_studio_protects_the_drawing_and_its_dxf_like_every_other_route",
+        "scripts/browser-check.mjs (plan preview and DXF download, loopback and shared)",
+        "engineering/quality/tests.json#t-platform-drafting-20261030 (339 passed, 0 failed)"
+      ],
+      "verified_on": "2026-10-30",
+      "verified_host": "linux/x86_64, i3-1125G4, 7.4 GB RAM, integrated graphics"
+    },
+    {
+      "id": "task.m12b.drawing-editor-and-sheets",
+      "title": "Drafting editor, text and dimensions, and a plotted PDF sheet",
+      "rationale": "The first drafting slice could read, preview and exchange a plan but could not draw on it or print it, which is the difference between a drawing viewer and a drafting tool. A buyer's second question after 'can I model it' is 'can I mark it up and hand over a sheet'. This closes that loop inside the same local application, without touching the kernel, whose boolean defects remain recorded.",
+      "priority": "user_value",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "The drawing is an editable document: entities and layers can be added, changed, removed, undone and redone through the API, and each edit is validated by the drawing document.",
+        "The drawing is saved as a .zdraft beside the project, and a saved drawing is no longer overwritten when the model changes.",
+        "Text and linear-dimension entities are first-class: validated, saved, drawn in the page, written to DXF (a dimension exploded into lines and text) and read back where the format allows.",
+        "A sheet lays out the drawing on A4\u2013A0 or Letter paper, portrait or landscape, at a requested scale or a fitted standard scale, and refuses a scale that does not fit by naming the smallest standard scale that does.",
+        "The sheet carries a frame and a title block with title, drawing number, revision, author, date, scale, unit, paper and entity count.",
+        "The sheet plots to a valid PDF that a reader opens at the right page size, with selectable text.",
+        "The page has a drawing editor: line, circle, polyline, point, dimension and text tools, layer selection and layer visibility/lock, selection and deletion, undo, save, DXF and PDF downloads.",
+        "A shared session can edit the drawing and download both the DXF and the PDF, with the token presented as a header.",
+        "Editing the drawing does not touch the kernel, so it still works when a feature cannot rebuild."
+      ],
+      "inputs": [
+        "module.cad-drafting",
+        "module.cad-studio",
+        "module.cad-cli"
+      ],
+      "outputs": [
+        "crates/cad-drafting/src/sheet.rs",
+        "crates/cad-drafting/src/pdf.rs",
+        "crates/cad-drafting/src/lib.rs",
+        "crates/cad-cli/src/lib.rs",
+        "crates/cad-cli/src/main.rs",
+        "crates/cad-cli/tests/draft_workflow.rs",
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/assets/app.js",
+        "crates/cad-studio/assets/app.css",
+        "crates/cad-studio/assets/index.html",
+        "crates/cad-studio/tests/http_api.rs",
+        "scripts/browser-check.mjs"
+      ],
+      "depends_on": [
+        "task.m12.drafting-document"
+      ],
+      "blocks": [],
+      "expected_changes": [
+        "crates/cad-drafting/src/lib.rs",
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/assets/app.js",
+        "docs/feature-matrix.md",
+        "docs/tasks.md"
+      ],
+      "required_tests": [
+        "cargo test --offline --workspace -j 2",
+        "cargo clippy --offline --workspace --all-targets -- -D warnings",
+        "cargo fmt --all --check",
+        "node scripts/browser-check.mjs <running studio>"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "rollback": "Revert cad-drafting to the document + reader only (drop sheet.rs, pdf.rs, the Text and Dimension variants and MAX_TEXT_CHARS); remove the /api/draft/entity, /api/draft/remove, /api/draft/layer, /api/draft/undo, /api/draft/redo, /api/draft/save and /api/export/pdf routes and the drawing state in cad-studio; restore the read-only drawing panel; drop `atlas sheet`. Existing .zdraft files that contain text or dimensions then fail to load with an unknown-variant error rather than being silently misread.",
+      "source": "curated",
+      "trigger_digest": null,
+      "acceptance_results": [
+        "Met: /api/draft/entity, /api/draft/remove, /api/draft/layer, /api/draft/undo and /api/draft/redo edit the drawing through Draft::add_entity/remove_entity/add_layer/undo/redo; a radius of zero and an unknown entity kind are both refused with the document's message (HTTP test).",
+        "Met: /api/draft/save writes <project stem>.zdraft and the payload switches from source `model` to `file`; after a model parameter edit the saved drawing keeps its own bounds, so the model no longer overwrites it (HTTP test).",
+        "Met: Text and Dimension are entity variants with validation, DXF output and SVG rendering. A dimension is written as two extension lines, the dimension line, two ticks and a TEXT entity, and reads back as that geometry (unit test asserts 5 LINE records, no DIMENSION record, and the value `40`).",
+        "Met: Sheet covers A4/A3/A2/A1/A0/Letter portrait or landscape with an explicit scale or a standard fit; a scale that does not fit returns the smallest standard scale that does (4000 mm at 1:1 on A3 reports 1:20; CLI and unit tests).",
+        "Met: the plot has a frame and a title block carrying title, number, revision, author, date, scale, unit/paper and entity count (unit test asserts every field, and a rendered A3 sheet was inspected).",
+        "Met: the PDF has a correct MediaBox (A4 landscape 841.89 x 595.276 pt), a valid xref, escaped text and `%%EOF`; pdftotext extracts the title, number, author, scale and both dimensions, and pdftoppm renders the page.",
+        "Met: the panel has Select/Line/Circle/Poly/Dim/Text tools, undo and delete, a layer selector with On/Locked toggles, an add-layer field, Save drawing, DXF and Plot PDF. A headless browser arms the line tool, clicks two points, sees the entity count go to 2 and the panel report `model (live)`, then saves and sees the file name.",
+        "Met: in a shared studio the editor works and both downloads carry the token; the browser check downloads a .dxf and a .pdf from the shared page, and unauthenticated /api/export/pdf is a 401 like every other route.",
+        "Met: drafting and plotting never call the kernel; the drawing is built from the sketch."
+      ],
+      "contract_changes": [],
+      "limitations": [
+        "The editor is line-based: no snapping, no object snap, no grips, no trimming/filleting, no copy/rotate/scale, no multi-selection.",
+        "One sheet per plot and one plan view per project; there are no projected, section or detail views, and no sheet set.",
+        "The dimension tool takes two clicks and a fixed proportional offset; there is no text override in the page, no radius/diameter/angular dimensions, and no dimension style.",
+        "Text is single-line, unrotated, and uses the reader's font. The PDF uses the base-14 Helvetica faces, so text is selectable but not embedded; the file is therefore not PDF/A.",
+        "The reader still cannot read DIMENSION records from other programs; it reads their exploded lines and text only.",
+        "No measurement of plotting time on a large drawing; the sheet is laid out in memory and written uncompressed."
+      ],
+      "evidence": [
+        "crates/cad-drafting/src/sheet.rs (paper, orientation, scale, fit, title block, dimensions, plot primitives)",
+        "crates/cad-drafting/src/pdf.rs (PDF 1.4 writer, base-14 fonts, xref)",
+        "crates/cad-studio/tests/http_api.rs::the_drawing_is_an_editable_document_of_its_own",
+        "crates/cad-studio/tests/http_api.rs::a_drawing_plots_to_a_pdf_sheet_with_a_title_block",
+        "crates/cad-cli/tests/draft_workflow.rs::a_drawing_plots_to_a_named_pdf_sheet",
+        "scripts/browser-check.mjs (drawing a line, saving, DXF and PDF downloads in a shared session)",
+        "engineering/quality/tests.json#t-platform-editor-20261030 (359 passed, 0 failed)"
+      ],
+      "verified_on": "2026-10-30",
+      "verified_host": "linux/x86_64, i3-1125G4, 7.4 GB RAM, integrated graphics"
     }
   ]
 }

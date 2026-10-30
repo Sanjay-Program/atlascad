@@ -25,6 +25,7 @@
       <button id="redoBtn" class="icon-button" title="Redo (Ctrl+Y)" aria-label="Redo" disabled>↷</button>
       <button id="saveBtn" class="button ghost" title="Save project (Ctrl+S)">Save</button>
       <button id="exportBtn" class="button ghost" title="Export binary STL">Export STL</button>
+      <button id="exportDxfBtn" class="button ghost" title="Download the plan drawing as DXF R12">Export DXF</button>
       <button id="paletteBtn" class="button command" title="Command palette (Ctrl+K)">
         <span>Commands</span><kbd>Ctrl K</kbd>
       </button>
@@ -251,6 +252,83 @@
         <div class="meta-grid" id="properties">
           <span>Volume</span><span>—</span>
         </div>
+      </section>
+      <section class="panel-section" id="drawingSection">
+        <div class="section-head"><h2>Drawing</h2><span class="hint" id="drawingLabel">plan view</span></div>
+        <p class="hint" id="drawingHint">A 2D drawing of the part. It follows the model until you draw on it or save it, then it is yours.</p>
+        <div id="drawingPreview" class="drawing-preview" role="application" aria-label="Drawing editor">
+          <span class="hint">loading…</span>
+        </div>
+        <div class="draw-tools" role="toolbar" aria-label="Drawing tools">
+          <button type="button" class="tool-button" data-tool="select" aria-pressed="true" title="Select">Select</button>
+          <button type="button" class="tool-button" data-tool="line" aria-pressed="false" title="Line: click two points">Line</button>
+          <button type="button" class="tool-button" data-tool="circle" aria-pressed="false" title="Circle: click the centre, then a point on it">Circle</button>
+          <button type="button" class="tool-button" data-tool="polyline" aria-pressed="false" title="Polyline: click points, then Finish or Close">Poly</button>
+          <button type="button" class="tool-button" data-tool="point" aria-pressed="false" title="Point">Point</button>
+          <button type="button" class="tool-button" data-tool="dimension" aria-pressed="false" title="Dimension: click the two points to measure">Dim</button>
+          <button type="button" class="tool-button" data-tool="text" aria-pressed="false" title="Text: type a value, then click where it goes">Text</button>
+          <button type="button" class="tool-button" id="drawUndoBtn" title="Undo the last drawing edit">↶</button>
+          <button type="button" class="tool-button" id="drawDeleteBtn" title="Delete the selected entity">✕</button>
+        </div>
+        <input id="drawText" class="drawing-text-input" type="text" maxlength="512" placeholder="Text for the Text tool" autocomplete="off">
+        <div class="field-row" id="polylineActions" hidden>
+          <button type="button" id="polylineFinishBtn" class="button">Finish</button>
+          <button type="button" id="polylineCloseBtn" class="button">Close</button>
+          <button type="button" id="polylineCancelBtn" class="button ghost">Cancel</button>
+        </div>
+        <div class="field">
+          <label for="layerSelect">Layer</label>
+          <select id="layerSelect"></select>
+        </div>
+        <div class="field-row">
+          <button type="button" id="layerVisibleBtn" class="button ghost" aria-pressed="true">On</button>
+          <button type="button" id="layerLockBtn" class="button ghost" aria-pressed="false">Unlocked</button>
+        </div>
+        <div class="field">
+          <label for="layerName">New layer</label>
+          <input id="layerName" type="text" maxlength="255" placeholder="e.g. HOLES" autocomplete="off">
+        </div>
+        <button type="button" id="addLayerBtn" class="button wide">Add layer</button>
+        <div class="meta-grid" id="drawingInfo">
+          <span>Entities</span><span id="drawingEntities">—</span>
+          <span>Layers</span><span id="drawingLayers">—</span>
+          <span>Extents</span><span id="drawingExtents">—</span>
+          <span>Length</span><span id="drawingLength">—</span>
+          <span>Source</span><span id="drawingSource">—</span>
+          <span>Selected</span><span id="drawingSelection">nothing</span>
+        </div>
+        <div class="field-row">
+          <button type="button" id="saveDrawingBtn" class="button">Save drawing</button>
+          <button type="button" id="downloadDxfBtn" class="button ghost" title="Download the drawing as DXF R12">DXF</button>
+        </div>
+        <details class="sheet-options" id="sheetOptions">
+          <summary>Plot sheet</summary>
+          <div class="sheet-grid">
+            <label for="sheetPaper">Paper</label>
+            <select id="sheetPaper">
+              <option value="A4">A4</option>
+              <option value="A3" selected>A3</option>
+              <option value="A2">A2</option>
+              <option value="A1">A1</option>
+              <option value="A0">A0</option>
+              <option value="Letter">Letter</option>
+            </select>
+            <label for="sheetOrientation">Turn</label>
+            <select id="sheetOrientation">
+              <option value="landscape" selected>landscape</option>
+              <option value="portrait">portrait</option>
+            </select>
+            <label for="sheetScale">Scale</label>
+            <input id="sheetScale" type="text" value="fit" placeholder="fit, 1, 2" autocomplete="off">
+            <label for="sheetTitle">Title</label>
+            <input id="sheetTitle" type="text" maxlength="120" placeholder="drawing title" autocomplete="off">
+            <label for="sheetNumber">No.</label>
+            <input id="sheetNumber" type="text" maxlength="120" placeholder="drawing number" autocomplete="off">
+            <label for="sheetAuthor">By</label>
+            <input id="sheetAuthor" type="text" maxlength="120" placeholder="author" autocomplete="off">
+          </div>
+        </details>
+        <button type="button" id="plotPdfBtn" class="button wide">Plot PDF</button>
       </section>
       <section class="panel-section" id="revisionsSection">
         <div class="section-head"><h2>Revisions</h2><span class="hint" id="revisionsLabel">0 saved</span></div>

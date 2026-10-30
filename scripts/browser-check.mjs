@@ -171,6 +171,65 @@ try {
   const exportEnabled = await evaluate('!document.getElementById("exportBtn").disabled');
   check(exportEnabled, 'export is enabled for a built body');
 
+  // The plan drawing is fetched separately from the model, so it needs its own wait: the panel must
+  // end up showing the sketch outline and a usable DXF button, not the loading placeholder.
+  await waitFor(
+    'document.querySelectorAll("#drawingPreview svg path").length === 1',
+    'the plan preview'
+  );
+  const drawing = await evaluate(`({
+    entities: document.getElementById("drawingEntities").textContent,
+    layers: document.getElementById("drawingLayers").textContent,
+    length: document.getElementById("drawingLength").textContent,
+    disabled: document.getElementById("downloadDxfBtn").disabled,
+  })`);
+  check(drawing.entities === '1', `the drawing has ${drawing.entities} entities`);
+  check(
+    drawing.layers.split(', ').includes('OUTLINE'),
+    `the drawing layers are ${drawing.layers}`
+  );
+  check(/mm$/.test(drawing.length), `the drawing length is ${drawing.length}`);
+  check(!drawing.disabled, 'the DXF download is enabled for a drawing with geometry');
+
+  // The editor: arm the line tool, click two points in the drawing, and check the document grew.
+  // Each click is its own evaluation because the first click re-renders the SVG: dispatching both on
+  // one (now detached) element would deliver only the first.
+  await evaluate('document.querySelector(\'.draw-tools [data-tool="line"]\').click()');
+  const clickDrawing = async (fx, fy) => {
+    await evaluate(`(() => {
+      const svg = document.querySelector("#drawingPreview svg");
+      const rect = svg.getBoundingClientRect();
+      svg.dispatchEvent(new MouseEvent("click", {
+        clientX: rect.left + rect.width * ${fx},
+        clientY: rect.top + rect.height * ${fy},
+        bubbles: true,
+      }));
+      return true;
+    })()`);
+  };
+  await clickDrawing(0.3, 0.5);
+  await clickDrawing(0.7, 0.5);
+  await waitFor(
+    'document.getElementById("drawingEntities").textContent === "2"',
+    'the drawn line to reach the document'
+  );
+  const drawn = await evaluate(`({
+    paths: document.querySelectorAll("#drawingPreview svg path").length,
+    source: document.getElementById("drawingSource").textContent,
+    hint: document.getElementById("drawingHint").textContent,
+  })`);
+  check(drawn.paths >= 2, `the line is on the page (${drawn.paths} paths)`);
+  check(drawn.source === 'model (live)', `the drawing source is ${drawn.source}`);
+
+  // Saving turns the generated plan into a file of its own, which the panel says out loud.
+  await evaluate('document.getElementById("saveDrawingBtn").click()');
+  await waitFor(
+    'document.getElementById("drawingSource").textContent.includes(".zdraft")',
+    'the saved drawing file'
+  );
+  const savedSource = await evaluate('document.getElementById("drawingSource").textContent');
+  check(/\.zdraft$/.test(savedSource), `the drawing was saved as ${savedSource}`);
+
   // A shared session shows a copyable link; a loopback session must not show one at all.
   const sharedTarget = /[?&]token=/.test(TARGET);
   const share = await evaluate(
@@ -197,6 +256,29 @@ try {
     check(
       sizes.some((size) => size > 84),
       `a shared session cannot export an STL with its token (${JSON.stringify(sizes)})`
+    );
+    await evaluate('document.getElementById("downloadDxfBtn").click()');
+    await waitFor(
+      `Array.from(document.querySelectorAll("#log li")).some((row) => row.textContent.includes("Exported DXF R12 plan"))`,
+      'the shared DXF export',
+      10000
+    );
+    const files = readdirSync(downloads);
+    check(
+      files.some((name) => name.endsWith('.dxf')),
+      `a shared session cannot export a DXF with its token (${files.join(', ')})`
+    );
+    // The sheet plot is a second download, and in a shared session it takes the same token path.
+    await evaluate('document.getElementById("plotPdfBtn").click()');
+    await waitFor(
+      `Array.from(document.querySelectorAll("#log li")).some((row) => row.textContent.includes("Plotted a PDF sheet"))`,
+      'the shared PDF plot',
+      10000
+    );
+    const afterPlot = readdirSync(downloads);
+    check(
+      afterPlot.some((name) => name.endsWith('.pdf')),
+      `a shared session cannot plot a PDF with its token (${afterPlot.join(', ')})`
     );
   }
 
