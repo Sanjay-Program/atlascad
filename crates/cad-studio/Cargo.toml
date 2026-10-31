@@ -13,6 +13,7 @@ cad-document.workspace = true
 cad-kernel-truck.workspace = true
 cad-io.workspace = true
 cad-drafting.workspace = true
+cad-engineering-model.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 

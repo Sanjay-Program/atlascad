@@ -10,6 +10,7 @@ members = [
     "crates/cad-agent-geometry",
     "crates/cad-document",
     "crates/cad-entitlements",
+    "crates/cad-engineering-model",
     "crates/cad-io",
     "crates/cad-studio",
     "crates/cad-drafting",
@@ -34,6 +35,7 @@ cad-agent-runtime = { path = "crates/cad-agent-runtime" }
 cad-agent-geometry = { path = "crates/cad-agent-geometry" }
 cad-document = { path = "crates/cad-document" }
 cad-entitlements = { path = "crates/cad-entitlements" }
+cad-engineering-model = { path = "crates/cad-engineering-model" }
 cad-io = { path = "crates/cad-io" }
 cad-studio = { path = "crates/cad-studio" }
 cad-drafting = { path = "crates/cad-drafting" }

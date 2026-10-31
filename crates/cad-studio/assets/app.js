@@ -2145,6 +2145,7 @@
       const value = byId(id).value.trim();
       if (value) params.set(name, value);
     }
+    if (!byId("sheetDimensions").checked) params.set("dimensions", "0");
     try {
       const headers = new Headers();
       if (shareToken) headers.set("x-atlas-token", shareToken);

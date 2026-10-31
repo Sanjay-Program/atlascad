@@ -28,6 +28,7 @@
 mod http;
 
 use cad_contract::capability::KernelInfo;
+use cad_contract::document::Revision;
 use cad_contract::ids::{DocumentId, EntityId};
 use cad_contract::kernel::Kernel;
 use cad_document::{
@@ -36,6 +37,10 @@ use cad_document::{
     RevolveAxis, SketchProfile, clear_recovery,
 };
 use cad_drafting::Draft;
+use cad_engineering_model::{
+    ArtifactAssessment, ArtifactId, ArtifactKind, ArtifactRegistry, DerivedArtifact, DocumentRef,
+    Material, MaterialLibrary,
+};
 use cad_kernel_truck::TruckKernel;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
@@ -66,6 +71,8 @@ pub enum StudioError {
     DrawingDoc(cad_drafting::DraftError),
     /// A sheet could not be laid out: empty drawing, a scale that does not fit, a bad field.
     Sheet(cad_drafting::PlotError),
+    /// The engineering-model registry could not be built or assessed.
+    Model(cad_engineering_model::ModelError),
     Json(String),
     Io(String),
     BadRequest(String),
@@ -89,6 +96,7 @@ impl std::fmt::Display for StudioError {
             StudioError::Drafting(error) => write!(f, "drawing: {error}"),
             StudioError::DrawingDoc(error) => write!(f, "drawing: {error}"),
             StudioError::Sheet(error) => write!(f, "sheet: {error}"),
+            StudioError::Model(error) => write!(f, "engineering model: {error}"),
             StudioError::Json(message) => write!(f, "JSON: {message}"),
             StudioError::Io(message) => write!(f, "I/O: {message}"),
             StudioError::BadRequest(message) => write!(f, "{message}"),
@@ -146,6 +154,12 @@ impl From<cad_drafting::PlotError> for StudioError {
     }
 }
 
+impl From<cad_engineering_model::ModelError> for StudioError {
+    fn from(error: cad_engineering_model::ModelError) -> Self {
+        StudioError::Model(error)
+    }
+}
+
 impl From<serde_json::Error> for StudioError {
     fn from(error: serde_json::Error) -> Self {
         StudioError::Json(error.to_string())
@@ -177,9 +191,11 @@ impl StudioError {
             // A plan can only fail because the project it describes is invalid, which the same
             // request would report as a 400 for any other endpoint.
             StudioError::Drafting(_) | StudioError::DrawingDoc(_) | StudioError::Sheet(_) => 400,
-            StudioError::Stl(_) | StudioError::Io(_) | StudioError::Lock | StudioError::Bind(_) => {
-                500
-            }
+            StudioError::Model(_)
+            | StudioError::Stl(_)
+            | StudioError::Io(_)
+            | StudioError::Lock
+            | StudioError::Bind(_) => 500,
         }
     }
 
@@ -204,6 +220,7 @@ impl StudioError {
             StudioError::Stl(_) => "export_failure",
             StudioError::Drafting(_) | StudioError::DrawingDoc(_) => "drawing_failure",
             StudioError::Sheet(_) => "sheet_failure",
+            StudioError::Model(_) => "engineering_model_failure",
             StudioError::Io(_) | StudioError::Lock | StudioError::Bind(_) => "internal_error",
         }
     }
@@ -349,6 +366,33 @@ struct DraftView {
     dirty: bool,
     undo: usize,
     redo: usize,
+    /// The model revision this drawing was generated from, when that is known. A drawing loaded
+    /// from a `.zdraft` file does not record its source revision, so it is `None` rather than a
+    /// guess.
+    derived_from_revision: Option<u64>,
+    /// `current`, `requires_review` or `unknown`.
+    derivation_status: &'static str,
+}
+
+/// The one derived artifact the studio currently produces, assessed against the live revision.
+#[derive(Debug, Serialize)]
+struct DrawingEngineeringView {
+    kind: &'static str,
+    derived_from_revision: Option<u64>,
+    status: &'static str,
+    /// Present when the derivation revision is known; built by [`ArtifactRegistry::assess`].
+    assessment: Option<ArtifactAssessment>,
+}
+
+/// Document identity, revision and the materials a study may assign.
+#[derive(Debug, Serialize)]
+struct EngineeringView {
+    document: u64,
+    revision: u64,
+    unit: String,
+    drawing: DrawingEngineeringView,
+    /// Typical handbook values, not a certified material specification.
+    materials: Vec<Material>,
 }
 
 #[derive(Debug, Serialize)]
@@ -408,8 +452,9 @@ struct StudioState {
     /// Set by any drawing edit. A drawing generated from the model is regenerated when the model
     /// changes *unless* this is set: once a user has drawn on it, the drawing is theirs.
     drawing_edited: bool,
-    /// The project revision the generated drawing was derived from.
-    drawing_revision: u64,
+    /// The project revision the drawing was generated from. `None` when the drawing came from a
+    /// `.zdraft` file, which does not carry its source revision, or before one exists.
+    drawing_revision: Option<u64>,
 }
 
 impl StudioState {
@@ -432,7 +477,7 @@ impl StudioState {
             drawing: None,
             drawing_file: None,
             drawing_edited: false,
-            drawing_revision: 0,
+            drawing_revision: None,
         };
         // Evaluate once at startup so a broken project is refused before a URL is printed.
         let _ = state.payload()?;
@@ -727,25 +772,30 @@ impl StudioState {
         ) {
             (None, _, _) => true,
             // A generated drawing follows the model until it is edited or saved.
-            (Some(_), None, false) => self.drawing_revision != revision,
+            (Some(_), None, false) => self.drawing_revision != Some(revision),
             _ => false,
         };
         if !stale {
             return Ok(());
         }
-        if let Some(path) = self.drawing_file.clone() {
+        let generated = if let Some(path) = self.drawing_file.clone() {
             self.drawing = Some(Draft::load(&path)?);
+            false
         } else {
             let sidecar = self.drawing_path();
             if sidecar.is_file() && !self.drawing_edited {
                 self.drawing = Some(Draft::load(&sidecar)?);
                 self.drawing_file = Some(sidecar);
+                false
             } else {
                 self.drawing = Some(cad_drafting::plan_draft(&self.project)?);
                 self.drawing_file = None;
+                true
             }
-        }
-        self.drawing_revision = revision;
+        };
+        // A `.zdraft` file does not record the model revision it came from, so loading one leaves
+        // the derivation unknown instead of claiming it is current.
+        self.drawing_revision = if generated { Some(revision) } else { None };
         Ok(())
     }
 
@@ -762,6 +812,12 @@ impl StudioState {
             .drawing
             .as_ref()
             .ok_or_else(|| StudioError::BadRequest("the drawing is unavailable".into()))?;
+        let current = self.project.revision.get();
+        let derivation_status = match self.drawing_revision {
+            None => "unknown",
+            Some(revision) if revision == current => "current",
+            Some(_) => "requires_review",
+        };
         Ok(DraftView {
             name: draft.name.clone(),
             unit: draft.header.units.symbol().to_string(),
@@ -781,6 +837,53 @@ impl StudioState {
             dirty: self.drawing_edited,
             undo: draft.undo_depth(),
             redo: draft.redo_depth(),
+            derived_from_revision: self.drawing_revision,
+            derivation_status,
+        })
+    }
+
+    /// Document identity, the live revision, the built-in materials and the drawing's derivation
+    /// status. The drawing is assessed through the same registry the CLI uses, so the application and
+    /// the release gate cannot disagree about whether a derived result belongs to this revision.
+    fn engineering_payload(&mut self) -> Result<EngineeringView, StudioError> {
+        self.ensure_drawing()?;
+        let document = self.project.header.document;
+        let revision = self.project.revision;
+        let (status, assessment) = match self.drawing_revision {
+            Some(source) => {
+                let source_revision = Revision::from_raw(source).ok_or_else(|| {
+                    StudioError::BadRequest("the drawing records a zero source revision".into())
+                })?;
+                let id = ArtifactId::new(1)
+                    .ok_or_else(|| StudioError::BadRequest("invalid artifact id".into()))?;
+                let mut registry = ArtifactRegistry::new(document);
+                registry.add(DerivedArtifact::new(
+                    id,
+                    ArtifactKind::Drawing,
+                    "drawing",
+                    DocumentRef::new(document, source_revision, None),
+                ))?;
+                let report = registry.assess(DocumentRef::new(document, revision, None))?;
+                let assessment = report.artifacts.into_iter().next();
+                let status = assessment
+                    .as_ref()
+                    .map(|assessment| assessment.status.label())
+                    .unwrap_or("unknown");
+                (status, assessment)
+            }
+            None => ("unknown", None),
+        };
+        Ok(EngineeringView {
+            document: document.get(),
+            revision: revision.get(),
+            unit: self.project.header.units.symbol().to_string(),
+            drawing: DrawingEngineeringView {
+                kind: ArtifactKind::Drawing.label(),
+                derived_from_revision: self.drawing_revision,
+                status,
+                assessment,
+            },
+            materials: MaterialLibrary::standard().materials().to_vec(),
         })
     }
 
@@ -857,6 +960,8 @@ impl StudioState {
         }
         self.drawing_file = Some(path);
         self.drawing_edited = false;
+        // Saving pins the drawing to the model revision it now represents.
+        self.drawing_revision = Some(self.project.revision.get());
         self.draft_payload()
     }
 
@@ -1060,7 +1165,11 @@ pub fn start_with_options(
 ) -> Result<StudioHandle, StudioError> {
     let mut state = StudioState::new(project, path, recovered)?;
     let bind = options.bind.unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST));
-    let shared = !bind.is_loopback();
+    // A token means the operator wants a guarded session, even when the socket is loopback. That is
+    // the deployment shape in deploy/: a TLS proxy on the same host forwards to 127.0.0.1, so
+    // deciding “shared” from the bind address alone would serve the document with no token behind a
+    // public hostname — the worst of both worlds.
+    let shared = !bind.is_loopback() || options.token.is_some();
     let token = if shared {
         let token = options.token.unwrap_or_else(new_share_token);
         if token.len() < 16 {
@@ -1237,9 +1346,13 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
     let path = path_only(&request.path);
     // The page itself, its CSS and its script carry no document data. Everything under /api/ does,
     // so a shared studio requires the token there and nowhere else — otherwise the browser could not
-    // even load the page that is allowed to present the token.
+    // even load the page that is allowed to present the token. The liveness route is the one
+    // exception: it reports whether the process is serving and which version, never the document,
+    // and a container or load balancer cannot be given a secret just to ask if we are alive.
+    let liveness = request.method == "GET" && path == "/api/health";
     if let Some(share) = &share
         && path.starts_with("/api/")
+        && !liveness
         && let Err(error) = require_share_token(request, share)
     {
         return error_response(&error);
@@ -1269,6 +1382,12 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
             Ok(payload) => to_json(200, &payload),
             Err(error) => error_response(&error),
         },
+        ("GET", "/api/engineering") => {
+            match with_state(state, |state| state.engineering_payload()) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            }
+        }
         ("GET", "/api/export/pdf") => {
             let query = request.path.clone();
             match with_state(state, |state| {
@@ -1941,11 +2060,16 @@ fn require_host(request: &http::Request, port: u16, shared: bool) -> Result<(), 
         .trim()
         .to_ascii_lowercase();
     if shared {
-        // The address a colleague's browser used is unknown to the server; the port is not.
-        return if host.ends_with(&format!(":{port}")) {
-            Ok(())
-        } else {
+        // A shared studio is reached under whatever name the reader used: a LAN address, a DNS
+        // name, a port-mapped container whose public port is not the one we listen on, or a proxy
+        // that terminates TLS. Requiring the presented host to carry *our* port rejected every one
+        // of those with 403 — including the container behind `-p 7599:7519` and the Caddy setup in
+        // deploy/. The name proves nothing here; the token does. So any well-formed authority is
+        // accepted, and the token check that follows is what actually guards the document.
+        return if host.is_empty() {
             Err(StudioError::Forbidden)
+        } else {
+            Ok(())
         };
     }
     let allowed = [format!("127.0.0.1:{port}"), format!("localhost:{port}")];
@@ -1967,16 +2091,21 @@ fn require_same_origin(
         .trim()
         .to_ascii_lowercase();
     if shared {
-        // The page was reached at some address:port; a form post must come from that same origin.
+        // The page was reached at some address:port; a form post must come from that same origin,
+        // so a page on another site cannot drive edits. The scheme is either one: a proxy that
+        // terminates TLS forwards the public `Host` while the browser reports `https://`, and
+        // comparing against a hard-coded `http://` refused every proxied edit.
         let host = request
             .header("host")
             .ok_or(StudioError::Forbidden)?
             .trim()
             .to_ascii_lowercase();
-        return if origin == format!("http://{host}") {
-            Ok(())
-        } else {
-            Err(StudioError::Forbidden)
+        let authority = origin
+            .strip_prefix("http://")
+            .or_else(|| origin.strip_prefix("https://"));
+        return match authority {
+            Some(authority) if !host.is_empty() && authority == host => Ok(()),
+            _ => Err(StudioError::Forbidden),
         };
     }
     let allowed = [

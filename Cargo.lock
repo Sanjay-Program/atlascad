@@ -108,6 +108,7 @@ dependencies = [
  "cad-contract",
  "cad-document",
  "cad-drafting",
+ "cad-engineering-model",
  "cad-io",
  "cad-kernel-truck",
  "serde",
@@ -155,6 +156,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cad-engineering-model"
+version = "0.1.0"
+dependencies = [
+ "cad-contract",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "cad-entitlements"
 version = "0.1.0"
 dependencies = [
@@ -189,6 +200,7 @@ dependencies = [
  "cad-contract",
  "cad-document",
  "cad-drafting",
+ "cad-engineering-model",
  "cad-io",
  "cad-kernel-truck",
  "serde",

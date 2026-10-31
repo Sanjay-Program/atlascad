@@ -12,6 +12,7 @@ The root Rust workspace is the actively developed integration surface. The appli
 | `crates/cad-kernel-truck` | Adapter implementing the shared kernel contract with Truck geometry crates. |
 | `crates/cad-document` | Document and revision primitives. |
 | `crates/cad-drafting` | 2D drawing document: layers, point/line/circle/arc/polyline/text/dimension entities, undo, versioned `.zdraft` save/load, DXF R12 reading and writing, sheet layout (A4–A0, Letter) with a title block, and a vector PDF plotter. |
+| `crates/cad-engineering-model` | Phase A unified engineering model: document/revision/fingerprint identity, a validated seven-material library, revision-pinned derived artifacts (drawing, simulation, toolpath, PCB layout, inspection, documentation), acyclic dependency validation, transitive staleness and explicit review, and versioned atomic JSON persistence. It records provenance and result summaries; it does not produce simulations, toolpaths or PCBs. |
 | `crates/cad-cli` | Headless command-line client for exercising the document and geometry path and exporting STL. |
 | `crates/cad-io` | Validated binary STL reading and writing shared by the CLI and the application. |
 | `crates/cad-studio` | Atlas Studio: the local-first CAD application, its HTTP API, and its browser workspace (WebGL viewport, feature tree, parameters, command palette). |
@@ -33,9 +34,9 @@ The project owner reports that development began about a year before the work wa
 
 ## Current platform status
 
-The root platform has a versioned shared contract, a Truck adapter, a headless consumer, an engineering control plane, a small agent platform, and a working local CAD application. The root-workspace gate passes 359 tests across twelve packages on the recorded machine; startup, request latency, and export timings are in [`docs/performance-baseline.md`](docs/performance-baseline.md).
+The root platform has a versioned shared contract, a Truck adapter, a headless consumer, an engineering control plane, a small agent platform, and a working local CAD application. The root-workspace gate passes 382 tests across thirteen packages on the recorded machine; startup, request latency, and export timings are in [`docs/performance-baseline.md`](docs/performance-baseline.md).
 
-Stage A of the CAD roadmap is **partially implemented**. `cad-studio` supports an ordered feature graph: rectangle, circle, regular-polygon, drawn-polyline and arc-sector sketches, each on a horizontal plane at any height; extrude features that start a body, join it with a kernel union, or remove material with a kernel difference (cut), swept up or down from their sketch plane; full-turn revolve features that turn a sketch about one of its own axes; parameter and sketch-placement edits that rebuild every dependent feature; a per-feature rebuild cache so an unchanged or last-feature edit does not re-run the whole history; crash recovery that snapshots unsaved edits next to the project and restores them on the next start, including when the project file itself cannot be read; per-feature rebuild status with failure reporting; undo/redo; save, reopen, and binary STL export. A `.zcad` project written by any earlier schema opens through migration. Alongside the model, the studio has a **drawing editor**: a plan of the sketch you can draw on (line, circle, polyline, point, dimension, text) with layers, undo, save to a `.zdraft` beside the project, DXF R12 download, and **plot to a PDF sheet** on A4–A0 or Letter with a title block and overall dimensions. `cad-drafting` also reads a DXF written by another program (layers, colours, off/locked state, units, polylines and text, with unsupported entity types counted rather than dropped). It does **not** yet provide sketch constraints, dimensions *in the sketch*, sweeps or lofts, partial revolves, fillets, multi-body, assemblies, projected/section views, GD&T, a BOM, STL import, or STEP/IGES interchange; DXF and PDF are the only formats it writes or reads. Those remain planned work in [`docs/roadmap.md`](docs/roadmap.md).
+Stage A of the CAD roadmap is **partially implemented**. `cad-studio` supports an ordered feature graph: rectangle, circle, regular-polygon, drawn-polyline and arc-sector sketches, each on a horizontal plane at any height; extrude features that start a body, join it with a kernel union, or remove material with a kernel difference (cut), swept up or down from their sketch plane; full-turn revolve features that turn a sketch about one of its own axes; parameter and sketch-placement edits that rebuild every dependent feature; a per-feature rebuild cache so an unchanged or last-feature edit does not re-run the whole history; crash recovery that snapshots unsaved edits next to the project and restores them on the next start, including when the project file itself cannot be read; per-feature rebuild status with failure reporting; undo/redo; save, reopen, and binary STL export. A `.zcad` project written by any earlier schema opens through migration. Alongside the model, the studio has a **drawing editor**: a plan of the sketch you can draw on (line, circle, polyline, point, dimension, text) with layers, undo, save to a `.zdraft` beside the project, DXF R12 download, and **plot to a PDF sheet** on A4–A0 or Letter with a title block and overall dimensions. `cad-drafting` also reads a DXF written by another program (layers, colours, off/locked state, units, polylines and text, with unsupported entity types counted rather than dropped). A drawing is also the first **derived artifact** tracked by the unified engineering model: it records the model revision it came from, a saved drawing becomes visibly `requires_review` after a model edit, `GET /api/engineering` reports that state with the material library, and `atlas artifacts check` exits 3 when any recorded drawing, simulation or toolpath belongs to an older revision. That provenance layer is implemented and tested; there are still **no CAM, CAE, ECAD, BIM, GIS, generative-design or AI capabilities** in the workspace, and the capability pages say so explicitly. It does **not** yet provide sketch constraints, dimensions *in the sketch*, sweeps or lofts, partial revolves, fillets, multi-body, assemblies, projected/section views, GD&T, a BOM, STL import, or STEP/IGES interchange; DXF and PDF are the only formats it writes or reads. Those remain planned work in [`docs/roadmap.md`](docs/roadmap.md).
 
 The CADCraft and SolidCraft desktop applications are not wired to the shared contract. The root adapter advertises only the capabilities its tests exercise. Known kernel limitations and measured behavior are documented in `docs/kernel-comparison.md` and `docs/performance-baseline.md`.
 
@@ -65,6 +66,15 @@ Open the printed `http://127.0.0.1:7519` in a browser. Then, in the page:
    and normal; `Iso`/`Front`/`Top`/`Right`, `Fit`, `Wire`, `Grid` are in the viewport toolbar.
 5. **Save / export** — `Ctrl/Cmd+S` writes the `.zcad` file; *Export STL* downloads a binary STL.
 
+To gate a downstream artifact on the model revision it came from:
+
+```sh
+atlas artifacts add --registry ~/bracket.artifacts.json --document 1 --revision 3 \
+    --id 1 --kind drawing --label "shop drawing"
+atlas artifacts check --project ~/bracket.zcad --registry ~/bracket.artifacts.json
+# exits 3 when a recorded artifact needs recomputation or review
+```
+
 Reopen a project later with `./target/release/cad-studio --file ~/bracket.zcad`. Unsaved edits are
 snapshotted next to the file, so a crash or `kill -9` reopens with the work restored and a banner to
 keep or discard it. `--port 7600` picks another port.
@@ -83,6 +93,26 @@ required on every API call and is generated per session; `--token <32+ chars>` f
 `--advertise name.local` sets the host in the link, and `--host 0.0.0.0` does the same as `--share`
 without changing the printed host. Loopback-only use is unchanged: no token, no link. Do not expose
 the port to the internet — this is a LAN convenience, not a hosted service.
+
+For a real deployment, use `--token-file` (or `ATLAS_STUDIO_TOKEN`) so the secret never appears in
+`ps`, and put a proxy in front:
+
+```sh
+./target/release/cad-studio --file ~/bracket.zcad --share --host 127.0.0.1 \
+    --advertise cad.example.com --token-file /etc/atlas-studio/token
+```
+
+A loopback-bound studio **with a token** is still a shared studio: the socket stays private while the
+public name reaches it through a TLS proxy. Health is public — `GET /api/health` reports liveness and
+the version with no token, so a supervisor can probe it.
+
+### Deploy it
+
+`deploy/` holds a container image, a hardened systemd unit and a Caddyfile. The image is built and
+smoke-tested by `deploy/build-image.sh --smoke` (build, start, healthcheck, anonymous read refused,
+tokenised read, plotted PDF, teardown). [`docs/operations/deployment.md`](docs/operations/deployment.md)
+states exactly what a deployment is and is not: one process per document, one token that cannot be
+revoked without a restart, no accounts, no in-process TLS, no multi-document mode.
 
 ## Build and verify
 

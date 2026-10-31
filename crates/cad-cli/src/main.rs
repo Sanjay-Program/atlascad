@@ -8,7 +8,14 @@
 //! atlas dxf   --from sheet.zdraft --out sheet.dxf
 //! atlas dxf-import --from sheet.dxf [--save sheet.zdraft] [--out sheet.dxf]
 //! atlas sheet --file part.zcad --pdf part.pdf [--paper A3] [--scale fit|N]
+//! atlas artifacts add --registry part.artifacts.json --document 1 --revision 3
+//!                     --id 1 --kind drawing --label "shop drawing"
+//! atlas artifacts review --registry part.artifacts.json --id 1 --revision 4
+//! atlas artifacts check --project part.zcad --registry part.artifacts.json
 //! ```
+//!
+//! `artifacts check` exits 3 when any derived artifact needs recomputation or review, so a release
+//! step can gate on it without parsing the JSON.
 //!
 //! The summary is printed to stdout as JSON; progress and file writes go to stderr, so a caller can
 //! pipe stdout into another tool.
@@ -17,11 +24,15 @@ use cad_cli::{
     BoxSpec, Built, CliError, build_box, build_union, draft_plan_view, draft_summary, draft_to_dxf,
     evaluate_project, import_dxf, plot_sheet, write_draft, write_stl_binary,
 };
-use cad_contract::ids::DocumentId;
+use cad_contract::document::Revision;
+use cad_contract::ids::{DocumentId, EntityId};
 use cad_contract::kernel::Kernel;
 use cad_contract::tol::DEFAULT_LINEAR_MM;
 use cad_contract::units::Unit;
 use cad_document::Project;
+use cad_engineering_model::{
+    ArtifactId, ArtifactKind, ArtifactRegistry, DerivedArtifact, DocumentRef,
+};
 use cad_kernel_truck::TruckKernel;
 use std::path::{Path, PathBuf};
 
@@ -50,6 +61,7 @@ fn run() -> Result<i32, CliError> {
         "dxf" => cmd_dxf(&rest),
         "dxf-import" => cmd_dxf_import(&rest),
         "sheet" => cmd_sheet(&rest),
+        "artifacts" => cmd_artifacts(&rest),
         "help" | "--help" | "-h" => {
             usage();
             Ok(0)
@@ -88,6 +100,14 @@ fn usage() {
     println!(
         "              [--author A] [--date D] [--notes N] [--margin MM] [--dimensions on|off]"
     );
+    println!(
+        "  atlas artifacts add --registry FILE --document ID --revision N --id ID --kind KIND"
+    );
+    println!(
+        "              --label TEXT [--entity ID[,ID...]] [--upstream ID[,ID...]] [--summary TEXT]"
+    );
+    println!("  atlas artifacts review --registry FILE --id ID --revision N");
+    println!("  atlas artifacts check --project PROJECT.zcad --registry FILE");
     println!();
     println!("Geometry is modelled in millimetres; --unit describes the values you typed.");
     println!("STL carries no units, so write --header next to it when the unit matters.");
@@ -138,6 +158,13 @@ impl Flags {
         self.pairs
             .iter()
             .find(|(name, _)| name == key)
+            .map(|(_, value)| value.as_str())
+    }
+
+    fn all<'a>(&'a self, key: &'a str) -> impl Iterator<Item = &'a str> + 'a {
+        self.pairs
+            .iter()
+            .filter(move |(name, _)| name == key)
             .map(|(_, value)| value.as_str())
     }
 
@@ -455,6 +482,191 @@ fn cmd_sheet(arguments: &[String]) -> Result<i32, CliError> {
         summary.texts
     );
     Ok(0)
+}
+
+/// `atlas artifacts <add|review|check>` — revision-pinned derived-artifact tracking.
+///
+/// A toolpath, drawing, simulation or inspection report is not current merely because the file
+/// exists. This command records which design revision produced it and refuses to call it released
+/// when the design has moved on without a recompute or an explicit review.
+fn cmd_artifacts(arguments: &[String]) -> Result<i32, CliError> {
+    let (subcommand, rest) = arguments.split_first().ok_or_else(|| {
+        CliError::Input("artifacts needs a subcommand: add, review or check".into())
+    })?;
+    match subcommand.as_str() {
+        "add" => cmd_artifacts_add(rest),
+        "review" => cmd_artifacts_review(rest),
+        "check" => cmd_artifacts_check(rest),
+        other => Err(CliError::Input(format!(
+            "unknown artifacts subcommand `{other}`; use add, review or check"
+        ))),
+    }
+}
+
+fn cmd_artifacts_add(arguments: &[String]) -> Result<i32, CliError> {
+    let flags = Flags::parse(arguments)?;
+    let path = PathBuf::from(flags.require("--registry")?);
+    let document = parse_document(&flags)?;
+    let revision = parse_revision(&flags, "--revision")?;
+    let id = parse_artifact_id(&flags, "--id")?;
+    let kind_name = flags.require("--kind")?;
+    let kind = ArtifactKind::parse(kind_name).ok_or_else(|| {
+        CliError::Input(format!(
+            "`{kind_name}` is not an artifact kind; use drawing, simulation, manufacturing_setup, \
+             toolpath, inspection, pcb_layout, documentation or other"
+        ))
+    })?;
+    let label = flags.require("--label")?;
+    let mut registry = if path.exists() {
+        ArtifactRegistry::load(&path)?
+    } else {
+        ArtifactRegistry::new(document)
+    };
+    let mut artifact =
+        DerivedArtifact::new(id, kind, label, DocumentRef::new(document, revision, None));
+    artifact.source_entities = parse_entities(flags.all("--entity"))?;
+    artifact.upstream = parse_artifact_ids(flags.all("--upstream"))?;
+    if let Some(summary) = flags.get("--summary") {
+        artifact.result.summary = summary.to_string();
+    }
+    registry.add(artifact)?;
+    registry.save(&path)?;
+    print_json(&serde_json::json!({
+        "registry": path.display().to_string(),
+        "artifact": id.get(),
+        "kind": kind.label(),
+        "source_revision": revision.get(),
+        "artifacts": registry.artifacts().len(),
+    }))?;
+    eprintln!(
+        "recorded artifact {} ({}) at revision {} in {}",
+        id.get(),
+        kind.label(),
+        revision.get(),
+        path.display()
+    );
+    Ok(0)
+}
+
+fn cmd_artifacts_review(arguments: &[String]) -> Result<i32, CliError> {
+    let flags = Flags::parse(arguments)?;
+    let path = PathBuf::from(flags.require("--registry")?);
+    let id = parse_artifact_id(&flags, "--id")?;
+    let revision = parse_revision(&flags, "--revision")?;
+    let mut registry = ArtifactRegistry::load(&path)?;
+    registry.review(id, revision)?;
+    registry.save(&path)?;
+    print_json(&serde_json::json!({
+        "registry": path.display().to_string(),
+        "artifact": id.get(),
+        "reviewed_revision": revision.get(),
+    }))?;
+    eprintln!(
+        "artifact {} reviewed at revision {} (the result was not recomputed)",
+        id.get(),
+        revision.get()
+    );
+    Ok(0)
+}
+
+fn cmd_artifacts_check(arguments: &[String]) -> Result<i32, CliError> {
+    let flags = Flags::parse(arguments)?;
+    let project_path = PathBuf::from(flags.require("--project")?);
+    let registry_path = PathBuf::from(flags.require("--registry")?);
+    let project = Project::load(&project_path)?;
+    let registry = ArtifactRegistry::load(&registry_path)?;
+    let report = registry.assess(DocumentRef::new(
+        project.header.document,
+        project.revision,
+        None,
+    ))?;
+    print_json(&report)?;
+    if report.requires_action {
+        let stale = report
+            .artifacts
+            .iter()
+            .filter(|artifact| !artifact.releasable)
+            .count();
+        eprintln!(
+            "{stale} of {} derived artifacts need recomputation or review at revision {}",
+            report.artifacts.len(),
+            report.revision.get()
+        );
+        Ok(3)
+    } else {
+        eprintln!(
+            "all {} derived artifacts are releasable at revision {}",
+            report.artifacts.len(),
+            report.revision.get()
+        );
+        Ok(0)
+    }
+}
+
+fn parse_document(flags: &Flags) -> Result<DocumentId, CliError> {
+    let value = flags.require("--document")?;
+    let raw = value
+        .parse::<u64>()
+        .map_err(|_| CliError::Input(format!("document `{value}` is not a number")))?;
+    Ok(DocumentId::new(raw))
+}
+
+fn parse_revision(flags: &Flags, key: &str) -> Result<Revision, CliError> {
+    let value = flags.require(key)?;
+    let raw = value
+        .parse::<u64>()
+        .map_err(|_| CliError::Input(format!("revision `{value}` is not a number")))?;
+    Revision::from_raw(raw)
+        .ok_or_else(|| CliError::Input(format!("`{key}` must be a positive revision")))
+}
+
+fn parse_artifact_id(flags: &Flags, key: &str) -> Result<ArtifactId, CliError> {
+    let value = flags.require(key)?;
+    let raw = value
+        .parse::<u64>()
+        .map_err(|_| CliError::Input(format!("artifact id `{value}` is not a number")))?;
+    ArtifactId::new(raw)
+        .ok_or_else(|| CliError::Input(format!("`{key}` must be a positive artifact id")))
+}
+
+fn parse_artifact_ids<'a>(
+    values: impl Iterator<Item = &'a str>,
+) -> Result<Vec<ArtifactId>, CliError> {
+    let mut ids = Vec::new();
+    for value in values {
+        for part in value.split(',') {
+            let part = part.trim();
+            if part.is_empty() {
+                continue;
+            }
+            let raw = part
+                .parse::<u64>()
+                .map_err(|_| CliError::Input(format!("upstream id `{part}` is not a number")))?;
+            let id = ArtifactId::new(raw).ok_or_else(|| {
+                CliError::Input("an upstream artifact id must be positive".into())
+            })?;
+            ids.push(id);
+        }
+    }
+    Ok(ids)
+}
+
+fn parse_entities<'a>(values: impl Iterator<Item = &'a str>) -> Result<Vec<EntityId>, CliError> {
+    let mut entities = Vec::new();
+    for value in values {
+        for part in value.split(',') {
+            let part = part.trim();
+            if part.is_empty() {
+                continue;
+            }
+            let raw = part
+                .parse::<u64>()
+                .map_err(|_| CliError::Input(format!("entity id `{part}` is not a number")))?;
+            let id = EntityId::new(raw).map_err(|error| CliError::Input(error.to_string()))?;
+            entities.push(id);
+        }
+    }
+    Ok(entities)
 }
 
 fn print_json<T: serde::Serialize>(value: &T) -> Result<(), CliError> {

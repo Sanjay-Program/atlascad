@@ -543,6 +543,25 @@ impl Draft {
         bounds
     }
 
+    /// Bounds of the geometry alone: every entity except text and dimensions.
+    ///
+    /// Annotation sits beside a part, so a drawing's overall dimensions must measure the part and
+    /// not its own dimension lines. A drawing with no geometry (text only, say) has no geometry
+    /// bounds, which is why this returns `Option` even when [`Draft::bounds`] would not.
+    pub fn geometry_bounds(&self) -> Option<Bounds> {
+        let mut bounds: Option<Bounds> = None;
+        for entity in &self.entities {
+            if matches!(
+                entity.kind,
+                EntityKind::Text { .. } | EntityKind::Dimension { .. }
+            ) {
+                continue;
+            }
+            extend(&mut bounds, entity_bounds(&entity.kind));
+        }
+        bounds
+    }
+
     /// Total drawn length of every entity, in document units. A point contributes nothing.
     pub fn total_length(&self) -> f64 {
         self.entities

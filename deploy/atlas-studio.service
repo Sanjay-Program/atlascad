@@ -1,0 +1,75 @@
+# Atlas CAD Studio — one document, one process, served on loopback.
+#
+# The studio listens on 127.0.0.1 and a reverse proxy (see deploy/Caddyfile) terminates TLS. The
+# token comes from a root-owned file, so it never appears in `ps` or in a shell history.
+#
+# Install:
+#   install -o root -g root -m 0644 deploy/atlas-studio.service /etc/systemd/system/
+#   install -d -o atlas -g atlas /var/lib/atlas-studio /etc/atlas-studio
+#   install -o root -g atlas -m 0640 /dev/null /etc/atlas-studio/token
+#   systemctl daemon-reload && systemctl enable --now atlas-studio
+#
+# The unit is deliberately narrow: no network access beyond a local socket is needed, no shell, no
+# writable paths outside the data directory, and a memory cap so a hostile file cannot take the
+# machine down.
+
+[Unit]
+Description=Atlas CAD Studio (single document)
+Documentation=file:///usr/share/doc/atlas-cad/deployment.md
+After=network-online.target
+Wants=network-online.target
+# A studio holds one document; it is not a cluster member. Restart forever, but back off.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=atlas
+Group=atlas
+WorkingDirectory=/var/lib/atlas-studio
+# Defaults first: an EnvironmentFile= line later in the file overrides them.
+Environment=ATLAS_PUBLIC_HOST=cad.local
+Environment=ATLAS_PORT=7519
+EnvironmentFile=-/etc/atlas-studio/env
+ExecStart=/usr/local/bin/cad-studio \
+    --file /var/lib/atlas-studio/part.zcad \
+    --share \
+    --host 127.0.0.1 \
+    --advertise ${ATLAS_PUBLIC_HOST} \
+    --token-file /etc/atlas-studio/token \
+    --port ${ATLAS_PORT}
+Restart=on-failure
+RestartSec=2
+
+# --- Hardening -------------------------------------------------------------------------------
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+ReadWritePaths=/var/lib/atlas-studio
+UMask=0077
+
+# A CAD rebuild on a large history is the peak; this is a ceiling, not a promise.
+MemoryMax=2G
+LimitNOFILE=1024
+TasksMax=64
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -681,12 +681,24 @@
       "target": "repo.cad-drafting",
       "command": "cargo test --offline --workspace -j 2",
       "outcome": "success",
-      "passed": 359,
+      "passed": 360,
       "failed": 0,
       "skipped": 0,
       "duration_ms": 0,
       "recorded_at": "2026-10-30",
-      "notes": "Twelve-package root workspace, 359 tests including doctests, 0 failed (339 before the editor cycle). cad-drafting 59 (42 document/reader + 17 new: sheet layout, fit search, hidden-layer plotting, title block fields, text and dimension primitives, PDF structure, xref offsets, escaping, page sizes). cad-studio http_api 29 (2 new: the editable drawing document incl. undo/redo and the sidecar save; the PDF sheet incl. MediaBox, title block, fit and refusals). cad-cli draft_workflow 4 (1 new: atlas sheet writes a named A4 PDF and refuses an impossible scale and an unknown paper). fmt and clippy -D warnings clean. Full gate green: corpus 8 ok / 3 known / 0 regressions, licences 84/84, SBOM, 56 live simulation assertions, browser 27 loopback / 31 shared, zero console errors. A plotted A3 sheet was rendered with pdftoppm and inspected; pdftotext extracts every title-block field."
+      "notes": "Twelve-package root workspace, 360 tests including doctests, 0 failed (339 before the editor cycle). cad-drafting 60 (42 document/reader + 18 new: sheet layout, fit search, hidden-layer plotting, title block fields, text and dimension primitives, PDF structure, xref offsets, escaping, page sizes). cad-studio http_api 29 (2 new: the editable drawing document incl. undo/redo and the sidecar save; the PDF sheet incl. MediaBox, title block, fit and refusals). cad-cli draft_workflow 4 (1 new: atlas sheet writes a named A4 PDF and refuses an impossible scale and an unknown paper). fmt and clippy -D warnings clean. Full gate green: corpus 8 ok / 3 known / 0 regressions, licences 84/84, SBOM, 56 live simulation assertions, browser 27 loopback / 31 shared, zero console errors. A plotted A3 sheet was rendered with pdftoppm and inspected; pdftotext extracts every title-block field."
+    },
+    {
+      "id": "t-platform-engineering-model-20261031",
+      "target": "repo.cad-engineering-model",
+      "command": "./scripts/gate.sh --quick",
+      "outcome": "success",
+      "passed": 382,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-10-31",
+      "notes": "Thirteen-package root workspace, 382 tests including doctests, 0 failed (360 before this cycle). New cad-engineering-model 14 unit tests + 1 doctest: material validation, duplicate/zero artifact ids, unknown upstream, self and multi-node cycles, revision staleness, transitive blocked-upstream, fingerprint mismatch, review semantics, future revision, wrong document, versioned atomic persistence with unknown-field/newer-schema/8 MiB/zero-revision refusals. cad-cli artifacts_workflow 2: add a drawing and dependent toolpath, check passes, edit the model, check exits 3, review both, check passes with source revisions unchanged; unknown upstream and bad kind refused without writing a file. cad-studio http_api 32 (1 new): generated drawing current, saved drawing pinned, model edit reports requires_review, /api/engineering returns the matching assessment and seven non-certified materials. fmt and clippy --workspace --all-targets -D warnings clean; corpus 8 ok / 3 known failure / 0 regressions; manifests 0 error / 0 warning; licences 85/85 allowed; SBOM 85 components. The live HTTP/browser simulation was skipped by --quick and is not claimed by this record."
     }
   ]
 }

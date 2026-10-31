@@ -2012,6 +2012,18 @@ fn a_shared_studio_requires_its_token_and_keeps_the_same_origin_rule()
     assert_eq!(missing.status, 401);
     assert_eq!(json(&missing)?["error"]["kind"], "unauthorized");
 
+    // Liveness is the one route a shared studio answers without the token: a container healthcheck
+    // or a proxy cannot hold the secret, and the reply is the same version string anyone can read
+    // from the binary. It must not leak so much as the document's name.
+    let health = request(addr, "GET", "/api/health", &[], &[])?;
+    assert_eq!(health.status, 200);
+    assert_eq!(json(&health)?["ok"], true);
+    let body = String::from_utf8_lossy(&health.body);
+    assert!(
+        !body.contains("shared"),
+        "health must not name the document: {body}"
+    );
+
     let wrong = request(
         addr,
         "GET",
@@ -2098,16 +2110,148 @@ fn a_shared_studio_requires_its_token_and_keeps_the_same_origin_rule()
     // 40 x 30 x 20 = 24000 mm3.
     assert!((payload["geometry"]["volume_mm3"].as_f64().ok_or("volume")? - 24000.0).abs() < 1e-6);
 
-    // A Host naming another port is not this studio, shared or not.
-    let wrong_port = request_with_host(
+    // A shared studio is reached under names the server cannot know: a port-mapped container
+    // (`-p 7599:7519`) and a TLS-terminating proxy both present a `Host` whose port is missing or
+    // different. Refusing those made every real deployment return 403, so the token is the guard
+    // and the name is not. An empty `Host` is still a malformed request.
+    let proxied = request_with_host(
         addr,
-        "127.0.0.1:9999",
+        "cad.example.com",
         "GET",
-        "/api/state",
-        &[("x-atlas-token", &token)],
+        &format!("/api/state?token={token}"),
+        &[],
         &[],
     )?;
-    assert_eq!(wrong_port.status, 403);
+    assert_eq!(
+        proxied.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&proxied.body)
+    );
+    let no_host = request_with_host(
+        addr,
+        "",
+        "GET",
+        &format!("/api/state?token={token}"),
+        &[],
+        &[],
+    )?;
+    assert_eq!(no_host.status, 403);
+    // ... and the token is still required, so an unknown host reads nothing.
+    let proxied_anonymous =
+        request_with_host(addr, "cad.example.com", "GET", "/api/state", &[], &[])?;
+    assert_eq!(proxied_anonymous.status, 401);
+    drop(dir);
+    Ok(())
+}
+
+/// A proxy that terminates TLS forwards the public `Host` while the browser reports an `https://`
+/// origin, so a write must be accepted across that scheme difference and still refused for another
+/// site.
+#[test]
+fn a_proxied_shared_studio_accepts_https_edits_and_refuses_another_site()
+-> Result<(), Box<dyn std::error::Error>> {
+    use cad_studio::{ShareOptions, start_with_options};
+    use std::net::{IpAddr, Ipv4Addr};
+
+    let dir = TempDir::new()?;
+    let path = dir.path().join("proxied.zcad");
+    let project = default_project("proxied", [40.0, 30.0, 10.0])?;
+    project.save(&path)?;
+    let token = "0123456789abcdef0123456789abcdef";
+    let handle = start_with_options(
+        project,
+        path.clone(),
+        0,
+        None,
+        ShareOptions {
+            bind: Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)),
+            token: Some(token.into()),
+            host: Some("cad.example.com".into()),
+        },
+    )?;
+    let addr = handle.addr();
+    let body = r#"{"id":"depth","value":20}"#;
+
+    let foreign = request_with_host(
+        addr,
+        "cad.example.com",
+        "POST",
+        "/api/parameter",
+        &[
+            ("x-atlas-token", token),
+            ("origin", "https://evil.example"),
+            ("content-type", "application/json"),
+        ],
+        body.as_bytes(),
+    )?;
+    assert_eq!(foreign.status, 403);
+
+    let edited = request_with_host(
+        addr,
+        "cad.example.com",
+        "POST",
+        "/api/parameter",
+        &[
+            ("x-atlas-token", token),
+            ("origin", "https://cad.example.com"),
+            ("content-type", "application/json"),
+        ],
+        body.as_bytes(),
+    )?;
+    assert_eq!(
+        edited.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&edited.body)
+    );
+    // 40 x 30 x 20 = 24000 mm3: the edit the proxy forwarded reached the document.
+    let volume = json(&edited)?["geometry"]["volume_mm3"]
+        .as_f64()
+        .ok_or("volume")?;
+    assert!((volume - 24000.0).abs() < 1e-6);
+    drop(dir);
+    Ok(())
+}
+
+/// A token on a loopback-bound studio is what a TLS proxy on the same host needs: the socket is
+/// private, the public name is not, and the document must still be guarded.
+#[test]
+fn a_loopback_studio_with_a_token_requires_it() -> Result<(), Box<dyn std::error::Error>> {
+    use cad_studio::{ShareOptions, start_with_options};
+    use std::net::{IpAddr, Ipv4Addr};
+
+    let dir = TempDir::new()?;
+    let path = dir.path().join("proxied-loopback.zcad");
+    let project = default_project("behindproxy", [10.0, 10.0, 5.0])?;
+    project.save(&path)?;
+    let token = "0123456789abcdef0123456789abcdef";
+    let handle = start_with_options(
+        project,
+        path.clone(),
+        0,
+        None,
+        ShareOptions {
+            bind: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+            token: Some(token.into()),
+            host: Some("cad.example.com".into()),
+        },
+    )?;
+    let addr = handle.addr();
+    assert!(addr.ip().is_loopback());
+    assert_eq!(handle.token(), Some(token));
+    assert_eq!(
+        handle.share_url(),
+        Some(format!(
+            "http://cad.example.com:{}/?token={token}",
+            addr.port()
+        ))
+    );
+
+    let anonymous = request(addr, "GET", "/api/state", &[], &[])?;
+    assert_eq!(anonymous.status, 401);
+    let authorised = request(addr, "GET", &format!("/api/state?token={token}"), &[], &[])?;
+    assert_eq!(authorised.status, 200);
     drop(dir);
     Ok(())
 }
@@ -2409,6 +2553,87 @@ fn a_drawing_plots_to_a_pdf_sheet_with_a_title_block() -> Result<(), Box<dyn std
             .unwrap_or_default()
             .contains("does not fit"),
         "a scale that does not fit says so"
+    );
+    Ok(())
+}
+
+/// A drawing is a derived artifact, so the studio must say which model revision it belongs to. A
+/// generated drawing follows the model; once saved it is pinned, and a later model edit leaves it
+/// visibly stale instead of silently presenting it as current.
+#[test]
+fn the_engineering_summary_pins_the_drawing_and_materials_to_the_live_revision()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("engineering", [10.0, 10.0, 5.0])?;
+    let addr = handle.addr();
+
+    let state = json(&request(addr, "GET", "/api/state", &[], &[])?)?;
+    let first_revision = state["revision"].as_u64().ok_or("revision")?;
+    assert_eq!(state["units"], "mm");
+
+    // A generated plan is derived from the current revision.
+    let draft = json(&request(addr, "GET", "/api/draft", &[], &[])?)?;
+    assert_eq!(
+        draft["derived_from_revision"].as_u64(),
+        Some(first_revision)
+    );
+    assert_eq!(draft["derivation_status"], "current");
+    assert_eq!(draft["source"], "model");
+
+    // Saving turns it into a file drawing; the file records its source revision only through this
+    // record, so the status must remain current until the model changes.
+    let saved = post(addr, "/api/draft/save", "{}")?;
+    assert_eq!(saved.status, 200);
+    assert_eq!(json(&saved)?["derivation_status"], "current");
+
+    let edited = post(addr, "/api/parameter", r#"{"id":"width","value":20}"#)?;
+    assert_eq!(edited.status, 200);
+    let second_revision = json(&edited)?["revision"].as_u64().ok_or("revision")?;
+    assert!(second_revision > first_revision);
+
+    let stale = json(&request(addr, "GET", "/api/draft", &[], &[])?)?;
+    assert_eq!(
+        stale["derived_from_revision"].as_u64(),
+        Some(first_revision),
+        "the saved drawing keeps the revision it was made at"
+    );
+    assert_eq!(stale["derivation_status"], "requires_review");
+
+    let engineering = json(&request(addr, "GET", "/api/engineering", &[], &[])?)?;
+    assert_eq!(engineering["document"].as_u64(), Some(1));
+    assert_eq!(engineering["revision"].as_u64(), Some(second_revision));
+    assert_eq!(engineering["unit"], "mm");
+    assert_eq!(
+        engineering["drawing"]["derived_from_revision"].as_u64(),
+        Some(first_revision)
+    );
+    assert_eq!(engineering["drawing"]["status"], "requires_review");
+    assert_eq!(
+        engineering["drawing"]["assessment"]["status"]["state"],
+        "requires_review"
+    );
+    assert_eq!(
+        engineering["drawing"]["assessment"]["source"]["revision"].as_u64(),
+        Some(first_revision)
+    );
+    assert_eq!(
+        engineering["drawing"]["assessment"]["status"]["current_revision"].as_u64(),
+        Some(second_revision)
+    );
+    assert_eq!(
+        engineering["drawing"]["assessment"]["releasable"],
+        serde_json::json!(false)
+    );
+
+    // The material library is real data, not an empty placeholder, and every entry is marked as a
+    // typical value rather than a certified specification.
+    let materials = engineering["materials"].as_array().ok_or("materials")?;
+    assert_eq!(materials.len(), 7);
+    assert_eq!(materials[0]["id"], "steel.1018");
+    assert!(
+        materials.iter().all(|material| material["source"]
+            .as_str()
+            .is_some_and(|source| source.contains("not a certified material specification"))),
+        "the library must not present typical values as certified data"
     );
     Ok(())
 }

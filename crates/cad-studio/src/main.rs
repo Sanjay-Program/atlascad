@@ -32,6 +32,7 @@ fn run() -> Result<(), String> {
     let mut bind: Option<IpAddr> = None;
     let mut advertise: Option<String> = None;
     let mut token: Option<String> = None;
+    let mut token_file: Option<PathBuf> = None;
 
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
@@ -99,10 +100,13 @@ fn run() -> Result<(), String> {
                 let value = arguments
                     .next()
                     .ok_or_else(|| "`--token` needs a value".to_string())?;
-                if value.len() < 16 {
-                    return Err("`--token` must be at least 16 characters".into());
-                }
-                token = Some(value);
+                token = Some(validate_token(&value, "`--token`")?);
+            }
+            "--token-file" => {
+                let value = arguments
+                    .next()
+                    .ok_or_else(|| "`--token-file` needs a path".to_string())?;
+                token_file = Some(PathBuf::from(value));
             }
             "--help" | "-h" => {
                 usage();
@@ -122,15 +126,49 @@ fn run() -> Result<(), String> {
     if share && bind.is_none() {
         bind = Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED));
     }
-    let shared = bind.is_some_and(|ip| !ip.is_loopback());
-    if token.is_some() && !shared {
-        return Err("`--token` only applies to a shared studio; add `--share` or `--host`".into());
+    // `--share --host 127.0.0.1` is the reverse-proxy deployment from deploy/: the socket stays on
+    // loopback and the token is still required, because the public name reaches it through Caddy.
+    let shared = share || bind.is_some_and(|ip| !ip.is_loopback());
+
+    // A deployed instance should not carry its secret in `ps` or in a shell history. The token can
+    // come from a file or the environment instead, and when it does the printed link is redacted
+    // because the operator already holds the secret in a file they control.
+    let mut token_origin = "option";
+    if token.is_none()
+        && let Some(path) = &token_file
+    {
+        let text = std::fs::read_to_string(path)
+            .map_err(|error| format!("cannot read the token file {}: {error}", path.display()))?;
+        token = Some(
+            validate_token(&text, "the token in the token file")
+                .map_err(|error| format!("{}: {error}", path.display()))?,
+        );
+        token_origin = "file";
+    }
+    if token.is_none()
+        && let Ok(value) = std::env::var("ATLAS_STUDIO_TOKEN")
+        && !value.trim().is_empty()
+    {
+        token = Some(validate_token(&value, "ATLAS_STUDIO_TOKEN")?);
+        token_origin = "environment";
+    }
+    if (token.is_some() || token_file.is_some()) && !shared {
+        return Err(
+            "a token only applies to a shared studio; add `--share` or `--host <address>`".into(),
+        );
     }
     let advertised = if shared {
         advertise.or_else(|| share_host(bind))
     } else {
         None
     };
+    if shared && advertised.is_none() && bind.is_some_and(|ip| ip.is_loopback()) {
+        return Err(
+            "`--share` on loopback needs `--advertise HOST`: the link has to name the proxy\n\
+             in front of this studio, and no address on this machine can be discovered for it"
+                .into(),
+        );
+    }
     if shared && advertised.is_none() {
         eprintln!(
             "cad-studio: no network address found; pass `--host <this machine's IP>` so the share link is usable"
@@ -192,7 +230,14 @@ fn run() -> Result<(), String> {
     }
     println!("  url:  {}", handle.url());
     if let Some(share_url) = handle.share_url() {
-        println!("  share: {share_url}");
+        if token_origin == "option" {
+            println!("  share: {share_url}");
+        } else {
+            println!("  share: {}", redact_token(&share_url));
+            println!(
+                "         token: loaded from the {token_origin}; append ?token=... to the link (it is not printed here)"
+            );
+        }
         println!("         anyone with this link can view and edit until you stop the studio");
     }
     println!("  stop: Ctrl+C");
@@ -203,12 +248,43 @@ fn run() -> Result<(), String> {
     }
 }
 
+/// A token must be long enough to be worth guessing and must survive being put in a URL.
+fn validate_token(value: &str, origin: &str) -> Result<String, String> {
+    let token = value.trim();
+    if token.len() < 16 {
+        return Err(format!("{origin} must be at least 16 characters"));
+    }
+    if token.chars().count() > 128 {
+        return Err(format!("{origin} must be at most 128 characters"));
+    }
+    if token
+        .chars()
+        .any(|character| character.is_whitespace() || character.is_control())
+    {
+        return Err(format!(
+            "{origin} must not contain whitespace or control characters"
+        ));
+    }
+    Ok(token.to_string())
+}
+
+/// The share link without its token, for a deployment whose token lives in a file or the environment.
+fn redact_token(url: &str) -> String {
+    match url.split_once("?token=") {
+        Some((base, _)) => format!("{base}?token=<from token file>"),
+        None => url.to_string(),
+    }
+}
+
 fn usage() {
     println!("cad-studio {}", env!("CARGO_PKG_VERSION"));
     println!();
     println!("USAGE:");
     println!(
         "  cad-studio --file PATH [--port PORT] [--share] [--host IP] [--advertise HOST] [--token TOKEN]"
+    );
+    println!(
+        "  cad-studio --file PATH --share --host IP --token-file PATH   (or ATLAS_STUDIO_TOKEN)"
     );
     println!("  cad-studio --new PATH [--name NAME] [--size X,Y,Z] [--port PORT]");
     println!();
@@ -224,7 +300,9 @@ fn usage() {
 /// the interface the default route uses.
 fn share_host(bind: Option<IpAddr>) -> Option<String> {
     match bind {
-        Some(ip) if !ip.is_unspecified() => Some(ip.to_string()),
+        // A loopback bind is never what a colleague should type: the link would point at their own
+        // machine. The discoverable LAN address is advertised instead.
+        Some(ip) if !ip.is_unspecified() && !ip.is_loopback() => Some(ip.to_string()),
         _ => lan_address().map(|ip| ip.to_string()),
     }
 }

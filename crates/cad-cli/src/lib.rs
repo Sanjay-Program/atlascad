@@ -59,6 +59,8 @@ pub enum CliError {
     Plan(#[from] PlanError),
     #[error("sheet: {0}")]
     Sheet(#[from] cad_drafting::PlotError),
+    #[error("engineering model: {0}")]
+    Model(#[from] cad_engineering_model::ModelError),
 }
 
 /// An axis-aligned box request. Coordinates are in the document's unit; the kernel always receives

@@ -32,6 +32,11 @@ cad-drafting  (2D drawing: layers, entities, undo, .zdraft, DXF R12 read/write)
      └──► cad-studio             /api/draft (+ entity/layer/undo/save), /api/export/{dxf,pdf}
                                  → the Drawing panel and its editor (no kernel call)
 
+cad-engineering-model    (document/revision identity, material library, derived-artifact provenance
+     ▲                    and transitive staleness; sidecar JSON, no solver/CAM/ECAD producer)
+     ├──► cad-cli         atlas artifacts add|review|check (exit 3 when a recorded result is stale)
+     └──► cad-studio      GET /api/engineering, drawing derived_from_revision + derivation_status
+
 cad-agent-api ◄── cad-agent-runtime ◄── cad-agent-geometry   (one implemented agent, in-process)
 cad-entitlements          (local/cloud quota policy; no billing provider)
 cad-engineering (atlas-eng)  manifests → scan → tasks → report; licence and SBOM policy
@@ -53,9 +58,11 @@ cloud service, any AI provider, and any plugin or scripting host.
 | `cad-engineering` — control plane + `atlas-eng` | verified, 30 tests | `docs/engineering-control-plane.md` |
 | `cad-cli` — headless contract consumer, binary STL, native project and drafting commands | verified, 13 tests | `crates/cad-cli/tests`, `engineering/quality/tests.json#t-platform-drafting-20261030` |
 | `cad-drafting` — `.zdraft` drawing: layers (colour/visibility/lock/line weight), point/line/circle/arc/polyline/text/dimension, validated entities, bounded undo/redo, versioned save/load, DXF R12 writer and reader with a skipped-type report, sheet layout (A4–A0/Letter, scale or fit, frame and title block) and a vector PDF plotter | verified, 59 tests | `crates/cad-drafting/src/{lib,dxf,sheet,pdf}.rs`, `engineering/quality/tests.json#t-platform-editor-20261030` |
+| `cad-engineering-model` — Phase A shared engineering model: document/revision/fingerprint, stable artifact ids and kinds, validated 7-material library, revision-pinned derived artifacts, acyclic dependency validation, transitive staleness, explicit review, versioned atomic JSON; CLI release gate and studio engineering summary | verified, 14 unit tests + 1 doctest, 2 CLI workflow tests, 1 studio HTTP test | `crates/cad-engineering-model/src/lib.rs`, `crates/cad-cli/tests/artifacts_workflow.rs`, `crates/cad-studio/tests/http_api.rs`, `docs/architecture/UNIFIED_ENGINEERING_MODEL.md` |
 | `cad-document` — .zcad schema 8: ordered feature graph, rectangle/circle/polygon/polyline/sector sketches on a horizontal plane at any height, new-body/join/cut extrudes with an up/down direction, full-turn revolves, parameters, per-feature `BuildCache`, named revisions, crash-recovery snapshots and a last-good-file backup, persisted undo/redo, schema-1…7 migration | verified, 78 tests | `crates/cad-document/src/lib.rs`, `engineering/quality/tests.json#t-platform-workspace-20261030`, ADR-0009 |
 | `cad-io` — validated binary STL reader/writer shared by CLI and app | verified, 6 tests | `engineering/quality/tests.json#t-cad-io` |
-| `cad-studio` — local HTTP application, WebGL workspace, parameters, ordered feature tree with rebuild status, extrude (up/down) and revolve, arc-sector profile, sketch plane placement, named revisions panel and palette commands, crash-recovery banner and discard, picking, save, STL export, **drawing editor** (line/circle/polyline/point/dimension/text, layers, undo, save, DXF) with a **PDF sheet plot**, token-gated LAN sharing | verified, 29 tests + driven browser workflows (27 loopback / 31 shared assertions) | `crates/cad-studio/tests/http_api.rs`, `engineering/quality/tests.json#t-platform-workspace-20261030`, `scripts/browser-check.mjs` |
+| `cad-studio` — local HTTP application, WebGL workspace, parameters, ordered feature tree with rebuild status, extrude (up/down) and revolve, arc-sector profile, sketch plane placement, named revisions panel and palette commands, crash-recovery banner and discard, picking, save, STL export, **drawing editor** (line/circle/polyline/point/dimension/text, layers, undo, save, DXF) with a **PDF sheet plot**, token-gated sharing (LAN or behind a proxy), public liveness route | verified, 31 tests + driven browser workflows (27 loopback / 31 shared assertions) | `crates/cad-studio/tests/http_api.rs`, `engineering/quality/tests.json#t-platform-workspace-20261030`, `scripts/browser-check.mjs` |
+| `deploy/` — container image (built and smoke-tested here), hardened systemd unit (`systemd-analyze verify`), Caddyfile, env template, `build-image.sh --smoke` | verified by an end-to-end container smoke run and a proxied-shape run against the release binary | `deploy/`, `docs/operations/deployment.md` |
 | `cad-entitlements` — local/cloud feature quota policy | verified, 10 tests; no billing provider | `engineering/quality/tests.json#t-cad-entitlements` |
 | `cad-agent-api` — the versioned agent contract | verified, 13 tests | `engineering/quality/tests.json#t-cad-agent-api` |
 | `cad-agent-runtime` — registry, lifecycle, grants, budgets, schema check | verified, 16 tests | `engineering/quality/tests.json#t-cad-agent-runtime` |
@@ -75,9 +82,14 @@ WASM build has been attempted (the target is not installed). Nothing in this pag
 
 ## 2. Verified versus advertised
 
-* **Verified on 2026-10-30:** all twelve root workspace packages passed fmt, the clippy gate, and
-  workspace tests (359 passed, including one doctest), with 56 live simulation assertions and the
-  headless browser checks at 27 loopback / 31 shared, zero console errors. The drafting editor was
+* **Verified on 2026-10-31 for the new Phase A surface, and on 2026-10-30 for the rest:** all
+  thirteen root workspace packages pass fmt, the clippy gate and workspace tests (**382 passed**,
+  including one doctest; the new crate contributes 14 unit tests, 1 doctest, 2 CLI workflows and 1
+  studio HTTP test), with 56 live simulation assertions and the
+  headless browser checks at 27 loopback / 31 shared, zero console errors. The deployment artefacts
+  were exercised, not described: the image was built and smoke-tested end to end (healthcheck,
+  anonymous 401, tokenised 200, plotted PDF), the proxy shape was run against the release binary
+  with a real `Host` and an `https://` origin, and `systemd-analyze verify` accepted the unit. The drafting editor was
   driven as a user would: a line is drawn by clicking two points, saved as a `.zdraft`, and a shared
   session downloads the STL, the DXF and a plotted PDF through the token. A plotted A3 sheet was
   rendered and inspected, and `pdftotext` extracts every title-block field. Evidence is in

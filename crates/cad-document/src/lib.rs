@@ -41,6 +41,9 @@ use cad_contract::kernel::{Kernel, SolidId, validate_profile};
 use cad_contract::mesh::Mesh;
 use cad_contract::tol::Tolerance;
 use cad_contract::units::Unit;
+use cad_engineering_model::{
+    ArtifactId, ArtifactRegistry, DerivedArtifact, DocumentRef, StalenessReport,
+};
 use serde::{Deserialize, Serialize};
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
@@ -74,7 +77,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 ///   an extrude a direction. Both fields are defaulted, so a schema-7 file is already valid; the
 ///   version is bumped because a schema-7 reader would refuse the new sketch field as an invalid
 ///   document rather than report a newer schema.
-pub const PROJECT_SCHEMA: u32 = 8;
+/// * Schema 9 embeds the derived-artifact registry, so a drawing's or toolpath's source revision
+///   travels with the design instead of living in a sidecar that can be lost or copied separately.
+///   The field is defaulted, so a schema-8 file opens with an empty registry; the version is bumped
+///   so a schema-8 build says "newer schema" instead of discarding the records.
+pub const PROJECT_SCHEMA: u32 = 9;
 
 /// Smallest regular polygon the sketch model accepts.
 pub const MIN_POLYGON_SIDES: u32 = 3;
@@ -158,6 +165,8 @@ pub enum ProjectError {
     UnsupportedSchema { found: u32, supported: u32 },
     #[error("I/O at {path}: {message}")]
     Io { path: String, message: String },
+    #[error("engineering model: {0}")]
+    Engineering(#[from] cad_engineering_model::ModelError),
 }
 
 impl From<cad_contract::error::KernelError> for ProjectError {

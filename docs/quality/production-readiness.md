@@ -118,8 +118,8 @@ faces, and the error discipline is real. Neither is the problem.
 | Patterns, mirror, split, combine | **Absent** | same |
 | Multi-body parts | **Absent**: a second `new_body` is refused by design | `cad-document` |
 | Assemblies, mates, interference | **Absent** | — |
-| Drawing sheets: dimensions, text, title block, scale, PDF plot | **Absent** | the drawing document and DXF exchange exist; the sheet and the plot do not |
-| GD&T, BOM, balloons | **Absent** | — |
+| A drawing you can mark up and hand over | **Present for one plan view** (2026-10-30): a 2D editor (line/circle/polyline/point/dimension/text) with layers and undo, DXF R12 out and in, and a **PDF sheet** on A4–A0/Letter with a frame, title block, scale and overall dimensions | `crates/cad-drafting/src/{sheet,pdf}.rs`, `t-platform-editor-20261030`. No snapping, projected/section views, sheet sets or batch plot |
+| GD&T, BOM, balloons, projected/section views | **Absent** | one plan view per sheet is all a plot contains |
 | Mass properties from exact geometry | **Absent** (mesh volume only) | `Capability::MassProperties` unimplemented |
 | Large-model performance (10k+ faces) | **Unmeasured**; no tessellation resource budget | `docs/security-review.md` §3 |
 | Crash safety / recovery | **Delivered this cycle** for unsaved edits and unreadable files | §5 |
@@ -242,6 +242,22 @@ console errors). Workspace **279 tests, 0 failed**, fmt and clippy clean.
   did not have.
 * `.github/workflows/ci.yml` and `deny.toml` add the advisory and provenance job. **The workflow has
   not been executed on a runner**; only the gate it calls was run here.
+
+**Deployment, added 2026-10-30 (M13):** the product now has shapes that were run, not described.
+`deploy/` holds a container image (non-root, `/data` volume, no compiler inside), a hardened systemd
+unit, a Caddyfile and `build-image.sh --smoke`, which builds the image and then asserts, over HTTP:
+liveness without a token (`{"ok":true,"version":"0.1.0"}`), **401** for the document without the
+token, **200** with it, and a 2 395-byte `%PDF-1.4`; the document is visible in the volume afterwards.
+Building it found two defects that a laptop run could not: a shared studio required the presented
+`Host` to carry its own listen port, so **every request through a port mapping or a proxy returned
+403**, and a loopback-bound studio could not be token-guarded at all — the exact shape a TLS
+terminator on the same host needs. Both are fixed and covered by tests. Liveness is now the one
+`/api/` route answered without a token; it names nothing about the document.
+
+What deployment does **not** add: accounts (one token, all-or-nothing, no revocation without a
+restart), more than one document per process, TLS in-process, an audit trail, a signed image or an
+update channel. The container surface has had no security review or image scan. See
+`docs/operations/deployment.md`.
 
 **Not** delivered: signing/notarisation/installers, an update channel, a support process, multi-user
 or cloud collaboration, and every Critical/High product finding above. Named revisions and the

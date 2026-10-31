@@ -378,21 +378,24 @@ impl Sheet {
         }
 
         if self.dimensions {
-            // 9 mm of paper between the geometry and its overall dimensions, converted to model
-            // units so the offset is the same on an A4 at 1:5 and an A0 at 1:1.
+            // Overall dimensions measure the *geometry*, not the annotation: a user-drawn dimension
+            // below the part must not make the part taller. They are anchored to the geometry edges
+            // and offset 9 mm of paper, converted to model units so the offset is the same on an A4
+            // at 1:5 and an A0 at 1:1.
+            let [gx0, gy0, gx1, gy1] = draft.geometry_bounds().unwrap_or(bounds);
             let overshoot = 9.0 * scale;
             dimension(
                 &mut plot,
-                [min_x, min_y],
-                [max_x, min_y],
+                [gx0, gy0],
+                [gx1, gy0],
                 -overshoot,
                 None,
                 &to_paper,
             );
             dimension(
                 &mut plot,
-                [min_x, min_y],
-                [min_x, max_y],
+                [gx0, gy0],
+                [gx0, gy1],
                 overshoot,
                 None,
                 &to_paper,
@@ -886,6 +889,36 @@ mod tests {
         bare.dimensions = false;
         let plot = bare.plot(&plate()).unwrap_or_else(|e| unreachable!("{e}"));
         assert!(!plot.text_values().contains(&"40"));
+    }
+
+    #[test]
+    fn overall_dimensions_measure_the_part_and_not_its_annotation() {
+        let mut draft = plate();
+        draft
+            .add_entity(
+                "0",
+                EntityKind::Dimension {
+                    start: [0.0, 0.0],
+                    end: [40.0, 0.0],
+                    offset: -8.0,
+                    text: None,
+                },
+            )
+            .unwrap_or_else(|error| unreachable!("{error}"));
+        // The annotation reaches 8 mm below the part, so the drawing's own bounds are 48 mm high.
+        let [_, min_y, _, max_y] = draft.bounds().unwrap_or_default();
+        assert!(max_y - min_y > 30.0);
+        // The plot's overall dimensions still read the part: 40 wide, 30 high.
+        let plot = Sheet::new("plate")
+            .plot(&draft)
+            .unwrap_or_else(|e| unreachable!("{e}"));
+        let values = plot.text_values();
+        assert!(values.contains(&"40"), "{values:?}");
+        assert!(values.contains(&"30"), "{values:?}");
+        assert!(
+            !values.contains(&"48"),
+            "the annotation is not the part: {values:?}"
+        );
     }
 
     #[test]

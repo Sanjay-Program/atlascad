@@ -2670,7 +2670,8 @@
         "Met: the PDF has a correct MediaBox (A4 landscape 841.89 x 595.276 pt), a valid xref, escaped text and `%%EOF`; pdftotext extracts the title, number, author, scale and both dimensions, and pdftoppm renders the page.",
         "Met: the panel has Select/Line/Circle/Poly/Dim/Text tools, undo and delete, a layer selector with On/Locked toggles, an add-layer field, Save drawing, DXF and Plot PDF. A headless browser arms the line tool, clicks two points, sees the entity count go to 2 and the panel report `model (live)`, then saves and sees the file name.",
         "Met: in a shared studio the editor works and both downloads carry the token; the browser check downloads a .dxf and a .pdf from the shared page, and unauthenticated /api/export/pdf is a 401 like every other route.",
-        "Met: drafting and plotting never call the kernel; the drawing is built from the sketch."
+        "Met: drafting and plotting never call the kernel; the drawing is built from the sketch.",
+        "Met: overall dimensions measure the geometry, not the annotation \u2014 a dimension drawn 8 mm below a 40 x 30 plate does not make the sheet read 48; the geometry-only bounds are asserted by a unit test."
       ],
       "contract_changes": [],
       "limitations": [
@@ -2688,10 +2689,99 @@
         "crates/cad-studio/tests/http_api.rs::a_drawing_plots_to_a_pdf_sheet_with_a_title_block",
         "crates/cad-cli/tests/draft_workflow.rs::a_drawing_plots_to_a_named_pdf_sheet",
         "scripts/browser-check.mjs (drawing a line, saving, DXF and PDF downloads in a shared session)",
-        "engineering/quality/tests.json#t-platform-editor-20261030 (359 passed, 0 failed)"
+        "engineering/quality/tests.json#t-platform-editor-20261030 (360 passed, 0 failed)"
       ],
       "verified_on": "2026-10-30",
       "verified_host": "linux/x86_64, i3-1125G4, 7.4 GB RAM, integrated graphics"
+    },
+    {
+      "id": "task.m13.deployment",
+      "title": "Deployable studio: container image, hardened service, TLS proxy \u2014 and the two sharing defects it exposed",
+      "rationale": "The studio ran on the author's laptop and nowhere else. A product that cannot be installed, supervised and reached under a real name is a demo, and describing a deployment without running it hides the defects that only appear behind a port mapping or a proxy. Building the three supported shapes and smoke-testing them found two: every proxied request returned 403 because a shared studio required the presented Host to carry its own listen port, and a loopback-bound studio could not be token-guarded at all \u2014 the exact shape a TLS terminator on the same host needs.",
+      "priority": "user_value",
+      "risk": "medium",
+      "status": "verified",
+      "acceptance_criteria": [
+        "A container image is built from the release binary with no compiler in the shipped artefact, runs as a non-root user, keeps the document in a volume, and creates the document on first start.",
+        "The image can be smoke-tested in one command: build, start, wait for the container healthcheck, then assert liveness without a token, 401 for the document without one, 200 with it, and a plotted PDF.",
+        "The container healthcheck is a real HTTP request, so a process that is alive but wedged is unhealthy.",
+        "A systemd unit serves one document on loopback with the token read from a root-owned file, passes `systemd-analyze verify`, and restarts on failure without a restart loop.",
+        "A Caddy configuration terminates TLS in front of the studio and probes the public liveness route.",
+        "A shared studio accepts the `Host` a proxy or a port mapping presents, and a write is accepted when the browser reports an `https://` origin matching that host, while another site is still refused.",
+        "A loopback-bound studio with a token is a shared studio: the socket stays private and every API call still needs the token.",
+        "Liveness is the only API route a shared studio answers without a token, and it names nothing about the document."
+      ],
+      "inputs": [
+        "module.cad-studio",
+        "module.cad-cli"
+      ],
+      "outputs": [
+        "deploy/Dockerfile",
+        "deploy/docker-entrypoint.sh",
+        "deploy/build-image.sh",
+        "deploy/atlas-studio.service",
+        "deploy/atlas-studio.env.example",
+        "deploy/Caddyfile",
+        "docs/operations/deployment.md",
+        "crates/cad-studio/src/main.rs",
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/tests/http_api.rs"
+      ],
+      "depends_on": [
+        "task.m12b.drawing-editor-and-sheets"
+      ],
+      "blocks": [],
+      "expected_changes": [
+        "deploy/",
+        "crates/cad-studio/src/lib.rs",
+        "crates/cad-studio/src/main.rs",
+        "crates/cad-studio/tests/http_api.rs",
+        "README.md",
+        "docs/operations/deployment.md"
+      ],
+      "required_tests": [
+        "cargo test --offline --workspace -j 2",
+        "cargo clippy --offline --workspace --all-targets -- -D warnings",
+        "cargo fmt --all --check",
+        "deploy/build-image.sh --smoke",
+        "systemd-analyze verify deploy/atlas-studio.service"
+      ],
+      "attempts": 1,
+      "last_error": null,
+      "rollback": "Delete deploy/ and docs/operations/deployment.md, and restore the port-equality host check and the bind-address-derived `shared` flag in cad-studio. The proxy and port-mapped deployments then return 403 again, and a loopback-bound studio can no longer require a token; the `/api/health` exemption from the token gate is dropped with them. No document format changes, so existing projects are unaffected.",
+      "source": "curated",
+      "trigger_digest": null,
+      "acceptance_results": [
+        "Met: deploy/build-image.sh compiles the release binary and hands docker a two-file context; the image runs as uid 10001, keeps /data as a volume, and the entrypoint creates the document with --new on first start (smoke run).",
+        "Met: `deploy/build-image.sh --smoke` built the image, waited for health, and printed the four required results: `{\"ok\":true,\"version\":\"0.1.0\"}`, 401 without a token, 200 with it, and a 2 395-byte `%PDF-1.4`.",
+        "Met: the healthcheck is an HTTP request over bash /dev/tcp with the port in `Host`; a `--help`-style probe would have answered 200 for a wedged process.",
+        "Met: `systemd-analyze verify deploy/atlas-studio.service` reports only that the binary is not installed at /usr/local/bin, with no unknown directive; StartLimitIntervalSec/StartLimitBurst bound the restarts.",
+        "Met: deploy/Caddyfile terminates TLS, sets HSTS and no-store, caps the body at 2 MB and routes /api/health separately.",
+        "Met: an HTTP test and a run against the release binary: `Host: cad.example.com` with the token returns 200, an `https://cad.example.com` origin edit returns 200 and changes the volume to 24 000 mm3, and `https://evil.example` returns 403. Anonymous reads on that host return 401.",
+        "Met: `a_loopback_studio_with_a_token_requires_it` starts a studio bound to 127.0.0.1 with a token and asserts 401 anonymous, 200 tokenised, and a share link naming the advertised host.",
+        "Met: `GET /api/health` returns 200 without a token on a shared studio and the body does not contain the document name (HTTP test)."
+      ],
+      "contract_changes": [],
+      "limitations": [
+        "One token, all-or-nothing: no accounts, no per-user permissions, no revocation without restarting with a new token.",
+        "One document per process; N documents need N processes and N ports.",
+        "No TLS, certificates or HSTS in-process; they belong to the proxy.",
+        "No audit trail of who changed what, and no multi-user conflict handling beyond last-write-wins on a single document.",
+        "The image is not signed and no update channel exists, so this is deployment-ready, not release-ready.",
+        "Licence: the root LICENSE is personal/non-commercial; deploying for paying work needs the signed agreement."
+      ],
+      "evidence": [
+        "deploy/Dockerfile, deploy/docker-entrypoint.sh, deploy/build-image.sh (end-to-end smoke run: healthy, 401, 200, 2 395-byte PDF)",
+        "deploy/atlas-studio.service, deploy/atlas-studio.env.example (systemd-analyze verify)",
+        "deploy/Caddyfile",
+        "crates/cad-studio/tests/http_api.rs::a_shared_studio_requires_its_token_and_keeps_the_same_origin_rule (proxied Host accepted, empty Host refused, anonymous read refused)",
+        "crates/cad-studio/tests/http_api.rs::a_proxied_shared_studio_accepts_https_edits_and_refuses_another_site",
+        "crates/cad-studio/tests/http_api.rs::a_loopback_studio_with_a_token_requires_it",
+        "docs/operations/deployment.md",
+        "release run: release binary with --share --host 127.0.0.1 --advertise cad.example.com --token-file returned 200, 401, an edited volume and a `%PDF-1.4` through a proxied Host"
+      ],
+      "verified_on": "2026-10-30",
+      "verified_host": "Linux, 8 cores, 7 GB RAM, rustc 1.95.0, docker 29.6.2"
     }
   ]
 }

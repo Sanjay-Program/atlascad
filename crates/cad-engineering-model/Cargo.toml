@@ -1,0 +1,17 @@
+[package]
+name = "cad-engineering-model"
+description = "Phase A unified engineering model: stable document and artifact identity, a validated material library, and revision-pinned derived artifacts with transitive staleness detection."
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+cad-contract.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

@@ -456,6 +456,11 @@ kbd {
   font-size: 11px;
 }
 
+.sheet-grid input[type="checkbox"] {
+  width: auto;
+  justify-self: start;
+}
+
 .sheet-grid input,
 .sheet-grid select {
   width: 100%;

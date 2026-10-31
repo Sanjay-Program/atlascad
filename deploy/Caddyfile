@@ -1,0 +1,56 @@
+# Atlas CAD Studio behind Caddy.
+#
+# Why a proxy at all: the studio speaks plain HTTP on loopback. TLS termination, a public hostname
+# and an HSTS header belong to a component that is good at them. Caddy obtains and renews a
+# certificate automatically, which is the only part of "hosted" that is not application code.
+#
+#   caddy run --config deploy/Caddyfile --adapter caddyfile
+#
+# Before this is reachable: the DNS name must point at the host, ports 80 and 443 must be open, and
+# the studio must be running on 127.0.0.1:7519. No account is created; the access token in the URL is
+# the whole authorisation model (see docs/operations/deployment.md for what that means).
+
+cad.example.com {
+	encode zstd gzip
+
+	# The studio's own limits are 16 KiB of headers and 1 MiB of JSON; give the proxy a little slack
+	# and refuse anything larger before it reaches the application.
+	request_body {
+		max_size 2MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	# Health is public so a supervisor can check the process without holding the token. It reports
+	# only liveness and the version.
+	@health path /api/health
+	handle @health {
+		reverse_proxy 127.0.0.1:7519
+	}
+
+	# Everything else carries the document. The studio checks the token itself; the proxy must not
+	# cache any of it, and the token in the query string must not leak to a third party.
+	handle {
+		reverse_proxy 127.0.0.1:7519 {
+			header_up X-Forwarded-For {remote_host}
+		}
+		header Cache-Control "no-store"
+	}
+
+	# The access log records the request URI, and a shared link carries the token in the query
+	# string. Treat this log as a secret: 0600, on the same host, rotated and not shipped anywhere.
+	# (Disable this block entirely if that cannot be guaranteed.)
+	log {
+		output file /var/log/caddy/atlas-studio.log {
+			roll_size 10MB
+			roll_keep 5
+		}
+		format json
+		level INFO
+	}
+}

@@ -118,6 +118,129 @@ now waits for the plan SVG and downloads a `.dxf` in a shared session; full gate
 6. Line weight is document data only; R12 has no line-weight table, so it does not reach the file.
 7. No performance measurement of import or drafting on a large drawing.
 
+### M12b — Drafting editor, text and dimensions, plotted PDF sheet (M)
+
+**Goal:** the drawing can be marked up and printed, not just read.
+
+**Why this order:** the previous slice made a drawing a document that can be saved and exchanged.
+A drafter's next two acts are always the same — draw on it, then hand over a sheet — and neither
+touched the kernel, so both could be built and verified while the boolean defects stayed recorded.
+
+**Status:** verified · **Priority:** user_value · **Risk:** medium · **Verified:** 2026-10-30
+
+**Delivered:**
+
+1. **Editor API.** `/api/draft/entity`, `/api/draft/remove`, `/api/draft/layer`,
+   `/api/draft/undo`, `/api/draft/redo` and `/api/draft/save` edit the drawing document. Every
+   edit is validated by `add_entity`/`add_layer`, so a zero radius or an unknown entity kind is
+   refused with the document's own message rather than stored and rendered.
+2. **The drawing is its own file.** `save` writes `<project stem>.zdraft`; the payload reports
+   `source: model` while the plan is generated from the sketch and `source: file` afterwards, and a
+   saved drawing is no longer regenerated when the model changes. A generated plan now arrives with
+   an empty undo history, so the first undo in the panel undoes the user's first edit.
+3. **Text and dimensions.** `EntityKind::Text` (single line, positive height, bounded length) and
+   `EntityKind::Dimension` (two distinct points, finite offset, optional override). A dimension is
+   **exploded** in DXF into two extension lines, the dimension line, two ticks and a `TEXT` value —
+   R12's own `DIMENSION` entity points at a block, which is a much larger surface — and the reader
+   reads `TEXT` back, so a round trip loses nothing but the parametric dimension.
+4. **Sheet layout** (`cad_drafting::Sheet`): A4/A3/A2/A1/A0/Letter, portrait or landscape, an
+   explicit model-units-per-paper-mm scale or `fit` (standard ratios, never enlarging), margins, a
+   frame, a title block with title, number, revision, author, date, scale, unit, paper and entity
+   count, and overall width/height dimensions. A scale that does not fit is refused with the
+   smallest standard scale that does.
+5. **PDF plotter** (`cad_drafting::to_pdf`): uncompressed PDF 1.4, one page, vector paths, base-14
+   Helvetica and Helvetica-Bold with WinAnsi encoding, a real xref table. Text stays selectable and
+   the file is inspectable without a library; the trade is that fonts are not embedded, so it is not
+   PDF/A.
+6. **UI.** The Drawing panel gained a tool row (Select, Line, Circle, Poly, Point, Dim, Text),
+   undo/delete, a text field for the Text tool, a layer selector with On/Locked toggles, an
+   add-layer field, **Save drawing**, **DXF** and **Plot PDF** with paper, orientation, scale, title,
+   number and author. Clicks are mapped through the SVG's own viewBox and letterboxing, and the
+   server is the authority: an edit appears only after the document accepted it.
+7. **CLI.** `atlas sheet --file project.zcad|drawing.zdraft --pdf out.pdf [--paper A4] [--scale fit|N]
+   [--title …] [--number …] [--revision …] [--author …] [--date …] [--notes …] [--dimensions on|off]`.
+
+**Evidence:** `cad-drafting` at 60 tests (17 new: layout, fit search, hidden-layer plotting, title
+block fields, text/dimension primitives, PDF structure, xref offsets, escaping, page sizes); the HTTP
+suite at 29 (the editable document with undo/redo and the sidecar save; the PDF sheet with MediaBox,
+title block, fit and refusals); `cad-cli` at 4 drafting workflows including `atlas sheet`; browser
+checks at 27 loopback / 31 shared, which draw a line by clicking two points, save it, and download
+both a `.dxf` and a `.pdf` from a shared session. A rendered A3 sheet was inspected, and `pdftotext`
+extracts every title-block field. Full gate green at **360 tests** (`t-platform-editor-20261030`).
+
+**Recorded limitations, not claimed away:**
+
+1. The editor is click-based: no object snap, grips, trimming, fillets, copy/rotate/scale or
+   multi-selection.
+2. One plan view on one titled page. No projected, section or detail views, no GD&T, no BOM, no
+   sheet set, no batch plot.
+3. Dimensions are linear only, with a fixed proportional offset and no in-page override or style;
+   text is single-line and unrotated.
+4. The PDF is not PDF/A (no embedded fonts) and is uncompressed; there is no plot-time measurement
+   on a large drawing.
+5. The DXF reader still cannot read another program's `DIMENSION` records — only their exploded
+   geometry and the `TEXT` values.
+
+### M13 — Deployment: container, service, proxy (M)
+
+**Goal:** the studio can be installed, supervised and reached under a real name, and the shapes that
+claim to work are the shapes that were run.
+
+**Why this order:** the application had been verified only on the author's machine, on loopback.
+Everything that a deployment changes — the port a request arrives on, the name in `Host`, the scheme
+in `Origin`, whether the process is actually answering — is invisible to a laptop run, and saying
+“deploy it behind a proxy” without doing it would have shipped two defects described as features.
+
+**Status:** verified · **Priority:** user_value · **Risk:** medium · **Verified:** 2026-10-30
+
+**Delivered:**
+
+1. **Container.** `deploy/Dockerfile` (non-root uid 10001, `/data` volume, `tini`, no compiler in the
+   image), `deploy/docker-entrypoint.sh` (creates the document on first start, takes the token from
+   `ATLAS_STUDIO_TOKEN` or `ATLAS_STUDIO_TOKEN_FILE`, never from the command line) and
+   `deploy/build-image.sh` (compiles the release binary, hands docker a two-file context so `target/`
+   and `.git/` never leave the machine, and with `--smoke` runs the whole check).
+2. **The healthcheck is a request.** A real `GET /api/health` over bash's `/dev/tcp`, because a
+   `--help` probe answers 200 for a wedged process. Getting it right required the `Host` header to
+   carry the port, which is what exposed the defect below.
+3. **A loopback-bound studio can carry a token.** `shared` was derived from the bind address alone,
+   so `--share --host 127.0.0.1 --token-file …` — the shape every TLS terminator on the same host
+   needs — was refused at startup, and had it not been it would have served the document with no
+   token behind a public name. A supplied token now means a shared session.
+4. **Proxied and port-mapped deployments work.** A shared studio required the presented `Host` to end
+   with its own listen port, so `-p 7599:7519` and Caddy both returned **403 on every request**; the
+   same-origin check compared `Origin` against `http://{Host}`, so an HTTPS proxy refused every edit.
+   The name proves nothing (the token does) and the scheme is either one.
+5. **Liveness is public, everything else is not.** `GET /api/health` is the single `/api/` route a
+   shared studio answers without a token: a container healthcheck or a load balancer cannot hold a
+   secret, and the reply names no part of the document.
+6. **Service and proxy.** `deploy/atlas-studio.service` (hardened: `ProtectSystem=strict`,
+   `MemoryDenyWriteExecute`, a syscall allow-list, `MemoryMax=2G`, restart limits) and
+   `deploy/Caddyfile` (TLS, HSTS, `no-store`, 2 MB body cap, a separate route for health).
+7. **A deployment guide that states the limits**: one process per document, one token that cannot be
+   revoked without a restart, no accounts, no in-process TLS, no audit trail.
+
+**Evidence:** `deploy/build-image.sh --smoke` end to end — image built, container healthy,
+`{"ok":true,"version":"0.1.0"}` without a token, 401 without one, 200 with it, a 2 395-byte
+`%PDF-1.4`, and the document present in the volume; the release binary run in the proxy shape
+(`--share --host 127.0.0.1 --advertise cad.example.com --token-file`) with `Host: cad.example.com`
+returning 200, anonymous 401, an `https://` origin edit changing the volume, and a plotted PDF;
+`systemd-analyze verify` clean apart from the not-installed binary; two new HTTP tests (proxied host
+and `https` origin, loopback with a token) and the liveness assertion in the shared-session test.
+Full gate green at **364 tests**, simulation 56 assertions, browser 27 loopback / 31 shared.
+
+**Recorded limitations, not claimed away:**
+
+1. One token, all-or-nothing: no accounts or roles, no revocation without a restart, and every holder
+   of the link can edit, undo and save.
+2. One document per process; N documents are N processes and N ports.
+3. No TLS, certificate handling or HSTS inside the binary; they belong to the proxy.
+4. No audit trail, no per-user history, no conflict handling beyond last-write-wins on one document.
+5. The image is unsigned and there is no update channel: deployment-ready, not release-ready.
+6. The container surface has had no security review or image scan.
+7. Deployment for paying work still needs the signed commercial licence; the root `LICENSE` is
+   personal/non-commercial.
+
 ### M11b — Cut, behind a verified difference (M)
 
 **Goal:** a second extrude can remove material, and the application refuses cut on a kernel whose
