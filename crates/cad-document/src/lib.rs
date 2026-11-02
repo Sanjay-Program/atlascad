@@ -466,6 +466,16 @@ pub struct Project {
     revisions: Vec<NamedRevision>,
     #[serde(default = "first_revision_id")]
     next_revision: u64,
+    /// Derived artifacts recorded against this design, embedded so a drawing's or toolpath's source
+    /// revision travels with the project instead of in a sidecar that can be lost or copied
+    /// separately. Absent until the first record is written, which keeps a project that produces no
+    /// derived output unchanged on disk.
+    ///
+    /// Artifacts are deliberately **not** part of an undo snapshot or a named revision: a derived
+    /// result describes a design revision and must remain visible (and stale) after an undo, not
+    /// disappear with the edit that produced it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    artifacts: Option<ArtifactRegistry>,
 }
 
 /// First revision id. Named revisions have their own id space, separate from entity ids, because a
@@ -770,6 +780,7 @@ impl Project {
             redo: Vec::new(),
             revisions: Vec::new(),
             next_revision: first_revision_id(),
+            artifacts: None,
         }
     }
 
@@ -819,6 +830,61 @@ impl Project {
                 features: revision.snapshot.features.len(),
             })
             .collect()
+    }
+
+    /// The derived artifacts recorded with this project, if any.
+    pub fn artifacts(&self) -> Option<&ArtifactRegistry> {
+        self.artifacts.as_ref()
+    }
+
+    /// Record a derived artifact, replacing the record with the same id.
+    ///
+    /// This does **not** bump the document revision: recording a result is not a design change, and
+    /// bumping the revision would immediately make every other derived artifact stale. The project
+    /// file is changed, so a caller that tracks unsaved work must treat it as dirty.
+    pub fn record_artifact(&mut self, artifact: DerivedArtifact) -> Result<(), ProjectError> {
+        if artifact.source.document != self.header.document {
+            return Err(ProjectError::Invalid(format!(
+                "artifact {} belongs to document {}, but this project is document {}",
+                artifact.id.get(),
+                artifact.source.document.get(),
+                self.header.document.get()
+            )));
+        }
+        let document = self.header.document;
+        let registry = self
+            .artifacts
+            .get_or_insert_with(|| ArtifactRegistry::new(document));
+        registry.upsert(artifact)?;
+        Ok(())
+    }
+
+    /// Acknowledge that an artifact's stale result was reviewed at `revision`.
+    ///
+    /// The record keeps the revision it was generated from; this only records the human decision, as
+    /// [`ArtifactRegistry::review`] documents.
+    pub fn review_artifact(
+        &mut self,
+        id: ArtifactId,
+        revision: Revision,
+    ) -> Result<(), ProjectError> {
+        let registry = self.artifacts.as_mut().ok_or_else(|| {
+            ProjectError::Invalid("this project records no derived artifacts".into())
+        })?;
+        registry.review(id, revision)?;
+        Ok(())
+    }
+
+    /// Assess every recorded artifact against this project's live revision.
+    ///
+    /// `None` means the project records no derived artifacts at all, which is different from an
+    /// empty report: a caller gating a release can distinguish "nothing to check" from "checked".
+    pub fn assess_artifacts(&self) -> Result<Option<StalenessReport>, ProjectError> {
+        let Some(registry) = &self.artifacts else {
+            return Ok(None);
+        };
+        let current = DocumentRef::new(self.header.document, self.revision, None);
+        Ok(Some(registry.assess(current)?))
     }
 
     /// Record the current history under `name` and return the revision's id.
@@ -1957,31 +2023,54 @@ impl Project {
             .get("schema")
             .and_then(serde_json::Value::as_u64)
             .ok_or_else(|| ProjectError::Invalid("missing `schema`".into()))?;
-        let schema = u32::try_from(schema).unwrap_or(u32::MAX);
-        let value = match schema {
-            1 => migrate_v7_to_v8(migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(
-                migrate_v3_to_v4(migrate_v2_to_v3(migrate_v1_to_v2(value)?)?)?,
-            )?)?)?)?,
-            2 => migrate_v7_to_v8(migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(
-                migrate_v3_to_v4(migrate_v2_to_v3(value)?)?,
-            )?)?)?)?,
-            3 => migrate_v7_to_v8(migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(
-                migrate_v3_to_v4(value)?,
-            )?)?)?)?,
-            4 => migrate_v7_to_v8(migrate_v6_to_v7(migrate_v5_to_v6(migrate_v4_to_v5(
-                value,
-            )?)?)?)?,
-            5 => migrate_v7_to_v8(migrate_v6_to_v7(migrate_v5_to_v6(value)?)?)?,
-            6 => migrate_v7_to_v8(migrate_v6_to_v7(value)?)?,
-            7 => migrate_v7_to_v8(value)?,
-            PROJECT_SCHEMA => value,
-            _ => {
-                return Err(ProjectError::UnsupportedSchema {
-                    found: schema,
-                    supported: PROJECT_SCHEMA,
-                });
-            }
-        };
+        let mut schema = u32::try_from(schema).unwrap_or(u32::MAX);
+        if schema > PROJECT_SCHEMA {
+            return Err(ProjectError::UnsupportedSchema {
+                found: schema,
+                supported: PROJECT_SCHEMA,
+            });
+        }
+        // Apply each migration in turn. Every step stamps the schema it produced, so a failure in
+        // the middle reports the version actually being read rather than the original one.
+        let mut value = value;
+        if schema == 1 {
+            value = migrate_v1_to_v2(value)?;
+            schema = 2;
+        }
+        if schema == 2 {
+            value = migrate_v2_to_v3(value)?;
+            schema = 3;
+        }
+        if schema == 3 {
+            value = migrate_v3_to_v4(value)?;
+            schema = 4;
+        }
+        if schema == 4 {
+            value = migrate_v4_to_v5(value)?;
+            schema = 5;
+        }
+        if schema == 5 {
+            value = migrate_v5_to_v6(value)?;
+            schema = 6;
+        }
+        if schema == 6 {
+            value = migrate_v6_to_v7(value)?;
+            schema = 7;
+        }
+        if schema == 7 {
+            value = migrate_v7_to_v8(value)?;
+            schema = 8;
+        }
+        if schema == 8 {
+            value = migrate_v8_to_v9(value)?;
+            schema = 9;
+        }
+        if schema != PROJECT_SCHEMA {
+            return Err(ProjectError::UnsupportedSchema {
+                found: schema,
+                supported: PROJECT_SCHEMA,
+            });
+        }
         let project: Project = serde_json::from_value(value)
             .map_err(|error| ProjectError::Invalid(format!("project JSON: {error}")))?;
         project.validate()?;
@@ -2000,6 +2089,16 @@ impl Project {
             return Err(ProjectError::Invalid(
                 "embedded document header is not at the current schema".into(),
             ));
+        }
+        if let Some(registry) = &self.artifacts {
+            registry.validate()?;
+            if registry.document != self.header.document {
+                return Err(ProjectError::Invalid(format!(
+                    "the artifact registry belongs to document {}, but the project is document {}",
+                    registry.document.get(),
+                    self.header.document.get()
+                )));
+            }
         }
         if Revision::from_raw(self.revision.get()).is_none() {
             return Err(ProjectError::Invalid("revision must be positive".into()));
@@ -2513,7 +2612,7 @@ fn migrate_v4_to_v5(mut value: serde_json::Value) -> Result<serde_json::Value, P
     let object = value
         .as_object_mut()
         .ok_or_else(|| ProjectError::Invalid("project JSON is not an object".into()))?;
-    object.insert("schema".into(), serde_json::json!(PROJECT_SCHEMA));
+    object.insert("schema".into(), serde_json::json!(5));
     Ok(value)
 }
 
@@ -2527,7 +2626,7 @@ fn migrate_v5_to_v6(mut value: serde_json::Value) -> Result<serde_json::Value, P
     let object = value
         .as_object_mut()
         .ok_or_else(|| ProjectError::Invalid("project JSON is not an object".into()))?;
-    object.insert("schema".into(), serde_json::json!(PROJECT_SCHEMA));
+    object.insert("schema".into(), serde_json::json!(6));
     Ok(value)
 }
 
@@ -2541,7 +2640,7 @@ fn migrate_v6_to_v7(mut value: serde_json::Value) -> Result<serde_json::Value, P
     let object = value
         .as_object_mut()
         .ok_or_else(|| ProjectError::Invalid("project JSON is not an object".into()))?;
-    object.insert("schema".into(), serde_json::json!(PROJECT_SCHEMA));
+    object.insert("schema".into(), serde_json::json!(7));
     Ok(value)
 }
 
@@ -2556,7 +2655,20 @@ fn migrate_v7_to_v8(mut value: serde_json::Value) -> Result<serde_json::Value, P
     let object = value
         .as_object_mut()
         .ok_or_else(|| ProjectError::Invalid("project JSON is not an object".into()))?;
-    object.insert("schema".into(), serde_json::json!(PROJECT_SCHEMA));
+    object.insert("schema".into(), serde_json::json!(8));
+    Ok(value)
+}
+
+/// Convert a schema-8 payload in place: only the version changes.
+///
+/// Schema 9 adds the optional embedded artifact registry, which is defaulted, so a schema-8 file is
+/// already a valid schema-9 file with no records. The bump exists so a schema-8 build says "newer
+/// schema" rather than discarding records it cannot represent. No file is rewritten by loading it.
+fn migrate_v8_to_v9(mut value: serde_json::Value) -> Result<serde_json::Value, ProjectError> {
+    let object = value
+        .as_object_mut()
+        .ok_or_else(|| ProjectError::Invalid("project JSON is not an object".into()))?;
+    object.insert("schema".into(), serde_json::json!(9));
     Ok(value)
 }
 
@@ -3261,6 +3373,78 @@ mod tests {
             temp_files, 0,
             "successful saves must remove temporary files"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_recorded_artifact_travels_with_the_project_and_goes_stale_on_edit() -> TestResult {
+        let dir = TempDir::new("artifact-registry")?;
+        let mut project = box_project()?;
+        let document = project.header.document;
+        let revision = project.revision;
+        let id = ArtifactId::new(1).ok_or("artifact id")?;
+        project.record_artifact(DerivedArtifact::new(
+            id,
+            cad_engineering_model::ArtifactKind::Drawing,
+            "shop drawing",
+            DocumentRef::new(document, revision, None),
+        ))?;
+        let path = dir.0.join("bracket.zcad");
+        project.save(&path)?;
+
+        let mut reopened = Project::load(&path)?;
+        let registry = reopened.artifacts().ok_or("a saved registry")?;
+        assert_eq!(registry.artifacts().len(), 1);
+        assert_eq!(registry.artifacts()[0].source.revision, revision);
+        let report = reopened.assess_artifacts()?.ok_or("a report")?;
+        assert!(!report.requires_action);
+
+        // A design edit moves the project forward; the recorded drawing must be visibly stale and
+        // survive a save that happens after the edit.
+        reopened.set_parameter("depth", 8.0)?;
+        let report = reopened.assess_artifacts()?.ok_or("a report")?;
+        assert!(report.requires_action);
+        assert_eq!(report.artifacts[0].status.label(), "requires_review");
+        reopened.save(&path)?;
+        let mut reopened = Project::load(&path)?;
+        assert_eq!(reopened.artifacts().ok_or("registry")?.artifacts().len(), 1);
+
+        reopened.review_artifact(id, reopened.revision)?;
+        let report = reopened.assess_artifacts()?.ok_or("a report")?;
+        assert!(!report.requires_action);
+        assert_eq!(report.artifacts[0].status.label(), "accepted_after_review");
+        assert_eq!(
+            report.artifacts[0].source.revision, revision,
+            "review records the decision but never rewrites the derived revision"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn an_artifact_for_another_document_is_refused() -> TestResult {
+        let mut project = box_project()?;
+        let id = ArtifactId::new(1).ok_or("artifact id")?;
+        let artifact = DerivedArtifact::new(
+            id,
+            cad_engineering_model::ArtifactKind::Toolpath,
+            "roughing",
+            DocumentRef::new(DocumentId::new(99), Revision::INITIAL, None),
+        );
+        assert!(project.record_artifact(artifact).is_err());
+        assert!(project.artifacts().is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn a_schema_eight_project_migrates_to_nine_without_records() -> TestResult {
+        let project = box_project()?;
+        let mut value: serde_json::Value = serde_json::from_str(&project.to_json()?)?;
+        let object = value.as_object_mut().ok_or("project object")?;
+        object.insert("schema".into(), serde_json::json!(8));
+        object.remove("artifacts");
+        let loaded = Project::from_json(serde_json::to_vec(&value)?.as_slice())?;
+        assert_eq!(loaded.schema, PROJECT_SCHEMA);
+        assert!(loaded.artifacts().is_none());
         Ok(())
     }
 

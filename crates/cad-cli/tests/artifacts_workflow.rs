@@ -277,6 +277,99 @@ fn derived_artifacts_are_pinned_to_a_revision_and_a_design_change_blocks_release
 }
 
 #[test]
+fn artifacts_can_live_inside_the_project_file() -> Result<(), Box<dyn std::error::Error>> {
+    let dir = TempDir::new()?;
+    let project = dir.0.join("embedded.zcad");
+    let project_arg = project.to_string_lossy().into_owned();
+
+    let created = run(&[
+        "project",
+        "new",
+        "--file",
+        &project_arg,
+        "--name",
+        "embedded",
+        "--size",
+        "10,10,5",
+    ])?;
+    assert!(created.status.success());
+    let first = revision(&created)?;
+    let revision_arg = first.to_string();
+
+    let recorded = run(&[
+        "artifacts",
+        "add",
+        "--project",
+        &project_arg,
+        "--revision",
+        &revision_arg,
+        "--id",
+        "1",
+        "--kind",
+        "drawing",
+        "--label",
+        "shop drawing",
+    ])?;
+    assert!(
+        recorded.status.success(),
+        "{}",
+        String::from_utf8_lossy(&recorded.stderr)
+    );
+    let text = std::fs::read_to_string(&project)?;
+    assert!(
+        text.contains("\"artifacts\""),
+        "the project file must carry the record, not a sidecar"
+    );
+
+    let current = run(&["artifacts", "check", "--project", &project_arg])?;
+    assert!(current.status.success());
+    assert_eq!(stdout_json(&current)?["requires_action"], false);
+
+    let edited = run(&[
+        "project",
+        "set",
+        "--file",
+        &project_arg,
+        "--param",
+        "depth",
+        "--value",
+        "9",
+    ])?;
+    assert!(edited.status.success());
+    let second = revision(&edited)?;
+
+    let stale = run(&["artifacts", "check", "--project", &project_arg])?;
+    assert_eq!(stale.status.code(), Some(3));
+    let report = stdout_json(&stale)?;
+    assert_eq!(status_of(&report, 1)?, "requires_review");
+
+    let reviewed = run(&[
+        "artifacts",
+        "review",
+        "--project",
+        &project_arg,
+        "--id",
+        "1",
+        "--revision",
+        &second.to_string(),
+    ])?;
+    assert!(
+        reviewed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&reviewed.stderr)
+    );
+    let released = run(&["artifacts", "check", "--project", &project_arg])?;
+    assert!(released.status.success());
+    let report = stdout_json(&released)?;
+    assert_eq!(status_of(&report, 1)?, "accepted_after_review");
+    assert_eq!(
+        report["artifacts"][0]["source"]["revision"].as_u64(),
+        Some(first)
+    );
+    Ok(())
+}
+
+#[test]
 fn an_unknown_upstream_artifact_and_a_bad_kind_are_refused()
 -> Result<(), Box<dyn std::error::Error>> {
     let dir = TempDir::new()?;

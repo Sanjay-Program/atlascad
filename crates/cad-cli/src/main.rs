@@ -101,13 +101,14 @@ fn usage() {
         "              [--author A] [--date D] [--notes N] [--margin MM] [--dimensions on|off]"
     );
     println!(
-        "  atlas artifacts add --registry FILE --document ID --revision N --id ID --kind KIND"
+        "  atlas artifacts add --project PROJECT.zcad --revision N --id ID --kind KIND [--label TEXT]"
     );
+    println!("              [--entity ID[,ID...]] [--upstream ID[,ID...]] [--summary TEXT]");
+    println!("  atlas artifacts review --project PROJECT.zcad --id ID --revision N");
+    println!("  atlas artifacts check --project PROJECT.zcad");
     println!(
-        "              --label TEXT [--entity ID[,ID...]] [--upstream ID[,ID...]] [--summary TEXT]"
+        "  atlas artifacts ... --registry FILE --document ID  (the older sidecar form; also accepted)"
     );
-    println!("  atlas artifacts review --registry FILE --id ID --revision N");
-    println!("  atlas artifacts check --project PROJECT.zcad --registry FILE");
     println!();
     println!("Geometry is modelled in millimetres; --unit describes the values you typed.");
     println!("STL carries no units, so write --header next to it when the unit matters.");
@@ -505,6 +506,9 @@ fn cmd_artifacts(arguments: &[String]) -> Result<i32, CliError> {
 
 fn cmd_artifacts_add(arguments: &[String]) -> Result<i32, CliError> {
     let flags = Flags::parse(arguments)?;
+    if flags.get("--project").is_some() {
+        return cmd_artifacts_add_to_project(&flags);
+    }
     let path = PathBuf::from(flags.require("--registry")?);
     let document = parse_document(&flags)?;
     let revision = parse_revision(&flags, "--revision")?;
@@ -548,8 +552,84 @@ fn cmd_artifacts_add(arguments: &[String]) -> Result<i32, CliError> {
     Ok(0)
 }
 
+/// Record an artifact in the project file itself, so it travels with the design.
+fn cmd_artifacts_add_to_project(flags: &Flags) -> Result<i32, CliError> {
+    let path = PathBuf::from(flags.require("--project")?);
+    let mut project = Project::load(&path)?;
+    let document = project.header.document;
+    if let Some(named) = flags.get("--document") {
+        let named = parse_document_value(named)?;
+        if named != document {
+            return Err(CliError::Input(format!(
+                "`--document {}` does not match the project's document {}",
+                named.get(),
+                document.get()
+            )));
+        }
+    }
+    let revision = parse_revision(flags, "--revision")?;
+    let id = parse_artifact_id(flags, "--id")?;
+    let kind_name = flags.require("--kind")?;
+    let kind = ArtifactKind::parse(kind_name).ok_or_else(|| {
+        CliError::Input(format!(
+            "`{kind_name}` is not an artifact kind; use drawing, simulation, manufacturing_setup, \
+             toolpath, inspection, pcb_layout, documentation or other"
+        ))
+    })?;
+    let label = flags.get("--label").unwrap_or(kind.label());
+    let mut artifact =
+        DerivedArtifact::new(id, kind, label, DocumentRef::new(document, revision, None));
+    artifact.source_entities = parse_entities(flags.all("--entity"))?;
+    artifact.upstream = parse_artifact_ids(flags.all("--upstream"))?;
+    if let Some(summary) = flags.get("--summary") {
+        artifact.result.summary = summary.to_string();
+    }
+    project.record_artifact(artifact)?;
+    project.save(&path)?;
+    let recorded = project
+        .artifacts()
+        .map(|registry| registry.artifacts().len());
+    print_json(&serde_json::json!({
+        "project": path.display().to_string(),
+        "document": document.get(),
+        "artifact": id.get(),
+        "kind": kind.label(),
+        "source_revision": revision.get(),
+        "revision": project.revision.get(),
+        "artifacts": recorded,
+    }))?;
+    eprintln!(
+        "recorded artifact {} ({}) at revision {} in {}",
+        id.get(),
+        kind.label(),
+        revision.get(),
+        path.display()
+    );
+    Ok(0)
+}
+
 fn cmd_artifacts_review(arguments: &[String]) -> Result<i32, CliError> {
     let flags = Flags::parse(arguments)?;
+    if flags.get("--project").is_some() {
+        let path = PathBuf::from(flags.require("--project")?);
+        let id = parse_artifact_id(&flags, "--id")?;
+        let revision = parse_revision(&flags, "--revision")?;
+        let mut project = Project::load(&path)?;
+        project.review_artifact(id, revision)?;
+        project.save(&path)?;
+        print_json(&serde_json::json!({
+            "project": path.display().to_string(),
+            "artifact": id.get(),
+            "reviewed_revision": revision.get(),
+        }))?;
+        eprintln!(
+            "artifact {} reviewed at revision {} in {} (the result was not recomputed)",
+            id.get(),
+            revision.get(),
+            path.display()
+        );
+        return Ok(0);
+    }
     let path = PathBuf::from(flags.require("--registry")?);
     let id = parse_artifact_id(&flags, "--id")?;
     let revision = parse_revision(&flags, "--revision")?;
@@ -572,14 +652,24 @@ fn cmd_artifacts_review(arguments: &[String]) -> Result<i32, CliError> {
 fn cmd_artifacts_check(arguments: &[String]) -> Result<i32, CliError> {
     let flags = Flags::parse(arguments)?;
     let project_path = PathBuf::from(flags.require("--project")?);
-    let registry_path = PathBuf::from(flags.require("--registry")?);
     let project = Project::load(&project_path)?;
-    let registry = ArtifactRegistry::load(&registry_path)?;
-    let report = registry.assess(DocumentRef::new(
-        project.header.document,
-        project.revision,
-        None,
-    ))?;
+    let report = match flags.get("--registry") {
+        Some(registry_path) => {
+            let registry = ArtifactRegistry::load(Path::new(registry_path))?;
+            registry.assess(DocumentRef::new(
+                project.header.document,
+                project.revision,
+                None,
+            ))?
+        }
+        None => project.assess_artifacts()?.ok_or_else(|| {
+            CliError::Input(
+                "this project records no derived artifacts; record one with \
+                 `atlas artifacts add --project`"
+                    .into(),
+            )
+        })?,
+    };
     print_json(&report)?;
     if report.requires_action {
         let stale = report
@@ -605,6 +695,10 @@ fn cmd_artifacts_check(arguments: &[String]) -> Result<i32, CliError> {
 
 fn parse_document(flags: &Flags) -> Result<DocumentId, CliError> {
     let value = flags.require("--document")?;
+    parse_document_value(value)
+}
+
+fn parse_document_value(value: &str) -> Result<DocumentId, CliError> {
     let raw = value
         .parse::<u64>()
         .map_err(|_| CliError::Input(format!("document `{value}` is not a number")))?;

@@ -2637,3 +2637,87 @@ fn the_engineering_summary_pins_the_drawing_and_materials_to_the_live_revision()
     );
     Ok(())
 }
+
+/// The drawing's source revision must live in the project file, not only in this session: a restart
+/// has to see the same stale pin, and a review must be recorded without rewriting that revision.
+#[test]
+fn a_saved_drawing_is_recorded_in_the_project_and_can_be_reviewed()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, path, handle) = fixture("artifact-registry", [10.0, 10.0, 5.0])?;
+    let addr = handle.addr();
+    let first = json(&request(addr, "GET", "/api/state", &[], &[])?)?["revision"]
+        .as_u64()
+        .ok_or("revision")?;
+
+    let saved = post(addr, "/api/draft/save", "{}")?;
+    assert_eq!(saved.status, 200);
+
+    let edited = post(addr, "/api/parameter", r#"{"id":"width","value":20}"#)?;
+    assert_eq!(edited.status, 200);
+    let second = json(&edited)?["revision"].as_u64().ok_or("revision")?;
+    assert!(second > first);
+
+    let stale = json(&request(addr, "GET", "/api/engineering", &[], &[])?)?;
+    assert_eq!(stale["drawing"]["status"], "requires_review");
+    assert_eq!(
+        stale["drawing"]["derived_from_revision"].as_u64(),
+        Some(first)
+    );
+    assert_eq!(
+        stale["drawing"]["assessment"]["releasable"],
+        serde_json::json!(false)
+    );
+
+    // An explicit review acknowledges the stale result at the current revision.
+    let review = post(
+        addr,
+        "/api/engineering/review",
+        &format!(r#"{{"id":1,"revision":{second}}}"#),
+    )?;
+    assert_eq!(review.status, 200);
+    let reviewed = json(&review)?;
+    assert_eq!(reviewed["drawing"]["status"], "accepted_after_review");
+    assert_eq!(
+        reviewed["drawing"]["assessment"]["releasable"],
+        serde_json::json!(true)
+    );
+    assert_eq!(
+        reviewed["drawing"]["derived_from_revision"].as_u64(),
+        Some(first),
+        "a review must not rewrite the revision the drawing was made at"
+    );
+
+    // A zero revision is not a review target.
+    let zero = post(addr, "/api/engineering/review", r#"{"id":1,"revision":0}"#)?;
+    assert_eq!(zero.status, 400);
+
+    // Save and read the file: the registry is inside the project document itself.
+    let saved = post(addr, "/api/save", "{}")?;
+    assert_eq!(saved.status, 200);
+    let text = std::fs::read_to_string(&path)?;
+    assert!(
+        text.contains("\"artifacts\"") && text.contains("\"reviewed_revision\""),
+        "the project file must carry the record, not a session-only claim"
+    );
+
+    // Reopen the saved project in a new studio: the pin and the review must survive the restart,
+    // because a `.zdraft` file itself carries neither.
+    drop(handle);
+    let reopened_project = cad_document::Project::load(&path)?;
+    let reopened = cad_studio::start(reopened_project, path.clone(), 0)?;
+    let addr = reopened.addr();
+    let draft = json(&request(addr, "GET", "/api/draft", &[], &[])?)?;
+    assert_eq!(draft["source"], "file");
+    assert_eq!(
+        draft["derived_from_revision"].as_u64(),
+        Some(first),
+        "the saved drawing's revision must be read back from the project registry"
+    );
+    let engineering = json(&request(addr, "GET", "/api/engineering", &[], &[])?)?;
+    assert_eq!(engineering["drawing"]["status"], "accepted_after_review");
+    assert_eq!(
+        engineering["drawing"]["assessment"]["source"]["revision"].as_u64(),
+        Some(first)
+    );
+    Ok(())
+}

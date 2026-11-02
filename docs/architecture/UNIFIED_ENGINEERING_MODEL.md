@@ -132,18 +132,19 @@ Assessment changes nothing. `GET /api/engineering` and `atlas artifacts check` a
 ### 5.1 CLI — a release gate
 
 ```sh
-atlas artifacts add --registry part.artifacts.json --document 1 --revision 3 \
+atlas artifacts add --project part.zcad --revision 3 \
     --id 1 --kind drawing --label "shop drawing" --entity 1,2
-atlas artifacts add --registry part.artifacts.json --document 1 --revision 3 \
+atlas artifacts add --project part.zcad --revision 3 \
     --id 2 --kind toolpath --label "roughing" --upstream 1
-atlas artifacts review --registry part.artifacts.json --id 1 --revision 4
-atlas artifacts check --project part.zcad --registry part.artifacts.json
+atlas artifacts review --project part.zcad --id 1 --revision 4
+atlas artifacts check --project part.zcad
 ```
 
 `check` prints the report as JSON and **exits 3** when any artifact needs recomputation or review, so
 a script or CI step can gate on it without parsing output. A design change after the artifacts were
 recorded fails the gate; reviewing each artifact clears it and leaves the original source revision in
-the report.
+the report. The older `--registry FILE --document ID` form is still accepted for a registry that is
+not embedded in a project, but the project form is the one that cannot drift from the design.
 
 ### 5.2 Studio — the drawing as the first derived artifact
 
@@ -158,6 +159,11 @@ the drawing assessment built through the same registry the CLI uses. `GET /api/d
   presenting a stale sheet.
 * A drawing loaded from a file does **not** record its source revision (`.zdraft` has no such field),
   so its status is `unknown`. The studio refuses to guess.
+* **Saving** a drawing with `POST /api/draft/save` records (or updates) the drawing artifact in the
+  project's embedded registry at the current revision, then saves it with the next `POST /api/save`.
+  `POST /api/engineering/review {"id":1,"revision":N}` records an explicit review through the same
+  `ArtifactRegistry::review` path as the CLI. Recording a result does not bump the design revision;
+  the studio marks the project dirty itself so the record is not lost.
 
 ## 6. Validation rules (all enforced on write and on load)
 
@@ -182,8 +188,10 @@ the drawing assessment built through the same registry the CLI uses. `GET /api/d
    query time instead.
 4. **No entity-level diff.** `source_entities` is recorded but not yet used to narrow "what changed";
    the report names the revisions, not the modified entities.
-5. **Not persisted in the project file.** The registry is a sidecar JSON file with its own schema. A
-   `.zcad` file does not carry its artifacts.
+5. **Persistence is single-writer.** The registry is now embedded in `.zcad` (schema 9) and written
+   atomically with the project. There is no file locking, so two processes editing one project still
+   race in the ordinary way; the older sidecar registry remains readable for compatibility. A
+   `.zdraft` drawing file itself still carries no source revision.
 6. **Fingerprint is optional** and only compared when both sides provide one.
 7. **No multi-user or audit log.** A review is a field, not a signed record; there is no user
    identity in this local-first application.
@@ -193,11 +201,9 @@ the drawing assessment built through the same registry the CLI uses. `GET /api/d
 
 1. **Change events with entity granularity.** Make `cad-document` report which entities a mutation
    touched, so `assess` can say *what* changed, not only that the revision moved.
-2. **Persist the registry beside the project** (or inside schema 9) with migration, so artifacts move
-   with the file.
+2. **Per-kind release policy.** A drawing may be released after review; a toolpath or structural
+   result should require recomputation rather than review. That distinction is policy the registry
+   should express, and it is not implemented.
 3. **A second real producer.** Linear static analysis against the existing mesh is the smallest
    honest CAE producer; until it exists, `ArtifactKind::Simulation` should stay untrusted metadata.
-4. **Blocked-until-validated release rules per kind.** A drawing may be released after review; a
-   toolpath or structural result should require recomputation rather than review. That distinction is
-   policy the registry should express, and it is not implemented.
-5. **Measurement** of `assess` on a full 4096-artifact registry.
+4. **Measurement** of `assess` on a full 4096-artifact registry.

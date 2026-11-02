@@ -11,7 +11,7 @@ when code, a test and a recorded limitation exist. The detailed research matrix 
 
 | Area | Capability | Evidence |
 |---|---|---|
-| Document | `.zcad` schema 8: atomic save, schema-1…7 migration, unknown/newer-schema refusal, named revisions, crash recovery, last-good backup | 78 `cad-document` tests |
+| Document | `.zcad` schema 9: atomic save, schema-1…8 migration, unknown/newer-schema refusal, named revisions, crash recovery, last-good backup, embedded derived-artifact registry | 81 `cad-document` tests |
 | Sketch | Rectangle, circle, regular polygon, drawn closed polyline, arc sector; each on a horizontal plane at any height | analytic area/volume tests over HTTP |
 | Modelling | Extrude as new body / join / cut, upwards or downwards; full-turn revolve about a sketch axis | analytic volumes through the Truck kernel; watertight STL exports |
 | History | Ordered feature graph with stable IDs, dependency refusal, per-feature rebuild status, per-prefix rebuild cache, undo/redo | kernel-call-count tests; 0.01 ms unchanged / 7.9 ms last-of-six |
@@ -20,7 +20,7 @@ when code, a test and a recorded limitation exist. The detailed research matrix 
 | Drawing | Plan of the model, editable drawing document with layers, text, linear dimensions, DXF, A4–A0/Letter titled PDF | 60 `cad-drafting` tests, CLI and browser workflows |
 | Display | WebGL viewport with orbit/pan/zoom/fit/standard views, wireframe, grid, picking | headless-browser assertions |
 | Identity | Document id, revision, units, tolerance, stable entity ids | `cad-contract`, `.zcad` schema |
-| Derived-result tracking | A drawing is pinned to the model revision it came from; a saved drawing becomes visibly stale after a model edit | `cad-engineering-model`, `GET /api/engineering`, `/api/draft` |
+| Derived-result tracking | A drawing is pinned to the model revision it came from and the record is stored inside the `.zcad` project; a saved drawing becomes visibly stale after a model edit and can be reviewed | `cad-engineering-model`, `GET /api/engineering`, `POST /api/engineering/review`, `atlas artifacts` |
 
 ## Known limits that define the boundary
 

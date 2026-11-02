@@ -792,6 +792,29 @@ impl ArtifactRegistry {
         Ok(())
     }
 
+    /// Add an artifact, or replace the record with the same id.
+    ///
+    /// A producer that recomputes a drawing or a study updates the existing record rather than
+    /// accumulating one entry per run. The replacement is validated as a whole registry, so an
+    /// update that would break a downstream reference is refused and the previous record is kept.
+    pub fn upsert(&mut self, artifact: DerivedArtifact) -> Result<(), ModelError> {
+        match self
+            .artifacts
+            .iter()
+            .position(|existing| existing.id == artifact.id)
+        {
+            Some(position) => {
+                let previous = std::mem::replace(&mut self.artifacts[position], artifact);
+                if let Err(error) = self.validate() {
+                    self.artifacts[position] = previous;
+                    return Err(error);
+                }
+                Ok(())
+            }
+            None => self.add(artifact),
+        }
+    }
+
     /// Remove an artifact. An artifact that other artifacts depend on cannot be removed.
     pub fn remove(&mut self, id: ArtifactId) -> Result<(), ModelError> {
         let referenced = self
@@ -1227,6 +1250,28 @@ mod tests {
             Err(ModelError::UnknownUpstream(99))
         ));
         assert_eq!(registry.artifacts().len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn upsert_replaces_a_recomputed_record_in_place() -> TestResult {
+        let mut registry = ArtifactRegistry::new(document());
+        registry.add(artifact(1, ArtifactKind::Drawing, "drawing", at(2)?)?)?;
+        registry.add(artifact(2, ArtifactKind::Drawing, "detail", at(2)?)?)?;
+        let mut recomputed = artifact(1, ArtifactKind::Drawing, "drawing", at(5)?)?;
+        recomputed.result.summary = "replotted".into();
+        registry.upsert(recomputed)?;
+        assert_eq!(registry.artifacts().len(), 2);
+        let stored = registry.get(ArtifactId::new(1).ok_or("id")?);
+        assert_eq!(stored.map(|record| record.source.revision.get()), Some(5));
+        assert_eq!(
+            stored.map(|record| record.result.summary.as_str()),
+            Some("replotted")
+        );
+        // A new id is an ordinary add; a duplicate must still be an update, not a second record.
+        registry.upsert(artifact(3, ArtifactKind::Toolpath, "roughing", at(5)?)?)?;
+        assert_eq!(registry.artifacts().len(), 3);
+        assert_eq!(registry.assess(at(5)?)?.artifacts.len(), 3);
         Ok(())
     }
 

@@ -22,7 +22,7 @@ a rung is claimed only when its acceptance has been exercised.
 
 | Phase | Scope | Status | What is real | What is missing |
 |---|---|---|---|---|
-| **A** | Shared engineering foundation | **partial — rung 7 for identity/materials/provenance** | `cad-engineering-model`: document + revision + fingerprint, stable artifact ids, validated 7-material library, revision-pinned artifacts, transitive staleness, explicit review, versioned atomic JSON; CLI gate (`atlas artifacts`, exit 3); studio `/api/engineering` and drawing staleness | artifacts are a sidecar, not in `.zcad`; entity-level change diff; per-kind release policy; only one producer (drawing) |
+| **A** | Shared engineering foundation | **partial — rung 7 for identity/materials/provenance/persistence** | `cad-engineering-model`: document + revision + fingerprint, stable artifact ids, validated 7-material library, revision-pinned artifacts, transitive staleness, explicit review, versioned atomic JSON; embedded in `.zcad` schema 9; CLI gate (`atlas artifacts`, exit 3); studio `/api/engineering` and `/api/engineering/review`; drawing staleness | entity-level change diff; per-kind release policy; only one producer (drawing) |
 | **B** | Core CAD and assemblies | **partial — core CAD at rung 7–8, assemblies absent (rung 1)** | parametric feature graph, sketch profiles, extrude/join/cut/revolve, rebuild cache, drawing editor, DXF/PDF, STL; see `docs/cad/CAD_CAPABILITIES.md` | fillet/chamfer/shell/sweep/loft/pattern, multi-body, assemblies, joints, motion, BOM, constraints, STEP/IGES |
 | **C** | Basic CAM (2.5D/3-axis) | **absent (rung 1–2)** | artifact metadata kind and revision gate only | every CAM producer, tool library, simulation, postprocessor |
 | **D** | Basic CAE | **absent (rung 1–2)** | material library and result provenance only | study model, mesh, solver, results, reference suite |
@@ -37,11 +37,11 @@ a rung is claimed only when its acceptance has been exercised.
 | Document/revision/fingerprint identity | 7 | revision + fingerprint mismatch tests; used by CLI and studio | security review of the JSON boundary |
 | Material library and validation | 5 | 7 validated entries; impossible-property tests | temperature-dependent data and a qualified source before any structural claim |
 | Stable artifact identity and kinds | 5 | duplicate/zero id refusal; kind parse tests | a second producer |
-| Derived artifact provenance and upstream links | 7 | CLI workflow and studio HTTP test | persistence with the project file |
+| Derived artifact provenance and upstream links | 7 | CLI workflow and studio HTTP tests | entity-level "what changed" |
 | Transitive staleness and blocked-upstream propagation | 7 | chain test, blocked test, end-to-end gate | entity-level "what changed" |
 | Review acknowledgment | 7 | review semantics tests; CLI review | identity/audit trail if multi-user |
-| Versioned atomic persistence | 5 | round trip, unknown/newer schema, 8 MiB, zero revision, no temp files | measurement on a 4096-artifact registry |
-| Release gate | 7 | `atlas artifacts check` exits 3 on stale records | CI wiring and per-kind policy |
+| Versioned atomic persistence | 7 | registry round trip; project schema-9 save/reopen and schema-8 migration; unknown/newer schema, 8 MiB, zero revision, no temp files | measurement on a 4096-artifact registry |
+| Release gate | 7 | `atlas artifacts check` exits 3 on stale records in project-embedded and sidecar modes | CI wiring and per-kind policy |
 
 ## Required documents
 
@@ -59,15 +59,14 @@ a rung is claimed only when its acceptance has been exercised.
 
 ## Next highest-priority tasks
 
-1. **Persist the artifact registry with the project** (or as a managed sidecar written atomically by
-   the studio) and migrate `.zcad` accordingly. Today a registry can drift from its project file.
-2. **Entity-level change reporting** from `cad-document`, so a stale report can name the sketches and
+1. **Entity-level change reporting** from `cad-document`, so a stale report can name the sketches and
    features that changed rather than only the revision numbers.
-3. **One real CAE producer**: linear static analysis on the existing watertight mesh, validated
+2. **One real CAE producer**: linear static analysis on the existing watertight mesh, validated
    against a cantilever and a mesh-convergence series. This is the cheapest honest Phase D slice and
    immediately exercises the artifact registry with a second producer.
-4. **A second CAM/CAE consumer** of `ArtifactKind::Simulation`/`Toolpath` that is generated rather
+3. **A second CAM/CAE consumer** of `ArtifactKind::Simulation`/`Toolpath` that is generated rather
    than supplied by hand, so the gate protects real output.
+4. **Per-kind release policy** so a toolpath or structural result cannot be released by review alone.
 5. Then — and only then — begin CAM 2.5D foundations and the electronics data model.
 
 ## Explicit non-claims

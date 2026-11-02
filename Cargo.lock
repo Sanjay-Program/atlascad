@@ -130,6 +130,7 @@ name = "cad-document"
 version = "0.1.0"
 dependencies = [
  "cad-contract",
+ "cad-engineering-model",
  "serde",
  "serde_json",
  "thiserror 2.0.21",

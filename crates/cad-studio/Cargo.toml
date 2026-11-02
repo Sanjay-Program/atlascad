@@ -17,6 +17,10 @@ cad-engineering-model.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
+[dev-dependencies]
+# The HTTP tests reopen a saved project to prove that provenance survives a restart.
+cad-document = { path = "../cad-document" }
+
 [lints]
 workspace = true
 

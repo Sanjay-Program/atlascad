@@ -186,7 +186,7 @@ impl StudioError {
                 ProjectError::UnknownRevision(_) => 404,
                 ProjectError::NothingToUndo | ProjectError::NothingToRedo => 409,
                 ProjectError::Kernel(_) | ProjectError::FeatureFailed { .. } => 422,
-                ProjectError::Io { .. } => 500,
+                ProjectError::Io { .. } | ProjectError::Engineering(_) => 500,
             },
             // A plan can only fail because the project it describes is invalid, which the same
             // request would report as a 400 for any other endpoint.
@@ -215,6 +215,7 @@ impl StudioError {
             StudioError::Project(ProjectError::UnknownSketch(_)) => "unknown_sketch",
             StudioError::Project(ProjectError::UnknownRevision(_)) => "unknown_revision",
             StudioError::Project(ProjectError::FeatureFailed { .. }) => "feature_failed",
+            StudioError::Project(ProjectError::Engineering(_)) => "engineering_model_failure",
             StudioError::Project(_) => "invalid_project",
             StudioError::Kernel(_) => "kernel_failure",
             StudioError::Stl(_) => "export_failure",
@@ -455,6 +456,10 @@ struct StudioState {
     /// The project revision the drawing was generated from. `None` when the drawing came from a
     /// `.zdraft` file, which does not carry its source revision, or before one exists.
     drawing_revision: Option<u64>,
+    /// Set when the embedded artifact registry changed without a design revision bump. Recording a
+    /// result is not a design edit, so it must not move the revision, but the project file still
+    /// differs from disk and has to be marked unsaved.
+    artifacts_changed: bool,
 }
 
 impl StudioState {
@@ -478,6 +483,7 @@ impl StudioState {
             drawing_file: None,
             drawing_edited: false,
             drawing_revision: None,
+            artifacts_changed: false,
         };
         // Evaluate once at startup so a broken project is refused before a URL is printed.
         let _ = state.payload()?;
@@ -627,7 +633,9 @@ impl StudioState {
                 .unwrap_or("millimeter")
                 .to_string(),
             // A recovered session is dirty by definition: the file on disk is not what is on screen.
-            dirty: self.recovered.is_some() || self.project.revision.get() != self.saved_revision,
+            dirty: self.recovered.is_some()
+                || self.project.revision.get() != self.saved_revision
+                || self.artifacts_changed,
             parameters,
             sketches,
             features,
@@ -725,6 +733,7 @@ impl StudioState {
     fn save(&mut self) -> Result<StatePayload, StudioError> {
         self.project.save(&self.path)?;
         self.saved_revision = self.project.revision.get();
+        self.artifacts_changed = false;
         // The project file is now the newest copy, so the snapshot would only be a stale offer on
         // the next start. Failing to remove it is reported, not ignored.
         clear_recovery(&self.path)?;
@@ -741,6 +750,7 @@ impl StudioState {
         let project = Project::load(&self.path)?;
         self.project = project;
         self.saved_revision = self.project.revision.get();
+        self.artifacts_changed = false;
         self.cache.clear(&mut self.kernel);
         clear_recovery(&self.path)?;
         self.recovered = None;
@@ -793,9 +803,20 @@ impl StudioState {
                 true
             }
         };
-        // A `.zdraft` file does not record the model revision it came from, so loading one leaves
-        // the derivation unknown instead of claiming it is current.
-        self.drawing_revision = if generated { Some(revision) } else { None };
+        // A `.zdraft` file does not record the model revision it came from. The project's embedded
+        // registry may still pin it, which is how provenance survives a restart; without a record
+        // the status stays unknown rather than claiming the drawing is current.
+        self.drawing_revision = if generated {
+            Some(revision)
+        } else {
+            self.project.artifacts().and_then(|registry| {
+                registry
+                    .artifacts()
+                    .iter()
+                    .find(|artifact| artifact.kind == ArtifactKind::Drawing)
+                    .map(|artifact| artifact.source.revision.get())
+            })
+        };
         Ok(())
     }
 
@@ -849,29 +870,58 @@ impl StudioState {
         self.ensure_drawing()?;
         let document = self.project.header.document;
         let revision = self.project.revision;
-        let (status, assessment) = match self.drawing_revision {
-            Some(source) => {
-                let source_revision = Revision::from_raw(source).ok_or_else(|| {
-                    StudioError::BadRequest("the drawing records a zero source revision".into())
+        let current = DocumentRef::new(document, revision, None);
+        // A saved drawing is stored in the project's embedded registry, so it survives a restart and
+        // is assessed against the live revision by the same code the CLI release gate uses. A
+        // drawing that only exists in memory (a generated plan, never saved) has no record, and its
+        // state is derived from the revision it was generated at.
+        let recorded = self.project.artifacts().and_then(|registry| {
+            registry
+                .artifacts()
+                .iter()
+                .find(|artifact| artifact.kind == ArtifactKind::Drawing)
+                .cloned()
+        });
+        let (derived_from, status, assessment) = match recorded {
+            Some(artifact) => {
+                let registry = self.project.artifacts().ok_or_else(|| {
+                    StudioError::BadRequest("the artifact registry is unavailable".into())
                 })?;
-                let id = ArtifactId::new(1)
-                    .ok_or_else(|| StudioError::BadRequest("invalid artifact id".into()))?;
-                let mut registry = ArtifactRegistry::new(document);
-                registry.add(DerivedArtifact::new(
-                    id,
-                    ArtifactKind::Drawing,
-                    "drawing",
-                    DocumentRef::new(document, source_revision, None),
-                ))?;
-                let report = registry.assess(DocumentRef::new(document, revision, None))?;
-                let assessment = report.artifacts.into_iter().next();
+                let report = registry.assess(current)?;
+                let assessment = report
+                    .artifacts
+                    .into_iter()
+                    .find(|candidate| candidate.id == artifact.id);
                 let status = assessment
                     .as_ref()
                     .map(|assessment| assessment.status.label())
                     .unwrap_or("unknown");
-                (status, assessment)
+                (Some(artifact.source.revision.get()), status, assessment)
             }
-            None => ("unknown", None),
+            None => match self.drawing_revision {
+                Some(source) => {
+                    let source_revision = Revision::from_raw(source).ok_or_else(|| {
+                        StudioError::BadRequest("the drawing records a zero source revision".into())
+                    })?;
+                    let id = ArtifactId::new(1)
+                        .ok_or_else(|| StudioError::BadRequest("invalid artifact id".into()))?;
+                    let mut registry = ArtifactRegistry::new(document);
+                    registry.add(DerivedArtifact::new(
+                        id,
+                        ArtifactKind::Drawing,
+                        "drawing",
+                        DocumentRef::new(document, source_revision, None),
+                    ))?;
+                    let report = registry.assess(current)?;
+                    let assessment = report.artifacts.into_iter().next();
+                    let status = assessment
+                        .as_ref()
+                        .map(|assessment| assessment.status.label())
+                        .unwrap_or("unknown");
+                    (Some(source), status, assessment)
+                }
+                None => (None, "unknown", None),
+            },
         };
         Ok(EngineeringView {
             document: document.get(),
@@ -879,7 +929,7 @@ impl StudioState {
             unit: self.project.header.units.symbol().to_string(),
             drawing: DrawingEngineeringView {
                 kind: ArtifactKind::Drawing.label(),
-                derived_from_revision: self.drawing_revision,
+                derived_from_revision: derived_from,
                 status,
                 assessment,
             },
@@ -962,7 +1012,38 @@ impl StudioState {
         self.drawing_edited = false;
         // Saving pins the drawing to the model revision it now represents.
         self.drawing_revision = Some(self.project.revision.get());
+        self.record_drawing_artifact()?;
         self.draft_payload()
+    }
+
+    /// Store the saved drawing's source revision in the project's embedded registry.
+    ///
+    /// This is what makes the pin survive a restart: before it existed only the in-memory session
+    /// knew which revision a `.zdraft` file came from.
+    fn record_drawing_artifact(&mut self) -> Result<(), StudioError> {
+        let document = self.project.header.document;
+        let revision = self.project.revision;
+        let id = ArtifactId::new(1)
+            .ok_or_else(|| StudioError::BadRequest("invalid artifact id".into()))?;
+        self.project.record_artifact(DerivedArtifact::new(
+            id,
+            ArtifactKind::Drawing,
+            "drawing",
+            DocumentRef::new(document, revision, None),
+        ))?;
+        self.artifacts_changed = true;
+        Ok(())
+    }
+
+    /// Acknowledge a stale artifact's result at `revision` without pretending it was recomputed.
+    fn review_artifact(
+        &mut self,
+        id: ArtifactId,
+        revision: Revision,
+    ) -> Result<EngineeringView, StudioError> {
+        self.project.review_artifact(id, revision)?;
+        self.artifacts_changed = true;
+        self.engineering_payload()
     }
 
     fn dxf(&mut self) -> Result<(Vec<u8>, String), StudioError> {
@@ -1612,6 +1693,31 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             Ok(payload) => to_json(200, &payload),
             Err(error) => error_response(&error),
         },
+        "/api/engineering/review" => match parse_body::<ArtifactReviewRequest>(request) {
+            Ok(body) => {
+                let id = match ArtifactId::new(body.id) {
+                    Some(id) => id,
+                    None => {
+                        return error_response(&StudioError::BadRequest(
+                            "an artifact id of 0 is not valid".into(),
+                        ));
+                    }
+                };
+                let revision = match Revision::from_raw(body.revision) {
+                    Some(revision) => revision,
+                    None => {
+                        return error_response(&StudioError::BadRequest(
+                            "a review revision must be positive".into(),
+                        ));
+                    }
+                };
+                match with_state(state, |state| state.review_artifact(id, revision)) {
+                    Ok(payload) => to_json(200, &payload),
+                    Err(error) => error_response(&error),
+                }
+            }
+            Err(error) => error_response(&error),
+        },
         "/api/revision" => match parse_body::<RevisionRequest>(request) {
             Ok(body) => match with_state(state, |state| {
                 state.mutate(|project| project.add_revision(&body.name).map(|_| ()))
@@ -1733,6 +1839,14 @@ struct RevisionRequest {
 #[serde(deny_unknown_fields)]
 struct RevisionIdRequest {
     id: u64,
+}
+
+/// Acknowledgment that a stale derived artifact was reviewed at a given design revision.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArtifactReviewRequest {
+    id: u64,
+    revision: u64,
 }
 
 /// A new sketch. The profile is driven by the document's default parameters (`width`/`height`, or

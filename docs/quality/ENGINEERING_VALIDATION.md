@@ -1,6 +1,6 @@
 # Engineering Validation
 
-**As of:** 2026-10-31 · **Status:** Phase A has tests; later engineering domains have none because they
+**As of:** 2026-11-02 · **Status:** Phase A has tests; later engineering domains have none because they
 are not implemented.
 
 This page records how an engineering capability is allowed to move from "code exists" to "trusted",
@@ -18,12 +18,12 @@ and the evidence for the Phase A unified engineering model. The general status l
   an HTTP response time.
 * Licensing and safety findings are part of validation, not an afterthought.
 
-## 2. Phase A evidence (2026-10-31)
+## 2. Phase A evidence (2026-11-02)
 
 ### Command
 
 ```sh
-cargo test --offline -p cad-engineering-model -p cad-cli -p cad-studio
+cargo test --offline -p cad-engineering-model -p cad-document -p cad-cli -p cad-studio
 ```
 
 ### What is asserted
@@ -37,12 +37,14 @@ cargo test --offline -p cad-engineering-model -p cad-cli -p cad-studio
 | Review semantics | review records the revision, does not change the source revision, keeps `is_current() == false`, and cannot predate the source | unit tests |
 | Fingerprint | same revision with different content becomes `requires_recompute`; missing fingerprints fall back to the revision number | unit test |
 | Persistence | JSON round trip, unknown-field refusal, newer-schema refusal, 8 MiB limit, zero-revision refusal, atomic save with no temporary left behind | unit tests |
-| CLI gate | create a project, record a drawing and a dependent toolpath, check passes; edit the model, check exits **3**; review one artifact, gate still fails; review both, gate passes; source revisions remain unchanged | `cad-cli/tests/artifacts_workflow.rs` |
+| Project-embedded registry | a recorded artifact survives save/reopen; a later design edit reports `requires_review`; review reports `accepted_after_review` with the original source revision; an artifact for another document is refused; a schema-8 project opens with no records | `cad-document` unit tests |
+| CLI gate | create a project, record a drawing and a dependent toolpath, check passes; edit the model, check exits **3**; review one artifact, gate still fails; review both, gate passes; source revisions remain unchanged; the same workflow runs with the registry inside the project and no sidecar file | `cad-cli/tests/artifacts_workflow.rs` |
 | CLI refusal | an unknown upstream is refused and no file is written; an unknown artifact kind is refused | same file |
-| Studio integration | a generated drawing is `current`; a saved drawing is pinned; a model edit makes it `requires_review`; `/api/engineering` reports the same state plus seven materials marked non-certified | `cad-studio/tests/http_api.rs` |
+| Studio integration | a generated drawing is `current`; a saved drawing is pinned; a model edit makes it `requires_review`; `/api/engineering/review` acknowledges it and the saved project file contains the record; `/api/engineering` reports the same state plus seven materials marked non-certified | `cad-studio/tests/http_api.rs` |
 
-Counts on the implementation run: 14 model unit tests plus 1 doctest, 2 CLI end-to-end tests, and 1
-new HTTP test (32 in the studio API suite). The full workspace gate result is recorded in
+Counts on the implementation run: 15 model unit tests plus 1 doctest, 3 CLI end-to-end tests, and 2
+HTTP tests (33 in the studio API suite), plus 3 `cad-document` persistence tests. The full workspace
+gate passes 388 tests with 0 failures on the recorded host. The full workspace gate result is recorded in
 `engineering/quality/tests.json` when it is run on this commit; until then, only the focused results
 above are claimed.
 

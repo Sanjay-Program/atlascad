@@ -39,6 +39,27 @@ function check(condition, message) {
   passed += 1;
 }
 
+/// Chrome reports the download event before the file has necessarily reached its final size, so a
+/// directory listing immediately after the log line can be empty. Poll until the assertion is true
+/// or the timeout expires; the caller's `check` still decides the result.
+async function waitForDownloads(downloads, accept, timeout = 10000) {
+  const deadline = Date.now() + timeout;
+  let names = [];
+  for (;;) {
+    names = readdirSync(downloads);
+    if (accept(names) || Date.now() >= deadline) return names;
+    await sleep(50);
+  }
+}
+
+function downloadSize(downloads, name) {
+  try {
+    return statSync(`${downloads}/${name}`).size;
+  } catch {
+    return 0;
+  }
+}
+
 async function devtools(path) {
   const response = await fetch(`http://127.0.0.1:${PORT}${path}`);
   return response.json();
@@ -252,10 +273,12 @@ try {
       'the shared export',
       10000
     );
-    const sizes = readdirSync(downloads).map((name) => statSync(`${downloads}/${name}`).size);
+    const names = await waitForDownloads(downloads, (entries) =>
+      entries.some((name) => downloadSize(downloads, name) > 84)
+    );
     check(
-      sizes.some((size) => size > 84),
-      `a shared session cannot export an STL with its token (${JSON.stringify(sizes)})`
+      names.some((name) => downloadSize(downloads, name) > 84),
+      `a shared session cannot export an STL with its token (${JSON.stringify(names)})`
     );
     await evaluate('document.getElementById("downloadDxfBtn").click()');
     await waitFor(
@@ -263,7 +286,9 @@ try {
       'the shared DXF export',
       10000
     );
-    const files = readdirSync(downloads);
+    const files = await waitForDownloads(downloads, (entries) =>
+      entries.some((name) => name.endsWith('.dxf'))
+    );
     check(
       files.some((name) => name.endsWith('.dxf')),
       `a shared session cannot export a DXF with its token (${files.join(', ')})`

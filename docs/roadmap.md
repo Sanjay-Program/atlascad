@@ -7,6 +7,19 @@ Sizes are rough effort for one engineer: **S** ≤ 1 day, **M** ≤ 1 week, **L*
 
 ---
 
+## Done in the 2026-11-02 cycle
+
+| Item | Result | Evidence |
+|---|---|---|
+| **Artifact registry persisted inside `.zcad` (schema 9)** | **done** — a recorded drawing or toolpath now travels with the project instead of in a sidecar that can be lost or copied separately. `cad-document` exposes `record_artifact`, `review_artifact` and `assess_artifacts`; recording does not bump the design revision, so unrelated results do not become stale, and a schema-8 project opens with no records. | 3 `cad-document` tests; registry round-trip and schema-8 migration |
+| **`atlas artifacts` works on the project** | **done** — `add`, `review` and `check` accept `--project` and write/read the embedded registry; the sidecar form remains for compatibility. | third CLI end-to-end test (`artifacts_can_live_inside_the_project_file`) |
+| **Studio records and reviews provenance** | **done** — saving a drawing upserts its record in the project; `POST /api/engineering/review` acknowledges staleness through the same registry code; `/api/engineering` prefers the persisted record. | HTTP test saves, edits, reviews, saves the project and reads `reviewed_revision` out of the file |
+
+This cycle does not add any CAM, CAE, ECAD, BIM, GIS, generative-design or AI capability. It closes
+the top item in the Phase A tracker: the provenance layer is now persisted with the design.
+
+---
+
 ## Done in the 2026-10-31 cycle
 
 | Item | Result | Evidence |
