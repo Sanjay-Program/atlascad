@@ -1,0 +1,40 @@
+# Atlas CAE — one linear static study per container.
+#
+# This is a batch job, not a service. It reads a project and a study file, writes one result and
+# exits with a status; there is no port, no healthcheck and no queue. The contract, the exit codes
+# and the measured resource envelope are in docs/operations/cae-deployment.md.
+#
+# Build it with deploy/build-cae-image.sh, which compiles the binary on this host and hands docker a
+# two-file context. Building the workspace inside the image would put a compiler and the crate graph
+# in the shipped artefact; the split keeps the image small and the build where the toolchain is.
+#
+#   deploy/build-cae-image.sh --smoke   # build, run a study, refusals, non-root, teardown
+
+FROM debian:bookworm-slim
+
+# tini forwards SIGTERM to the study. The solver installs no handler, so a cancelled job dies at
+# once; because the result is published by rename, a kill never leaves a half-written result file.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tini \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 atlas \
+    && useradd --system --uid 10001 --gid atlas --home-dir /work --shell /usr/sbin/nologin atlas \
+    && mkdir -p /work /results \
+    && chown atlas:atlas /work /results
+
+COPY atlas /usr/local/bin/atlas
+COPY cae-entrypoint.sh /usr/local/bin/cae-entrypoint.sh
+RUN chmod 0755 /usr/local/bin/atlas /usr/local/bin/cae-entrypoint.sh
+
+USER atlas
+WORKDIR /work
+
+# The contract: two read-only inputs, one writable output directory, an optional record. No VOLUME
+# is declared on purpose: a job whose result volume is not mounted must fail (exit 2), not publish
+# its result into an anonymous volume nobody will find.
+ENV ATLAS_PROJECT=/work/part.zcad \
+    ATLAS_STUDY=/work/study.json \
+    ATLAS_RESULT=/results/result.json
+
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/cae-entrypoint.sh"]
+CMD []

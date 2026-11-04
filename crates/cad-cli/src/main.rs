@@ -20,6 +20,7 @@
 //! The summary is printed to stdout as JSON; progress and file writes go to stderr, so a caller can
 //! pipe stdout into another tool.
 
+use cad_cae::{Axis, FaceLoad, FaceSelection, StaticStudy, Support, parse_study, run_static};
 use cad_cli::{
     BoxSpec, Built, CliError, build_box, build_union, draft_plan_view, draft_summary, draft_to_dxf,
     evaluate_project, import_dxf, plot_sheet, write_draft, write_stl_binary,
@@ -31,17 +32,20 @@ use cad_contract::tol::DEFAULT_LINEAR_MM;
 use cad_contract::units::Unit;
 use cad_document::Project;
 use cad_engineering_model::{
-    ArtifactId, ArtifactKind, ArtifactRegistry, DerivedArtifact, DocumentRef,
+    ArtifactId, ArtifactKind, ArtifactRegistry, DerivedArtifact, DocumentRef, MaterialLibrary,
 };
 use cad_kernel_truck::TruckKernel;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 fn main() {
     let code = match run() {
         Ok(code) => code,
         Err(error) => {
             eprintln!("atlas: {error}");
-            1
+            error.exit_code()
         }
     };
     std::process::exit(code);
@@ -62,6 +66,7 @@ fn run() -> Result<i32, CliError> {
         "dxf-import" => cmd_dxf_import(&rest),
         "sheet" => cmd_sheet(&rest),
         "artifacts" => cmd_artifacts(&rest),
+        "cae" => cmd_cae(&rest),
         "help" | "--help" | "-h" => {
             usage();
             Ok(0)
@@ -109,7 +114,21 @@ fn usage() {
     println!(
         "  atlas artifacts ... --registry FILE --document ID  (the older sidecar form; also accepted)"
     );
+    println!(
+        "  atlas cae static --file PROJECT.zcad --study STUDY.json --out RESULT.json [--record ID]"
+    );
+    println!(
+        "  atlas cae static --file PROJECT.zcad --voxel MM --material ID --fix AXIS=COORD[@TOL]"
+    );
+    println!(
+        "                   [--hold AXIS=COORD:COMPONENT] --load AXIS=COORD[@TOL] --force X,Y,Z"
+    );
+    println!(
+        "                   [--out RESULT.json] [--record ARTIFACT_ID] [--label TEXT] [--name TEXT]"
+    );
+    println!("                   [--solver-tol T] [--max-iter N]");
     println!();
+    println!("Exit: 0 ok, 1 internal or I/O fault, 2 bad input, 3 analysis refused.");
     println!("Geometry is modelled in millimetres; --unit describes the values you typed.");
     println!("STL carries no units, so write --header next to it when the unit matters.");
     println!("DXF is written as R12 (AC1009) in the drawing's own unit.");
@@ -691,6 +710,273 @@ fn cmd_artifacts_check(arguments: &[String]) -> Result<i32, CliError> {
         );
         Ok(0)
     }
+}
+
+fn cmd_cae(arguments: &[String]) -> Result<i32, CliError> {
+    let (subcommand, rest) = arguments
+        .split_first()
+        .ok_or_else(|| CliError::Input("cae needs a subcommand: static".into()))?;
+    match subcommand.as_str() {
+        "static" => cmd_cae_static(rest),
+        other => Err(CliError::Input(format!(
+            "unknown cae subcommand `{other}`; use `atlas cae static`"
+        ))),
+    }
+}
+
+/// `atlas cae static` — one linear static study on the project's evaluated solid.
+///
+/// The study comes from a versioned `--study FILE` (what a deployment job passes) or from flags
+/// (what a person types at a terminal); the two are exclusive. The result is printed as JSON and
+/// can be written with `--out`. `--record ID` records (or replaces) a simulation artifact at the
+/// project's current revision and saves the project, so the result travels with the design and the
+/// release gate can tell when it has gone stale.
+fn cmd_cae_static(arguments: &[String]) -> Result<i32, CliError> {
+    let flags = Flags::parse(arguments)?;
+    let path = PathBuf::from(flags.require("--file")?);
+    if flags.get("--out").is_none() && flags.get("--record").is_none() {
+        return Err(CliError::Input(
+            "pass `--out result.json`, `--record ID`, or both".into(),
+        ));
+    }
+
+    // A flag silently overriding a field of the study file would make the recorded inputs
+    // disagree with the result, so mixing them is refused rather than resolved.
+    let study = match flags.get("--study") {
+        Some(study_path) => {
+            reject_study_flags(&flags)?;
+            read_study(study_path)?
+        }
+        None => study_from_flags(&flags)?,
+    };
+
+    let mut project = Project::load(&path)?;
+    let (evaluated, mut kernel) = evaluate_project(&project)?;
+    let library = MaterialLibrary::standard();
+    let result = run_static(&evaluated.mesh, &study, &library);
+    kernel.release(evaluated.solid);
+    let result = result
+        .map_err(|error| CliError::Analysis(format!("cae: {error}")))?
+        .with_source(project.header.document, project.revision);
+
+    if let Some(out) = flags.get("--out") {
+        let out = PathBuf::from(out);
+        let json = serde_json::to_string_pretty(&result)
+            .map_err(|error| CliError::Analysis(format!("cannot serialise the result: {error}")))?;
+        write_atomic(&out, json.as_bytes())?;
+        eprintln!("wrote {} ({})", out.display(), result.summary_line());
+    }
+    if let Some(value) = flags.get("--record") {
+        let raw = value
+            .parse::<u64>()
+            .map_err(|_| CliError::Input(format!("artifact id `{value}` is not a number")))?;
+        let id = ArtifactId::new(raw)
+            .ok_or_else(|| CliError::Input("`--record` needs a positive artifact id".into()))?;
+        let label = flags.get("--label").unwrap_or("linear static study");
+        let mut artifact = DerivedArtifact::new(
+            id,
+            ArtifactKind::Simulation,
+            label,
+            DocumentRef::new(project.header.document, project.revision, None),
+        );
+        artifact.source_entities = project
+            .sketches()
+            .iter()
+            .map(|sketch| sketch.id)
+            .chain(project.features().iter().map(|feature| feature.id))
+            .collect();
+        artifact.result.summary = result.summary_line();
+        artifact.result.warnings = result.warnings.clone();
+        project.record_artifact(artifact)?;
+        project.save(&path)?;
+        eprintln!(
+            "recorded simulation artifact {} at revision {} in {}",
+            id.get(),
+            project.revision.get(),
+            path.display()
+        );
+    }
+    print_json(&result)?;
+    Ok(0)
+}
+
+/// Flags that define the study themselves. They cannot accompany `--study`.
+const STUDY_FLAGS: [&str; 9] = [
+    "--voxel",
+    "--material",
+    "--fix",
+    "--hold",
+    "--load",
+    "--force",
+    "--solver-tol",
+    "--max-iter",
+    "--name",
+];
+
+fn reject_study_flags(flags: &Flags) -> Result<(), CliError> {
+    if let Some((name, _)) = flags
+        .pairs
+        .iter()
+        .find(|(name, _)| STUDY_FLAGS.contains(&name.as_str()))
+    {
+        return Err(CliError::Input(format!(
+            "`{name}` cannot be combined with `--study`; the study file defines it"
+        )));
+    }
+    Ok(())
+}
+
+/// Read a versioned study file. A malformed, oversized or newer file is bad input (exit 2); a valid
+/// file whose study the model refuses is an analysis refusal (exit 3).
+fn read_study(path: &str) -> Result<StaticStudy, CliError> {
+    let path = PathBuf::from(path);
+    let bytes = std::fs::read(&path).map_err(|source| CliError::Io {
+        path: path.display().to_string(),
+        source,
+    })?;
+    parse_study(&bytes).map_err(|error| match error {
+        cad_cae::CaeError::StudyFile(message) => {
+            CliError::Input(format!("study {}: {message}", path.display()))
+        }
+        other => CliError::Analysis(format!("study {}: {other}", path.display())),
+    })
+}
+
+fn study_from_flags(flags: &Flags) -> Result<StaticStudy, CliError> {
+    let voxel = flags
+        .require("--voxel")?
+        .parse::<f64>()
+        .map_err(|_| CliError::Input("`--voxel` is not a number".into()))?;
+    let material = flags.require("--material")?.to_string();
+    let mut study = StaticStudy::new(
+        flags.get("--name").unwrap_or("linear static"),
+        voxel,
+        material,
+    );
+    for value in flags.all("--fix") {
+        let (axis, coordinate, tolerance) = parse_face_spec(value, "--fix")?;
+        study
+            .supports
+            .push(Support::fixed(FaceSelection::with_tolerance(
+                axis, coordinate, tolerance,
+            )));
+    }
+    for value in flags.all("--hold") {
+        let (spec, component) = value.split_once(':').ok_or_else(|| {
+            CliError::Input(format!(
+                "`--hold {value}` must be AXIS=COORD:COMPONENT, for example y=0:y"
+            ))
+        })?;
+        let (axis, coordinate, tolerance) = parse_face_spec(spec, "--hold")?;
+        let component = Axis::parse(component).ok_or_else(|| {
+            CliError::Input(format!("`{component}` is not a held component x, y or z"))
+        })?;
+        study.supports.push(Support::hold(
+            FaceSelection::with_tolerance(axis, coordinate, tolerance),
+            component,
+        ));
+    }
+    let (axis, coordinate, tolerance) = parse_face_spec(flags.require("--load")?, "--load")?;
+    let force = parse_triple(flags.require("--force")?, "--force")?;
+    study.loads.push(FaceLoad::new(
+        FaceSelection::with_tolerance(axis, coordinate, tolerance),
+        force,
+    ));
+    if let Some(value) = flags.get("--solver-tol") {
+        study.solver.relative_tolerance = value
+            .parse::<f64>()
+            .map_err(|_| CliError::Input("`--solver-tol` is not a number".into()))?;
+    }
+    if let Some(value) = flags.get("--max-iter") {
+        study.solver.max_iterations = value
+            .parse::<usize>()
+            .map_err(|_| CliError::Input("`--max-iter` is not an integer".into()))?;
+    }
+    study
+        .validate()
+        .map_err(|error| CliError::Analysis(format!("study: {error}")))?;
+    Ok(study)
+}
+
+/// Publish a result file atomically: a watcher or supervisor never observes a half-written result,
+/// and a kill during the write leaves the previous file untouched.
+fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), CliError> {
+    static RESULT_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let name = path.file_name().ok_or_else(|| {
+        CliError::Input(format!("result path {} has no file name", path.display()))
+    })?;
+    let sequence = RESULT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let temp = parent.join(format!(
+        ".{}.tmp-{}-{sequence}",
+        name.to_string_lossy(),
+        std::process::id()
+    ));
+
+    let written = (|| {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp)
+            .map_err(|source| CliError::Io {
+                path: temp.display().to_string(),
+                source,
+            })?;
+        file.write_all(bytes).map_err(|source| CliError::Io {
+            path: temp.display().to_string(),
+            source,
+        })?;
+        file.sync_all().map_err(|source| CliError::Io {
+            path: temp.display().to_string(),
+            source,
+        })?;
+        drop(file);
+        std::fs::rename(&temp, path).map_err(|source| CliError::Io {
+            path: path.display().to_string(),
+            source,
+        })?;
+        #[cfg(unix)]
+        std::fs::File::open(parent)
+            .and_then(|directory| directory.sync_all())
+            .map_err(|source| CliError::Io {
+                path: parent.display().to_string(),
+                source,
+            })?;
+        Ok(())
+    })();
+    if written.is_err() {
+        let _ = std::fs::remove_file(&temp);
+    }
+    written
+}
+
+/// Parse `AXIS=COORD[@TOL]` into a plane selection. The default tolerance is 1 µm.
+fn parse_face_spec(value: &str, flag: &str) -> Result<(Axis, f64, f64), CliError> {
+    let (plane, tolerance) = match value.split_once('@') {
+        Some((plane, tolerance)) => (plane, Some(tolerance)),
+        None => (value, None),
+    };
+    let (axis, coordinate) = plane.split_once('=').ok_or_else(|| {
+        CliError::Input(format!(
+            "`{flag} {value}` must be AXIS=COORD, for example x=0"
+        ))
+    })?;
+    let axis = Axis::parse(axis)
+        .ok_or_else(|| CliError::Input(format!("`{axis}` is not an axis; use x, y or z")))?;
+    let coordinate = coordinate
+        .parse::<f64>()
+        .map_err(|_| CliError::Input(format!("`{coordinate}` is not a coordinate")))?;
+    let tolerance = match tolerance {
+        Some(value) => value
+            .parse::<f64>()
+            .map_err(|_| CliError::Input(format!("`{value}` is not a tolerance")))?,
+        None => 1.0e-3,
+    };
+    Ok((axis, coordinate, tolerance))
 }
 
 fn parse_document(flags: &Flags) -> Result<DocumentId, CliError> {

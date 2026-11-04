@@ -1,6 +1,6 @@
 # The Unified Engineering Model
 
-**As of:** 2026-10-31 · **Status:** Phase A implemented and tested; later phases are not.
+**As of:** 2026-11-03 · **Status:** Phase A implemented and tested, including a per-kind release policy; linear static analysis is the first real CAE producer. Later phases are not.
 
 This page describes the shared engineering data layer that a CAD, CAM, CAE or ECAD workspace uses to
 answer one question honestly: **which derived result belongs to which design revision?** It is the
@@ -22,10 +22,12 @@ CLI: `atlas artifacts`. Studio: `GET /api/engineering` and the drawing fields in
 | Derived artifacts pinned to a source revision, source entities and upstream artifacts | implemented, unit-tested | registry round-trip; duplicate and unknown-upstream refusal |
 | Transitive staleness detection over an acyclic dependency graph | implemented, unit-tested | `ArtifactRegistry::assess`; chain and blocking tests |
 | Explicit review that acknowledges staleness without rewriting the source revision | implemented, unit-tested | `ArtifactRegistry::review`; `AcceptedAfterReview` keeps `is_current() == false` |
+| Per-kind release policy: simulation, toolpath, manufacturing setup, inspection and PCB layout are recompute-only; drawing, documentation and other may be released after review | implemented, unit-tested | `ArtifactKind::release_requirement`, `ArtifactAssessment::policy` |
 | Versioned JSON persistence, atomic save, fail-closed load | implemented, unit-tested | unknown-field, newer-schema, oversize and zero-revision refusals |
 | Headless workflow and release gate | integrated, end-to-end tested | `atlas artifacts add/review/check`, exit code 3 when action is required |
 | Studio visibility of the one derived artifact it produces | integrated, HTTP-tested | `GET /api/engineering`, `derived_from_revision` and `derivation_status` in `/api/draft` |
-| Simulation, toolpath, PCB and inspection producers | **not implemented** | no solver, no CAM, no ECAD; see the capability pages |
+| Linear static simulation producer | implemented, unit- and end-to-end tested | `cad-cae` and `atlas cae static --record`; see `docs/cae/CAE_CAPABILITIES.md` |
+| Toolpath, PCB and inspection producers | **not implemented** | no CAM, ECAD or inspection engine |
 
 The important limit in that table: the model records and reasons about artifacts, but today only one
 producer exists — the drawing. A registry can hold a `simulation` or `toolpath` record, and the CLI
@@ -104,13 +106,32 @@ payload may be trusted for the current revision.
 | `current` | derived from the current revision | yes |
 | `requires_review` | derived from an older revision, not acknowledged | no |
 | `requires_recompute` | same revision, different fingerprint: content changed underneath it | no |
-| `accepted_after_review` | older result, acknowledged at the current revision | yes, and visibly not current |
+| `accepted_after_review` | older result, acknowledged at the current revision | only for kinds whose policy allows review; a simulation or toolpath still needs recomputation |
 | `blocked_by_upstream` | itself current, but an upstream artifact requires action | no |
 | `future_revision` | records a revision newer than the document supplied | no |
 
 `ArtifactStatus::is_current` is `false` for `accepted_after_review` on purpose. Review is not
 recomputation, and a report that showed a reviewed artifact as current would be the exact silent
 promotion the brief forbids.
+
+### 3.5 Release policy per kind
+
+A review is a person saying "I have seen that this came from an older revision". For a drawing or a
+document, that can be enough: the artifact is a presentation of the design and the reader can judge
+it. For a result that makes a claim about physical behaviour or machine output, it is not: the stale
+result does not become a description of the new part because someone acknowledged it.
+
+`ArtifactKind::release_requirement` therefore splits the kinds:
+
+| Policy | Kinds | A reviewed stale result |
+|---|---|---|
+| `review_or_recompute` | drawing, documentation, other | releasable, and still reported as `accepted_after_review` (not current) |
+| `recompute` | simulation, toolpath, manufacturing setup, inspection, PCB layout | **not** releasable; the gate still requires action until the producer records a result at the current revision |
+
+`ArtifactAssessment` reports both the `status` and the `policy`, so a consumer does not have to
+derive the rule. A current result is releasable under either policy. The upstream propagation uses
+the policy-aware answer, so a drawing built on a reviewed-but-recompute-only study is
+`blocked_by_upstream` rather than releasable.
 
 ## 4. Assessment algorithm
 
@@ -178,9 +199,9 @@ the drawing assessment built through the same registry the CLI uses. `GET /api/d
 
 ## 7. Recorded limitations
 
-1. **One producer.** Only the drawing exists; there is no simulation, toolpath, PCB or inspection
-   producer to register. The registry is exercised end to end with drawing and toolpath records, but
-   the toolpath record is metadata a caller supplies, not the output of a CAM engine.
+1. **Two producers.** The drawing and the linear static study are generated by real producers; a
+   toolpath, PCB or inspection record is still metadata a caller supplies, not the output of an
+   engine.
 2. **No result payloads.** Summary and warnings only. Nothing here can reproduce or visualise a
    result.
 3. **No automatic invalidation hook.** Producers must record the revision they used. The document
@@ -201,9 +222,10 @@ the drawing assessment built through the same registry the CLI uses. `GET /api/d
 
 1. **Change events with entity granularity.** Make `cad-document` report which entities a mutation
    touched, so `assess` can say *what* changed, not only that the revision moved.
-2. **Per-kind release policy.** A drawing may be released after review; a toolpath or structural
-   result should require recomputation rather than review. That distinction is policy the registry
-   should express, and it is not implemented.
-3. **A second real producer.** Linear static analysis against the existing mesh is the smallest
-   honest CAE producer; until it exists, `ArtifactKind::Simulation` should stay untrusted metadata.
-4. **Measurement** of `assess` on a full 4096-artifact registry.
+2. **Modal analysis** on the existing CAE mesh, then thermal analysis and buckling, each with its own
+   analytic reference and convergence series.
+3. **Persisted result payloads** (displacement and stress fields) with a viewer, so the registry's
+   summary points at an inspectable result instead of only describing it.
+4. **A per-artifact policy override with an audit record**, so a team can justify an exception to the
+   recompute rule without the default being weakened.
+5. **Measurement** of `assess` on a full 4096-artifact registry.

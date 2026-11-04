@@ -201,7 +201,7 @@ fn drafting_refuses_requests_that_would_look_like_success() -> Result<(), Box<dy
     let bare = Command::new(env!("CARGO_BIN_EXE_atlas"))
         .args(["draft", "--file", &project_arg])
         .output()?;
-    assert_eq!(bare.status.code(), Some(1));
+    assert_eq!(bare.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&bare.stderr).contains("--save"));
 
     // A drawing handed to `draft` as if it were a project names the right command instead.
@@ -209,7 +209,7 @@ fn drafting_refuses_requests_that_would_look_like_success() -> Result<(), Box<dy
     let confused = Command::new(env!("CARGO_BIN_EXE_atlas"))
         .args(["draft", "--file", &drawing_arg, "--out", "unused.dxf"])
         .output()?;
-    assert_eq!(confused.status.code(), Some(1));
+    assert_eq!(confused.status.code(), Some(2));
     assert!(
         String::from_utf8_lossy(&confused.stderr).contains("atlas dxf"),
         "the error should point at the working command"
@@ -324,7 +324,7 @@ fn a_drawing_plots_to_a_named_pdf_sheet() -> Result<(), Box<dyn std::error::Erro
             "B2",
         ])
         .output()?;
-    assert_eq!(bad_paper.status.code(), Some(1));
+    assert_eq!(bad_paper.status.code(), Some(2));
     assert!(
         String::from_utf8_lossy(&bad_paper.stderr).contains("A4"),
         "{}",

@@ -51,6 +51,8 @@ pub enum CliError {
     },
     #[error("invalid input: {0}")]
     Input(String),
+    #[error("analysis refused: {0}")]
+    Analysis(String),
     #[error("project: {0}")]
     Project(#[from] ProjectError),
     #[error("drafting: {0}")]
@@ -61,6 +63,30 @@ pub enum CliError {
     Sheet(#[from] cad_drafting::PlotError),
     #[error("engineering model: {0}")]
     Model(#[from] cad_engineering_model::ModelError),
+}
+
+impl CliError {
+    /// The process exit code this error produces.
+    ///
+    /// A deployment distinguishes the three cases on purpose:
+    ///
+    /// * `0` success;
+    /// * `1` an internal or I/O fault (a full disk, an unreadable kernel) — the only case worth
+    ///   retrying unchanged;
+    /// * `2` the job input or command line is wrong (malformed study file, bad flag, missing
+    ///   argument);
+    /// * `3` the input is well formed but the analysis refused it (open mesh, empty face selection,
+    ///   non-converged solve). Retrying the same input cannot help; the study or the design must
+    ///   change.
+    ///
+    /// `atlas artifacts check` also exits 3, but for its own reason: it is a release gate.
+    pub const fn exit_code(&self) -> i32 {
+        match self {
+            CliError::Input(_) => 2,
+            CliError::Analysis(_) => 3,
+            _ => 1,
+        }
+    }
 }
 
 /// An axis-aligned box request. Coordinates are in the document's unit; the kernel always receives

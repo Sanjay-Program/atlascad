@@ -4,6 +4,8 @@ Atlas CAD Studio is a single-document, single-process application. Three shapes 
 they are the only three: a container behind a published port, a systemd unit behind Caddy, and a
 studio shared directly on a LAN. Anything else — accounts, several documents per server, TLS inside
 the binary, horizontal scaling — is not implemented, and no amount of configuration will produce it.
+A CAE study is **not** a fourth studio shape: it is a separate batch container that reads the same
+document file (section 8).
 
 Everything below was run on the machine that wrote it: the image was built and smoke-tested, the
 proxy shape was exercised with a real `Host` and an `https://` origin, and the unit was checked with
@@ -111,7 +113,17 @@ The document format is versioned (`schema`). A studio refuses a document newer t
 rather than trying to read it, so rollback means restoring the previous binary **and** a document
 written by it. Take a copy of the `.zcad` before upgrading.
 
-## 8. What this deployment does not give you
+## 8. Analysis jobs
+
+The studio does not run CAE. A study is a batch container of its own, built by
+`deploy/build-cae-image.sh --smoke` from `deploy/Dockerfile.cae`: one project file and one versioned
+study file in, one self-contained result file out, and an exit code that distinguishes bad input (2)
+from an analysis refusal (3). There is no port, no healthcheck and no queue. It can mount the same
+data volume as the studio, but the project file is single-writer: stop the studio before a job that
+records a simulation. The contract, hardening flags, measured resource envelope and limits are in
+[`cae-deployment.md`](cae-deployment.md).
+
+## 9. What this deployment does not give you
 
 - No accounts, no per-user permissions: one token, all-or-nothing, every holder can edit.
 - No revocation short of restarting with a new token.

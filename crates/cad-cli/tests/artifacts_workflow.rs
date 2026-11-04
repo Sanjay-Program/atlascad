@@ -231,7 +231,8 @@ fn derived_artifacts_are_pinned_to_a_revision_and_a_design_change_blocks_release
     assert_eq!(status_of(&report, 2)?, "requires_review");
     assert!(!releasable(&report, 2)?);
 
-    // Reviewing the toolpath too releases the set; its source revision is still the first one.
+    // Reviewing the toolpath too acknowledges it, but a toolpath is recompute-only: the release
+    // gate stays closed until the toolpath is regenerated from the current revision.
     let reviewed = run(&[
         "artifacts",
         "review",
@@ -243,7 +244,7 @@ fn derived_artifacts_are_pinned_to_a_revision_and_a_design_change_blocks_release
         &revision_arg,
     ])?;
     assert!(reviewed.status.success());
-    let released = run(&[
+    let blocked = run(&[
         "artifacts",
         "check",
         "--project",
@@ -251,10 +252,18 @@ fn derived_artifacts_are_pinned_to_a_revision_and_a_design_change_blocks_release
         "--registry",
         &registry_arg,
     ])?;
-    assert!(released.status.success());
-    let report = stdout_json(&released)?;
-    assert_eq!(report["requires_action"], false);
+    assert_eq!(
+        blocked.status.code(),
+        Some(3),
+        "review must not release a toolpath; only a recompute may"
+    );
+    let report = stdout_json(&blocked)?;
+    assert_eq!(report["requires_action"], true);
     assert_eq!(status_of(&report, 2)?, "accepted_after_review");
+    assert!(!releasable(&report, 2)?);
+    assert_eq!(report["artifacts"][1]["policy"].as_str(), Some("recompute"));
+    // The drawing is a presentation, so its review does release it.
+    assert!(releasable(&report, 1)?);
     for artifact in report["artifacts"].as_array().ok_or("artifacts")? {
         assert_eq!(artifact["source"]["revision"].as_u64(), Some(first));
         assert_eq!(
@@ -263,7 +272,7 @@ fn derived_artifacts_are_pinned_to_a_revision_and_a_design_change_blocks_release
         );
     }
 
-    // A file on disk now holds the acknowledgment, so a later process sees the same state.
+    // A file on disk now holds the acknowledgments, so a later process sees the same state.
     let rechecked = run(&[
         "artifacts",
         "check",
@@ -272,7 +281,7 @@ fn derived_artifacts_are_pinned_to_a_revision_and_a_design_change_blocks_release
         "--registry",
         &registry_arg,
     ])?;
-    assert!(rechecked.status.success());
+    assert_eq!(rechecked.status.code(), Some(3));
     Ok(())
 }
 

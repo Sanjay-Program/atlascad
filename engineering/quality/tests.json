@@ -699,6 +699,30 @@
       "duration_ms": 0,
       "recorded_at": "2026-10-31",
       "notes": "Thirteen-package root workspace, 382 tests including doctests, 0 failed (360 before this cycle). New cad-engineering-model 14 unit tests + 1 doctest: material validation, duplicate/zero artifact ids, unknown upstream, self and multi-node cycles, revision staleness, transitive blocked-upstream, fingerprint mismatch, review semantics, future revision, wrong document, versioned atomic persistence with unknown-field/newer-schema/8 MiB/zero-revision refusals. cad-cli artifacts_workflow 2: add a drawing and dependent toolpath, check passes, edit the model, check exits 3, review both, check passes with source revisions unchanged; unknown upstream and bad kind refused without writing a file. cad-studio http_api 32 (1 new): generated drawing current, saved drawing pinned, model edit reports requires_review, /api/engineering returns the matching assessment and seven non-certified materials. fmt and clippy --workspace --all-targets -D warnings clean; corpus 8 ok / 3 known failure / 0 regressions; manifests 0 error / 0 warning; licences 85/85 allowed; SBOM 85 components. The live HTTP/browser simulation was skipped by --quick and is not claimed by this record."
+    },
+    {
+      "id": "t-platform-cae-20261103",
+      "target": "repo.cad-cae",
+      "command": "cargo test --offline --workspace -j 2 && cargo clippy --offline --workspace --all-targets -j 2 -- -D warnings",
+      "outcome": "success",
+      "passed": 405,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-11-03",
+      "notes": "Fourteen-package root workspace, 405 tests including doctests, 0 failed (382 before this cycle), fmt and clippy --all-targets -D warnings clean. New cad-cae package: 7 unit tests (element stiffness symmetry, rigid translation, uniform-strain stress recovery, voxel classification and ray crossing) and 6 analytic integration tests (exact uniaxial patch test: 10 MPa and 1.0 N.mm within 1e-8 relative and equilibrium below 1e-8; cantilever convergence 5 -> 2.5 mm against the Timoshenko reference; open mesh, volume, material, plane-selection, support/load and voxel-size refusals). cad-cli cae_workflow 2 end-to-end tests: atlas cae static evaluates the Truck mesh, writes the result JSON and records a simulation artifact; a design edit makes the gate exit 3; review reports accepted_after_review with releasable false and policy recompute and still exits 3; recomputing at the new revision exits 0. cad-engineering-model 17 unit tests + 1 doctest (2 new release-policy tests: simulation/toolpath cannot be released by review, drawing can, and a policy-blocked result blocks its dependents). Measured on this host with the release CLI: 60x10x10 mm cantilever, 100 N, AISI 1018, reference 0.043052 mm; 5 mm 0.037498 (-12.90%, 48 elements), 2.5 mm 0.041352 (-3.95%, 384), 1.25 mm 0.042513 (-1.25%, 3072); peak von Mises did not converge (14.34/24.34/29.53 MPa) because the idealised fixed end is singular, and that is documented. atlas-eng validate 0 errors, 0 warnings across 14 manifest files. The live HTTP/browser simulation was not part of this record."
+    },
+    {
+      "id": "t-platform-cae-deploy-20261103",
+      "target": "repo.cad-cae",
+      "command": "cargo test --offline --workspace -j 2 && deploy/build-cae-image.sh --smoke",
+      "outcome": "success",
+      "passed": 410,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-11-03",
+      "notes": "Fourteen-package root workspace, 410 tests including doctests, 0 failed (405 before this cycle), fmt and clippy --all-targets -D warnings clean. New this cycle: 3 cad-cae unit tests (versioned study round trip; malformed/oversized/unknown-field/newer-schema refusals; a well-formed but unsupportable study is a validation refusal, not a broken file) and 2 cad-cli cae_workflow tests (a --study file and the equivalent flags produce identical mesh/results, the result embeds definition + engine cad-cae 0.1.0 + source document/revision, the atomic write leaves no temp file; malformed/newer/mixed input exits 2, an empty study and an unknown material exit 3, and a refusal publishes no result). Exit codes are now 0 ok / 1 internal or I/O / 2 bad input / 3 analysis refused across atlas, so two drafting workflow assertions moved from 1 to 2. deploy/build-cae-image.sh --smoke built the non-root image and ran the hardened shape (no network, read-only root, cap-drop ALL, no-new-privileges, 512 MB cap): the 384-element cantilever measured 0.041352 mm, 3.95% from the Timoshenko reference, 111 PCG iterations; the read-only project stayed byte-identical; an off-body load exited 3 and published nothing; a malformed study exited 2; the process ran as uid 10001; a job without a result volume exited 2; recording a simulation inside the container left atlas artifacts check passing. Measured host envelope: 64 000 elements 7.8 s / 20 MB peak RSS, 160 000 elements 22.9 s / 43 MB, and 160 000 elements in 24.1 s in the container under 512 MB. The Kubernetes Job in docs/operations/cae-deployment.md was NOT run on a cluster; the image is unsigned and unscanned."
     }
   ]
 }

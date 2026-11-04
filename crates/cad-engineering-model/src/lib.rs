@@ -236,6 +236,46 @@ impl ArtifactKind {
         };
         Some(kind)
     }
+
+    /// What a release gate requires before this kind of result may be used downstream.
+    ///
+    /// A drawing or a document is a presentation of the design: a person can look at it, see the
+    /// revision it came from, and accept it. A simulation result, a toolpath, a manufacturing setup,
+    /// an inspection record or a PCB layout is a claim about physical behaviour or machine output;
+    /// an acknowledgment that it is stale says nothing about whether it still describes the part.
+    /// Those kinds therefore require recomputation, and a review can never release them.
+    pub const fn release_requirement(self) -> ReleaseRequirement {
+        match self {
+            ArtifactKind::Drawing | ArtifactKind::Documentation | ArtifactKind::Other => {
+                ReleaseRequirement::ReviewOrRecompute
+            }
+            ArtifactKind::Simulation
+            | ArtifactKind::Toolpath
+            | ArtifactKind::ManufacturingSetup
+            | ArtifactKind::Inspection
+            | ArtifactKind::PcbLayout => ReleaseRequirement::Recompute,
+        }
+    }
+}
+
+/// What a release gate must have before an artifact may be used downstream.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReleaseRequirement {
+    /// A result derived from an older revision may be released after an explicit review.
+    ReviewOrRecompute,
+    /// A result derived from an older revision must be recomputed; review is only an
+    /// acknowledgment and never a release.
+    Recompute,
+}
+
+impl ReleaseRequirement {
+    pub const fn label(self) -> &'static str {
+        match self {
+            ReleaseRequirement::ReviewOrRecompute => "review_or_recompute",
+            ReleaseRequirement::Recompute => "recompute",
+        }
+    }
 }
 
 /// A material category. The category is metadata, not a solver model.
@@ -705,10 +745,11 @@ impl ArtifactStatus {
         matches!(self, ArtifactStatus::Current)
     }
 
-    /// True when the artifact may be used downstream without further validation.
+    /// True when the artifact's *source status* allows release.
     ///
-    /// A reviewed artifact qualifies: the user has seen that it is stale and accepted it. A current
-    /// or reviewed artifact whose upstream is blocked does not qualify.
+    /// This is only half the answer: whether release is actually permitted also depends on the
+    /// kind's [`ReleaseRequirement`]. [`ArtifactAssessment::releasable`] combines both, and a
+    /// reviewed simulation or toolpath is not releasable even though its status permits review.
     pub const fn is_releasable(self) -> bool {
         matches!(
             self,
@@ -742,7 +783,10 @@ pub struct ArtifactAssessment {
     pub label: String,
     pub source: DocumentRef,
     pub status: ArtifactStatus,
-    /// True when this artifact may be released with the supplied revision.
+    /// What this kind of artifact needs before it can be released.
+    pub policy: ReleaseRequirement,
+    /// True when this artifact may be released with the supplied revision: its status permits it
+    /// *and* the kind's policy does.
     pub releasable: bool,
 }
 
@@ -994,17 +1038,17 @@ impl ArtifactRegistry {
         }
         let order = self.topological_order()?;
         let mut statuses: BTreeMap<u64, ArtifactStatus> = BTreeMap::new();
+        let mut releasable: BTreeMap<u64, bool> = BTreeMap::new();
         for position in order {
             let Some(artifact) = self.artifacts.get(position) else {
                 continue;
             };
             let mut status = source_status(artifact, current);
             if status.is_releasable()
-                && let Some(upstream) = artifact.upstream.iter().find(|upstream| {
-                    statuses
-                        .get(&upstream.get())
-                        .is_some_and(|status| status.requires_action())
-                })
+                && let Some(upstream) = artifact
+                    .upstream
+                    .iter()
+                    .find(|upstream| releasable.get(&upstream.get()).is_some_and(|open| !open))
             {
                 status = ArtifactStatus::BlockedByUpstream {
                     upstream: upstream.get(),
@@ -1012,6 +1056,11 @@ impl ArtifactRegistry {
                     current_revision: current.revision.get(),
                 };
             }
+            let policy = artifact.kind.release_requirement();
+            let can_release = status.is_releasable()
+                && !(matches!(status, ArtifactStatus::AcceptedAfterReview { .. })
+                    && policy == ReleaseRequirement::Recompute);
+            releasable.insert(artifact.id.get(), can_release);
             statuses.insert(artifact.id.get(), status);
         }
         let artifacts = self
@@ -1030,7 +1079,8 @@ impl ArtifactRegistry {
                     label: artifact.label.clone(),
                     source: artifact.source,
                     status,
-                    releasable: status.is_releasable(),
+                    policy: artifact.kind.release_requirement(),
+                    releasable: releasable.get(&artifact.id.get()).copied().unwrap_or(false),
                 }
             })
             .collect::<Vec<_>>();
@@ -1161,7 +1211,7 @@ mod tests {
     use super::{
         ArtifactId, ArtifactKind, ArtifactRegistry, ArtifactResult, ArtifactStatus,
         DerivedArtifact, DocumentRef, Fingerprint, MAX_MODEL_BYTES, MODEL_SCHEMA, Material,
-        MaterialCategory, MaterialLibrary, ModelError,
+        MaterialCategory, MaterialLibrary, ModelError, ReleaseRequirement,
     };
     use cad_contract::document::Revision;
     use cad_contract::ids::{DocumentId, EntityId};
@@ -1336,12 +1386,7 @@ mod tests {
     #[test]
     fn review_acknowledges_but_does_not_rewrite_the_source_revision() -> TestResult {
         let mut registry = ArtifactRegistry::new(document());
-        registry.add(artifact(
-            1,
-            ArtifactKind::Simulation,
-            "linear static",
-            at(2)?,
-        )?)?;
+        registry.add(artifact(1, ArtifactKind::Drawing, "linear static", at(2)?)?)?;
         registry.review(
             ArtifactId::new(1).ok_or("id")?,
             Revision::from_raw(4).ok_or("rev")?,
@@ -1376,6 +1421,70 @@ mod tests {
             Some(4),
             "the latest review wins"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_simulation_or_toolpath_cannot_be_released_by_review_alone() -> TestResult {
+        let mut registry = ArtifactRegistry::new(document());
+        registry.add(artifact(
+            1,
+            ArtifactKind::Simulation,
+            "linear static",
+            at(2)?,
+        )?)?;
+        registry.review(
+            ArtifactId::new(1).ok_or("id")?,
+            Revision::from_raw(4).ok_or("rev")?,
+        )?;
+        let report = registry.assess(at(4)?)?;
+        assert_eq!(report.artifacts[0].status.label(), "accepted_after_review");
+        assert_eq!(report.artifacts[0].policy, ReleaseRequirement::Recompute);
+        assert!(
+            !report.artifacts[0].releasable,
+            "a reviewed simulation still came from revision 2; release needs a recompute"
+        );
+        assert!(report.requires_action);
+
+        // A result that is current needs no review, whatever its policy says.
+        let report = registry.assess(at(2)?)?;
+        assert_eq!(report.artifacts[0].status, ArtifactStatus::Current);
+        assert!(report.artifacts[0].releasable);
+
+        // A drawing is a presentation of the design, so review may release it.
+        let mut drawings = ArtifactRegistry::new(document());
+        drawings.add(artifact(1, ArtifactKind::Drawing, "drawing", at(2)?)?)?;
+        drawings.review(
+            ArtifactId::new(1).ok_or("id")?,
+            Revision::from_raw(4).ok_or("rev")?,
+        )?;
+        let report = drawings.assess(at(4)?)?;
+        assert_eq!(
+            report.artifacts[0].policy,
+            ReleaseRequirement::ReviewOrRecompute
+        );
+        assert!(report.artifacts[0].releasable);
+        assert!(!report.requires_action);
+        Ok(())
+    }
+
+    #[test]
+    fn a_reviewed_result_that_policy_blocks_also_blocks_its_dependents() -> TestResult {
+        let mut registry = ArtifactRegistry::new(document());
+        registry.add(artifact(1, ArtifactKind::Simulation, "static", at(2)?)?)?;
+        registry.review(
+            ArtifactId::new(1).ok_or("id")?,
+            Revision::from_raw(4).ok_or("rev")?,
+        )?;
+        let mut drawing = artifact(2, ArtifactKind::Drawing, "drawing", at(4)?)?;
+        drawing.upstream.push(ArtifactId::new(1).ok_or("id")?);
+        registry.add(drawing)?;
+        let report = registry.assess(at(4)?)?;
+        assert_eq!(report.artifacts[0].status.label(), "accepted_after_review");
+        assert!(!report.artifacts[0].releasable);
+        assert_eq!(report.artifacts[1].status.label(), "blocked_by_upstream");
+        assert!(!report.artifacts[1].releasable);
+        assert!(report.requires_action);
         Ok(())
     }
 

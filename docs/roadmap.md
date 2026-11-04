@@ -7,6 +7,25 @@ Sizes are rough effort for one engineer: **S** ≤ 1 day, **M** ≤ 1 week, **L*
 
 ---
 
+## Done in the 2026-11-03 cycle
+
+| Item | Result | Evidence |
+|---|---|---|
+| **Phase D — first real CAE producer** | **done, 10 unit + 6 integration tests** — `cad-cae` runs a linear static study on the evaluated solid: a voxel hex8 mesh classified from the closed tessellation, isotropic linear elasticity with 2×2×2 Gauss integration, a Jacobi-preconditioned conjugate gradient solve, plane supports (fixed or component-held) and lumped face loads. It reports displacement, von Mises stress at element centres, strain energy, reactions, equilibrium residual, factor of safety as an explicit stress ratio, solver iterations/residual and the assumptions. Open meshes, voxel meshes more than 25% off the body volume, unknown materials, empty plane selections and non-converged solves are refused with a reason. | `crates/cad-cae`; `docs/cae/CAE_CAPABILITIES.md` |
+| Analytic validation | **done** — an exact uniaxial patch test recovers 10 MPa and 1.0 N·mm strain energy within 1e-8 and balances to better than 1e-8; a 60×10×10 mm cantilever against Timoshenko measures **−12.90% / −3.95% / −1.25%** at 5 / 2.5 / 1.25 mm voxels (48 / 384 / 3 072 elements, 51 / 107 / 214 PCG iterations). The peak von Mises in the same series (14.34 / 24.34 / 29.53 MPa) did **not** converge, because the idealised fixed end is singular; that is recorded, not hidden. | `crates/cad-cae/tests/static_analysis.rs`, `docs/quality/ENGINEERING_VALIDATION.md` §3 |
+| **Per-kind release policy** | **done, 4 new tests** — `ArtifactKind::release_requirement` makes a drawing, documentation or other artifact releasable after review, and makes a simulation, toolpath, manufacturing setup, inspection or PCB layout **recompute-only**. A reviewed simulation keeps `accepted_after_review` but is not releasable, and a drawing that depends on it is `blocked_by_upstream`. The CLI gate exits 3 until the result is recomputed. | `cad-engineering-model`; `crates/cad-cli/tests/artifacts_workflow.rs` |
+| **`atlas cae static`** | **done, 4 end-to-end CLI tests** — evaluates the project through Truck, runs the study, writes the result JSON and, with `--record ID`, records a `simulation` artifact at the project revision and saves it. Editing the design makes `atlas artifacts check` exit 3; review still exits 3; recomputing at the new revision exits 0. A versioned `--study` file is an alternative to the flags (mixing them is refused), the result embeds the definition, engine and source revision, and the result is published atomically. | `crates/cad-cli/src/main.rs`, `crates/cad-cli/tests/cae_workflow.rs` |
+| **CAE deployment job** | **done, smoke-tested end to end** — `deploy/Dockerfile.cae` and `deploy/build-cae-image.sh --smoke` build a non-root batch container with no network and a read-only root, run a real 384-element cantilever (0.041352 mm, 3.95 % from beam theory), assert exit 3 for an off-body load and 2 for a malformed study, refuse a job without a result volume, keep the read-only project byte-identical, and record a releasable `simulation`. Measured: 64 000 elements in 7.8 s / 20 MB; 160 000 in 22.9 s / 43 MB, and 24.1 s inside the container under a 512 MB cap. | `deploy/`, `docs/operations/cae-deployment.md` |
+| Root workspace gate | **green — 410 tests** (up from 388), fmt and clippy `-D warnings` clean, `atlas-eng validate` 0 errors / 0 warnings across 14 manifests | `engineering/quality/tests.json#t-platform-cae-20261103` |
+
+**Not done in this cycle, and not implied by the table above:** modal, thermal, buckling, nonlinear,
+Dynamic, injection-moulding or electronics-cooling analysis; result fields or a viewer; a
+boundary-fitted mesher; entity-level change reporting; a job queue or submission service (the CAE
+container is one batch unit, not an orchestrator); any CAM, ECAD, BIM, GIS, generative-design or
+AI capability; any machine output or control. The studio still has no study editor.
+
+---
+
 ## Done in the 2026-11-02 cycle
 
 | Item | Result | Evidence |
