@@ -45,8 +45,7 @@ impl HeightField {
                 continue;
             };
             let (a, b, c) = (*a, *b, *c);
-            let determinant =
-                (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+            let determinant = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
             if determinant.abs() < 1.0e-12 {
                 continue;
             }
@@ -70,10 +69,7 @@ impl HeightField {
                 let x = stock.min[0] + (column as f64 + 0.5) * cell[0];
                 let mut best = f64::NEG_INFINITY;
                 for facet in &facets {
-                    if x < facet.min[0]
-                        || x > facet.max[0]
-                        || y < facet.min[1]
-                        || y > facet.max[1]
+                    if x < facet.min[0] || x > facet.max[0] || y < facet.min[1] || y > facet.max[1]
                     {
                         continue;
                     }
@@ -124,8 +120,8 @@ impl HeightField {
     pub fn height_at(&self, x: f64, y: f64) -> f64 {
         let column = (((x - self.min[0]) / self.cell[0]).floor())
             .clamp(0.0, (self.columns - 1) as f64) as usize;
-        let row =
-            (((y - self.min[1]) / self.cell[1]).floor()).clamp(0.0, (self.rows - 1) as f64) as usize;
+        let row = (((y - self.min[1]) / self.cell[1]).floor()).clamp(0.0, (self.rows - 1) as f64)
+            as usize;
         self.heights[row * self.columns + column]
     }
 

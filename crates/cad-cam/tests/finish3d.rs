@@ -112,7 +112,10 @@ fn a_stock_allowance_lifts_the_finishing_surface() -> Result<(), Failure> {
         .filter(|point| point.kind != MoveKind::Rapid)
         .map(|point| point.position[2])
         .fold(f64::INFINITY, f64::min);
-    assert!((cut_z - 15.4).abs() < 1.0e-6, "cut at {cut_z}, expected 15.4");
+    assert!(
+        (cut_z - 15.4).abs() < 1.0e-6,
+        "cut at {cut_z}, expected 15.4"
+    );
     Ok(())
 }
 

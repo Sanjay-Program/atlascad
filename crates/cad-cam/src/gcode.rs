@@ -124,7 +124,11 @@ impl Postprocessor {
             out.push_str("%\n");
         }
 
-        self.line(&mut out, &mut number, &format!("({})", sanitize(&self.program)));
+        self.line(
+            &mut out,
+            &mut number,
+            &format!("({})", sanitize(&self.program)),
+        );
         self.line(&mut out, &mut number, "G21");
         self.line(&mut out, &mut number, "G90");
         self.line(&mut out, &mut number, "G94");

@@ -330,7 +330,9 @@ pub enum ToolpathError {
     InvalidClearance { clearance: f64, stock_top: f64 },
     #[error("toolpath point {index} is a zero-length move")]
     ZeroLengthMove { index: usize },
-    #[error("toolpath point {index} jumps {distance} mm, more than the {MAX_SEGMENT_MM} mm maximum")]
+    #[error(
+        "toolpath point {index} jumps {distance} mm, more than the {MAX_SEGMENT_MM} mm maximum"
+    )]
     Discontinuous { index: usize, distance: f64 },
     #[error(
         "toolpath point {index} leaves the machine envelope: axis {axis} at {value} mm, allowed {min} .. {max}"

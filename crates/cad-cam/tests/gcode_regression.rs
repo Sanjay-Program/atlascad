@@ -55,8 +55,8 @@ fn second_toolpath() -> Result<Toolpath, Box<dyn std::error::Error>> {
 
 #[test]
 fn grbl_program_matches_its_fixture() -> Result<(), Box<dyn std::error::Error>> {
-    let program = Postprocessor::new(PostFormat::Grbl, "atlas cam facing")
-        .emit(&toolpath()?, &setup()?)?;
+    let program =
+        Postprocessor::new(PostFormat::Grbl, "atlas cam facing").emit(&toolpath()?, &setup()?)?;
     assert_eq!(
         program,
         "(atlas cam facing)\n\
@@ -113,7 +113,10 @@ fn one_toolpath_is_byte_identical_through_both_entry_points()
     let path = toolpath()?;
     let setup = setup()?;
     let post = Postprocessor::new(PostFormat::Mach3, "atlas cam facing");
-    assert_eq!(post.emit(&path, &setup)?, post.emit_program(&[&path], &setup)?);
+    assert_eq!(
+        post.emit(&path, &setup)?,
+        post.emit_program(&[&path], &setup)?
+    );
     Ok(())
 }
 
@@ -146,8 +149,8 @@ fn linuxcnc_program_matches_its_fixture() -> Result<(), Box<dyn std::error::Erro
 
 #[test]
 fn mach3_program_matches_its_fixture() -> Result<(), Box<dyn std::error::Error>> {
-    let program = Postprocessor::new(PostFormat::Mach3, "atlas cam facing")
-        .emit(&toolpath()?, &setup()?)?;
+    let program =
+        Postprocessor::new(PostFormat::Mach3, "atlas cam facing").emit(&toolpath()?, &setup()?)?;
     assert_eq!(
         program,
         "%\n\
@@ -194,8 +197,8 @@ fn line_numbers_are_optional_and_sequential() -> Result<(), Box<dyn std::error::
 
 #[test]
 fn a_program_name_cannot_break_out_of_its_comment() -> Result<(), Box<dyn std::error::Error>> {
-    let program = Postprocessor::new(PostFormat::Grbl, "atlas (beta)")
-        .emit(&toolpath()?, &setup()?)?;
+    let program =
+        Postprocessor::new(PostFormat::Grbl, "atlas (beta)").emit(&toolpath()?, &setup()?)?;
     assert!(program.starts_with("(atlas _beta_)\n"), "{program}");
     Ok(())
 }

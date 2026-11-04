@@ -13,7 +13,8 @@
 # capabilities, a memory cap and two volumes. It asserts a real part end to end (three operations,
 # one program with a tool change, Markdown/PDF sheet, preview, summary), that a holder collision keeps
 # exit 3 and publishes nothing, that a malformed job exits 2, that the process is not root, that the
-# read-only inputs were not modified, and that a job without an output volume is refused.
+# read-only inputs were not modified, that a recorded toolpath passes the release gate, and that a job
+# without an output volume is refused.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -52,7 +53,8 @@ context="$(mktemp -d)"
 work=""
 results=""
 refused_results=""
-cleanup() { rm -rf "$context" "$work" "$results" "$refused_results"; }
+record_results=""
+cleanup() { rm -rf "$context" "$work" "$results" "$refused_results" "$record_results"; }
 trap cleanup EXIT
 cp target/release/atlas "$context/atlas"
 cp deploy/cam-entrypoint.sh "$context/cam-entrypoint.sh"
@@ -70,12 +72,13 @@ fi
 work="$(mktemp -d)"
 results="$(mktemp -d)"
 refused_results="$(mktemp -d)"
+record_results="$(mktemp -d)"
 trap cleanup EXIT
 # mktemp creates 0700 directories owned by the invoking user; the container runs as uid 10001 and
 # must be able to read the inputs and write the output. These are the two permissions the contract
 # actually needs.
 chmod 0755 "$work"
-chmod 0777 "$results" "$refused_results"
+chmod 0777 "$results" "$refused_results" "$record_results"
 
 printf '==> a known part: 20 x 20 x 12 mm block in a 40 x 30 x 20 mm stock\n'
 target/release/atlas box --size 20,20,12 --out "$work/part.stl" >/dev/null
@@ -171,6 +174,57 @@ inputs_after="$(sha256sum "$work/job.json" "$work/part.stl" | cut -d' ' -f1 | tr
     exit 1
 }
 
+printf '==> the container records the program against a design revision\n'
+target/release/atlas project new --file "$work/bracket.zcad" --name "container bracket" --size 40,30,20 >/dev/null
+project_before="$(sha256sum "$work/bracket.zcad" | cut -d' ' -f1)"
+status=0
+docker run --rm \
+    --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+    --memory 512m --pids-limit 256 --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+    -v "$work:/work:ro,z" \
+    -v "$record_results:/out:z" \
+    -e ATLAS_JOB=/work/job.json \
+    -e ATLAS_OUT=/out \
+    -e ATLAS_PROJECT=/work/bracket.zcad \
+    -e ATLAS_RECORD=7 \
+    "$tag" >/dev/null 2>"$work/record.stderr" || status=$?
+[ "$status" -eq 0 ] || {
+    echo "smoke failed: the recording job exited $status; stderr:" >&2
+    cat "$work/record.stderr" >&2
+    exit 1
+}
+[ -f "$record_results/project.zcad" ] || {
+    echo "smoke failed: the recorded project was not published" >&2
+    exit 1
+}
+target/release/atlas artifacts check --project "$record_results/project.zcad" >/dev/null 2>"$work/record-check.stderr" || {
+    echo "smoke failed: the recorded toolpath does not pass the release gate; stderr:" >&2
+    cat "$work/record-check.stderr" >&2
+    exit 1
+}
+project_after="$(sha256sum "$work/bracket.zcad" | cut -d' ' -f1)"
+[ "$project_before" = "$project_after" ] || {
+    echo "smoke failed: the read-only project input was modified" >&2
+    exit 1
+}
+
+printf '==> only half the provenance contract is bad input\n'
+status=0
+docker run --rm \
+    --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+    --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+    -v "$work:/work:ro,z" \
+    -v "$refused_results:/out:z" \
+    -e ATLAS_JOB=/work/job.json \
+    -e ATLAS_OUT=/out \
+    -e ATLAS_RECORD=7 \
+    "$tag" >/dev/null 2>"$work/half-record.stderr" || status=$?
+[ "$status" -eq 2 ] || {
+    echo "smoke failed: ATLAS_RECORD without ATLAS_PROJECT exited $status, expected 2" >&2
+    cat "$work/half-record.stderr" >&2
+    exit 1
+}
+
 printf '==> a holder collision is refused and publishes nothing\n'
 target/release/atlas box --size 20,20,19 --out "$work/island.stl" >/dev/null
 python3 - "$work/job.json" "$work/collision.json" <<'PY'
@@ -230,4 +284,4 @@ docker run --rm \
     exit 1
 }
 
-echo "ok: $tag posted a part, changed tools, refused a collision, stayed unprivileged"
+echo "ok: $tag posted a part, changed tools, recorded it against a revision, refused a collision, stayed unprivileged"

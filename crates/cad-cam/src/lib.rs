@@ -29,6 +29,7 @@
 //!   ray can reach, which is the right model for 2.5D/3-axis cutting and cannot represent an
 //!   undercut.
 
+pub mod feeds;
 pub mod gcode;
 pub mod pdf;
 pub mod setup;
@@ -40,6 +41,7 @@ pub mod tool;
 pub mod tool_path;
 pub mod tool_path_visitor;
 
+pub use feeds::{FeedsError, FeedsRequest, Material, RecommendedFeeds, recommend};
 pub use gcode::{PostError, PostFormat, Postprocessor};
 pub use pdf::setup_sheet_pdf;
 pub use setup::{Setup, SetupError, Stock, WorkCoordinate};
@@ -60,6 +62,8 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Any failure the CAM pipeline can report, so a caller can propagate one error type.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum CamError {
+    #[error(transparent)]
+    Feeds(#[from] FeedsError),
     #[error(transparent)]
     Tool(#[from] ToolError),
     #[error(transparent)]

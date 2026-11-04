@@ -48,11 +48,13 @@ fn merge(a: &Mesh, b: &Mesh) -> Mesh {
     let offset = positions.len() as u32;
     positions.extend_from_slice(&b.positions);
     let mut triangles = a.triangles.clone();
-    triangles.extend(
-        b.triangles
-            .iter()
-            .map(|triangle| [triangle[0] + offset, triangle[1] + offset, triangle[2] + offset]),
-    );
+    triangles.extend(b.triangles.iter().map(|triangle| {
+        [
+            triangle[0] + offset,
+            triangle[1] + offset,
+            triangle[2] + offset,
+        ]
+    }));
     Mesh {
         positions,
         triangles,
@@ -119,7 +121,10 @@ fn roughing_clears_above_the_part_and_leaves_the_tall_block_alone() -> Result<()
             && point.position[0] > 22.0
             && point.position[0] < 32.0
     });
-    assert!(low_block_cut, "the low block was not roughed to its finish level");
+    assert!(
+        low_block_cut,
+        "the low block was not roughed to its finish level"
+    );
     assert!(
         !toolpath.points.iter().any(|point| {
             point.kind != MoveKind::Rapid
@@ -146,10 +151,12 @@ fn roughing_clears_above_the_part_and_leaves_the_tall_block_alone() -> Result<()
     );
 
     // The first stock slab above the part is removed too, so roughing starts at 18 mm.
-    assert!(toolpath
-        .points
-        .iter()
-        .any(|point| (point.position[2] - 18.0).abs() < 1.0e-6));
+    assert!(
+        toolpath
+            .points
+            .iter()
+            .any(|point| (point.position[2] - 18.0).abs() < 1.0e-6)
+    );
     Ok(())
 }
 
@@ -193,10 +200,7 @@ fn a_part_that_fills_the_stock_needs_no_roughing() -> Result<(), Failure> {
     )
     .err();
     assert!(
-        matches!(
-            error,
-            Some(cad_cam::ToolpathError::NothingToMachine)
-        ),
+        matches!(error, Some(cad_cam::ToolpathError::NothingToMachine)),
         "a full block has nothing to rough, got {error:?}"
     );
     Ok(())

@@ -17,8 +17,9 @@
 use cad_contract::mesh::Mesh;
 
 use crate::setup::{Setup, Stock};
+use crate::simulation::MaterialRemoval;
 use crate::surface::HeightField;
-use crate::tool::{Machine, Tool, ToolGeometry};
+use crate::tool::{Machine, Tool, ToolGeometry, ToolId};
 use crate::tool_path::{
     MoveKind, POSITION_TOLERANCE_MM, Toolpath, ToolpathError, ToolpathId, ToolpathPoint,
 };
@@ -97,6 +98,24 @@ pub enum Operation {
         /// Height-field sampling resolution, millimetres.
         resolution_mm: f64,
     },
+    /// Cut the material a larger roughing tool could not reach, using a simulated copy of its
+    /// toolpath as the starting state.
+    Rest3D {
+        /// The part mesh, in work coordinates.
+        part: Mesh,
+        /// The diameter of the tool that cut the prior roughing pass, millimetres.
+        prior_tool_mm: f64,
+        /// The distance between raster passes of that prior roughing pass, millimetres.
+        prior_stepover_mm: f64,
+        /// Distance between rest raster passes, millimetres.
+        stepover_mm: f64,
+        /// Depth of one Z level, millimetres (clamped to the tool's maximum).
+        stepdown_mm: f64,
+        /// Material left above the part floor, millimetres.
+        stock_to_leave_mm: f64,
+        /// Height-field sampling resolution, millimetres.
+        resolution_mm: f64,
+    },
     /// Rough the stock down to a part with a Z-level raster of the sampled part surface.
     Rough3D {
         /// The part mesh, in work coordinates.
@@ -124,6 +143,7 @@ impl Operation {
             Operation::Rough3D { .. } => "3D roughing",
             Operation::Finish3D { .. } => "3D finishing",
             Operation::FinishWalls { .. } => "wall finishing",
+            Operation::Rest3D { .. } => "rest machining",
         }
     }
 
@@ -137,9 +157,10 @@ impl Operation {
             | Operation::Pocket { depth_mm, .. }
             | Operation::Drill { depth_mm, .. }
             | Operation::Slot { depth_mm, .. } => Some(*depth_mm),
-            Operation::Rough3D { .. } | Operation::Finish3D { .. } | Operation::FinishWalls { .. } => {
-                None
-            }
+            Operation::Rough3D { .. }
+            | Operation::Finish3D { .. }
+            | Operation::FinishWalls { .. }
+            | Operation::Rest3D { .. } => None,
         }
     }
 }
@@ -177,18 +198,32 @@ pub fn generate(
             stepover_mm,
             stock_to_leave_mm,
             resolution_mm,
-        } => planner.finish3d(
-            part,
-            *stepover_mm,
-            *stock_to_leave_mm,
-            *resolution_mm,
-        )?,
+        } => planner.finish3d(part, *stepover_mm, *stock_to_leave_mm, *resolution_mm)?,
         Operation::FinishWalls {
             part,
             stepdown_mm,
             stock_to_leave_mm,
             resolution_mm,
         } => planner.finish_walls(part, *stepdown_mm, *stock_to_leave_mm, *resolution_mm)?,
+        Operation::Rest3D {
+            part,
+            prior_tool_mm,
+            prior_stepover_mm,
+            stepover_mm,
+            stepdown_mm,
+            stock_to_leave_mm,
+            resolution_mm,
+        } => planner.rest3d(
+            part,
+            PriorPass {
+                diameter_mm: *prior_tool_mm,
+                stepover_mm: *prior_stepover_mm,
+            },
+            *stepover_mm,
+            *stepdown_mm,
+            *stock_to_leave_mm,
+            *resolution_mm,
+        )?,
         other => {
             let depth = other.depth_mm().unwrap_or(0.0);
             if !depth.is_finite() || depth <= 0.0 {
@@ -234,7 +269,8 @@ pub fn generate(
                 } => planner.slot(*start, *end, *depth_mm, *stepdown_mm)?,
                 Operation::Rough3D { .. }
                 | Operation::Finish3D { .. }
-                | Operation::FinishWalls { .. } => {
+                | Operation::FinishWalls { .. }
+                | Operation::Rest3D { .. } => {
                     return Err(ToolpathError::InvalidParameter(
                         "3D operations are planned by their own branch".into(),
                     ));
@@ -342,6 +378,13 @@ fn offset_polygon(profile: &[[f64; 2]], distance: f64) -> Result<Vec<[f64; 2]>, 
         ]);
     }
     Ok(offset)
+}
+
+/// The roughing pass rest machining starts from: the tool and the raster it used.
+#[derive(Debug, Clone, Copy)]
+struct PriorPass {
+    diameter_mm: f64,
+    stepover_mm: f64,
 }
 
 /// Accumulates points while enforcing the retract-before-rapid discipline.
@@ -547,10 +590,7 @@ impl<'a> Planner<'a> {
         for hole in holes {
             if !hole[0].is_finite()
                 || !hole[1].is_finite()
-                || !self
-                    .setup
-                    .stock
-                    .contains_xy(*hole, -POSITION_TOLERANCE_MM)
+                || !self.setup.stock.contains_xy(*hole, -POSITION_TOLERANCE_MM)
             {
                 return Err(ToolpathError::InvalidParameter(format!(
                     "hole at ({}, {}) is not inside the stock",
@@ -586,11 +626,7 @@ impl<'a> Planner<'a> {
             ));
         }
         for point in [start, end] {
-            if !self
-                .setup
-                .stock
-                .contains_xy(point, -POSITION_TOLERANCE_MM)
-            {
+            if !self.setup.stock.contains_xy(point, -POSITION_TOLERANCE_MM) {
                 return Err(ToolpathError::InvalidParameter(format!(
                     "slot endpoint ({}, {}) is not inside the stock",
                     point[0], point[1]
@@ -650,8 +686,135 @@ impl<'a> Planner<'a> {
                     let height = field.height_at(*x, *y);
                     // No part here: clear it. Above part material: cut only if the allowance would
                     // still be left, so a part face is never touched.
-                    let cuttable = !height.is_finite()
-                        || height + stock_to_leave < z - POSITION_TOLERANCE_MM;
+                    let cuttable =
+                        !height.is_finite() || height + stock_to_leave < z - POSITION_TOLERANCE_MM;
+                    match (cuttable, start) {
+                        (true, None) => start = Some(*x),
+                        (false, Some(begin)) => {
+                            cut_any |= self.cut_interval(begin, last, *y, z, radius, sample_step);
+                            start = None;
+                        }
+                        _ => {}
+                    }
+                    last = *x;
+                }
+                if let Some(begin) = start {
+                    cut_any |= self.cut_interval(begin, last, *y, z, radius, sample_step);
+                }
+            }
+        }
+        if !cut_any {
+            return Err(ToolpathError::NothingToMachine);
+        }
+        Ok(())
+    }
+
+    /// Rest machining: cut only what a prior roughing pass with a larger tool left behind.
+    ///
+    /// The prior pass is not trusted from a file. It is planned here with the larger tool, using
+    /// the same stepover, stepdown, allowance and resolution as the operation, then carved into a
+    /// stock model. At each Z level the rest tool cuts a raster interval only where three things
+    /// hold: material still stands above the level, the part target plus the allowance is below
+    /// it, and the interval is wide enough for the cutter after the wall inset. The result is
+    /// therefore bounded by both the simulated prior passes and the part, never one alone.
+    fn rest3d(
+        &mut self,
+        part: &Mesh,
+        prior: PriorPass,
+        stepover: f64,
+        stepdown: f64,
+        stock_to_leave: f64,
+        resolution: f64,
+    ) -> Result<(), ToolpathError> {
+        let prior_diameter = prior.diameter_mm;
+        let prior_stepover = prior.stepover_mm;
+        if !prior_diameter.is_finite() || prior_diameter <= self.tool.diameter_mm() + 1.0e-9 {
+            return Err(ToolpathError::InvalidParameter(format!(
+                "rest machining needs a prior tool larger than the {} mm rest tool, got {prior_diameter} mm",
+                self.tool.diameter_mm()
+            )));
+        }
+        if !prior_stepover.is_finite() || prior_stepover <= 0.0 {
+            return Err(ToolpathError::InvalidParameter(format!(
+                "rest machining needs a positive prior stepover, got {prior_stepover} mm"
+            )));
+        }
+        if !stepover.is_finite() || stepover <= 0.0 {
+            return Err(ToolpathError::InvalidParameter(format!(
+                "rest machining needs a positive stepover, got {stepover} mm"
+            )));
+        }
+        if !stock_to_leave.is_finite() || stock_to_leave < 0.0 {
+            return Err(ToolpathError::InvalidParameter(format!(
+                "rest machining needs a finite, non-negative stock to leave, got {stock_to_leave} mm"
+            )));
+        }
+        let stepdown = self.stepdown(stepdown, "rest machining")?;
+        let stock = self.setup.stock;
+        // A height field must resolve the rest tool, or a slot the cutter fits in would be sampled
+        // shut. Half a radius is the coarsest grid that still sees a cutter-wide channel.
+        let resolution = resolution.min(self.tool.radius_mm() * 0.5);
+        let field = HeightField::from_mesh(part, stock, resolution)
+            .map_err(|error| ToolpathError::InvalidParameter(error.to_string()))?;
+        if field.highest().is_none() {
+            return Err(ToolpathError::NothingToMachine);
+        }
+
+        // Plan and carve the prior roughing pass with the larger tool.
+        let prior_id = ToolId::new(u64::MAX - 1)
+            .ok_or_else(|| ToolpathError::InvalidParameter("no tool id available".into()))?;
+        let prior_tool = Tool::new(
+            prior_id,
+            format!("{prior_diameter} mm prior roughing reference"),
+            ToolGeometry::FlatEndMill {
+                diameter_mm: prior_diameter,
+                flute_length_mm: prior_diameter * 3.0,
+            },
+            self.tool.cutting,
+            self.tool.max_depth_of_cut_mm,
+        )
+        .map_err(|error| ToolpathError::InvalidParameter(error.to_string()))?;
+        let mut prior_planner = Planner::new(self.setup, &prior_tool);
+        match prior_planner.rough3d(part, prior_stepover, stepdown, stock_to_leave, resolution) {
+            Ok(()) | Err(ToolpathError::NothingToMachine) => {}
+            Err(error) => return Err(error),
+        }
+        let prior_path_id = ToolpathId::new(u64::MAX)
+            .ok_or_else(|| ToolpathError::InvalidParameter("no toolpath id available".into()))?;
+        let prior_path = Toolpath::new(
+            prior_path_id,
+            prior_id,
+            prior_planner.points,
+            prior_tool.cutting.spindle_rpm,
+            self.clearance,
+        );
+        let mut removal = MaterialRemoval::new(stock, resolution)
+            .map_err(|error| ToolpathError::InvalidParameter(error.to_string()))?;
+        removal.carve(&prior_path, &prior_tool);
+
+        let floor = stock.min[2] + stock_to_leave;
+        let radius = self.tool.radius_mm();
+        let cell = field.cell_size();
+        let sample_step = cell[0].min(radius * 0.5).max(POSITION_TOLERANCE_MM * 10.0);
+        let xs = raster(stock.min[0], stock.max[0], sample_step);
+        let ys = raster(stock.min[1], stock.max[1], stepover);
+        let mut cut_any = false;
+        for z in levels(self.top, self.top - floor, stepdown) {
+            for y in &ys {
+                let mut start: Option<f64> = None;
+                let mut last = stock.min[0];
+                for x in &xs {
+                    let target = field.height_at(*x, *y);
+                    let allowed = if target.is_finite() {
+                        target + stock_to_leave
+                    } else {
+                        floor
+                    };
+                    // Cut only where the prior pass left material above this level and the level
+                    // is still above the allowed part surface: never a pass the prior tool made,
+                    // never the part.
+                    let cuttable = removal.height_at(*x, *y) > z + POSITION_TOLERANCE_MM
+                        && allowed < z - POSITION_TOLERANCE_MM;
                     match (cuttable, start) {
                         (true, None) => start = Some(*x),
                         (false, Some(begin)) => {
@@ -734,7 +897,9 @@ impl<'a> Planner<'a> {
             let mut previous: Option<[f64; 3]> = None;
             for point in points {
                 let gap = match previous {
-                    Some(previous) => (point[0] - previous[0]).abs() > sample * 1.5 + POSITION_TOLERANCE_MM,
+                    Some(previous) => {
+                        (point[0] - previous[0]).abs() > sample * 1.5 + POSITION_TOLERANCE_MM
+                    }
                     None => false,
                 };
                 if gap && run.len() >= 2 {
@@ -938,8 +1103,7 @@ fn contour_lines(values: &[f64], columns: usize, rows: usize, level: f64) -> Vec
 
 /// Join segments that share an endpoint into polylines.
 fn stitch(segments: Vec<([f64; 2], [f64; 2])>) -> Vec<Vec<[f64; 2]>> {
-    let mut remaining: Vec<Option<([f64; 2], [f64; 2])>> =
-        segments.into_iter().map(Some).collect();
+    let mut remaining: Vec<Option<([f64; 2], [f64; 2])>> = segments.into_iter().map(Some).collect();
     let mut lines: Vec<Vec<[f64; 2]>> = Vec::new();
     for start in 0..remaining.len() {
         let Some((head, tail)) = remaining[start].take() else {

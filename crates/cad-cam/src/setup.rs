@@ -29,9 +29,7 @@ impl WorkCoordinate {
     /// Build a work coordinate system, normalising the z axis.
     pub fn new(origin: [f64; 3], z_axis: [f64; 3]) -> Result<Self, SetupError> {
         if !origin.iter().all(|value| value.is_finite()) {
-            return Err(SetupError::Invalid(
-                "the WCS origin must be finite".into(),
-            ));
+            return Err(SetupError::Invalid("the WCS origin must be finite".into()));
         }
         let length = (z_axis[0] * z_axis[0] + z_axis[1] * z_axis[1] + z_axis[2] * z_axis[2]).sqrt();
         if !length.is_finite() || length < 1.0e-12 {
@@ -41,11 +39,7 @@ impl WorkCoordinate {
         }
         Ok(WorkCoordinate {
             origin,
-            z_axis: [
-                z_axis[0] / length,
-                z_axis[1] / length,
-                z_axis[2] / length,
-            ],
+            z_axis: [z_axis[0] / length, z_axis[1] / length, z_axis[2] / length],
         })
     }
 
@@ -57,7 +51,9 @@ impl WorkCoordinate {
         if machine != Machine::Milling3Axis {
             return Err(SetupError::UnsupportedMachine(machine));
         }
-        if self.z_axis[0].abs() > 1.0e-9 || self.z_axis[1].abs() > 1.0e-9 || (self.z_axis[2] - 1.0).abs() > 1.0e-9
+        if self.z_axis[0].abs() > 1.0e-9
+            || self.z_axis[1].abs() > 1.0e-9
+            || (self.z_axis[2] - 1.0).abs() > 1.0e-9
         {
             return Err(SetupError::UnsupportedWorkCoordinate(format!(
                 "z axis [{}, {}, {}] is not machine +Z",

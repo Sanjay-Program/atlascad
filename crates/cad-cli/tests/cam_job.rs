@@ -25,17 +25,9 @@ fn a_job_writes_every_artifact_for_a_part() -> Result<(), Failure> {
     );
 
     let output = atlas()
-        .args([
-            "cam",
-            "job",
-            "--size",
-            "40,30,20",
-            "--part",
-        ])
+        .args(["cam", "job", "--size", "40,30,20", "--part"])
         .arg(&part)
-        .args([
-            "--out-dir",
-        ])
+        .args(["--out-dir"])
         .arg(&directory)
         .args([
             "--tool",
@@ -98,7 +90,10 @@ fn a_job_writes_every_artifact_for_a_part() -> Result<(), Failure> {
         program.contains("(change tool to T2 then cycle start)\nM0\n"),
         "{program}"
     );
-    assert!(program.contains("Z15 "), "the ball nose cuts 3 mm above the 12 mm top");
+    assert!(
+        program.contains("Z15 "),
+        "the ball nose cuts 3 mm above the 12 mm top"
+    );
     assert!(sheet.contains("| wall finishing | T1 |"), "{sheet}");
     assert!(sheet.contains("| 3D finishing | T2 |"), "{sheet}");
     assert!(sheet.contains("| T2 | 6 mm ball end mill |"), "{sheet}");
@@ -218,7 +213,13 @@ fn an_unreadable_part_is_input_error() -> Result<(), Failure> {
     std::fs::create_dir_all(&directory)?;
     let output = atlas()
         .args([
-            "cam", "job", "--size", "40,30,20", "--part", "does-not-exist.stl", "--out-dir",
+            "cam",
+            "job",
+            "--size",
+            "40,30,20",
+            "--part",
+            "does-not-exist.stl",
+            "--out-dir",
         ])
         .arg(&directory)
         .output()?;
@@ -314,13 +315,198 @@ fn a_versioned_job_file_carries_every_input() -> Result<(), Failure> {
 }
 
 #[test]
+fn a_job_takes_its_cutting_data_from_the_material() -> Result<(), Failure> {
+    let directory = std::env::temp_dir().join(format!("atlas-cam-material-{}", std::process::id()));
+    std::fs::create_dir_all(&directory)?;
+    a_part_beside_the_job(&directory)?;
+    let job = JOB_FILE.replace(
+        "\"stock_mm\": [40, 30, 20],",
+        "\"stock_mm\": [40, 30, 20],\n    \"material\": \"aluminium\",\n    \"flutes\": 3,",
+    );
+    assert!(job.contains("\"material\""), "the fixture was edited");
+    let path = write_job(&directory, &job)?;
+    let out = directory.join("out");
+    let output = atlas()
+        .args(["cam", "job", "--job"])
+        .arg(&path)
+        .args(["--out-dir"])
+        .arg(&out)
+        .output()?;
+    assert!(
+        output.status.success(),
+        "cam job failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let program = std::fs::read_to_string(out.join("program.nc"))?;
+    assert!(program.contains("S13262 M3"), "{program}");
+    assert!(program.contains("F795"), "{program}");
+    let summary: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(out.join("summary.json"))?)?;
+    assert_eq!(summary["material"], "aluminium");
+    std::fs::remove_dir_all(&directory)?;
+    Ok(())
+}
+
+#[test]
+fn a_job_clears_rest_material_with_a_smaller_tool() -> Result<(), Failure> {
+    use cad_cam::Stock;
+    use cad_contract::mesh::Mesh;
+
+    fn merge(a: &Mesh, b: &Mesh) -> Mesh {
+        let mut positions = a.positions.clone();
+        let offset = positions.len() as u32;
+        positions.extend_from_slice(&b.positions);
+        let mut triangles = a.triangles.clone();
+        triangles.extend(b.triangles.iter().map(|triangle| {
+            [
+                triangle[0] + offset,
+                triangle[1] + offset,
+                triangle[2] + offset,
+            ]
+        }));
+        Mesh {
+            positions,
+            triangles,
+            normals: Vec::new(),
+        }
+    }
+
+    let directory = std::env::temp_dir().join(format!("atlas-cam-rest-{}", std::process::id()));
+    std::fs::create_dir_all(&directory)?;
+    let base = Stock {
+        min: [0.0, 5.0, 0.0],
+        max: [20.0, 15.0, 5.0],
+    };
+    let left = Stock {
+        min: [0.0, 5.0, 5.0],
+        max: [8.5, 15.0, 15.0],
+    };
+    let right = Stock {
+        min: [11.5, 5.0, 5.0],
+        max: [20.0, 15.0, 15.0],
+    };
+    let part = merge(&merge(&base.to_mesh(), &left.to_mesh()), &right.to_mesh());
+    let part_path = directory.join("channel.stl");
+    cad_io::write_stl_binary(&part, &part_path)?;
+
+    let out = directory.join("out");
+    let output = atlas()
+        .args(["cam", "job", "--size", "20,20,15", "--part"])
+        .arg(&part_path)
+        .args(["--out-dir"])
+        .arg(&out)
+        .args([
+            "--tool",
+            "6",
+            "--stepover",
+            "4",
+            "--stepdown",
+            "2",
+            "--stock-to-leave",
+            "0.5",
+            "--resolution",
+            "1",
+            "--rest",
+            "2",
+        ])
+        .output()?;
+    assert!(
+        output.status.success(),
+        "cam job failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let summary: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(out.join("summary.json"))?)?;
+    assert!(
+        summary["rest_moves"].as_u64().unwrap_or(0) > 0,
+        "the rest pass wrote no moves: {summary}"
+    );
+    let operations = summary["operations"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        operations.iter().any(|name| name == "rest machining"),
+        "the summary does not name the rest pass: {summary}"
+    );
+    let program = std::fs::read_to_string(out.join("program.nc"))?;
+    assert!(
+        program.contains("T3"),
+        "the rest tool is not in the program"
+    );
+    let sheet = std::fs::read_to_string(out.join("setup.md"))?;
+    assert!(
+        sheet.contains("2 mm rest flat end mill"),
+        "the setup sheet does not describe the rest tool: {sheet}"
+    );
+
+    // The same rest pass is reachable from a versioned job file.
+    let job = directory.join("rest-job.json");
+    std::fs::write(
+        &job,
+        r#"{
+  "schema": 1,
+  "job": {
+    "name": "rest channel",
+    "stock_mm": [20, 20, 15],
+    "part": "channel.stl",
+    "tool": { "diameter_mm": 6, "stepover_mm": 4, "stepdown_mm": 2, "stock_to_leave_mm": 0.5 },
+    "rest": { "diameter_mm": 2 },
+    "resolution_mm": 1
+  }
+}
+"#,
+    )?;
+    let file_out = directory.join("file-out");
+    let file_run = atlas()
+        .args(["cam", "job", "--job"])
+        .arg(&job)
+        .args(["--out-dir"])
+        .arg(&file_out)
+        .output()?;
+    assert!(
+        file_run.status.success(),
+        "job-file rest failed: {}",
+        String::from_utf8_lossy(&file_run.stderr)
+    );
+    let file_summary: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(file_out.join("summary.json"))?)?;
+    assert!(
+        file_summary["rest_moves"].as_u64().unwrap_or(0) > 0,
+        "the job-file rest pass wrote no moves: {file_summary}"
+    );
+    std::fs::remove_dir_all(&directory)?;
+    Ok(())
+}
+
+#[test]
+fn rest_machining_needs_a_part() -> Result<(), Failure> {
+    let directory =
+        std::env::temp_dir().join(format!("atlas-cam-rest-nopart-{}", std::process::id()));
+    let output = atlas()
+        .args(["cam", "job", "--size", "20,20,15", "--out-dir"])
+        .arg(&directory)
+        .args(["--rest", "2"])
+        .output()?;
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("--rest"), "stderr: {stderr}");
+    Ok(())
+}
+
+#[test]
 fn an_unknown_job_field_is_refused() -> Result<(), Failure> {
     let directory = std::env::temp_dir().join(format!("atlas-cam-unknown-{}", std::process::id()));
     std::fs::create_dir_all(&directory)?;
     a_part_beside_the_job(&directory)?;
     let job = write_job(
         &directory,
-        &JOB_FILE.replace("\"resolution_mm\": 2", "\"resolution_mm\": 2, \"rapid_feed\": 900"),
+        &JOB_FILE.replace(
+            "\"resolution_mm\": 2",
+            "\"resolution_mm\": 2, \"rapid_feed\": 900",
+        ),
     )?;
     let output = atlas()
         .args(["cam", "job", "--job"])
@@ -344,7 +530,10 @@ fn a_newer_job_schema_is_refused() -> Result<(), Failure> {
     let directory = std::env::temp_dir().join(format!("atlas-cam-schema-{}", std::process::id()));
     std::fs::create_dir_all(&directory)?;
     a_part_beside_the_job(&directory)?;
-    let job = write_job(&directory, &JOB_FILE.replace("\"schema\": 1", "\"schema\": 2"))?;
+    let job = write_job(
+        &directory,
+        &JOB_FILE.replace("\"schema\": 1", "\"schema\": 2"),
+    )?;
     let output = atlas()
         .args(["cam", "job", "--job"])
         .arg(&job)
@@ -375,11 +564,7 @@ fn a_job_file_cannot_be_combined_with_input_flags() -> Result<(), Failure> {
     let output = atlas()
         .args(["cam", "job", "--job"])
         .arg(&job)
-        .args([
-            "--tool",
-            "6",
-            "--out-dir",
-        ])
+        .args(["--tool", "6", "--out-dir"])
         .arg(directory.join("out"))
         .output()?;
     assert_eq!(

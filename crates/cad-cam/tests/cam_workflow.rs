@@ -65,11 +65,13 @@ fn facing_is_a_zig_zag_raster_over_the_whole_block() -> Result<(), Failure> {
     assert_eq!(toolpath.points[3].position, [43.0, -3.0, 25.0]);
 
     // The cut follows the block: the top face is removed to z = 20 - 2.
-    assert!(toolpath
-        .points
-        .iter()
-        .filter(|point| point.kind.is_cutting())
-        .all(|point| point.position[2] >= 18.0 - POSITION_TOLERANCE_MM));
+    assert!(
+        toolpath
+            .points
+            .iter()
+            .filter(|point| point.kind.is_cutting())
+            .all(|point| point.position[2] >= 18.0 - POSITION_TOLERANCE_MM)
+    );
     assert!(toolpath.cutting_length_mm() > 0.0);
     assert!(toolpath.estimated_minutes() > 0.0);
     Ok(())
@@ -88,16 +90,17 @@ fn a_contour_is_closed_at_every_depth() -> Result<(), Failure> {
     // 5 mm at 2 mm per pass is three passes (2, 4, 5). The first enters at the clearance plane;
     // the next two start already above the loop origin, so they plunge in place.
     assert_eq!(toolpath.points.len(), 7 + 6 + 6);
-    let levels: Vec<f64> = toolpath
-        .points
-        .iter()
-        .map(|point| point.position[2])
-        .fold(Vec::new(), |mut unique, z| {
-            if !unique.iter().any(|seen: &f64| (*seen - z).abs() < 1.0e-9) {
-                unique.push(z);
-            }
-            unique
-        });
+    let levels: Vec<f64> =
+        toolpath
+            .points
+            .iter()
+            .map(|point| point.position[2])
+            .fold(Vec::new(), |mut unique, z| {
+                if !unique.iter().any(|seen: &f64| (*seen - z).abs() < 1.0e-9) {
+                    unique.push(z);
+                }
+                unique
+            });
     assert_eq!(levels, vec![25.0, 18.0, 16.0, 15.0]);
 
     // The tool-centre path is the profile offset outwards by the 3 mm radius.
@@ -125,7 +128,11 @@ fn a_pocket_clears_its_region_inside_the_tool_radius() -> Result<(), Failure> {
     // Two depths: a boundary loop plus a two-line raster each. The first raster line starts where
     // the loop's retract left the tool, so it plunges in place.
     assert_eq!(toolpath.points.len(), 2 * 14);
-    for point in toolpath.points.iter().filter(|point| point.kind.is_cutting()) {
+    for point in toolpath
+        .points
+        .iter()
+        .filter(|point| point.kind.is_cutting())
+    {
         assert!(
             point.position[0] >= 13.0 - POSITION_TOLERANCE_MM
                 && point.position[0] <= 27.0 + POSITION_TOLERANCE_MM,
@@ -230,6 +237,9 @@ fn an_operation_deeper_than_the_block_is_refused() -> Result<(), Failure> {
         path_id(1)?,
     )
     .err();
-    assert!(error.is_some(), "a 25 mm face cut on a 20 mm block must fail");
+    assert!(
+        error.is_some(),
+        "a 25 mm face cut on a 20 mm block must fail"
+    );
     Ok(())
 }

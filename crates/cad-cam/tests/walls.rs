@@ -59,7 +59,12 @@ fn part() -> Mesh {
 }
 
 fn generate_op(operation: &Operation, raw_id: u64) -> Result<Toolpath, Failure> {
-    Ok(generate(operation, &setup(stock()?)?, &tool()?, path_id(raw_id)?)?)
+    Ok(generate(
+        operation,
+        &setup(stock()?)?,
+        &tool()?,
+        path_id(raw_id)?,
+    )?)
 }
 
 fn wall_path() -> Result<Toolpath, Failure> {

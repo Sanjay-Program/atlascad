@@ -68,7 +68,10 @@ fn an_impossible_depth_is_refused_without_writing_a_program()
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(!out.exists(), "a refused operation must not write a program");
+    assert!(
+        !out.exists(),
+        "a refused operation must not write a program"
+    );
     std::fs::remove_dir_all(&directory)?;
     Ok(())
 }

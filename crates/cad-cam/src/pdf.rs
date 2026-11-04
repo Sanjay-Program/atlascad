@@ -48,7 +48,8 @@ pub fn setup_sheet_pdf(sheet: &SetupSheet) -> Vec<u8> {
         ));
     }
     objects.push(
-        "<</Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding>>".to_string(),
+        "<</Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding>>"
+            .to_string(),
     );
     objects.push(
         "<</Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding>>"
@@ -83,10 +84,7 @@ fn sheet_lines(sheet: &SetupSheet) -> Vec<String> {
     let size = sheet.stock.size();
     let mut lines = vec![
         format!("Machine: {}", machine_name(sheet.machine)),
-        format!(
-            "Stock: {:.1} x {:.1} x {:.1} mm",
-            size[0], size[1], size[2]
-        ),
+        format!("Stock: {:.1} x {:.1} x {:.1} mm", size[0], size[1], size[2]),
         format!("Stock volume: {:.0} mm3", size[0] * size[1] * size[2]),
         format!("Clearance plane: {:.1} mm", sheet.clearance_mm),
         format!(

@@ -47,10 +47,12 @@ cad-cae  (voxel hex8 linear static; analytic patch test, measured cantilever con
      ├──► cad-cli  atlas cae static → a revision-pinned simulation record in the project's registry
      └──► deploy/atlas-cae  one batch container per study (exit 0/1/2/3, no network, no queue)
 cad-cam  (3-axis: setup/stock/WCS, tool library with holders, facing/contour/pocket/drill/slot,
-          3D Z-level roughing, wall finishing, ball-nose surface finishing, holder clearance)
+          material feeds and speeds, 3D Z-level roughing, rest machining, wall finishing,
+          ball-nose surface finishing, holder clearance)
      ▲
-     ├──► cad-cli  atlas cam job --job JOB.json → one program with a tool change, setup.md/pdf,
-     │             stock preview, summary.json (versioned job file; exit 0/1/2/3)
+     ├──► cad-cli  atlas cam feeds → calculated cutting data; atlas cam job --job JOB.json → one
+     │             program with tool changes, setup.md/pdf, stock preview, summary.json
+     │             (versioned job file; exit 0/1/2/3)
      └──► deploy/atlas-cam  one batch container per job (no network, no queue)
                  (no studio surface, no controller verification, no program run on a machine)
 cad-engineering (atlas-eng)  manifests → scan → tasks → report; licence and SBOM policy

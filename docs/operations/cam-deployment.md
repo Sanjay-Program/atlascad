@@ -74,6 +74,9 @@ The job file is versioned because a deployment outlives a flag list:
       "holder": { "diameter_mm": 20, "length_mm": 40 }
     },
     "finish": { "diameter_mm": 6 },
+    "rest": { "diameter_mm": 2 },
+    "material": "aluminium",
+    "flutes": 3,
     "resolution_mm": 2
   }
 }
@@ -85,7 +88,8 @@ names, and the mount is the boundary.
 
 Defaults when a field is omitted: `format` = `grbl`, `resolution_mm` = 1,
 `tool.stepover_mm` = 4, `tool.stepdown_mm` = 2, `tool.flute_length_mm` = 20,
-`tool.stock_to_leave_mm` = 0, no holder, no finishing pass.
+`tool.stock_to_leave_mm` = 0, `flutes` = 2, no holder, no rest pass, no finishing pass, and no
+`material` (the conservative 12 000 rpm / 600 mm/min cutting condition).
 
 Rules enforced before planning (all refused with exit 2 and a reason, never clamped):
 
@@ -96,25 +100,29 @@ Rules enforced before planning (all refused with exit 2 and a reason, never clam
   `stock_to_leave_mm` finite and non-negative; `flute_length_mm` positive;
 * a holder needs both `diameter_mm` and `length_mm` positive;
 * `finish.diameter_mm` positive, and `job.finish` requires `job.part`;
+* `rest.diameter_mm` positive and smaller than `tool.diameter_mm`, and `job.rest` requires
+  `job.part`; `material` is a known material name and `flutes` is at least 1;
 * `format` is `grbl`, `linuxcnc` or `mach3`.
 
 The job file and the input flags are mutually exclusive: `--job` with `--size`, `--part`, `--tool`,
 `--stepover`, `--stepdown`, `--stock-to-leave`, `--resolution`, `--format`, `--flute`,
-`--holder-diameter`, `--holder-length` or `--finish` is refused. A silent override would make the
+`--holder-diameter`, `--holder-length`, `--finish`, `--rest`, `--material` or `--flutes` is refused. A silent override would make the
 embedded inputs disagree with the numbers. `--out-dir` is still required, because where a job writes
 is an operator decision.
 
 ### 2.2 Outputs
 
-Five files, each published by write-to-temp + rename, so a watcher never sees a partial one:
+Five files, each published by write-to-temp + rename, so a watcher never sees a partial one
+(six when provenance is recorded):
 
 | File | Content |
 | --- | --- |
-| `program.<ext>` | one program for every operation, with a tool change (`M0` on Grbl, `T.. M6` on LinuxCNC/Mach3) |
+| `program.<ext>` | one program for every operation, with a tool change per tool (`M0` on Grbl, `T.. M6` on LinuxCNC/Mach3) |
 | `setup.md` | machine, stock, WCS, clearance, tool table, per-operation moves/lengths/time |
 | `setup.pdf` | the same sheet as a paginated A4 PDF with no timestamps (byte-identical for the same job) |
 | `stock-preview.txt` | heightmap removal preview: removed volume, fraction, deepest cut |
-| `summary.json` | printed to stdout too: engine version (`cad-cam 0.1.0`), operations, moves, lengths, times, removal, holder, job path, file list |
+| `summary.json` | printed to stdout too: engine version (`cad-cam 0.1.0`), material, operations (including rest machining), moves, lengths, times, removal, holder, job path, file list |
+| `project.zcad` | only with `ATLAS_PROJECT`: a copy of the design at the recorded revision, carrying the `toolpath` artifact |
 
 `summary.json` names the job file it ran (`job`), so a result can be traced to its inputs without a
 sidecar. The summary records numbers, not the toolpaths; keep `program.*` as the artefact.
@@ -125,10 +133,13 @@ sidecar. The summary records numbers, not the toolpaths; keep `program.*` as the
 | --- | --- | --- |
 | `ATLAS_JOB` | `/work/job.json` | versioned job file |
 | `ATLAS_OUT` | `/out` | output directory |
+| `ATLAS_PROJECT` | unset | optional read-only design; copied to `/out/project.zcad` and recorded |
+| `ATLAS_RECORD` | unset | artifact id to record; requires `ATLAS_PROJECT` |
 
 The entrypoint checks that the job is readable and the output directory exists and is writable
-**before** planning, and exits 2 if not. It then `exec`s `atlas`, so the container's exit code is
-the planner's. The part travels through the same `/work` mount as the job file.
+**before** planning, and exits 2 if not. The provenance pair is all-or-nothing: half of it is exit 2,
+not a silently unrecorded job. It then `exec`s `atlas`, so the container's exit code is the planner's.
+The part travels through the same `/work` mount as the job file.
 
 ## 3. Exit codes and retry policy
 
@@ -166,6 +177,13 @@ docker run --rm \
   atlas-cam:0.1.0
 ```
 
+To pin the program to a design revision, add the read-only project and the artifact id; the project
+is copied into the output so the input volume stays read-only:
+
+```sh
+  -e ATLAS_PROJECT=/work/part.zcad -e ATLAS_RECORD=7 \
+```
+
 `--network none` is not a restriction the planner works around: it makes no network call.
 `--read-only` is why the output volume must be mounted; the entrypoint refuses with exit 2 rather
 than writing into an anonymous volume nobody will find.
@@ -177,6 +195,7 @@ A local run outside a container is the same command:
 
 ```sh
 atlas cam job --job job.json --out-dir out
+atlas cam job --job job.json --out-dir out --project part.zcad --record 7
 ```
 
 ## 5. Resource envelope (measured)
@@ -208,6 +227,10 @@ publish means a killed job never leaves a partial program.
   then exits 3 once the design moves on, and a toolpath is **recompute-only**: reviewing it does not
   release it, so the answer is to rerun the job against the new revision. The artifact keeps the
   summary, not the program — keep `program.*` beside it.
+* In the container, `ATLAS_PROJECT` + `ATLAS_RECORD` do the same without writing to the input mount:
+  the entrypoint copies the project to `/out/project.zcad` and records there, so the published
+  directory carries the design revision and the artifact that names the program. The smoke test
+  checks the copy passes `atlas artifacts check` and that the input project is byte-unchanged.
 * Recording needs a project, and a CAM job can start from a bare STL. Use a project when the part is
   a designed solid; use the STL-only job when it is not, and the summary plus program are the
   provenance.
@@ -264,6 +287,9 @@ spec:
           env:
             - { name: ATLAS_JOB, value: /work/job.json }
             - { name: ATLAS_OUT, value: /out }
+            # optional: pin the program to the design revision
+            # - { name: ATLAS_PROJECT, value: /work/part.zcad }
+            # - { name: ATLAS_RECORD, value: "7" }
           resources:
             requests: { cpu: "1", memory: 128Mi }
             limits: { memory: 512Mi }
@@ -322,4 +348,6 @@ The smoke test builds the image and asserts, in the hardened container: a 20 × 
 40 × 30 × 20 mm stock posts 614 moves as one program with a Grbl tool-change pause, three operations
 (3D roughing, wall finishing, 3D finishing), 18 176 mm³ removed, five output files, a valid PDF; the
 read-only inputs are unchanged; a holder collision exits **3** and publishes no program; a malformed
-job exits **2**; the process is uid 10001; and a job without an output volume exits **2**.
+job exits **2**; the process is uid 10001; a job without an output volume exits **2**; a recorded
+job publishes `project.zcad` that passes the artifact gate while the input project is byte-unchanged;
+and half the provenance pair exits **2**.

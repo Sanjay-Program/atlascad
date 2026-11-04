@@ -43,7 +43,10 @@ fn a_reference_toolpath_is_accepted() -> Result<(), Box<dyn std::error::Error>> 
 fn a_toolpath_shorter_than_two_moves_is_refused() -> Result<(), Box<dyn std::error::Error>> {
     let setup = setup()?;
     let path = toolpath(vec![ToolpathPoint::rapid([0.0, 0.0, 25.0])])?;
-    assert_eq!(path.validate(&setup), Err(ToolpathError::TooShort { points: 1 }));
+    assert_eq!(
+        path.validate(&setup),
+        Err(ToolpathError::TooShort { points: 1 })
+    );
     Ok(())
 }
 

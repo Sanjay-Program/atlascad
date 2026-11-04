@@ -89,9 +89,8 @@ impl MaterialRemoval {
         let origin = [self.stock.min[0], self.stock.min[1]];
         let x0 = ((x - radius - origin[0]) / self.cell[0]).floor().max(0.0) as usize;
         let y0 = ((y - radius - origin[1]) / self.cell[1]).floor().max(0.0) as usize;
-        let x1 =
-            (((x + radius - origin[0]) / self.cell[0]).ceil()).clamp(0.0, self.columns as f64)
-                as usize;
+        let x1 = (((x + radius - origin[0]) / self.cell[0]).ceil()).clamp(0.0, self.columns as f64)
+            as usize;
         let y1 = (((y + radius - origin[1]) / self.cell[1]).ceil()).clamp(0.0, self.rows as f64)
             as usize;
         if x0 >= x1 || y0 >= y1 || x0 >= self.columns || y0 >= self.rows {
@@ -161,10 +160,10 @@ impl MaterialRemoval {
         let origin = [self.stock.min[0], self.stock.min[1]];
         let x0 = ((x - radius - origin[0]) / self.cell[0]).floor().max(0.0) as usize;
         let y0 = ((y - radius - origin[1]) / self.cell[1]).floor().max(0.0) as usize;
-        let x1 = (((x + radius - origin[0]) / self.cell[0]).ceil())
-            .clamp(0.0, self.columns as f64) as usize;
-        let y1 = (((y + radius - origin[1]) / self.cell[1]).ceil())
-            .clamp(0.0, self.rows as f64) as usize;
+        let x1 = (((x + radius - origin[0]) / self.cell[0]).ceil()).clamp(0.0, self.columns as f64)
+            as usize;
+        let y1 = (((y + radius - origin[1]) / self.cell[1]).ceil()).clamp(0.0, self.rows as f64)
+            as usize;
         if x0 >= x1 || y0 >= y1 || x0 >= self.columns || y0 >= self.rows {
             return self.stock.max[2];
         }
