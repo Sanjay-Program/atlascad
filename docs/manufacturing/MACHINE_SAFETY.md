@@ -37,13 +37,14 @@ manufacturing output must satisfy; it is not evidence that a machine was driven.
 
 | Check | Status |
 |---|---|
-| Toolpath generation | not implemented |
-| Postprocessor and reference fixtures | not implemented |
-| Machine kinematics and axis limits | not implemented |
-| Tool/holder/fixture collision | not implemented |
-| Material-removal or machine simulation | not implemented |
-| Safe retract/linking strategy | not implemented |
+| Toolpath generation | **implemented for a 3-axis mill** (`cad-cam`: facing, contour, pocket, drilling, slotting, 3D Z-level roughing, Z-level wall finishing, ball-nose 3D finishing); every toolpath is re-validated before posting |
+| Postprocessor and reference fixtures | **implemented** for Grbl, LinuxCNC and Mach3 with byte-exact regression fixtures, including a tool change in one program; not verified against a controller, and there is no tool-length probing or per-tool work offset |
+| Machine kinematics and axis limits | **partially implemented**: moves are checked against a 3-axis envelope. There are no kinematics, rotary axes or singularities to check, and no five-axis path exists |
+| Tool/holder/fixture collision | **partially implemented**: a modelled holder is checked as a vertical cylinder against a progressively carved heightmap stock, along each move. The machine head, spindle nose, fixtures, clamps and rotary table are not modelled, and side entry into material that was never above the holder is not detected |
+| Material-removal or machine simulation | **partially implemented**: a heightmap stock-removal preview with removed volume and deepest cut. It cannot show undercuts and is not a machine simulation |
+| Safe retract/linking strategy | **partially implemented**: cutting runs are separated by straight retracts to the validated clearance plane. There is no ramp or helical entry, and no linking strategy beyond the clearance plane |
 | Revision-provenance gate for recorded toolpaths | **implemented** (`atlas artifacts check`, exit 3) |
 
 The last row is a data-governance check only. It prevents a stale toolpath from being *called*
-released; it does not make any toolpath safe.
+released; it does not make any toolpath safe. No program produced by this workspace has been run
+on a physical machine, and nothing in the CAM crates constitutes a safety certification.

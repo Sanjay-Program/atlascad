@@ -21,6 +21,11 @@
 //! pipe stdout into another tool.
 
 use cad_cae::{Axis, FaceLoad, FaceSelection, StaticStudy, Support, parse_study, run_static};
+use cad_cam::{
+    CuttingCondition, Holder, Machine, MachineEnvelope, MaterialRemoval, Operation, PostFormat,
+    Postprocessor, Setup, SetupSheet, Stock, Tool, ToolGeometry, ToolId, Toolpath, ToolpathId,
+    WorkCoordinate, check_holder_clearance, generate, setup_sheet_pdf,
+};
 use cad_cli::{
     BoxSpec, Built, CliError, build_box, build_union, draft_plan_view, draft_summary, draft_to_dxf,
     evaluate_project, import_dxf, plot_sheet, write_draft, write_stl_binary,
@@ -67,6 +72,7 @@ fn run() -> Result<i32, CliError> {
         "sheet" => cmd_sheet(&rest),
         "artifacts" => cmd_artifacts(&rest),
         "cae" => cmd_cae(&rest),
+        "cam" => cmd_cam(&rest),
         "help" | "--help" | "-h" => {
             usage();
             Ok(0)
@@ -117,6 +123,18 @@ fn usage() {
     println!(
         "  atlas cae static --file PROJECT.zcad --study STUDY.json --out RESULT.json [--record ID]"
     );
+    println!(
+        "  atlas cam gcode --size X,Y,Z [--depth MM] [--stepover MM] [--tool MM] [--format grbl|linuxcnc|mach3]"
+    );
+    println!("                  [--program NAME] --out FILE.nc");
+    println!(
+        "  atlas cam job --size X,Y,Z --out-dir DIR [--part PART.stl] [--tool MM] [--stepover MM]"
+    );
+    println!("                [--stepdown MM] [--stock-to-leave MM] [--resolution MM] [--format F]");
+    println!("                [--flute MM] [--holder-diameter MM] [--holder-length MM]");
+    println!("                [--finish BALL_MM]");
+    println!("  atlas cam job --job JOB.json --out-dir DIR   (versioned job file; no other input flags)");
+    println!("                [--project PROJECT.zcad --record ARTIFACT_ID [--label TEXT]]");
     println!(
         "  atlas cae static --file PROJECT.zcad --voxel MM --material ID --fix AXIS=COORD[@TOL]"
     );
@@ -900,6 +918,772 @@ fn study_from_flags(flags: &Flags) -> Result<StaticStudy, CliError> {
 
 /// Publish a result file atomically: a watcher or supervisor never observes a half-written result,
 /// and a kill during the write leaves the previous file untouched.
+fn cmd_cam(arguments: &[String]) -> Result<i32, CliError> {
+    let (subcommand, rest) = arguments
+        .split_first()
+        .ok_or_else(|| CliError::Input("cam needs a subcommand: gcode".into()))?;
+    match subcommand.as_str() {
+        "gcode" => cmd_cam_gcode(rest),
+        "job" => cmd_cam_job(rest),
+        other => Err(CliError::Input(format!(
+            "unknown cam subcommand `{other}`; use `atlas cam gcode`"
+        ))),
+    }
+}
+
+/// The JSON a `cam gcode` run reports, so a deployment can gate on the numbers it produced.
+#[derive(serde::Serialize)]
+struct CamSummary {
+    format: String,
+    program: String,
+    out: String,
+    tool_mm: f64,
+    depth_mm: f64,
+    moves: usize,
+    cutting_mm: f64,
+    rapid_mm: f64,
+    estimated_minutes: f64,
+    spindle_rpm: f64,
+    feed_mm_min: f64,
+}
+
+/// `atlas cam gcode` — face a rectangular block on a 3-axis mill and post the program.
+///
+/// The toolpath is generated and validated (envelope, gouging, rapids through the stock) before a
+/// byte is written, so a refused operation exits 3 and leaves no half-written program behind.
+fn cmd_cam_gcode(arguments: &[String]) -> Result<i32, CliError> {
+    let flags = Flags::parse(arguments)?;
+    let size = cam_parse_size(flags.require("--size")?)?;
+    let depth = cam_parse_number(flags.get("--depth").unwrap_or("2"), "--depth")?;
+    let stepover = cam_parse_number(flags.get("--stepover").unwrap_or("4"), "--stepover")?;
+    let diameter = cam_parse_number(flags.get("--tool").unwrap_or("6"), "--tool")?;
+    let format = PostFormat::parse(flags.get("--format").unwrap_or("grbl"))
+        .map_err(|error| CliError::Input(error.to_string()))?;
+    let program = flags.get("--program").unwrap_or("atlas cam facing");
+    let out = PathBuf::from(flags.require("--out")?);
+
+    let tool_id = ToolId::new(1)
+        .ok_or_else(|| CliError::Input("tool ids start at one".to_string()))?;
+    let path_id = ToolpathId::new(1)
+        .ok_or_else(|| CliError::Input("toolpath ids start at one".to_string()))?;
+    let stock = Stock::new([0.0; 3], size).map_err(cam_error)?;
+    let setup = Setup::new(
+        Machine::Milling3Axis,
+        MachineEnvelope::default_mill(),
+        stock,
+        WorkCoordinate::standard(),
+        size[2] + 5.0,
+    )
+    .map_err(cam_error)?;
+    let tool = Tool::new(
+        tool_id,
+        format!("{diameter} mm flat end mill"),
+        ToolGeometry::FlatEndMill {
+            diameter_mm: diameter,
+            flute_length_mm: 20.0,
+        },
+        CuttingCondition::conservative_default(),
+        2.0,
+    )
+    .map_err(cam_error)?;
+    let toolpath = generate(
+        &Operation::Facing {
+            depth_mm: depth,
+            stepover_mm: stepover,
+        },
+        &setup,
+        &tool,
+        path_id,
+    )
+    .map_err(cam_error)?;
+    let gcode = Postprocessor::new(format, program)
+        .emit(&toolpath, &setup)
+        .map_err(cam_error)?;
+    write_atomic(&out, gcode.as_bytes())?;
+
+    let summary = CamSummary {
+        format: format.name().to_string(),
+        program: program.to_string(),
+        out: out.display().to_string(),
+        tool_mm: diameter,
+        depth_mm: depth,
+        moves: toolpath.points.len(),
+        cutting_mm: toolpath.cutting_length_mm(),
+        rapid_mm: toolpath.rapid_length_mm(),
+        estimated_minutes: toolpath.estimated_minutes(),
+        spindle_rpm: toolpath.spindle_rpm,
+        feed_mm_min: tool.cutting.feed_mm_min,
+    };
+    eprintln!(
+        "wrote {} ({} moves, {:.2} min, {} format)",
+        out.display(),
+        summary.moves,
+        summary.estimated_minutes,
+        summary.format
+    );
+    print_json(&summary)?;
+    Ok(0)
+}
+
+/// The JSON a `cam job` run reports: what was posted and what the stock preview removed.
+#[derive(serde::Serialize)]
+struct CamJobSummary {
+    engine: String,
+    program: String,
+    format: String,
+    part: Option<String>,
+    job: Option<String>,
+    holder: Option<String>,
+    wall_moves: Option<usize>,
+    finish_moves: Option<usize>,
+    operations: Vec<String>,
+    moves: usize,
+    cutting_mm: f64,
+    rapid_mm: f64,
+    estimated_minutes: f64,
+    removed_mm3: f64,
+    removal_fraction: f64,
+    files: Vec<String>,
+}
+
+/// The inputs of one CAM job, from flags or from a versioned job file.
+///
+/// A job file is the deployment form: it is versioned, rejects unknown fields, carries no ambient
+/// defaults beyond the ones documented, and cannot be combined with the input flags it replaces.
+#[derive(Debug, Clone, PartialEq)]
+struct CamJobInputs {
+    stock: [f64; 3],
+    stepover: f64,
+    stepdown: f64,
+    diameter: f64,
+    flute: f64,
+    holder_diameter: f64,
+    holder_length: f64,
+    stock_to_leave: f64,
+    resolution: f64,
+    format: PostFormat,
+    program: String,
+    finish_diameter: Option<f64>,
+    part: Option<PathBuf>,
+    job_file: Option<PathBuf>,
+}
+
+impl CamJobInputs {
+    const CONFLICTS: [&'static str; 12] = [
+        "--size",
+        "--part",
+        "--tool",
+        "--stepover",
+        "--stepdown",
+        "--stock-to-leave",
+        "--resolution",
+        "--format",
+        "--flute",
+        "--holder-diameter",
+        "--holder-length",
+        "--finish",
+    ];
+
+    fn parse(flags: &Flags) -> Result<Self, CliError> {
+        match flags.get("--job") {
+            Some(path) => Self::from_file(Path::new(path), flags),
+            None => Self::from_flags(flags),
+        }
+    }
+
+    fn from_flags(flags: &Flags) -> Result<Self, CliError> {
+        let finish_diameter = match flags.get("--finish") {
+            Some(text) => Some(cam_parse_number(text, "--finish")?),
+            None => None,
+        };
+        Ok(Self {
+            stock: cam_parse_size(flags.require("--size")?)?,
+            stepover: cam_parse_number(flags.get("--stepover").unwrap_or("4"), "--stepover")?,
+            stepdown: cam_parse_number(flags.get("--stepdown").unwrap_or("2"), "--stepdown")?,
+            diameter: cam_parse_number(flags.get("--tool").unwrap_or("6"), "--tool")?,
+            flute: cam_parse_number(flags.get("--flute").unwrap_or("20"), "--flute")?,
+            holder_diameter: cam_parse_number(
+                flags.get("--holder-diameter").unwrap_or("0"),
+                "--holder-diameter",
+            )?,
+            holder_length: cam_parse_number(
+                flags.get("--holder-length").unwrap_or("40"),
+                "--holder-length",
+            )?,
+            stock_to_leave: cam_parse_number(
+                flags.get("--stock-to-leave").unwrap_or("0.5"),
+                "--stock-to-leave",
+            )?,
+            resolution: cam_parse_number(flags.get("--resolution").unwrap_or("1"), "--resolution")?,
+            format: PostFormat::parse(flags.get("--format").unwrap_or("grbl"))
+                .map_err(|error| CliError::Input(error.to_string()))?,
+            program: flags.get("--program").unwrap_or("atlas cam job").to_string(),
+            finish_diameter,
+            part: flags.get("--part").map(PathBuf::from),
+            job_file: None,
+        })
+    }
+
+    fn from_file(path: &Path, flags: &Flags) -> Result<Self, CliError> {
+        if let Some(conflict) = Self::CONFLICTS.iter().find(|name| flags.get(name).is_some()) {
+            return Err(CliError::Input(format!(
+                "`--job` and `{conflict}` cannot be combined: the job file carries the inputs"
+            )));
+        }
+        let bytes = std::fs::read(path).map_err(|source| {
+            CliError::Input(format!("cannot read the CAM job `{}`: {source}", path.display()))
+        })?;
+        if bytes.len() > 64 * 1024 {
+            return Err(CliError::Input(format!(
+                "the CAM job `{}` is larger than 64 KiB",
+                path.display()
+            )));
+        }
+        let file: CamJobFile = serde_json::from_slice(&bytes).map_err(|error| {
+            CliError::Input(format!(
+                "the CAM job `{}` is not a valid job file: {error}",
+                path.display()
+            ))
+        })?;
+        if file.schema != 1 {
+            return Err(CliError::Input(format!(
+                "the CAM job schema {} is not supported; this atlas reads schema 1",
+                file.schema
+            )));
+        }
+        let name = file.job.name.trim().to_string();
+        if name.is_empty() || name.chars().count() > 120 {
+            return Err(CliError::Input(
+                "`job.name` must be 1 to 120 visible characters".to_string(),
+            ));
+        }
+        let stock = file.job.stock_mm;
+        for value in stock {
+            cam_positive(value, "job.stock_mm")?;
+        }
+        let tool = &file.job.tool;
+        let diameter = cam_positive(tool.diameter_mm, "job.tool.diameter_mm")?;
+        let stepover = cam_positive(tool.stepover_mm, "job.tool.stepover_mm")?;
+        let stepdown = cam_positive(tool.stepdown_mm, "job.tool.stepdown_mm")?;
+        let flute = cam_positive(tool.flute_length_mm, "job.tool.flute_length_mm")?;
+        let stock_to_leave = cam_non_negative(tool.stock_to_leave_mm, "job.tool.stock_to_leave_mm")?;
+        let (holder_diameter, holder_length) = match &tool.holder {
+            Some(holder) => (
+                cam_positive(holder.diameter_mm, "job.tool.holder.diameter_mm")?,
+                cam_positive(holder.length_mm, "job.tool.holder.length_mm")?,
+            ),
+            None => (0.0, 40.0),
+        };
+        let resolution = cam_positive(file.job.resolution_mm, "job.resolution_mm")?;
+        let finish_diameter = match &file.job.finish {
+            Some(finish) => Some(cam_positive(
+                finish.diameter_mm,
+                "job.finish.diameter_mm",
+            )?),
+            None => None,
+        };
+        let format = PostFormat::parse(&file.job.format)
+            .map_err(|error| CliError::Input(format!("`job.format`: {error}")))?;
+        let part = match &file.job.part {
+            Some(relative) => {
+                let part = Path::new(relative);
+                let base = path.parent().unwrap_or_else(|| Path::new("."));
+                Some(if part.is_absolute() {
+                    part.to_path_buf()
+                } else {
+                    base.join(part)
+                })
+            }
+            None => None,
+        };
+        if finish_diameter.is_some() && part.is_none() {
+            return Err(CliError::Input(
+                "`job.finish` needs `job.part`: there is no surface to follow".to_string(),
+            ));
+        }
+        Ok(Self {
+            stock,
+            stepover,
+            stepdown,
+            diameter,
+            flute,
+            holder_diameter,
+            holder_length,
+            stock_to_leave,
+            resolution,
+            format,
+            program: name,
+            finish_diameter,
+            part,
+            job_file: Some(path.to_path_buf()),
+        })
+    }
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CamJobFile {
+    schema: u32,
+    job: CamJobDefinition,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CamJobDefinition {
+    name: String,
+    stock_mm: [f64; 3],
+    #[serde(default)]
+    part: Option<String>,
+    #[serde(default = "cam_default_format")]
+    format: String,
+    tool: CamJobTool,
+    #[serde(default)]
+    finish: Option<CamJobFinish>,
+    #[serde(default = "cam_default_resolution")]
+    resolution_mm: f64,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CamJobTool {
+    diameter_mm: f64,
+    #[serde(default = "cam_default_stepover")]
+    stepover_mm: f64,
+    #[serde(default = "cam_default_stepdown")]
+    stepdown_mm: f64,
+    #[serde(default = "cam_default_flute")]
+    flute_length_mm: f64,
+    #[serde(default)]
+    stock_to_leave_mm: f64,
+    #[serde(default)]
+    holder: Option<CamJobHolder>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CamJobHolder {
+    diameter_mm: f64,
+    length_mm: f64,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CamJobFinish {
+    diameter_mm: f64,
+}
+
+fn cam_default_format() -> String {
+    "grbl".to_string()
+}
+
+fn cam_default_resolution() -> f64 {
+    1.0
+}
+
+fn cam_default_stepover() -> f64 {
+    4.0
+}
+
+fn cam_default_stepdown() -> f64 {
+    2.0
+}
+
+fn cam_default_flute() -> f64 {
+    20.0
+}
+
+fn cam_positive(value: f64, field: &str) -> Result<f64, CliError> {
+    if !value.is_finite() || value <= 0.0 {
+        return Err(CliError::Input(format!(
+            "`{field}` must be positive and finite, got {value}"
+        )));
+    }
+    Ok(value)
+}
+
+fn cam_non_negative(value: f64, field: &str) -> Result<f64, CliError> {
+    if !value.is_finite() || value < 0.0 {
+        return Err(CliError::Input(format!(
+            "`{field}` must be finite and non-negative, got {value}"
+        )));
+    }
+    Ok(value)
+}
+
+/// `atlas cam job` — the whole headless CAM workflow into one directory.
+///
+/// With `--part` it roughs the part from the stock with Z-level 3D roughing; without it, it faces
+/// the block. It then posts one program, writes the setup sheet, carves the stock preview and
+/// writes the summary. Every number in the sheet and summary comes from the validated toolpath.
+fn cmd_cam_job(arguments: &[String]) -> Result<i32, CliError> {
+    let flags = Flags::parse(arguments)?;
+    let inputs = CamJobInputs::parse(&flags)?;
+    let out_dir = PathBuf::from(flags.require("--out-dir")?);
+    // Provenance flags are parsed before planning so a typo fails without writing a program.
+    let record = match flags.get("--record") {
+        Some(value) => {
+            let raw = value
+                .parse::<u64>()
+                .map_err(|_| CliError::Input(format!("artifact id `{value}` is not a number")))?;
+            Some(
+                ArtifactId::new(raw)
+                    .ok_or_else(|| CliError::Input("`--record` needs a positive artifact id".into()))?,
+            )
+        }
+        None => None,
+    };
+    if record.is_some() && flags.get("--project").is_none() {
+        return Err(CliError::Input(
+            "`--record` needs `--project PROJECT.zcad`: a toolpath is recorded against a design revision"
+                .to_string(),
+        ));
+    }
+    if record.is_none() && flags.get("--project").is_some() {
+        return Err(CliError::Input(
+            "`--project` needs `--record ARTIFACT_ID`".to_string(),
+        ));
+    }
+    let size = inputs.stock;
+    let stepover = inputs.stepover;
+    let stepdown = inputs.stepdown;
+    let diameter = inputs.diameter;
+    let flute = inputs.flute;
+    let holder_diameter = inputs.holder_diameter;
+    let holder_length = inputs.holder_length;
+    let stock_to_leave = inputs.stock_to_leave;
+    let resolution = inputs.resolution;
+    let format = inputs.format;
+    let program = inputs.program.as_str();
+    let finish_diameter = inputs.finish_diameter;
+
+    let tool_id = ToolId::new(1)
+        .ok_or_else(|| CliError::Input("tool ids start at one".to_string()))?;
+    let path_id = ToolpathId::new(1)
+        .ok_or_else(|| CliError::Input("toolpath ids start at one".to_string()))?;
+    let stock = Stock::new([0.0; 3], size).map_err(cam_error)?;
+    let setup = Setup::new(
+        Machine::Milling3Axis,
+        MachineEnvelope::default_mill(),
+        stock,
+        WorkCoordinate::standard(),
+        size[2] + 5.0,
+    )
+    .map_err(cam_error)?;
+    let mut tool = Tool::new(
+        tool_id,
+        format!("{diameter} mm flat end mill"),
+        ToolGeometry::FlatEndMill {
+            diameter_mm: diameter,
+            flute_length_mm: flute,
+        },
+        CuttingCondition::conservative_default(),
+        2.0,
+    )
+    .map_err(cam_error)?;
+    let holder_note = if holder_diameter > 0.0 {
+        tool = tool
+            .with_holder(Holder::new(holder_diameter, holder_length).map_err(cam_error)?)
+            .map_err(cam_error)?;
+        Some(format!(
+            "{holder_diameter} x {holder_length} mm, clear of the stock"
+        ))
+    } else {
+        None
+    };
+    let finish_tool = match finish_diameter {
+        Some(diameter) => {
+            let mut finish_tool = Tool::new(
+                ToolId::new(2)
+                    .ok_or_else(|| CliError::Input("tool ids start at one".to_string()))?,
+                format!("{diameter} mm ball end mill"),
+                ToolGeometry::BallEndMill {
+                    diameter_mm: diameter,
+                    flute_length_mm: flute,
+                },
+                CuttingCondition::conservative_default(),
+                2.0,
+            )
+            .map_err(cam_error)?;
+            if holder_diameter > 0.0 {
+                finish_tool = finish_tool
+                    .with_holder(Holder::new(holder_diameter, holder_length).map_err(cam_error)?)
+                    .map_err(cam_error)?;
+            }
+            Some(finish_tool)
+        }
+        None => None,
+    };
+
+    let part = match &inputs.part {
+        Some(path) => {
+            let bytes = std::fs::read(path).map_err(|source| {
+                CliError::Input(format!("cannot read the part `{}`: {source}", path.display()))
+            })?;
+            Some(cad_io::read_stl_binary(&bytes).map_err(|error| {
+                CliError::Input(format!("the part `{}` is not a valid binary STL: {error}", path.display()))
+            })?)
+        }
+        None => None,
+    };
+
+    if finish_tool.is_some() && part.is_none() {
+        return Err(CliError::Input(
+            "`--finish` needs `--part`: there is no surface to follow".to_string(),
+        ));
+    }
+
+    let mut operations: Vec<(String, Toolpath)> = Vec::new();
+    if let Some(part) = &part {
+        let operation = Operation::Rough3D {
+            part: part.clone(),
+            stepover_mm: stepover,
+            stepdown_mm: stepdown,
+            stock_to_leave_mm: stock_to_leave,
+            resolution_mm: resolution,
+        };
+        let toolpath = generate(&operation, &setup, &tool, path_id).map_err(cam_error)?;
+        operations.push((operation.name().to_string(), toolpath));
+    } else {
+        let operation = Operation::Facing {
+            depth_mm: stepdown.min(size[2]),
+            stepover_mm: stepover,
+        };
+        let toolpath = generate(&operation, &setup, &tool, path_id).map_err(cam_error)?;
+        operations.push((operation.name().to_string(), toolpath));
+    }
+
+    let walls = match (&part, finish_tool.is_some()) {
+        (Some(part), true) => {
+            let path_id = ToolpathId::new(2)
+                .ok_or_else(|| CliError::Input("toolpath ids start at one".to_string()))?;
+            let operation = Operation::FinishWalls {
+                part: part.clone(),
+                stepdown_mm: stepdown,
+                stock_to_leave_mm: 0.0,
+                resolution_mm: resolution,
+            };
+            let toolpath = generate(&operation, &setup, &tool, path_id).map_err(cam_error)?;
+            Some((operation.name().to_string(), toolpath))
+        }
+        _ => None,
+    };
+
+    let finish = match (&part, &finish_tool) {
+        (Some(part), Some(tool)) => {
+            let path_id = ToolpathId::new(3)
+                .ok_or_else(|| CliError::Input("toolpath ids start at one".to_string()))?;
+            let operation = Operation::Finish3D {
+                part: part.clone(),
+                stepover_mm: stepover,
+                stock_to_leave_mm: 0.0,
+                resolution_mm: resolution,
+            };
+            let toolpath = generate(&operation, &setup, tool, path_id).map_err(cam_error)?;
+            toolpath.validate(&setup).map_err(cam_error)?;
+            check_holder_clearance(&toolpath, tool, stock, resolution).map_err(cam_error)?;
+            Some((operation.name().to_string(), toolpath))
+        }
+        _ => None,
+    };
+
+    // The flat tool cuts the roughing pass and then the walls; the ball nose follows the surface.
+    for (_, toolpath) in &operations {
+        check_holder_clearance(toolpath, &tool, stock, resolution).map_err(cam_error)?;
+    }
+    if let Some((_, toolpath)) = &walls {
+        check_holder_clearance(toolpath, &tool, stock, resolution).map_err(cam_error)?;
+    }
+
+    std::fs::create_dir_all(&out_dir).map_err(|source| CliError::Io {
+        path: out_dir.display().to_string(),
+        source,
+    })?;
+    let mut segments: Vec<&Toolpath> = operations
+        .iter()
+        .chain(walls.iter())
+        .map(|(_, toolpath)| toolpath)
+        .collect();
+    if let Some((_, toolpath)) = &finish {
+        segments.push(toolpath);
+    }
+    let program_path = out_dir.join(format!("program.{}", format.extension()));
+    let gcode = Postprocessor::new(format, program)
+        .emit_program(&segments, &setup)
+        .map_err(cam_error)?;
+    write_atomic(&program_path, gcode.as_bytes())?;
+
+    let mut sheet = SetupSheet::new(program, &setup);
+    for (name, toolpath) in &operations {
+        sheet.add_operation(name.clone(), &tool, toolpath);
+    }
+    if let Some((name, toolpath)) = &walls {
+        sheet.add_operation(name.clone(), &tool, toolpath);
+    }
+    if let (Some((name, toolpath)), Some(finish_tool)) = (&finish, &finish_tool) {
+        sheet.add_operation(name.clone(), finish_tool, toolpath);
+    }
+    let sheet_path = out_dir.join("setup.md");
+    write_atomic(&sheet_path, sheet.render().as_bytes())?;
+    let pdf_path = out_dir.join("setup.pdf");
+    write_atomic(&pdf_path, &setup_sheet_pdf(&sheet))?;
+
+    let mut removal = MaterialRemoval::new(stock, resolution).map_err(cam_error)?;
+    for (_, toolpath) in operations.iter().chain(walls.iter()) {
+        removal.carve(toolpath, &tool);
+    }
+    if let (Some((_, toolpath)), Some(finish_tool)) = (&finish, &finish_tool) {
+        removal.carve(toolpath, finish_tool);
+    }
+    let preview_path = out_dir.join("stock-preview.txt");
+    write_atomic(&preview_path, removal.render().as_bytes())?;
+
+    let summary_path = out_dir.join("summary.json");
+    let summary = CamJobSummary {
+        engine: format!("cad-cam {}", cad_cam::VERSION),
+        program: program.to_string(),
+        format: format.to_string(),
+        part: inputs
+            .part
+            .as_ref()
+            .map(|path| path.display().to_string()),
+        job: inputs
+            .job_file
+            .as_ref()
+            .map(|path| path.display().to_string()),
+        holder: holder_note,
+        wall_moves: walls.as_ref().map(|(_, toolpath)| toolpath.points.len()),
+        finish_moves: finish.as_ref().map(|(_, toolpath)| toolpath.points.len()),
+        operations: operations
+            .iter()
+            .chain(walls.iter())
+            .map(|(name, _)| name.clone())
+            .chain(finish.iter().map(|(name, _)| name.clone()))
+            .collect(),
+        moves: segments
+            .iter()
+            .map(|toolpath| toolpath.points.len())
+            .sum(),
+        cutting_mm: segments
+            .iter()
+            .map(|toolpath| toolpath.cutting_length_mm())
+            .sum(),
+        rapid_mm: segments
+            .iter()
+            .map(|toolpath| toolpath.rapid_length_mm())
+            .sum(),
+        estimated_minutes: segments
+            .iter()
+            .map(|toolpath| toolpath.estimated_minutes())
+            .sum(),
+        removed_mm3: removal.removed_volume_mm3(),
+        removal_fraction: removal.removal_fraction(),
+        files: vec![
+            program_path.display().to_string(),
+            sheet_path.display().to_string(),
+            preview_path.display().to_string(),
+            summary_path.display().to_string(),
+            pdf_path.display().to_string(),
+        ],
+    };
+    let json = serde_json::to_string_pretty(&summary)
+        .map_err(|error| CliError::Analysis(format!("cam: cannot serialise the summary: {error}")))?;
+    write_atomic(&summary_path, json.as_bytes())?;
+    if let (Some(id), Some(project_path)) = (record, flags.get("--project")) {
+        record_toolpath(&flags, id, project_path, &summary)?;
+    }
+    eprintln!(
+        "wrote {} ({} moves, {:.1} mm3 removed, {:.2} min)",
+        program_path.display(),
+        summary.moves,
+        summary.removed_mm3,
+        summary.estimated_minutes
+    );
+    print_json(&summary)?;
+    Ok(0)
+}
+
+/// Record the posted program as a `toolpath` artifact at the project's current revision.
+///
+/// A toolpath is recompute-only: the release gate reports it stale as soon as the design moves on,
+/// and reviewing it does not clear that. The artifact keeps the summary, not the program.
+fn record_toolpath(
+    flags: &Flags,
+    id: ArtifactId,
+    project_path: &str,
+    summary: &CamJobSummary,
+) -> Result<(), CliError> {
+    let path = PathBuf::from(project_path);
+    let mut project = Project::load(&path)?;
+    let label = flags.get("--label").unwrap_or("CAM program");
+    let mut artifact = DerivedArtifact::new(
+        id,
+        ArtifactKind::Toolpath,
+        label,
+        DocumentRef::new(project.header.document, project.revision, None),
+    );
+    artifact.source_entities = project
+        .sketches()
+        .iter()
+        .map(|sketch| sketch.id)
+        .chain(project.features().iter().map(|feature| feature.id))
+        .collect();
+    artifact.result.summary = format!(
+        "{} ({}, {}): {} moves, {:.1} mm cutting, {:.2} min, {:.0} mm3 removed of {:.0} ({:.1}%), {} operations",
+        summary.program,
+        summary.format,
+        summary.engine,
+        summary.moves,
+        summary.cutting_mm,
+        summary.estimated_minutes,
+        summary.removed_mm3,
+        summary.removed_mm3 / summary.removal_fraction.max(1.0e-12),
+        summary.removal_fraction * 100.0,
+        summary.operations.len()
+    );
+    if let Some(holder) = &summary.holder {
+        artifact.result.summary.push_str(&format!("; holder {holder}"));
+    }
+    project.record_artifact(artifact)?;
+    project.save(&path)?;
+    eprintln!(
+        "recorded toolpath artifact {} at revision {} in {}",
+        id.get(),
+        project.revision.get(),
+        path.display()
+    );
+    Ok(())
+}
+
+fn cam_error(error: impl std::fmt::Display) -> CliError {
+    CliError::Analysis(format!("cam: {error}"))
+}
+
+fn cam_parse_number(text: &str, flag: &str) -> Result<f64, CliError> {
+    let value = text.parse::<f64>().map_err(|_| {
+        CliError::Input(format!("`{flag}` value `{text}` is not a number"))
+    })?;
+    if !value.is_finite() {
+        return Err(CliError::Input(format!(
+            "`{flag}` value `{text}` must be finite"
+        )));
+    }
+    Ok(value)
+}
+
+fn cam_parse_size(text: &str) -> Result<[f64; 3], CliError> {
+    let parts: Vec<&str> = text.split(',').collect();
+    if parts.len() != 3 {
+        return Err(CliError::Input(format!(
+            "`--size` needs X,Y,Z, got `{text}`"
+        )));
+    }
+    Ok([
+        cam_parse_number(parts[0], "--size")?,
+        cam_parse_number(parts[1], "--size")?,
+        cam_parse_number(parts[2], "--size")?,
+    ])
+}
+
 fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), CliError> {
     static RESULT_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 

@@ -1,0 +1,15 @@
+[package]
+name = "cad-cam"
+description = "2.5D/3-axis CAM: machining setup, tool library, stock, toolpath generation and G-code export."
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+cad-contract.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

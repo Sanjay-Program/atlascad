@@ -24,7 +24,7 @@ a rung is claimed only when its acceptance has been exercised.
 |---|---|---|---|---|
 | **A** | Shared engineering foundation | **rung 7 for identity, materials, provenance and per-kind release policy** | `cad-engineering-model`: document + revision + fingerprint, stable artifact ids, validated 7-material library, revision-pinned artifacts, transitive staleness, explicit review, per-kind release policy, versioned atomic JSON; embedded in `.zcad` schema 9; CLI gate (`atlas artifacts`, exit 3); studio `/api/engineering` and `/api/engineering/review`; drawing and simulation staleness | entity-level change diff; only two producers (drawing, linear static study); no signed audit trail |
 | **B** | Core CAD and assemblies | **partial — core CAD at rung 7–8, assemblies absent (rung 1)** | parametric feature graph, sketch profiles, extrude/join/cut/revolve, rebuild cache, drawing editor, DXF/PDF, STL | fillet/chamfer/shell/sweep/loft/pattern, multi-body, assemblies, joints, motion, BOM, constraints, STEP/IGES |
-| **C** | Basic CAM (2.5D/3-axis) | **absent (rung 1–2)** | artifact metadata kind and a recompute-only release policy | every CAM producer, tool library, simulation, postprocessor |
+| **C** | Basic CAM (2.5D/3-axis) | **2.5D, 3D roughing, wall and surface finishing and holder checking at rung 7 headless; turning absent** | `cad-cam`: setup/stock/WCS, tool library with holders, facing/contour/pocket/drilling/slotting, 3D Z-level roughing from a sampled part heightfield, Z-level wall finishing by contouring the sampled cross-section, ball-nose 3D finishing, toolpath validation (continuity, axis limits, gouging, rapids through the stock), material-removal stock preview, tool-holder clearance against the carved stock, setup sheet, tool list and paginated PDF, Grbl/LinuxCNC/Mach3 postprocessors with byte-exact fixtures and a tool change in one program, `atlas cam gcode` and `atlas cam job`, a versioned job file, a toolpath artifact recorded at the design revision, and a hardened batch image, 61 domain tests and 13 CLI tests | rest machining, turning, machine-head and fixture collision, machine simulation, feeds-and-speeds calculation, GUI |
 | **D** | Basic CAE | **partial — linear static at rung 7, batch-deployed; modal, thermal, buckling absent** | `cad-cae`: voxel hex8 mesh from the closed tessellation, isotropic linear elasticity, Jacobi-PCG solve, displacement/von Mises/strain energy/reactions, volume-error and open-mesh guards, analytic patch test and cantilever convergence series, `atlas cae static`, revision-pinned `simulation` record, a versioned `--study` job file, and a non-root batch container with exit 0/1/2/3 | modal, thermal, buckling, nonlinear, dynamic, injection moulding, electronics cooling, result fields and a viewer, boundary-fitted meshing, a job queue or submission service |
 | **E** | Electronics | **absent (rung 0–1)** | one FR-4 material entry and a PCB-layout artifact kind | schematic, PCB, ERC, sync, SPICE, 3D integration, cooling |
 | **F** | Advanced engineering | **absent (rung 1)** | nothing | 4/5-axis, nesting, turning, additive, nonlinear, buckling, moulding, generative design |
@@ -43,6 +43,27 @@ a rung is claimed only when its acceptance has been exercised.
 | Per-kind release policy (new 2026-11-03) | 5 | simulations, toolpaths, manufacturing setups, inspections and PCB layouts require a recompute; drawings, documentation and other kinds may be released after review; a policy-blocked result blocks its dependents | a user-facing explanation in the studio and a per-artifact policy override with an audit record |
 | Versioned atomic persistence | 7 | registry round trip; project schema-9 save/reopen and schema-8 migration; unknown/newer schema, 8 MiB, zero revision, no temp files | measurement on a 4096-artifact registry |
 | Release gate | 7 | `atlas artifacts check` exits 3 on stale records in project-embedded and sidecar modes; a reviewed toolpath still exits 3 | CI wiring; a per-kind requirement in the report is not yet shown in the studio |
+
+## Phase C detail
+
+| Item | Rung | Evidence | Next rung needs |
+|---|---:|---|---|
+| Setup, stock and work coordinate system | 7 | stock outside the machine envelope and a clearance plane below the stock top are refused; machine->work mapping is checked against the envelope | tilted WCS and 4/5-axis kinematics |
+| Tool library | 7 | flat/ball end mill, drill and face mill; duplicate ids, non-positive diameters, spindle speeds above the machine limit and a plunge feed above the cutting feed are refused | a material/tool database and feeds-and-speeds calculation |
+| Facing, contour, pocket, drilling, slotting | 7 | reference fixture with exact move counts, offset contour corners, closed loops and peck depths; deep cuts split by the tool's maximum depth of cut | rest machining, adaptive clearing |
+| Toolpath validation | 7 | 12 acceptance cases: short, non-finite, unset feed, zero-length, 250 mm discontinuity, envelope, gouge, rapid-through-stock collision, clearance and spindle | fixture collision, machine simulation |
+| Postprocessors | 7 | Grbl, LinuxCNC and Mach3 byte-exact fixtures, modal moves, optional line numbers, a tool change in one program (Grbl `M0` pause, LinuxCNC/Mach3 `T.. M6`), unsafe toolpaths refused before posting | a controller-accepted program on real hardware, and a versioned post definition |
+| `atlas cam gcode` | 7 | CLI test writes a program and a JSON summary; an impossible depth exits 3 without writing a file | a studio surface and a job-file form |
+| Material-removal preview | 7 | heightmap stock model carved by the validated program; facing a 40 x 30 block 2 mm deep reports 2 400 mm³ within 5%; rapids remove nothing; text render and deepest cut | a triangle or voxel model that can show an undercut |
+| Setup sheet and tool list | 7 | generated from the same setup, tools and toolpaths as the program; machine, stock, WCS, clearance, per-tool feeds/speeds and per-operation moves, lengths and time | a per-fixture layout page |
+| PDF setup sheet | 7 | a self-contained A4 writer (Helvetica, uncompressed streams) with a valid trailer whose `startxref` points at the xref table, deterministic bytes, escaped parenthesised text and pagination past 48 lines | a text-shaping layer for non-ASCII titles |
+| 3D roughing | 7 | two-block fixture (16 mm beside 8 mm): the tall block is untouched below its top, the low block stops at the deepest level leaving the 0.5 mm allowance, stock beside the part is cleared to the bottom skin, levels respect the 2 mm maximum depth of cut, and a part filling the stock returns `NothingToMachine` | rest machining, a watertight part requirement |
+| 3D finishing | 6 | six cases on a sampled step part: every surface cut sits one ball radius above the sampled height (15.0 mm over a 12 mm top), the allowance lifts it, a flat end mill and a surface above the clearance plane are refused, and reversing the raster leaves the same cut length | rest machining, pencil/steep-shallow finishing, a normal-offset (non-conservative) contact point |
+| Wall finishing | 7 | a 20 x 20 x 12 mm block inside the stock: every cut stays at least one tool radius from the wall and within reach of the roughing shell, levels respect the 2 mm maximum depth of cut and stop at the floor, the pass removes stock roughing left, a part that fills the stock returns `NothingToMachine`, and a negative allowance is refused | slicing the mesh boundary and offsetting the contour, instead of contouring a grid-sampled cross-section (which leaves about one cell on the wall) |
+| Tool-holder clearance | 6 | the holder is checked as a wide cylinder against the progressively carved heightmap: a short tool with a wide holder collides at the named move, a 19 mm narrow slot does not clear a 20 mm holder, long flutes and no holder pass | machine head, spindle nose, fixtures and clamps; side entry into material that was never above the holder |
+| `atlas cam job` | 7 | one command writes `program.nc`, `setup.md`, `setup.pdf`, `stock-preview.txt` and `summary.json` from an STL part or, without one, faces the block; `--finish MM` adds wall finishing and a ball-nose surface pass, all in one program with a tool change; CLI tests assert all five, the three operations, the change, the printed summary, and a holder collision that exits 3 without writing a program | a studio surface |
+| Versioned CAM job file, provenance and batch image | 7 | `--job` reads schema 1, refuses unknown fields, caps the file at 64 KiB, resolves the part beside the job and refuses every conflicting input flag, all with exit 2; `--project` + `--record` writes a recompute-only `toolpath` artifact at the current revision and `atlas artifacts check` passes until the design moves on; `deploy/build-cam-image.sh --smoke` built `atlas-cam:0.1.0` and ran it hardened: 614 moves and five files, holder collision exit 3 with nothing published, malformed job exit 2, uid 10001, no output volume exit 2 | cluster orchestration was not executed; recording needs a project, so an STL-only job has no revision to pin |
+| Turning, multi-axis | 0 | — | a real producer, a reference fixture and a collision test each |
 
 ## Phase D detail
 
@@ -66,7 +87,7 @@ a rung is claimed only when its acceptance has been exercised.
 |---|---|
 | `docs/architecture/UNIFIED_ENGINEERING_MODEL.md` | written, describes the implemented Phase A and the release policy |
 | `docs/cad/CAD_CAPABILITIES.md` | written, implemented set + limits |
-| `docs/cam/CAM_CAPABILITIES.md` | written, explicitly **not implemented** |
+| `docs/cam/CAM_CAPABILITIES.md` | written, **2.5D CAM implemented and tested**; 3D, turning, simulation and GUI explicitly absent |
 | `docs/cae/CAE_CAPABILITIES.md` | written, **linear static implemented and validated**; other analyses explicitly absent |
 | `docs/ecad/ECAD_CAPABILITIES.md` | written, explicitly **not implemented** |
 | `docs/ai/ENGINEERING_AI.md` | written, no AI implemented; pipeline and safety rules stated |
@@ -85,13 +106,14 @@ a rung is claimed only when its acceptance has been exercised.
    quality reporting.
 4. **Entity-level change reporting** from `cad-document`, so a stale report can name the sketches and
    features that changed rather than only the revision numbers.
-5. **CAM 2.5D foundation**: machining setup, tool library, contour/pocket/facing/drilling, a
-   toolpath preview and postprocessor fixtures, gated by the recompute-only toolpath policy.
+5. **CAM depth**: 3D finishing/surfacing over the existing height field, and a stock preview that
+   can show an undercut, before any turning or multi-axis claim.
 
 ## Explicit non-claims
 
-* No CAM, ECAD, BIM, GIS, generative-design or AI capability is implemented.
-* No machine code is generated and no machine is controlled.
+* No ECAD, BIM, GIS, generative-design or AI capability is implemented.
+* CAM posts G-code for Grbl, LinuxCNC and Mach3, but no program has been run on a controller and no
+  machine is controlled. 3D milling, turning and multi-axis CAM do not exist.
 * Linear static results are preliminary studies; no result is certified, and no modal, thermal,
   buckling, nonlinear or dynamic result exists.
 * Injection moulding and electronics cooling do not exist.

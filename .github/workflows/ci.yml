@@ -43,6 +43,20 @@ jobs:
           path: engineering/sbom/atlascad.cdx.json
           if-no-files-found: error
 
+  cam-image:
+    name: cam batch image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+
+      # The image contract is not covered by the workspace gate: this builds atlas-cam and runs the
+      # hardened container end to end (post, tool change, holder refusal, bad job, non-root).
+      - name: build and smoke the CAM job image
+        run: deploy/build-cam-image.sh --smoke
+
   advisories:
     name: advisories and dependency sources
     runs-on: ubuntu-latest
