@@ -539,6 +539,13 @@ After the guard was narrowed to that measured envelope, the full gate passed aga
 and `deploy/smoke.sh --advanced` passed against the rebuilt image (**126 assertions, 18 steps, 21
 screenshots, 3 parsed downloads**).
 
+Re-checked on commit `f838def` against the production `compose.yaml`, not the smoke file: `deploy/up.sh`
+with `STUDIO_PUBLIC_HOST=localhost` and ports moved to 8088/8448/7529 (the older `deploy-*` smoke
+stack from 2026-11-04 still owns 80/443 on this host) started a healthy TLS stack, `/api/health`
+returned 200, plain HTTP answered 308 to HTTPS, `/api/state` answered 401 without a token and 200
+with one, and stop → `backup.sh` → volume wiped → `restore.sh --yes` → `up.sh` returned the same
+state byte for byte (1 486 bytes, `efb6674f…`). The stack was then removed with `down -v`.
+
 What remains absent is unchanged and listed in `docs/operations/deployment.md` §9: no accounts, no
 revocation without a restart, no multi-document mode, no in-process TLS, no audit trail, no
 horizontal scaling.
