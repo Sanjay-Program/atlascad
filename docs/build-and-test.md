@@ -540,11 +540,18 @@ and `deploy/smoke.sh --advanced` passed against the rebuilt image (**126 asserti
 screenshots, 3 parsed downloads**).
 
 Re-checked on commit `f838def` against the production `compose.yaml`, not the smoke file: `deploy/up.sh`
-with `STUDIO_PUBLIC_HOST=localhost` and ports moved to 8088/8448/7529 (the older `deploy-*` smoke
-stack from 2026-11-04 still owns 80/443 on this host) started a healthy TLS stack, `/api/health`
-returned 200, plain HTTP answered 308 to HTTPS, `/api/state` answered 401 without a token and 200
-with one, and stop → `backup.sh` → volume wiped → `restore.sh --yes` → `up.sh` returned the same
-state byte for byte (1 486 bytes, `efb6674f…`). The stack was then removed with `down -v`.
+started a healthy TLS stack, `/api/health` returned 200, plain HTTP answered 308 to HTTPS,
+`/api/state` answered 401 without a token and 200 with one, and stop → `backup.sh` → volume wiped →
+`restore.sh --yes` → `up.sh` returned the same state byte for byte (1 486 bytes, `efb6674f…`). The
+older `deploy-*` smoke stack from 2026-11-04, a leftover that had been holding 80/443, was then
+removed, and the same `up.sh` was run again with no port overrides on the documented defaults
+(80/443/7519). There `scripts/browser-drive.mjs` passed its full advanced flow over
+`https://localhost` (126 assertions, 18 steps, 21 screenshots, 3 downloads, STL volume matching the
+model); the driver's status-bar reader now keeps the thousands separator in view, which it had been
+dropping in `12,000 mm³`. Both stacks were removed with `down -v` afterwards.
+
+Browser-drive fix: the status bar groups thousands, and the old `([0-9.]+)\s*mm` pattern started
+after the comma and read `000`. The pattern now captures the grouped number.
 
 What remains absent is unchanged and listed in `docs/operations/deployment.md` §9: no accounts, no
 revocation without a restart, no multi-document mode, no in-process TLS, no audit trail, no

@@ -363,9 +363,10 @@ try {
 
   const volumeMm3 = async () => {
     const text = await evaluate('document.getElementById("statusGeometry").textContent');
-    const match = text.match(/([0-9.]+)\s*mm/);
+    // The status bar groups thousands (12,000 mm³), so take the whole number and drop the commas.
+    const match = text.match(/([0-9][0-9,]*(?:\.[0-9]+)?)\s*mm/);
     check(Boolean(match), `the status bar has no volume: ${text}`);
-    return Number(match[1]);
+    return Number(match[1].replace(/,/g, ""));
   };
 
   const near = (actual, expected, tolerance = 0.01) =>
