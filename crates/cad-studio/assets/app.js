@@ -1362,8 +1362,10 @@
     const operationSelect = byId("newFeatureOperation");
     // Rebuild the options from scratch so the unavailable ones are not selectable. Cut is offered
     // only when the kernel advertises boolean difference, because a cut on a kernel without it has
-    // no geometry behind the button. The truck adapter advertises it: a cut whose tool overshoots
-    // the body is exact (verified analytically and through this API).
+    // no geometry behind the button. The truck adapter advertises it: a cut whose tool pierces
+    // the body is exact (verified analytically and through this API), and the document refuses one
+    // that stops below the body's top face instead of accepting the wrong solid the raw boolean
+    // returns.
     const capabilities = project && project.kernel ? project.kernel.capabilities : [];
     const supportsDifference = capabilities.includes("boolean difference");
     const supportsRevolve = capabilities.includes("revolve");

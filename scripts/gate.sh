@@ -44,9 +44,16 @@ cargo run --offline -q -p cad-engineering --bin atlas-eng -- licences
 step "SBOM (dry run: fails if the graph cannot be read)"
 cargo run --offline -q -p cad-engineering --bin atlas-eng -- sbom
 
+step "deployment assets (shell syntax, compose interpolation, Caddyfile)"
+./deploy/validate.sh
+
 if [ "$QUICK" -eq 0 ]; then
   step "live simulation: HTTP server, CLI, control plane and browser"
   ./scripts/simulate.sh
+
+  # simulate.sh leaves an up-to-date release binary behind, which this suite drives.
+  step "exhaustive product check: every route, export, recovery and share path"
+  python3 scripts/full-check.py
 else
   step "live HTTP simulation (skipped: --quick)"
 fi

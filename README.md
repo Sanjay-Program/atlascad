@@ -110,9 +110,18 @@ the version with no token, so a supervisor can probe it.
 
 ### Deploy it
 
-`deploy/` holds a container image, a hardened systemd unit and a Caddyfile. The image is built and
+`deploy/` holds the hosted stack (`compose.yaml`: studio plus Caddy, the token as a file secret,
+both containers hardened), a container image, a hardened systemd unit and a Caddyfile.
+`deploy/up.sh` starts the stack after a preflight (token, DNS name, image, interpolatable config),
+and `deploy/backup.sh` / `deploy/restore.sh` cover the document volume. The image is built and
 smoke-tested by `deploy/build-image.sh --smoke` (build, start, healthcheck, anonymous read refused,
-tokenised read, plotted PDF, teardown). [`docs/operations/deployment.md`](docs/operations/deployment.md)
+tokenised read, plotted PDF, teardown). `deploy/smoke.sh` proves the *hosted* shape end to end: it
+creates a brand-new document on a fresh volume, checks liveness over HTTP and HTTPS through Caddy,
+checks the token boundary, and drives the real page in headless Chrome through the proxy (31
+assertions, including STL/DXF/PDF downloads) before tearing everything down. `python3 scripts/full-check.py`
+is the exhaustive functional pass against the same binary: 223 assertions over every sketch profile,
+every extrusion operation, revolve, drafting entities and plots, engineering review, revisions, export,
+concurrency, persistence, kill -9 recovery and the whole share-token matrix. [`docs/operations/deployment.md`](docs/operations/deployment.md)
 states exactly what a deployment is and is not: one process per document, one token that cannot be
 revoked without a restart, no accounts, no in-process TLS, no multi-document mode.
 
@@ -137,8 +146,8 @@ measured resource envelope, the retry policy and the hardening limits.
 ## Build and verify
 
 The whole gate — formatting, lints, tests, the analytic kernel corpus, manifest validation, the
-dependency licence policy, the SBOM check and a live simulation of the real release server — is one
-command:
+dependency licence policy, the SBOM check, deployment-asset validation (`deploy/validate.sh`) and a
+live simulation of the real release server — is one command:
 
 ```sh
 ./scripts/gate.sh          # ~6 s warm on the recorded host
@@ -166,6 +175,18 @@ notarisation, an update channel, advisory monitoring), is in
 [`docs/operations/release-process.md`](docs/operations/release-process.md).
 
 The offline commands require dependencies to have been fetched already. For a first build with network access, omit `--offline` or run `cargo fetch` first. The application workspaces are substantially larger than the root platform; their own build guidance is in each application's README and in `docs/build-and-test.md`.
+
+To check every stack in the repository — the platform plus the six kernel and two application
+checkouts — rather than only the root workspace:
+
+```sh
+./scripts/verify-stacks.sh              # resolve + cargo check, one line per stack
+./scripts/verify-stacks.sh --metadata   # manifests only (seconds)
+./scripts/verify-stacks.sh --test       # full test run per stack
+```
+
+The measured results, including the checkouts that do not build and why, are in
+[`docs/build-and-test.md`](docs/build-and-test.md) §9.
 
 ### CLI examples
 

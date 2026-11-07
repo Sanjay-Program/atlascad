@@ -430,3 +430,115 @@ whole-workspace build is reasonable and is what the apps' own workflows do.
 | No WASM target or wasm-pack installed | **Blocked** — nothing claimed |
 | No advisory/licence tooling installed | **Blocked** — see security S-1 |
 | Full test suites never executed here | **Open** — the exact commands are recorded above for a larger machine |
+
+## 9. Every stack, not just the root workspace — 2026-11-06
+
+The root gate covers the platform. The six kernel checkouts and the two application checkouts have
+their own manifests, toolchains and external requirements, so they were run separately and are
+recorded here as measured results, not assumptions. One command asks the same question of each:
+
+```sh
+./scripts/verify-stacks.sh              # resolve + cargo check, per stack
+./scripts/verify-stacks.sh --metadata   # resolve only (seconds)
+./scripts/verify-stacks.sh --test       # resolve + cargo test
+./scripts/verify-stacks.sh --stack cadrum
+```
+
+It writes one log per stack to `dist/stack-verification/`, prints a status line per stack, and exits
+non-zero on a failure. A pre-existing breakage is marked `KNOWN` and reported without failing the
+run, the same way the kernel corpus treats a recorded `known-fail` fixture.
+
+| Stack | Command (2026-11-06) | Result |
+| --- | --- | --- |
+| root platform | `./scripts/gate.sh` | **PASS** — fmt, clippy `-D warnings`, workspace tests, corpus (8 ok / 3 known-fail / 0 regressions), 14 manifests, 87 licences, SBOM, deployment assets (`deploy/validate.sh`), 56 HTTP assertions, 27 + 31 browser assertions |
+| hosted compose stack | `deploy/smoke.sh` | **PASS** — fresh 10 × 10 × 5 document created on a new volume, TLS handshake + liveness on `:8443`, 401/200 through the proxy, 31 browser assertions through Caddy, teardown |
+| `kernels/truck` | `cargo check -p truck-meshalgo --lib` | **PASS**, 1 m 20 s. `cargo test -p truck-meshalgo` does **not** compile: `include_str!` reads `../resources/shape/bottle.json`, which is absent from the snapshot (the same path returns 404 at the pinned upstream commit). Library is usable; the test suite is blocked by a missing fixture. |
+| `kernels/monstertruck` | `cargo check -p monstertruck-core -p monstertruck-modeling -p monstertruck-meshing -p monstertruck-solid` | **PASS**, 59.5 s. The checkout pins a nightly `rust-toolchain.toml`, so the first command installs that toolchain through rustup — a one-time download, not a hang. |
+| `kernels/hagane` | `cargo test` | **PASS**, exit 0, every suite green. Uses its own pinned 1.99.0 toolchain. |
+| `kernels/cadrum` | `cargo check` then `cargo test` | **PASS**. `build.rs` downloads a prebuilt OCCT; check took 5 m 13 s, tests (including doctests) passed. No system OpenCASCADE was installed. |
+| `kernels/cascade-rs` | `cargo check --lib` | **PASS**, 8.8 s. `cargo test` **FAILS**: the examples import `cascade_rs` (the library is renamed `cascade`) and one does not cover `Shape::CompSolid`. The library builds; the examples are upstream-broken at this snapshot. |
+| `kernels/opencascade-rs` | `cargo metadata --no-deps` | **PASS** (7 packages). Not built: `occt-sys` compiles OpenCASCADE from C++ sources through cmake, which is not provisioned on this host. |
+| `apps/cadcraft` | `cargo check -p cadcraft-geom` | **PASS**, 14.8 s, after fetching the `craft-libs` git dependencies. |
+| `apps/solidcraft` | — | **Not run this session.** The recorded measurement for `solidcraft-kernel` is 8 m 22 s at 2.56 GB peak RSS; the patched Truck crates it vendors are exercised by the root gate. |
+| `crates/cad-constraints` | `cargo metadata` | **KNOWN DEFECT**: the directory contains only a `Cargo.toml` — no `src/`, no target, and it is not a workspace member — so cargo cannot parse it. Left in place and reported rather than deleted. |
+
+### The exhaustive product check — 2026-11-06
+
+The matrix asks whether each checkout compiles. `python3 scripts/full-check.py` asks whether the
+product works: it starts the release `cad-studio`, drives it over HTTP exactly as the page does, and
+checks what comes back — 223 assertions in 13 sections, each on a scratch document.
+
+| Section | Assertions | What it proves |
+| --- | --- | --- |
+| assets | 9 | The page, CSS, script and favicon are served with the right types and non-empty bodies. |
+| protocol | 12 | Every documented refusal: foreign origin, wrong content type, oversized body, unknown route, unknown parameter and sketch, HTTP methods. |
+| sketches | 26 | All five profiles (rectangle, circle, regular polygon, polyline, sector), profile edits, origin moves, extrude cut/join/new-body, and analytic volumes for each. |
+| drafting | 54 | All seven entity kinds, layers, undo/redo, save, DXF and PDF with paper/orientation/scale options. |
+| engineering | 11 | Document identity, revision and unit, the seven-material library, the drawing assessment, refusals for a zero or unknown artifact. |
+| revisions | 12 | Record, duplicate-name refusal, restore, delete, and the revision list. |
+| exports | 15 | STL volume and triangle count against the model, DXF against the plan, and export-after-edit ordering. |
+| concurrency | 18 | Eight parallel writers keep the document consistent. |
+| persistence | 11 | Save, reopen on a new process, history and every feature survive; the file is versioned. |
+| revolve | 13 | Both axes sweep their analytic solid (a vertical annulus and a horizontal cylinder, with a drawn non-square profile so the two cannot coincide), plus the refusals: axis-crossing profile, unknown axis. |
+| boss | 9 | A circle on a raised plane joined upward lands at the analytic volume. |
+| recovery | 12 | `kill -9` keeps the unsaved edit, which reopens as recovered, then saves or discards. |
+| share | 21 | The token matrix: 401 without or with a wrong token, header and query forms, foreign and missing Origin, proxied Host, empty Host, and exports. |
+
+It runs as a step of `./scripts/gate.sh` after `simulate.sh`, which leaves the release binary it drives
+behind; `--quick` skips both. `--keep` keeps the scratch documents and `--verbose` prints every
+request. Two limits it records rather than hides: a join whose faces are coplanar with the body (the
+revolve annulus at the plate edge) is refused by the kernel and reported as a failed feature, and the
+share-token gate answers 401 before the origin gate can answer 403. One defect it found was fixed: an
+unknown artifact review returned 500 once the project had an artifact registry, because the model
+error was wrapped as an engineering failure; it is now a 400.
+
+Two things the matrix demonstrates about the repository layout: `exclude = ["apps", "kernels", "references"]`
+in the root manifest is what lets every nested checkout resolve on its own, and a nested
+`rust-toolchain.toml` is enough to change the compiler for that directory only.
+
+### The hosted stack, validated as a deployment — 2026-11-07
+
+The compose stack was treated as a deployment rather than a demo on this date: the defects below
+were measured, fixed and re-run, and `deploy/validate.sh` is now a step of `./scripts/gate.sh`.
+
+| Check | Command | Result |
+| --- | --- | --- |
+| static assets | `deploy/validate.sh` | **PASS** — 16 shell scripts parse, both compose files interpolate, both Caddyfiles pass `caddy validate` (skipped cleanly when neither a caddy binary nor a cached image exists) |
+| hosted proofline | `deploy/smoke.sh` | **PASS** — fresh 10 × 10 × 5 document on a new volume, HTTP and TLS liveness, 401/200, token absent from `Config.Env` and readable by uid 10001, HSTS + `no-store`, 31 browser assertions, teardown |
+| advanced interaction drive | `deploy/smoke.sh --advanced` | **PASS** — 126 assertions in 18 steps through Caddy at `https://localhost:8443`: real pointer drags, wheel zoom, every panel, keyboard shortcuts, drawn profiles, downloads parsed (STL volume, DXF, `%PDF`), 21 screenshots, zero console or failed-request errors |
+| start · backup · restore | `deploy/up.sh`, `deploy/backup.sh`, `deploy/restore.sh` | **PASS** — stack healthy after preflight, volume archived with a checksum, volume wiped, archive restored, and `/api/state` came back byte-identical (1475 bytes, `proof`, 1 feature, 500.0 mm³) |
+| production redirect | `curl http://…/api/health` on the production Caddyfile | **308** to HTTPS, as the production site name intends |
+
+Defects found and fixed in this pass, each reproduced before the fix:
+
+- the production `Caddyfile` hardcoded `cad.example.com` and proxied to `127.0.0.1:7519`, so the
+  compose stack's proxy could never reach the studio and `STUDIO_PUBLIC_HOST` had no effect; the
+  site name, upstream and log path now come from the environment;
+- compose replaced the image's real healthcheck with `cad-studio --help`, which reports a wedged
+  process as healthy; the override was removed and `up --wait` now reads the HTTP probe;
+- compose ignored secret `uid`/`gid`/`mode` (measured on Compose 5.3.1) and bind-mounted a 0600 host
+  file uid 10001 could not read, so the studio was unhealthy; a one-shot `atlas-token` service
+  stages the file into a private volume instead, and the token never enters `Config.Env`;
+- `compose.smoke.yaml` did not resolve on its own (`extends` carries services, not `secrets`,
+  volumes or dependent service definitions), which `deploy/validate.sh` caught before the smoke did;
+- `smoke.sh` invoked compose without the variables the stack is interpolated from, so its failure
+  path printed an interpolation error instead of the logs.
+- a **silent geometry defect** the advanced driver hit when its revision step changed `depth`: the
+  cut's tool depth is the same parameter, so the through-cut became a partial one and the document
+  reported `built` with the wrong solid. Re-measured directly through the API: a contained tool
+  returned 0.776 mm³ against 499.215 analytic, and a tool from an interior plane returned the
+  removed chunk (62.117 mm³ against 737.17) in an 8 mm plate. `cad-document` now refuses a cut whose
+  tool does not clear the body's top face, naming the tool end and the body top; the body stays at
+  500.0 mm³ with status `failed`, and the new HTTP test
+  `a_cut_that_does_not_pass_through_the_body_is_refused_not_built` covers it. The guard is narrower
+  than "no blind cuts": a raised-plane pocket (tool z 3…8 in a 0…5 body) is the existing analytic
+  test, and a pocket from the top face (tool z 3…5.01) measures 493.788 mm³ against 493.717
+  analytic, the difference being the circle's 24-segment polygon.
+
+After the guard was narrowed to that measured envelope, the full gate passed again (**223 assertions**)
+and `deploy/smoke.sh --advanced` passed against the rebuilt image (**126 assertions, 18 steps, 21
+screenshots, 3 parsed downloads**).
+
+What remains absent is unchanged and listed in `docs/operations/deployment.md` §9: no accounts, no
+revocation without a restart, no multi-document mode, no in-process TLS, no audit trail, no
+horizontal scaling.

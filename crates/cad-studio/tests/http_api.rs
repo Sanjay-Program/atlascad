@@ -1102,6 +1102,74 @@ fn a_cut_removes_the_analytic_volume_and_survives_save_reopen_and_undo()
     Ok(())
 }
 
+/// A cut that stops below the body's top face is a failed feature, not a wrong solid.
+///
+/// The cut construction is measured exact only when the tool clears the top. On the real truck
+/// kernel a contained tool returned the tool itself (0.776 mm³ against 499.215 analytic) and a tool
+/// from an interior plane down past the bottom returned the removed chunk (62.117 mm³ against the
+/// remaining 737.17), both reported as `built`. The guard refuses the feature with the tool end and
+/// the body top and leaves the body untouched, so a wrong solid can never be saved or exported.
+#[test]
+fn a_cut_that_does_not_pass_through_the_body_is_refused_not_built()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("cut-pierce", [10.0, 10.0, 5.0])?;
+    let addr = handle.addr();
+
+    // A 10 x 10 sketch on the z = 2 plane, swept down by the 5 mm depth parameter: the tool spans
+    // z -3..2, so it starts inside the 0..5 body and stops inside it.
+    let added = post(
+        addr,
+        "/api/sketch",
+        r#"{"kind":"rectangle","origin":[0,0],"plane":2}"#,
+    )?;
+    assert_eq!(
+        added.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&added.body)
+    );
+    let added = json(&added)?;
+    let second = added["sketches"][1]["id"]
+        .as_u64()
+        .ok_or("second sketch id")?;
+
+    let cut = post(
+        addr,
+        "/api/feature/extrude",
+        &format!(
+            r#"{{"sketch_id":{second},"operation":"cut","depth_param":"depth","direction":"down"}}"#
+        ),
+    )?;
+    assert_eq!(cut.status, 200, "{}", String::from_utf8_lossy(&cut.body));
+    let state = json(&cut)?;
+
+    let features = state["features"].as_array().ok_or("features")?;
+    assert_eq!(features.len(), 2);
+    assert_eq!(features[0]["status"], "built");
+    assert_eq!(
+        features[1]["status"], "failed",
+        "a non-piercing cut must fail instead of returning a wrong solid: {state}"
+    );
+    let message = features[1]["message"].as_str().unwrap_or_default();
+    assert!(
+        message.contains("must clear the body's top face"),
+        "the failure names the rule: {message}"
+    );
+    assert!(
+        message.contains("2.000") && message.contains("5.000"),
+        "the failure names the tool end and the body top: {message}"
+    );
+    assert_eq!(state["failure"]["feature"], features[1]["id"]);
+
+    // The body is untouched, so the refused feature cannot be saved as a smaller/wrong solid.
+    let volume = state["geometry"]["volume_mm3"].as_f64().ok_or("volume")?;
+    assert!(
+        (volume - 500.0).abs() < 1e-6,
+        "volume after the refused cut: {volume}"
+    );
+    Ok(())
+}
+
 /// The arc-based sector profile through the real Truck kernel: an arc sketch cuts a pocket out of a
 /// plate, and the result is measured against the analytic area of the polygon the arc resolves to.
 ///

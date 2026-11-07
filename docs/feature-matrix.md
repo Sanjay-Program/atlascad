@@ -75,7 +75,7 @@ Verified on this machine (2026-10-22).
 | Truck adapter: extrude | **Shipped (verified here)** | 148 753 boxes/s, exact volume |
 | Truck adapter: boolean union | **Shipped (verified here)** | 1120 mm³ ± 0.004 |
 | Truck adapter: boolean intersection | **Shipped (verified here)** | 40 mm³ |
-| Truck adapter: boolean **difference** | **Shipped (verified here)** | coplanar, piercing and contained cuts now pass the analytic corpus; the adapter advertises `BooleanDifference` and the document refuses a cut when it is absent |
+| Truck adapter: boolean **difference** | **Shipped (verified here)** | coplanar, piercing and contained cuts pass the analytic corpus at the adapter; the document requires the cut tool to clear the body's top face and refuses one that stops below it rather than accepting the raw boolean's wrong solid (measured: contained 0.776 vs 499.215 mm³, interior-plane 62.117 vs 737.17 mm³); it also refuses a cut when the kernel does not advertise `BooleanDifference` |
 | Truck adapter: boolean **chains** (3+ operands) | **Blocked (kernel panic)** | third union panics inside truck; caught as `Internal` |
 | Coplanar-face booleans without a workaround | **Partial** | fails; a ~1e-4 mm tool nudge makes them work (100/100 unions needed it) |
 | Panic containment | **Shipped (verified here)** | real panic converted to `Internal` |

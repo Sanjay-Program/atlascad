@@ -6,11 +6,17 @@
 #
 #   caddy run --config deploy/Caddyfile --adapter caddyfile
 #
+# Three values come from the environment, so one file serves both deployment shapes:
+#   STUDIO_PUBLIC_HOST  the site name, and the name on the certificate (default cad.example.com)
+#   STUDIO_UPSTREAM     where the studio listens (default 127.0.0.1:7519, the systemd shape;
+#                       compose sets atlas-studio:7519)
+#   STUDIO_LOG_FILE     the access-log file (default /var/log/caddy/atlas-studio.log)
+#
 # Before this is reachable: the DNS name must point at the host, ports 80 and 443 must be open, and
-# the studio must be running on 127.0.0.1:7519. No account is created; the access token in the URL is
-# the whole authorisation model (see docs/operations/deployment.md for what that means).
+# the studio must be running. No account is created; the access token in the URL is the whole
+# authorisation model (see docs/operations/deployment.md for what that means).
 
-cad.example.com {
+{$STUDIO_PUBLIC_HOST:cad.example.com} {
 	encode zstd gzip
 
 	# The studio's own limits are 16 KiB of headers and 1 MiB of JSON; give the proxy a little slack
@@ -30,13 +36,13 @@ cad.example.com {
 	# only liveness and the version.
 	@health path /api/health
 	handle @health {
-		reverse_proxy 127.0.0.1:7519
+		reverse_proxy {$STUDIO_UPSTREAM:127.0.0.1:7519}
 	}
 
 	# Everything else carries the document. The studio checks the token itself; the proxy must not
 	# cache any of it, and the token in the query string must not leak to a third party.
 	handle {
-		reverse_proxy 127.0.0.1:7519 {
+		reverse_proxy {$STUDIO_UPSTREAM:127.0.0.1:7519} {
 			header_up X-Forwarded-For {remote_host}
 		}
 		header Cache-Control "no-store"
@@ -44,9 +50,10 @@ cad.example.com {
 
 	# The access log records the request URI, and a shared link carries the token in the query
 	# string. Treat this log as a secret: 0600, on the same host, rotated and not shipped anywhere.
-	# (Disable this block entirely if that cannot be guaranteed.)
+	# (Set STUDIO_LOG_FILE=/dev/stdout to log to the container's/process's stdout instead, where the
+	# supervisor owns retention; that is also a token-bearing log.)
 	log {
-		output file /var/log/caddy/atlas-studio.log {
+		output file {$STUDIO_LOG_FILE:/var/log/caddy/atlas-studio.log} {
 			roll_size 10MB
 			roll_keep 5
 		}

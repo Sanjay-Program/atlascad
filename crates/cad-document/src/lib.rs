@@ -871,8 +871,17 @@ impl Project {
         let registry = self.artifacts.as_mut().ok_or_else(|| {
             ProjectError::Invalid("this project records no derived artifacts".into())
         })?;
-        registry.review(id, revision)?;
-        Ok(())
+        // An unknown artifact is the caller naming something this project does not record, so it
+        // belongs with the other bad requests. Left as the engineering model's own error it was
+        // wrapped as a project failure and reported as 500, which says the server broke when the
+        // request was simply wrong.
+        match registry.review(id, revision) {
+            Ok(()) => Ok(()),
+            Err(cad_engineering_model::ModelError::UnknownArtifact(raw)) => Err(
+                ProjectError::Invalid(format!("artifact {raw} is not recorded in this project")),
+            ),
+            Err(error) => Err(error.into()),
+        }
     }
 
     /// Assess every recorded artifact against this project's live revision.
@@ -1924,8 +1933,8 @@ impl Project {
                 // otherwise share both of its faces with the body. See CUT_OVERSHOOT_MM.
                 //
                 // A revolved tool has no such overshoot: its extent is the sketch, so it is used as
-                // drawn and may hit the kernel's coplanar limitation. That is reported by the
-                // feature if it happens rather than hidden.
+                // drawn, and it still has to span the body or the guard below refuses the feature.
+                // That is reported by the feature rather than hidden.
                 let tool = match action {
                     ResolvedAction::Extrude { depth_mm, plane_mm } => {
                         match overshooting_tool(kernel, profile, *depth_mm, *plane_mm, running) {
@@ -1934,12 +1943,40 @@ impl Project {
                                 tool
                             }
                             // No coincidence to break, or the kernel cannot move a solid: cut with
-                            // the tool exactly as drawn.
+                            // the tool exactly as drawn. The guard below still requires it to
+                            // clear the body's top face.
                             None => swept,
                         }
                     }
                     ResolvedAction::Revolve { .. } => swept,
                 };
+                // A cut is only exact in this construction when its tool clears the body's top
+                // face, and the failure is otherwise silent. Measured on a 10 x 10 x 5 plate, a
+                // contained cut (tool z 2..3) returned the tool (0.776 mm³ instead of 499.215 mm³)
+                // and a cut from an interior plane down past the bottom (tool z -3..5 in a 0..8
+                // body) returned the removed chunk (62.117 mm³ instead of the remaining 737.17
+                // mm³); both reported `built`. A raised-plane pocket whose tool spans 3..8 is exact
+                // (the HTTP test measures its analytic volume), which is why the rule is "clear the
+                // top", not "span both faces". Refusing is deliberately stricter than the raw
+                // kernel: the document places and moves the tool itself, so it only accepts the
+                // case it has measured as exact.
+                let body_bounds = kernel
+                    .bounding_box(running)
+                    .map_err(|error| format!("the body's bounds could not be read: {error}"))?;
+                let tool_bounds = kernel
+                    .bounding_box(tool)
+                    .map_err(|error| format!("the cut tool's bounds could not be read: {error}"))?;
+                let slack = CUT_OVERSHOOT_MM * 0.5;
+                if tool_bounds.max[2] < body_bounds.max[2] + slack {
+                    kernel.release(tool);
+                    return Err(format!(
+                        "a cut must clear the body's top face: its tool ends at z {:.3} mm but the \
+                         body's top is {:.3} mm, and a cut that stops inside the body returns the \
+                         wrong solid; move the sketch plane to the top face or sweep the cut \
+                         through it",
+                        tool_bounds.max[2], body_bounds.max[2],
+                    ));
+                }
                 match kernel.boolean(cad_contract::kernel::BooleanOp::Difference, running, tool) {
                     Ok(cut) => {
                         kernel.release(tool);
@@ -2675,10 +2712,9 @@ fn migrate_v8_to_v9(mut value: serde_json::Value) -> Result<serde_json::Value, P
 /// A cut tool that reaches past every face of `body` that `depth_mm` would otherwise share.
 ///
 /// `None` means "no coincidence to break" — either the tool's far end stops inside the body, or the
-/// kernel cannot move a solid, in which case the caller keeps the tool exactly as drawn and the cut
-/// may carry the kernel's coplanar defect rather than failing outright. That fallback is deliberate:
-/// a cut that is right to 1.1e-4 mm is more useful than no cut, and the alternative would be to
-/// refuse cutting on any kernel that cannot translate.
+/// kernel cannot move a solid, in which case the caller keeps the tool exactly as drawn. The caller
+/// then requires the tool to clear the body's top face: a cut that stops below it is refused rather
+/// than accepted, because the boolean is only measured exact when the tool reaches past the top.
 fn overshooting_tool<K: Kernel>(
     kernel: &mut K,
     profile: &[[f64; 2]],

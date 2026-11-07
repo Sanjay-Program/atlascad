@@ -52,7 +52,7 @@ Legend: **V** verified by execution · **R** read from source · **—** not pre
 | Solid primitives | **V** (extruded prisms) | R | R | R | R | R |
 | Boolean union | **V** — 1120 mm³ for a 1000+160−40 fixture, 0.0037 mm³ error; corpus: partial overlap passes | R | R | R | R | R |
 | Boolean intersection | **V** — 40 mm³ for a 2×2×10 overlap; corpus: thin wall and near-degenerate sliver pass | R | R | R | R | R |
-| Boolean difference | **V** — exact for a tool that overshoots the body (§4.2); coincident faces remain a recorded limitation | ? | ? | ? | ? | ? |
+| Boolean difference | **V** — exact for a tool that pierces the body, and the document refuses a cut that stops inside it (§4.2.1); coincident faces remain a recorded limitation | ? | ? | ? | ? | ? |
 | Boolean chains (3+ operands) | **V — fails at the third union** (§4.3) | ? | ? | ? | ? | ? |
 | Coplanar-face booleans | **V — fails without a nudge** (§4.1) | R | R | R | R | R |
 | Extrude | **V** — 148 753 boxes/s, exact analytic volume | R | R | R | R | R |
@@ -186,6 +186,23 @@ so a pocket that ends inside the body is not extended at all. The extra material
 it changes nothing, and the operation is ordinary: the end-to-end HTTP test measures 255.000 mm³ for a
 through-cut, exactly.
 
+The one case the document refuses is a cut whose tool does **not clear the body's top face**. The raw
+boolean returns a wrong solid for those placements while the feature reports `built`, and this
+construction is only measured exact when the tool extends past the top. Measured:
+
+| Cut tool | Expected | Reported before the guard |
+|---|---|---|
+| raised-plane pocket, tool z 3…8 in a 0…5 body | 1 844.709 mm³ | **1 844.709 mm³** (built, exact) |
+| contained cavity, tool z 2…3 in a 0…5 body | 499.215 mm³ | **0.776 mm³** (the tool itself) |
+| interior plane down past the bottom, tool z −3…5 in a 0…8 body | 737.17 mm³ | **62.117 mm³** (the removed chunk) |
+
+The guard reads both bounding boxes and fails the feature with the tool end and the body top. It is not
+a ban on blind cuts — the first row is a blind pocket that works and is covered by an HTTP test — and it
+is not a claim that a tool ending exactly on the top face is safe: that is the coplanar case §4.2.2
+records, so the guard requires `CUT_OVERSHOOT_MM` of clearance. A pocket from the top face (plane 5,
+depth 2 down, tool z 3…5.01) measured 493.788 mm³ against 493.717 analytic, the 0.07 mm³ being the
+circle's 24-segment polygon.
+
 #### 4.2.2 What is still not exact
 
 A caller that hands `Kernel::boolean` two operands with a coincident face still gets the coplanar retry,
@@ -197,9 +214,11 @@ result back, which is why a membrane one nudge thick remains on the shared face:
 * watertightness: **8 hairline sliver edges** at one hole corner, so that mesh is not a closed manifold.
 
 The fixture `difference_coplanar_cut` is recorded as a **known failure** with these numbers rather than
-promoted, and the application avoids the case entirely by overshooting. Also guarded: a difference that
-removes everything is refused with a message, because there is no mesh for "nothing" and the retry would
-otherwise return a shell as thick as its own nudge (measured 0.008 mm³ for a plate cut by its own profile).
+promoted, and the application avoids the case entirely by overshooting. It also refuses a cut whose tool
+does not span the body (§4.2.1), rather than accepting the wrong solid the raw boolean returns. Also
+guarded: a difference that removes everything is refused with a message, because there is no mesh for
+"nothing" and the retry would otherwise return a shell as thick as its own nudge (measured 0.008 mm³ for
+a plate cut by its own profile).
 
 ### 4.3 Chains fail
 
@@ -286,5 +305,6 @@ lacks, and every second kernel multiplies the test surface.
 * The 75/76 oracle figure is SolidCraft's claim, not a re-run.
 * WASM viability is unverified for every candidate.
 * Boolean chains are **unavailable** through the adapter (the third union panics inside truck). Difference
-  is available and exact for a tool that overshoots the body; operands with coincident faces remain a
-  recorded, measured limitation (§4.2.2), and the root cause is in the kernel layer, not the adapter.
+  is available and exact for a tool that clears the body's top face, and the document refuses a tool
+  that stops below it (§4.2.1); operands with coincident faces remain a recorded, measured limitation
+  (§4.2.2), and the root cause is in the kernel layer, not the adapter.

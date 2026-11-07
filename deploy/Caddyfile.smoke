@@ -1,0 +1,97 @@
+# Smoke Caddyfile for localhost TLS.
+#
+# This is the same proxy shape as deploy/Caddyfile, but tuned for a local smoke run:
+#   - it serves http://localhost and http://127.0.0.1 on port 80,
+#   - it serves https://localhost and https://127.0.0.1 on port 443 with a certificate from
+#     Caddy's local CA (`tls internal`), so the full TLS path is exercised, not assumed,
+#   - it does NOT redirect HTTP to HTTPS (the smoke checks both ports explicitly),
+#   - it logs to stdout so nobody has to create /var/log/caddy as root,
+#   - it still forwards to atlas-studio:7519 and still refuses to cache the document.
+#
+# The site addresses are *named* (`localhost`, `127.0.0.1`) on purpose. A bare `:443` block has no
+# name for the certificate, so Caddy's internal issuer has nothing to issue for and every TLS
+# handshake fails with `tlsv1 alert internal error` — measured on this stack before the fix. Named
+# addresses are what make the local-CA certificate possible.
+#
+# This file is for the smoke profile only. Do not use it for a public name: the certificate
+# is not a public CA certificate and the log goes to stdout.
+#
+# Activate:  ./smoke.sh                       (builds if needed, starts, verifies, tears down)
+# or:        ./gen-token.sh
+#            STUDIO_PUBLIC_HOST=localhost docker compose --file compose.smoke.yaml up -d --wait
+
+{
+	# The container's own ports are always 80/443. A host that already runs a stack maps these to
+	# other ports in compose.yaml (STUDIO_HTTP_PORT / STUDIO_HTTPS_PORT).
+	http_port 80
+	https_port 443
+}
+
+http://localhost, http://127.0.0.1 {
+	encode zstd gzip
+
+	request_body {
+		max_size 2MB
+	}
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	@health path /api/health
+	handle @health {
+		reverse_proxy atlas-studio:7519
+	}
+
+	handle {
+		reverse_proxy atlas-studio:7519 {
+			header_up X-Forwarded-For {remote_host}
+		}
+		header Cache-Control "no-store"
+	}
+
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}
+
+https://localhost, https://127.0.0.1 {
+	tls {
+		issuer internal
+	}
+
+	encode zstd gzip
+
+	request_body {
+		max_size 2MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	@health path /api/health
+	handle @health {
+		reverse_proxy atlas-studio:7519
+	}
+
+	handle {
+		reverse_proxy atlas-studio:7519 {
+			header_up X-Forwarded-For {remote_host}
+		}
+		header Cache-Control "no-store"
+	}
+
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}

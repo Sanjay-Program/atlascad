@@ -300,9 +300,14 @@ try {
       'the shared PDF plot',
       10000
     );
-    const afterPlot = readdirSync(downloads);
+    // The UI log line is written when the fetch resolves; the browser then has to write the file.
+    // Reading the directory immediately after the log line is a race — through a proxy the write
+    // can land a few milliseconds later — so poll for the file like the other two downloads.
+    const afterPlot = await waitForDownloads(downloads, (entries) =>
+      entries.some((name) => name.endsWith('.pdf') && downloadSize(downloads, name) > 100)
+    );
     check(
-      afterPlot.some((name) => name.endsWith('.pdf')),
+      afterPlot.some((name) => name.endsWith('.pdf') && downloadSize(downloads, name) > 100),
       `a shared session cannot plot a PDF with its token (${afterPlot.join(', ')})`
     );
   }

@@ -1,0 +1,63 @@
+# Smoke compose for localhost TLS.
+#
+# This is the production stack, pointed at the smoke Caddyfile and localhost. Run it with:
+#
+#   cd deploy
+#   ./gen-token.sh
+#   STUDIO_PUBLIC_HOST=localhost docker compose --file compose.smoke.yaml up -d --wait
+#   curl -fsS http://127.0.0.1:8080/api/health
+#   curl -fsS "http://127.0.0.1:8080/api/state?token=$(cat studio-token.txt)"
+#
+# `./smoke.sh` does all of that and more (TLS, the token boundary, a headless-browser pass through
+# the proxy, teardown) and is the supported entry point.
+#
+# The Caddy proxy is included so the full hosted shape (TLS via Caddy, studio behind it) can be
+# smoke-tested on a single host. On a SELinux host (Fedora/RHEL), the bind-mounted Caddyfile needs
+# a :z relabel so the root-owned Caddy process can read it — that is why the volume uses :ro,z.
+#
+# The production compose (compose.yaml) is unchanged and remains the file for a real public name.
+# This file exists so a smoke run does not require env-file juggling and does not touch the
+# production Caddyfile.
+#
+# The studio token arrives through the same file secret as production (STUDIO_TOKEN_FILE, default
+# ./studio-token.txt), so the smoke proves the real secret path rather than a shortcut.
+
+name: atlas-smoke
+
+services:
+  # The studio depends on this one-shot token stage; `extends` carries that dependency but not the
+  # service definition, so it is declared (and extended) explicitly here too.
+  atlas-token:
+    extends:
+      file: compose.yaml
+      service: atlas-token
+
+  atlas-studio:
+    extends:
+      file: compose.yaml
+      service: atlas-studio
+    environment:
+      # Do not override ATLAS_HOST: keep the image default (0.0.0.0) so docker port mapping
+      # works. The host-side mapping already restricts exposure to 127.0.0.1.
+      ATLAS_ADVERTISE: ${STUDIO_PUBLIC_HOST:-localhost}
+
+  atlas-proxy:
+    extends:
+      file: compose.yaml
+      service: atlas-proxy
+    volumes:
+      - ./Caddyfile.smoke:/etc/caddy/Caddyfile:ro,z
+      - atlas-caddy-data:/data
+      - atlas-caddy-config:/config
+      - atlas-caddy-log:/var/log/caddy
+    environment:
+      STUDIO_PUBLIC_HOST: localhost
+      STUDIO_UPSTREAM: atlas-studio:7519
+
+# `extends` carries services, not the top-level blocks; the volumes must be declared here too.
+volumes:
+  atlas-studio-data:
+  atlas-studio-secret:
+  atlas-caddy-data:
+  atlas-caddy-config:
+  atlas-caddy-log:

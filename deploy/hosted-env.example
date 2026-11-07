@@ -1,0 +1,38 @@
+# Hosted Atlas CAD Studio — environment for deploy/compose.yaml.
+#
+# This file is a working template, not a description. Copy it to deploy/.env (git-ignored) and
+# fill in the two required values, or source it in your shell before `docker compose up`:
+#
+#   cp deploy/hosted-env.example deploy/.env
+#   ./deploy/gen-token.sh                      # writes deploy/studio-token.txt, 0600
+#   editor deploy/.env                         # set STUDIO_PUBLIC_HOST
+#   ./deploy/up.sh                             # preflight, start, wait for health
+#
+# `deploy/up.sh` reads deploy/.env when it exists; plain `docker compose` in deploy/ does too.
+
+# REQUIRED. The DNS name users open. It must already point at this host, and 80/443 must be open:
+# Caddy obtains the certificate for this name.
+STUDIO_PUBLIC_HOST=cad.example.com
+
+# REQUIRED. The file holding the bearer token (16–128 characters, no whitespace). It is mounted as
+# a container secret read by uid 10001, never passed as an environment variable. `gen-token.sh`
+# writes a 64-character token to this path.
+STUDIO_TOKEN_FILE=./studio-token.txt
+
+# Image tags. Pin CADDY_IMAGE_TAG to a minor version in production rather than tracking `2`.
+STUDIO_IMAGE_TAG=0.1.0
+CADDY_IMAGE_TAG=2
+
+# Host ports. Defaults are 80/443 for the proxy and 7519 (loopback only) for the studio. A second
+# stack on the same host needs different values for all three.
+# STUDIO_HTTP_PORT=80
+# STUDIO_HTTPS_PORT=443
+# STUDIO_BIND_PORT=7519
+
+# The document created on the container's first start only. Once /data holds a .zcad file, these
+# are ignored: the studio reopens the existing document.
+# STUDIO_NAME=part
+# STUDIO_SIZE=40,30,10
+
+# Local smoke (localhost, Caddy issues a local-CA certificate). `./smoke.sh` sets this itself.
+# STUDIO_PUBLIC_HOST=localhost
