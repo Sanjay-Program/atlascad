@@ -225,6 +225,52 @@
           }
         }
       ],
+      "name": "cad-cae",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/cad-cae@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
+      "name": "cad-cam",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/cad-cam@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
       "name": "cad-cli",
       "properties": [
         {
@@ -294,6 +340,29 @@
           }
         }
       ],
+      "name": "cad-drafting",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/cad-drafting@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
       "name": "cad-engineering",
       "properties": [
         {
@@ -306,6 +375,29 @@
         }
       ],
       "purl": "pkg:cargo/cad-engineering@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
+      "name": "cad-engineering-model",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/cad-engineering-model@0.1.0",
       "type": "application",
       "version": "0.1.0"
     },
