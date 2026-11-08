@@ -13,6 +13,7 @@
 
 use cad_cae::{
     Axis, CaeError, FaceLoad, FaceSelection, SolverSettings, StaticStudy, Support, run_static,
+    run_static_with_fields,
 };
 use cad_contract::mesh::Mesh;
 use cad_engineering_model::MaterialLibrary;
@@ -260,4 +261,85 @@ fn a_study_without_supports_or_loads_is_refused() {
         [1.0, 0.0, 0.0],
     )];
     assert!(matches!(study.validate(), Err(CaeError::Invalid(_))));
+}
+
+#[test]
+fn detailed_field_results_can_be_requested_and_serialized() -> Result<(), Box<dyn Error>> {
+    let mesh = box_mesh([0.0, 0.0, 0.0], [20.0, 10.0, 10.0]);
+    let mut study = StaticStudy::new("bar", 5.0, STEEL);
+    study.supports = vec![Support::fixed(FaceSelection::new(Axis::X, 0.0))];
+    study.loads = vec![FaceLoad::new(
+        FaceSelection::new(Axis::X, 20.0),
+        [0.0, 0.0, -100.0],
+    )];
+
+    // Without fields (default)
+    let summary_only = run_static(&mesh, &study, &library())?;
+    assert!(summary_only.fields.is_none());
+
+    // With fields
+    let with_fields = run_static_with_fields(&mesh, &study, &library(), true)?;
+    let fields = with_fields
+        .fields
+        .as_ref()
+        .ok_or("fields must be populated")?;
+
+    // Node count matches active nodes in mesh
+    assert_eq!(fields.node_displacements_mm.len(), with_fields.mesh.nodes);
+    // Element count matches elements in mesh
+    assert_eq!(fields.element_centroids_mm.len(), with_fields.mesh.elements);
+    assert_eq!(
+        fields.element_von_mises_mpa.len(),
+        with_fields.mesh.elements
+    );
+
+    // Peak displacement magnitude should match max_displacement_mm
+    let max_disp = fields
+        .node_displacements_mm
+        .iter()
+        .map(|u| (u[0] * u[0] + u[1] * u[1] + u[2] * u[2]).sqrt())
+        .fold(0.0f64, f64::max);
+    assert!((max_disp - with_fields.results.max_displacement_mm).abs() < 1e-6);
+
+    // Peak element stress should match max_von_mises_mpa
+    let max_vm = fields
+        .element_von_mises_mpa
+        .iter()
+        .copied()
+        .fold(0.0f64, f64::max);
+    assert!((max_vm - with_fields.results.max_von_mises_mpa).abs() < 1e-6);
+
+    // Full JSON round trip
+    let json = serde_json::to_string(&with_fields)?;
+    let deserialized: cad_cae::StaticResult = serde_json::from_str(&json)?;
+    assert_eq!(deserialized.study, with_fields.study);
+    let des_fields = deserialized
+        .fields
+        .as_ref()
+        .ok_or("deserialized fields missing")?;
+    assert_eq!(
+        des_fields.node_displacements_mm.len(),
+        fields.node_displacements_mm.len()
+    );
+    assert_eq!(
+        des_fields.element_centroids_mm.len(),
+        fields.element_centroids_mm.len()
+    );
+    assert_eq!(
+        des_fields.element_von_mises_mpa.len(),
+        fields.element_von_mises_mpa.len()
+    );
+    for (a, b) in des_fields
+        .element_von_mises_mpa
+        .iter()
+        .zip(fields.element_von_mises_mpa.iter())
+    {
+        assert!((a - b).abs() < 1e-6);
+    }
+    assert!(
+        (deserialized.results.max_displacement_mm - with_fields.results.max_displacement_mm).abs()
+            < 1e-9
+    );
+
+    Ok(())
 }

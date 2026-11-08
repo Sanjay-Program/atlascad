@@ -449,6 +449,17 @@ pub struct StudySource {
     pub revision: Revision,
 }
 
+/// Detailed result fields across the finite element mesh for inspection and 3D visualization.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FieldResults {
+    /// Displacement vectors `[ux, uy, uz]` for each active mesh node, in mm.
+    pub node_displacements_mm: Vec<[f64; 3]>,
+    /// Centroid position `[x, y, z]` for each element, in mm.
+    pub element_centroids_mm: Vec<[f64; 3]>,
+    /// Von Mises stress at each element centroid, in MPa.
+    pub element_von_mises_mpa: Vec<f64>,
+}
+
 /// One completed linear static study.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StaticResult {
@@ -469,6 +480,9 @@ pub struct StaticResult {
     pub solver: SolverReport,
     pub results: ResultSummary,
     pub warnings: Vec<String>,
+    /// Detailed displacement and stress fields, when requested.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fields: Option<FieldResults>,
 }
 
 impl StaticResult {
@@ -524,6 +538,16 @@ pub fn run_static(
     mesh: &Mesh,
     study: &StaticStudy,
     library: &MaterialLibrary,
+) -> Result<StaticResult, CaeError> {
+    run_static_with_fields(mesh, study, library, false)
+}
+
+/// Run a linear static study on `mesh`, optionally collecting full node displacement and element stress fields.
+pub fn run_static_with_fields(
+    mesh: &Mesh,
+    study: &StaticStudy,
+    library: &MaterialLibrary,
+    include_fields: bool,
 ) -> Result<StaticResult, CaeError> {
     study.validate()?;
     let material = library
@@ -826,6 +850,47 @@ pub fn run_static(
             factor_of_safety,
         },
         warnings,
+        fields: if include_fields {
+            let node_displacements_mm: Vec<[f64; 3]> = positions
+                .iter()
+                .enumerate()
+                .map(|(index, _)| {
+                    [
+                        outcome.displacement[index * 3],
+                        outcome.displacement[index * 3 + 1],
+                        outcome.displacement[index * 3 + 2],
+                    ]
+                })
+                .collect();
+            let mut element_centroids_mm = Vec::with_capacity(element_nodes.len());
+            let mut element_von_mises_mpa = Vec::with_capacity(element_nodes.len());
+            let mut ue = [0.0; fe::ELEMENT_DOFS];
+            for nodes in &element_nodes {
+                let mut centroid = [0.0; 3];
+                for local_node in 0..fe::ELEMENT_NODES {
+                    let global = nodes[local_node] as usize;
+                    let base = global * 3;
+                    ue[local_node * 3] = outcome.displacement[base];
+                    ue[local_node * 3 + 1] = outcome.displacement[base + 1];
+                    ue[local_node * 3 + 2] = outcome.displacement[base + 2];
+                    if let Some(position) = positions.get(global) {
+                        for (axis, value) in centroid.iter_mut().enumerate() {
+                            *value += position[axis] / 8.0;
+                        }
+                    }
+                }
+                let stress = fe::centre_stress(&ue, grid.cell, &elasticity);
+                element_centroids_mm.push(centroid);
+                element_von_mises_mpa.push(fe::von_mises(&stress));
+            }
+            Some(FieldResults {
+                node_displacements_mm,
+                element_centroids_mm,
+                element_von_mises_mpa,
+            })
+        } else {
+            None
+        },
     })
 }
 

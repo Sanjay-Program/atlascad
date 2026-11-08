@@ -446,6 +446,107 @@ pub struct RevisionSummary {
     pub features: usize,
 }
 
+/// What changed in a single parameter between two revisions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ParameterChange {
+    Added {
+        id: String,
+        value: f64,
+    },
+    Removed {
+        id: String,
+        old_value: f64,
+    },
+    Modified {
+        id: String,
+        old_value: f64,
+        new_value: f64,
+    },
+}
+
+/// What changed in a sketch between two revisions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum SketchChange {
+    Added {
+        id: EntityId,
+    },
+    Removed {
+        id: EntityId,
+    },
+    Modified {
+        id: EntityId,
+        origin_changed: bool,
+        plane_z_changed: bool,
+        profile_changed: bool,
+    },
+}
+
+/// What changed in a feature between two revisions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum FeatureChange {
+    Added {
+        id: EntityId,
+    },
+    Removed {
+        id: EntityId,
+    },
+    Modified {
+        id: EntityId,
+        operation_changed: bool,
+        sketch_changed: bool,
+        kind_changed: bool,
+    },
+}
+
+/// The entity-level difference between two document states or revisions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DocumentDiff {
+    pub from_revision: u64,
+    pub to_revision: u64,
+    pub parameters: Vec<ParameterChange>,
+    pub sketches: Vec<SketchChange>,
+    pub features: Vec<FeatureChange>,
+}
+
+impl DocumentDiff {
+    /// True when neither parameters, sketches nor features changed.
+    pub fn is_empty(&self) -> bool {
+        self.parameters.is_empty() && self.sketches.is_empty() && self.features.is_empty()
+    }
+
+    /// All entity IDs (sketches and features) affected by this change.
+    pub fn affected_entities(&self) -> Vec<EntityId> {
+        let mut ids = Vec::new();
+        for s in &self.sketches {
+            match s {
+                SketchChange::Added { id }
+                | SketchChange::Removed { id }
+                | SketchChange::Modified { id, .. } => {
+                    ids.push(*id);
+                }
+            }
+        }
+        for f in &self.features {
+            match f {
+                FeatureChange::Added { id }
+                | FeatureChange::Removed { id }
+                | FeatureChange::Modified { id, .. } => {
+                    ids.push(*id);
+                }
+            }
+        }
+        ids.sort();
+        ids.dedup();
+        ids
+    }
+
+    /// Whether any entity in `entities` was affected by this change.
+    pub fn affects_any(&self, entities: &[EntityId]) -> bool {
+        let affected = self.affected_entities();
+        entities.iter().any(|id| affected.contains(id))
+    }
+}
+
 /// The persistent project. Kernel handles are never stored here.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -971,6 +1072,135 @@ impl Project {
             return Err(ProjectError::UnknownRevision(id));
         }
         self.bump_revision()
+    }
+
+    /// Compute the entity-level diff between a historical revision and the current project state.
+    ///
+    /// Accepts either the internal revision ID returned by [`Project::add_revision`] or the
+    /// document revision number itself.
+    pub fn diff_revision(&self, target_id_or_revision: u64) -> Result<DocumentDiff, ProjectError> {
+        let rev = self
+            .revisions
+            .iter()
+            .find(|revision| {
+                revision.id == target_id_or_revision || revision.revision == target_id_or_revision
+            })
+            .ok_or(ProjectError::UnknownRevision(target_id_or_revision))?;
+        Ok(Self::compute_diff(
+            rev.revision,
+            self.revision.get(),
+            &rev.snapshot.parameters,
+            &self.parameters,
+            &rev.snapshot.sketches,
+            &self.sketches,
+            &rev.snapshot.features,
+            &self.features,
+        ))
+    }
+
+    /// Compute the entity-level difference between two snapshots or lists of entities.
+    #[allow(clippy::too_many_arguments)]
+    fn compute_diff(
+        from_revision: u64,
+        to_revision: u64,
+        old_params: &[Parameter],
+        new_params: &[Parameter],
+        old_sketches: &[Sketch],
+        new_sketches: &[Sketch],
+        old_features: &[Feature],
+        new_features: &[Feature],
+    ) -> DocumentDiff {
+        let mut parameters = Vec::new();
+        for old in old_params {
+            match new_params.iter().find(|p| p.id == old.id) {
+                Some(new) => {
+                    if (new.value - old.value).abs() > f64::EPSILON {
+                        parameters.push(ParameterChange::Modified {
+                            id: old.id.clone(),
+                            old_value: old.value,
+                            new_value: new.value,
+                        });
+                    }
+                }
+                None => {
+                    parameters.push(ParameterChange::Removed {
+                        id: old.id.clone(),
+                        old_value: old.value,
+                    });
+                }
+            }
+        }
+        for new in new_params {
+            if !old_params.iter().any(|p| p.id == new.id) {
+                parameters.push(ParameterChange::Added {
+                    id: new.id.clone(),
+                    value: new.value,
+                });
+            }
+        }
+
+        let mut sketches = Vec::new();
+        for old in old_sketches {
+            match new_sketches.iter().find(|s| s.id == old.id) {
+                Some(new) => {
+                    let origin_changed = (old.origin[0] - new.origin[0]).abs() > f64::EPSILON
+                        || (old.origin[1] - new.origin[1]).abs() > f64::EPSILON;
+                    let plane_z_changed = (old.plane_z - new.plane_z).abs() > f64::EPSILON;
+                    let profile_changed = old.profile != new.profile;
+                    if origin_changed || plane_z_changed || profile_changed {
+                        sketches.push(SketchChange::Modified {
+                            id: old.id,
+                            origin_changed,
+                            plane_z_changed,
+                            profile_changed,
+                        });
+                    }
+                }
+                None => {
+                    sketches.push(SketchChange::Removed { id: old.id });
+                }
+            }
+        }
+        for new in new_sketches {
+            if !old_sketches.iter().any(|s| s.id == new.id) {
+                sketches.push(SketchChange::Added { id: new.id });
+            }
+        }
+
+        let mut features = Vec::new();
+        for old in old_features {
+            match new_features.iter().find(|f| f.id == old.id) {
+                Some(new) => {
+                    let operation_changed = old.operation != new.operation;
+                    let sketch_changed = old.sketch_id != new.sketch_id;
+                    let kind_changed = old.kind != new.kind;
+                    if operation_changed || sketch_changed || kind_changed {
+                        features.push(FeatureChange::Modified {
+                            id: old.id,
+                            operation_changed,
+                            sketch_changed,
+                            kind_changed,
+                        });
+                    }
+                }
+                None => {
+                    features.push(FeatureChange::Removed { id: old.id });
+                }
+            }
+        }
+        for new in new_features {
+            if !old_features.iter().any(|f| f.id == new.id) {
+                features.push(FeatureChange::Added { id: new.id });
+            }
+        }
+
+        DocumentDiff {
+            from_revision,
+            to_revision,
+            parameters,
+            sketches,
+            features,
+        }
     }
 
     /// Number of undo snapshots available.
@@ -5602,6 +5832,61 @@ mod tests {
         assert!(info.file_unreadable);
         let mut kernel = BoxKernel::new();
         assert!((recovered.evaluate(&mut kernel)?.volume_mm3 - 800.0).abs() < 1e-9);
+        Ok(())
+    }
+
+    #[test]
+    fn diff_revision_identifies_modified_parameters_sketches_and_features() -> TestResult {
+        let mut project = box_project()?;
+        let rev1 = project.add_revision("initial_box")?;
+
+        // 1. Modifying a parameter
+        project.set_parameter("depth", 25.0)?;
+
+        // 2. Adding a sketch and an extrude join
+        let circle_id = project.add_circle_sketch("depth", [5.0, 5.0])?;
+        let join_id = project.add_extrude_feature_in_direction(
+            circle_id,
+            "depth",
+            ExtrudeOperation::Join,
+            ExtrudeDirection::Up,
+        )?;
+
+        // Compute diff against rev1
+        let diff = project.diff_revision(rev1)?;
+        assert_eq!(diff.from_revision, 6);
+        assert!(!diff.is_empty());
+
+        // Parameter change assertion
+        assert_eq!(diff.parameters.len(), 1);
+        assert!(matches!(
+            &diff.parameters[0],
+            ParameterChange::Modified { id, old_value, new_value }
+                if id == "depth" && (*old_value - 5.0).abs() < 1e-6 && (*new_value - 25.0).abs() < 1e-6
+        ));
+
+        // Sketch additions assertion
+        assert_eq!(diff.sketches.len(), 1);
+        assert!(matches!(&diff.sketches[0], SketchChange::Added { id } if *id == circle_id));
+
+        // Feature additions assertion
+        assert_eq!(diff.features.len(), 1);
+        assert!(matches!(&diff.features[0], FeatureChange::Added { id } if *id == join_id));
+
+        // Affected entities check
+        let affected = diff.affected_entities();
+        assert_eq!(affected.len(), 2);
+        assert!(affected.contains(&circle_id));
+        assert!(affected.contains(&join_id));
+        assert!(diff.affects_any(&[circle_id]));
+        assert!(!diff.affects_any(&[EntityId::new(999)?]));
+
+        // Unknown revision error
+        assert!(matches!(
+            project.diff_revision(999),
+            Err(ProjectError::UnknownRevision(999))
+        ));
+
         Ok(())
     }
 }
