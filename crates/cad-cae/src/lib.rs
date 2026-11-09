@@ -381,6 +381,104 @@ pub fn parse_study(bytes: &[u8]) -> Result<StaticStudy, CaeError> {
     Ok(file.study)
 }
 
+/// A modal vibration study to compute natural frequencies and mode shapes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ModalStudy {
+    pub name: String,
+    /// Edge length of one hexahedral element, in millimetres.
+    pub voxel_size_mm: f64,
+    /// Material id from the shared material library.
+    pub material: String,
+    pub supports: Vec<Support>,
+    #[serde(default = "default_num_modes")]
+    pub num_modes: usize,
+    #[serde(default)]
+    pub solver: SolverSettings,
+}
+
+fn default_num_modes() -> usize {
+    3
+}
+
+impl ModalStudy {
+    pub fn new(name: impl Into<String>, voxel_size_mm: f64, material: impl Into<String>) -> Self {
+        ModalStudy {
+            name: name.into(),
+            voxel_size_mm,
+            material: material.into(),
+            supports: Vec::new(),
+            num_modes: 3,
+            solver: SolverSettings::default(),
+        }
+    }
+
+    pub fn with_modes(mut self, num_modes: usize) -> Self {
+        self.num_modes = num_modes;
+        self
+    }
+
+    pub fn with_support(mut self, support: Support) -> Self {
+        self.supports.push(support);
+        self
+    }
+
+    pub fn validate(&self) -> Result<(), CaeError> {
+        let name = self.name.trim();
+        if name.is_empty() || name.chars().count() > 120 {
+            return Err(CaeError::Invalid(
+                "a study name must be 1..=120 characters".into(),
+            ));
+        }
+        if !self.voxel_size_mm.is_finite() || self.voxel_size_mm <= 0.0 {
+            return Err(CaeError::Invalid(format!(
+                "voxel size {} is not a positive length",
+                self.voxel_size_mm
+            )));
+        }
+        if self.material.trim().is_empty() {
+            return Err(CaeError::Invalid("the study names no material".into()));
+        }
+        if self.num_modes == 0 || self.num_modes > 20 {
+            return Err(CaeError::Invalid(
+                "num_modes must be between 1 and 20".into(),
+            ));
+        }
+        if self.supports.is_empty() {
+            return Err(CaeError::Invalid(
+                "the study has no supports; a grounded modal study requires supports".into(),
+            ));
+        }
+        if self.supports.len() > 64 {
+            return Err(CaeError::Invalid(
+                "a study is limited to 64 supports".into(),
+            ));
+        }
+        for support in &self.supports {
+            support.face.validate("a support")?;
+            if !support.fix.iter().any(|fixed| *fixed) {
+                return Err(CaeError::Invalid(
+                    "a support fixes no component; remove it instead".into(),
+                ));
+            }
+        }
+        if !self.solver.relative_tolerance.is_finite()
+            || self.solver.relative_tolerance <= 0.0
+            || self.solver.relative_tolerance > 1.0e-2
+        {
+            return Err(CaeError::Invalid(
+                "the solver relative tolerance must be in (0, 1e-2]".into(),
+            ));
+        }
+        if self.solver.max_iterations == 0 || self.solver.max_iterations > 1_000_000 {
+            return Err(CaeError::Invalid(
+                "the solver iteration limit must be in 1..=1,000,000".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// The material values a result was computed with, so the result cannot drift from its inputs.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MaterialRef {
@@ -521,6 +619,63 @@ impl StaticResult {
             self.mesh.nodes,
             self.mesh.degrees_of_freedom,
             self.mesh.voxel_size_mm
+        )
+    }
+}
+
+/// One natural vibration mode.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ModeResult {
+    pub mode: usize,
+    /// Cyclic frequency in Hertz (Hz).
+    pub frequency_hz: f64,
+    /// Angular frequency in radians per second (rad/s).
+    pub angular_frequency_rad_s: f64,
+    pub generalized_mass: f64,
+    pub max_displacement_normalized: f64,
+    pub max_displacement_at_mm: [f64; 3],
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode_shape: Option<Vec<[f64; 3]>>,
+}
+
+/// The completed result of a dynamic modal analysis.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ModalResult {
+    pub study: String,
+    pub quality: String,
+    pub engine: String,
+    pub definition: ModalStudy,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<StudySource>,
+    pub material: MaterialRef,
+    pub mesh: MeshSummary,
+    pub modes: Vec<ModeResult>,
+    pub warnings: Vec<String>,
+}
+
+impl ModalResult {
+    /// Attach the design revision this result was computed from.
+    pub fn with_source(mut self, document: DocumentId, revision: Revision) -> Self {
+        self.source = Some(StudySource { document, revision });
+        self
+    }
+
+    /// The fundamental (lowest) natural frequency in Hertz, if computed.
+    pub fn fundamental_frequency_hz(&self) -> Option<f64> {
+        self.modes.first().map(|m| m.frequency_hz)
+    }
+
+    /// One-paragraph summary of the modal analysis.
+    pub fn summary_line(&self) -> String {
+        let f1 = self
+            .fundamental_frequency_hz()
+            .map(|f| format!("{f:.2} Hz"))
+            .unwrap_or_else(|| "N/A".to_string());
+        format!(
+            "modal: fundamental frequency {f1}, {} modes computed, {} hex8 elements at {:.3} mm. {QUALITY_LABEL}",
+            self.modes.len(),
+            self.mesh.elements,
+            self.mesh.voxel_size_mm,
         )
     }
 }
@@ -891,6 +1046,246 @@ pub fn run_static_with_fields(
         } else {
             None
         },
+    })
+}
+
+/// Run a dynamic modal analysis on `mesh` with the study's material.
+pub fn run_modal(
+    mesh: &Mesh,
+    study: &ModalStudy,
+    library: &MaterialLibrary,
+) -> Result<ModalResult, CaeError> {
+    study.validate()?;
+    let material = library
+        .get(&study.material)
+        .ok_or_else(|| CaeError::UnknownMaterial(study.material.clone()))?;
+    mesh.validate()
+        .map_err(|error| CaeError::Mesh(error.to_string()))?;
+    if !mesh.is_closed() {
+        return Err(CaeError::OpenMesh(mesh.open_edges()));
+    }
+    let youngs = material
+        .youngs_modulus_mpa
+        .ok_or_else(|| CaeError::MissingProperty(material.id.clone(), "Young's modulus"))?;
+    let poisson = material
+        .poisson_ratio
+        .ok_or_else(|| CaeError::MissingProperty(material.id.clone(), "Poisson ratio"))?;
+    let density_kg_m3 = material.density_kg_m3;
+    if !density_kg_m3.is_finite() || density_kg_m3 <= 0.0 {
+        return Err(CaeError::MissingProperty(
+            material.id.clone(),
+            "valid positive density",
+        ));
+    }
+
+    let source_volume = mesh.signed_volume().abs();
+    if !source_volume.is_finite() || source_volume <= 0.0 {
+        return Err(CaeError::Mesh(
+            "the mesh encloses no volume; check its orientation".into(),
+        ));
+    }
+
+    let grid = voxel::VoxelGrid::build(mesh, study.voxel_size_mm)?;
+    let [nx, ny, nz] = grid.counts;
+    let node_counts = grid.node_counts();
+    let node_total = node_counts[0]
+        .checked_mul(node_counts[1])
+        .and_then(|value| value.checked_mul(node_counts[2]))
+        .ok_or_else(|| CaeError::Invalid("the node grid overflows".into()))?;
+    let elements = grid.element_count();
+    if elements == 0 {
+        return Err(CaeError::Invalid(
+            "the voxel mesh contains no solid elements".into(),
+        ));
+    }
+    if elements > MAX_STUDY_ELEMENTS || node_total > MAX_STUDY_NODES {
+        return Err(CaeError::TooLarge {
+            elements,
+            nodes: node_total,
+            max_elements: MAX_STUDY_ELEMENTS,
+            max_nodes: MAX_STUDY_NODES,
+        });
+    }
+    let ndof = node_total * 3;
+
+    let mut positions = Vec::with_capacity(node_total);
+    for k in 0..node_counts[2] {
+        for j in 0..node_counts[1] {
+            for i in 0..node_counts[0] {
+                positions.push([
+                    grid.origin[0] + i as f64 * grid.cell,
+                    grid.origin[1] + j as f64 * grid.cell,
+                    grid.origin[2] + k as f64 * grid.cell,
+                ]);
+            }
+        }
+    }
+    if positions.len() != node_total {
+        return Err(CaeError::Invalid("the node table is inconsistent".into()));
+    }
+
+    let node = |i: usize, j: usize, k: usize| -> u32 {
+        (i + node_counts[0] * (j + node_counts[1] * k)) as u32
+    };
+    let mut element_nodes = Vec::with_capacity(elements);
+    for k in 0..nz {
+        for j in 0..ny {
+            for i in 0..nx {
+                let index = i + nx * (j + ny * k);
+                if !grid.inside.get(index).copied().unwrap_or(false) {
+                    continue;
+                }
+                element_nodes.push([
+                    node(i, j, k),
+                    node(i + 1, j, k),
+                    node(i + 1, j + 1, k),
+                    node(i, j + 1, k),
+                    node(i, j, k + 1),
+                    node(i + 1, j, k + 1),
+                    node(i + 1, j + 1, k + 1),
+                    node(i, j + 1, k + 1),
+                ]);
+            }
+        }
+    }
+    if element_nodes.len() != elements {
+        return Err(CaeError::Invalid(
+            "the element table is inconsistent with the voxel mask".into(),
+        ));
+    }
+
+    let voxel_volume_mm3 = elements as f64 * grid.cell.powi(3);
+    let volume_error_ratio = (voxel_volume_mm3 - source_volume).abs() / source_volume;
+    if volume_error_ratio > MAX_VOLUME_ERROR {
+        return Err(CaeError::Invalid(format!(
+            "the {} mm voxel mesh has volume {voxel_volume_mm3:.3} mm3 against the body's \
+             {source_volume:.3} mm3 ({:.0}% off, limit {:.0}%); use a smaller voxel size",
+            grid.cell,
+            volume_error_ratio * 100.0,
+            MAX_VOLUME_ERROR * 100.0
+        )));
+    }
+
+    let mut used = vec![false; node_total];
+    for nodes in &element_nodes {
+        for &node in nodes.iter() {
+            if let Some(entry) = used.get_mut(node as usize) {
+                *entry = true;
+            }
+        }
+    }
+
+    let elasticity = fe::Elasticity::isotropic(youngs, poisson);
+    let local_k = fe::hex_stiffness(grid.cell, &elasticity);
+    let local_m = fe::hex_mass(grid.cell, density_kg_m3);
+
+    let mut fixed = vec![false; ndof];
+    // In modal analysis, any node not belonging to any element MUST have its DOFs fixed
+    // so it has no spurious zero-frequency or NaN modes.
+    for (node_idx, &is_used) in used.iter().enumerate() {
+        if !is_used {
+            fixed[node_idx * 3] = true;
+            fixed[node_idx * 3 + 1] = true;
+            fixed[node_idx * 3 + 2] = true;
+        }
+    }
+
+    for support in &study.supports {
+        let selected = select_nodes(&positions, &used, &support.face).map_err(|message| {
+            CaeError::Invalid(format!("support at {}: {message}", describe(&support.face)))
+        })?;
+        for index in selected {
+            for component in 0..3 {
+                if support.fix[component] {
+                    fixed[index * 3 + component] = true;
+                }
+            }
+        }
+    }
+    let constrained_dofs = fixed.iter().filter(|value| **value).count();
+    if constrained_dofs >= ndof {
+        return Err(CaeError::Invalid(
+            "the supports constrain every degree of freedom; no dynamic modes exist".into(),
+        ));
+    }
+
+    let outcome = fe::solve_modal(
+        &element_nodes,
+        &local_k,
+        &local_m,
+        ndof,
+        &fixed,
+        study.num_modes,
+        &study.solver,
+    )
+    .map_err(CaeError::Solver)?;
+
+    let mut modes = Vec::with_capacity(outcome.modes.len());
+    for m in outcome.modes {
+        let mut max_disp = 0.0;
+        let mut max_disp_at = [0.0; 3];
+        let mut node_displacements = Vec::with_capacity(node_total);
+        for (idx, pos) in positions.iter().enumerate() {
+            let d = [
+                m.eigenvector[idx * 3],
+                m.eigenvector[idx * 3 + 1],
+                m.eigenvector[idx * 3 + 2],
+            ];
+            let mag = magnitude(d);
+            if mag > max_disp {
+                max_disp = mag;
+                max_disp_at = *pos;
+            }
+            node_displacements.push(d);
+        }
+
+        modes.push(ModeResult {
+            mode: m.mode,
+            frequency_hz: m.frequency_hz,
+            angular_frequency_rad_s: m.angular_frequency_rad_s,
+            generalized_mass: m.generalized_mass,
+            max_displacement_normalized: max_disp,
+            max_displacement_at_mm: max_disp_at,
+            mode_shape: Some(node_displacements),
+        });
+    }
+
+    let mut warnings = vec![
+        "The analysis mesh is a voxel (stair-step) hexahedral approximation of the tessellated \
+         surface; curved and sloped faces are quantised at the voxel size."
+            .to_string(),
+        "Supports are idealised fixed or component-fixed nodes.".to_string(),
+        "Linear elastic, small strain, homogeneous isotropic material, no damping.".to_string(),
+        QUALITY_LABEL.to_string(),
+    ];
+    if volume_error_ratio > 0.05 {
+        warnings.push(format!(
+            "The voxel mesh volume differs from the body by {:.1}%; refine the voxel size before \
+             relying on absolute quantities.",
+            volume_error_ratio * 100.0
+        ));
+    }
+
+    Ok(ModalResult {
+        study: study.name.clone(),
+        quality: QUALITY_LABEL.to_string(),
+        engine: format!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")),
+        definition: study.clone(),
+        source: None,
+        material: material_ref(material, youngs, poisson),
+        mesh: MeshSummary {
+            surface_triangles: mesh.triangle_count(),
+            voxel_size_mm: grid.cell,
+            elements,
+            nodes: node_total,
+            degrees_of_freedom: ndof,
+            constrained_dofs,
+            voxel_volume_mm3,
+            source_volume_mm3: source_volume,
+            volume_error_ratio,
+        },
+        modes,
+        warnings,
     })
 }
 

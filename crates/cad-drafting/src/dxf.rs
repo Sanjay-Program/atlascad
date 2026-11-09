@@ -257,6 +257,24 @@ fn entity(record: &Record) -> Result<EntityKind, DraftError> {
                 value,
             })
         }
+        "ELLIPSE" => {
+            let center = [number(record, 10)?, number(record, 20)?];
+            let major_dx = number_opt(record, 11).unwrap_or(1.0);
+            let major_dy = number_opt(record, 21).unwrap_or(0.0);
+            let major_len = major_dx.hypot(major_dy);
+            let ratio = number_opt(record, 40).unwrap_or(1.0);
+            let minor_len = major_len * ratio;
+            Ok(EntityKind::Ellipse {
+                center,
+                radius_x: if major_len > 0.0 { major_len } else { 1.0 },
+                radius_y: if minor_len > 0.0 { minor_len } else { 1.0 },
+            })
+        }
+        "SPLINE" => {
+            let points = paired_points(record)?;
+            let closed = flags(record, 70) & 1 != 0;
+            Ok(EntityKind::Spline { points, closed })
+        }
         other => Err(DraftError::Invalid(format!(
             "`{other}` is not an entity this reader writes"
         ))),

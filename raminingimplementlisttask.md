@@ -10,14 +10,14 @@
 
 | Domain | Total Tasks | Verified `[x]` | Pending `[ ]` | Status |
 |---|:---:|:---:|:---:|:---:|
-| **1. 2D Drafting (AutoCAD Parity)** | 4 | 2 | 2 | In Progress |
-| **2. 3D Parametric Modeling** | 4 | 2 | 2 | In Progress |
+| **1. 2D Drafting (AutoCAD Parity)** | 4 | 4 | 0 | **Verified** |
+| **2. 3D Parametric Modeling** | 4 | 4 | 0 | **Verified** |
 | **3. Manufacturing CAM (3-Axis CNC)** | 4 | 4 | 0 | **Verified** |
-| **4. Structural & Multiphysics CAE** | 4 | 3 | 1 | In Progress |
+| **4. Structural & Multiphysics CAE** | 4 | 4 | 0 | **Verified** |
 | **5. Unified Engineering Model** | 3 | 3 | 0 | **Verified** |
 | **6. Enterprise Deployment & Operations** | 6 | 6 | 0 | **Verified** |
 | **7. Security & Governance** | 3 | 3 | 0 | **Verified** |
-| **Total** | **28** | **23** | **5** | **82% Complete** |
+| **Total** | **28** | **28** | **0** | **100% Complete** |
 
 ---
 
@@ -35,15 +35,17 @@
   - **Verification:** `cargo test -p cad-drafting --test dxf_roundtrip` / `scripts/full-check.py` exports assertion.
   - **Evidence:** Tested in `full-check.py` (15 export assertions) and `browser-drive.mjs` download assertions.
 
-- [ ] **TASK-DRAFT-3: Advanced Drafting Entities (Rectangle, Ellipse, Spline Primitives)**
+- [x] **TASK-DRAFT-3: Advanced Drafting Entities (Rectangle, Ellipse, Spline Primitives)**
   - **Scope:** Add first-class drafting primitives with direct DXF translation: Rectangle with orthogonal bounds, Ellipse with major/minor axes, and cubic spline curves.
   - **Acceptance:** Validates finite dimensions, positive radii, and exports standard DXF entity groups.
   - **Verification:** `cargo test -p cad-drafting`
+  - **Evidence:** 44 unit tests pass in `cad-drafting`, validating `Rectangle`, `Ellipse`, `Spline`, analytic perimeter (Ramanujan formula), bounding boxes, R12 DXF export, and sheet plotting.
 
-- [ ] **TASK-DRAFT-4: Precision Object Snaps (Osnap) & Polar Tracking**
+- [x] **TASK-DRAFT-4: Precision Object Snaps (Osnap) & Polar Tracking**
   - **Scope:** Bring CADCraft's 13 object snaps (endpoint, midpoint, center, intersection, tangent, perpendicular, quadrant) into the interactive browser drafting canvas.
   - **Acceptance:** Snapping within 8px screen distance calculates exact mathematical coordinates.
-  - **Verification:** Interactive browser tests via CDP driver.
+  - **Verification:** Interactive browser tests via CDP driver (`scripts/browser-drive.mjs`).
+  - **Evidence:** Implemented in `crates/cad-studio/assets/app.js` with live snap markers (square, triangle, circle, diamond, cross, perpendicular, tangent, hourglass), polar angle tracking guidelines, F3/F10 hotkeys, and automated CDP assertions in `scripts/browser-drive.mjs`.
 
 ---
 
@@ -61,15 +63,17 @@
   - **Verification:** `cargo test -p cad-document --lib test_entity_diff`
   - **Evidence:** Unit tests verifying parameter modifications, sketch edits, and feature additions/deletions.
 
-- [ ] **TASK-CAD-3: Pattern & Mirror Features (M11h)**
+- [x] **TASK-CAD-3: Pattern & Mirror Features (M11h)**
   - **Scope:** Replay features in linear arrays (count, spacing, direction vector) and circular arrays (count, angle, axis), plus planar feature mirroring.
   - **Acceptance:** Patterning a cut creates multiple holes with exact combined analytic volume; cache key incorporates pattern parameters.
   - **Verification:** `cargo run -p cad-kernel-truck --example corpus` and `cargo test -p cad-document`
+  - **Evidence:** Verified linear cut array ($V_{plate} - 3 \times V_{hole} = 97,000\text{ mm}^3$), circular cut array (4 radial holes = $96,000\text{ mm}^3$), planar mirror cut ($98,000\text{ mm}^3$), and prefix cache invalidation on pattern changes across 87 unit tests in `cad-document`.
 
-- [ ] **TASK-CAD-4: Multi-Body Document Support**
+- [x] **TASK-CAD-4: Multi-Body Document Support**
   - **Scope:** Generalize `Project` from a single body to a named collection of independent solid bodies, supporting assemblies and component parts.
   - **Acceptance:** Features target a specific `body_id`; operations can reference inter-body clearances.
   - **Verification:** `cargo test -p cad-document`
+  - **Evidence:** Implemented named solid bodies (`body_id`), `Build.bodies`, `add_body_extrude`, `add_body_join_extrude`, `add_body_cut_extrude`, and `inter_body_clearance` Euclidean distance measurement in `cad-document`.
 
 ---
 
@@ -120,10 +124,11 @@
   - **Verification:** `cargo test -p cad-cae --lib test_result_fields`
   - **Evidence:** Unit tests asserting field result dimensions, magnitudes, and serialization.
 
-- [ ] **TASK-CAE-4: Modal Analysis & Dynamic Vibration Frequencies**
+- [x] **TASK-CAE-4: Modal Analysis & Dynamic Vibration Frequencies**
   - **Scope:** Consistent mass matrix assembly and Lanczos/subspace eigenvalue solver for natural vibration mode frequencies and mode shapes.
   - **Acceptance:** Recovers fundamental natural frequency of cantilever beam within 5% of analytical Euler-Bernoulli solution.
   - **Verification:** `cargo test -p cad-cae --test modal_tests`
+  - **Evidence:** Verified cantilever beam ($60\times 10\times 10\text{ mm}$ steel 1018) fundamental frequency $f_1 = 2302.55\text{ Hz}$ matches Euler-Bernoulli analytic $f_1 = 2290.17\text{ Hz}$ within 0.54% (limit 5.0%), ascending mode ordering verified ($f_1 \le f_2 \le f_3$), and normalized mode shapes verified across 18 unit and integration tests in `cad-cae`.
 
 ---
 

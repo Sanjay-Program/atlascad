@@ -263,12 +263,19 @@
           <button type="button" class="tool-button" data-tool="select" aria-pressed="true" title="Select">Select</button>
           <button type="button" class="tool-button" data-tool="line" aria-pressed="false" title="Line: click two points">Line</button>
           <button type="button" class="tool-button" data-tool="circle" aria-pressed="false" title="Circle: click the centre, then a point on it">Circle</button>
+          <button type="button" class="tool-button" data-tool="rectangle" aria-pressed="false" title="Rectangle: click opposite corners">Rect</button>
+          <button type="button" class="tool-button" data-tool="ellipse" aria-pressed="false" title="Ellipse: click centre, then radii">Ellipse</button>
           <button type="button" class="tool-button" data-tool="polyline" aria-pressed="false" title="Polyline: click points, then Finish or Close">Poly</button>
+          <button type="button" class="tool-button" data-tool="spline" aria-pressed="false" title="Spline: click fit points, then Finish or Close">Spline</button>
           <button type="button" class="tool-button" data-tool="point" aria-pressed="false" title="Point">Point</button>
           <button type="button" class="tool-button" data-tool="dimension" aria-pressed="false" title="Dimension: click the two points to measure">Dim</button>
           <button type="button" class="tool-button" data-tool="text" aria-pressed="false" title="Text: type a value, then click where it goes">Text</button>
           <button type="button" class="tool-button" id="drawUndoBtn" title="Undo the last drawing edit">↶</button>
           <button type="button" class="tool-button" id="drawDeleteBtn" title="Delete the selected entity">✕</button>
+        </div>
+        <div class="field-row osnap-bar">
+          <button type="button" class="tool-button active" id="osnapToggleBtn" aria-pressed="true" title="Object Snaps (F3): Endpoint, Midpoint, Center, Quadrant, Intersection, Perpendicular, Tangent, Nearest">OSNAP</button>
+          <button type="button" class="tool-button active" id="polarToggleBtn" aria-pressed="true" title="Polar Tracking (F10): 45°/90° alignment guides">POLAR</button>
         </div>
         <input id="drawText" class="drawing-text-input" type="text" maxlength="512" placeholder="Text for the Text tool" autocomplete="off">
         <div class="field-row" id="polylineActions" hidden>
@@ -361,9 +368,18 @@
     </aside>
   </main>
 
+  <div id="commandLineBar" class="command-line-bar" role="region" aria-label="AutoCAD Command Prompt">
+    <span class="command-prompt-label">Command:</span>
+    <input type="text" id="commandPromptInput" class="command-prompt-input" autocomplete="off" spellcheck="false" placeholder="Type command (L, C, REC, EL, PL, SPL, DIM, EXT, FEA, MODAL, CAM, HELP) or coordinates (10,20)" />
+    <div id="commandSuggestions" class="command-suggestions" hidden></div>
+  </div>
+
   <footer class="statusbar">
     <span id="statusMessage" class="status-message">Connecting…</span>
     <span class="spacer"></span>
+    <span id="statusCoords" class="status-item" title="Cursor Coordinates">X: 0.000, Y: 0.000</span>
+    <button type="button" id="statusOsnapIndicator" class="status-badge" title="F3: Toggle Object Snap">OSNAP: ON</button>
+    <button type="button" id="statusPolarIndicator" class="status-badge" title="F10: Toggle Polar Tracking">POLAR: ON</button>
     <span id="statusPick" class="status-item">—</span>
     <span id="statusGeometry" class="status-item">—</span>
     <span id="statusUnits" class="status-item">mm</span>
@@ -390,6 +406,12 @@
         <button type="button" class="link" data-close="help">close</button>
       </div>
       <dl class="shortcut-grid">
+        <dt>L / C / REC</dt><dd>AutoCAD Line / Circle / Rectangle</dd>
+        <dt>EL / PL / SPL</dt><dd>AutoCAD Ellipse / Polyline / Spline</dd>
+        <dt>DIM / TEXT / PO</dt><dd>AutoCAD Dimension / Text / Point</dd>
+        <dt>F3 / F10</dt><dd>Toggle Object Snap / Polar Tracking</dd>
+        <dt>FEA / MODAL</dt><dd>Linear Static Stress / Dynamic Vibration FEA</dd>
+        <dt>CAM / GCODE</dt><dd>Generate 3-Axis CNC Machining Toolpaths</dd>
         <dt>Ctrl K</dt><dd>Command palette</dd>
         <dt>Ctrl S</dt><dd>Save project</dd>
         <dt>Ctrl Z</dt><dd>Undo</dd>
@@ -407,6 +429,17 @@
         <dt>Scroll</dt><dd>Zoom</dd>
       </dl>
       <p class="hint">All commands in the palette are connected to the project API. There are no placeholder actions.</p>
+    </div>
+  </div>
+
+  <div id="simulationHud" class="palette sim-hud" hidden>
+    <div class="palette-backdrop" data-close="simHud"></div>
+    <div class="palette-card sim-hud-card" role="dialog" aria-modal="true" aria-labelledby="simHudTitle">
+      <div class="section-head">
+        <h2 id="simHudTitle">Engineering Analysis & CAM</h2>
+        <button type="button" class="link" data-close="simHud">close</button>
+      </div>
+      <div id="simHudContent" class="sim-hud-content"></div>
     </div>
   </div>
 

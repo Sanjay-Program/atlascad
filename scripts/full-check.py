@@ -663,6 +663,38 @@ def export_section(studio: Studio) -> None:
     report("exports")
 
 
+def simulation_section(studio: Studio) -> None:
+    section("simulation: linear static FEA, modal vibration frequencies, and 3-axis CAM toolpaths")
+    # 1. Static FEA simulation
+    fea = studio.post("/api/cae/static", {"material": "steel.1018", "voxel_size_mm": 5.0})
+    check(fea.status == 200, f"the static FEA endpoint returns 200 (got {fea.status})")
+    fea_data = fea.json()
+    check(fea_data.get("elements", 0) > 0, "the static FEA mesh has solid elements")
+    check(fea_data.get("max_displacement_mm", 0.0) > 0.0, "the deflection is non-zero")
+    check(fea_data.get("max_von_mises_mpa", 0.0) > 0.0, "the von Mises stress is non-zero")
+    check("linear elastic" in fea_data.get("quality", "").lower(), "the quality label is returned")
+
+    # 2. Dynamic modal vibration frequencies
+    modal = studio.post("/api/cae/modal", {"material": "steel.1018", "num_modes": 3})
+    check(modal.status == 200, f"the modal endpoint returns 200 (got {modal.status})")
+    modal_data = modal.json()
+    modes = modal_data.get("modes", [])
+    check(len(modes) == 3, f"3 modes are returned (got {len(modes)})")
+    check(modal_data.get("fundamental_frequency_hz", 0.0) > 0.0, "fundamental frequency is positive")
+    f1 = modes[0].get("frequency_hz", 0.0)
+    f2 = modes[1].get("frequency_hz", 0.0)
+    check(f2 >= f1, f"modes are ordered by frequency: {f1} <= {f2}")
+
+    # 3. 3-Axis CNC CAM toolpath generation
+    cam = studio.post("/api/cam/toolpaths", {"tool_diameter_mm": 6.0})
+    check(cam.status == 200, f"the CAM endpoint returns 200 (got {cam.status})")
+    cam_data = cam.json()
+    check(cam_data.get("moves_count", 0) > 0, "CAM generates motion moves")
+    check(cam_data.get("cutting_length_mm", 0.0) > 0.0, "cutting distance is non-zero")
+    check("G" in cam_data.get("gcode_preview", ""), "G-code preview is returned")
+    report("simulation")
+
+
 def persistence_section(work: pathlib.Path, studio: Studio) -> None:
     section("persistence: save, reopen, undo history and every feature")
     features = len(studio.state()["features"])
@@ -877,6 +909,7 @@ def main() -> int:
         engineering_section(studio)
         revisions_section(studio)
         export_section(studio)
+        simulation_section(studio)
         concurrency_section(studio)
         persistence_section(work, studio)
     finally:

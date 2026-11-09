@@ -237,20 +237,81 @@ fn norm(a: &[f64]) -> f64 {
     dot(a, a).sqrt()
 }
 
-/// Jacobi-preconditioned conjugate gradient.
-///
-/// Stops on a relative residual `||r|| / ||f||` at or below the study tolerance. It returns an error
-/// rather than a partially converged field when the iteration limit is hit: a result that is
-/// reported as converged but is not would be worse than no result.
-pub(crate) fn solve(
+/// Local consistent mass matrix, row-major 24x24, for a cube of side `side_mm` and density in kg/m³.
+pub(crate) fn hex_mass(side_mm: f64, density_kg_m3: f64) -> Vec<f64> {
+    // In consistent mm-tonne-s units, 1 kg/m³ = 1e-12 tonne/mm³.
+    let rho = density_kg_m3 * 1.0e-12;
+    let elem_mass = rho * side_mm.powi(3);
+    let mut mass = vec![0.0; ELEMENT_DOFS * ELEMENT_DOFS];
+    for i in 0..ELEMENT_NODES {
+        let ni = natural_coordinates(i);
+        for j in 0..ELEMENT_NODES {
+            let nj = natural_coordinates(j);
+            let factor =
+                (3.0 + ni[0] * nj[0]) * (3.0 + ni[1] * nj[1]) * (3.0 + ni[2] * nj[2]) / 1728.0;
+            let entry = elem_mass * factor;
+            for c in 0..3 {
+                let row = i * 3 + c;
+                let col = j * 3 + c;
+                mass[row * ELEMENT_DOFS + col] = entry;
+            }
+        }
+    }
+    mass
+}
+
+/// Multiply by the global mass matrix, matrix-free over the element list.
+pub(crate) fn apply_mass(
+    element_nodes: &[[u32; ELEMENT_NODES]],
+    local_mass: &[f64],
+    u: &[f64],
+    fixed: &[bool],
+    out: &mut [f64],
+) {
+    out.fill(0.0);
+    let mut ue = [0.0; ELEMENT_DOFS];
+    let mut fe = [0.0; ELEMENT_DOFS];
+    for nodes in element_nodes {
+        for (local_node, &node) in nodes.iter().enumerate() {
+            let base = node as usize * 3;
+            for component in 0..3 {
+                ue[local_node * 3 + component] = u[base + component];
+            }
+        }
+        for (row, value) in fe.iter_mut().enumerate() {
+            let row_start = row * ELEMENT_DOFS;
+            let mut sum = 0.0;
+            for (column, u_val) in ue.iter().enumerate() {
+                sum += local_mass[row_start + column] * u_val;
+            }
+            *value = sum;
+        }
+        for (local_node, &node) in nodes.iter().enumerate() {
+            let base = node as usize * 3;
+            for component in 0..3 {
+                out[base + component] += fe[local_node * 3 + component];
+            }
+        }
+    }
+    for (value, &is_fixed) in out.iter_mut().zip(fixed.iter()) {
+        if is_fixed {
+            *value = 0.0;
+        }
+    }
+}
+
+/// Solve `K u = f` with Jacobi-preconditioned conjugate gradient.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn solve_system(
     element_nodes: &[[u32; ELEMENT_NODES]],
     local: &[f64],
     ndof: usize,
     fixed: &[bool],
     force: &[f64],
-    settings: &SolverSettings,
-) -> Result<SolveOutcome, String> {
-    let diag = diagonal(element_nodes, local, ndof);
+    diag: &[f64],
+    tolerance: f64,
+    max_iterations: usize,
+) -> Result<(Vec<f64>, usize, f64), String> {
     let mut u = vec![0.0; ndof];
     let mut residual = force.to_vec();
     for (value, &is_fixed) in residual.iter_mut().zip(fixed.iter()) {
@@ -260,7 +321,7 @@ pub(crate) fn solve(
     }
     let reference = norm(&residual);
     if reference == 0.0 {
-        return Err("the load vector is zero after constraints; nothing to solve".into());
+        return Ok((u, 0, 0.0));
     }
     let mut preconditioned: Vec<f64> = residual
         .iter()
@@ -275,7 +336,7 @@ pub(crate) fn solve(
     }
     let mut ap = vec![0.0; ndof];
     let mut relative_residual = 1.0;
-    for iteration in 1..=settings.max_iterations {
+    for iteration in 1..=max_iterations {
         apply(element_nodes, local, &direction, fixed, &mut ap);
         let curvature = dot(&direction, &ap);
         if !curvature.is_finite() || curvature <= 0.0 {
@@ -295,17 +356,8 @@ pub(crate) fn solve(
         if !relative_residual.is_finite() {
             return Err("the residual became non-finite".into());
         }
-        if relative_residual <= settings.relative_tolerance {
-            // Reactions are the constrained rows of K u, so compute the product without zeroing
-            // them. Zeroing is only for iterating in the free subspace.
-            let unconstrained = vec![false; ndof];
-            apply(element_nodes, local, &u, &unconstrained, &mut ap);
-            return Ok(SolveOutcome {
-                displacement: u,
-                iterations: iteration,
-                relative_residual,
-                internal_force: ap,
-            });
+        if relative_residual <= tolerance {
+            return Ok((u, iteration, relative_residual));
         }
         for ((value, r), d) in preconditioned
             .iter_mut()
@@ -327,8 +379,206 @@ pub(crate) fn solve(
     Err(format!(
         "the solver did not reach a relative residual of {:.1e} in {} iterations (reached {relative_residual:.3e}); \
          increase --max-iter or coarsen the mesh",
-        settings.relative_tolerance, settings.max_iterations
+        tolerance, max_iterations
     ))
+}
+
+/// Jacobi-preconditioned conjugate gradient.
+pub(crate) fn solve(
+    element_nodes: &[[u32; ELEMENT_NODES]],
+    local: &[f64],
+    ndof: usize,
+    fixed: &[bool],
+    force: &[f64],
+    settings: &SolverSettings,
+) -> Result<SolveOutcome, String> {
+    let diag = diagonal(element_nodes, local, ndof);
+    let (u, iterations, relative_residual) = solve_system(
+        element_nodes,
+        local,
+        ndof,
+        fixed,
+        force,
+        &diag,
+        settings.relative_tolerance,
+        settings.max_iterations,
+    )?;
+    let unconstrained = vec![false; ndof];
+    let mut ap = vec![0.0; ndof];
+    apply(element_nodes, local, &u, &unconstrained, &mut ap);
+    Ok(SolveOutcome {
+        displacement: u,
+        iterations,
+        relative_residual,
+        internal_force: ap,
+    })
+}
+
+/// One computed dynamic natural mode.
+pub(crate) struct ModeOutcome {
+    pub mode: usize,
+    #[allow(dead_code)]
+    pub lambda: f64,
+    pub frequency_hz: f64,
+    pub angular_frequency_rad_s: f64,
+    pub generalized_mass: f64,
+    pub eigenvector: Vec<f64>,
+}
+
+/// The result of dynamic modal analysis.
+pub(crate) struct ModalOutcome {
+    pub modes: Vec<ModeOutcome>,
+}
+
+fn m_orthogonalize(
+    v: &mut [f64],
+    previous_modes: &[Vec<f64>],
+    element_nodes: &[[u32; ELEMENT_NODES]],
+    local_mass: &[f64],
+    fixed: &[bool],
+    temp_mv: &mut [f64],
+) {
+    for prev in previous_modes {
+        apply_mass(element_nodes, local_mass, v, fixed, temp_mv);
+        let coeff = dot(prev, temp_mv);
+        for (v_val, &p_val) in v.iter_mut().zip(prev.iter()) {
+            *v_val -= coeff * p_val;
+        }
+    }
+}
+
+/// Inverse-iteration subspace modal solver with Gram-Schmidt M-deflation.
+pub(crate) fn solve_modal(
+    element_nodes: &[[u32; ELEMENT_NODES]],
+    local_stiffness: &[f64],
+    local_mass: &[f64],
+    ndof: usize,
+    fixed: &[bool],
+    num_modes: usize,
+    settings: &SolverSettings,
+) -> Result<ModalOutcome, String> {
+    let diag_k = diagonal(element_nodes, local_stiffness, ndof);
+    let mut converged_modes: Vec<Vec<f64>> = Vec::with_capacity(num_modes);
+    let mut modes: Vec<ModeOutcome> = Vec::with_capacity(num_modes);
+    let mut mv = vec![0.0; ndof];
+    let mut mw = vec![0.0; ndof];
+    let mut kw = vec![0.0; ndof];
+
+    for mode_idx in 0..num_modes {
+        let mut v = vec![0.0; ndof];
+        for (i, val) in v.iter_mut().enumerate() {
+            if !fixed[i] {
+                let phase = (i as f64 + 1.0) * (mode_idx as f64 + 1.0);
+                *val = (phase * 0.71828).sin() + (phase * 0.31415).cos();
+            }
+        }
+        // Orthogonalize against previously found modes
+        m_orthogonalize(
+            &mut v,
+            &converged_modes,
+            element_nodes,
+            local_mass,
+            fixed,
+            &mut mv,
+        );
+        m_orthogonalize(
+            &mut v,
+            &converged_modes,
+            element_nodes,
+            local_mass,
+            fixed,
+            &mut mv,
+        );
+        apply_mass(element_nodes, local_mass, &v, fixed, &mut mv);
+        let mass_norm = dot(&v, &mv).sqrt();
+        if mass_norm > 0.0 {
+            for x in &mut v {
+                *x /= mass_norm;
+            }
+        }
+
+        let mut lambda = 0.0;
+        let max_iter = 30;
+        for iter in 0..max_iter {
+            // y = M * v
+            apply_mass(element_nodes, local_mass, &v, fixed, &mut mv);
+            // Solve K * w = y
+            let (mut w, _, _) = solve_system(
+                element_nodes,
+                local_stiffness,
+                ndof,
+                fixed,
+                &mv,
+                &diag_k,
+                settings.relative_tolerance.min(1.0e-6),
+                settings.max_iterations,
+            )?;
+            // Deflate against prior modes
+            m_orthogonalize(
+                &mut w,
+                &converged_modes,
+                element_nodes,
+                local_mass,
+                fixed,
+                &mut mw,
+            );
+            m_orthogonalize(
+                &mut w,
+                &converged_modes,
+                element_nodes,
+                local_mass,
+                fixed,
+                &mut mw,
+            );
+
+            apply_mass(element_nodes, local_mass, &w, fixed, &mut mw);
+            let w_m_w = dot(&w, &mw);
+            if w_m_w <= 0.0 || !w_m_w.is_finite() {
+                return Err("mass normalization encountered non-positive inner product".into());
+            }
+            let w_norm = w_m_w.sqrt();
+
+            apply(element_nodes, local_stiffness, &w, fixed, &mut kw);
+            let w_k_w = dot(&w, &kw);
+            let new_lambda = (w_k_w / w_m_w).max(0.0);
+
+            let mut diff = 0.0;
+            for (v_val, w_val) in v.iter_mut().zip(w.iter()) {
+                let next_v = *w_val / w_norm;
+                diff += (next_v - *v_val).powi(2);
+                *v_val = next_v;
+            }
+
+            let rel_change = (new_lambda - lambda).abs() / new_lambda.max(1.0);
+            lambda = new_lambda;
+            if iter >= 3 && (rel_change < 1.0e-5 || diff.sqrt() < 1.0e-5) {
+                break;
+            }
+        }
+
+        let omega = lambda.sqrt();
+        let freq_hz = omega / std::f64::consts::TAU;
+        converged_modes.push(v.clone());
+        modes.push(ModeOutcome {
+            mode: mode_idx + 1,
+            lambda,
+            frequency_hz: freq_hz,
+            angular_frequency_rad_s: omega,
+            generalized_mass: 1.0,
+            eigenvector: v,
+        });
+    }
+
+    modes.sort_by(|a, b| {
+        a.frequency_hz
+            .partial_cmp(&b.frequency_hz)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    for (idx, m) in modes.iter_mut().enumerate() {
+        m.mode = idx + 1;
+    }
+
+    Ok(ModalOutcome { modes })
 }
 
 #[cfg(test)]

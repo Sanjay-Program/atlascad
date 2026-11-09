@@ -1098,6 +1098,220 @@ impl StudioState {
         let bytes = cad_io::stl_bytes(&mesh)?;
         Ok((bytes, export_name(&self.project.name)))
     }
+
+    fn cae_static(&mut self, request: &CaeStaticRequest) -> Result<serde_json::Value, StudioError> {
+        if self.project.features().is_empty() {
+            return Err(StudioError::BadRequest(
+                "this project has no solid to analyze".into(),
+            ));
+        }
+        let build = self
+            .project
+            .build_with_cache(&mut self.kernel, &mut self.cache)?;
+        if let Some(failure) = build.failed {
+            return Err(StudioError::BadRequest(format!(
+                "feature {} cannot be rebuilt: {}",
+                failure.id, failure.message
+            )));
+        }
+        let mesh = build.mesh.ok_or_else(|| {
+            StudioError::BadRequest("this project has no solid to analyze".into())
+        })?;
+
+        let mut min = [f64::INFINITY; 3];
+        let mut max = [f64::NEG_INFINITY; 3];
+        for p in &mesh.positions {
+            for i in 0..3 {
+                min[i] = min[i].min(p[i]);
+                max[i] = max[i].max(p[i]);
+            }
+        }
+        let span_x = (max[0] - min[0]).max(1.0);
+        let voxel_size = request
+            .voxel_size_mm
+            .unwrap_or_else(|| (span_x / 12.0).clamp(2.5, 10.0));
+
+        let mut study = cad_cae::StaticStudy::new("studio-static", voxel_size, &request.material);
+        study.supports = vec![cad_cae::Support::fixed(cad_cae::FaceSelection::new(
+            cad_cae::Axis::X,
+            min[0],
+        ))];
+        study.loads = vec![cad_cae::FaceLoad::new(
+            cad_cae::FaceSelection::new(cad_cae::Axis::X, max[0]),
+            [0.0, 0.0, -100.0],
+        )];
+
+        let library = cad_engineering_model::MaterialLibrary::standard();
+        let result = cad_cae::run_static(&mesh, &study, &library)
+            .map_err(|e| StudioError::BadRequest(format!("CAE simulation error: {e}")))?;
+
+        Ok(serde_json::json!({
+            "study": result.study,
+            "voxel_size_mm": result.mesh.voxel_size_mm,
+            "elements": result.mesh.elements,
+            "nodes": result.mesh.nodes,
+            "max_displacement_mm": result.results.max_displacement_mm,
+            "max_von_mises_mpa": result.results.max_von_mises_mpa,
+            "factor_of_safety": result.results.factor_of_safety,
+            "equilibrium_residual": result.results.equilibrium_residual_ratio,
+            "iterations": result.solver.iterations,
+            "quality": result.quality,
+            "warnings": result.warnings,
+        }))
+    }
+
+    fn cae_modal(&mut self, request: &CaeModalRequest) -> Result<serde_json::Value, StudioError> {
+        if self.project.features().is_empty() {
+            return Err(StudioError::BadRequest(
+                "this project has no solid to analyze".into(),
+            ));
+        }
+        let build = self
+            .project
+            .build_with_cache(&mut self.kernel, &mut self.cache)?;
+        if let Some(failure) = build.failed {
+            return Err(StudioError::BadRequest(format!(
+                "feature {} cannot be rebuilt: {}",
+                failure.id, failure.message
+            )));
+        }
+        let mesh = build.mesh.ok_or_else(|| {
+            StudioError::BadRequest("this project has no solid to analyze".into())
+        })?;
+
+        let mut min = [f64::INFINITY; 3];
+        let mut max = [f64::NEG_INFINITY; 3];
+        for p in &mesh.positions {
+            for i in 0..3 {
+                min[i] = min[i].min(p[i]);
+                max[i] = max[i].max(p[i]);
+            }
+        }
+        let span_x = (max[0] - min[0]).max(1.0);
+        let voxel_size = request
+            .voxel_size_mm
+            .unwrap_or_else(|| (span_x / 12.0).clamp(2.5, 10.0));
+        let num_modes = request.num_modes.unwrap_or(3);
+
+        let study = cad_cae::ModalStudy::new("studio-modal", voxel_size, &request.material)
+            .with_modes(num_modes)
+            .with_support(cad_cae::Support::fixed(cad_cae::FaceSelection::new(
+                cad_cae::Axis::X,
+                min[0],
+            )));
+
+        let library = cad_engineering_model::MaterialLibrary::standard();
+        let result = cad_cae::run_modal(&mesh, &study, &library)
+            .map_err(|e| StudioError::BadRequest(format!("CAE modal error: {e}")))?;
+
+        let modes_summary: Vec<_> = result
+            .modes
+            .iter()
+            .map(|m| {
+                serde_json::json!({
+                    "mode": m.mode,
+                    "frequency_hz": m.frequency_hz,
+                    "angular_frequency_rad_s": m.angular_frequency_rad_s,
+                    "generalized_mass": m.generalized_mass,
+                })
+            })
+            .collect();
+
+        Ok(serde_json::json!({
+            "study": result.study,
+            "voxel_size_mm": result.mesh.voxel_size_mm,
+            "elements": result.mesh.elements,
+            "nodes": result.mesh.nodes,
+            "fundamental_frequency_hz": result.fundamental_frequency_hz(),
+            "modes": modes_summary,
+            "quality": result.quality,
+            "warnings": result.warnings,
+        }))
+    }
+
+    fn cam_toolpaths(&mut self, request: &CamRequest) -> Result<serde_json::Value, StudioError> {
+        if self.project.features().is_empty() {
+            return Err(StudioError::BadRequest(
+                "this project has no solid to machine".into(),
+            ));
+        }
+        let build = self
+            .project
+            .build_with_cache(&mut self.kernel, &mut self.cache)?;
+        if let Some(failure) = build.failed {
+            return Err(StudioError::BadRequest(format!(
+                "feature {} cannot be rebuilt: {}",
+                failure.id, failure.message
+            )));
+        }
+        let mesh = build.mesh.ok_or_else(|| {
+            StudioError::BadRequest("this project has no solid to machine".into())
+        })?;
+
+        let mut min = [f64::INFINITY; 3];
+        let mut max = [f64::NEG_INFINITY; 3];
+        for p in &mesh.positions {
+            for i in 0..3 {
+                min[i] = min[i].min(p[i]);
+                max[i] = max[i].max(p[i]);
+            }
+        }
+
+        let margin = 5.0;
+        let stock_min = [min[0] - margin, min[1] - margin, min[2] - margin];
+        let stock_max = [max[0] + margin, max[1] + margin, max[2] + 2.0];
+        let stock = cad_cam::Stock::new(stock_min, stock_max)
+            .map_err(|e| StudioError::BadRequest(format!("CAM stock error: {e}")))?;
+        let setup = cad_cam::Setup::new(
+            cad_cam::Machine::Milling3Axis,
+            cad_cam::MachineEnvelope::default_mill(),
+            stock,
+            cad_cam::WorkCoordinate::standard(),
+            stock_max[2] + 5.0,
+        )
+        .map_err(|e| StudioError::BadRequest(format!("CAM setup error: {e}")))?;
+
+        let tool_dia = request.tool_diameter_mm.unwrap_or(6.0);
+        let tool_id = cad_cam::ToolId::new(1)
+            .ok_or_else(|| StudioError::BadRequest("invalid tool id".into()))?;
+        let tool = cad_cam::Tool::new(
+            tool_id,
+            "Flat end mill",
+            cad_cam::ToolGeometry::FlatEndMill {
+                diameter_mm: tool_dia,
+                flute_length_mm: 20.0,
+            },
+            cad_cam::CuttingCondition::conservative_default(),
+            2.0,
+        )
+        .map_err(|e| StudioError::BadRequest(format!("CAM tool error: {e}")))?;
+
+        let op = cad_cam::Operation::Facing {
+            depth_mm: request.depth_mm.unwrap_or(1.0),
+            stepover_mm: request.stepover_mm.unwrap_or(tool_dia * 0.7),
+        };
+        let path_id = cad_cam::ToolpathId::new(1)
+            .ok_or_else(|| StudioError::BadRequest("invalid path id".into()))?;
+        let toolpath = cad_cam::generate(&op, &setup, &tool, path_id)
+            .map_err(|e| StudioError::BadRequest(format!("CAM generation error: {e}")))?;
+
+        let summary = cad_cam::summarize(&toolpath, &setup);
+        let post = cad_cam::Postprocessor::new(cad_cam::PostFormat::LinuxCnc, "STUDIO_PROG");
+        let gcode = post
+            .emit(&toolpath, &setup)
+            .map_err(|e| StudioError::BadRequest(format!("CAM post error: {e}")))?;
+        let preview_lines: Vec<&str> = gcode.lines().take(25).collect();
+
+        Ok(serde_json::json!({
+            "tool_name": tool.name,
+            "moves_count": toolpath.points.len(),
+            "cutting_length_mm": toolpath.cutting_length_mm(),
+            "rapid_length_mm": toolpath.rapid_length_mm(),
+            "estimated_minutes": toolpath.estimated_minutes(),
+            "summary": summary,
+            "gcode_preview": preview_lines.join("\n"),
+        }))
+    }
 }
 
 fn export_name(name: &str) -> String {
@@ -1761,6 +1975,27 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             Ok(payload) => to_json(200, &payload),
             Err(error) => error_response(&error),
         },
+        "/api/cae/static" => match parse_body_or_default::<CaeStaticRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.cae_static(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/cae/modal" => match parse_body_or_default::<CaeModalRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.cae_modal(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/cam/toolpaths" => match parse_body_or_default::<CamRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.cam_toolpaths(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
         _ => error_response(&StudioError::NotFound),
     }
 }
@@ -2253,6 +2488,51 @@ fn parse_body<T: serde::de::DeserializeOwned>(request: &http::Request) -> Result
         return Err(StudioError::BadRequest("request body is empty".into()));
     }
     serde_json::from_slice(&request.body).map_err(StudioError::from)
+}
+
+fn parse_body_or_default<T: serde::de::DeserializeOwned + Default>(
+    request: &http::Request,
+) -> Result<T, StudioError> {
+    if request.body.is_empty() {
+        Ok(T::default())
+    } else {
+        serde_json::from_slice(&request.body).map_err(StudioError::from)
+    }
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CaeStaticRequest {
+    #[serde(default = "default_steel")]
+    material: String,
+    #[serde(default)]
+    voxel_size_mm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CaeModalRequest {
+    #[serde(default = "default_steel")]
+    material: String,
+    #[serde(default)]
+    voxel_size_mm: Option<f64>,
+    #[serde(default)]
+    num_modes: Option<usize>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CamRequest {
+    #[serde(default)]
+    tool_diameter_mm: Option<f64>,
+    #[serde(default)]
+    stepover_mm: Option<f64>,
+    #[serde(default)]
+    depth_mm: Option<f64>,
+}
+
+fn default_steel() -> String {
+    "steel.1018".to_string()
 }
 
 fn with_state<T>(

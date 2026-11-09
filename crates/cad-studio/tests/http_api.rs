@@ -2789,3 +2789,51 @@ fn a_saved_drawing_is_recorded_in_the_project_and_can_be_reviewed()
     );
     Ok(())
 }
+
+#[test]
+fn cae_and_cam_endpoints_execute_on_solid_model() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("cae-cam-test", [40.0, 20.0, 10.0])?;
+    let addr = handle.addr();
+
+    // 1. Run static FEA
+    let fea_resp = post(addr, "/api/cae/static", r#"{"voxel_size_mm": 5.0}"#)?;
+    assert_eq!(fea_resp.status, 200);
+    let fea_json = json(&fea_resp)?;
+    assert!(fea_json["elements"].as_u64().unwrap_or(0) > 0);
+    assert!(fea_json["max_displacement_mm"].as_f64().unwrap_or(0.0) > 0.0);
+    assert!(fea_json["max_von_mises_mpa"].as_f64().unwrap_or(0.0) > 0.0);
+
+    // 2. Run modal dynamic vibration analysis
+    let modal_resp = post(
+        addr,
+        "/api/cae/modal",
+        r#"{"voxel_size_mm": 5.0, "num_modes": 2}"#,
+    )?;
+    assert_eq!(modal_resp.status, 200);
+    let modal_json = json(&modal_resp)?;
+    let modes = modal_json["modes"]
+        .as_array()
+        .ok_or("modes should be an array")?;
+    assert_eq!(modes.len(), 2);
+    let f1 = modes[0]["frequency_hz"]
+        .as_f64()
+        .ok_or("f1 should be a float")?;
+    assert!(f1 > 0.0);
+
+    // 3. Run CAM toolpath generation
+    let cam_resp = post(
+        addr,
+        "/api/cam/toolpaths",
+        r#"{"tool_diameter_mm": 6.0, "depth_mm": 1.0}"#,
+    )?;
+    assert_eq!(cam_resp.status, 200);
+    let cam_json = json(&cam_resp)?;
+    assert!(cam_json["moves_count"].as_u64().unwrap_or(0) > 0);
+    assert!(cam_json["cutting_length_mm"].as_f64().unwrap_or(0.0) > 0.0);
+    let gcode = cam_json["gcode_preview"]
+        .as_str()
+        .ok_or("gcode_preview should be a string")?;
+    assert!(gcode.contains('G'));
+
+    Ok(())
+}

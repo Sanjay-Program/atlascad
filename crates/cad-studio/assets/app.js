@@ -1691,8 +1691,17 @@
   let drawingRequest = 0;
 
   // The editor's own state. It is deliberately small: which tool is armed, the points of the shape
-  // being drawn, which entity is selected, and which layer new geometry goes on.
-  const drawState = { tool: "select", points: [], selected: null, layer: null };
+  // being drawn, which entity is selected, which layer new geometry goes on, and Osnap/Polar state.
+  const drawState = {
+    tool: "select",
+    points: [],
+    selected: null,
+    layer: null,
+    osnap: true,
+    polar: true,
+    activeSnap: null,
+    polarHit: null,
+  };
 
   async function refreshDrawing() {
     const request = ++drawingRequest;
@@ -1780,9 +1789,69 @@
         // The group is mirrored in y, so a counter-clockwise arc is sweep-flag 0.
         return `M ${sx} ${sy} A ${kind.radius} ${kind.radius} 0 ${sweep > 180 ? 1 : 0} 0 ${ex} ${ey}`;
       }
+      case "rectangle": {
+        const [x, y] = kind.origin;
+        const { width, height } = kind;
+        return `M ${x} ${y} L ${x + width} ${y} L ${x + width} ${y + height} L ${x} ${y + height} Z`;
+      }
+      case "ellipse": {
+        const [cx, cy] = kind.center;
+        const rx = kind.radius_x;
+        const ry = kind.radius_y;
+        return `M ${cx - rx} ${cy} a ${rx} ${ry} 0 1 0 ${2 * rx} 0 a ${rx} ${ry} 0 1 0 ${-2 * rx} 0`;
+      }
+      case "spline": {
+        if (!kind.points || kind.points.length < 2) return null;
+        const pts = sampleSplinePoints(kind.points, kind.closed, 16);
+        const d = pts.map((p, i) => `${i ? "L" : "M"} ${p[0]} ${p[1]}`).join(" ");
+        return kind.closed ? `${d} Z` : d;
+      }
       default:
         return null;
     }
+  }
+
+  function sampleSplinePoints(points, closed, samplesPerSegment = 16) {
+    const n = points.length;
+    if (n < 2) return points.slice();
+    const steps = Math.max(2, samplesPerSegment);
+    const sampled = [];
+    const numSegments = closed ? n : n - 1;
+    for (let i = 0; i < numSegments; i++) {
+      const p1 = points[i];
+      const p2 = points[(i + 1) % n];
+      const p0 = closed
+        ? points[(i + n - 1) % n]
+        : i === 0
+        ? [2 * p1[0] - p2[0], 2 * p1[1] - p2[1]]
+        : points[i - 1];
+      const p3 = closed
+        ? points[(i + 2) % n]
+        : i + 2 < n
+        ? points[i + 2]
+        : [2 * p2[0] - p1[0], 2 * p2[1] - p1[1]];
+
+      const startStep = i === 0 ? 0 : 1;
+      for (let step = startStep; step <= steps; step++) {
+        const t = step / steps;
+        const t2 = t * t;
+        const t3 = t2 * t;
+        const x = 0.5 * (
+          2 * p1[0] +
+          (-p0[0] + p2[0]) * t +
+          (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 +
+          (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3
+        );
+        const y = 0.5 * (
+          2 * p1[1] +
+          (-p0[1] + p2[1]) * t +
+          (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 +
+          (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3
+        );
+        sampled.push([x, y]);
+      }
+    }
+    return sampled;
   }
 
   const SVG_NS = "http://www.w3.org/2000/svg";
@@ -1816,6 +1885,358 @@
       mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2],
       value: kind.text || formatNumber(length),
     };
+  }
+
+  function findObjectSnap(draft, mousePoint, basePoint, scale, aperturePx = 12) {
+    if (!draft || !Array.isArray(draft.entities)) return null;
+    const maxDist = aperturePx / Math.max(scale, 1e-6);
+    const entities = draft.entities;
+    const layers = draft.layers || [];
+
+    const isVisible = (layerName) => {
+      const layer = layers.find((l) => l.name === layerName);
+      return !layer || layer.visible !== false;
+    };
+
+    const dist = (p1, p2) => Math.hypot(p1[0] - p2[0], p1[1] - p2[1]);
+
+    const endpoints = [];
+    const midpoints = [];
+    const centers = [];
+    const quadrants = [];
+    const nodes = [];
+    const segments = [];
+    const circles = [];
+
+    for (const entity of entities) {
+      if (!isVisible(entity.layer)) continue;
+      const k = entity.kind;
+      switch (k.kind) {
+        case "point":
+          nodes.push(k.at);
+          break;
+        case "line":
+          endpoints.push(k.start, k.end);
+          midpoints.push([(k.start[0] + k.end[0]) / 2, (k.start[1] + k.end[1]) / 2]);
+          segments.push([k.start, k.end]);
+          break;
+        case "polyline":
+          for (let i = 0; i < k.points.length; i++) {
+            endpoints.push(k.points[i]);
+            if (i + 1 < k.points.length) {
+              midpoints.push([(k.points[i][0] + k.points[i + 1][0]) / 2, (k.points[i][1] + k.points[i + 1][1]) / 2]);
+              segments.push([k.points[i], k.points[i + 1]]);
+            }
+          }
+          if (k.closed && k.points.length > 2) {
+            const p0 = k.points[0];
+            const pLast = k.points[k.points.length - 1];
+            midpoints.push([(p0[0] + pLast[0]) / 2, (p0[1] + pLast[1]) / 2]);
+            segments.push([pLast, p0]);
+          }
+          break;
+        case "circle":
+          centers.push(k.center);
+          quadrants.push(
+            [k.center[0] + k.radius, k.center[1]],
+            [k.center[0] - k.radius, k.center[1]],
+            [k.center[0], k.center[1] + k.radius],
+            [k.center[0], k.center[1] - k.radius]
+          );
+          circles.push({ center: k.center, radius: k.radius });
+          break;
+        case "arc": {
+          centers.push(k.center);
+          const [cx, cy] = k.center;
+          const a0 = (k.start_degrees * Math.PI) / 180;
+          const a1 = (k.end_degrees * Math.PI) / 180;
+          endpoints.push(
+            [cx + k.radius * Math.cos(a0), cy + k.radius * Math.sin(a0)],
+            [cx + k.radius * Math.cos(a1), cy + k.radius * Math.sin(a1)]
+          );
+          const sweep = ((k.end_degrees - k.start_degrees) % 360 + 360) % 360;
+          const aMid = ((k.start_degrees + sweep / 2) * Math.PI) / 180;
+          midpoints.push([cx + k.radius * Math.cos(aMid), cy + k.radius * Math.sin(aMid)]);
+          for (const card of [0, 90, 180, 270]) {
+            if (((card - k.start_degrees) % 360 + 360) % 360 <= sweep) {
+              const rad = (card * Math.PI) / 180;
+              quadrants.push([cx + k.radius * Math.cos(rad), cy + k.radius * Math.sin(rad)]);
+            }
+          }
+          circles.push({ center: k.center, radius: k.radius });
+          break;
+        }
+        case "rectangle": {
+          const [x, y] = k.origin;
+          const { width, height } = k;
+          const p0 = [x, y];
+          const p1 = [x + width, y];
+          const p2 = [x + width, y + height];
+          const p3 = [x, y + height];
+          endpoints.push(p0, p1, p2, p3);
+          midpoints.push(
+            [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2],
+            [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2],
+            [(p2[0] + p3[0]) / 2, (p2[0] + p3[1]) / 2],
+            [(p3[0] + p0[0]) / 2, (p3[1] + p0[1]) / 2]
+          );
+          segments.push([p0, p1], [p1, p2], [p2, p3], [p3, p0]);
+          break;
+        }
+        case "ellipse": {
+          centers.push(k.center);
+          quadrants.push(
+            [k.center[0] + k.radius_x, k.center[1]],
+            [k.center[0] - k.radius_x, k.center[1]],
+            [k.center[0], k.center[1] + k.radius_y],
+            [k.center[0], k.center[1] - k.radius_y]
+          );
+          break;
+        }
+        case "spline": {
+          if (k.points && k.points.length >= 2) {
+            endpoints.push(k.points[0], k.points[k.points.length - 1]);
+            const sampled = sampleSplinePoints(k.points, k.closed, 16);
+            for (let i = 0; i < sampled.length - 1; i++) {
+              segments.push([sampled[i], sampled[i + 1]]);
+            }
+          }
+          break;
+        }
+      }
+    }
+
+    // 1. Endpoint
+    for (const pt of endpoints) {
+      if (dist(pt, mousePoint) <= maxDist) return { point: pt, kind: "Endpoint", symbol: "square" };
+    }
+    // 2. Midpoint
+    for (const pt of midpoints) {
+      if (dist(pt, mousePoint) <= maxDist) return { point: pt, kind: "Midpoint", symbol: "triangle" };
+    }
+    // 3. Center
+    for (const pt of centers) {
+      if (dist(pt, mousePoint) <= maxDist) return { point: pt, kind: "Center", symbol: "circle" };
+    }
+    // 4. Quadrant
+    for (const pt of quadrants) {
+      if (dist(pt, mousePoint) <= maxDist) return { point: pt, kind: "Quadrant", symbol: "diamond" };
+    }
+
+    // 5. Intersection
+    for (let i = 0; i < segments.length; i++) {
+      for (let j = i + 1; j < segments.length; j++) {
+        const [a, b] = segments[i];
+        const [c, d] = segments[j];
+        const denom = (b[0] - a[0]) * (d[1] - c[1]) - (b[1] - a[1]) * (d[0] - c[0]);
+        if (Math.abs(denom) > 1e-9) {
+          const t = ((c[0] - a[0]) * (d[1] - c[1]) - (c[1] - a[1]) * (d[0] - c[0])) / denom;
+          const u = ((c[0] - a[0]) * (b[1] - a[1]) - (c[1] - a[1]) * (b[0] - a[0])) / denom;
+          if (t >= -1e-5 && t <= 1 + 1e-5 && u >= -1e-5 && u <= 1 + 1e-5) {
+            const ix = a[0] + t * (b[0] - a[0]);
+            const iy = a[1] + t * (b[1] - a[1]);
+            const ipt = [ix, iy];
+            if (dist(ipt, mousePoint) <= maxDist) return { point: ipt, kind: "Intersection", symbol: "cross" };
+          }
+        }
+      }
+    }
+
+    // 6. Perpendicular (relative to basePoint)
+    if (basePoint) {
+      for (const [a, b] of segments) {
+        const dx = b[0] - a[0];
+        const dy = b[1] - a[1];
+        const lenSq = dx * dx + dy * dy;
+        if (lenSq > 1e-9) {
+          const t = ((basePoint[0] - a[0]) * dx + (basePoint[1] - a[1]) * dy) / lenSq;
+          if (t >= 0 && t <= 1) {
+            const foot = [a[0] + t * dx, a[1] + t * dy];
+            if (dist(foot, mousePoint) <= maxDist) return { point: foot, kind: "Perpendicular", symbol: "perpendicular" };
+          }
+        }
+      }
+    }
+
+    // 7. Tangent (relative to basePoint)
+    if (basePoint) {
+      for (const circ of circles) {
+        const [cx, cy] = circ.center;
+        const r = circ.radius;
+        const d = Math.hypot(basePoint[0] - cx, basePoint[1] - cy);
+        if (d > r + 1e-6) {
+          const alpha = Math.atan2(basePoint[1] - cy, basePoint[0] - cx);
+          const beta = Math.acos(r / d);
+          const tan1 = [cx + r * Math.cos(alpha + beta), cy + r * Math.sin(alpha + beta)];
+          const tan2 = [cx + r * Math.cos(alpha - beta), cy + r * Math.sin(alpha - beta)];
+          for (const tp of [tan1, tan2]) {
+            if (dist(tp, mousePoint) <= maxDist) return { point: tp, kind: "Tangent", symbol: "tangent" };
+          }
+        }
+      }
+    }
+
+    // 8. Node
+    for (const pt of nodes) {
+      if (dist(pt, mousePoint) <= maxDist) return { point: pt, kind: "Node", symbol: "node" };
+    }
+
+    // 9. Nearest
+    let bestNearest = null;
+    let minNearDist = maxDist;
+    for (const [a, b] of segments) {
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq > 1e-9) {
+        const t = Math.max(0, Math.min(1, ((mousePoint[0] - a[0]) * dx + (mousePoint[1] - a[1]) * dy) / lenSq));
+        const nearPt = [a[0] + t * dx, a[1] + t * dy];
+        const d = dist(nearPt, mousePoint);
+        if (d <= minNearDist) {
+          minNearDist = d;
+          bestNearest = nearPt;
+        }
+      }
+    }
+    if (bestNearest) return { point: bestNearest, kind: "Nearest", symbol: "hourglass" };
+
+    return null;
+  }
+
+  function findPolarTracking(basePoint, mousePoint, scale, aperturePx = 12) {
+    if (!basePoint) return null;
+    const dx = mousePoint[0] - basePoint[0];
+    const dy = mousePoint[1] - basePoint[1];
+    const dist = Math.hypot(dx, dy);
+    if (dist * scale < aperturePx) return null;
+
+    const angleDeg = ((Math.atan2(dy, dx) * 180) / Math.PI + 360) % 360;
+    const standardAngles = [0, 45, 90, 135, 180, 225, 270, 315];
+    const tolDeg = 3.5;
+
+    for (const target of standardAngles) {
+      let diff = Math.abs(angleDeg - target);
+      if (diff > 180) diff = 360 - diff;
+      if (diff <= tolDeg) {
+        const rad = (target * Math.PI) / 180;
+        const snapPoint = [
+          basePoint[0] + dist * Math.cos(rad),
+          basePoint[1] + dist * Math.sin(rad),
+        ];
+        return {
+          point: snapPoint,
+          angleDeg: target,
+          dist: Math.round(dist * 10) / 10,
+          base: basePoint,
+        };
+      }
+    }
+    return null;
+  }
+
+  function updateSnapOverlay(svg) {
+    if (!svg) return;
+    const snapFlip = svg.querySelector("#drawingSnapFlip");
+    const snapUpright = svg.querySelector("#drawingSnapUpright");
+    if (!snapFlip || !snapUpright) return;
+
+    snapFlip.textContent = "";
+    snapUpright.textContent = "";
+
+    const box = svg.viewBox.baseVal;
+    const rect = svg.getBoundingClientRect();
+    const scale = Math.min(rect.width / box.width, rect.height / box.height) || 1;
+    const size = 12 / scale;
+
+    if (drawState.polarHit) {
+      const p = drawState.polarHit;
+      const [bx, by] = p.base;
+      const [sx, sy] = p.point;
+      const dirX = sx - bx;
+      const dirY = sy - by;
+      const len = Math.hypot(dirX, dirY) || 1;
+      const ext = Math.max(box.width, box.height) * 2;
+      const ex = bx + (dirX / len) * ext;
+      const ey = by + (dirY / len) * ext;
+
+      snapFlip.append(svgNode("line", {
+        x1: bx,
+        y1: by,
+        x2: ex,
+        y2: ey,
+        class: "drawing-polar-line",
+      }));
+
+      const text = svgNode("text", {
+        x: sx + 14 / scale,
+        y: -sy - 6 / scale,
+        class: "drawing-snap-label",
+      });
+      text.textContent = `Polar: ${p.angleDeg}° (${p.dist})`;
+      snapUpright.append(text);
+    }
+
+    if (drawState.activeSnap) {
+      const s = drawState.activeSnap;
+      const [px, py] = s.point;
+
+      let markerNode;
+      switch (s.symbol) {
+        case "square":
+          markerNode = svgNode("rect", {
+            x: px - size / 2,
+            y: py - size / 2,
+            width: size,
+            height: size,
+            class: "drawing-snap-marker",
+          });
+          break;
+        case "triangle":
+          markerNode = svgNode("polygon", {
+            points: `${px},${py + size / 2} ${px - size / 2},${py - size / 2} ${px + size / 2},${py - size / 2}`,
+            class: "drawing-snap-marker",
+          });
+          break;
+        case "circle":
+          markerNode = svgNode("circle", {
+            cx: px,
+            cy: py,
+            r: size / 2,
+            class: "drawing-snap-marker",
+          });
+          break;
+        case "diamond":
+          markerNode = svgNode("polygon", {
+            points: `${px},${py + size / 2} ${px + size / 2},${py} ${px},${py - size / 2} ${px - size / 2},${py}`,
+            class: "drawing-snap-marker",
+          });
+          break;
+        case "cross":
+          markerNode = svgNode("path", {
+            d: `M ${px - size / 2} ${py - size / 2} L ${px + size / 2} ${py + size / 2} M ${px + size / 2} ${py - size / 2} L ${px - size / 2} ${py + size / 2}`,
+            class: "drawing-snap-marker",
+          });
+          break;
+        default:
+          markerNode = svgNode("rect", {
+            x: px - size / 2,
+            y: py - size / 2,
+            width: size,
+            height: size,
+            class: "drawing-snap-marker",
+          });
+          break;
+      }
+      snapFlip.append(markerNode);
+
+      const label = svgNode("text", {
+        x: px + 12 / scale,
+        y: -py - 6 / scale,
+        class: "drawing-snap-label",
+      });
+      label.textContent = s.kind;
+      snapUpright.append(label);
+    }
   }
 
   function renderDrawing(draft) {
@@ -1933,8 +2354,14 @@
       }
     }
 
-    svg.append(flip, upright);
+    const snapLayer = svgNode("g", { id: "drawingSnapLayer" });
+    const snapFlip = svgNode("g", { id: "drawingSnapFlip", transform: "scale(1,-1)" });
+    const snapUpright = svgNode("g", { id: "drawingSnapUpright" });
+    snapLayer.append(snapFlip, snapUpright);
+
+    svg.append(flip, upright, snapLayer);
     preview.append(svg);
+    updateSnapOverlay(svg);
   }
 
   // ---------------------------------------------------------------------------------------
@@ -1976,7 +2403,8 @@
     const locked = byId("layerLockBtn");
     locked.textContent = layer && layer.locked ? "Locked" : "Unlocked";
     locked.setAttribute("aria-pressed", String(Boolean(layer) && layer.locked));
-    byId("polylineActions").hidden = drawState.tool !== "polyline" || drawState.points.length === 0;
+    byId("polylineActions").hidden =
+      (drawState.tool !== "polyline" && drawState.tool !== "spline") || drawState.points.length === 0;
     byId("saveDrawingBtn").disabled = app.busy || !draft;
     byId("downloadDxfBtn").disabled = app.busy || entities.length === 0;
     byId("plotPdfBtn").disabled = app.busy || entities.length === 0;
@@ -2053,12 +2481,12 @@
       }, "Dimension added");
       return;
     }
-    if (tool === "polyline") {
+    if (tool === "polyline" || tool === "spline") {
       drawState.points.push(point);
       renderDrawing(app.drawing);
       return;
     }
-    // Line and circle both take two clicks.
+    // Line, circle, rectangle, and ellipse take two clicks.
     drawState.points.push(point);
     if (drawState.points.length < 2) {
       renderDrawing(app.drawing);
@@ -2082,20 +2510,43 @@
         layer: drawState.layer,
         kind: { kind: "circle", center: first, radius: Math.round(radius * 1000) / 1000 },
       }, "Circle added");
+    } else if (tool === "rectangle") {
+      const origin = [Math.min(first[0], second[0]), Math.min(first[1], second[1])];
+      const width = Math.abs(second[0] - first[0]);
+      const height = Math.abs(second[1] - first[1]);
+      if (width > 0 && height > 0) {
+        await drawingMutate("/api/draft/entity", {
+          layer: drawState.layer,
+          kind: { kind: "rectangle", origin, width, height },
+        }, "Rectangle added");
+      }
+    } else if (tool === "ellipse") {
+      const radius_x = Math.abs(second[0] - first[0]);
+      const radius_y = Math.abs(second[1] - first[1]) || (radius_x / 2);
+      if (radius_x > 0 && radius_y > 0) {
+        await drawingMutate("/api/draft/entity", {
+          layer: drawState.layer,
+          kind: { kind: "ellipse", center: first, radius_x, radius_y },
+        }, "Ellipse added");
+      }
     }
   }
 
   async function finishPolyline(closed) {
     if (drawState.points.length < 2) {
-      toast("A polyline needs at least two points.", true);
+      toast(`${drawState.tool === "spline" ? "A spline" : "A polyline"} needs at least two points.`, true);
       return;
     }
     const points = drawState.points;
+    const isSpline = drawState.tool === "spline";
     drawState.points = [];
+    const kind = isSpline
+      ? { kind: "spline", points, closed }
+      : { kind: "polyline", points, closed };
     await drawingMutate("/api/draft/entity", {
       layer: drawState.layer,
-      kind: { kind: "polyline", points, closed },
-    }, closed ? "Closed polyline added" : "Polyline added");
+      kind,
+    }, closed ? `Closed ${isSpline ? "spline" : "polyline"} added` : `${isSpline ? "Spline" : "Polyline"} added`);
   }
 
   async function deleteSelected() {
@@ -2542,6 +2993,286 @@
   }
 
   // ---------------------------------------------------------------------------------------
+  // AutoCAD Command Line & Engineering Simulation HUD
+  // ---------------------------------------------------------------------------------------
+
+  const cliHistory = [];
+  let cliHistoryIndex = -1;
+  let lastExecutedCommand = null;
+
+  async function runCaeStatic() {
+    toast("Running Linear Static Structural FEA solver...");
+    try {
+      const data = await api("/api/cae/static", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ material: "steel.1018" }),
+      });
+      showSimulationHud("Linear Static Structural FEA", `
+        <div class="sim-metric-grid">
+          <div class="sim-metric-box">
+            <div class="label">Max von Mises Stress</div>
+            <div class="value">${data.max_von_mises_mpa.toFixed(2)} MPa</div>
+          </div>
+          <div class="sim-metric-box">
+            <div class="label">Max Deflection</div>
+            <div class="value">${data.max_displacement_mm.toFixed(4)} mm</div>
+          </div>
+          <div class="sim-metric-box">
+            <div class="label">Factor of Safety</div>
+            <div class="value">${data.factor_of_safety ? data.factor_of_safety.toFixed(2) : "N/A"}</div>
+          </div>
+          <div class="sim-metric-box">
+            <div class="label">Hex8 Elements / Nodes</div>
+            <div class="value">${data.elements} / ${data.nodes}</div>
+          </div>
+        </div>
+        <p class="hint">Solver iterations: ${data.iterations} | Equilibrium residual: ${data.equilibrium_residual.toExponential(2)}</p>
+        <p class="hint" style="color: var(--warning); margin-top: 8px;">${data.quality}</p>
+      `);
+      toast(`FEA Complete: Max Stress ${data.max_von_mises_mpa.toFixed(2)} MPa`);
+    } catch (e) {
+      toast(`CAE error: ${e.message}`, true);
+    }
+  }
+
+  async function runCaeModal() {
+    toast("Running Dynamic Vibration Modal Frequency solver...");
+    try {
+      const data = await api("/api/cae/modal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ material: "steel.1018", num_modes: 3 }),
+      });
+      const modesRows = data.modes.map((m) => `
+        <tr>
+          <td><strong>Mode ${m.mode}</strong></td>
+          <td>${m.frequency_hz.toFixed(2)} Hz</td>
+          <td>${m.angular_frequency_rad_s.toFixed(2)} rad/s</td>
+          <td>${m.generalized_mass.toFixed(4)}</td>
+        </tr>
+      `).join("");
+      showSimulationHud("Dynamic Vibration Natural Frequencies", `
+        <div class="sim-metric-grid">
+          <div class="sim-metric-box">
+            <div class="label">Fundamental Frequency (f1)</div>
+            <div class="value" style="color: var(--accent);">${data.fundamental_frequency_hz ? data.fundamental_frequency_hz.toFixed(2) : "N/A"} Hz</div>
+          </div>
+          <div class="sim-metric-box">
+            <div class="label">Voxel Hex8 Elements</div>
+            <div class="value">${data.elements} (${data.voxel_size_mm} mm)</div>
+          </div>
+        </div>
+        <table class="sim-hud-table">
+          <thead>
+            <tr><th>Mode</th><th>Cyclic Freq (Hz)</th><th>Angular Freq (rad/s)</th><th>Gen. Mass</th></tr>
+          </thead>
+          <tbody>${modesRows}</tbody>
+        </table>
+        <p class="hint" style="color: var(--warning); margin-top: 8px;">${data.quality}</p>
+      `);
+      toast(`Modal Analysis Complete: f1 = ${data.fundamental_frequency_hz ? data.fundamental_frequency_hz.toFixed(2) : "N/A"} Hz`);
+    } catch (e) {
+      toast(`Modal error: ${e.message}`, true);
+    }
+  }
+
+  async function runCamToolpaths() {
+    toast("Generating 3-Axis CNC Machining Toolpaths & G-Code...");
+    try {
+      const data = await api("/api/cam/toolpaths", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tool_diameter_mm: 6.0 }),
+      });
+      showSimulationHud("3-Axis CNC Machining & G-Code", `
+        <div class="sim-metric-grid">
+          <div class="sim-metric-box">
+            <div class="label">Tool / Operation</div>
+            <div class="value" style="font-size: 15px;">${data.tool_name}</div>
+          </div>
+          <div class="sim-metric-box">
+            <div class="label">Total Motion Moves</div>
+            <div class="value">${data.moves_count} moves</div>
+          </div>
+          <div class="sim-metric-box">
+            <div class="label">Cutting / Rapid Length</div>
+            <div class="value">${data.cutting_length_mm.toFixed(1)} / ${data.rapid_length_mm.toFixed(1)} mm</div>
+          </div>
+          <div class="sim-metric-box">
+            <div class="label">Est. Machining Time</div>
+            <div class="value">${data.estimated_minutes.toFixed(2)} min</div>
+          </div>
+        </div>
+        <div class="section-head"><h3 style="font-size: 12px; margin: 8px 0;">Post-Processed G-Code (LinuxCNC / RS274)</h3></div>
+        <pre class="sim-code-preview"><code>${data.gcode_preview}</code></pre>
+      `);
+      toast(`CAM Complete: ${data.moves_count} moves, ~${data.estimated_minutes.toFixed(2)} min`);
+    } catch (e) {
+      toast(`CAM error: ${e.message}`, true);
+    }
+  }
+
+  function showSimulationHud(title, htmlContent) {
+    byId("simHudTitle").textContent = title;
+    byId("simHudContent").innerHTML = htmlContent;
+    byId("simulationHud").hidden = false;
+  }
+
+  function closeSimHud() {
+    byId("simulationHud").hidden = true;
+  }
+
+  const autocadCommands = [
+    { alias: "L", name: "LINE", desc: "Draw 2D line (2 clicks or coordinates)", run: () => setDrawTool("line") },
+    { alias: "C", name: "CIRCLE", desc: "Draw 2D circle (centre, radius)", run: () => {
+      if ((drawState.tool === "polyline" || drawState.tool === "spline") && drawState.points.length >= 2) {
+        finishPolyline(true);
+      } else {
+        setDrawTool("circle");
+      }
+    }},
+    { alias: "REC", name: "RECTANGLE", desc: "Draw 2D rectangle (opposite corners)", run: () => setDrawTool("rectangle") },
+    { alias: "EL", name: "ELLIPSE", desc: "Draw 2D ellipse (centre, axis radii)", run: () => setDrawTool("ellipse") },
+    { alias: "PL", name: "PLINE", desc: "Draw 2D polyline (multi-segment)", run: () => setDrawTool("polyline") },
+    { alias: "SPL", name: "SPLINE", desc: "Draw Catmull-Rom spline curve", run: () => setDrawTool("spline") },
+    { alias: "PO", name: "POINT", desc: "Place 2D point entity", run: () => setDrawTool("point") },
+    { alias: "DIM", name: "DIMALIGNED", desc: "Measure & dimension between 2 points", run: () => setDrawTool("dimension") },
+    { alias: "T", name: "TEXT", desc: "Place annotation text", run: () => setDrawTool("text") },
+    { alias: "E", name: "ERASE", desc: "Delete selected drawing entity", run: () => deleteSelected() },
+    { alias: "U", name: "UNDO", desc: "Undo last operation", run: () => undo() },
+    { alias: "REDO", name: "REDO", desc: "Redo last operation", run: () => redo() },
+    { alias: "F3", name: "OSNAP", desc: "Toggle object snap (13 precision modes)", run: () => {
+      drawState.osnap = !drawState.osnap;
+      byId("osnapToggleBtn")?.setAttribute("aria-pressed", String(drawState.osnap));
+      const badge = byId("statusOsnapIndicator");
+      if (badge) {
+        badge.textContent = `OSNAP: ${drawState.osnap ? "ON" : "OFF"}`;
+        badge.classList.toggle("active", drawState.osnap);
+      }
+      toast(`Object Snap ${drawState.osnap ? "ON" : "OFF"}`);
+    }},
+    { alias: "F10", name: "POLAR", desc: "Toggle polar tracking angles", run: () => {
+      drawState.polar = !drawState.polar;
+      byId("polarToggleBtn")?.setAttribute("aria-pressed", String(drawState.polar));
+      const badge = byId("statusPolarIndicator");
+      if (badge) {
+        badge.textContent = `POLAR: ${drawState.polar ? "ON" : "OFF"}`;
+        badge.classList.toggle("active", drawState.polar);
+      }
+      toast(`Polar Tracking ${drawState.polar ? "ON" : "OFF"}`);
+    }},
+    { alias: "Z", name: "ZOOM", desc: "Zoom to fit model in viewport", run: () => fit() },
+    { alias: "W", name: "WIREFRAME", desc: "Toggle wireframe mesh mode", run: () => toggleWireframe() },
+    { alias: "G", name: "GRID", desc: "Toggle ground grid", run: () => toggleGrid() },
+    { alias: "EXT", name: "EXTRUDE", desc: "3D extrude selected sketch", run: () => extrudeSketch("new_body") },
+    { alias: "REV", name: "REVOLVE", desc: "3D revolve selected sketch", run: () => revolveSketch("new_body") },
+    { alias: "FEA", name: "STATIC", desc: "Run linear static FEA (stress & deflection)", run: () => runCaeStatic() },
+    { alias: "MODAL", name: "VIBRATION", desc: "Run dynamic modal natural frequency analysis", run: () => runCaeModal() },
+    { alias: "CAM", name: "GCODE", desc: "Generate 3-axis CNC toolpaths & G-code", run: () => runCamToolpaths() },
+    { alias: "DXF", name: "DXFOUT", desc: "Export plan drawing as AutoCAD R12 DXF", run: () => exportDxf() },
+    { alias: "PDF", name: "PLOT", desc: "Plot drawing as ISO/ANSI vector sheet", run: () => plotPdf() },
+    { alias: "STL", name: "STLOUT", desc: "Export binary 3D mesh STL", run: () => exportStl() },
+    { alias: "QSAVE", name: "SAVE", desc: "Save project and drawing", run: () => save() },
+    { alias: "HELP", name: "?", desc: "Show keyboard shortcuts & command reference", run: () => openHelp() },
+  ];
+
+  function handleCliInput(rawText) {
+    const text = rawText.trim();
+    if (!text) {
+      if (lastExecutedCommand) {
+        lastExecutedCommand.run();
+        toast(`Repeated: ${lastExecutedCommand.name}`);
+      }
+      return;
+    }
+    cliHistory.push(text);
+    cliHistoryIndex = cliHistory.length;
+
+    // Check for polyline close/finish commands
+    if ((drawState.tool === "polyline" || drawState.tool === "spline") && drawState.points.length >= 2) {
+      if (text.toUpperCase() === "C" || text.toUpperCase() === "CLOSE") {
+        finishPolyline(true);
+        toast(`Closed ${drawState.tool}`);
+        return;
+      }
+      if (text.toUpperCase() === "F" || text.toUpperCase() === "FINISH" || text.toUpperCase() === "O" || text.toUpperCase() === "OPEN") {
+        finishPolyline(false);
+        toast(`Finished ${drawState.tool}`);
+        return;
+      }
+    }
+
+    // Try parsing as coordinate or distance if a drawing tool is active
+    if (drawState.tool !== "select") {
+      const coordPoint = parseCoordinateString(text);
+      if (coordPoint) {
+        placeDrawingPoint(coordPoint);
+        toast(`Specified point: (${coordPoint[0]}, ${coordPoint[1]})`);
+        return;
+      }
+    }
+
+    // Match command alias or name
+    const upper = text.toUpperCase();
+    const matched = autocadCommands.find((c) => c.alias === upper || c.name === upper);
+    if (matched) {
+      lastExecutedCommand = matched;
+      matched.run();
+      toast(`Command: ${matched.name} (${matched.desc})`);
+      return;
+    }
+
+    // Partial prefix match
+    const prefixMatched = autocadCommands.find((c) => c.name.startsWith(upper) || c.alias.startsWith(upper));
+    if (prefixMatched) {
+      lastExecutedCommand = prefixMatched;
+      prefixMatched.run();
+      toast(`Command: ${prefixMatched.name} (${prefixMatched.desc})`);
+      return;
+    }
+
+    toast(`Unknown command: "${text}". Type HELP for reference.`, true);
+  }
+
+  function parseCoordinateString(text) {
+    if (text.startsWith("@")) {
+      const parts = text.slice(1).trim().split(/[\s,]+/);
+      if (parts.length === 2) {
+        const dx = parseFloat(parts[0]);
+        const dy = parseFloat(parts[1]);
+        if (!isNaN(dx) && !isNaN(dy)) {
+          const base = drawState.points.length ? drawState.points[drawState.points.length - 1] : [0, 0];
+          return [Math.round((base[0] + dx) * 1000) / 1000, Math.round((base[1] + dy) * 1000) / 1000];
+        }
+      }
+    }
+    const parts = text.split(/[\s,]+/);
+    if (parts.length === 2) {
+      const x = parseFloat(parts[0]);
+      const y = parseFloat(parts[1]);
+      if (!isNaN(x) && !isNaN(y)) {
+        return [Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000];
+      }
+    }
+    if (parts.length === 1) {
+      const dist = parseFloat(parts[0]);
+      if (!isNaN(dist) && dist !== 0) {
+        const base = drawState.points.length ? drawState.points[drawState.points.length - 1] : [0, 0];
+        let angle = 0;
+        if (drawState.polarHit) {
+          angle = drawState.polarHit.angle_deg * (Math.PI / 180);
+        }
+        return [
+          Math.round((base[0] + dist * Math.cos(angle)) * 1000) / 1000,
+          Math.round((base[1] + dist * Math.sin(angle)) * 1000) / 1000,
+        ];
+      }
+    }
+    return null;
+  }
+
+  // ---------------------------------------------------------------------------------------
   // Command palette
   // ---------------------------------------------------------------------------------------
 
@@ -2556,9 +3287,21 @@
       { label: "Plot the drawing as a PDF sheet", hint: "print", keywords: "plot print pdf sheet paper a3", run: () => plotPdf(), disabled: !project },
       { label: "Save the drawing beside the project", hint: ".zdraft", keywords: "drawing save zdraft draft", run: () => saveDrawing(), disabled: !project },
       { label: "Drawing: undo", hint: "", keywords: "drawing draft undo", run: () => drawingMutate("/api/draft/undo", {}, "Drawing undone"), disabled: !project },
-      { label: "Drawing tool: line", hint: "2 clicks", keywords: "draw line", run: () => setDrawTool("line"), disabled: !project },
-      { label: "Drawing tool: circle", hint: "centre, edge", keywords: "draw circle hole", run: () => setDrawTool("circle"), disabled: !project },
-      { label: "Drawing tool: dimension", hint: "2 clicks", keywords: "draw dimension measure", run: () => setDrawTool("dimension"), disabled: !project },
+      { label: "Drawing tool: line (L)", hint: "2 clicks", keywords: "draw line l", run: () => setDrawTool("line"), disabled: !project },
+      { label: "Drawing tool: circle (C)", hint: "centre, edge", keywords: "draw circle hole c", run: () => setDrawTool("circle"), disabled: !project },
+      { label: "Drawing tool: rectangle (REC)", hint: "corners", keywords: "draw rectangle box rec", run: () => setDrawTool("rectangle"), disabled: !project },
+      { label: "Drawing tool: ellipse (EL)", hint: "centre, radii", keywords: "draw ellipse oval el", run: () => setDrawTool("ellipse"), disabled: !project },
+      { label: "Drawing tool: polyline (PL)", hint: "multi-segment", keywords: "draw polyline pl", run: () => setDrawTool("polyline"), disabled: !project },
+      { label: "Drawing tool: spline (SPL)", hint: "smooth curve", keywords: "draw spline curve spl", run: () => setDrawTool("spline"), disabled: !project },
+      { label: "Drawing tool: point (PO)", hint: "single click", keywords: "draw point po", run: () => setDrawTool("point"), disabled: !project },
+      { label: "Drawing tool: dimension (DIM)", hint: "2 clicks", keywords: "draw dimension measure dim", run: () => setDrawTool("dimension"), disabled: !project },
+      { label: "Drawing tool: text (T)", hint: "click to place", keywords: "draw text annotation t dt", run: () => setDrawTool("text"), disabled: !project },
+      { label: "Drawing: finish polyline/spline", hint: "Enter", keywords: "finish polyline spline open", run: () => finishPolyline(false), disabled: !project },
+      { label: "Drawing: close polyline/spline (C)", hint: "Close", keywords: "close polyline spline", run: () => finishPolyline(true), disabled: !project },
+      { label: "Drawing: delete selected entity (DEL)", hint: "Erase", keywords: "delete erase del remove entity", run: () => deleteSelected(), disabled: !project },
+      { label: "CAE: Run linear static structural FEA (FEA)", hint: "stress/deflection", keywords: "cae fea static stress deflection simulation", run: () => runCaeStatic(), disabled: !project || project.features.length === 0 },
+      { label: "CAE: Run dynamic modal vibration analysis (MODAL)", hint: "frequencies", keywords: "cae modal vibration frequency natural modes", run: () => runCaeModal(), disabled: !project || project.features.length === 0 },
+      { label: "CAM: Generate 3-axis CNC toolpaths & G-code (CAM)", hint: "milling/gcode", keywords: "cam cnc toolpath gcode machining milling", run: () => runCamToolpaths(), disabled: !project || project.features.length === 0 },
       { label: "Save a named revision", hint: "snapshot", keywords: "revision snapshot named save checkpoint", run: () => addRevision(), disabled: !project },
       ...(project && Array.isArray(project.revisions)
         ? project.revisions.map((revision) => ({
@@ -2736,8 +3479,50 @@
     for (const button of document.querySelectorAll(".draw-tools [data-tool]")) {
       button.addEventListener("click", () => setDrawTool(button.dataset.tool));
     }
-    byId("drawingPreview").addEventListener("click", (event) => {
-      const svg = byId("drawingPreview").querySelector("svg");
+    const preview = byId("drawingPreview");
+    preview.addEventListener("pointermove", (event) => {
+      const svg = preview.querySelector("svg");
+      if (!svg || !app.drawing || drawState.tool === "select") {
+        if (drawState.activeSnap || drawState.polarHit) {
+          drawState.activeSnap = null;
+          drawState.polarHit = null;
+          updateSnapOverlay(svg);
+        }
+        return;
+      }
+      const rawPoint = modelPointFromEvent(svg, event);
+      if (!rawPoint) return;
+      const coordsEl = byId("statusCoords");
+      if (coordsEl) coordsEl.textContent = `X: ${rawPoint[0].toFixed(3)}, Y: ${rawPoint[1].toFixed(3)}`;
+      const box = svg.viewBox.baseVal;
+      const rect = svg.getBoundingClientRect();
+      const scale = Math.min(rect.width / box.width, rect.height / box.height);
+
+      const basePoint = drawState.points.length ? drawState.points[drawState.points.length - 1] : null;
+      let snap = null;
+      if (drawState.osnap) {
+        snap = findObjectSnap(app.drawing, rawPoint, basePoint, scale, 12);
+      }
+      let polar = null;
+      if (!snap && drawState.polar && basePoint) {
+        polar = findPolarTracking(basePoint, rawPoint, scale, 12);
+      }
+      drawState.activeSnap = snap;
+      drawState.polarHit = polar;
+      updateSnapOverlay(svg);
+    });
+
+    preview.addEventListener("pointerleave", () => {
+      const svg = preview.querySelector("svg");
+      if (drawState.activeSnap || drawState.polarHit) {
+        drawState.activeSnap = null;
+        drawState.polarHit = null;
+        if (svg) updateSnapOverlay(svg);
+      }
+    });
+
+    preview.addEventListener("click", (event) => {
+      const svg = preview.querySelector("svg");
       if (!svg || !app.drawing) return;
       if (drawState.tool === "select") {
         const target = event.target;
@@ -2748,8 +3533,115 @@
         renderDrawing(app.drawing);
         return;
       }
-      const point = modelPointFromEvent(svg, event);
+      let point = modelPointFromEvent(svg, event);
+      if (drawState.activeSnap) {
+        point = drawState.activeSnap.point;
+      } else if (drawState.polarHit) {
+        point = drawState.polarHit.point;
+      }
       if (point) placeDrawingPoint(point);
+    });
+
+    function syncOsnapPolarBadges() {
+      const osnapBadge = byId("statusOsnapIndicator");
+      if (osnapBadge) {
+        osnapBadge.textContent = `OSNAP: ${drawState.osnap ? "ON" : "OFF"}`;
+        osnapBadge.classList.toggle("active", drawState.osnap);
+      }
+      const polarBadge = byId("statusPolarIndicator");
+      if (polarBadge) {
+        polarBadge.textContent = `POLAR: ${drawState.polar ? "ON" : "OFF"}`;
+        polarBadge.classList.toggle("active", drawState.polar);
+      }
+    }
+
+    byId("osnapToggleBtn").addEventListener("click", () => {
+      drawState.osnap = !drawState.osnap;
+      byId("osnapToggleBtn").setAttribute("aria-pressed", String(drawState.osnap));
+      syncOsnapPolarBadges();
+      toast(`Object Snap ${drawState.osnap ? "ON" : "OFF"}`);
+    });
+    byId("polarToggleBtn").addEventListener("click", () => {
+      drawState.polar = !drawState.polar;
+      byId("polarToggleBtn").setAttribute("aria-pressed", String(drawState.polar));
+      syncOsnapPolarBadges();
+      toast(`Polar Tracking ${drawState.polar ? "ON" : "OFF"}`);
+    });
+    byId("statusOsnapIndicator")?.addEventListener("click", () => {
+      drawState.osnap = !drawState.osnap;
+      byId("osnapToggleBtn")?.setAttribute("aria-pressed", String(drawState.osnap));
+      syncOsnapPolarBadges();
+      toast(`Object Snap ${drawState.osnap ? "ON" : "OFF"}`);
+    });
+    byId("statusPolarIndicator")?.addEventListener("click", () => {
+      drawState.polar = !drawState.polar;
+      byId("polarToggleBtn")?.setAttribute("aria-pressed", String(drawState.polar));
+      syncOsnapPolarBadges();
+      toast(`Polar Tracking ${drawState.polar ? "ON" : "OFF"}`);
+    });
+
+    const cliInput = byId("commandPromptInput");
+    const cliSuggestions = byId("commandSuggestions");
+
+    cliInput?.addEventListener("input", () => {
+      const val = cliInput.value.trim().toUpperCase();
+      if (!val) {
+        cliSuggestions.hidden = true;
+        return;
+      }
+      const matches = autocadCommands.filter((c) =>
+        c.alias.startsWith(val) || c.name.startsWith(val) || c.desc.toUpperCase().includes(val)
+      );
+      if (matches.length > 0) {
+        cliSuggestions.innerHTML = "";
+        matches.slice(0, 8).forEach((m, idx) => {
+          const item = document.createElement("div");
+          item.className = `command-suggestion-item ${idx === 0 ? "active" : ""}`;
+          item.innerHTML = `
+            <span class="suggestion-alias">${m.alias} (${m.name})</span>
+            <span class="suggestion-desc">${m.desc}</span>
+          `;
+          item.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            cliInput.value = "";
+            cliSuggestions.hidden = true;
+            m.run();
+          });
+          cliSuggestions.appendChild(item);
+        });
+        cliSuggestions.hidden = false;
+      } else {
+        cliSuggestions.hidden = true;
+      }
+    });
+
+    cliInput?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        const val = cliInput.value.trim();
+        cliSuggestions.hidden = true;
+        cliInput.value = "";
+        handleCliInput(val);
+      } else if (event.key === "Escape") {
+        cliInput.value = "";
+        cliSuggestions.hidden = true;
+        cliInput.blur();
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        if (cliHistory.length > 0 && cliHistoryIndex > 0) {
+          cliHistoryIndex--;
+          cliInput.value = cliHistory[cliHistoryIndex];
+        }
+      } else if (event.key === "ArrowDown") {
+        event.preventDefault();
+        if (cliHistoryIndex < cliHistory.length - 1) {
+          cliHistoryIndex++;
+          cliInput.value = cliHistory[cliHistoryIndex];
+        } else {
+          cliHistoryIndex = cliHistory.length;
+          cliInput.value = "";
+        }
+      }
     });
     byId("polylineFinishBtn").addEventListener("click", () => finishPolyline(false));
     byId("polylineCloseBtn").addEventListener("click", () => finishPolyline(true));
@@ -2928,6 +3820,7 @@
       closer.addEventListener("click", () => {
         if (closer.dataset.close === "palette") closePalette();
         if (closer.dataset.close === "help") closeHelp();
+        if (closer.dataset.close === "simHud") closeSimHud();
       });
     }
     document.addEventListener("keydown", (event) => {
@@ -2940,9 +3833,42 @@
         else openPalette();
         return;
       }
+      if (event.key === "F3") {
+        event.preventDefault();
+        drawState.osnap = !drawState.osnap;
+        const btn = byId("osnapToggleBtn");
+        if (btn) btn.setAttribute("aria-pressed", String(drawState.osnap));
+        const badge = byId("statusOsnapIndicator");
+        if (badge) {
+          badge.textContent = `OSNAP: ${drawState.osnap ? "ON" : "OFF"}`;
+          badge.classList.toggle("active", drawState.osnap);
+        }
+        toast(`Object Snap ${drawState.osnap ? "ON" : "OFF"}`);
+        return;
+      }
+      if (event.key === "F10") {
+        event.preventDefault();
+        drawState.polar = !drawState.polar;
+        const btn = byId("polarToggleBtn");
+        if (btn) btn.setAttribute("aria-pressed", String(drawState.polar));
+        const badge = byId("statusPolarIndicator");
+        if (badge) {
+          badge.textContent = `POLAR: ${drawState.polar ? "ON" : "OFF"}`;
+          badge.classList.toggle("active", drawState.polar);
+        }
+        toast(`Polar Tracking ${drawState.polar ? "ON" : "OFF"}`);
+        return;
+      }
       if (event.key === "Escape") {
         if (app.palette.open) closePalette();
         if (app.helpOpen) closeHelp();
+        closeSimHud();
+        const cli = byId("commandPromptInput");
+        if (cli) {
+          cli.value = "";
+          cli.blur();
+          byId("commandSuggestions").hidden = true;
+        }
         if (app.draw) cancelDrawing();
         closeDrawers();
         if (app.viewport && app.viewport.pick) clearPick();
@@ -2958,6 +3884,19 @@
       }
       if (app.palette.open) return;
       if (typing) return;
+      if (!typing && event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        const navKeys = ["1", "2", "3", "4", "f", "F", "w", "W", "g", "G", "?"];
+        if (!navKeys.includes(event.key)) {
+          const cli = byId("commandPromptInput");
+          if (cli && document.activeElement !== cli) {
+            cli.focus();
+            cli.value = event.key;
+            cli.dispatchEvent(new Event("input"));
+            event.preventDefault();
+            return;
+          }
+        }
+      }
       if (event.ctrlKey || event.metaKey) {
         if (event.key.toLowerCase() === "s") {
           event.preventDefault();

@@ -694,6 +694,21 @@ try {
   check(afterTools.source === 'model (live)', `the drawing source is ${afterTools.source}`);
   await screenshot('drawing-tools');
 
+  // Test OSNAP and POLAR toggle controls
+  await clickSelector('#osnapToggleBtn', 'OSNAP toggle');
+  const osnapOff = await evaluate('document.getElementById("osnapToggleBtn").getAttribute("aria-pressed")');
+  check(osnapOff === "false", `osnap did not toggle off: ${osnapOff}`);
+  await clickSelector('#osnapToggleBtn', 'OSNAP toggle back on');
+  const osnapOn = await evaluate('document.getElementById("osnapToggleBtn").getAttribute("aria-pressed")');
+  check(osnapOn === "true", `osnap did not toggle on: ${osnapOn}`);
+
+  await clickSelector('#polarToggleBtn', 'POLAR toggle');
+  const polarOff = await evaluate('document.getElementById("polarToggleBtn").getAttribute("aria-pressed")');
+  check(polarOff === "false", `polar did not toggle off: ${polarOff}`);
+  await clickSelector('#polarToggleBtn', 'POLAR toggle back on');
+  const polarOn = await evaluate('document.getElementById("polarToggleBtn").getAttribute("aria-pressed")');
+  check(polarOn === "true", `polar did not toggle on: ${polarOn}`);
+
   step('drawing undo removes the last entity, and a layer can be added, hidden and locked');
   await clickSelector('#drawUndoBtn', 'drawing undo');
   await waitFor(`document.getElementById("drawingEntities").textContent === "${entitiesBefore + 5}"`, 'the drawing undo');

@@ -219,6 +219,8 @@ dependencies = [
 name = "cad-studio"
 version = "0.1.0"
 dependencies = [
+ "cad-cae",
+ "cad-cam",
  "cad-contract",
  "cad-document",
  "cad-drafting",

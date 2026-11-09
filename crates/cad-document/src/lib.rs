@@ -45,6 +45,7 @@ use cad_engineering_model::{
     ArtifactId, ArtifactRegistry, DerivedArtifact, DocumentRef, StalenessReport,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -392,6 +393,39 @@ impl FeatureKind {
     }
 }
 
+/// The axis in the sketch plane across which a feature is mirrored.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MirrorAxis {
+    /// Mirror across the local Y-axis (negates X coordinates).
+    Y,
+    /// Mirror across the local X-axis (negates Y coordinates).
+    X,
+}
+
+/// How a feature is patterned across an array or mirrored across an axis.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+pub enum FeaturePattern {
+    /// Repeat the feature in a 1D linear array with `count` instances, spaced by `spacing_param`
+    /// along `direction`.
+    Linear {
+        count: u32,
+        spacing_param: String,
+        direction: [f64; 2],
+    },
+    /// Repeat the feature in a circular array with `count` instances distributed over `total_angle_deg`
+    /// about `center` in the sketch plane.
+    Circular {
+        count: u32,
+        total_angle_deg: f64,
+        #[serde(default)]
+        center: [f64; 2],
+    },
+    /// Mirror the feature across an axis in the sketch plane.
+    Mirror { axis: MirrorAxis },
+}
+
 /// One step of the ordered history: a sketch consumed by an [`FeatureKind`], and what that does to
 /// the body built by the earlier steps.
 ///
@@ -407,6 +441,10 @@ pub struct Feature {
     #[serde(default)]
     pub operation: ExtrudeOperation,
     pub kind: FeatureKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<FeaturePattern>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -495,6 +533,10 @@ pub enum FeatureChange {
         operation_changed: bool,
         sketch_changed: bool,
         kind_changed: bool,
+        #[serde(default)]
+        pattern_changed: bool,
+        #[serde(default)]
+        body_changed: bool,
     },
 }
 
@@ -615,6 +657,15 @@ pub struct FeatureFailure {
     pub message: String,
 }
 
+/// Summary information for one named solid body in a multi-body document.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BodyInfo {
+    pub id: String,
+    pub solid: SolidId,
+    pub mesh: Mesh,
+    pub volume_mm3: f64,
+}
+
 /// The result of rebuilding the ordered history.
 ///
 /// A rebuild that fails part-way is still a result, not an error: the caller gets one report per
@@ -626,6 +677,7 @@ pub struct Build {
     pub mesh: Option<Mesh>,
     pub solid: Option<SolidId>,
     pub failed: Option<FeatureFailure>,
+    pub bodies: Vec<BodyInfo>,
 }
 
 impl Build {
@@ -640,6 +692,25 @@ impl Build {
             .iter()
             .find(|report| report.id == id)
             .map(|report| &report.outcome)
+    }
+
+    /// Measure the clearance (minimum distance in millimetres) between two named bodies.
+    /// Returns None if either body does not exist in the build.
+    pub fn inter_body_clearance(&self, body_a: &str, body_b: &str) -> Option<f64> {
+        let a = self.bodies.iter().find(|b| b.id == body_a)?;
+        let b = self.bodies.iter().find(|b| b.id == body_b)?;
+        let box_a = a.mesh.bounding_box()?;
+        let box_b = b.mesh.bounding_box()?;
+        let dx = (box_b.min[0] - box_a.max[0])
+            .max(box_a.min[0] - box_b.max[0])
+            .max(0.0);
+        let dy = (box_b.min[1] - box_a.max[1])
+            .max(box_a.min[1] - box_b.max[1])
+            .max(0.0);
+        let dz = (box_b.min[2] - box_a.max[2])
+            .max(box_a.min[2] - box_b.max[2])
+            .max(0.0);
+        Some((dx * dx + dy * dy + dz * dz).sqrt())
     }
 }
 
@@ -778,9 +849,13 @@ fn prefix_hash(
     feature: &Feature,
     profile: &[[f64; 2]],
     action: &ResolvedAction,
+    pattern: Option<&ResolvedPattern>,
     tolerance_mm: f64,
 ) -> u64 {
     let mut hash = hash_u64(prefix, feature.id.get());
+    if let Some(body_id) = &feature.body_id {
+        hash = hash_bytes(hash, body_id.as_bytes());
+    }
     hash = hash_bytes(
         hash,
         &[match feature.operation {
@@ -818,7 +893,63 @@ fn prefix_hash(
             hash = hash_u64(hash, plane_mm.to_bits());
         }
     }
+    match pattern {
+        None => {
+            hash = hash_bytes(hash, &[0]);
+        }
+        Some(ResolvedPattern::Linear {
+            count,
+            spacing_mm,
+            direction,
+        }) => {
+            hash = hash_bytes(hash, &[1]);
+            hash = hash_u64(hash, *count as u64);
+            hash = hash_u64(hash, spacing_mm.to_bits());
+            hash = hash_u64(hash, direction[0].to_bits());
+            hash = hash_u64(hash, direction[1].to_bits());
+        }
+        Some(ResolvedPattern::Circular {
+            count,
+            total_angle_rad,
+            center_mm,
+        }) => {
+            hash = hash_bytes(hash, &[2]);
+            hash = hash_u64(hash, *count as u64);
+            hash = hash_u64(hash, total_angle_rad.to_bits());
+            hash = hash_u64(hash, center_mm[0].to_bits());
+            hash = hash_u64(hash, center_mm[1].to_bits());
+        }
+        Some(ResolvedPattern::Mirror { axis }) => {
+            hash = hash_bytes(
+                hash,
+                &[
+                    3,
+                    match axis {
+                        MirrorAxis::X => 0,
+                        MirrorAxis::Y => 1,
+                    },
+                ],
+            );
+        }
+    }
     hash_u64(hash, tolerance_mm.to_bits())
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum ResolvedPattern {
+    Linear {
+        count: u32,
+        spacing_mm: f64,
+        direction: [f64; 2],
+    },
+    Circular {
+        count: u32,
+        total_angle_rad: f64,
+        center_mm: [f64; 2],
+    },
+    Mirror {
+        axis: MirrorAxis,
+    },
 }
 
 /// What a feature asks the kernel to do, resolved to millimetre inputs.
@@ -1174,12 +1305,21 @@ impl Project {
                     let operation_changed = old.operation != new.operation;
                     let sketch_changed = old.sketch_id != new.sketch_id;
                     let kind_changed = old.kind != new.kind;
-                    if operation_changed || sketch_changed || kind_changed {
+                    let pattern_changed = old.pattern != new.pattern;
+                    let body_changed = old.body_id != new.body_id;
+                    if operation_changed
+                        || sketch_changed
+                        || kind_changed
+                        || pattern_changed
+                        || body_changed
+                    {
                         features.push(FeatureChange::Modified {
                             id: old.id,
                             operation_changed,
                             sketch_changed,
                             kind_changed,
+                            pattern_changed,
+                            body_changed,
                         });
                     }
                 }
@@ -1276,6 +1416,24 @@ impl Project {
                 parameter.value = value;
             }
         }
+        self.bump_revision()
+    }
+
+    /// Add a new positive finite parameter to the document.
+    pub fn add_parameter(&mut self, id: impl Into<String>, value: f64) -> Result<(), ProjectError> {
+        let id_str = id.into();
+        if !value.is_finite() || value <= 0.0 {
+            return Err(ProjectError::Invalid(format!(
+                "parameter `{id_str}` must be a finite positive number, got {value}"
+            )));
+        }
+        if self.parameters.iter().any(|p| p.id == id_str) {
+            return Err(ProjectError::Invalid(format!(
+                "parameter `{id_str}` already exists"
+            )));
+        }
+        self.push_undo();
+        self.parameters.push(Parameter { id: id_str, value });
         self.bump_revision()
     }
 
@@ -1615,28 +1773,141 @@ impl Project {
         self.add_revolve_feature(sketch_id, axis, ExtrudeOperation::Cut)
     }
 
-    /// Shared validation and append for every feature kind.
-    fn append_feature(
+    /// Add a new independent body via extrude.
+    pub fn add_body_extrude(
+        &mut self,
+        sketch_id: EntityId,
+        depth_param: &str,
+        body_id: &str,
+    ) -> Result<EntityId, ProjectError> {
+        let _ = self.parameter(depth_param)?;
+        self.append_feature_with_target(
+            sketch_id,
+            ExtrudeOperation::NewBody,
+            FeatureKind::Extrude {
+                depth_param: depth_param.to_string(),
+                direction: ExtrudeDirection::Up,
+            },
+            None,
+            Some(body_id.to_string()),
+        )
+    }
+
+    /// Add a join extrude targeting a specific body.
+    pub fn add_body_join_extrude(
+        &mut self,
+        sketch_id: EntityId,
+        depth_param: &str,
+        body_id: &str,
+    ) -> Result<EntityId, ProjectError> {
+        let _ = self.parameter(depth_param)?;
+        self.append_feature_with_target(
+            sketch_id,
+            ExtrudeOperation::Join,
+            FeatureKind::Extrude {
+                depth_param: depth_param.to_string(),
+                direction: ExtrudeDirection::Up,
+            },
+            None,
+            Some(body_id.to_string()),
+        )
+    }
+
+    /// Add a cut extrude targeting a specific body.
+    pub fn add_body_cut_extrude(
+        &mut self,
+        sketch_id: EntityId,
+        depth_param: &str,
+        body_id: &str,
+    ) -> Result<EntityId, ProjectError> {
+        let _ = self.parameter(depth_param)?;
+        self.append_feature_with_target(
+            sketch_id,
+            ExtrudeOperation::Cut,
+            FeatureKind::Extrude {
+                depth_param: depth_param.to_string(),
+                direction: ExtrudeDirection::Up,
+            },
+            None,
+            Some(body_id.to_string()),
+        )
+    }
+
+    /// Set or clear the pattern on a feature.
+    pub fn set_feature_pattern(
+        &mut self,
+        feature_id: EntityId,
+        pattern: Option<FeaturePattern>,
+    ) -> Result<(), ProjectError> {
+        let feature = self
+            .features
+            .iter_mut()
+            .find(|f| f.id == feature_id)
+            .ok_or_else(|| {
+                ProjectError::Invalid(format!("unknown feature {}", feature_id.get()))
+            })?;
+        if feature.pattern == pattern {
+            return Ok(());
+        }
+        self.push_undo();
+        if let Some(feature) = self.features.iter_mut().find(|f| f.id == feature_id) {
+            feature.pattern = pattern;
+        }
+        self.bump_revision()
+    }
+
+    /// Set or clear the target body ID for a feature.
+    pub fn set_feature_body(
+        &mut self,
+        feature_id: EntityId,
+        body_id: Option<String>,
+    ) -> Result<(), ProjectError> {
+        let feature = self
+            .features
+            .iter_mut()
+            .find(|f| f.id == feature_id)
+            .ok_or_else(|| {
+                ProjectError::Invalid(format!("unknown feature {}", feature_id.get()))
+            })?;
+        if feature.body_id == body_id {
+            return Ok(());
+        }
+        self.push_undo();
+        if let Some(feature) = self.features.iter_mut().find(|f| f.id == feature_id) {
+            feature.body_id = body_id;
+        }
+        self.bump_revision()
+    }
+
+    /// Shared validation and append for every feature kind with optional pattern and body targeting.
+    pub fn append_feature_with_target(
         &mut self,
         sketch_id: EntityId,
         operation: ExtrudeOperation,
         kind: FeatureKind,
+        pattern: Option<FeaturePattern>,
+        body_id: Option<String>,
     ) -> Result<EntityId, ProjectError> {
         if !self.sketches.iter().any(|sketch| sketch.id == sketch_id) {
             return Err(ProjectError::UnknownSketch(sketch_id.get()));
         }
+        let body_name = body_id.as_deref().unwrap_or("default");
+        let body_exists = self
+            .features
+            .iter()
+            .any(|f| f.body_id.as_deref().unwrap_or("default") == body_name);
         match operation {
-            ExtrudeOperation::NewBody if !self.features.is_empty() => {
+            ExtrudeOperation::NewBody if body_exists => {
                 return Err(ProjectError::Invalid(
                     "this project already has a body; add this feature as a join instead".into(),
                 ));
             }
-            ExtrudeOperation::Join if self.features.is_empty() => {
+            ExtrudeOperation::Join if !body_exists => {
                 return Err(ProjectError::Invalid(
                     "a join needs an existing body; the first feature must create one".into(),
                 ));
             }
-            ExtrudeOperation::Cut if self.features.is_empty() => {
+            ExtrudeOperation::Cut if !body_exists => {
                 return Err(ProjectError::Invalid(
                     "a cut needs an existing body; the first feature must create one".into(),
                 ));
@@ -1650,9 +1921,21 @@ impl Project {
             sketch_id,
             operation,
             kind,
+            pattern,
+            body_id,
         });
         self.bump_revision()?;
         Ok(id)
+    }
+
+    /// Shared validation and append for every feature kind.
+    fn append_feature(
+        &mut self,
+        sketch_id: EntityId,
+        operation: ExtrudeOperation,
+        kind: FeatureKind,
+    ) -> Result<EntityId, ProjectError> {
+        self.append_feature_with_target(sketch_id, operation, kind, None, None)
     }
 
     pub fn undo(&mut self) -> Result<(), ProjectError> {
@@ -1793,7 +2076,97 @@ impl Project {
         validate_profile(&profile).map_err(|error| ProjectError::Invalid(error.to_string()))?;
         Ok(profile)
     }
+}
 
+fn target_body_id(feature: &Feature, bodies: &HashMap<String, SolidId>) -> String {
+    if let Some(id) = &feature.body_id {
+        id.clone()
+    } else if bodies.contains_key("default") || bodies.is_empty() {
+        "default".to_string()
+    } else if bodies.len() == 1 {
+        bodies
+            .keys()
+            .next()
+            .cloned()
+            .unwrap_or_else(|| "default".to_string())
+    } else {
+        "default".to_string()
+    }
+}
+
+fn generate_pattern_profiles(
+    base: &[[f64; 2]],
+    pattern: Option<&ResolvedPattern>,
+) -> Vec<Vec<[f64; 2]>> {
+    match pattern {
+        None => vec![base.to_vec()],
+        Some(ResolvedPattern::Linear {
+            count,
+            spacing_mm,
+            direction,
+        }) => {
+            if *count <= 1 {
+                return vec![base.to_vec()];
+            }
+            let mut instances = Vec::with_capacity(*count as usize);
+            for i in 0..*count {
+                let offset_dist = i as f64 * spacing_mm;
+                let dx = offset_dist * direction[0];
+                let dy = offset_dist * direction[1];
+                let instance: Vec<[f64; 2]> = base.iter().map(|&[x, y]| [x + dx, y + dy]).collect();
+                instances.push(instance);
+            }
+            instances
+        }
+        Some(ResolvedPattern::Circular {
+            count,
+            total_angle_rad,
+            center_mm,
+        }) => {
+            if *count <= 1 {
+                return vec![base.to_vec()];
+            }
+            let step = if (*total_angle_rad).abs() >= std::f64::consts::TAU - 1e-6 {
+                *total_angle_rad / (*count as f64)
+            } else {
+                *total_angle_rad / ((*count - 1) as f64)
+            };
+            let mut instances = Vec::with_capacity(*count as usize);
+            for i in 0..*count {
+                let angle = i as f64 * step;
+                let cos_a = angle.cos();
+                let sin_a = angle.sin();
+                let instance: Vec<[f64; 2]> = base
+                    .iter()
+                    .map(|&[x, y]| {
+                        let rx = x - center_mm[0];
+                        let ry = y - center_mm[1];
+                        [
+                            rx * cos_a - ry * sin_a + center_mm[0],
+                            rx * sin_a + ry * cos_a + center_mm[1],
+                        ]
+                    })
+                    .collect();
+                instances.push(instance);
+            }
+            instances
+        }
+        Some(ResolvedPattern::Mirror { axis }) => {
+            let mut mirrored: Vec<[f64; 2]> = base
+                .iter()
+                .map(|&[x, y]| match axis {
+                    MirrorAxis::Y => [-x, y],
+                    MirrorAxis::X => [x, -y],
+                })
+                .collect();
+            // Reversing the polygon vertices restores the CCW winding after planar reflection.
+            mirrored.reverse();
+            vec![base.to_vec(), mirrored]
+        }
+    }
+}
+
+impl Project {
     /// Rebuild every feature in order, stopping at the first failure.
     ///
     /// A kernel failure is reported in the result rather than returned as an error, because a
@@ -1807,17 +2180,24 @@ impl Project {
         self.validate()?;
         let mut build = Build::default();
         let tolerance_mm = self.header.tolerance.linear_mm();
-        let mut body: Option<SolidId> = None;
+        let mut bodies: HashMap<String, SolidId> = HashMap::new();
+        let mut body_info: HashMap<String, BodyInfo> = HashMap::new();
+        let mut last_solid: Option<SolidId> = None;
+        let mut last_mesh: Option<Mesh> = None;
 
         for feature in &self.features {
+            let target = target_body_id(feature, &bodies);
+            let body_for_feature = bodies.get(&target).copied();
+
             let outcome = match self.resolve_feature(feature) {
-                Ok((profile, action)) => self.rebuild_feature(
+                Ok((profile, action, pattern)) => self.rebuild_feature(
                     feature,
                     &profile,
                     &action,
+                    pattern.as_ref(),
                     kernel,
                     tolerance_mm,
-                    body,
+                    body_for_feature,
                     true,
                 ),
                 Err(message) => Err(message),
@@ -1831,8 +2211,18 @@ impl Project {
                             triangles: rebuilt.triangles,
                         },
                     });
-                    body = Some(rebuilt.solid);
-                    build.mesh = Some(rebuilt.mesh);
+                    last_solid = Some(rebuilt.solid);
+                    last_mesh = Some(rebuilt.mesh.clone());
+                    bodies.insert(target.to_string(), rebuilt.solid);
+                    body_info.insert(
+                        target.to_string(),
+                        BodyInfo {
+                            id: target.to_string(),
+                            solid: rebuilt.solid,
+                            mesh: rebuilt.mesh,
+                            volume_mm3: rebuilt.volume_mm3,
+                        },
+                    );
                 }
                 Err(message) => {
                     build.reports.push(FeatureReport {
@@ -1850,7 +2240,11 @@ impl Project {
             }
         }
 
-        build.solid = body;
+        build.solid = last_solid;
+        build.mesh = last_mesh;
+        let mut all_bodies: Vec<BodyInfo> = body_info.into_values().collect();
+        all_bodies.sort_by(|a, b| a.id.cmp(&b.id));
+        build.bodies = all_bodies;
         Ok(build)
     }
 
@@ -1884,12 +2278,18 @@ impl Project {
         }
         let tolerance_mm = self.header.tolerance.linear_mm();
         let mut build = Build::default();
-        let mut body: Option<SolidId> = None;
+        let mut bodies: HashMap<String, SolidId> = HashMap::new();
+        let mut body_info: HashMap<String, BodyInfo> = HashMap::new();
+        let mut last_solid: Option<SolidId> = None;
+        let mut last_mesh: Option<Mesh> = None;
         let mut prefix = HASH_SEED;
         let mut chain: Vec<u64> = Vec::with_capacity(self.features.len());
 
         for feature in &self.features {
-            let (profile, action) = match self.resolve_feature(feature) {
+            let target = target_body_id(feature, &bodies);
+            let body_for_feature = bodies.get(&target).copied();
+
+            let (profile, action, pattern) = match self.resolve_feature(feature) {
                 Ok(resolved) => resolved,
                 Err(message) => {
                     build.reports.push(FeatureReport {
@@ -1905,13 +2305,30 @@ impl Project {
                     break;
                 }
             };
-            prefix = prefix_hash(prefix, feature, &profile, &action, tolerance_mm);
+            prefix = prefix_hash(
+                prefix,
+                feature,
+                &profile,
+                &action,
+                pattern.as_ref(),
+                tolerance_mm,
+            );
             chain.push(prefix);
 
             if let Some(entry) = cache.entries.iter().find(|entry| entry.prefix == prefix) {
                 cache.hits = cache.hits.saturating_add(1);
-                body = Some(entry.solid);
-                build.mesh = Some(entry.mesh.clone());
+                last_solid = Some(entry.solid);
+                last_mesh = Some(entry.mesh.clone());
+                bodies.insert(target.to_string(), entry.solid);
+                body_info.insert(
+                    target.to_string(),
+                    BodyInfo {
+                        id: target.to_string(),
+                        solid: entry.solid,
+                        mesh: entry.mesh.clone(),
+                        volume_mm3: entry.volume_mm3,
+                    },
+                );
                 build.reports.push(FeatureReport {
                     id: feature.id,
                     outcome: FeatureOutcome::Built {
@@ -1929,9 +2346,10 @@ impl Project {
                 feature,
                 &profile,
                 &action,
+                pattern.as_ref(),
                 kernel,
                 tolerance_mm,
-                body,
+                body_for_feature,
                 false,
             ) {
                 Ok(rebuilt) => {
@@ -1949,8 +2367,18 @@ impl Project {
                             triangles: rebuilt.triangles,
                         },
                     });
-                    body = Some(rebuilt.solid);
-                    build.mesh = Some(rebuilt.mesh);
+                    last_solid = Some(rebuilt.solid);
+                    last_mesh = Some(rebuilt.mesh.clone());
+                    bodies.insert(target.to_string(), rebuilt.solid);
+                    body_info.insert(
+                        target.to_string(),
+                        BodyInfo {
+                            id: target.to_string(),
+                            solid: rebuilt.solid,
+                            mesh: rebuilt.mesh,
+                            volume_mm3: rebuilt.volume_mm3,
+                        },
+                    );
                 }
                 Err(message) => {
                     build.reports.push(FeatureReport {
@@ -1997,8 +2425,55 @@ impl Project {
         }
         cache.entries = kept;
 
-        build.solid = body;
+        build.solid = last_solid;
+        build.mesh = last_mesh;
+        let mut all_bodies: Vec<BodyInfo> = body_info.into_values().collect();
+        all_bodies.sort_by(|a, b| a.id.cmp(&b.id));
+        build.bodies = all_bodies;
         Ok(build)
+    }
+
+    fn resolve_pattern(&self, pattern: &FeaturePattern) -> Result<ResolvedPattern, String> {
+        match pattern {
+            FeaturePattern::Linear {
+                count,
+                spacing_param,
+                direction,
+            } => {
+                if *count < 1 {
+                    return Err("pattern count must be at least 1".into());
+                }
+                let val = self.parameter(spacing_param).map_err(|e| e.to_string())?;
+                let spacing_mm = self.header.units.to_mm(val);
+                let len = (direction[0] * direction[0] + direction[1] * direction[1]).sqrt();
+                if len <= 1e-9 {
+                    return Err("linear pattern direction cannot be a zero vector".into());
+                }
+                let dir_norm = [direction[0] / len, direction[1] / len];
+                Ok(ResolvedPattern::Linear {
+                    count: *count,
+                    spacing_mm,
+                    direction: dir_norm,
+                })
+            }
+            FeaturePattern::Circular {
+                count,
+                total_angle_deg,
+                center,
+            } => {
+                if *count < 1 {
+                    return Err("circular pattern count must be at least 1".into());
+                }
+                let unit = self.header.units;
+                let center_mm = [unit.to_mm(center[0]), unit.to_mm(center[1])];
+                Ok(ResolvedPattern::Circular {
+                    count: *count,
+                    total_angle_rad: total_angle_deg.to_radians(),
+                    center_mm,
+                })
+            }
+            FeaturePattern::Mirror { axis } => Ok(ResolvedPattern::Mirror { axis: *axis }),
+        }
     }
 
     /// The resolved inputs of one feature: its profile in millimetres and what to do with it.
@@ -2006,10 +2481,11 @@ impl Project {
     /// Resolving is separate from building so the cache can hash exactly what the kernel will be
     /// given. The error strings are the ones a failing feature reports, so an uncached and a cached
     /// rebuild fail with the same message.
+    #[allow(clippy::type_complexity)]
     fn resolve_feature(
         &self,
         feature: &Feature,
-    ) -> Result<(Vec<[f64; 2]>, ResolvedAction), String> {
+    ) -> Result<(Vec<[f64; 2]>, ResolvedAction, Option<ResolvedPattern>), String> {
         let sketch = self
             .sketch(feature.sketch_id)
             .ok_or_else(|| format!("sketch {} does not exist", feature.sketch_id))?;
@@ -2044,7 +2520,11 @@ impl Project {
                 }
             }
         };
-        Ok((profile, action))
+        let pattern = match &feature.pattern {
+            Some(p) => Some(self.resolve_pattern(p)?),
+            None => None,
+        };
+        Ok((profile, action, pattern))
     }
 
     /// Rebuild one feature from already-resolved inputs, returning the body it produced.
@@ -2058,168 +2538,239 @@ impl Project {
         feature: &Feature,
         profile: &[[f64; 2]],
         action: &ResolvedAction,
+        pattern: Option<&ResolvedPattern>,
         kernel: &mut K,
         tolerance_mm: f64,
         body: Option<SolidId>,
         release_superseded: bool,
     ) -> Result<RebuiltFeature, String> {
-        let (swept, plane_mm) = match action {
-            ResolvedAction::Extrude { depth_mm, plane_mm } => (
-                kernel
-                    .extrude(profile, *depth_mm)
-                    .map_err(|error| format!("extrude failed: {error}"))?,
-                *plane_mm,
-            ),
-            ResolvedAction::Revolve {
-                axis_origin_mm,
-                axis_direction_mm,
-                plane_mm,
-            } => {
-                if !kernel.supports(cad_contract::capability::Capability::Revolve) {
-                    return Err(
-                        "the kernel does not advertise revolve, so this feature cannot be built"
-                            .into(),
-                    );
-                }
-                let turned = kernel
-                    .revolve(
-                        profile,
-                        *axis_origin_mm,
-                        *axis_direction_mm,
-                        std::f64::consts::TAU,
-                    )
-                    .map_err(|error| format!("revolve failed: {error}"))?;
-                (turned, *plane_mm)
-            }
-        };
-        // Both kinds are built on the world plane and then moved, because every kernel sweep starts
-        // at z = 0 and the contract has no plane argument.
-        let swept = place_on_plane(kernel, swept, plane_mm)?;
+        let instance_profiles = generate_pattern_profiles(profile, pattern);
+        let mut current_body = body;
+        let mut initial_superseded: Option<SolidId> = None;
 
-        let (next, superseded): (SolidId, Option<SolidId>) = match (feature.operation, body) {
-            (ExtrudeOperation::NewBody, None) => (swept, None),
-            (ExtrudeOperation::NewBody, Some(_)) => {
-                kernel.release(swept);
-                return Err(
-                    "a second new body is not supported; later features must join the first".into(),
-                );
-            }
-            (ExtrudeOperation::Join, None) => {
-                kernel.release(swept);
-                return Err("a join needs a body from an earlier feature".into());
-            }
-            (ExtrudeOperation::Join, Some(running)) => {
-                if !kernel.supports(cad_contract::capability::Capability::BooleanUnion) {
-                    kernel.release(swept);
-                    return Err(
-                        "the kernel does not advertise boolean union, so this join cannot be built"
-                            .into(),
-                    );
+        for (inst_idx, inst_profile) in instance_profiles.iter().enumerate() {
+            let (swept, plane_mm) = match action {
+                ResolvedAction::Extrude { depth_mm, plane_mm } => (
+                    kernel
+                        .extrude(inst_profile, *depth_mm)
+                        .map_err(|error| format!("extrude failed: {error}"))?,
+                    *plane_mm,
+                ),
+                ResolvedAction::Revolve {
+                    axis_origin_mm,
+                    axis_direction_mm,
+                    plane_mm,
+                } => {
+                    if !kernel.supports(cad_contract::capability::Capability::Revolve) {
+                        return Err(
+                            "the kernel does not advertise revolve, so this feature cannot be built"
+                                .into(),
+                        );
+                    }
+                    let turned = kernel
+                        .revolve(
+                            inst_profile,
+                            *axis_origin_mm,
+                            *axis_direction_mm,
+                            std::f64::consts::TAU,
+                        )
+                        .map_err(|error| format!("revolve failed: {error}"))?;
+                    (turned, *plane_mm)
                 }
-                // A boss that sits on a face of the body shares that face with it, which is the
-                // coplanar case the kernel handles worst. The tool is moved into the body by
-                // JOIN_OVERLAP_MM instead, where the extra material is already present. A revolved
-                // tool is used as drawn; if it is coplanar the failure is reported, not hidden.
-                let tool = match action {
-                    ResolvedAction::Extrude { depth_mm, plane_mm } => {
-                        match overlapping_join_tool(kernel, profile, *depth_mm, *plane_mm, running)
+            };
+            // Both kinds are built on the world plane and then moved, because every kernel sweep starts
+            // at z = 0 and the contract has no plane argument.
+            let swept = place_on_plane(kernel, swept, plane_mm)?;
+
+            match (feature.operation, current_body) {
+                (ExtrudeOperation::NewBody, None) => {
+                    current_body = Some(swept);
+                }
+                (ExtrudeOperation::NewBody, Some(running)) => {
+                    if inst_idx == 0 {
+                        kernel.release(swept);
+                        return Err(
+                            "a second new body is not supported; later features must join the first"
+                                .into(),
+                        );
+                    } else {
+                        if !kernel.supports(cad_contract::capability::Capability::BooleanUnion) {
+                            kernel.release(swept);
+                            return Err(
+                                "the kernel does not advertise boolean union, so this join cannot be built"
+                                    .into(),
+                            );
+                        }
+                        match kernel.boolean(cad_contract::kernel::BooleanOp::Union, running, swept)
                         {
-                            Some(tool) => {
+                            Ok(joined) => {
                                 kernel.release(swept);
-                                tool
+                                if inst_idx > 1 {
+                                    kernel.release(running);
+                                } else if initial_superseded.is_none() {
+                                    initial_superseded = Some(running);
+                                }
+                                current_body = Some(joined);
                             }
-                            None => swept,
+                            Err(error) => {
+                                kernel.release(swept);
+                                if inst_idx > 0 {
+                                    kernel.release(running);
+                                }
+                                return Err(format!("union failed: {error}"));
+                            }
                         }
                     }
-                    ResolvedAction::Revolve { .. } => swept,
-                };
-                match kernel.boolean(cad_contract::kernel::BooleanOp::Union, running, tool) {
-                    Ok(joined) => {
-                        kernel.release(tool);
-                        (joined, Some(running))
-                    }
-                    Err(error) => {
-                        kernel.release(tool);
-                        return Err(format!("join failed: {error}"));
-                    }
                 }
-            }
-            (ExtrudeOperation::Cut, None) => {
-                kernel.release(swept);
-                return Err("a cut needs a body from an earlier feature".into());
-            }
-            (ExtrudeOperation::Cut, Some(running)) => {
-                if !kernel.supports(cad_contract::capability::Capability::BooleanDifference) {
+                (ExtrudeOperation::Join, None) => {
                     kernel.release(swept);
-                    return Err(
-                        "the kernel does not advertise boolean difference, so this cut cannot be built"
-                            .into(),
-                    );
+                    return Err("a join needs a body from an earlier feature".into());
                 }
-                // An *extruded* cut tool is made to overshoot the body, so no face of the tool is
-                // coincident with a face of the body. Coincident faces are the boolean case the
-                // kernel handles worst, and they are the common case: every extrude starts on the
-                // z = 0 sketch plane, so a cut whose depth equals the body's thickness would
-                // otherwise share both of its faces with the body. See CUT_OVERSHOOT_MM.
-                //
-                // A revolved tool has no such overshoot: its extent is the sketch, so it is used as
-                // drawn, and it still has to span the body or the guard below refuses the feature.
-                // That is reported by the feature rather than hidden.
-                let tool = match action {
-                    ResolvedAction::Extrude { depth_mm, plane_mm } => {
-                        match overshooting_tool(kernel, profile, *depth_mm, *plane_mm, running) {
-                            Some(tool) => {
-                                kernel.release(swept);
-                                tool
+                (ExtrudeOperation::Join, Some(running)) => {
+                    if !kernel.supports(cad_contract::capability::Capability::BooleanUnion) {
+                        kernel.release(swept);
+                        return Err(
+                            "the kernel does not advertise boolean union, so this join cannot be built"
+                                .into(),
+                        );
+                    }
+                    // A boss that sits on a face of the body shares that face with it, which is the
+                    // coplanar case the kernel handles worst. The tool is moved into the body by
+                    // JOIN_OVERLAP_MM instead, where the extra material is already present. A revolved
+                    // tool is used as drawn; if it is coplanar the failure is reported, not hidden.
+                    let tool = match action {
+                        ResolvedAction::Extrude { depth_mm, plane_mm } => {
+                            match overlapping_join_tool(
+                                kernel,
+                                inst_profile,
+                                *depth_mm,
+                                *plane_mm,
+                                running,
+                            ) {
+                                Some(tool) => {
+                                    kernel.release(swept);
+                                    tool
+                                }
+                                None => swept,
                             }
-                            // No coincidence to break, or the kernel cannot move a solid: cut with
-                            // the tool exactly as drawn. The guard below still requires it to
-                            // clear the body's top face.
-                            None => swept,
+                        }
+                        ResolvedAction::Revolve { .. } => swept,
+                    };
+                    match kernel.boolean(cad_contract::kernel::BooleanOp::Union, running, tool) {
+                        Ok(joined) => {
+                            kernel.release(tool);
+                            if inst_idx > 0 {
+                                kernel.release(running);
+                            } else if initial_superseded.is_none() {
+                                initial_superseded = Some(running);
+                            }
+                            current_body = Some(joined);
+                        }
+                        Err(error) => {
+                            kernel.release(tool);
+                            if inst_idx > 0 {
+                                kernel.release(running);
+                            }
+                            return Err(format!("join failed: {error}"));
                         }
                     }
-                    ResolvedAction::Revolve { .. } => swept,
-                };
-                // A cut is only exact in this construction when its tool clears the body's top
-                // face, and the failure is otherwise silent. Measured on a 10 x 10 x 5 plate, a
-                // contained cut (tool z 2..3) returned the tool (0.776 mm³ instead of 499.215 mm³)
-                // and a cut from an interior plane down past the bottom (tool z -3..5 in a 0..8
-                // body) returned the removed chunk (62.117 mm³ instead of the remaining 737.17
-                // mm³); both reported `built`. A raised-plane pocket whose tool spans 3..8 is exact
-                // (the HTTP test measures its analytic volume), which is why the rule is "clear the
-                // top", not "span both faces". Refusing is deliberately stricter than the raw
-                // kernel: the document places and moves the tool itself, so it only accepts the
-                // case it has measured as exact.
-                let body_bounds = kernel
-                    .bounding_box(running)
-                    .map_err(|error| format!("the body's bounds could not be read: {error}"))?;
-                let tool_bounds = kernel
-                    .bounding_box(tool)
-                    .map_err(|error| format!("the cut tool's bounds could not be read: {error}"))?;
-                let slack = CUT_OVERSHOOT_MM * 0.5;
-                if tool_bounds.max[2] < body_bounds.max[2] + slack {
-                    kernel.release(tool);
-                    return Err(format!(
-                        "a cut must clear the body's top face: its tool ends at z {:.3} mm but the \
-                         body's top is {:.3} mm, and a cut that stops inside the body returns the \
-                         wrong solid; move the sketch plane to the top face or sweep the cut \
-                         through it",
-                        tool_bounds.max[2], body_bounds.max[2],
-                    ));
                 }
-                match kernel.boolean(cad_contract::kernel::BooleanOp::Difference, running, tool) {
-                    Ok(cut) => {
-                        kernel.release(tool);
-                        (cut, Some(running))
+                (ExtrudeOperation::Cut, None) => {
+                    kernel.release(swept);
+                    return Err("a cut needs a body from an earlier feature".into());
+                }
+                (ExtrudeOperation::Cut, Some(running)) => {
+                    if !kernel.supports(cad_contract::capability::Capability::BooleanDifference) {
+                        kernel.release(swept);
+                        return Err(
+                            "the kernel does not advertise boolean difference, so this cut cannot be built"
+                                .into(),
+                        );
                     }
-                    Err(error) => {
+                    // An *extruded* cut tool is made to overshoot the body, so no face of the tool is
+                    // coincident with a face of the body. Coincident faces are the boolean case the
+                    // kernel handles worst, and they are the common case: every extrude starts on the
+                    // z = 0 sketch plane, so a cut whose depth equals the body's thickness would
+                    // otherwise share both of its faces with the body. See CUT_OVERSHOOT_MM.
+                    //
+                    // A revolved tool has no such overshoot: its extent is the sketch, so it is used as
+                    // drawn, and it still has to span the body or the guard below refuses the feature.
+                    // That is reported by the feature rather than hidden.
+                    let tool = match action {
+                        ResolvedAction::Extrude { depth_mm, plane_mm } => {
+                            match overshooting_tool(
+                                kernel,
+                                inst_profile,
+                                *depth_mm,
+                                *plane_mm,
+                                running,
+                            ) {
+                                Some(tool) => {
+                                    kernel.release(swept);
+                                    tool
+                                }
+                                // No coincidence to break, or the kernel cannot move a solid: cut with
+                                // the tool exactly as drawn. The guard below still requires it to
+                                // clear the body's top face.
+                                None => swept,
+                            }
+                        }
+                        ResolvedAction::Revolve { .. } => swept,
+                    };
+                    // A cut is only exact in this construction when its tool clears the body's top
+                    // face, and the failure is otherwise silent. Measured on a 10 x 10 x 5 plate, a
+                    // contained cut (tool z 2..3) returned the tool (0.776 mm³ instead of 499.215 mm³)
+                    // and a cut from an interior plane down past the bottom (tool z -3..5 in a 0..8
+                    // body) returned the removed chunk (62.117 mm³ instead of the remaining 737.17
+                    // mm³); both reported `built`. A raised-plane pocket whose tool spans 3..8 is exact
+                    // (the HTTP test measures its analytic volume), which is why the rule is "clear the
+                    // top", not "span both faces". Refusing is deliberately stricter than the raw
+                    // kernel: the document places and moves the tool itself, so it only accepts the
+                    // case it has measured as exact.
+                    let body_bounds = kernel
+                        .bounding_box(running)
+                        .map_err(|error| format!("the body's bounds could not be read: {error}"))?;
+                    let tool_bounds = kernel.bounding_box(tool).map_err(|error| {
+                        format!("the cut tool's bounds could not be read: {error}")
+                    })?;
+                    let slack = CUT_OVERSHOOT_MM * 0.5;
+                    if tool_bounds.max[2] < body_bounds.max[2] + slack {
                         kernel.release(tool);
-                        return Err(format!("cut failed: {error}"));
+                        if inst_idx > 0 {
+                            kernel.release(running);
+                        }
+                        return Err(format!(
+                            "a cut must clear the body's top face: its tool ends at z {:.3} mm but the \
+                             body's top is {:.3} mm, and a cut that stops inside the body returns the \
+                             wrong solid; move the sketch plane to the top face or sweep the cut \
+                             through it",
+                            tool_bounds.max[2], body_bounds.max[2],
+                        ));
+                    }
+                    match kernel.boolean(cad_contract::kernel::BooleanOp::Difference, running, tool)
+                    {
+                        Ok(cut) => {
+                            kernel.release(tool);
+                            if inst_idx > 0 {
+                                kernel.release(running);
+                            } else if initial_superseded.is_none() {
+                                initial_superseded = Some(running);
+                            }
+                            current_body = Some(cut);
+                        }
+                        Err(error) => {
+                            kernel.release(tool);
+                            if inst_idx > 0 {
+                                kernel.release(running);
+                            }
+                            return Err(format!("cut failed: {error}"));
+                        }
                     }
                 }
             }
-        };
+        }
 
+        let next = current_body.ok_or_else(|| "feature produced no body".to_string())?;
         let rebuilt = match kernel.tessellate(next, tolerance_mm) {
             Ok(rebuilt) => rebuilt,
             Err(error) => {
@@ -2231,7 +2782,7 @@ impl Project {
             kernel.release(next);
             return Err(format!("the kernel produced an invalid mesh: {error}"));
         }
-        if let Some(previous) = superseded
+        if let Some(previous) = initial_superseded
             && release_superseded
         {
             kernel.release(previous);
@@ -2608,6 +3159,7 @@ fn validate_contents(
             )));
         }
     }
+    let mut seen_bodies: HashSet<String> = HashSet::new();
     for (index, feature) in features.iter().enumerate() {
         if !entity_ids.insert(feature.id) {
             return Err(ProjectError::Invalid(format!(
@@ -2624,20 +3176,35 @@ fn validate_contents(
                 features[index - 1].id
             )));
         }
-        if index == 0 {
+        let body_name = feature.body_id.as_deref().unwrap_or("default");
+        if seen_bodies.insert(body_name.to_string()) {
             if feature.operation != ExtrudeOperation::NewBody {
-                return Err(ProjectError::Invalid(format!(
-                    "feature {} must start a new body; a join or cut needs an earlier body",
-                    feature.id
-                )));
+                if index == 0 && body_name == "default" {
+                    return Err(ProjectError::Invalid(format!(
+                        "feature {} must start a new body; a join or cut needs an earlier body",
+                        feature.id
+                    )));
+                } else {
+                    return Err(ProjectError::Invalid(format!(
+                        "feature {} must start a new body for '{body_name}'; a join or cut needs an earlier body",
+                        feature.id
+                    )));
+                }
             }
         } else if feature.operation != ExtrudeOperation::Join
             && feature.operation != ExtrudeOperation::Cut
         {
-            return Err(ProjectError::Invalid(format!(
-                "feature {} starts a second body, which this document does not support; use a join or a cut",
-                feature.id
-            )));
+            if body_name == "default" {
+                return Err(ProjectError::Invalid(format!(
+                    "feature {} starts a second body, which this document does not support; use a join or a cut",
+                    feature.id
+                )));
+            } else {
+                return Err(ProjectError::Invalid(format!(
+                    "feature {} starts a second body for '{body_name}', which this document does not support; use a join or a cut",
+                    feature.id
+                )));
+            }
         }
         let sketch = sketches
             .iter()
@@ -4423,7 +4990,7 @@ mod tests {
         for (direction, expected) in [(ExtrudeDirection::Up, 5.0), (ExtrudeDirection::Down, -5.0)] {
             let project = raised_project(2.5, direction)?;
             let feature = project.features()[0].clone();
-            let (_, action) = project
+            let (_, action, _) = project
                 .resolve_feature(&feature)
                 .map_err(|message| -> Box<dyn std::error::Error> { message.into() })?;
             match action {
@@ -5886,6 +6453,465 @@ mod tests {
             project.diff_revision(999),
             Err(ProjectError::UnknownRevision(999))
         ));
+
+        Ok(())
+    }
+
+    struct PatternTestKernel {
+        next: u64,
+        solids: BTreeMap<u64, (f64, [f64; 3], [f64; 3])>,
+        calls: Vec<String>,
+    }
+
+    impl PatternTestKernel {
+        fn new() -> Self {
+            PatternTestKernel {
+                next: 1,
+                solids: BTreeMap::new(),
+                calls: Vec::new(),
+            }
+        }
+    }
+
+    impl Kernel for PatternTestKernel {
+        fn info(&self) -> KernelInfo {
+            KernelInfo::new(
+                "pattern-test-kernel",
+                "test",
+                CapabilitySet::from([
+                    Capability::Extrude,
+                    Capability::Tessellate,
+                    Capability::BooleanUnion,
+                    Capability::BooleanDifference,
+                    Capability::Transform,
+                ]),
+            )
+        }
+
+        fn extrude(
+            &mut self,
+            profile: &[[f64; 2]],
+            height_mm: f64,
+        ) -> cad_contract::Result<SolidId> {
+            validate_profile(profile)?;
+            let mut min_x = f64::INFINITY;
+            let mut min_y = f64::INFINITY;
+            let mut max_x = f64::NEG_INFINITY;
+            let mut max_y = f64::NEG_INFINITY;
+            for &[x, y] in profile {
+                min_x = min_x.min(x);
+                min_y = min_y.min(y);
+                max_x = max_x.max(x);
+                max_y = max_y.max(y);
+            }
+            let area = polygon_area(profile);
+            let volume = area * height_mm.abs();
+            let id = self.next;
+            self.next += 1;
+            let min_z = height_mm.min(0.0);
+            let max_z = height_mm.max(0.0);
+            self.solids
+                .insert(id, (volume, [min_x, min_y, min_z], [max_x, max_y, max_z]));
+            self.calls.push(format!("extrude {id}"));
+            Ok(SolidId::from_raw(id))
+        }
+
+        fn translate(
+            &mut self,
+            solid: SolidId,
+            delta_mm: [f64; 3],
+        ) -> cad_contract::Result<SolidId> {
+            let (vol, min, max) = *self
+                .solids
+                .get(&solid.get())
+                .ok_or(KernelError::UnknownSolid(solid))?;
+            let id = self.next;
+            self.next += 1;
+            let new_min = [
+                min[0] + delta_mm[0],
+                min[1] + delta_mm[1],
+                min[2] + delta_mm[2],
+            ];
+            let new_max = [
+                max[0] + delta_mm[0],
+                max[1] + delta_mm[1],
+                max[2] + delta_mm[2],
+            ];
+            self.solids.insert(id, (vol, new_min, new_max));
+            self.calls.push(format!("translate {id}"));
+            Ok(SolidId::from_raw(id))
+        }
+
+        fn bounding_box(&self, solid: SolidId) -> cad_contract::Result<cad_contract::mesh::Aabb3> {
+            let (_, min, max) = *self
+                .solids
+                .get(&solid.get())
+                .ok_or(KernelError::UnknownSolid(solid))?;
+            let mut bb = cad_contract::mesh::Aabb3::EMPTY;
+            bb.extend(min);
+            bb.extend(max);
+            Ok(bb)
+        }
+
+        fn boolean(
+            &mut self,
+            op: BooleanOp,
+            a: SolidId,
+            b: SolidId,
+        ) -> cad_contract::Result<SolidId> {
+            let (vol_a, min_a, max_a) = *self
+                .solids
+                .get(&a.get())
+                .ok_or(KernelError::UnknownSolid(a))?;
+            let (vol_b, min_b, max_b) = *self
+                .solids
+                .get(&b.get())
+                .ok_or(KernelError::UnknownSolid(b))?;
+            let id = self.next;
+            self.next += 1;
+            match op {
+                BooleanOp::Union => {
+                    let new_min = [
+                        min_a[0].min(min_b[0]),
+                        min_a[1].min(min_b[1]),
+                        min_a[2].min(min_b[2]),
+                    ];
+                    let new_max = [
+                        max_a[0].max(max_b[0]),
+                        max_a[1].max(max_b[1]),
+                        max_a[2].max(max_b[2]),
+                    ];
+                    self.solids.insert(id, (vol_a + vol_b, new_min, new_max));
+                    self.calls.push(format!("union {id}"));
+                }
+                BooleanOp::Difference => {
+                    let overlap_z = (max_a[2].min(max_b[2]) - min_a[2].max(min_b[2])).max(0.0);
+                    let height_b = (max_b[2] - min_b[2]).abs().max(1e-6);
+                    let cut_vol = vol_b * (overlap_z / height_b);
+                    self.solids.insert(id, (vol_a - cut_vol, min_a, max_a));
+                    self.calls.push(format!("cut {id}"));
+                }
+                BooleanOp::Intersection => {
+                    self.solids.insert(id, (vol_a.min(vol_b), min_a, max_a));
+                    self.calls.push(format!("intersect {id}"));
+                }
+            }
+            Ok(SolidId::from_raw(id))
+        }
+
+        fn tessellate(&self, solid: SolidId, _tol: f64) -> cad_contract::Result<Mesh> {
+            let (vol, min, max) = *self
+                .solids
+                .get(&solid.get())
+                .ok_or(KernelError::UnknownSolid(solid))?;
+            let dx = (max[0] - min[0]).abs().max(1e-3);
+            let dy = (max[1] - min[1]).abs().max(1e-3);
+            let dz = if dx * dy > 0.0 { vol / (dx * dy) } else { 1.0 };
+            let mut mesh = BoxKernel::box_mesh([dx, dy, dz]);
+            for p in &mut mesh.positions {
+                p[0] += min[0];
+                p[1] += min[1];
+                p[2] += min[2];
+            }
+            Ok(mesh)
+        }
+
+        fn release(&mut self, solid: SolidId) {
+            self.solids.remove(&solid.get());
+        }
+
+        fn contains(&self, solid: SolidId) -> Option<bool> {
+            Some(self.solids.contains_key(&solid.get()))
+        }
+    }
+
+    #[test]
+    fn pattern_linear_cut_creates_multiple_holes_with_analytic_volume() -> TestResult {
+        let mut project = Project::new("pattern_linear", DocumentId::new(1), Unit::Millimeter);
+        project.add_parameter("plate_w", 100.0)?;
+        project.add_parameter("plate_h", 100.0)?;
+        project.add_parameter("plate_t", 10.0)?;
+        project.add_parameter("hole_size", 10.0)?;
+        project.add_parameter("spacing", 20.0)?;
+
+        let plate_sk = project.add_rectangle_sketch("plate_w", "plate_h", [0.0, 0.0])?;
+        project.add_extrude_feature(plate_sk, "plate_t", ExtrudeOperation::NewBody)?;
+
+        let hole_sk = project.add_sketch_on_plane(
+            SketchProfile::Rectangle {
+                width_param: "hole_size".into(),
+                height_param: "hole_size".into(),
+            },
+            [10.0, 10.0],
+            10.0,
+        )?;
+        let cut_id = project.add_extrude_feature_in_direction(
+            hole_sk,
+            "plate_t",
+            ExtrudeOperation::Cut,
+            ExtrudeDirection::Down,
+        )?;
+
+        // Set linear pattern: 3 holes spaced 20mm in X direction
+        project.set_feature_pattern(
+            cut_id,
+            Some(FeaturePattern::Linear {
+                count: 3,
+                spacing_param: "spacing".into(),
+                direction: [1.0, 0.0],
+            }),
+        )?;
+
+        let mut kernel = PatternTestKernel::new();
+        let build = project.build(&mut kernel)?;
+        assert!(build.is_complete(), "{:?}", build.failed);
+
+        // Plate volume: 100 * 100 * 10 = 100,000 mm3
+        // 3 holes: 3 * (10 * 10 * 10) = 3,000 mm3
+        // Net analytic volume: 97,000 mm3
+        let outcome = build
+            .feature(cut_id)
+            .ok_or_else(|| ProjectError::Invalid("cut feature not found".into()))?;
+        match outcome {
+            FeatureOutcome::Built { volume_mm3, .. } => {
+                assert!(
+                    (volume_mm3 - 97_000.0).abs() < 1e-6,
+                    "expected 97,000 mm3, got {volume_mm3}"
+                );
+            }
+            FeatureOutcome::Failed { message } => {
+                return Err(format!("cut failed: {message}").into());
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn pattern_mirror_cut_creates_mirrored_holes_with_analytic_volume() -> TestResult {
+        let mut project = Project::new("pattern_mirror", DocumentId::new(1), Unit::Millimeter);
+        project.add_parameter("plate_w", 100.0)?;
+        project.add_parameter("plate_h", 100.0)?;
+        project.add_parameter("plate_t", 10.0)?;
+        project.add_parameter("hole_size", 10.0)?;
+
+        let plate_sk = project.add_rectangle_sketch("plate_w", "plate_h", [-50.0, -50.0])?;
+        project.add_extrude_feature(plate_sk, "plate_t", ExtrudeOperation::NewBody)?;
+
+        let hole_sk = project.add_sketch_on_plane(
+            SketchProfile::Rectangle {
+                width_param: "hole_size".into(),
+                height_param: "hole_size".into(),
+            },
+            [15.0, 15.0],
+            10.0,
+        )?;
+        let cut_id = project.add_extrude_feature_in_direction(
+            hole_sk,
+            "plate_t",
+            ExtrudeOperation::Cut,
+            ExtrudeDirection::Down,
+        )?;
+
+        // Mirror cut across Y-axis: generates 2 symmetric holes
+        project.set_feature_pattern(
+            cut_id,
+            Some(FeaturePattern::Mirror {
+                axis: MirrorAxis::Y,
+            }),
+        )?;
+
+        let mut kernel = PatternTestKernel::new();
+        let build = project.build(&mut kernel)?;
+        assert!(build.is_complete(), "{:?}", build.failed);
+
+        // Plate: 100,000 mm3
+        // 2 holes: 2 * 1,000 = 2,000 mm3
+        // Net volume: 98,000 mm3
+        let outcome = build
+            .feature(cut_id)
+            .ok_or_else(|| ProjectError::Invalid("cut feature not found".into()))?;
+        match outcome {
+            FeatureOutcome::Built { volume_mm3, .. } => {
+                assert!(
+                    (volume_mm3 - 98_000.0).abs() < 1e-6,
+                    "expected 98,000 mm3, got {volume_mm3}"
+                );
+            }
+            FeatureOutcome::Failed { message } => {
+                return Err(format!("cut failed: {message}").into());
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn pattern_circular_cut_creates_radial_holes_with_analytic_volume() -> TestResult {
+        let mut project = Project::new("pattern_circular", DocumentId::new(1), Unit::Millimeter);
+        project.add_parameter("plate_w", 100.0)?;
+        project.add_parameter("plate_h", 100.0)?;
+        project.add_parameter("plate_t", 10.0)?;
+        project.add_parameter("hole_size", 10.0)?;
+
+        let plate_sk = project.add_rectangle_sketch("plate_w", "plate_h", [0.0, 0.0])?;
+        project.add_extrude_feature(plate_sk, "plate_t", ExtrudeOperation::NewBody)?;
+
+        let hole_sk = project.add_sketch_on_plane(
+            SketchProfile::Rectangle {
+                width_param: "hole_size".into(),
+                height_param: "hole_size".into(),
+            },
+            [20.0, 50.0],
+            10.0,
+        )?;
+        let cut_id = project.add_extrude_feature_in_direction(
+            hole_sk,
+            "plate_t",
+            ExtrudeOperation::Cut,
+            ExtrudeDirection::Down,
+        )?;
+
+        // Circular pattern of 4 radial holes over 360 deg around [50, 50]
+        project.set_feature_pattern(
+            cut_id,
+            Some(FeaturePattern::Circular {
+                count: 4,
+                total_angle_deg: 360.0,
+                center: [50.0, 50.0],
+            }),
+        )?;
+
+        let mut kernel = PatternTestKernel::new();
+        let build = project.build(&mut kernel)?;
+        assert!(build.is_complete(), "{:?}", build.failed);
+
+        // Plate: 100,000 mm3
+        // 4 holes: 4 * 1,000 = 4,000 mm3
+        // Net volume: 96,000 mm3
+        let outcome = build
+            .feature(cut_id)
+            .ok_or_else(|| ProjectError::Invalid("cut feature not found".into()))?;
+        match outcome {
+            FeatureOutcome::Built { volume_mm3, .. } => {
+                assert!(
+                    (volume_mm3 - 96_000.0).abs() < 1e-6,
+                    "expected 96,000 mm3, got {volume_mm3}"
+                );
+            }
+            FeatureOutcome::Failed { message } => {
+                return Err(format!("cut failed: {message}").into());
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn cache_key_incorporates_pattern_parameters() -> TestResult {
+        let mut project = Project::new("pattern_cache", DocumentId::new(1), Unit::Millimeter);
+        project.add_parameter("plate_w", 100.0)?;
+        project.add_parameter("plate_h", 100.0)?;
+        project.add_parameter("plate_t", 10.0)?;
+        project.add_parameter("hole_size", 10.0)?;
+        project.add_parameter("spacing", 20.0)?;
+
+        let plate_sk = project.add_rectangle_sketch("plate_w", "plate_h", [0.0, 0.0])?;
+        project.add_extrude_feature(plate_sk, "plate_t", ExtrudeOperation::NewBody)?;
+
+        let hole_sk = project.add_sketch_on_plane(
+            SketchProfile::Rectangle {
+                width_param: "hole_size".into(),
+                height_param: "hole_size".into(),
+            },
+            [10.0, 10.0],
+            10.0,
+        )?;
+        let cut_id = project.add_extrude_feature_in_direction(
+            hole_sk,
+            "plate_t",
+            ExtrudeOperation::Cut,
+            ExtrudeDirection::Down,
+        )?;
+        project.set_feature_pattern(
+            cut_id,
+            Some(FeaturePattern::Linear {
+                count: 2,
+                spacing_param: "spacing".into(),
+                direction: [1.0, 0.0],
+            }),
+        )?;
+
+        let mut kernel = PatternTestKernel::new();
+        let mut cache = BuildCache::default();
+
+        // 1st build: 2 misses, 0 hits
+        let _ = project.build_with_cache(&mut kernel, &mut cache)?;
+        assert_eq!(cache.hits, 0);
+        assert_eq!(cache.misses, 2);
+
+        // 2nd build (identical): 2 hits, 0 misses
+        let _ = project.build_with_cache(&mut kernel, &mut cache)?;
+        assert_eq!(cache.hits, 2);
+        assert_eq!(cache.misses, 2);
+
+        // Modify pattern parameter (count: 2 -> 3)
+        project.set_feature_pattern(
+            cut_id,
+            Some(FeaturePattern::Linear {
+                count: 3,
+                spacing_param: "spacing".into(),
+                direction: [1.0, 0.0],
+            }),
+        )?;
+
+        // 3rd build: plate feature hits cache (1 hit), pattern feature misses and rebuilds (1 miss)
+        let _ = project.build_with_cache(&mut kernel, &mut cache)?;
+        assert_eq!(cache.hits, 3);
+        assert_eq!(cache.misses, 3);
+
+        Ok(())
+    }
+
+    #[test]
+    fn multibody_document_creates_independent_bodies_and_measures_clearance() -> TestResult {
+        let mut project = Project::new("multibody", DocumentId::new(1), Unit::Millimeter);
+        project.add_parameter("chassis_w", 50.0)?;
+        project.add_parameter("chassis_h", 50.0)?;
+        project.add_parameter("chassis_t", 10.0)?;
+        project.add_parameter("cover_w", 50.0)?;
+        project.add_parameter("cover_h", 50.0)?;
+        project.add_parameter("cover_t", 5.0)?;
+
+        // Body 1: "chassis" at z = 0..10
+        let chassis_sk = project.add_rectangle_sketch("chassis_w", "chassis_h", [0.0, 0.0])?;
+        project.add_body_extrude(chassis_sk, "chassis_t", "chassis")?;
+
+        // Body 2: "cover" at z = 25..30 (plane_z = 25.0)
+        let cover_sk = project.add_sketch_on_plane(
+            SketchProfile::Rectangle {
+                width_param: "cover_w".into(),
+                height_param: "cover_h".into(),
+            },
+            [0.0, 0.0],
+            25.0,
+        )?;
+        project.add_body_extrude(cover_sk, "cover_t", "cover")?;
+
+        let mut kernel = PatternTestKernel::new();
+        let build = project.build(&mut kernel)?;
+        assert!(build.is_complete(), "{:?}", build.failed);
+
+        // Check build.bodies has 2 distinct bodies
+        assert_eq!(build.bodies.len(), 2);
+        assert_eq!(build.bodies[0].id, "chassis");
+        assert_eq!(build.bodies[1].id, "cover");
+        assert_eq!(build.bodies[0].volume_mm3, 25_000.0);
+        assert_eq!(build.bodies[1].volume_mm3, 12_500.0);
+
+        // Chassis is z: 0..10, Cover is z: 25..30. Clearance dz = 25 - 10 = 15.0 mm.
+        let clearance = build.inter_body_clearance("chassis", "cover");
+        assert_eq!(clearance, Some(15.0));
+
+        // Clearance between nonexistent body is None
+        assert_eq!(build.inter_body_clearance("chassis", "phantom"), None);
 
         Ok(())
     }

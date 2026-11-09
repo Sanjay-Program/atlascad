@@ -640,6 +640,51 @@ where
                 closed: false,
             })
         }
+        EntityKind::Rectangle {
+            origin,
+            width,
+            height,
+        } => {
+            let p0 = to_paper(*origin);
+            let p1 = to_paper([origin[0] + width, origin[1]]);
+            let p2 = to_paper([origin[0] + width, origin[1] + height]);
+            let p3 = to_paper([origin[0], origin[1] + height]);
+            Some(PlotLine {
+                points: vec![p0, p1, p2, p3],
+                width_mm,
+                closed: true,
+            })
+        }
+        EntityKind::Ellipse {
+            center,
+            radius_x,
+            radius_y,
+        } => {
+            let steps = arc_steps(radius_x.max(*radius_y));
+            let points = (0..=steps)
+                .map(|step| {
+                    let angle = std::f64::consts::TAU * (step as f64) / (steps as f64);
+                    to_paper([
+                        center[0] + radius_x * angle.cos(),
+                        center[1] + radius_y * angle.sin(),
+                    ])
+                })
+                .collect();
+            Some(PlotLine {
+                points,
+                width_mm,
+                closed: true,
+            })
+        }
+        EntityKind::Spline { points, closed } => {
+            let sampled = crate::sample_spline(points, *closed, 16);
+            let paper_points = sampled.into_iter().map(to_paper).collect();
+            Some(PlotLine {
+                points: paper_points,
+                width_mm,
+                closed: *closed,
+            })
+        }
         // Text and dimensions carry their own primitives.
         EntityKind::Text { .. } | EntityKind::Dimension { .. } => None,
     }

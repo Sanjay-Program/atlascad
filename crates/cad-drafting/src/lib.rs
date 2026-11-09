@@ -168,6 +168,23 @@ pub enum EntityKind {
         offset: f64,
         text: Option<String>,
     },
+    /// A rectangle defined by its orthogonal origin corner, width, and height.
+    Rectangle {
+        origin: [f64; 2],
+        width: f64,
+        height: f64,
+    },
+    /// An ellipse centered at `center` with radii along the document X and Y axes.
+    Ellipse {
+        center: [f64; 2],
+        radius_x: f64,
+        radius_y: f64,
+    },
+    /// A smooth cubic Catmull-Rom spline passing through `points`.
+    Spline {
+        points: Vec<[f64; 2]>,
+        closed: bool,
+    },
 }
 
 impl EntityKind {
@@ -181,6 +198,9 @@ impl EntityKind {
             EntityKind::Polyline { .. } => "polyline",
             EntityKind::Text { .. } => "text",
             EntityKind::Dimension { .. } => "dimension",
+            EntityKind::Rectangle { .. } => "rectangle",
+            EntityKind::Ellipse { .. } => "ellipse",
+            EntityKind::Spline { .. } => "spline",
         }
     }
 
@@ -295,6 +315,54 @@ impl EntityKind {
                     return Err(DraftError::Invalid(format!(
                         "a dimension label accepts at most {MAX_TEXT_CHARS} characters"
                     )));
+                }
+                Ok(())
+            }
+            EntityKind::Rectangle {
+                origin,
+                width,
+                height,
+            } => {
+                validate_point(origin)?;
+                if !width.is_finite() || !height.is_finite() || *width == 0.0 || *height == 0.0 {
+                    return Err(DraftError::Invalid(
+                        "a rectangle must have finite, non-zero width and height".into(),
+                    ));
+                }
+                Ok(())
+            }
+            EntityKind::Ellipse {
+                center,
+                radius_x,
+                radius_y,
+            } => {
+                validate_point(center)?;
+                validate_radius(*radius_x)?;
+                validate_radius(*radius_y)?;
+                Ok(())
+            }
+            EntityKind::Spline { points, closed: _ } => {
+                if points.len() < 2 {
+                    return Err(DraftError::Invalid(format!(
+                        "a spline needs at least 2 points, got {}",
+                        points.len()
+                    )));
+                }
+                if points.len() > MAX_POLYLINE_POINTS {
+                    return Err(DraftError::Invalid(format!(
+                        "a spline accepts at most {MAX_POLYLINE_POINTS} points, got {}",
+                        points.len()
+                    )));
+                }
+                for point in points {
+                    validate_point(point)?;
+                }
+                for pair in points.windows(2) {
+                    if pair[0] == pair[1] {
+                        return Err(DraftError::Invalid(
+                            "a spline must not repeat a consecutive point".into(),
+                        ));
+                    }
                 }
                 Ok(())
             }
@@ -477,6 +545,52 @@ impl Draft {
             kind,
         });
         Ok(id)
+    }
+
+    /// Add a rectangle to an existing, unlocked layer.
+    pub fn add_rectangle(
+        &mut self,
+        layer: &str,
+        origin: [f64; 2],
+        width: f64,
+        height: f64,
+    ) -> Result<EntityId, DraftError> {
+        self.add_entity(
+            layer,
+            EntityKind::Rectangle {
+                origin,
+                width,
+                height,
+            },
+        )
+    }
+
+    /// Add an ellipse to an existing, unlocked layer.
+    pub fn add_ellipse(
+        &mut self,
+        layer: &str,
+        center: [f64; 2],
+        radius_x: f64,
+        radius_y: f64,
+    ) -> Result<EntityId, DraftError> {
+        self.add_entity(
+            layer,
+            EntityKind::Ellipse {
+                center,
+                radius_x,
+                radius_y,
+            },
+        )
+    }
+
+    /// Add a cubic Catmull-Rom spline curve through `points` to an existing, unlocked layer.
+    pub fn add_spline(
+        &mut self,
+        layer: &str,
+        points: Vec<[f64; 2]>,
+        closed: bool,
+    ) -> Result<EntityId, DraftError> {
+        self.add_entity(layer, EntityKind::Spline { points, closed })
     }
 
     /// Remove an entity. The layer must exist and be unlocked.
@@ -946,6 +1060,35 @@ fn entity_bounds(kind: &EntityKind) -> Bounds {
             }
             bounds.unwrap_or([0.0, 0.0, 0.0, 0.0])
         }
+        EntityKind::Rectangle {
+            origin,
+            width,
+            height,
+        } => {
+            let x1 = origin[0];
+            let y1 = origin[1];
+            let x2 = origin[0] + width;
+            let y2 = origin[1] + height;
+            [x1.min(x2), y1.min(y2), x1.max(x2), y1.max(y2)]
+        }
+        EntityKind::Ellipse {
+            center,
+            radius_x,
+            radius_y,
+        } => [
+            center[0] - radius_x,
+            center[1] - radius_y,
+            center[0] + radius_x,
+            center[1] + radius_y,
+        ],
+        EntityKind::Spline { points, closed } => {
+            let sampled = sample_spline(points, *closed, 8);
+            let mut bounds: Option<Bounds> = None;
+            for point in &sampled {
+                extend(&mut bounds, [point[0], point[1], point[0], point[1]]);
+            }
+            bounds.unwrap_or([0.0, 0.0, 0.0, 0.0])
+        }
     }
 }
 
@@ -974,10 +1117,82 @@ fn entity_length(kind: &EntityKind) -> f64 {
             }
             length
         }
+        EntityKind::Rectangle { width, height, .. } => 2.0 * (width.abs() + height.abs()),
+        EntityKind::Ellipse {
+            radius_x, radius_y, ..
+        } => {
+            let a = radius_x.abs();
+            let b = radius_y.abs();
+            std::f64::consts::PI * (3.0 * (a + b) - ((3.0 * a + b) * (a + 3.0 * b)).sqrt())
+        }
+        EntityKind::Spline { points, closed } => {
+            let sampled = sample_spline(points, *closed, 16);
+            let mut length: f64 = sampled
+                .windows(2)
+                .map(|pair| distance(&pair[0], &pair[1]))
+                .sum();
+            if *closed && let (Some(first), Some(last)) = (sampled.first(), sampled.last()) {
+                length += distance(first, last);
+            }
+            length
+        }
         // Annotation has no drawn length: a dimension is a measurement of geometry that is already
         // counted, so adding it here would double-count the part.
         EntityKind::Text { .. } | EntityKind::Dimension { .. } => 0.0,
     }
+}
+
+/// Sample a cubic Catmull-Rom spline through `points`.
+pub(crate) fn sample_spline(
+    points: &[[f64; 2]],
+    closed: bool,
+    samples_per_segment: usize,
+) -> Vec<[f64; 2]> {
+    let n = points.len();
+    if n < 2 {
+        return points.to_vec();
+    }
+    let steps = samples_per_segment.max(2);
+    let mut sampled = Vec::new();
+
+    let num_segments = if closed { n } else { n - 1 };
+    for i in 0..num_segments {
+        let p1 = points[i];
+        let p2 = points[(i + 1) % n];
+        let p0 = if closed {
+            points[(i + n - 1) % n]
+        } else if i == 0 {
+            [2.0 * p1[0] - p2[0], 2.0 * p1[1] - p2[1]]
+        } else {
+            points[i - 1]
+        };
+        let p3 = if closed {
+            points[(i + 2) % n]
+        } else if i + 2 < n {
+            points[i + 2]
+        } else {
+            [2.0 * p2[0] - p1[0], 2.0 * p2[1] - p1[1]]
+        };
+
+        let start_step = if i == 0 { 0 } else { 1 };
+        for step in start_step..=steps {
+            let t = step as f64 / steps as f64;
+            let t2 = t * t;
+            let t3 = t2 * t;
+            let x = 0.5
+                * ((2.0 * p1[0])
+                    + (-p0[0] + p2[0]) * t
+                    + (2.0 * p0[0] - 5.0 * p1[0] + 4.0 * p2[0] - p3[0]) * t2
+                    + (-p0[0] + 3.0 * p1[0] - 3.0 * p2[0] + p3[0]) * t3);
+            let y = 0.5
+                * ((2.0 * p1[1])
+                    + (-p0[1] + p2[1]) * t
+                    + (2.0 * p0[1] - 5.0 * p1[1] + 4.0 * p2[1] - p3[1]) * t2
+                    + (-p0[1] + 3.0 * p1[1] - 3.0 * p2[1] + p3[1]) * t3);
+            sampled.push([x, y]);
+        }
+    }
+    sampled
 }
 
 fn distance(a: &[f64; 2], b: &[f64; 2]) -> f64 {
@@ -1086,6 +1301,64 @@ fn write_entity(out: &mut String, entity: &Entity) {
             if *closed
                 && points.len() > 2
                 && let (Some(first), Some(last)) = (points.first(), points.last())
+            {
+                pair(out, 0, "LINE");
+                pair(out, 8, layer);
+                point(out, 10, *last);
+                point(out, 11, *first);
+            }
+        }
+        EntityKind::Rectangle {
+            origin,
+            width,
+            height,
+        } => {
+            let p0 = *origin;
+            let p1 = [origin[0] + width, origin[1]];
+            let p2 = [origin[0] + width, origin[1] + height];
+            let p3 = [origin[0], origin[1] + height];
+            let corners = [p0, p1, p2, p3];
+            for i in 0..4 {
+                pair(out, 0, "LINE");
+                pair(out, 8, layer);
+                point(out, 10, corners[i]);
+                point(out, 11, corners[(i + 1) % 4]);
+            }
+        }
+        EntityKind::Ellipse {
+            center,
+            radius_x,
+            radius_y,
+        } => {
+            let steps = 64;
+            for i in 0..steps {
+                let a1 = std::f64::consts::TAU * (i as f64) / (steps as f64);
+                let a2 = std::f64::consts::TAU * ((i + 1) as f64) / (steps as f64);
+                let pt1 = [
+                    center[0] + radius_x * a1.cos(),
+                    center[1] + radius_y * a1.sin(),
+                ];
+                let pt2 = [
+                    center[0] + radius_x * a2.cos(),
+                    center[1] + radius_y * a2.sin(),
+                ];
+                pair(out, 0, "LINE");
+                pair(out, 8, layer);
+                point(out, 10, pt1);
+                point(out, 11, pt2);
+            }
+        }
+        EntityKind::Spline { points, closed } => {
+            let sampled = sample_spline(points, *closed, 16);
+            for pair_points in sampled.windows(2) {
+                pair(out, 0, "LINE");
+                pair(out, 8, layer);
+                point(out, 10, pair_points[0]);
+                point(out, 11, pair_points[1]);
+            }
+            if *closed
+                && let (Some(first), Some(last)) = (sampled.first(), sampled.last())
+                && first != last
             {
                 pair(out, 0, "LINE");
                 pair(out, 8, layer);
@@ -1518,14 +1791,127 @@ mod tests {
                 points: vec![[0.0, 0.0], [2.0, 0.0], [2.0, 2.0]],
                 closed: true,
             },
+            EntityKind::Rectangle {
+                origin: [0.0, 0.0],
+                width: 10.0,
+                height: 5.0,
+            },
+            EntityKind::Ellipse {
+                center: [0.0, 0.0],
+                radius_x: 6.0,
+                radius_y: 3.0,
+            },
+            EntityKind::Spline {
+                points: vec![[0.0, 0.0], [2.0, 3.0], [5.0, 2.0], [7.0, 0.0]],
+                closed: false,
+            },
         ];
         for kind in kinds {
             let label = kind.label();
             draft.add_entity(DEFAULT_LAYER, kind)?;
             assert!(!label.is_empty());
         }
-        assert_eq!(draft.entities().len(), 5);
+        assert_eq!(draft.entities().len(), 8);
         draft.validate()?;
+        Ok(())
+    }
+
+    #[test]
+    fn advanced_drafting_entities_validate_and_behave_analytically() -> TestResult {
+        let mut draft = drawing();
+
+        // 1. Rectangle
+        let rect_id = draft.add_rectangle(DEFAULT_LAYER, [2.0, 3.0], 10.0, 4.0)?;
+        assert_eq!(rect_id.get(), 1);
+        let rect_bounds = draft.bounds().ok_or("rect bounds")?;
+        assert_eq!(rect_bounds, [2.0, 3.0, 12.0, 7.0]);
+        assert_eq!(draft.total_length(), 28.0); // 2 * (10 + 4)
+
+        // Invalid rectangles
+        assert!(
+            draft
+                .add_rectangle(DEFAULT_LAYER, [0.0, 0.0], 0.0, 5.0)
+                .is_err()
+        );
+        assert!(
+            draft
+                .add_rectangle(DEFAULT_LAYER, [0.0, 0.0], 5.0, f64::NAN)
+                .is_err()
+        );
+
+        // 2. Ellipse
+        let mut draft_ell = drawing();
+        let ell_id = draft_ell.add_ellipse(DEFAULT_LAYER, [0.0, 0.0], 5.0, 3.0)?;
+        assert_eq!(ell_id.get(), 1);
+        let ell_bounds = draft_ell.bounds().ok_or("ell bounds")?;
+        assert_eq!(ell_bounds, [-5.0, -3.0, 5.0, 3.0]);
+        // Ramanujan ellipse perimeter for a=5, b=3 is ~25.52699
+        let ell_len = draft_ell.total_length();
+        assert!((ell_len - 25.52699).abs() < 1e-3, "ell_len = {ell_len}");
+
+        // Circle special case of ellipse: a=4, b=4 => perimeter exactly 8*pi
+        let mut draft_circ_ell = drawing();
+        draft_circ_ell.add_ellipse(DEFAULT_LAYER, [0.0, 0.0], 4.0, 4.0)?;
+        assert!((draft_circ_ell.total_length() - 8.0 * std::f64::consts::PI).abs() < 1e-9);
+
+        // Invalid ellipse
+        assert!(
+            draft
+                .add_ellipse(DEFAULT_LAYER, [0.0, 0.0], 0.0, 2.0)
+                .is_err()
+        );
+        assert!(
+            draft
+                .add_ellipse(DEFAULT_LAYER, [0.0, 0.0], -1.0, 2.0)
+                .is_err()
+        );
+
+        // 3. Spline
+        let mut draft_sp = drawing();
+        let pts = vec![[0.0, 0.0], [5.0, 10.0], [10.0, 0.0]];
+        let sp_id = draft_sp.add_spline(DEFAULT_LAYER, pts.clone(), false)?;
+        assert_eq!(sp_id.get(), 1);
+        let sp_bounds = draft_sp.bounds().ok_or("spline bounds")?;
+        assert!(sp_bounds[0] <= 0.0 && sp_bounds[2] >= 10.0);
+        assert!(sp_bounds[1] <= 0.0 && sp_bounds[3] >= 10.0);
+        assert!(draft_sp.total_length() > 20.0); // curved arc length > straight line segments
+
+        // Spline validation
+        assert!(
+            draft
+                .add_spline(DEFAULT_LAYER, vec![[0.0, 0.0]], false)
+                .is_err()
+        );
+        assert!(
+            draft
+                .add_spline(DEFAULT_LAYER, vec![[0.0, 0.0], [0.0, 0.0]], false)
+                .is_err()
+        );
+
+        // 4. DXF export & Sheet plot
+        let mut multi = drawing();
+        multi.add_rectangle(DEFAULT_LAYER, [0.0, 0.0], 10.0, 5.0)?;
+        multi.add_ellipse(DEFAULT_LAYER, [20.0, 20.0], 4.0, 2.0)?;
+        multi.add_spline(
+            DEFAULT_LAYER,
+            vec![[0.0, 0.0], [5.0, 5.0], [10.0, 0.0]],
+            true,
+        )?;
+
+        let dxf = multi.to_dxf();
+        assert!(dxf.contains("0\nSECTION\n2\nENTITIES\n"));
+        // 4 lines from rect + 64 lines from ellipse + 48 lines from closed 3-segment spline = 116 LINE entities
+        assert_eq!(dxf.matches("\n0\nLINE\n").count(), 4 + 64 + 48);
+
+        // Sheet plotting verification
+        let sheet = Sheet::new("test");
+        let plot = sheet.plot(&multi)?;
+        assert_eq!(plotted_entity_count(&multi), 3);
+        // plot.lines[0] is the page border frame. plot.lines[1..=3] are the 3 entities.
+        assert!(plot.lines[1].closed); // rectangle is closed
+        assert!(plot.lines[2].closed); // ellipse is closed
+        assert!(plot.lines[3].closed); // spline is closed
+
         Ok(())
     }
 }

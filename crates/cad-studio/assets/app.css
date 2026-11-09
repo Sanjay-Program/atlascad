@@ -56,7 +56,7 @@ body {
 body {
   margin: 0;
   display: grid;
-  grid-template-rows: var(--topbar) minmax(0, 1fr) var(--statusbar);
+  grid-template-rows: var(--topbar) minmax(0, 1fr) auto var(--statusbar);
   background: var(--bg);
   color: var(--text);
   font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -382,9 +382,51 @@ kbd {
 
 .draw-tools {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
+  margin-bottom: 6px;
+}
+
+.osnap-bar {
+  display: flex;
+  gap: 6px;
   margin-bottom: 8px;
+}
+
+.osnap-bar .tool-button {
+  flex: 1;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.osnap-bar .tool-button[aria-pressed="true"] {
+  border-color: #00e676;
+  background: rgba(0, 230, 118, 0.15);
+  color: #00e676;
+}
+
+.drawing-snap-marker {
+  stroke: #00e676;
+  stroke-width: 2px;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.drawing-snap-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  fill: #00e676;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9));
+}
+
+.drawing-polar-line {
+  stroke: #00e676;
+  stroke-width: 1.5px;
+  stroke-dasharray: 4 3;
+  opacity: 0.85;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
 }
 
 .tool-button {
@@ -1309,4 +1351,184 @@ kbd {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* ---------- AutoCAD Command Line Bar ---------- */
+
+.command-line-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background: var(--panel-raised);
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border);
+  font-family: "SFMono-Regular", "Cascadia Code", monospace;
+  font-size: 12px;
+  z-index: 20;
+}
+
+.command-prompt-label {
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.command-prompt-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+  padding: 3px 6px;
+}
+
+.command-prompt-input::placeholder {
+  color: var(--muted);
+  opacity: 0.65;
+}
+
+.command-suggestions {
+  position: absolute;
+  left: 12px;
+  bottom: 100%;
+  max-width: min(560px, 90vw);
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px 6px 0 0;
+  box-shadow: var(--shadow);
+  z-index: 30;
+}
+
+.command-suggestion-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 6px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+}
+
+.command-suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.command-suggestion-item.active,
+.command-suggestion-item:hover {
+  background: var(--panel-hover);
+}
+
+.suggestion-alias {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.suggestion-desc {
+  color: var(--text-dim);
+}
+
+/* ---------- status bar badges ---------- */
+
+.status-badge {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-family: "SFMono-Regular", "Cascadia Code", monospace;
+  font-size: 10px;
+  padding: 1px 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.status-badge:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.status-badge.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------- simulation and cam HUD ---------- */
+
+.sim-hud-card {
+  max-width: 680px;
+  width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 18px 24px;
+}
+
+.sim-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.sim-metric-box {
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+}
+
+.sim-metric-box .label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sim-metric-box .value {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-hud-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0;
+  font-size: 12px;
+}
+
+.sim-hud-table th,
+.sim-hud-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.sim-hud-table th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.sim-code-preview {
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  font-family: "SFMono-Regular", "Cascadia Code", monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre;
 }
