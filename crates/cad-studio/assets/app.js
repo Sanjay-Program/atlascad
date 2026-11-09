@@ -3654,6 +3654,96 @@ Principal: I1=${res.i_1.toFixed(1)}, I2=${res.i_2.toFixed(1)}, θp=${res.princip
     }
   }
 
+  function cadTrim() {
+    if (!drawState.selected) {
+      toast("Please select a line to trim", true);
+      return;
+    }
+    const val = prompt(
+      "Enter pick point on segment to remove (x, y), or leave blank to trim near midpoint:",
+      ""
+    );
+    let pick_point = [0, 0];
+    if (val) {
+      const parts = val.split(/[\s,]+/);
+      pick_point = [parseFloat(parts[0]) || 0, parseFloat(parts[1]) || 0];
+    } else if (app.drawing) {
+      const ent = app.drawing.entities.find((e) => e.id === drawState.selected);
+      if (ent && ent.kind && ent.kind.kind === "line") {
+        pick_point = [
+          (ent.kind.start[0] + ent.kind.end[0]) * 0.5,
+          (ent.kind.start[1] + ent.kind.end[1]) * 0.5,
+        ];
+      }
+    }
+    drawingMutate(
+      "/api/draft/trim",
+      { target_id: drawState.selected, boundary_ids: [], pick_point },
+      "Line trimmed at boundaries"
+    );
+  }
+
+  function cadExtend() {
+    if (!drawState.selected) {
+      toast("Please select a line to extend", true);
+      return;
+    }
+    const val = prompt("Enter pick point near the endpoint to extend (x, y):", "");
+    let pick_point = [0, 0];
+    if (val) {
+      const parts = val.split(/[\s,]+/);
+      pick_point = [parseFloat(parts[0]) || 0, parseFloat(parts[1]) || 0];
+    } else if (app.drawing) {
+      const ent = app.drawing.entities.find((e) => e.id === drawState.selected);
+      if (ent && ent.kind && ent.kind.kind === "line") {
+        pick_point = ent.kind.end;
+      }
+    }
+    drawingMutate(
+      "/api/draft/extend",
+      { target_id: drawState.selected, boundary_ids: [], pick_point },
+      "Line extended to boundary"
+    );
+  }
+
+  async function cadToCam() {
+    if (!drawState.selected) {
+      toast("Please select a closed profile (Rectangle, Circle, or Polyline) for CAM toolpath", true);
+      return;
+    }
+    const depthVal = prompt("Enter milling depth in mm (e.g. 10.0):", "10.0");
+    if (!depthVal) return;
+    const depth_mm = parseFloat(depthVal) || 10.0;
+    const stepVal = prompt("Enter stepdown per pass in mm (e.g. 3.0):", "3.0");
+    const stepdown_mm = parseFloat(stepVal) || 3.0;
+    const postChoice = prompt("Select CNC Controller: [1] LinuxCNC, [2] Grbl, [3] Mach3:", "1");
+    let post_format = "linuxcnc";
+    if (postChoice === "2" || (postChoice && postChoice.toLowerCase().includes("grbl"))) {
+      post_format = "grbl";
+    }
+    if (postChoice === "3" || (postChoice && postChoice.toLowerCase().includes("mach"))) {
+      post_format = "mach3";
+    }
+
+    try {
+      const res = await api("/api/draft/to-cam", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entity_id: drawState.selected, depth_mm, stepdown_mm, post_format }),
+      });
+      const gcodeSample = res.gcode.split("\n").slice(0, 15).join("\n");
+      const msg = `CAM TOOLPATH GENERATED:
+Profile: ${res.profile_points} points, Moves: ${res.moves_count}
+Cutting Length: ${res.cutting_length_mm.toFixed(1)} mm, Rapid Length: ${res.rapid_length_mm.toFixed(1)} mm
+G-code Preview:
+${gcodeSample}`;
+      toast(`CAM Generated: ${res.moves_count} moves, ${res.cutting_length_mm.toFixed(1)} mm cut`);
+      log(msg);
+    } catch (e) {
+      toast(e.message, true);
+    }
+  }
+
   const autocadCommands = [
     { alias: "L", name: "LINE", desc: "Draw 2D line (2 clicks or coordinates)", run: () => setDrawTool("line") },
     { alias: "C", name: "CIRCLE", desc: "Draw 2D circle (centre, radius)", run: () => {
@@ -3671,6 +3761,8 @@ Principal: I1=${res.i_1.toFixed(1)}, I2=${res.i_2.toFixed(1)}, θp=${res.princip
     { alias: "DIM", name: "DIMALIGNED", desc: "Measure & dimension between 2 points", run: () => setDrawTool("dimension") },
     { alias: "T", name: "TEXT", desc: "Place annotation text", run: () => setDrawTool("text") },
     { alias: "O", name: "OFFSET", desc: "Offset entity by distance (parallel/concentric)", run: () => cadOffset() },
+    { alias: "TR", name: "TRIM", desc: "Trim line at cutting boundaries", run: () => cadTrim() },
+    { alias: "EX", name: "EXTEND", desc: "Extend line to boundary edges", run: () => cadExtend() },
     { alias: "F", name: "FILLET", desc: "Fillet corner between two lines (R=0 to clean)", run: () => cadFillet() },
     { alias: "CHA", name: "CHAMFER", desc: "Chamfer corner between two lines", run: () => cadChamfer() },
     { alias: "MI", name: "MIRROR", desc: "Mirror selected entity across axis", run: () => cadMirror() },
@@ -3687,6 +3779,7 @@ Principal: I1=${res.i_1.toFixed(1)}, I2=${res.i_2.toFixed(1)}, θp=${res.princip
     { alias: "POL", name: "POLYGON", desc: "Draw regular polygon (inscribed or circumscribed)", run: () => cadPolygon() },
     { alias: "SEC", name: "SECPROPS", desc: "Engineering cross-section properties (moments of inertia, section modulus)", run: () => cadSection() },
     { alias: "SECTION", name: "SECTION", desc: "Engineering cross-section properties (moments of inertia, section modulus)", run: () => cadSection() },
+    { alias: "CAM2D", name: "CAM2D", desc: "Generate CNC toolpath and G-code from 2D profile", run: () => cadToCam() },
     { alias: "DI", name: "DIST", desc: "Measure distance, delta & angle between points", run: () => cadDist() },
     { alias: "AA", name: "AREA", desc: "Measure enclosed area and perimeter", run: () => cadArea() },
     { alias: "LI", name: "LIST", desc: "List properties of selected entity", run: () => cadList() },
@@ -4252,6 +4345,8 @@ Principal: I1=${res.i_1.toFixed(1)}, I2=${res.i_2.toFixed(1)}, θp=${res.princip
     byId("toolMoveBtn")?.addEventListener("click", () => cadMove());
     byId("toolCopyBtn")?.addEventListener("click", () => cadCopy());
     byId("toolExplodeBtn")?.addEventListener("click", () => cadExplode());
+    byId("toolTrimBtn")?.addEventListener("click", () => cadTrim());
+    byId("toolExtendBtn")?.addEventListener("click", () => cadExtend());
     byId("toolJoinBtn")?.addEventListener("click", () => cadJoin());
     byId("toolArrayBtn")?.addEventListener("click", () => cadArray());
     byId("toolPolygonBtn")?.addEventListener("click", () => cadPolygon());
@@ -4260,6 +4355,7 @@ Principal: I1=${res.i_1.toFixed(1)}, I2=${res.i_2.toFixed(1)}, θp=${res.princip
     byId("toolAreaBtn")?.addEventListener("click", () => cadArea());
     byId("toolHatchBtn")?.addEventListener("click", () => cadHatch());
     byId("toolToSolidBtn")?.addEventListener("click", () => cadToSolid());
+    byId("toolToCamBtn")?.addEventListener("click", () => cadToCam());
     byId("toolMultiviewBtn")?.addEventListener("click", () => cadMultiview());
     document.querySelectorAll(".snap-pill").forEach((btn) => {
       btn.addEventListener("click", () => {

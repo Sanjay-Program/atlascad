@@ -122,7 +122,7 @@ pub fn from_dxf(name: &str, document: DocumentId, text: &str) -> Result<DxfImpor
                 // An orphan vertex is a broken file, not a drawing feature.
                 index += 1;
             }
-            "LINE" | "CIRCLE" | "ARC" | "POINT" | "LWPOLYLINE" | "TEXT"
+            "LINE" | "CIRCLE" | "ARC" | "POINT" | "LWPOLYLINE" | "TEXT" | "ELLIPSE" | "SPLINE"
                 if section == "ENTITIES" =>
             {
                 entities.push((layer_of(record), entity(record)?));

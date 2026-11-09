@@ -1776,3 +1776,290 @@ pub fn analyze_circle_section(
         s_y: s_val,
     })
 }
+
+fn line_segment_intersection_t(
+    p1: [f64; 2],
+    p2: [f64; 2],
+    b1: [f64; 2],
+    b2: [f64; 2],
+) -> Option<f64> {
+    let v1x = p2[0] - p1[0];
+    let v1y = p2[1] - p1[1];
+    let v2x = b2[0] - b1[0];
+    let v2y = b2[1] - b1[1];
+
+    let denom = v1x * v2y - v1y * v2x;
+    if denom.abs() < 1e-9 {
+        return None;
+    }
+
+    let dpx = b1[0] - p1[0];
+    let dpy = b1[1] - p1[1];
+    let t = (dpx * v2y - dpy * v2x) / denom;
+    let u = (dpx * v1y - dpy * v1x) / denom;
+
+    if (-1e-6..=1.0 + 1e-6).contains(&u) {
+        Some(t)
+    } else {
+        None
+    }
+}
+
+fn line_circle_intersection_t(
+    p1: [f64; 2],
+    p2: [f64; 2],
+    center: [f64; 2],
+    radius: f64,
+) -> Vec<f64> {
+    let dx = p2[0] - p1[0];
+    let dy = p2[1] - p1[1];
+    let a = dx * dx + dy * dy;
+    if a < 1e-12 {
+        return Vec::new();
+    }
+    let fx = p1[0] - center[0];
+    let fy = p1[1] - center[1];
+    let b = 2.0 * (fx * dx + fy * dy);
+    let c = fx * fx + fy * fy - radius * radius;
+    let disc = b * b - 4.0 * a * c;
+    if disc < 0.0 {
+        return Vec::new();
+    }
+    let s = disc.sqrt();
+    let t1 = (-b - s) / (2.0 * a);
+    let t2 = (-b + s) / (2.0 * a);
+    vec![t1, t2]
+}
+
+fn collect_boundary_intersections_t(
+    p1: [f64; 2],
+    p2: [f64; 2],
+    boundaries: &[EntityKind],
+) -> Vec<f64> {
+    let mut ts = Vec::new();
+    for b in boundaries {
+        match b {
+            EntityKind::Line { start, end } => {
+                if let Some(t) = line_segment_intersection_t(p1, p2, *start, *end) {
+                    ts.push(t);
+                }
+            }
+            EntityKind::Rectangle {
+                origin,
+                width,
+                height,
+            } => {
+                let [x, y] = origin;
+                let c0 = [*x, *y];
+                let c1 = [x + width, *y];
+                let c2 = [x + width, y + height];
+                let c3 = [*x, y + height];
+                for (s, e) in [(c0, c1), (c1, c2), (c2, c3), (c3, c0)] {
+                    if let Some(t) = line_segment_intersection_t(p1, p2, s, e) {
+                        ts.push(t);
+                    }
+                }
+            }
+            EntityKind::Polyline { points, closed } if points.len() >= 2 => {
+                for i in 0..points.len() - 1 {
+                    if let Some(t) = line_segment_intersection_t(p1, p2, points[i], points[i + 1]) {
+                        ts.push(t);
+                    }
+                }
+                if *closed
+                    && points.len() >= 3
+                    && let Some(t) =
+                        line_segment_intersection_t(p1, p2, points[points.len() - 1], points[0])
+                {
+                    ts.push(t);
+                }
+            }
+            EntityKind::Circle { center, radius } => {
+                for t in line_circle_intersection_t(p1, p2, *center, *radius) {
+                    ts.push(t);
+                }
+            }
+            EntityKind::Arc {
+                center,
+                radius,
+                start_degrees,
+                end_degrees,
+            } => {
+                let dx = p2[0] - p1[0];
+                let dy = p2[1] - p1[1];
+                for t in line_circle_intersection_t(p1, p2, *center, *radius) {
+                    let pt = [p1[0] + t * dx, p1[1] + t * dy];
+                    let ang = (pt[1] - center[1])
+                        .atan2(pt[0] - center[0])
+                        .to_degrees()
+                        .rem_euclid(360.0);
+                    let sweep = (end_degrees - start_degrees).rem_euclid(360.0);
+                    if (ang - start_degrees).rem_euclid(360.0) <= sweep + 1e-4 {
+                        ts.push(t);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    ts
+}
+
+/// Trims a line segment at cutting boundary entities based on a picked point.
+///
+/// Finds all intersection points between `(p1, p2)` and `boundaries`.
+/// Divides the line into sub-intervals, determines which interval contains `pick_point`,
+/// and removes that interval, returning the remaining trimmed line segments.
+pub fn trim_line(
+    p1: [f64; 2],
+    p2: [f64; 2],
+    boundaries: &[EntityKind],
+    pick_point: [f64; 2],
+) -> Result<Vec<EntityKind>, DraftError> {
+    if !p1[0].is_finite()
+        || !p1[1].is_finite()
+        || !p2[0].is_finite()
+        || !p2[1].is_finite()
+        || !pick_point[0].is_finite()
+        || !pick_point[1].is_finite()
+    {
+        return Err(DraftError::Invalid("coordinates must be finite".into()));
+    }
+    let dx = p2[0] - p1[0];
+    let dy = p2[1] - p1[1];
+    let len_sq = dx * dx + dy * dy;
+    if len_sq < 1e-12 {
+        return Err(DraftError::Invalid("target line has zero length".into()));
+    }
+
+    let all_ts = collect_boundary_intersections_t(p1, p2, boundaries);
+    let mut interior_ts: Vec<f64> = all_ts
+        .into_iter()
+        .filter(|&t| t > 1e-5 && t < 1.0 - 1e-5)
+        .collect();
+
+    interior_ts.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    interior_ts.dedup_by(|a, b| (*b - *a).abs() < 1e-5);
+
+    if interior_ts.is_empty() {
+        return Err(DraftError::Invalid(
+            "no boundary intersection found on line to trim".into(),
+        ));
+    }
+
+    let mut intervals_t = Vec::with_capacity(interior_ts.len() + 2);
+    intervals_t.push(0.0);
+    intervals_t.extend(interior_ts);
+    intervals_t.push(1.0);
+
+    let t_pick = ((pick_point[0] - p1[0]) * dx + (pick_point[1] - p1[1]) * dy) / len_sq;
+
+    let num_intervals = intervals_t.len() - 1;
+    let mut trim_idx = 0;
+    let mut min_mid_dist = f64::INFINITY;
+
+    for i in 0..num_intervals {
+        let t_start = intervals_t[i];
+        let t_end = intervals_t[i + 1];
+        if t_pick >= t_start && t_pick <= t_end {
+            trim_idx = i;
+            break;
+        }
+        let mid = (t_start + t_end) * 0.5;
+        let d = (mid - t_pick).abs();
+        if d < min_mid_dist {
+            min_mid_dist = d;
+            trim_idx = i;
+        }
+    }
+
+    let mut remaining = Vec::new();
+    for i in 0..num_intervals {
+        if i == trim_idx {
+            continue;
+        }
+        let t_start = intervals_t[i];
+        let t_end = intervals_t[i + 1];
+        let seg_start = [p1[0] + t_start * dx, p1[1] + t_start * dy];
+        let seg_end = [p1[0] + t_end * dx, p1[1] + t_end * dy];
+        let seg_len = (seg_end[0] - seg_start[0]).hypot(seg_end[1] - seg_start[1]);
+        if seg_len > 1e-5 {
+            remaining.push(EntityKind::Line {
+                start: seg_start,
+                end: seg_end,
+            });
+        }
+    }
+
+    if remaining.is_empty() {
+        return Err(DraftError::Invalid(
+            "trimming removed the entire line; use ERASE instead".into(),
+        ));
+    }
+
+    Ok(remaining)
+}
+
+/// Extends a line segment to intersect the nearest cutting boundary entity in the chosen direction.
+///
+/// `pick_point` indicates which end of the line to extend (the closer endpoint).
+pub fn extend_line(
+    p1: [f64; 2],
+    p2: [f64; 2],
+    boundaries: &[EntityKind],
+    pick_point: [f64; 2],
+) -> Result<EntityKind, DraftError> {
+    if !p1[0].is_finite()
+        || !p1[1].is_finite()
+        || !p2[0].is_finite()
+        || !p2[1].is_finite()
+        || !pick_point[0].is_finite()
+        || !pick_point[1].is_finite()
+    {
+        return Err(DraftError::Invalid("coordinates must be finite".into()));
+    }
+    let dx = p2[0] - p1[0];
+    let dy = p2[1] - p1[1];
+    let len_sq = dx * dx + dy * dy;
+    if len_sq < 1e-12 {
+        return Err(DraftError::Invalid("target line has zero length".into()));
+    }
+
+    let d_start = dist_sq(pick_point, p1);
+    let d_end = dist_sq(pick_point, p2);
+    let extend_start = d_start < d_end;
+
+    let all_ts = collect_boundary_intersections_t(p1, p2, boundaries);
+
+    if extend_start {
+        let best_t = all_ts
+            .into_iter()
+            .filter(|&t| t < -1e-5)
+            .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        let t = best_t.ok_or_else(|| {
+            DraftError::Invalid("no boundary intersection found along extension direction".into())
+        })?;
+
+        let new_start = [p1[0] + t * dx, p1[1] + t * dy];
+        Ok(EntityKind::Line {
+            start: new_start,
+            end: p2,
+        })
+    } else {
+        let best_t = all_ts
+            .into_iter()
+            .filter(|&t| t > 1.0 + 1e-5)
+            .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        let t = best_t.ok_or_else(|| {
+            DraftError::Invalid("no boundary intersection found along extension direction".into())
+        })?;
+
+        let new_end = [p1[0] + t * dx, p1[1] + t * dy];
+        Ok(EntityKind::Line {
+            start: p1,
+            end: new_end,
+        })
+    }
+}

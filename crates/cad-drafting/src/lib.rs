@@ -49,10 +49,10 @@ pub use dxf::{DxfImport, ImportReport, MAX_DXF_BYTES, from_dxf};
 pub use edit::{
     AreaInquiry, DistanceInquiry, EntityProperties, SectionProperties, analyze_circle_section,
     analyze_cross_section, arc_from_3_points, chamfer_lines, circle_from_2_points,
-    circle_from_3_points, explode_entity, fillet_lines, generate_hatch_lines, join_entities,
-    line_intersection, measure_distance, measure_polygon_area, mirror_entity, offset_entity,
-    polar_array_entities, rectangular_array_entities, regular_polygon, rotate_entity, scale_entity,
-    translate_entity,
+    circle_from_3_points, explode_entity, extend_line, fillet_lines, generate_hatch_lines,
+    join_entities, line_intersection, measure_distance, measure_polygon_area, mirror_entity,
+    offset_entity, polar_array_entities, rectangular_array_entities, regular_polygon,
+    rotate_entity, scale_entity, translate_entity, trim_line,
 };
 pub use pdf::{PDF_VERSION, helvetica_width_pt, mm_to_pt, to_pdf};
 pub use sheet::{
@@ -1107,6 +1107,137 @@ impl Draft {
             kind: bevel,
         });
         Ok(bevel_id)
+    }
+
+    /// Trims a Line entity at cutting boundaries based on a picked point.
+    pub fn trim(
+        &mut self,
+        target_id: EntityId,
+        boundary_ids: &[EntityId],
+        pick_point: [f64; 2],
+    ) -> Result<Vec<EntityId>, DraftError> {
+        let (layer_name, (start, end)) = {
+            let ent = self
+                .entity(target_id)
+                .ok_or(DraftError::UnknownEntity(target_id.get()))?;
+            let layer = self
+                .layer(&ent.layer)
+                .ok_or_else(|| DraftError::UnknownLayer(ent.layer.clone()))?;
+            if layer.locked {
+                return Err(DraftError::Invalid(format!(
+                    "layer `{}` is locked",
+                    ent.layer
+                )));
+            }
+            match ent.kind {
+                EntityKind::Line { start, end } => (ent.layer.clone(), (start, end)),
+                _ => {
+                    return Err(DraftError::Invalid(
+                        "TRIM currently operates on Line entities".into(),
+                    ));
+                }
+            }
+        };
+
+        let mut boundaries = Vec::new();
+        for &b_id in boundary_ids {
+            if b_id != target_id
+                && let Some(b_ent) = self.entity(b_id)
+            {
+                boundaries.push(b_ent.kind.clone());
+            }
+        }
+        if boundaries.is_empty() {
+            for ent in &self.entities {
+                if ent.id != target_id {
+                    boundaries.push(ent.kind.clone());
+                }
+            }
+        }
+
+        let new_segments = edit::trim_line(start, end, &boundaries, pick_point)?;
+        for seg in &new_segments {
+            seg.validate()?;
+        }
+
+        self.push_undo();
+        self.entities.retain(|e| e.id != target_id);
+
+        let mut new_ids = Vec::with_capacity(new_segments.len());
+        for seg in new_segments {
+            let new_id = EntityId::new(self.next_entity)
+                .map_err(|error| DraftError::Invalid(error.to_string()))?;
+            let next = self
+                .next_entity
+                .checked_add(1)
+                .ok_or_else(|| DraftError::Invalid("entity id space exhausted".into()))?;
+            self.next_entity = next;
+            self.entities.push(Entity {
+                id: new_id,
+                layer: layer_name.clone(),
+                kind: seg,
+            });
+            new_ids.push(new_id);
+        }
+
+        Ok(new_ids)
+    }
+
+    /// Extends a Line entity to boundary edges at `pick_point`.
+    pub fn extend(
+        &mut self,
+        target_id: EntityId,
+        boundary_ids: &[EntityId],
+        pick_point: [f64; 2],
+    ) -> Result<EntityId, DraftError> {
+        let (start, end) = {
+            let ent = self
+                .entity(target_id)
+                .ok_or(DraftError::UnknownEntity(target_id.get()))?;
+            let layer = self
+                .layer(&ent.layer)
+                .ok_or_else(|| DraftError::UnknownLayer(ent.layer.clone()))?;
+            if layer.locked {
+                return Err(DraftError::Invalid(format!(
+                    "layer `{}` is locked",
+                    ent.layer
+                )));
+            }
+            match ent.kind {
+                EntityKind::Line { start, end } => (start, end),
+                _ => {
+                    return Err(DraftError::Invalid(
+                        "EXTEND currently operates on Line entities".into(),
+                    ));
+                }
+            }
+        };
+
+        let mut boundaries = Vec::new();
+        for &b_id in boundary_ids {
+            if b_id != target_id
+                && let Some(b_ent) = self.entity(b_id)
+            {
+                boundaries.push(b_ent.kind.clone());
+            }
+        }
+        if boundaries.is_empty() {
+            for ent in &self.entities {
+                if ent.id != target_id {
+                    boundaries.push(ent.kind.clone());
+                }
+            }
+        }
+
+        let extended_line = edit::extend_line(start, end, &boundaries, pick_point)?;
+        extended_line.validate()?;
+
+        self.push_undo();
+        if let Some(ent) = self.entities.iter_mut().find(|e| e.id == target_id) {
+            ent.kind = extended_line;
+        }
+
+        Ok(target_id)
     }
 
     /// Explodes compound entity `id` (Rectangle or Polyline) into fundamental Line entities.

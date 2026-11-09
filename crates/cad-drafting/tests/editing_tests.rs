@@ -539,3 +539,100 @@ fn test_engineering_section_properties() -> Result<(), Box<dyn std::error::Error
 
     Ok(())
 }
+
+#[test]
+fn test_trim_and_extend() -> Result<(), Box<dyn std::error::Error>> {
+    let doc_id = DocumentId::new(12);
+    let mut draft = Draft::new("Test Trim & Extend", doc_id, Unit::Millimeter);
+
+    // 1. Endpoint Trim
+    let target = draft.add_entity(
+        "0",
+        EntityKind::Line {
+            start: [0.0, 10.0],
+            end: [30.0, 10.0],
+        },
+    )?;
+    let boundary = draft.add_entity(
+        "0",
+        EntityKind::Line {
+            start: [10.0, 0.0],
+            end: [10.0, 20.0],
+        },
+    )?;
+
+    // Click near start (x=5) to trim away the [0, 10] to [10, 10] segment
+    let remaining = draft.trim(target, &[boundary], [5.0, 10.0])?;
+    assert_eq!(remaining.len(), 1);
+    let ent_rem = draft.entity(remaining[0]).ok_or("remaining line exists")?;
+    match ent_rem.kind {
+        EntityKind::Line { start, end } => {
+            assert!((start[0] - 10.0).abs() < 1e-5);
+            assert!((start[1] - 10.0).abs() < 1e-5);
+            assert!((end[0] - 30.0).abs() < 1e-5);
+            assert!((end[1] - 10.0).abs() < 1e-5);
+        }
+        _ => return Err("expected Line".into()),
+    }
+
+    // Undo restores target line
+    draft.undo()?;
+    assert!(draft.entity(target).is_some());
+
+    // 2. Interior Trim with two boundaries
+    let boundary2 = draft.add_entity(
+        "0",
+        EntityKind::Line {
+            start: [20.0, 0.0],
+            end: [20.0, 20.0],
+        },
+    )?;
+    // Click in middle (x=15) to trim away the middle segment [10, 20]
+    let pieces = draft.trim(target, &[boundary, boundary2], [15.0, 10.0])?;
+    assert_eq!(pieces.len(), 2);
+    let p1 = draft.entity(pieces[0]).ok_or("piece 1")?;
+    let p2 = draft.entity(pieces[1]).ok_or("piece 2")?;
+    match (p1.kind.clone(), p2.kind.clone()) {
+        (EntityKind::Line { start: s1, end: e1 }, EntityKind::Line { start: s2, end: e2 }) => {
+            assert!((s1[0] - 0.0).abs() < 1e-5);
+            assert!((e1[0] - 10.0).abs() < 1e-5);
+            assert!((s2[0] - 20.0).abs() < 1e-5);
+            assert!((e2[0] - 30.0).abs() < 1e-5);
+        }
+        _ => return Err("expected two Lines".into()),
+    }
+
+    // Undo
+    draft.undo()?;
+
+    // 3. Extend
+    let short_line = draft.add_entity(
+        "0",
+        EntityKind::Line {
+            start: [0.0, 10.0],
+            end: [5.0, 10.0],
+        },
+    )?;
+    // Extend toward boundary at x=10 by clicking near end (x=4)
+    let ext_id = draft.extend(short_line, &[boundary], [4.5, 10.0])?;
+    let ext_ent = draft.entity(ext_id).ok_or("extended exists")?;
+    match ext_ent.kind {
+        EntityKind::Line { start, end } => {
+            assert!((start[0] - 0.0).abs() < 1e-5);
+            assert!((end[0] - 10.0).abs() < 1e-5);
+        }
+        _ => return Err("expected Line".into()),
+    }
+
+    // Undo restores short line
+    draft.undo()?;
+    let restored = draft.entity(short_line).ok_or("restored exists")?;
+    match restored.kind {
+        EntityKind::Line { end, .. } => {
+            assert!((end[0] - 5.0).abs() < 1e-5);
+        }
+        _ => return Err("expected Line".into()),
+    }
+
+    Ok(())
+}

@@ -1428,6 +1428,202 @@ impl StudioState {
         serde_json::to_value(props).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn drawing_trim(&mut self, req: &DraftTrimRequest) -> Result<DraftView, StudioError> {
+        let target_id =
+            EntityId::new(req.target_id).map_err(|e| StudioError::BadRequest(e.to_string()))?;
+        let b_ids: Result<Vec<EntityId>, _> = req
+            .boundary_ids
+            .iter()
+            .map(|&id| EntityId::new(id).map_err(|e| StudioError::BadRequest(e.to_string())))
+            .collect();
+        let boundary_ids = b_ids?;
+        {
+            let draft = self.drawing_mut()?;
+            draft.trim(target_id, &boundary_ids, req.pick_point)?;
+        }
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
+    fn drawing_extend(&mut self, req: &DraftExtendRequest) -> Result<DraftView, StudioError> {
+        let target_id =
+            EntityId::new(req.target_id).map_err(|e| StudioError::BadRequest(e.to_string()))?;
+        let b_ids: Result<Vec<EntityId>, _> = req
+            .boundary_ids
+            .iter()
+            .map(|&id| EntityId::new(id).map_err(|e| StudioError::BadRequest(e.to_string())))
+            .collect();
+        let boundary_ids = b_ids?;
+        {
+            let draft = self.drawing_mut()?;
+            draft.extend(target_id, &boundary_ids, req.pick_point)?;
+        }
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
+    fn drawing_to_cam(
+        &mut self,
+        req: &DraftToCamRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let ent_id =
+            EntityId::new(req.entity_id).map_err(|e| StudioError::BadRequest(e.to_string()))?;
+        self.ensure_drawing()?;
+        let draft = self
+            .drawing
+            .as_ref()
+            .ok_or_else(|| StudioError::BadRequest("the drawing is unavailable".into()))?;
+        let ent = draft
+            .entity(ent_id)
+            .ok_or_else(|| StudioError::BadRequest(format!("unknown entity {}", req.entity_id)))?;
+
+        let mut profile = match &ent.kind {
+            cad_drafting::EntityKind::Rectangle {
+                origin,
+                width,
+                height,
+            } => {
+                let [x, y] = origin;
+                vec![
+                    *origin,
+                    [x + width, *y],
+                    [x + width, y + height],
+                    [*x, y + height],
+                ]
+            }
+            cad_drafting::EntityKind::Polyline { points, closed } => {
+                if !closed || points.len() < 3 {
+                    return Err(StudioError::BadRequest(
+                        "CAM profiling requires a closed polyline or rectangle".into(),
+                    ));
+                }
+                points.clone()
+            }
+            cad_drafting::EntityKind::Circle { center, radius } => {
+                let n = 32;
+                let step = 2.0 * std::f64::consts::PI / (n as f64);
+                let mut pts = Vec::with_capacity(n);
+                for i in 0..n {
+                    let ang = (i as f64) * step;
+                    pts.push([
+                        center[0] + radius * ang.cos(),
+                        center[1] + radius * ang.sin(),
+                    ]);
+                }
+                pts
+            }
+            other => {
+                return Err(StudioError::BadRequest(format!(
+                    "CAM profiling not supported for `{}` entity (requires Rectangle, Circle, or closed Polyline)",
+                    other.label()
+                )));
+            }
+        };
+
+        let mut area = 0.0;
+        let n = profile.len();
+        for i in 0..n {
+            let j = (i + 1) % n;
+            area += profile[i][0] * profile[j][1] - profile[j][0] * profile[i][1];
+        }
+        if area < 0.0 {
+            profile.reverse();
+        }
+
+        let mut min_x = f64::INFINITY;
+        let mut max_x = f64::NEG_INFINITY;
+        let mut min_y = f64::INFINITY;
+        let mut max_y = f64::NEG_INFINITY;
+        for p in &profile {
+            if p[0] < min_x {
+                min_x = p[0];
+            }
+            if p[0] > max_x {
+                max_x = p[0];
+            }
+            if p[1] < min_y {
+                min_y = p[1];
+            }
+            if p[1] > max_y {
+                max_y = p[1];
+            }
+        }
+
+        let depth_mm = req.depth_mm.unwrap_or(10.0);
+        let stepdown_mm = req.stepdown_mm.unwrap_or(3.0);
+
+        let margin = 10.0;
+        let stock_min = [min_x - margin, min_y - margin, -depth_mm - 5.0];
+        let stock_max = [max_x + margin, max_y + margin, 0.0];
+        let stock = cad_cam::Stock::new(stock_min, stock_max)
+            .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+
+        let clearance_z = 5.0;
+        let setup = cad_cam::Setup::new(
+            cad_cam::Machine::Milling3Axis,
+            cad_cam::MachineEnvelope::default_mill(),
+            stock,
+            cad_cam::WorkCoordinate::standard(),
+            clearance_z,
+        )
+        .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+
+        let tool_id = cad_cam::ToolId::new(1)
+            .ok_or_else(|| StudioError::BadRequest("invalid tool id".into()))?;
+        let tool = cad_cam::Tool::new(
+            tool_id,
+            "Flat end mill",
+            cad_cam::ToolGeometry::FlatEndMill {
+                diameter_mm: 6.0,
+                flute_length_mm: 20.0,
+            },
+            cad_cam::CuttingCondition::conservative_default(),
+            stepdown_mm,
+        )
+        .map_err(|e| StudioError::BadRequest(format!("CAM tool error: {e}")))?;
+
+        let op = cad_cam::Operation::Contour {
+            profile: profile.clone(),
+            depth_mm,
+            stepdown_mm,
+            offset_mm: 0.0,
+        };
+
+        let path_id = cad_cam::ToolpathId::new(1)
+            .ok_or_else(|| StudioError::BadRequest("invalid path id".into()))?;
+        let toolpath = cad_cam::generate(&op, &setup, &tool, path_id)
+            .map_err(|e| StudioError::BadRequest(format!("CAM generation error: {e}")))?;
+
+        let summary = cad_cam::summarize(&toolpath, &setup);
+        let post_format = match req
+            .post_format
+            .as_deref()
+            .unwrap_or("linuxcnc")
+            .to_lowercase()
+            .as_str()
+        {
+            "grbl" => cad_cam::PostFormat::Grbl,
+            "mach3" => cad_cam::PostFormat::Mach3,
+            _ => cad_cam::PostFormat::LinuxCnc,
+        };
+        let post = cad_cam::Postprocessor::new(post_format, "DRAFT_CONTOUR");
+        let gcode = post
+            .emit(&toolpath, &setup)
+            .map_err(|e| StudioError::BadRequest(format!("CAM post error: {e}")))?;
+
+        let resp = serde_json::json!({
+            "entity_id": req.entity_id,
+            "profile_points": profile.len(),
+            "moves_count": toolpath.points.len(),
+            "cutting_length_mm": toolpath.cutting_length_mm(),
+            "rapid_length_mm": toolpath.rapid_length_mm(),
+            "summary": summary,
+            "gcode": gcode,
+        });
+
+        Ok(resp)
+    }
+
     /// Store the saved drawing's source revision in the project's embedded registry.
     ///
     /// This is what makes the pin survive a restart: before it existed only the in-memory session
@@ -2407,6 +2603,27 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             },
             Err(error) => error_response(&error),
         },
+        "/api/draft/trim" => match parse_body::<DraftTrimRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_trim(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/extend" => match parse_body::<DraftExtendRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_extend(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/to-cam" => match parse_body::<DraftToCamRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_to_cam(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
         "/api/engineering/review" => match parse_body::<ArtifactReviewRequest>(request) {
             Ok(body) => {
                 let id = match ArtifactId::new(body.id) {
@@ -2717,6 +2934,36 @@ struct DraftConstructRequest {
 #[serde(deny_unknown_fields)]
 struct DraftSectionRequest {
     id: u64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftTrimRequest {
+    target_id: u64,
+    #[serde(default)]
+    boundary_ids: Vec<u64>,
+    pick_point: [f64; 2],
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftExtendRequest {
+    target_id: u64,
+    #[serde(default)]
+    boundary_ids: Vec<u64>,
+    pick_point: [f64; 2],
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftToCamRequest {
+    entity_id: u64,
+    #[serde(default)]
+    depth_mm: Option<f64>,
+    #[serde(default)]
+    stepdown_mm: Option<f64>,
+    #[serde(default)]
+    post_format: Option<String>,
 }
 
 /// A name for a new named revision.

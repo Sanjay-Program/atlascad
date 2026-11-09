@@ -3091,5 +3091,84 @@ fn drafting_constructions_join_array_and_section_analysis() -> Result<(), Box<dy
     )?;
     assert_eq!(array_polar.status, 200);
 
+    // 8. Trim line at boundary
+    let trim_target = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"0","kind":{"kind":"line","start":[0.0,10.0],"end":[40.0,10.0]}}"#,
+    )?;
+    let t_id = json(&trim_target)?["entities"]
+        .as_array()
+        .ok_or("entities")?
+        .last()
+        .ok_or("trim target")?["id"]
+        .as_u64()
+        .ok_or("id")?;
+
+    let trim_bound = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"0","kind":{"kind":"line","start":[20.0,0.0],"end":[20.0,30.0]}}"#,
+    )?;
+    let b_id = json(&trim_bound)?["entities"]
+        .as_array()
+        .ok_or("entities")?
+        .last()
+        .ok_or("trim bound")?["id"]
+        .as_u64()
+        .ok_or("id")?;
+
+    let trim_resp = post(
+        addr,
+        "/api/draft/trim",
+        &format!(r#"{{"target_id":{t_id},"boundary_ids":[{b_id}],"pick_point":[5.0,10.0]}}"#),
+    )?;
+    assert_eq!(trim_resp.status, 200);
+    let trim_entities = json(&trim_resp)?["entities"]
+        .as_array()
+        .ok_or("entities")?
+        .clone();
+    assert!(trim_entities.iter().all(|e| e["id"] != t_id));
+
+    // 9. Extend line to boundary
+    let ext_target = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"0","kind":{"kind":"line","start":[0.0,5.0],"end":[15.0,5.0]}}"#,
+    )?;
+    let e_id = json(&ext_target)?["entities"]
+        .as_array()
+        .ok_or("entities")?
+        .last()
+        .ok_or("ext target")?["id"]
+        .as_u64()
+        .ok_or("id")?;
+
+    let ext_resp = post(
+        addr,
+        "/api/draft/extend",
+        &format!(r#"{{"target_id":{e_id},"boundary_ids":[{b_id}],"pick_point":[14.0,5.0]}}"#),
+    )?;
+    assert_eq!(ext_resp.status, 200);
+
+    // 10. Direct 2D Draft to CAM toolpath & G-code generation
+    let cam_resp = post(
+        addr,
+        "/api/draft/to-cam",
+        &format!(
+            r#"{{"entity_id":{poly_id},"depth_mm":8.0,"stepdown_mm":2.0,"post_format":"grbl"}}"#
+        ),
+    )?;
+    assert_eq!(cam_resp.status, 200);
+    let cam_data = json(&cam_resp)?;
+    let moves = cam_data["moves_count"].as_u64().ok_or("moves_count")?;
+    let cut_len = cam_data["cutting_length_mm"]
+        .as_f64()
+        .ok_or("cutting_length_mm")?;
+    let gcode = cam_data["gcode"].as_str().ok_or("gcode")?;
+    assert!(moves > 0);
+    assert!(cut_len > 0.0);
+    assert!(gcode.contains("G01") || gcode.contains("G1"));
+
     Ok(())
 }

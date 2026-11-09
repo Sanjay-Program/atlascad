@@ -640,6 +640,26 @@ def drafting_section(studio: Studio) -> None:
     arr_polar = studio.post("/api/draft/array", {"mode": "polar", "ids": [c2p_id], "count": 4, "center": [0.0, 0.0], "fill_angle_deg": 360.0, "rotate_items": True})
     check(arr_polar.status == 200, "polar array generated copies")
 
+    # Trim and Extend
+    t_target = studio.post("/api/draft/entity", {"layer": "0", "kind": {"kind": "line", "start": [0.0, 15.0], "end": [40.0, 15.0]}})
+    t_bound = studio.post("/api/draft/entity", {"layer": "0", "kind": {"kind": "line", "start": [20.0, 0.0], "end": [20.0, 30.0]}})
+    id_tt = t_target.json()["entities"][-1]["id"]
+    id_tb = t_bound.json()["entities"][-1]["id"]
+    tr_resp = studio.post("/api/draft/trim", {"target_id": id_tt, "boundary_ids": [id_tb], "pick_point": [5.0, 15.0]})
+    check(tr_resp.status == 200, "line trimmed at boundary")
+
+    e_target = studio.post("/api/draft/entity", {"layer": "0", "kind": {"kind": "line", "start": [0.0, 25.0], "end": [15.0, 25.0]}})
+    id_et = e_target.json()["entities"][-1]["id"]
+    ex_resp = studio.post("/api/draft/extend", {"target_id": id_et, "boundary_ids": [id_tb], "pick_point": [14.0, 25.0]})
+    check(ex_resp.status == 200, "line extended to boundary")
+
+    # 2D Draft to CAM CNC Toolpath & G-code
+    cam_resp = studio.post("/api/draft/to-cam", {"entity_id": poly_id, "depth_mm": 6.0, "stepdown_mm": 2.0, "post_format": "grbl"})
+    check(cam_resp.status == 200, "2D draft to CAM toolpath generated")
+    cam_json = cam_resp.json()
+    check(cam_json["moves_count"] > 0 and cam_json["cutting_length_mm"] > 0.0, "CAM toolpath moves and cutting length positive")
+    check("G01" in cam_json["gcode"] or "G1" in cam_json["gcode"], "emitted G-code contains linear feed moves")
+
     report("drafting")
 
 
