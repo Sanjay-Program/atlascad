@@ -608,6 +608,38 @@ def drafting_section(studio: Studio) -> None:
     mv_layers = [l["name"] for l in mv_resp.json()["layers"]]
     check("OUTLINE" in mv_layers and "SECTION" in mv_layers and "HATCH" in mv_layers, "multi-view drawing has standard layers")
 
+    # Geometric constructions (Circle 2P, Polygon)
+    c2p_resp = studio.post("/api/draft/construct", {"kind": "circle_2p", "layer": "0", "p1": [0.0, 0.0], "p2": [50.0, 0.0]})
+    check(c2p_resp.status == 200, "circle 2P construction succeeded")
+    c2p_id = c2p_resp.json()["entities"][-1]["id"]
+
+    poly_resp = studio.post("/api/draft/construct", {"kind": "polygon", "layer": "0", "center": [0.0, 0.0], "radius": 20.0, "sides": 6, "inscribed": True})
+    check(poly_resp.status == 200, "hexagon construction succeeded")
+    poly_id = poly_resp.json()["entities"][-1]["id"]
+
+    # Engineering cross-section properties analysis
+    sec_resp = studio.post("/api/draft/section-analysis", {"id": poly_id})
+    check(sec_resp.status == 200, "section analysis succeeded")
+    sec_data = sec_resp.json()
+    check(abs(sec_data["area"] - 1039.23) < 1.0, f"section area matches analytic hexagon: {sec_data['area']}")
+    check(sec_data["i_xx"] > 0.0 and sec_data["j_polar"] > 0.0, "second moments of area computed analytically")
+
+    # Join entities
+    j_l1 = studio.post("/api/draft/entity", {"layer": "0", "kind": {"kind": "line", "start": [10.0, 10.0], "end": [25.0, 10.0]}})
+    j_l2 = studio.post("/api/draft/entity", {"layer": "0", "kind": {"kind": "line", "start": [25.0, 10.0], "end": [25.0, 20.0]}})
+    id_j1 = j_l1.json()["entities"][-1]["id"]
+    id_j2 = j_l2.json()["entities"][-1]["id"]
+    join_resp = studio.post("/api/draft/join", {"ids": [id_j1, id_j2], "tolerance": 0.001})
+    check(join_resp.status == 200, "join command chained lines into polyline")
+    joined_id = join_resp.json()["entities"][-1]["id"]
+
+    # Rectangular and Polar pattern array
+    arr_rect = studio.post("/api/draft/array", {"mode": "rectangular", "ids": [joined_id], "rows": 2, "cols": 2, "row_spacing": 20.0, "col_spacing": 20.0})
+    check(arr_rect.status == 200, "rectangular array generated copies")
+
+    arr_polar = studio.post("/api/draft/array", {"mode": "polar", "ids": [c2p_id], "count": 4, "center": [0.0, 0.0], "fill_angle_deg": 360.0, "rotate_items": True})
+    check(arr_polar.status == 200, "polar array generated copies")
+
     report("drafting")
 
 

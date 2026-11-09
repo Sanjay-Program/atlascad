@@ -1701,6 +1701,7 @@
     polar: true,
     activeSnap: null,
     polarHit: null,
+    snapOverride: null,
   };
 
   async function refreshDrawing() {
@@ -2003,6 +2004,95 @@
           }
           break;
         }
+      }
+    }
+
+    const override = drawState.snapOverride;
+    if (override) {
+      if (override === "Endpoint") {
+        for (const pt of endpoints) if (dist(pt, mousePoint) <= maxDist) return { point: pt, kind: "Endpoint", symbol: "square" };
+        return null;
+      }
+      if (override === "Midpoint") {
+        for (const pt of midpoints) if (dist(pt, mousePoint) <= maxDist) return { point: pt, kind: "Midpoint", symbol: "triangle" };
+        return null;
+      }
+      if (override === "Center") {
+        for (const pt of centers) if (dist(pt, mousePoint) <= maxDist) return { point: pt, kind: "Center", symbol: "circle" };
+        return null;
+      }
+      if (override === "Quadrant") {
+        for (const pt of quadrants) if (dist(pt, mousePoint) <= maxDist) return { point: pt, kind: "Quadrant", symbol: "diamond" };
+        return null;
+      }
+      if (override === "Intersection") {
+        for (let i = 0; i < segments.length; i++) {
+          for (let j = i + 1; j < segments.length; j++) {
+            const [a, b] = segments[i];
+            const [c, d] = segments[j];
+            const denom = (b[0] - a[0]) * (d[1] - c[1]) - (b[1] - a[1]) * (d[0] - c[0]);
+            if (Math.abs(denom) > 1e-9) {
+              const t = ((c[0] - a[0]) * (d[1] - c[1]) - (c[1] - a[1]) * (d[0] - c[0])) / denom;
+              const u = ((c[0] - a[0]) * (b[1] - a[1]) - (c[1] - a[1]) * (b[0] - a[0])) / denom;
+              if (t >= -1e-5 && t <= 1 + 1e-5 && u >= -1e-5 && u <= 1 + 1e-5) {
+                const ix = a[0] + t * (b[0] - a[0]);
+                const iy = a[1] + t * (b[1] - a[1]);
+                const ipt = [ix, iy];
+                if (dist(ipt, mousePoint) <= maxDist) return { point: ipt, kind: "Intersection", symbol: "cross" };
+              }
+            }
+          }
+        }
+        return null;
+      }
+      if (override === "Perpendicular" && basePoint) {
+        for (const [a, b] of segments) {
+          const dx = b[0] - a[0];
+          const dy = b[1] - a[1];
+          const lenSq = dx * dx + dy * dy;
+          if (lenSq > 1e-9) {
+            const t = ((basePoint[0] - a[0]) * dx + (basePoint[1] - a[1]) * dy) / lenSq;
+            if (t >= 0 && t <= 1) {
+              const foot = [a[0] + t * dx, a[1] + t * dy];
+              if (dist(foot, mousePoint) <= maxDist) return { point: foot, kind: "Perpendicular", symbol: "perpendicular" };
+            }
+          }
+        }
+        return null;
+      }
+      if (override === "Tangent" && basePoint) {
+        for (const circ of circles) {
+          const [cx, cy] = circ.center;
+          const r = circ.radius;
+          const d = Math.hypot(basePoint[0] - cx, basePoint[1] - cy);
+          if (d > r + 1e-6) {
+            const alpha = Math.atan2(basePoint[1] - cy, basePoint[0] - cx);
+            const beta = Math.acos(r / d);
+            const tan1 = [cx + r * Math.cos(alpha + beta), cy + r * Math.sin(alpha + beta)];
+            const tan2 = [cx + r * Math.cos(alpha - beta), cy + r * Math.sin(alpha - beta)];
+            for (const tp of [tan1, tan2]) {
+              if (dist(tp, mousePoint) <= maxDist) return { point: tp, kind: "Tangent", symbol: "tangent" };
+            }
+          }
+        }
+        return null;
+      }
+      if (override === "Node") {
+        for (const pt of nodes) if (dist(pt, mousePoint) <= maxDist) return { point: pt, kind: "Node", symbol: "node" };
+        return null;
+      }
+      if (override === "Nearest") {
+        for (const [a, b] of segments) {
+          const dx = b[0] - a[0];
+          const dy = b[1] - a[1];
+          const lenSq = dx * dx + dy * dy;
+          if (lenSq > 1e-9) {
+            const t = Math.max(0, Math.min(1, ((mousePoint[0] - a[0]) * dx + (mousePoint[1] - a[1]) * dy) / lenSq));
+            const nearPt = [a[0] + t * dx, a[1] + t * dy];
+            if (dist(nearPt, mousePoint) <= maxDist) return { point: nearPt, kind: "Nearest", symbol: "hourglass" };
+          }
+        }
+        return null;
       }
     }
 
@@ -3421,6 +3511,149 @@
     }
   }
 
+  function cadJoin() {
+    if (!app.drawing || !app.drawing.entities) {
+      toast("No entities available to join", true);
+      return;
+    }
+    let ids = [];
+    if (drawState.selected) {
+      ids = [drawState.selected];
+      const otherPrompt = prompt(
+        `Joining entity ${drawState.selected}. Enter additional entity IDs to join (comma-separated), or leave blank:`,
+        ""
+      );
+      if (otherPrompt) {
+        const parsed = otherPrompt
+          .split(/[\s,]+/)
+          .map((s) => parseInt(s, 10))
+          .filter((n) => !isNaN(n));
+        ids = ids.concat(parsed);
+      }
+    } else {
+      const val = prompt("Enter entity IDs to join (comma-separated, e.g. 1, 2, 3):", "");
+      if (!val) return;
+      ids = val
+        .split(/[\s,]+/)
+        .map((s) => parseInt(s, 10))
+        .filter((n) => !isNaN(n));
+    }
+    if (ids.length === 0) {
+      toast("No entities specified for JOIN", true);
+      return;
+    }
+    drawingMutate("/api/draft/join", { ids, tolerance: 0.001 }, "Joined into Polyline");
+  }
+
+  function cadArray(defaultMode) {
+    if (!drawState.selected) {
+      toast("Please select an entity first to array", true);
+      return;
+    }
+    let mode = defaultMode;
+    if (!mode) {
+      const choice = prompt("Specify array type: [R]ectangular or [P]olar:", "R");
+      if (!choice) return;
+      mode = choice.toUpperCase().startsWith("P") ? "polar" : "rectangular";
+    }
+    if (mode === "polar") {
+      const countVal = prompt("Enter number of items in polar array:", "6");
+      if (!countVal) return;
+      const count = parseInt(countVal, 10) || 6;
+      const centerVal = prompt("Enter center of rotation cx, cy (or leave blank for origin):", "0, 0");
+      const cParts = (centerVal || "0, 0").split(/[\s,]+/);
+      const center = [parseFloat(cParts[0]) || 0, parseFloat(cParts[1]) || 0];
+      const angleVal = prompt("Enter fill angle in degrees (e.g. 360):", "360");
+      const fillAngle = parseFloat(angleVal) || 360.0;
+      drawingMutate(
+        "/api/draft/array",
+        {
+          mode: "polar",
+          ids: [drawState.selected],
+          count,
+          center,
+          fill_angle_deg: fillAngle,
+          rotate_items: true,
+        },
+        "Polar array created"
+      );
+    } else {
+      const gridVal = prompt("Enter rows, columns (e.g. 3, 4):", "3, 4");
+      if (!gridVal) return;
+      const gParts = gridVal.split(/[\s,]+/);
+      const rows = parseInt(gParts[0], 10) || 2;
+      const cols = parseInt(gParts[1], 10) || 2;
+      const spaceVal = prompt("Enter row spacing, column spacing (e.g. 20, 25):", "20, 25");
+      const sParts = (spaceVal || "20, 25").split(/[\s,]+/);
+      const rowSpacing = parseFloat(sParts[0]) || 20.0;
+      const colSpacing = parseFloat(sParts[1]) || 25.0;
+      drawingMutate(
+        "/api/draft/array",
+        {
+          mode: "rectangular",
+          ids: [drawState.selected],
+          rows,
+          cols,
+          row_spacing: rowSpacing,
+          col_spacing: colSpacing,
+        },
+        "Rectangular array created"
+      );
+    }
+  }
+
+  function cadPolygon() {
+    const sidesVal = prompt("Enter number of sides (3-1024):", "6");
+    if (!sidesVal) return;
+    const sides = parseInt(sidesVal, 10) || 6;
+    const centerVal = prompt("Enter center coordinates cx, cy (or 0, 0):", "0, 0");
+    const cParts = (centerVal || "0, 0").split(/[\s,]+/);
+    const center = [parseFloat(cParts[0]) || 0, parseFloat(cParts[1]) || 0];
+    const rVal = prompt("Enter radius of circle:", "25.0");
+    if (!rVal) return;
+    const radius = parseFloat(rVal) || 25.0;
+    const inChoice = prompt("Inscribed in circle [I] or Circumscribed [C]?", "I");
+    const inscribed = !(inChoice && inChoice.toUpperCase().startsWith("C"));
+    drawingMutate(
+      "/api/draft/construct",
+      {
+        kind: "polygon",
+        layer: drawState.layer || "0",
+        center,
+        radius,
+        sides,
+        inscribed,
+        start_angle_deg: 0.0,
+      },
+      "Regular polygon created"
+    );
+  }
+
+  async function cadSection() {
+    if (!drawState.selected) {
+      toast("Please select a closed entity (Circle, Rectangle, or closed Polyline) to analyze", true);
+      return;
+    }
+    try {
+      const res = await api("/api/draft/section-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: drawState.selected }),
+      });
+      const msg = `SECTION PROPERTIES:
+Area: ${res.area.toFixed(2)} mm², Perimeter: ${res.perimeter.toFixed(2)} mm
+Centroid: (${res.centroid[0].toFixed(2)}, ${res.centroid[1].toFixed(2)})
+Ixx: ${res.i_xx.toFixed(1)} mm⁴, Iyy: ${res.i_yy.toFixed(1)} mm⁴, J: ${res.j_polar.toFixed(1)} mm⁴
+Sx: ${res.s_x.toFixed(1)} mm³, Sy: ${res.s_y.toFixed(1)} mm³
+rx: ${res.r_x.toFixed(2)} mm, ry: ${res.r_y.toFixed(2)} mm
+Principal: I1=${res.i_1.toFixed(1)}, I2=${res.i_2.toFixed(1)}, θp=${res.principal_angle_deg.toFixed(1)}°`;
+      toast(`Section: Area=${res.area.toFixed(1)} mm², Ixx=${res.i_xx.toFixed(0)}, Iyy=${res.i_yy.toFixed(0)}`);
+      log(msg);
+    } catch (e) {
+      toast(e.message, true);
+    }
+  }
+
   const autocadCommands = [
     { alias: "L", name: "LINE", desc: "Draw 2D line (2 clicks or coordinates)", run: () => setDrawTool("line") },
     { alias: "C", name: "CIRCLE", desc: "Draw 2D circle (centre, radius)", run: () => {
@@ -3447,6 +3680,21 @@
     { alias: "CO", name: "COPY", desc: "Duplicate entity shifted by (dx, dy)", run: () => cadCopy() },
     { alias: "CP", name: "COPY", desc: "Duplicate entity shifted by (dx, dy)", run: () => cadCopy() },
     { alias: "X", name: "EXPLODE", desc: "Decompose rectangle/polyline into lines", run: () => cadExplode() },
+    { alias: "J", name: "JOIN", desc: "Join lines and open polylines into a unified polyline", run: () => cadJoin() },
+    { alias: "AR", name: "ARRAY", desc: "Create rectangular or polar pattern array", run: () => cadArray() },
+    { alias: "ARRAYRECT", name: "ARRAYRECT", desc: "Create rectangular 2D pattern array", run: () => cadArray("rectangular") },
+    { alias: "ARRAYPOLAR", name: "ARRAYPOLAR", desc: "Create polar circular pattern array", run: () => cadArray("polar") },
+    { alias: "POL", name: "POLYGON", desc: "Draw regular polygon (inscribed or circumscribed)", run: () => cadPolygon() },
+    { alias: "SEC", name: "SECPROPS", desc: "Engineering cross-section properties (moments of inertia, section modulus)", run: () => cadSection() },
+    { alias: "SECTION", name: "SECTION", desc: "Engineering cross-section properties (moments of inertia, section modulus)", run: () => cadSection() },
+    { alias: "DI", name: "DIST", desc: "Measure distance, delta & angle between points", run: () => cadDist() },
+    { alias: "AA", name: "AREA", desc: "Measure enclosed area and perimeter", run: () => cadArea() },
+    { alias: "LI", name: "LIST", desc: "List properties of selected entity", run: () => cadList() },
+    { alias: "3D", name: "EXTDRAFT", desc: "Extrude 2D sketch profile into 3D solid", run: () => cadToSolid() },
+    { alias: "H", name: "HATCH", desc: "Crosshatch boundary with ANSI31 or NET pattern", run: () => cadHatch() },
+    { alias: "BH", name: "BHATCH", desc: "Boundary crosshatch with ANSI31 pattern", run: () => cadHatch() },
+    { alias: "MV", name: "MULTIVIEW", desc: "Generate 4-view orthographic drawing with cross-sections", run: () => cadMultiview() },
+    { alias: "ORTHO", name: "ORTHOGRAPHIC", desc: "Generate 4-view orthographic drawing with cross-sections", run: () => cadMultiview() },
     { alias: "DI", name: "DIST", desc: "Measure distance, delta & angle between points", run: () => cadDist() },
     { alias: "AA", name: "AREA", desc: "Measure enclosed area and perimeter", run: () => cadArea() },
     { alias: "LI", name: "LIST", desc: "List properties of selected entity", run: () => cadList() },
@@ -3531,6 +3779,28 @@
 
     // Match command alias or name
     const upper = text.toUpperCase();
+
+    // Single-shot OSNAP overrides
+    const snapMap = {
+      END: "Endpoint",
+      MID: "Midpoint",
+      CEN: "Center",
+      INT: "Intersection",
+      PER: "Perpendicular",
+      TAN: "Tangent",
+      QUA: "Quadrant",
+      NOD: "Node",
+      NEA: "Nearest",
+    };
+    if (snapMap[upper]) {
+      drawState.snapOverride = snapMap[upper];
+      document.querySelectorAll(".snap-pill").forEach((b) => {
+        b.classList.toggle("active", b.dataset.snap === snapMap[upper]);
+      });
+      toast(`Single-shot Snap: ${drawState.snapOverride}`);
+      return;
+    }
+
     const matched = autocadCommands.find((c) => c.alias === upper || c.name === upper);
     if (matched) {
       lastExecutedCommand = matched;
@@ -3816,7 +4086,7 @@
 
       const basePoint = drawState.points.length ? drawState.points[drawState.points.length - 1] : null;
       let snap = null;
-      if (drawState.osnap) {
+      if (drawState.osnap || drawState.snapOverride) {
         snap = findObjectSnap(app.drawing, rawPoint, basePoint, scale, 12);
       }
       let polar = null;
@@ -3856,6 +4126,10 @@
         point = drawState.polarHit.point;
       }
       if (point) placeDrawingPoint(point);
+      if (drawState.snapOverride) {
+        drawState.snapOverride = null;
+        document.querySelectorAll(".snap-pill").forEach((b) => b.classList.remove("active"));
+      }
     });
 
     function syncOsnapPolarBadges() {
@@ -3978,11 +4252,30 @@
     byId("toolMoveBtn")?.addEventListener("click", () => cadMove());
     byId("toolCopyBtn")?.addEventListener("click", () => cadCopy());
     byId("toolExplodeBtn")?.addEventListener("click", () => cadExplode());
+    byId("toolJoinBtn")?.addEventListener("click", () => cadJoin());
+    byId("toolArrayBtn")?.addEventListener("click", () => cadArray());
+    byId("toolPolygonBtn")?.addEventListener("click", () => cadPolygon());
+    byId("toolSectionBtn")?.addEventListener("click", () => cadSection());
     byId("toolDistBtn")?.addEventListener("click", () => cadDist());
     byId("toolAreaBtn")?.addEventListener("click", () => cadArea());
     byId("toolHatchBtn")?.addEventListener("click", () => cadHatch());
     byId("toolToSolidBtn")?.addEventListener("click", () => cadToSolid());
     byId("toolMultiviewBtn")?.addEventListener("click", () => cadMultiview());
+    document.querySelectorAll(".snap-pill").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const snapType = btn.dataset.snap;
+        if (drawState.snapOverride === snapType) {
+          drawState.snapOverride = null;
+          btn.classList.remove("active");
+          toast("Snap override cleared");
+        } else {
+          drawState.snapOverride = snapType;
+          document.querySelectorAll(".snap-pill").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          toast(`Single-shot Snap: ${snapType}`);
+        }
+      });
+    });
     byId("layerSelect").addEventListener("change", () => {
       drawState.layer = byId("layerSelect").value;
       syncDrawingControls();

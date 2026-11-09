@@ -1301,6 +1301,133 @@ impl StudioState {
         self.draft_payload()
     }
 
+    fn drawing_join(&mut self, req: &DraftJoinRequest) -> Result<DraftView, StudioError> {
+        let ids: Result<Vec<EntityId>, _> = req
+            .ids
+            .iter()
+            .map(|&id| EntityId::new(id).map_err(|e| StudioError::BadRequest(e.to_string())))
+            .collect();
+        let entity_ids = ids?;
+        let tol = req.tolerance.unwrap_or(1e-4);
+        {
+            let draft = self.drawing_mut()?;
+            draft.join_entities(&entity_ids, tol)?;
+        }
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
+    fn drawing_array(&mut self, req: &DraftArrayRequest) -> Result<DraftView, StudioError> {
+        let ids: Result<Vec<EntityId>, _> = req
+            .ids
+            .iter()
+            .map(|&id| EntityId::new(id).map_err(|e| StudioError::BadRequest(e.to_string())))
+            .collect();
+        let entity_ids = ids?;
+        {
+            let draft = self.drawing_mut()?;
+            match req.mode.as_str() {
+                "rectangular" => {
+                    let rows = req.rows.unwrap_or(1);
+                    let cols = req.cols.unwrap_or(1);
+                    let row_spacing = req.row_spacing.unwrap_or(0.0);
+                    let col_spacing = req.col_spacing.unwrap_or(0.0);
+                    draft.rectangular_array(&entity_ids, rows, cols, row_spacing, col_spacing)?;
+                }
+                "polar" => {
+                    let count = req.count.unwrap_or(2);
+                    let center = req.center.unwrap_or([0.0, 0.0]);
+                    let fill_angle = req.fill_angle_deg.unwrap_or(360.0);
+                    let rotate = req.rotate_items.unwrap_or(true);
+                    draft.polar_array(&entity_ids, count, center, fill_angle, rotate)?;
+                }
+                other => {
+                    return Err(StudioError::BadRequest(format!(
+                        "unknown array mode `{other}` (must be `rectangular` or `polar`)"
+                    )));
+                }
+            }
+        }
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
+    fn drawing_construct(&mut self, req: &DraftConstructRequest) -> Result<DraftView, StudioError> {
+        let layer_name = req.layer.as_deref().unwrap_or(cad_drafting::DEFAULT_LAYER);
+        {
+            let draft = self.drawing_mut()?;
+            if draft.layer(layer_name).is_none() {
+                draft.add_layer(layer_name, 7)?;
+            }
+            match req.kind.as_str() {
+                "circle_2p" => {
+                    let p1 = req
+                        .p1
+                        .ok_or_else(|| StudioError::BadRequest("circle_2p requires p1".into()))?;
+                    let p2 = req
+                        .p2
+                        .ok_or_else(|| StudioError::BadRequest("circle_2p requires p2".into()))?;
+                    draft.add_circle_2p(layer_name, p1, p2)?;
+                }
+                "circle_3p" => {
+                    let p1 = req
+                        .p1
+                        .ok_or_else(|| StudioError::BadRequest("circle_3p requires p1".into()))?;
+                    let p2 = req
+                        .p2
+                        .ok_or_else(|| StudioError::BadRequest("circle_3p requires p2".into()))?;
+                    let p3 = req
+                        .p3
+                        .ok_or_else(|| StudioError::BadRequest("circle_3p requires p3".into()))?;
+                    draft.add_circle_3p(layer_name, p1, p2, p3)?;
+                }
+                "arc_3p" => {
+                    let p1 = req
+                        .p1
+                        .ok_or_else(|| StudioError::BadRequest("arc_3p requires p1".into()))?;
+                    let p2 = req
+                        .p2
+                        .ok_or_else(|| StudioError::BadRequest("arc_3p requires p2".into()))?;
+                    let p3 = req
+                        .p3
+                        .ok_or_else(|| StudioError::BadRequest("arc_3p requires p3".into()))?;
+                    draft.add_arc_3p(layer_name, p1, p2, p3)?;
+                }
+                "polygon" => {
+                    let center = req.center.unwrap_or([0.0, 0.0]);
+                    let radius = req
+                        .radius
+                        .ok_or_else(|| StudioError::BadRequest("polygon requires radius".into()))?;
+                    let sides = req.sides.unwrap_or(6);
+                    let inscribed = req.inscribed.unwrap_or(true);
+                    let start_angle = req.start_angle_deg.unwrap_or(0.0);
+                    draft.add_polygon(layer_name, center, radius, sides, inscribed, start_angle)?;
+                }
+                other => {
+                    return Err(StudioError::BadRequest(format!(
+                        "unknown construction kind `{other}`"
+                    )));
+                }
+            }
+        }
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
+    fn drawing_section(
+        &mut self,
+        req: &DraftSectionRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let ent_id = EntityId::new(req.id).map_err(|e| StudioError::BadRequest(e.to_string()))?;
+        self.ensure_drawing()?;
+        let draft = self
+            .drawing
+            .as_ref()
+            .ok_or_else(|| StudioError::BadRequest("the drawing is unavailable".into()))?;
+        let props = draft.inquire_section(ent_id)?;
+        serde_json::to_value(props).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     /// Store the saved drawing's source revision in the project's embedded registry.
     ///
     /// This is what makes the pin survive a restart: before it existed only the in-memory session
@@ -2252,6 +2379,34 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             Ok(payload) => to_json(200, &payload),
             Err(error) => error_response(&error),
         },
+        "/api/draft/join" => match parse_body::<DraftJoinRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_join(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/array" => match parse_body::<DraftArrayRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_array(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/construct" => match parse_body::<DraftConstructRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_construct(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/section-analysis" => match parse_body::<DraftSectionRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_section(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
         "/api/engineering/review" => match parse_body::<ArtifactReviewRequest>(request) {
             Ok(body) => {
                 let id = match ArtifactId::new(body.id) {
@@ -2501,6 +2656,67 @@ struct DraftHatchRequest {
     angle_deg: Option<f64>,
     #[serde(default)]
     spacing: Option<f64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftJoinRequest {
+    ids: Vec<u64>,
+    #[serde(default)]
+    tolerance: Option<f64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftArrayRequest {
+    mode: String,
+    ids: Vec<u64>,
+    #[serde(default)]
+    rows: Option<usize>,
+    #[serde(default)]
+    cols: Option<usize>,
+    #[serde(default)]
+    row_spacing: Option<f64>,
+    #[serde(default)]
+    col_spacing: Option<f64>,
+    #[serde(default)]
+    count: Option<usize>,
+    #[serde(default)]
+    center: Option<[f64; 2]>,
+    #[serde(default)]
+    fill_angle_deg: Option<f64>,
+    #[serde(default)]
+    rotate_items: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftConstructRequest {
+    kind: String,
+    #[serde(default)]
+    layer: Option<String>,
+    #[serde(default)]
+    p1: Option<[f64; 2]>,
+    #[serde(default)]
+    p2: Option<[f64; 2]>,
+    #[serde(default)]
+    p3: Option<[f64; 2]>,
+    #[serde(default)]
+    center: Option<[f64; 2]>,
+    #[serde(default)]
+    radius: Option<f64>,
+    #[serde(default)]
+    sides: Option<usize>,
+    #[serde(default)]
+    inscribed: Option<bool>,
+    #[serde(default)]
+    start_angle_deg: Option<f64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftSectionRequest {
+    id: u64,
 }
 
 /// A name for a new named revision.

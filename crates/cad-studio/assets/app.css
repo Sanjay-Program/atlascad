@@ -406,7 +406,7 @@ kbd {
 .osnap-bar {
   display: flex;
   gap: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .osnap-bar .tool-button {
@@ -419,6 +419,39 @@ kbd {
   border-color: #00e676;
   background: rgba(0, 230, 118, 0.15);
   color: #00e676;
+}
+
+.osnap-pills-row {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 8px;
+  overflow-x: auto;
+}
+
+.snap-pill {
+  flex: 1;
+  padding: 3px 4px;
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+  background: var(--bg-surface-raised, #23272e);
+  color: var(--text-muted, #8b949e);
+  border: 1px solid var(--border-subtle, #30363d);
+  border-radius: 3px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.snap-pill:hover {
+  background: var(--bg-hover, #2c313a);
+  color: var(--text-bright, #f0f6fc);
+  border-color: #00e676;
+}
+
+.snap-pill.active {
+  background: rgba(0, 230, 118, 0.2);
+  color: #00e676;
+  border-color: #00e676;
 }
 
 .drawing-snap-marker {

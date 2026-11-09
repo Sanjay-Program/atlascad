@@ -37,6 +37,25 @@ pub struct EntityProperties {
     pub bounds: [f64; 4],
 }
 
+/// Structural and mechanical engineering cross-section properties.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SectionProperties {
+    pub area: f64,
+    pub perimeter: f64,
+    pub centroid: [f64; 2],
+    pub i_xx: f64,
+    pub i_yy: f64,
+    pub i_xy: f64,
+    pub j_polar: f64,
+    pub i_1: f64,
+    pub i_2: f64,
+    pub principal_angle_deg: f64,
+    pub r_x: f64,
+    pub r_y: f64,
+    pub s_x: f64,
+    pub s_y: f64,
+}
+
 /// Computes distance and angle in degrees between two 2D points.
 pub fn measure_distance(p1: [f64; 2], p2: [f64; 2]) -> Result<DistanceInquiry, DraftError> {
     if !p1[0].is_finite() || !p1[1].is_finite() || !p2[0].is_finite() || !p2[1].is_finite() {
@@ -1160,4 +1179,600 @@ pub fn generate_hatch_lines(
     }
 
     Ok(lines)
+}
+
+/// Constructs a circle whose diameter is defined by two endpoints `p1` and `p2`.
+pub fn circle_from_2_points(p1: [f64; 2], p2: [f64; 2]) -> Result<EntityKind, DraftError> {
+    if !p1[0].is_finite() || !p1[1].is_finite() || !p2[0].is_finite() || !p2[1].is_finite() {
+        return Err(DraftError::Invalid("coordinates must be finite".into()));
+    }
+    let dx = p2[0] - p1[0];
+    let dy = p2[1] - p1[1];
+    let dist = (dx * dx + dy * dy).sqrt();
+    if dist < 1e-9 {
+        return Err(DraftError::Invalid(
+            "points must be distinct to define a circle diameter".into(),
+        ));
+    }
+    let center = [(p1[0] + p2[0]) * 0.5, (p1[1] + p2[1]) * 0.5];
+    let radius = dist * 0.5;
+    Ok(EntityKind::Circle { center, radius })
+}
+
+/// Computes center and radius of a circumcircle defined by three points.
+pub fn circumcircle_center_radius(
+    p1: [f64; 2],
+    p2: [f64; 2],
+    p3: [f64; 2],
+) -> Result<([f64; 2], f64), DraftError> {
+    for p in &[p1, p2, p3] {
+        if !p[0].is_finite() || !p[1].is_finite() {
+            return Err(DraftError::Invalid("coordinates must be finite".into()));
+        }
+    }
+    let d = 2.0 * (p1[0] * (p2[1] - p3[1]) + p2[0] * (p3[1] - p1[1]) + p3[0] * (p1[1] - p2[1]));
+    if d.abs() < 1e-9 {
+        return Err(DraftError::Invalid(
+            "the 3 points are collinear or coincident; cannot define a circle or arc".into(),
+        ));
+    }
+    let p1_sq = p1[0] * p1[0] + p1[1] * p1[1];
+    let p2_sq = p2[0] * p2[0] + p2[1] * p2[1];
+    let p3_sq = p3[0] * p3[0] + p3[1] * p3[1];
+
+    let ux = (p1_sq * (p2[1] - p3[1]) + p2_sq * (p3[1] - p1[1]) + p3_sq * (p1[1] - p2[1])) / d;
+    let uy = (p1_sq * (p3[0] - p2[0]) + p2_sq * (p1[0] - p3[0]) + p3_sq * (p2[0] - p1[0])) / d;
+
+    let r_sq = (p1[0] - ux) * (p1[0] - ux) + (p1[1] - uy) * (p1[1] - uy);
+    let radius = r_sq.sqrt();
+    if radius < 1e-9 || !radius.is_finite() {
+        return Err(DraftError::Invalid("invalid circumcircle radius".into()));
+    }
+    Ok(([ux, uy], radius))
+}
+
+/// Constructs a circumcircle passing through three distinct, non-collinear points.
+pub fn circle_from_3_points(
+    p1: [f64; 2],
+    p2: [f64; 2],
+    p3: [f64; 2],
+) -> Result<EntityKind, DraftError> {
+    let (center, radius) = circumcircle_center_radius(p1, p2, p3)?;
+    Ok(EntityKind::Circle { center, radius })
+}
+
+/// Constructs an arc starting at `p1`, passing through intermediate point `p2`, and ending at `p3`.
+pub fn arc_from_3_points(
+    p1: [f64; 2],
+    p2: [f64; 2],
+    p3: [f64; 2],
+) -> Result<EntityKind, DraftError> {
+    let (center, radius) = circumcircle_center_radius(p1, p2, p3)?;
+    let theta1 = (p1[1] - center[1])
+        .atan2(p1[0] - center[0])
+        .to_degrees()
+        .rem_euclid(360.0);
+    let theta2 = (p2[1] - center[1])
+        .atan2(p2[0] - center[0])
+        .to_degrees()
+        .rem_euclid(360.0);
+    let theta3 = (p3[1] - center[1])
+        .atan2(p3[0] - center[0])
+        .to_degrees()
+        .rem_euclid(360.0);
+
+    let d_theta2 = (theta2 - theta1).rem_euclid(360.0);
+    let d_theta3 = (theta3 - theta1).rem_euclid(360.0);
+
+    if d_theta2 < 1e-6 || d_theta3 < 1e-6 || (d_theta3 - d_theta2).abs() < 1e-6 {
+        return Err(DraftError::Invalid(
+            "the 3 points must be distinct and non-overlapping".into(),
+        ));
+    }
+
+    // In DXF / 2D drafting, arcs sweep counter-clockwise from start_degrees to end_degrees.
+    let (start_degrees, end_degrees) = if d_theta2 < d_theta3 {
+        // Traversal p1 -> p2 -> p3 is counter-clockwise
+        (theta1, theta3)
+    } else {
+        // Traversal p1 -> p2 -> p3 is clockwise; in CCW representation, sweeps from p3 to p1
+        (theta3, theta1)
+    };
+
+    Ok(EntityKind::Arc {
+        center,
+        radius,
+        start_degrees,
+        end_degrees,
+    })
+}
+
+/// Constructs a regular polygon with `sides` vertices.
+///
+/// If `inscribed` is true, vertices lie on a circle of `radius`.
+/// If `inscribed` is false (circumscribed), the polygon's sides are tangent to a circle of `radius`.
+pub fn regular_polygon(
+    center: [f64; 2],
+    radius: f64,
+    sides: usize,
+    inscribed: bool,
+    start_angle_deg: f64,
+) -> Result<EntityKind, DraftError> {
+    if !center[0].is_finite()
+        || !center[1].is_finite()
+        || !radius.is_finite()
+        || !start_angle_deg.is_finite()
+    {
+        return Err(DraftError::Invalid(
+            "polygon parameters must be finite".into(),
+        ));
+    }
+    if radius <= 1e-9 {
+        return Err(DraftError::Invalid(
+            "polygon radius must be greater than zero".into(),
+        ));
+    }
+    if sides < 3 {
+        return Err(DraftError::Invalid(
+            "a polygon requires at least 3 sides".into(),
+        ));
+    }
+
+    let r_vert = if inscribed {
+        radius
+    } else {
+        let half_angle = std::f64::consts::PI / (sides as f64);
+        let cos_val = half_angle.cos();
+        if cos_val.abs() < 1e-9 {
+            return Err(DraftError::Invalid("invalid polygon geometry".into()));
+        }
+        radius / cos_val
+    };
+
+    let start_rad = start_angle_deg.to_radians();
+    let step = 2.0 * std::f64::consts::PI / (sides as f64);
+    let mut points = Vec::with_capacity(sides);
+
+    for i in 0..sides {
+        let ang = start_rad + (i as f64) * step;
+        let x = center[0] + r_vert * ang.cos();
+        let y = center[1] + r_vert * ang.sin();
+        points.push([x, y]);
+    }
+
+    Ok(EntityKind::Polyline {
+        points,
+        closed: true,
+    })
+}
+
+/// Combines a list of line segments and open polylines into a single connected Polyline.
+///
+/// Chaining automatically connects touching endpoints within `tolerance`.
+/// If the first and last vertices coincide, the resulting polyline is marked `closed: true`.
+pub fn join_entities(entities: &[EntityKind], tolerance: f64) -> Result<EntityKind, DraftError> {
+    if entities.is_empty() {
+        return Err(DraftError::Invalid("no entities provided to join".into()));
+    }
+    if tolerance <= 0.0 || !tolerance.is_finite() {
+        return Err(DraftError::Invalid(
+            "join tolerance must be positive finite".into(),
+        ));
+    }
+
+    // Convert each entity to a sequence of vertices [v0, v1, ...]
+    let mut chains: Vec<Vec<[f64; 2]>> = Vec::new();
+    for ent in entities {
+        match ent {
+            EntityKind::Line { start, end } => {
+                chains.push(vec![*start, *end]);
+            }
+            EntityKind::Polyline { points, closed } => {
+                if *closed {
+                    return Err(DraftError::Invalid(
+                        "cannot join an already closed polyline; select open lines or polylines"
+                            .into(),
+                    ));
+                }
+                if points.len() < 2 {
+                    return Err(DraftError::Invalid(
+                        "polyline must have at least 2 points".into(),
+                    ));
+                }
+                chains.push(points.clone());
+            }
+            EntityKind::Rectangle {
+                origin,
+                width,
+                height,
+            } => {
+                let [x, y] = origin;
+                chains.push(vec![
+                    *origin,
+                    [x + width, *y],
+                    [x + width, y + height],
+                    [*x, y + height],
+                    *origin,
+                ]);
+            }
+            _ => {
+                return Err(DraftError::Invalid(
+                    "JOIN only supports Line, Polyline, and Rectangle entities".into(),
+                ));
+            }
+        }
+    }
+
+    if chains.len() == 1 {
+        let pts = chains.remove(0);
+        let closed = pts.len() >= 3 && dist_sq(pts[0], pts[pts.len() - 1]).sqrt() <= tolerance;
+        let mut final_pts = pts;
+        if closed {
+            final_pts.pop();
+        }
+        return Ok(EntityKind::Polyline {
+            points: final_pts,
+            closed,
+        });
+    }
+
+    let tol_sq = tolerance * tolerance;
+    let mut current = chains.remove(0);
+
+    while !chains.is_empty() {
+        let head = current[0];
+        let tail = current[current.len() - 1];
+        let mut found_idx = None;
+        let mut match_type = 0; // 1: tail to seg.start, 2: tail to seg.end, 3: head to seg.end, 4: head to seg.start
+
+        for (i, seg) in chains.iter().enumerate() {
+            let seg_start = seg[0];
+            let seg_end = seg[seg.len() - 1];
+
+            if dist_sq(tail, seg_start) <= tol_sq {
+                found_idx = Some(i);
+                match_type = 1;
+                break;
+            } else if dist_sq(tail, seg_end) <= tol_sq {
+                found_idx = Some(i);
+                match_type = 2;
+                break;
+            } else if dist_sq(head, seg_end) <= tol_sq {
+                found_idx = Some(i);
+                match_type = 3;
+                break;
+            } else if dist_sq(head, seg_start) <= tol_sq {
+                found_idx = Some(i);
+                match_type = 4;
+                break;
+            }
+        }
+
+        if let Some(idx) = found_idx {
+            let seg = chains.remove(idx);
+            match match_type {
+                1 => {
+                    // Append seg[1..] to current
+                    current.extend_from_slice(&seg[1..]);
+                }
+                2 => {
+                    // Append reversed seg[..seg.len()-1] to current
+                    for pt in seg[..seg.len() - 1].iter().rev() {
+                        current.push(*pt);
+                    }
+                }
+                3 => {
+                    // Prepend seg[..seg.len()-1] to current
+                    let mut new_chain = seg;
+                    new_chain.pop(); // remove duplicate endpoint
+                    new_chain.extend(current);
+                    current = new_chain;
+                }
+                4 => {
+                    // Prepend reversed seg[1..] to current
+                    let mut new_chain: Vec<[f64; 2]> = seg[1..].iter().rev().copied().collect();
+                    new_chain.extend(current);
+                    current = new_chain;
+                }
+                _ => {}
+            }
+        } else {
+            return Err(DraftError::Invalid(
+                "selected entities do not form a single contiguous path; gaps detected".into(),
+            ));
+        }
+    }
+
+    // Check if the joined path is closed
+    let is_closed = current.len() >= 3 && dist_sq(current[0], current[current.len() - 1]) <= tol_sq;
+    if is_closed {
+        current.pop(); // remove redundant closure point
+    }
+
+    Ok(EntityKind::Polyline {
+        points: current,
+        closed: is_closed,
+    })
+}
+
+/// Creates a 2D rectangular array of copies of `entities`.
+pub fn rectangular_array_entities(
+    entities: &[EntityKind],
+    rows: usize,
+    cols: usize,
+    row_spacing: f64,
+    col_spacing: f64,
+) -> Result<Vec<EntityKind>, DraftError> {
+    if rows == 0 || cols == 0 {
+        return Err(DraftError::Invalid(
+            "rows and columns must be at least 1".into(),
+        ));
+    }
+    if !row_spacing.is_finite() || !col_spacing.is_finite() {
+        return Err(DraftError::Invalid("array spacing must be finite".into()));
+    }
+    let mut copies = Vec::new();
+    for r in 0..rows {
+        for c in 0..cols {
+            if r == 0 && c == 0 {
+                continue; // Original entity is at (0, 0)
+            }
+            let dx = (c as f64) * col_spacing;
+            let dy = (r as f64) * row_spacing;
+            for ent in entities {
+                copies.push(translate_entity(ent, dx, dy)?);
+            }
+        }
+    }
+    Ok(copies)
+}
+
+/// Creates a polar (circular) array of copies of `entities` distributed around `center`.
+pub fn polar_array_entities(
+    entities: &[EntityKind],
+    count: usize,
+    center: [f64; 2],
+    fill_angle_deg: f64,
+    rotate_items: bool,
+) -> Result<Vec<EntityKind>, DraftError> {
+    if count < 2 {
+        return Err(DraftError::Invalid(
+            "polar array count must be at least 2".into(),
+        ));
+    }
+    if !fill_angle_deg.is_finite() || fill_angle_deg.abs() < 1e-6 {
+        return Err(DraftError::Invalid(
+            "fill angle must be a non-zero finite number".into(),
+        ));
+    }
+    if !center[0].is_finite() || !center[1].is_finite() {
+        return Err(DraftError::Invalid(
+            "center coordinates must be finite".into(),
+        ));
+    }
+
+    let is_full_circle = (fill_angle_deg.abs() - 360.0).abs() < 1e-6;
+    let step = if is_full_circle {
+        fill_angle_deg / (count as f64)
+    } else {
+        fill_angle_deg / ((count - 1) as f64)
+    };
+
+    let mut copies = Vec::new();
+    for i in 1..count {
+        let angle = (i as f64) * step;
+        if rotate_items {
+            for ent in entities {
+                copies.push(rotate_entity(ent, center, angle)?);
+            }
+        } else {
+            let rad = angle.to_radians();
+            let cos_a = rad.cos();
+            let sin_a = rad.sin();
+            for ent in entities {
+                let anchor = match ent {
+                    EntityKind::Point { at } => *at,
+                    EntityKind::Line { start, end } => {
+                        [(start[0] + end[0]) * 0.5, (start[1] + end[1]) * 0.5]
+                    }
+                    EntityKind::Circle { center: c, .. } => *c,
+                    EntityKind::Arc { center: c, .. } => *c,
+                    EntityKind::Polyline { points, .. } => {
+                        let sx: f64 = points.iter().map(|p| p[0]).sum();
+                        let sy: f64 = points.iter().map(|p| p[1]).sum();
+                        [sx / points.len() as f64, sy / points.len() as f64]
+                    }
+                    EntityKind::Rectangle {
+                        origin,
+                        width,
+                        height,
+                    } => [origin[0] + width * 0.5, origin[1] + height * 0.5],
+                    EntityKind::Ellipse { center: c, .. } => *c,
+                    EntityKind::Text { at, .. } => *at,
+                    EntityKind::Dimension { start, end, .. } => {
+                        [(start[0] + end[0]) * 0.5, (start[1] + end[1]) * 0.5]
+                    }
+                    EntityKind::Spline { points, .. } => {
+                        let sx: f64 = points.iter().map(|p| p[0]).sum();
+                        let sy: f64 = points.iter().map(|p| p[1]).sum();
+                        [sx / points.len() as f64, sy / points.len() as f64]
+                    }
+                };
+                let rel_x = anchor[0] - center[0];
+                let rel_y = anchor[1] - center[1];
+                let rot_x = center[0] + rel_x * cos_a - rel_y * sin_a;
+                let rot_y = center[1] + rel_x * sin_a + rel_y * cos_a;
+                let dx = rot_x - anchor[0];
+                let dy = rot_y - anchor[1];
+                copies.push(translate_entity(ent, dx, dy)?);
+            }
+        }
+    }
+    Ok(copies)
+}
+
+/// Computes comprehensive cross-sectional properties for structural and mechanical engineering:
+/// Area, centroid, moments of inertia (Ixx, Iyy, Ixy, J), principal axes (I1, I2, theta_p),
+/// radii of gyration (rx, ry), and elastic section moduli (Sx, Sy).
+pub fn analyze_cross_section(points: &[[f64; 2]]) -> Result<SectionProperties, DraftError> {
+    if points.len() < 3 {
+        return Err(DraftError::Invalid(
+            "cross section requires at least 3 points to form a polygon".into(),
+        ));
+    }
+    for p in points {
+        if !p[0].is_finite() || !p[1].is_finite() {
+            return Err(DraftError::Invalid(
+                "coordinates must be finite numbers".into(),
+            ));
+        }
+    }
+
+    let n = points.len();
+    let mut double_area = 0.0;
+    let mut perimeter = 0.0;
+    let mut cx_sum = 0.0;
+    let mut cy_sum = 0.0;
+    let mut ixx_0 = 0.0;
+    let mut iyy_0 = 0.0;
+    let mut ixy_0 = 0.0;
+
+    for i in 0..n {
+        let j = (i + 1) % n;
+        let x0 = points[i][0];
+        let y0 = points[i][1];
+        let x1 = points[j][0];
+        let y1 = points[j][1];
+
+        let cross = x0 * y1 - x1 * y0;
+        double_area += cross;
+        cx_sum += (x0 + x1) * cross;
+        cy_sum += (y0 + y1) * cross;
+
+        // Second moments about origin
+        ixx_0 += (y0 * y0 + y0 * y1 + y1 * y1) * cross;
+        iyy_0 += (x0 * x0 + x0 * x1 + x1 * x1) * cross;
+        ixy_0 += (x0 * y1 + 2.0 * x0 * y0 + 2.0 * x1 * y1 + x1 * y0) * cross;
+
+        let dx = x1 - x0;
+        let dy = y1 - y0;
+        perimeter += (dx * dx + dy * dy).sqrt();
+    }
+
+    let area = (double_area.abs()) * 0.5;
+    if area < 1e-12 {
+        return Err(DraftError::Invalid(
+            "polygon has zero or negligible area".into(),
+        ));
+    }
+
+    // Centroid
+    let factor = 1.0 / (3.0 * double_area);
+    let centroid = [cx_sum * factor, cy_sum * factor];
+
+    // Normalize origin second moments
+    ixx_0 = ixx_0.abs() / 12.0;
+    iyy_0 = iyy_0.abs() / 12.0;
+    ixy_0 /= 24.0;
+    if double_area < 0.0 {
+        ixy_0 = -ixy_0;
+    }
+
+    // Parallel Axis Theorem: transfer to centroid
+    let cx = centroid[0];
+    let cy = centroid[1];
+    let i_xx = (ixx_0 - area * cy * cy).max(0.0);
+    let i_yy = (iyy_0 - area * cx * cx).max(0.0);
+    let i_xy = ixy_0 - area * cx * cy;
+    let j_polar = i_xx + i_yy;
+
+    // Principal moments of inertia
+    let i_avg = (i_xx + i_yy) * 0.5;
+    let diff = (i_xx - i_yy) * 0.5;
+    let rad = (diff * diff + i_xy * i_xy).sqrt();
+    let i_1 = i_avg + rad;
+    let i_2 = (i_avg - rad).max(0.0);
+    let principal_angle_deg = 0.5 * (-2.0 * i_xy).atan2(i_xx - i_yy).to_degrees();
+
+    // Radii of gyration
+    let r_x = (i_xx / area).sqrt();
+    let r_y = (i_yy / area).sqrt();
+
+    // Section moduli Sx, Sy
+    let mut min_x = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    for p in points {
+        if p[0] < min_x {
+            min_x = p[0];
+        }
+        if p[0] > max_x {
+            max_x = p[0];
+        }
+        if p[1] < min_y {
+            min_y = p[1];
+        }
+        if p[1] > max_y {
+            max_y = p[1];
+        }
+    }
+    let c_y = (max_y - cy).abs().max((min_y - cy).abs());
+    let c_x = (max_x - cx).abs().max((min_x - cx).abs());
+
+    let s_x = if c_y > 1e-9 { i_xx / c_y } else { 0.0 };
+    let s_y = if c_x > 1e-9 { i_yy / c_x } else { 0.0 };
+
+    Ok(SectionProperties {
+        area,
+        perimeter,
+        centroid,
+        i_xx,
+        i_yy,
+        i_xy,
+        j_polar,
+        i_1,
+        i_2,
+        principal_angle_deg,
+        r_x,
+        r_y,
+        s_x,
+        s_y,
+    })
+}
+
+/// Computes analytical cross-sectional properties for a circular section.
+pub fn analyze_circle_section(
+    center: [f64; 2],
+    radius: f64,
+) -> Result<SectionProperties, DraftError> {
+    if !center[0].is_finite() || !center[1].is_finite() || !radius.is_finite() || radius <= 1e-9 {
+        return Err(DraftError::Invalid(
+            "valid center and positive radius required".into(),
+        ));
+    }
+    let pi = std::f64::consts::PI;
+    let area = pi * radius * radius;
+    let perimeter = 2.0 * pi * radius;
+    let i_val = (pi * radius.powi(4)) / 4.0;
+    let j_polar = (pi * radius.powi(4)) / 2.0;
+    let s_val = (pi * radius.powi(3)) / 4.0;
+    let r_val = radius * 0.5;
+
+    Ok(SectionProperties {
+        area,
+        perimeter,
+        centroid: center,
+        i_xx: i_val,
+        i_yy: i_val,
+        i_xy: 0.0,
+        j_polar,
+        i_1: i_val,
+        i_2: i_val,
+        principal_angle_deg: 0.0,
+        r_x: r_val,
+        r_y: r_val,
+        s_x: s_val,
+        s_y: s_val,
+    })
 }

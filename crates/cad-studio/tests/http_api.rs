@@ -2967,3 +2967,129 @@ fn drafting_editing_endpoints_and_2d_to_3d_bridge() -> Result<(), Box<dyn std::e
 
     Ok(())
 }
+
+/// Advanced AutoCAD geometric constructions, join, pattern array, and engineering section properties via HTTP.
+#[test]
+fn drafting_constructions_join_array_and_section_analysis() -> Result<(), Box<dyn std::error::Error>>
+{
+    let (_dir, _path, handle) = fixture("draft_advanced_suite", [30.0, 30.0, 10.0])?;
+    let addr = handle.addr();
+
+    // 1. Circle 2P construction
+    let c2p = post(
+        addr,
+        "/api/draft/construct",
+        r#"{"kind":"circle_2p","layer":"0","p1":[0.0,0.0],"p2":[40.0,0.0]}"#,
+    )?;
+    assert_eq!(c2p.status, 200);
+    let c2p_json = json(&c2p)?;
+    let entities = c2p_json["entities"].as_array().ok_or("entities array")?;
+    let c2p_ent = entities.last().ok_or("c2p entity")?;
+    assert_eq!(c2p_ent["kind"]["kind"], "circle");
+    let c2p_id = c2p_ent["id"].as_u64().ok_or("c2p id")?;
+
+    // 2. Section Analysis on Circle
+    let sec_circle = post(
+        addr,
+        "/api/draft/section-analysis",
+        &format!(r#"{{"id":{c2p_id}}}"#),
+    )?;
+    assert_eq!(sec_circle.status, 200);
+    let sec_circ_json = json(&sec_circle)?;
+    let circ_area = sec_circ_json["area"].as_f64().ok_or("area")?;
+    assert!((circ_area - std::f64::consts::PI * 400.0).abs() < 1e-4);
+
+    // 3. Regular Polygon construction (inscribed hexagon)
+    let poly_resp = post(
+        addr,
+        "/api/draft/construct",
+        r#"{"kind":"polygon","layer":"0","center":[0.0,0.0],"radius":20.0,"sides":6,"inscribed":true}"#,
+    )?;
+    assert_eq!(poly_resp.status, 200);
+    let poly_json = json(&poly_resp)?;
+    let poly_entities = poly_json["entities"].as_array().ok_or("entities")?;
+    let poly_ent = poly_entities.last().ok_or("hex entity")?;
+    assert_eq!(poly_ent["kind"]["kind"], "polyline");
+    let poly_id = poly_ent["id"].as_u64().ok_or("hex id")?;
+
+    // 4. Section Analysis on Hexagon
+    let sec_hex = post(
+        addr,
+        "/api/draft/section-analysis",
+        &format!(r#"{{"id":{poly_id}}}"#),
+    )?;
+    assert_eq!(sec_hex.status, 200);
+    let sec_hex_json = json(&sec_hex)?;
+    let hex_area = sec_hex_json["area"].as_f64().ok_or("area")?;
+    // Regular hexagon area = (3 * sqrt(3) / 2) * R^2 = 2.598076 * 400 = 1039.23
+    assert!((hex_area - 1039.23).abs() < 1.0);
+
+    // 5. Join lines into polyline
+    let add_l1 = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"0","kind":{"kind":"line","start":[10.0,0.0],"end":[30.0,0.0]}}"#,
+    )?;
+    let id_l1 = json(&add_l1)?["entities"]
+        .as_array()
+        .ok_or("entities")?
+        .last()
+        .ok_or("l1")?["id"]
+        .as_u64()
+        .ok_or("id")?;
+    let add_l2 = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"0","kind":{"kind":"line","start":[30.0,0.0],"end":[30.0,20.0]}}"#,
+    )?;
+    let id_l2 = json(&add_l2)?["entities"]
+        .as_array()
+        .ok_or("entities")?
+        .last()
+        .ok_or("l2")?["id"]
+        .as_u64()
+        .ok_or("id")?;
+
+    let join_resp = post(
+        addr,
+        "/api/draft/join",
+        &format!(r#"{{"ids":[{id_l1},{id_l2}],"tolerance":0.001}}"#),
+    )?;
+    assert_eq!(join_resp.status, 200);
+    let join_json = json(&join_resp)?;
+    let join_entities = join_json["entities"].as_array().ok_or("entities")?;
+    assert!(
+        join_entities
+            .iter()
+            .all(|e| e["id"] != id_l1 && e["id"] != id_l2)
+    );
+    let joined_poly = join_entities.last().ok_or("joined poly")?;
+    assert_eq!(joined_poly["kind"]["kind"], "polyline");
+    let joined_id = joined_poly["id"].as_u64().ok_or("joined id")?;
+
+    // 6. Rectangular array
+    let array_rect = post(
+        addr,
+        "/api/draft/array",
+        &format!(
+            r#"{{"mode":"rectangular","ids":[{joined_id}],"rows":2,"cols":2,"row_spacing":25.0,"col_spacing":35.0}}"#
+        ),
+    )?;
+    assert_eq!(array_rect.status, 200);
+    let array_rect_json = json(&array_rect)?;
+    let after_rect_entities = array_rect_json["entities"].as_array().ok_or("entities")?;
+    // 2x2 = 4 total items (3 new copies)
+    assert!(after_rect_entities.len() >= 4);
+
+    // 7. Polar array
+    let array_polar = post(
+        addr,
+        "/api/draft/array",
+        &format!(
+            r#"{{"mode":"polar","ids":[{joined_id}],"count":4,"center":[0.0,0.0],"fill_angle_deg":360.0,"rotate_items":true}}"#
+        ),
+    )?;
+    assert_eq!(array_polar.status, 200);
+
+    Ok(())
+}

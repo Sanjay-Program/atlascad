@@ -47,9 +47,12 @@ mod sheet;
 
 pub use dxf::{DxfImport, ImportReport, MAX_DXF_BYTES, from_dxf};
 pub use edit::{
-    AreaInquiry, DistanceInquiry, EntityProperties, chamfer_lines, explode_entity, fillet_lines,
-    generate_hatch_lines, line_intersection, measure_distance, measure_polygon_area, mirror_entity,
-    offset_entity, rotate_entity, scale_entity, translate_entity,
+    AreaInquiry, DistanceInquiry, EntityProperties, SectionProperties, analyze_circle_section,
+    analyze_cross_section, arc_from_3_points, chamfer_lines, circle_from_2_points,
+    circle_from_3_points, explode_entity, fillet_lines, generate_hatch_lines, join_entities,
+    line_intersection, measure_distance, measure_polygon_area, mirror_entity, offset_entity,
+    polar_array_entities, rectangular_array_entities, regular_polygon, rotate_entity, scale_entity,
+    translate_entity,
 };
 pub use pdf::{PDF_VERSION, helvetica_width_pt, mm_to_pt, to_pdf};
 pub use sheet::{
@@ -642,6 +645,55 @@ impl Draft {
         Ok(ids)
     }
 
+    /// Add a circle defined by two diameter endpoints.
+    pub fn add_circle_2p(
+        &mut self,
+        layer: &str,
+        p1: [f64; 2],
+        p2: [f64; 2],
+    ) -> Result<EntityId, DraftError> {
+        let kind = edit::circle_from_2_points(p1, p2)?;
+        self.add_entity(layer, kind)
+    }
+
+    /// Add a circumcircle defined by three points.
+    pub fn add_circle_3p(
+        &mut self,
+        layer: &str,
+        p1: [f64; 2],
+        p2: [f64; 2],
+        p3: [f64; 2],
+    ) -> Result<EntityId, DraftError> {
+        let kind = edit::circle_from_3_points(p1, p2, p3)?;
+        self.add_entity(layer, kind)
+    }
+
+    /// Add an arc defined by three points (start, through, end).
+    pub fn add_arc_3p(
+        &mut self,
+        layer: &str,
+        p1: [f64; 2],
+        p2: [f64; 2],
+        p3: [f64; 2],
+    ) -> Result<EntityId, DraftError> {
+        let kind = edit::arc_from_3_points(p1, p2, p3)?;
+        self.add_entity(layer, kind)
+    }
+
+    /// Add a regular polygon (inscribed or circumscribed).
+    pub fn add_polygon(
+        &mut self,
+        layer: &str,
+        center: [f64; 2],
+        radius: f64,
+        sides: usize,
+        inscribed: bool,
+        start_angle_deg: f64,
+    ) -> Result<EntityId, DraftError> {
+        let kind = edit::regular_polygon(center, radius, sides, inscribed, start_angle_deg)?;
+        self.add_entity(layer, kind)
+    }
+
     /// Remove an entity. The layer must exist and be unlocked.
     pub fn remove_entity(&mut self, id: EntityId) -> Result<(), DraftError> {
         let position = self
@@ -1097,6 +1149,300 @@ impl Draft {
             new_ids.push(sub_id);
         }
         Ok(new_ids)
+    }
+
+    /// Combines multiple contiguous lines and open polylines into a single unified Polyline entity.
+    pub fn join_entities(
+        &mut self,
+        ids: &[EntityId],
+        tolerance: f64,
+    ) -> Result<EntityId, DraftError> {
+        if ids.is_empty() {
+            return Err(DraftError::Invalid("no entities provided to join".into()));
+        }
+        let mut kinds = Vec::with_capacity(ids.len());
+        let mut target_layer = None;
+
+        for id in ids {
+            let ent = self
+                .entity(*id)
+                .ok_or(DraftError::UnknownEntity(id.get()))?;
+            let layer = self
+                .layer(&ent.layer)
+                .ok_or_else(|| DraftError::UnknownLayer(ent.layer.clone()))?;
+            if layer.locked {
+                return Err(DraftError::Invalid(format!(
+                    "layer `{}` is locked",
+                    ent.layer
+                )));
+            }
+            if target_layer.is_none() {
+                target_layer = Some(ent.layer.clone());
+            }
+            kinds.push(ent.kind.clone());
+        }
+
+        let joined_kind = edit::join_entities(&kinds, tolerance)?;
+        joined_kind.validate()?;
+        let layer_name = target_layer.unwrap_or_else(|| DEFAULT_LAYER.to_string());
+
+        self.push_undo();
+        self.entities.retain(|e| !ids.contains(&e.id));
+
+        let new_id = EntityId::new(self.next_entity)
+            .map_err(|error| DraftError::Invalid(error.to_string()))?;
+        let next = self
+            .next_entity
+            .checked_add(1)
+            .ok_or_else(|| DraftError::Invalid("entity id space exhausted".into()))?;
+        self.next_entity = next;
+        self.entities.push(Entity {
+            id: new_id,
+            layer: layer_name,
+            kind: joined_kind,
+        });
+
+        Ok(new_id)
+    }
+
+    /// Creates a 2D rectangular array of copies of `ids`.
+    pub fn rectangular_array(
+        &mut self,
+        ids: &[EntityId],
+        rows: usize,
+        cols: usize,
+        row_spacing: f64,
+        col_spacing: f64,
+    ) -> Result<Vec<EntityId>, DraftError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        if rows == 0 || cols == 0 {
+            return Err(DraftError::Invalid(
+                "rows and columns must be at least 1".into(),
+            ));
+        }
+        if !row_spacing.is_finite() || !col_spacing.is_finite() {
+            return Err(DraftError::Invalid("spacing must be finite".into()));
+        }
+        if rows == 1 && cols == 1 {
+            return Ok(Vec::new());
+        }
+
+        let mut original_entities = Vec::with_capacity(ids.len());
+        for id in ids {
+            let ent = self
+                .entity(*id)
+                .ok_or(DraftError::UnknownEntity(id.get()))?;
+            let layer = self
+                .layer(&ent.layer)
+                .ok_or_else(|| DraftError::UnknownLayer(ent.layer.clone()))?;
+            if layer.locked {
+                return Err(DraftError::Invalid(format!(
+                    "layer `{}` is locked",
+                    ent.layer
+                )));
+            }
+            original_entities.push((ent.layer.clone(), ent.kind.clone()));
+        }
+
+        let mut copies = Vec::new();
+        for r in 0..rows {
+            for c in 0..cols {
+                if r == 0 && c == 0 {
+                    continue;
+                }
+                let dx = (c as f64) * col_spacing;
+                let dy = (r as f64) * row_spacing;
+                for (layer, kind) in &original_entities {
+                    let copied_kind = edit::translate_entity(kind, dx, dy)?;
+                    copied_kind.validate()?;
+                    copies.push((layer.clone(), copied_kind));
+                }
+            }
+        }
+
+        self.push_undo();
+        let mut new_ids = Vec::with_capacity(copies.len());
+        for (layer, kind) in copies {
+            let new_id = EntityId::new(self.next_entity)
+                .map_err(|error| DraftError::Invalid(error.to_string()))?;
+            let next = self
+                .next_entity
+                .checked_add(1)
+                .ok_or_else(|| DraftError::Invalid("entity id space exhausted".into()))?;
+            self.next_entity = next;
+            self.entities.push(Entity {
+                id: new_id,
+                layer,
+                kind,
+            });
+            new_ids.push(new_id);
+        }
+
+        Ok(new_ids)
+    }
+
+    /// Creates a polar (circular) array of copies of `ids` around `center`.
+    pub fn polar_array(
+        &mut self,
+        ids: &[EntityId],
+        count: usize,
+        center: [f64; 2],
+        fill_angle_deg: f64,
+        rotate_items: bool,
+    ) -> Result<Vec<EntityId>, DraftError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        if count < 2 {
+            return Err(DraftError::Invalid(
+                "polar array count must be at least 2".into(),
+            ));
+        }
+        if !fill_angle_deg.is_finite() || fill_angle_deg.abs() < 1e-6 {
+            return Err(DraftError::Invalid(
+                "fill angle must be non-zero finite".into(),
+            ));
+        }
+        if !center[0].is_finite() || !center[1].is_finite() {
+            return Err(DraftError::Invalid(
+                "center coordinates must be finite".into(),
+            ));
+        }
+
+        let mut original_entities = Vec::with_capacity(ids.len());
+        for id in ids {
+            let ent = self
+                .entity(*id)
+                .ok_or(DraftError::UnknownEntity(id.get()))?;
+            let layer = self
+                .layer(&ent.layer)
+                .ok_or_else(|| DraftError::UnknownLayer(ent.layer.clone()))?;
+            if layer.locked {
+                return Err(DraftError::Invalid(format!(
+                    "layer `{}` is locked",
+                    ent.layer
+                )));
+            }
+            original_entities.push((ent.layer.clone(), ent.kind.clone()));
+        }
+
+        let is_full_circle = (fill_angle_deg.abs() - 360.0).abs() < 1e-6;
+        let step = if is_full_circle {
+            fill_angle_deg / (count as f64)
+        } else {
+            fill_angle_deg / ((count - 1) as f64)
+        };
+
+        let mut copies = Vec::new();
+        for i in 1..count {
+            let angle = (i as f64) * step;
+            if rotate_items {
+                for (layer, kind) in &original_entities {
+                    let copied_kind = edit::rotate_entity(kind, center, angle)?;
+                    copied_kind.validate()?;
+                    copies.push((layer.clone(), copied_kind));
+                }
+            } else {
+                let rad = angle.to_radians();
+                let cos_a = rad.cos();
+                let sin_a = rad.sin();
+                for (layer, kind) in &original_entities {
+                    let anchor = match kind {
+                        EntityKind::Point { at } => *at,
+                        EntityKind::Line { start, end } => {
+                            [(start[0] + end[0]) * 0.5, (start[1] + end[1]) * 0.5]
+                        }
+                        EntityKind::Circle { center: c, .. } => *c,
+                        EntityKind::Arc { center: c, .. } => *c,
+                        EntityKind::Polyline { points, .. } => {
+                            let sx: f64 = points.iter().map(|p| p[0]).sum();
+                            let sy: f64 = points.iter().map(|p| p[1]).sum();
+                            [sx / points.len() as f64, sy / points.len() as f64]
+                        }
+                        EntityKind::Rectangle {
+                            origin,
+                            width,
+                            height,
+                        } => [origin[0] + width * 0.5, origin[1] + height * 0.5],
+                        EntityKind::Ellipse { center: c, .. } => *c,
+                        EntityKind::Text { at, .. } => *at,
+                        EntityKind::Dimension { start, end, .. } => {
+                            [(start[0] + end[0]) * 0.5, (start[1] + end[1]) * 0.5]
+                        }
+                        EntityKind::Spline { points, .. } => {
+                            let sx: f64 = points.iter().map(|p| p[0]).sum();
+                            let sy: f64 = points.iter().map(|p| p[1]).sum();
+                            [sx / points.len() as f64, sy / points.len() as f64]
+                        }
+                    };
+                    let rel_x = anchor[0] - center[0];
+                    let rel_y = anchor[1] - center[1];
+                    let rot_x = center[0] + rel_x * cos_a - rel_y * sin_a;
+                    let rot_y = center[1] + rel_x * sin_a + rel_y * cos_a;
+                    let dx = rot_x - anchor[0];
+                    let dy = rot_y - anchor[1];
+                    let copied_kind = edit::translate_entity(kind, dx, dy)?;
+                    copied_kind.validate()?;
+                    copies.push((layer.clone(), copied_kind));
+                }
+            }
+        }
+
+        self.push_undo();
+        let mut new_ids = Vec::with_capacity(copies.len());
+        for (layer, kind) in copies {
+            let new_id = EntityId::new(self.next_entity)
+                .map_err(|error| DraftError::Invalid(error.to_string()))?;
+            let next = self
+                .next_entity
+                .checked_add(1)
+                .ok_or_else(|| DraftError::Invalid("entity id space exhausted".into()))?;
+            self.next_entity = next;
+            self.entities.push(Entity {
+                id: new_id,
+                layer,
+                kind,
+            });
+            new_ids.push(new_id);
+        }
+
+        Ok(new_ids)
+    }
+
+    /// Computes engineering cross-sectional properties for a closed entity.
+    pub fn inquire_section(&self, id: EntityId) -> Result<edit::SectionProperties, DraftError> {
+        let ent = self.entity(id).ok_or(DraftError::UnknownEntity(id.get()))?;
+        match &ent.kind {
+            EntityKind::Circle { center, radius } => edit::analyze_circle_section(*center, *radius),
+            EntityKind::Rectangle {
+                origin,
+                width,
+                height,
+            } => {
+                let [x, y] = origin;
+                let pts = [
+                    *origin,
+                    [x + width, *y],
+                    [x + width, y + height],
+                    [*x, y + height],
+                ];
+                edit::analyze_cross_section(&pts)
+            }
+            EntityKind::Polyline { points, closed } => {
+                if !closed {
+                    return Err(DraftError::Invalid(
+                        "section analysis requires a closed polyline".into(),
+                    ));
+                }
+                edit::analyze_cross_section(points)
+            }
+            _ => Err(DraftError::Invalid(
+                "section analysis requires a closed entity (Circle, Rectangle, or closed Polyline)"
+                    .into(),
+            )),
+        }
     }
 
     /// Drop the undo and redo history.

@@ -283,8 +283,12 @@
           <button type="button" class="tool-button" id="toolMoveBtn" title="Move (M): translate selected entity">Move</button>
           <button type="button" class="tool-button" id="toolCopyBtn" title="Copy (CO): duplicate selected entity">Copy</button>
           <button type="button" class="tool-button" id="toolExplodeBtn" title="Explode (X): decompose rectangle or polyline into lines">Explode</button>
+          <button type="button" class="tool-button" id="toolJoinBtn" title="Join (J): combine lines into a unified polyline">Join</button>
+          <button type="button" class="tool-button" id="toolArrayBtn" title="Array (AR / ARRAYRECT / ARRAYPOLAR): rectangular or polar pattern array">Array</button>
+          <button type="button" class="tool-button" id="toolPolygonBtn" title="Polygon (POL): regular polygon (inscribed/circumscribed)">Polygon</button>
           <button type="button" class="tool-button" id="toolDistBtn" title="Distance (DI): measure distance and angle">Dist</button>
           <button type="button" class="tool-button" id="toolAreaBtn" title="Area (AA): measure polygon area and perimeter">Area</button>
+          <button type="button" class="tool-button" id="toolSectionBtn" title="Section Properties (SEC / SECPROPS): calculate moments of inertia, section modulus, centroid">SecProps</button>
           <button type="button" class="tool-button" id="toolHatchBtn" title="Hatch (H): fill boundary with ANSI31 or NET cross-hatch pattern">Hatch</button>
           <button type="button" class="tool-button tool-solid-accent" id="toolToSolidBtn" title="Extrude to 3D Solid (EXT / 3D): turn 2D closed profile into 3D solid">3D Solid</button>
           <button type="button" class="tool-button tool-solid-accent" id="toolMultiviewBtn" title="Multi-View (MV / ORTHO): generate 4-view orthographic drawing with cross-sections">Multi-View</button>
@@ -292,6 +296,15 @@
         <div class="field-row osnap-bar">
           <button type="button" class="tool-button active" id="osnapToggleBtn" aria-pressed="true" title="Object Snaps (F3): Endpoint, Midpoint, Center, Quadrant, Intersection, Perpendicular, Tangent, Nearest">OSNAP</button>
           <button type="button" class="tool-button active" id="polarToggleBtn" aria-pressed="true" title="Polar Tracking (F10): 45°/90° alignment guides">POLAR</button>
+        </div>
+        <div class="osnap-pills-row" role="group" aria-label="Single-shot Snap Overrides">
+          <button type="button" class="snap-pill" data-snap="Endpoint" title="Snap to Endpoint (END)">END</button>
+          <button type="button" class="snap-pill" data-snap="Midpoint" title="Snap to Midpoint (MID)">MID</button>
+          <button type="button" class="snap-pill" data-snap="Center" title="Snap to Center (CEN)">CEN</button>
+          <button type="button" class="snap-pill" data-snap="Intersection" title="Snap to Intersection (INT)">INT</button>
+          <button type="button" class="snap-pill" data-snap="Perpendicular" title="Snap Perpendicular (PER)">PER</button>
+          <button type="button" class="snap-pill" data-snap="Tangent" title="Snap Tangent (TAN)">TAN</button>
+          <button type="button" class="snap-pill" data-snap="Quadrant" title="Snap to Quadrant (QUA)">QUA</button>
         </div>
         <input id="drawText" class="drawing-text-input" type="text" maxlength="512" placeholder="Text for the Text tool" autocomplete="off">
         <div class="field-row" id="polylineActions" hidden>
