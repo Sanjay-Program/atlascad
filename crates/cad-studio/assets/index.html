@@ -273,6 +273,20 @@
           <button type="button" class="tool-button" id="drawUndoBtn" title="Undo the last drawing edit">↶</button>
           <button type="button" class="tool-button" id="drawDeleteBtn" title="Delete the selected entity">✕</button>
         </div>
+        <div class="draw-tools modify-tools" role="toolbar" aria-label="AutoCAD modify and 3D tools">
+          <button type="button" class="tool-button" id="toolOffsetBtn" title="Offset (O): parallel line, concentric circle, or expanded rectangle">Offset</button>
+          <button type="button" class="tool-button" id="toolFilletBtn" title="Fillet (F): round corner between two lines (R=0 to clean corner)">Fillet</button>
+          <button type="button" class="tool-button" id="toolChamferBtn" title="Chamfer (CHA): bevel corner between two lines">Chamfer</button>
+          <button type="button" class="tool-button" id="toolMirrorBtn" title="Mirror (MI): mirror across axis line">Mirror</button>
+          <button type="button" class="tool-button" id="toolRotateBtn" title="Rotate (RO): rotate selected entity">Rotate</button>
+          <button type="button" class="tool-button" id="toolScaleBtn" title="Scale (SC): scale selected entity">Scale</button>
+          <button type="button" class="tool-button" id="toolMoveBtn" title="Move (M): translate selected entity">Move</button>
+          <button type="button" class="tool-button" id="toolCopyBtn" title="Copy (CO): duplicate selected entity">Copy</button>
+          <button type="button" class="tool-button" id="toolExplodeBtn" title="Explode (X): decompose rectangle or polyline into lines">Explode</button>
+          <button type="button" class="tool-button" id="toolDistBtn" title="Distance (DI): measure distance and angle">Dist</button>
+          <button type="button" class="tool-button" id="toolAreaBtn" title="Area (AA): measure polygon area and perimeter">Area</button>
+          <button type="button" class="tool-button tool-solid-accent" id="toolToSolidBtn" title="Extrude to 3D Solid (EXT / 3D): turn 2D closed profile into 3D solid">3D Solid</button>
+        </div>
         <div class="field-row osnap-bar">
           <button type="button" class="tool-button active" id="osnapToggleBtn" aria-pressed="true" title="Object Snaps (F3): Endpoint, Midpoint, Center, Quadrant, Intersection, Perpendicular, Tangent, Nearest">OSNAP</button>
           <button type="button" class="tool-button active" id="polarToggleBtn" aria-pressed="true" title="Polar Tracking (F10): 45°/90° alignment guides">POLAR</button>

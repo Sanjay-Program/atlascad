@@ -1016,6 +1016,221 @@ impl StudioState {
         self.draft_payload()
     }
 
+    fn drawing_transform(&mut self, req: &DraftTransformRequest) -> Result<DraftView, StudioError> {
+        let ids: Result<Vec<EntityId>, _> = req
+            .ids
+            .iter()
+            .map(|&id| EntityId::new(id).map_err(|e| StudioError::BadRequest(e.to_string())))
+            .collect();
+        let entity_ids = ids?;
+        {
+            let draft = self.drawing_mut()?;
+            match req.op.as_str() {
+                "translate" => {
+                    let dx = req.dx.unwrap_or(0.0);
+                    let dy = req.dy.unwrap_or(0.0);
+                    draft.translate_entities(&entity_ids, dx, dy)?;
+                }
+                "copy" => {
+                    let dx = req.dx.unwrap_or(0.0);
+                    let dy = req.dy.unwrap_or(0.0);
+                    draft.copy_entities(&entity_ids, dx, dy)?;
+                }
+                "rotate" => {
+                    let center = req.center.unwrap_or([0.0, 0.0]);
+                    let rad = req.angle_deg.unwrap_or(0.0).to_radians();
+                    draft.rotate_entities(&entity_ids, center, rad)?;
+                }
+                "scale" => {
+                    let base = req.base.unwrap_or([0.0, 0.0]);
+                    let factor = req.factor.unwrap_or(1.0);
+                    draft.scale_entities(&entity_ids, base, factor)?;
+                }
+                "mirror" => {
+                    let p1 = req.p1.unwrap_or([0.0, 0.0]);
+                    let p2 = req.p2.unwrap_or([1.0, 0.0]);
+                    let erase = req.erase_source.unwrap_or(false);
+                    draft.mirror_entities(&entity_ids, p1, p2, erase)?;
+                }
+                other => {
+                    return Err(StudioError::BadRequest(format!(
+                        "unknown transform operation `{other}`"
+                    )));
+                }
+            }
+        }
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
+    fn drawing_offset(&mut self, req: &DraftOffsetRequest) -> Result<DraftView, StudioError> {
+        let id = EntityId::new(req.id).map_err(|e| StudioError::BadRequest(e.to_string()))?;
+        let side = req.side.unwrap_or(1.0);
+        {
+            let draft = self.drawing_mut()?;
+            draft.offset_entity(id, req.distance, side)?;
+        }
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
+    fn drawing_fillet(&mut self, req: &DraftFilletRequest) -> Result<DraftView, StudioError> {
+        let id1 = EntityId::new(req.id1).map_err(|e| StudioError::BadRequest(e.to_string()))?;
+        let id2 = EntityId::new(req.id2).map_err(|e| StudioError::BadRequest(e.to_string()))?;
+        {
+            let draft = self.drawing_mut()?;
+            draft.fillet(id1, id2, req.radius)?;
+        }
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
+    fn drawing_chamfer(&mut self, req: &DraftChamferRequest) -> Result<DraftView, StudioError> {
+        let id1 = EntityId::new(req.id1).map_err(|e| StudioError::BadRequest(e.to_string()))?;
+        let id2 = EntityId::new(req.id2).map_err(|e| StudioError::BadRequest(e.to_string()))?;
+        {
+            let draft = self.drawing_mut()?;
+            draft.chamfer(id1, id2, req.d1, req.d2)?;
+        }
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
+    fn drawing_explode(&mut self, req: &DraftExplodeRequest) -> Result<DraftView, StudioError> {
+        let id = EntityId::new(req.id).map_err(|e| StudioError::BadRequest(e.to_string()))?;
+        {
+            let draft = self.drawing_mut()?;
+            draft.explode_entity(id)?;
+        }
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
+    fn drawing_measure(&self, req: &DraftMeasureRequest) -> Result<serde_json::Value, StudioError> {
+        match req.mode.as_str() {
+            "distance" => {
+                let p1 = req.p1.ok_or_else(|| {
+                    StudioError::BadRequest("distance inquiry requires p1".into())
+                })?;
+                let p2 = req.p2.ok_or_else(|| {
+                    StudioError::BadRequest("distance inquiry requires p2".into())
+                })?;
+                let inq = cad_drafting::measure_distance(p1, p2)?;
+                serde_json::to_value(inq).map_err(|e| StudioError::Json(e.to_string()))
+            }
+            "area" => {
+                let pts = req.points.as_deref().ok_or_else(|| {
+                    StudioError::BadRequest("area inquiry requires polygon points".into())
+                })?;
+                let inq = cad_drafting::measure_polygon_area(pts)?;
+                serde_json::to_value(inq).map_err(|e| StudioError::Json(e.to_string()))
+            }
+            other => Err(StudioError::BadRequest(format!(
+                "unknown measure mode `{other}`"
+            ))),
+        }
+    }
+
+    fn drawing_to_solid(&mut self, req: &DraftToSolidRequest) -> Result<StatePayload, StudioError> {
+        let ent_id =
+            EntityId::new(req.entity_id).map_err(|e| StudioError::BadRequest(e.to_string()))?;
+        let (profile, origin) = {
+            let draft = self.drawing_mut()?;
+            let ent = draft.entity(ent_id).ok_or_else(|| {
+                StudioError::BadRequest(format!("unknown entity {}", req.entity_id))
+            })?;
+            match &ent.kind {
+                cad_drafting::EntityKind::Rectangle {
+                    origin,
+                    width,
+                    height,
+                } => {
+                    let w = *width;
+                    let h = *height;
+                    let orig = *origin;
+                    let poly = cad_document::SketchProfile::Polyline {
+                        points: vec![[0.0, 0.0], [w, 0.0], [w, h], [0.0, h]],
+                    };
+                    (poly, orig)
+                }
+                cad_drafting::EntityKind::Circle { center, radius } => {
+                    let r = *radius;
+                    let c = *center;
+                    let mut pts = Vec::with_capacity(32);
+                    for i in 0..32 {
+                        let th = (i as f64) * std::f64::consts::TAU / 32.0;
+                        pts.push([r * th.cos(), r * th.sin()]);
+                    }
+                    (cad_document::SketchProfile::Polyline { points: pts }, c)
+                }
+                cad_drafting::EntityKind::Polyline { points, closed } => {
+                    if !closed || points.len() < 3 {
+                        return Err(StudioError::BadRequest(
+                            "to extrude as solid, polyline must be closed with at least 3 points"
+                                .into(),
+                        ));
+                    }
+                    let orig = points[0];
+                    let rel_pts: Vec<[f64; 2]> = points
+                        .iter()
+                        .map(|p| [p[0] - orig[0], p[1] - orig[1]])
+                        .collect();
+                    (
+                        cad_document::SketchProfile::Polyline { points: rel_pts },
+                        orig,
+                    )
+                }
+                other => {
+                    return Err(StudioError::BadRequest(format!(
+                        "entity of kind `{}` cannot be extruded to a 3D solid (only closed shapes: rectangle, circle, closed polyline)",
+                        other.label()
+                    )));
+                }
+            }
+        };
+
+        let depth = if req.depth.is_finite() && req.depth > 0.0 {
+            req.depth
+        } else {
+            10.0
+        };
+
+        let operation = match req.operation.as_deref() {
+            Some("join") => ExtrudeOperation::Join,
+            Some("cut") => ExtrudeOperation::Cut,
+            Some("new_body") => ExtrudeOperation::NewBody,
+            Some(other) => {
+                return Err(StudioError::BadRequest(format!(
+                    "unknown operation `{other}`"
+                )));
+            }
+            None => {
+                if self.project.features().is_empty() {
+                    ExtrudeOperation::NewBody
+                } else {
+                    ExtrudeOperation::Join
+                }
+            }
+        };
+
+        self.mutate(|project| {
+            let param_id = format!("extr_{}", project.features().len() + 1);
+            if project.parameter(&param_id).is_err() {
+                project.add_parameter(param_id.clone(), depth)?;
+            } else {
+                project.set_parameter(&param_id, depth)?;
+            }
+            let sketch_id = project.add_sketch_on_plane(profile, origin, 0.0)?;
+            project.add_extrude_feature_in_direction(
+                sketch_id,
+                &param_id,
+                operation,
+                ExtrudeDirection::Up,
+            )?;
+            Ok(())
+        })
+    }
+
     /// Store the saved drawing's source revision in the project's embedded registry.
     ///
     /// This is what makes the pin survive a restart: before it existed only the in-memory session
@@ -1907,6 +2122,55 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             Ok(payload) => to_json(200, &payload),
             Err(error) => error_response(&error),
         },
+        "/api/draft/transform" => match parse_body::<DraftTransformRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_transform(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/offset" => match parse_body::<DraftOffsetRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_offset(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/fillet" => match parse_body::<DraftFilletRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_fillet(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/chamfer" => match parse_body::<DraftChamferRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_chamfer(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/explode" => match parse_body::<DraftExplodeRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_explode(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/measure" => match parse_body::<DraftMeasureRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_measure(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/to-solid" => match parse_body::<DraftToSolidRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_to_solid(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
         "/api/engineering/review" => match parse_body::<ArtifactReviewRequest>(request) {
             Ok(body) => {
                 let id = match ArtifactId::new(body.id) {
@@ -2060,6 +2324,85 @@ struct DrawingLayerRequest {
     visible: Option<bool>,
     #[serde(default)]
     locked: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftTransformRequest {
+    op: String,
+    ids: Vec<u64>,
+    #[serde(default)]
+    dx: Option<f64>,
+    #[serde(default)]
+    dy: Option<f64>,
+    #[serde(default)]
+    center: Option<[f64; 2]>,
+    #[serde(default)]
+    angle_deg: Option<f64>,
+    #[serde(default)]
+    base: Option<[f64; 2]>,
+    #[serde(default)]
+    factor: Option<f64>,
+    #[serde(default)]
+    p1: Option<[f64; 2]>,
+    #[serde(default)]
+    p2: Option<[f64; 2]>,
+    #[serde(default)]
+    erase_source: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftOffsetRequest {
+    id: u64,
+    distance: f64,
+    #[serde(default)]
+    side: Option<f64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftFilletRequest {
+    id1: u64,
+    id2: u64,
+    radius: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftChamferRequest {
+    id1: u64,
+    id2: u64,
+    d1: f64,
+    d2: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftExplodeRequest {
+    id: u64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftMeasureRequest {
+    mode: String,
+    #[serde(default)]
+    p1: Option<[f64; 2]>,
+    #[serde(default)]
+    p2: Option<[f64; 2]>,
+    #[serde(default)]
+    points: Option<Vec<[f64; 2]>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftToSolidRequest {
+    entity_id: u64,
+    #[serde(default)]
+    depth: f64,
+    #[serde(default)]
+    operation: Option<String>,
 }
 
 /// A name for a new named revision.

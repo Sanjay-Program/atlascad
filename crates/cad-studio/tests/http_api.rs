@@ -2837,3 +2837,112 @@ fn cae_and_cam_endpoints_execute_on_solid_model() -> Result<(), Box<dyn std::err
 
     Ok(())
 }
+
+/// Advanced CAD editing operations and 2D-to-3D parametric solid bridge via HTTP.
+#[test]
+fn drafting_editing_endpoints_and_2d_to_3d_bridge() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("advanced_cad", [20.0, 20.0, 10.0])?;
+    let addr = handle.addr();
+
+    // 1. Measure distance inquiry
+    let meas_resp = post(
+        addr,
+        "/api/draft/measure",
+        r#"{"mode":"distance","p1":[0.0,0.0],"p2":[30.0,40.0]}"#,
+    )?;
+    assert_eq!(meas_resp.status, 200);
+    let meas_json = json(&meas_resp)?;
+    let dist = meas_json["distance"]
+        .as_f64()
+        .ok_or("distance should be a float")?;
+    assert!((dist - 50.0).abs() < 1e-6);
+
+    // 2. Measure polygon area inquiry
+    let area_resp = post(
+        addr,
+        "/api/draft/measure",
+        r#"{"mode":"area","points":[[0.0,0.0],[20.0,0.0],[20.0,10.0],[0.0,10.0]]}"#,
+    )?;
+    assert_eq!(area_resp.status, 200);
+    let area_json = json(&area_resp)?;
+    let area = area_json["area"].as_f64().ok_or("area should be a float")?;
+    assert!((area - 200.0).abs() < 1e-6);
+
+    // 3. Add a rectangle in drawing
+    let add_rect = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"0","kind":{"kind":"rectangle","origin":[0.0,0.0],"width":50.0,"height":30.0}}"#,
+    )?;
+    assert_eq!(add_rect.status, 200);
+    let draft_payload = json(&add_rect)?;
+    let entities = draft_payload["entities"]
+        .as_array()
+        .ok_or("entities should be array")?;
+    let rect_id = entities.last().ok_or("last entity")?["id"]
+        .as_u64()
+        .ok_or("id")?;
+
+    // 4. Offset rectangle
+    let offset_resp = post(
+        addr,
+        "/api/draft/offset",
+        &format!(r#"{{"id":{rect_id},"distance":5.0,"side":1.0}}"#),
+    )?;
+    assert_eq!(offset_resp.status, 200);
+
+    // 5. Add two lines and fillet them
+    let add_l1 = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"0","kind":{"kind":"line","start":[0.0,20.0],"end":[0.0,0.0]}}"#,
+    )?;
+    let id_l1 = json(&add_l1)?["entities"]
+        .as_array()
+        .ok_or("entities")?
+        .last()
+        .ok_or("l1")?["id"]
+        .as_u64()
+        .ok_or("id")?;
+
+    let add_l2 = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"0","kind":{"kind":"line","start":[0.0,0.0],"end":[20.0,0.0]}}"#,
+    )?;
+    let id_l2 = json(&add_l2)?["entities"]
+        .as_array()
+        .ok_or("entities")?
+        .last()
+        .ok_or("l2")?["id"]
+        .as_u64()
+        .ok_or("id")?;
+
+    let fillet_resp = post(
+        addr,
+        "/api/draft/fillet",
+        &format!(r#"{{"id1":{id_l1},"id2":{id_l2},"radius":4.0}}"#),
+    )?;
+    assert_eq!(fillet_resp.status, 200);
+
+    // 6. 2D to 3D solid bridge: extrude the rectangle into a 3D solid!
+    let solid_resp = post(
+        addr,
+        "/api/draft/to-solid",
+        &format!(r#"{{"entity_id":{rect_id},"depth":15.0}}"#),
+    )?;
+    assert_eq!(
+        solid_resp.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&solid_resp.body)
+    );
+    let solid_json = json(&solid_resp)?;
+    let volume = solid_json["geometry"]["volume_mm3"]
+        .as_f64()
+        .ok_or("volume should be float")?;
+    // The model now has the extruded solid! Volume must be strictly positive
+    assert!(volume > 0.0);
+
+    Ok(())
+}

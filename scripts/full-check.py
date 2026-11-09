@@ -568,6 +568,36 @@ def drafting_section(studio: Studio) -> None:
     check(studio.get("/api/export/pdf?scale=0").status == 400, "a zero scale is 400")
     titled = studio.get("/api/export/pdf?title=Atlas%20bracket")
     check(titled.status == 200, "a percent-encoded title is accepted")
+
+    # Advanced AutoCAD Drafting & Inquiries
+    meas = studio.post("/api/draft/measure", {"mode": "distance", "p1": [0.0, 0.0], "p2": [30.0, 40.0]})
+    check(meas.status == 200 and abs(meas.json()["distance"] - 50.0) < 1e-4, "measure distance is analytic")
+
+    area_inq = studio.post("/api/draft/measure", {"mode": "area", "points": [[0.0, 0.0], [20.0, 0.0], [20.0, 10.0], [0.0, 10.0]]})
+    check(area_inq.status == 200 and abs(area_inq.json()["area"] - 200.0) < 1e-4, "measure area is analytic")
+
+    # Add rectangle and offset it
+    add_r = studio.post("/api/draft/entity", {"layer": "0", "kind": {"kind": "rectangle", "origin": [0.0, 0.0], "width": 40.0, "height": 20.0}})
+    check(add_r.status == 200, "draft rectangle added")
+    r_id = add_r.json()["entities"][-1]["id"]
+
+    off = studio.post("/api/draft/offset", {"id": r_id, "distance": 4.0, "side": 1.0})
+    check(off.status == 200, "offset rectangle created")
+
+    # Add 2 lines and fillet them
+    l1 = studio.post("/api/draft/entity", {"layer": "0", "kind": {"kind": "line", "start": [0.0, 30.0], "end": [0.0, 0.0]}})
+    l2 = studio.post("/api/draft/entity", {"layer": "0", "kind": {"kind": "line", "start": [0.0, 0.0], "end": [30.0, 0.0]}})
+    id_l1 = l1.json()["entities"][-1]["id"]
+    id_l2 = l2.json()["entities"][-1]["id"]
+    fil = studio.post("/api/draft/fillet", {"id1": id_l1, "id2": id_l2, "radius": 5.0})
+    check(fil.status == 200, "fillet creates tangent arc")
+
+    # 2D to 3D solid bridge
+    solid_bridge = studio.post("/api/draft/to-solid", {"entity_id": r_id, "depth": 12.0})
+    check(solid_bridge.status == 200 and solid_bridge.json()["geometry"]["volume_mm3"] > 0.0, "2D to 3D solid extrusion succeeded")
+    undone_bridge = studio.post("/api/undo")
+    check(undone_bridge.status == 200, "undo of 2D to 3D solid extrusion succeeded")
+
     report("drafting")
 
 

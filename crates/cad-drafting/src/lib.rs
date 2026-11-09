@@ -41,10 +41,16 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 mod dxf;
+pub mod edit;
 mod pdf;
 mod sheet;
 
 pub use dxf::{DxfImport, ImportReport, MAX_DXF_BYTES, from_dxf};
+pub use edit::{
+    AreaInquiry, DistanceInquiry, EntityProperties, chamfer_lines, explode_entity, fillet_lines,
+    line_intersection, measure_distance, measure_polygon_area, mirror_entity, offset_entity,
+    rotate_entity, scale_entity, translate_entity,
+};
 pub use pdf::{PDF_VERSION, helvetica_width_pt, mm_to_pt, to_pdf};
 pub use sheet::{
     MAX_SHEET_TEXT, Orientation, PaperSize, Plot, PlotError, PlotLine, PlotText, STANDARD_SCALES,
@@ -609,6 +615,445 @@ impl Draft {
         self.push_undo();
         self.entities.remove(position);
         Ok(())
+    }
+
+    /// Lookup an entity by id.
+    pub fn entity(&self, id: EntityId) -> Option<&Entity> {
+        self.entities.iter().find(|entity| entity.id == id)
+    }
+
+    /// Translate one or more entities by displacement (dx, dy).
+    pub fn translate_entities(
+        &mut self,
+        ids: &[EntityId],
+        dx: f64,
+        dy: f64,
+    ) -> Result<(), DraftError> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        for id in ids {
+            let ent = self
+                .entity(*id)
+                .ok_or(DraftError::UnknownEntity(id.get()))?;
+            let layer = self
+                .layer(&ent.layer)
+                .ok_or_else(|| DraftError::UnknownLayer(ent.layer.clone()))?;
+            if layer.locked {
+                return Err(DraftError::Invalid(format!(
+                    "layer `{}` is locked",
+                    ent.layer
+                )));
+            }
+        }
+        let mut new_kinds = Vec::with_capacity(ids.len());
+        for id in ids {
+            let ent = self
+                .entity(*id)
+                .ok_or(DraftError::UnknownEntity(id.get()))?;
+            let transformed = edit::translate_entity(&ent.kind, dx, dy)?;
+            transformed.validate()?;
+            new_kinds.push((*id, transformed));
+        }
+        self.push_undo();
+        for (id, transformed) in new_kinds {
+            if let Some(pos) = self.entities.iter().position(|e| e.id == id) {
+                self.entities[pos].kind = transformed;
+            }
+        }
+        Ok(())
+    }
+
+    /// Duplicate one or more entities shifted by displacement (dx, dy).
+    pub fn copy_entities(
+        &mut self,
+        ids: &[EntityId],
+        dx: f64,
+        dy: f64,
+    ) -> Result<Vec<EntityId>, DraftError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        for id in ids {
+            let ent = self
+                .entity(*id)
+                .ok_or(DraftError::UnknownEntity(id.get()))?;
+            let layer = self
+                .layer(&ent.layer)
+                .ok_or_else(|| DraftError::UnknownLayer(ent.layer.clone()))?;
+            if layer.locked {
+                return Err(DraftError::Invalid(format!(
+                    "layer `{}` is locked",
+                    ent.layer
+                )));
+            }
+        }
+        let mut copies = Vec::with_capacity(ids.len());
+        for id in ids {
+            let ent = self
+                .entity(*id)
+                .ok_or(DraftError::UnknownEntity(id.get()))?;
+            let copied_kind = edit::translate_entity(&ent.kind, dx, dy)?;
+            copied_kind.validate()?;
+            copies.push((ent.layer.clone(), copied_kind));
+        }
+        self.push_undo();
+        let mut new_ids = Vec::with_capacity(copies.len());
+        for (layer, kind) in copies {
+            let new_id = EntityId::new(self.next_entity)
+                .map_err(|error| DraftError::Invalid(error.to_string()))?;
+            let next = self
+                .next_entity
+                .checked_add(1)
+                .ok_or_else(|| DraftError::Invalid("entity id space exhausted".into()))?;
+            self.next_entity = next;
+            self.entities.push(Entity {
+                id: new_id,
+                layer,
+                kind,
+            });
+            new_ids.push(new_id);
+        }
+        Ok(new_ids)
+    }
+
+    /// Rotate one or more entities around center by angle_rad counter-clockwise.
+    pub fn rotate_entities(
+        &mut self,
+        ids: &[EntityId],
+        center: [f64; 2],
+        angle_rad: f64,
+    ) -> Result<(), DraftError> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        for id in ids {
+            let ent = self
+                .entity(*id)
+                .ok_or(DraftError::UnknownEntity(id.get()))?;
+            let layer = self
+                .layer(&ent.layer)
+                .ok_or_else(|| DraftError::UnknownLayer(ent.layer.clone()))?;
+            if layer.locked {
+                return Err(DraftError::Invalid(format!(
+                    "layer `{}` is locked",
+                    ent.layer
+                )));
+            }
+        }
+        let mut new_kinds = Vec::with_capacity(ids.len());
+        for id in ids {
+            let ent = self
+                .entity(*id)
+                .ok_or(DraftError::UnknownEntity(id.get()))?;
+            let transformed = edit::rotate_entity(&ent.kind, center, angle_rad)?;
+            transformed.validate()?;
+            new_kinds.push((*id, transformed));
+        }
+        self.push_undo();
+        for (id, transformed) in new_kinds {
+            if let Some(pos) = self.entities.iter().position(|e| e.id == id) {
+                self.entities[pos].kind = transformed;
+            }
+        }
+        Ok(())
+    }
+
+    /// Scale one or more entities around base by factor > 0.
+    pub fn scale_entities(
+        &mut self,
+        ids: &[EntityId],
+        base: [f64; 2],
+        factor: f64,
+    ) -> Result<(), DraftError> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        for id in ids {
+            let ent = self
+                .entity(*id)
+                .ok_or(DraftError::UnknownEntity(id.get()))?;
+            let layer = self
+                .layer(&ent.layer)
+                .ok_or_else(|| DraftError::UnknownLayer(ent.layer.clone()))?;
+            if layer.locked {
+                return Err(DraftError::Invalid(format!(
+                    "layer `{}` is locked",
+                    ent.layer
+                )));
+            }
+        }
+        let mut new_kinds = Vec::with_capacity(ids.len());
+        for id in ids {
+            let ent = self
+                .entity(*id)
+                .ok_or(DraftError::UnknownEntity(id.get()))?;
+            let transformed = edit::scale_entity(&ent.kind, base, factor)?;
+            transformed.validate()?;
+            new_kinds.push((*id, transformed));
+        }
+        self.push_undo();
+        for (id, transformed) in new_kinds {
+            if let Some(pos) = self.entities.iter().position(|e| e.id == id) {
+                self.entities[pos].kind = transformed;
+            }
+        }
+        Ok(())
+    }
+
+    /// Mirror one or more entities across an axis line (p1, p2).
+    /// If erase_source is true, updates source entities; otherwise duplicates mirrored entities.
+    pub fn mirror_entities(
+        &mut self,
+        ids: &[EntityId],
+        p1: [f64; 2],
+        p2: [f64; 2],
+        erase_source: bool,
+    ) -> Result<Vec<EntityId>, DraftError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        for id in ids {
+            let ent = self
+                .entity(*id)
+                .ok_or(DraftError::UnknownEntity(id.get()))?;
+            let layer = self
+                .layer(&ent.layer)
+                .ok_or_else(|| DraftError::UnknownLayer(ent.layer.clone()))?;
+            if layer.locked {
+                return Err(DraftError::Invalid(format!(
+                    "layer `{}` is locked",
+                    ent.layer
+                )));
+            }
+        }
+        let mut mirrored = Vec::with_capacity(ids.len());
+        for id in ids {
+            let ent = self
+                .entity(*id)
+                .ok_or(DraftError::UnknownEntity(id.get()))?;
+            let mir = edit::mirror_entity(&ent.kind, p1, p2)?;
+            mir.validate()?;
+            mirrored.push((*id, ent.layer.clone(), mir));
+        }
+        self.push_undo();
+        if erase_source {
+            for (id, _, mir) in mirrored {
+                if let Some(pos) = self.entities.iter().position(|e| e.id == id) {
+                    self.entities[pos].kind = mir;
+                }
+            }
+            Ok(ids.to_vec())
+        } else {
+            let mut new_ids = Vec::with_capacity(mirrored.len());
+            for (_, layer, mir) in mirrored {
+                let new_id = EntityId::new(self.next_entity)
+                    .map_err(|error| DraftError::Invalid(error.to_string()))?;
+                let next = self
+                    .next_entity
+                    .checked_add(1)
+                    .ok_or_else(|| DraftError::Invalid("entity id space exhausted".into()))?;
+                self.next_entity = next;
+                self.entities.push(Entity {
+                    id: new_id,
+                    layer,
+                    kind: mir,
+                });
+                new_ids.push(new_id);
+            }
+            Ok(new_ids)
+        }
+    }
+
+    /// Offsets entity with `id` by distance and adds the new offset entity to the same layer.
+    pub fn offset_entity(
+        &mut self,
+        id: EntityId,
+        distance: f64,
+        side: f64,
+    ) -> Result<EntityId, DraftError> {
+        let ent = self.entity(id).ok_or(DraftError::UnknownEntity(id.get()))?;
+        let layer_name = ent.layer.clone();
+        let target_layer = self
+            .layer(&layer_name)
+            .ok_or_else(|| DraftError::UnknownLayer(layer_name.clone()))?;
+        if target_layer.locked {
+            return Err(DraftError::Invalid(format!(
+                "layer `{layer_name}` is locked"
+            )));
+        }
+        let offset_kind = edit::offset_entity(&ent.kind, distance, side)?;
+        offset_kind.validate()?;
+
+        self.push_undo();
+        let new_id = EntityId::new(self.next_entity)
+            .map_err(|error| DraftError::Invalid(error.to_string()))?;
+        let next = self
+            .next_entity
+            .checked_add(1)
+            .ok_or_else(|| DraftError::Invalid("entity id space exhausted".into()))?;
+        self.next_entity = next;
+        self.entities.push(Entity {
+            id: new_id,
+            layer: layer_name,
+            kind: offset_kind,
+        });
+        Ok(new_id)
+    }
+
+    /// Fillets two lines with radius `radius`. Trims both lines and creates a tangent arc if radius > 0.
+    pub fn fillet(
+        &mut self,
+        id1: EntityId,
+        id2: EntityId,
+        radius: f64,
+    ) -> Result<Option<EntityId>, DraftError> {
+        let ent1 = self
+            .entity(id1)
+            .ok_or(DraftError::UnknownEntity(id1.get()))?;
+        let ent2 = self
+            .entity(id2)
+            .ok_or(DraftError::UnknownEntity(id2.get()))?;
+        let layer1 = self
+            .layer(&ent1.layer)
+            .ok_or_else(|| DraftError::UnknownLayer(ent1.layer.clone()))?;
+        let layer2 = self
+            .layer(&ent2.layer)
+            .ok_or_else(|| DraftError::UnknownLayer(ent2.layer.clone()))?;
+        if layer1.locked || layer2.locked {
+            return Err(DraftError::Invalid(
+                "one or both line layers are locked".into(),
+            ));
+        }
+        let (new_l1, new_l2, opt_arc) = edit::fillet_lines(&ent1.kind, &ent2.kind, radius)?;
+        new_l1.validate()?;
+        new_l2.validate()?;
+        if let Some(ref arc) = opt_arc {
+            arc.validate()?;
+        }
+        let arc_layer = ent1.layer.clone();
+
+        self.push_undo();
+        if let Some(pos) = self.entities.iter().position(|e| e.id == id1) {
+            self.entities[pos].kind = new_l1;
+        }
+        if let Some(pos) = self.entities.iter().position(|e| e.id == id2) {
+            self.entities[pos].kind = new_l2;
+        }
+
+        if let Some(arc) = opt_arc {
+            let arc_id = EntityId::new(self.next_entity)
+                .map_err(|error| DraftError::Invalid(error.to_string()))?;
+            let next = self
+                .next_entity
+                .checked_add(1)
+                .ok_or_else(|| DraftError::Invalid("entity id space exhausted".into()))?;
+            self.next_entity = next;
+            self.entities.push(Entity {
+                id: arc_id,
+                layer: arc_layer,
+                kind: arc,
+            });
+            Ok(Some(arc_id))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Chamfers two lines with cutback distances `d1` and `d2`. Trims both lines and creates a bevel line.
+    pub fn chamfer(
+        &mut self,
+        id1: EntityId,
+        id2: EntityId,
+        d1: f64,
+        d2: f64,
+    ) -> Result<EntityId, DraftError> {
+        let ent1 = self
+            .entity(id1)
+            .ok_or(DraftError::UnknownEntity(id1.get()))?;
+        let ent2 = self
+            .entity(id2)
+            .ok_or(DraftError::UnknownEntity(id2.get()))?;
+        let layer1 = self
+            .layer(&ent1.layer)
+            .ok_or_else(|| DraftError::UnknownLayer(ent1.layer.clone()))?;
+        let layer2 = self
+            .layer(&ent2.layer)
+            .ok_or_else(|| DraftError::UnknownLayer(ent2.layer.clone()))?;
+        if layer1.locked || layer2.locked {
+            return Err(DraftError::Invalid(
+                "one or both line layers are locked".into(),
+            ));
+        }
+        let (new_l1, new_l2, bevel) = edit::chamfer_lines(&ent1.kind, &ent2.kind, d1, d2)?;
+        new_l1.validate()?;
+        new_l2.validate()?;
+        bevel.validate()?;
+        let bevel_layer = ent1.layer.clone();
+
+        self.push_undo();
+        if let Some(pos) = self.entities.iter().position(|e| e.id == id1) {
+            self.entities[pos].kind = new_l1;
+        }
+        if let Some(pos) = self.entities.iter().position(|e| e.id == id2) {
+            self.entities[pos].kind = new_l2;
+        }
+
+        let bevel_id = EntityId::new(self.next_entity)
+            .map_err(|error| DraftError::Invalid(error.to_string()))?;
+        let next = self
+            .next_entity
+            .checked_add(1)
+            .ok_or_else(|| DraftError::Invalid("entity id space exhausted".into()))?;
+        self.next_entity = next;
+        self.entities.push(Entity {
+            id: bevel_id,
+            layer: bevel_layer,
+            kind: bevel,
+        });
+        Ok(bevel_id)
+    }
+
+    /// Explodes compound entity `id` (Rectangle or Polyline) into fundamental Line entities.
+    pub fn explode_entity(&mut self, id: EntityId) -> Result<Vec<EntityId>, DraftError> {
+        let pos = self
+            .entities
+            .iter()
+            .position(|e| e.id == id)
+            .ok_or(DraftError::UnknownEntity(id.get()))?;
+        let layer_name = self.entities[pos].layer.clone();
+        let target_layer = self
+            .layer(&layer_name)
+            .ok_or_else(|| DraftError::UnknownLayer(layer_name.clone()))?;
+        if target_layer.locked {
+            return Err(DraftError::Invalid(format!(
+                "layer `{layer_name}` is locked"
+            )));
+        }
+        let sub_entities = edit::explode_entity(&self.entities[pos].kind)?;
+        for sub in &sub_entities {
+            sub.validate()?;
+        }
+
+        self.push_undo();
+        self.entities.remove(pos);
+        let mut new_ids = Vec::with_capacity(sub_entities.len());
+        for sub in sub_entities {
+            let sub_id = EntityId::new(self.next_entity)
+                .map_err(|error| DraftError::Invalid(error.to_string()))?;
+            let next = self
+                .next_entity
+                .checked_add(1)
+                .ok_or_else(|| DraftError::Invalid("entity id space exhausted".into()))?;
+            self.next_entity = next;
+            self.entities.push(Entity {
+                id: sub_id,
+                layer: layer_name.clone(),
+                kind: sub,
+            });
+            new_ids.push(sub_id);
+        }
+        Ok(new_ids)
     }
 
     /// Drop the undo and redo history.

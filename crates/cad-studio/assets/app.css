@@ -387,6 +387,22 @@ kbd {
   margin-bottom: 6px;
 }
 
+.modify-tools {
+  margin-top: 2px;
+  margin-bottom: 8px;
+}
+
+.tool-solid-accent {
+  background: rgba(0, 229, 255, 0.15) !important;
+  border-color: #00e5ff !important;
+  color: #00e5ff !important;
+  font-weight: 700 !important;
+}
+
+.tool-solid-accent:hover {
+  background: rgba(0, 229, 255, 0.28) !important;
+}
+
 .osnap-bar {
   display: flex;
   gap: 6px;

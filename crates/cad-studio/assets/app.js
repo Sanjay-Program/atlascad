@@ -3123,6 +3123,274 @@
     byId("simulationHud").hidden = true;
   }
 
+  // ---------------------------------------------------------------------------------------
+  // AutoCAD Advanced Editing & 3D Bridge Handlers
+  // ---------------------------------------------------------------------------------------
+
+  function cadOffset() {
+    if (!drawState.selected) {
+      toast("Please select an entity first to offset", true);
+      return;
+    }
+    const val = prompt("Specify offset distance (e.g. 5.0):", "5.0");
+    if (!val) return;
+    const dist = parseFloat(val);
+    if (isNaN(dist) || dist <= 0) {
+      toast("Invalid offset distance", true);
+      return;
+    }
+    drawingMutate("/api/draft/offset", { id: drawState.selected, distance: dist, side: 1.0 }, "Offset created");
+  }
+
+  function cadFillet() {
+    if (drawState.filletFirst) {
+      if (!drawState.selected || drawState.selected === drawState.filletFirst) {
+        toast("Select a second distinct line to complete fillet", true);
+        return;
+      }
+      const id1 = drawState.filletFirst;
+      const id2 = drawState.selected;
+      const r = drawState.filletRadius || 0.0;
+      drawState.filletFirst = null;
+      drawingMutate("/api/draft/fillet", { id1, id2, radius: r }, "Fillet completed");
+      return;
+    }
+    const rVal = prompt("Specify fillet radius (0 for clean corner):", "0.0");
+    if (rVal === null) return;
+    const r = parseFloat(rVal);
+    drawState.filletRadius = isNaN(r) || r < 0 ? 0.0 : r;
+    if (drawState.selected) {
+      drawState.filletFirst = drawState.selected;
+      toast(`Fillet armed (R=${drawState.filletRadius}). Now click second line.`);
+    } else {
+      toast(`Fillet armed (R=${drawState.filletRadius}). Select first line.`);
+    }
+  }
+
+  function cadChamfer() {
+    if (drawState.chamferFirst) {
+      if (!drawState.selected || drawState.selected === drawState.chamferFirst) {
+        toast("Select a second distinct line to complete chamfer", true);
+        return;
+      }
+      const id1 = drawState.chamferFirst;
+      const id2 = drawState.selected;
+      const d1 = drawState.chamferD1 || 5.0;
+      const d2 = drawState.chamferD2 || 5.0;
+      drawState.chamferFirst = null;
+      drawingMutate("/api/draft/chamfer", { id1, id2, d1, d2 }, "Chamfer completed");
+      return;
+    }
+    const dVal = prompt("Specify chamfer cutback distances d1, d2 (e.g. 5.0, 5.0):", "5.0, 5.0");
+    if (!dVal) return;
+    const parts = dVal.split(/[\s,]+/);
+    const d1 = parseFloat(parts[0]) || 5.0;
+    const d2 = parseFloat(parts[1]) || d1;
+    drawState.chamferD1 = d1;
+    drawState.chamferD2 = d2;
+    if (drawState.selected) {
+      drawState.chamferFirst = drawState.selected;
+      toast(`Chamfer armed (${d1}, ${d2}). Now click second line.`);
+    } else {
+      toast(`Chamfer armed (${d1}, ${d2}). Select first line.`);
+    }
+  }
+
+  function cadMirror() {
+    if (!drawState.selected) {
+      toast("Please select an entity first to mirror", true);
+      return;
+    }
+    drawingMutate("/api/draft/transform", {
+      op: "mirror",
+      ids: [drawState.selected],
+      p1: [0.0, 0.0],
+      p2: [1.0, 0.0],
+      erase_source: false
+    }, "Entity mirrored across axis");
+  }
+
+  function cadRotate() {
+    if (!drawState.selected) {
+      toast("Please select an entity first to rotate", true);
+      return;
+    }
+    const val = prompt("Specify rotation angle in degrees (e.g. 45.0):", "45.0");
+    if (!val) return;
+    const ang = parseFloat(val);
+    if (isNaN(ang)) return;
+    drawingMutate("/api/draft/transform", {
+      op: "rotate",
+      ids: [drawState.selected],
+      angle_deg: ang,
+      center: [0.0, 0.0]
+    }, "Entity rotated");
+  }
+
+  function cadScale() {
+    if (!drawState.selected) {
+      toast("Please select an entity first to scale", true);
+      return;
+    }
+    const val = prompt("Specify scale factor (e.g. 2.0):", "2.0");
+    if (!val) return;
+    const factor = parseFloat(val);
+    if (isNaN(factor) || factor <= 0) return;
+    drawingMutate("/api/draft/transform", {
+      op: "scale",
+      ids: [drawState.selected],
+      factor: factor,
+      base: [0.0, 0.0]
+    }, "Entity scaled");
+  }
+
+  function cadMove() {
+    if (!drawState.selected) {
+      toast("Please select an entity first to move", true);
+      return;
+    }
+    const val = prompt("Specify displacement vector dx, dy (e.g. 10, 10):", "10, 10");
+    if (!val) return;
+    const parts = val.split(/[\s,]+/);
+    const dx = parseFloat(parts[0]) || 0;
+    const dy = parseFloat(parts[1]) || 0;
+    drawingMutate("/api/draft/transform", {
+      op: "translate",
+      ids: [drawState.selected],
+      dx,
+      dy
+    }, "Entity moved");
+  }
+
+  function cadCopy() {
+    if (!drawState.selected) {
+      toast("Please select an entity first to copy", true);
+      return;
+    }
+    const val = prompt("Specify copy displacement vector dx, dy (e.g. 15, 15):", "15, 15");
+    if (!val) return;
+    const parts = val.split(/[\s,]+/);
+    const dx = parseFloat(parts[0]) || 0;
+    const dy = parseFloat(parts[1]) || 0;
+    drawingMutate("/api/draft/transform", {
+      op: "copy",
+      ids: [drawState.selected],
+      dx,
+      dy
+    }, "Entity copied");
+  }
+
+  function cadExplode() {
+    if (!drawState.selected) {
+      toast("Please select a rectangle or polyline to explode", true);
+      return;
+    }
+    drawingMutate("/api/draft/explode", { id: drawState.selected }, "Exploded into individual lines");
+  }
+
+  async function cadDist() {
+    const val1 = prompt("First point x1, y1 (or leave blank to use origin):", "0, 0");
+    if (val1 === null) return;
+    const val2 = prompt("Second point x2, y2:", "30, 40");
+    if (val2 === null) return;
+    const p1Parts = val1.split(/[\s,]+/);
+    const p2Parts = val2.split(/[\s,]+/);
+    const p1 = [parseFloat(p1Parts[0]) || 0, parseFloat(p1Parts[1]) || 0];
+    const p2 = [parseFloat(p2Parts[0]) || 0, parseFloat(p2Parts[1]) || 0];
+
+    try {
+      const res = await api("/api/draft/measure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "distance", p1, p2 })
+      });
+      const msg = `DIST: ${res.distance.toFixed(3)} mm, ΔX: ${res.delta_x.toFixed(3)}, ΔY: ${res.delta_y.toFixed(3)}, Angle: ${res.angle_deg.toFixed(1)}°`;
+      toast(msg);
+      log(msg);
+    } catch (e) {
+      toast(e.message, true);
+    }
+  }
+
+  async function cadArea() {
+    if (!app.drawing || !app.drawing.entities) return;
+    let points = null;
+    if (drawState.selected) {
+      const ent = app.drawing.entities.find((e) => e.id === drawState.selected);
+      if (ent && ent.kind) {
+        if (ent.kind.kind === "rectangle") {
+          const o = ent.kind.origin;
+          const w = ent.kind.width;
+          const h = ent.kind.height;
+          points = [[o[0], o[1]], [o[0] + w, o[1]], [o[0] + w, o[1] + h], [o[0], o[1] + h]];
+        } else if (ent.kind.kind === "polyline" && ent.kind.closed) {
+          points = ent.kind.points;
+        }
+      }
+    }
+    if (!points) {
+      const val = prompt("Enter polygon coordinates (e.g. 0,0 20,0 20,10 0,10):", "0,0 20,0 20,10 0,10");
+      if (!val) return;
+      const raw = val.trim().split(/\s+/);
+      points = raw.map((pair) => {
+        const xy = pair.split(",");
+        return [parseFloat(xy[0]) || 0, parseFloat(xy[1]) || 0];
+      });
+    }
+    try {
+      const res = await api("/api/draft/measure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "area", points })
+      });
+      const msg = `AREA: ${res.area.toFixed(3)} mm², PERIMETER: ${res.perimeter.toFixed(3)} mm, Centroid: (${res.centroid[0].toFixed(2)}, ${res.centroid[1].toFixed(2)})`;
+      toast(msg);
+      log(msg);
+    } catch (e) {
+      toast(e.message, true);
+    }
+  }
+
+  function cadList() {
+    if (!drawState.selected || !app.drawing) {
+      toast("No entity selected. Click an entity in the drawing to inspect.", true);
+      return;
+    }
+    const ent = app.drawing.entities.find((e) => e.id === drawState.selected);
+    if (!ent) {
+      toast("Entity not found", true);
+      return;
+    }
+    const msg = `Entity #${ent.id}: kind=${ent.kind.kind}, layer=${ent.layer}, data=${JSON.stringify(ent.kind)}`;
+    toast(msg);
+    log(msg);
+  }
+
+  async function cadToSolid() {
+    if (!drawState.selected) {
+      toast("Select a closed 2D shape (rectangle, circle, polyline) to extrude into 3D solid", true);
+      return;
+    }
+    const val = prompt("Specify 3D extrusion depth (mm):", "15.0");
+    if (val === null) return;
+    const depth = parseFloat(val) || 15.0;
+    try {
+      const payload = await api("/api/draft/to-solid", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entity_id: drawState.selected, depth })
+      });
+      applyState(payload);
+      setView("iso");
+      const msg = `Extruded 2D shape #${drawState.selected} into 3D Solid Model (depth ${depth} mm)!`;
+      toast(msg);
+      log(msg);
+    } catch (e) {
+      toast(e.message, true);
+      log(e.message, "error");
+    }
+  }
+
   const autocadCommands = [
     { alias: "L", name: "LINE", desc: "Draw 2D line (2 clicks or coordinates)", run: () => setDrawTool("line") },
     { alias: "C", name: "CIRCLE", desc: "Draw 2D circle (centre, radius)", run: () => {
@@ -3139,6 +3407,20 @@
     { alias: "PO", name: "POINT", desc: "Place 2D point entity", run: () => setDrawTool("point") },
     { alias: "DIM", name: "DIMALIGNED", desc: "Measure & dimension between 2 points", run: () => setDrawTool("dimension") },
     { alias: "T", name: "TEXT", desc: "Place annotation text", run: () => setDrawTool("text") },
+    { alias: "O", name: "OFFSET", desc: "Offset entity by distance (parallel/concentric)", run: () => cadOffset() },
+    { alias: "F", name: "FILLET", desc: "Fillet corner between two lines (R=0 to clean)", run: () => cadFillet() },
+    { alias: "CHA", name: "CHAMFER", desc: "Chamfer corner between two lines", run: () => cadChamfer() },
+    { alias: "MI", name: "MIRROR", desc: "Mirror selected entity across axis", run: () => cadMirror() },
+    { alias: "RO", name: "ROTATE", desc: "Rotate entity around base point", run: () => cadRotate() },
+    { alias: "SC", name: "SCALE", desc: "Scale entity by factor", run: () => cadScale() },
+    { alias: "M", name: "MOVE", desc: "Translate entity by (dx, dy)", run: () => cadMove() },
+    { alias: "CO", name: "COPY", desc: "Duplicate entity shifted by (dx, dy)", run: () => cadCopy() },
+    { alias: "CP", name: "COPY", desc: "Duplicate entity shifted by (dx, dy)", run: () => cadCopy() },
+    { alias: "X", name: "EXPLODE", desc: "Decompose rectangle/polyline into lines", run: () => cadExplode() },
+    { alias: "DI", name: "DIST", desc: "Measure distance, delta & angle between points", run: () => cadDist() },
+    { alias: "AA", name: "AREA", desc: "Measure enclosed area and perimeter", run: () => cadArea() },
+    { alias: "LI", name: "LIST", desc: "List properties of selected entity", run: () => cadList() },
+    { alias: "3D", name: "EXTDRAFT", desc: "Extrude 2D sketch profile into 3D solid", run: () => cadToSolid() },
     { alias: "E", name: "ERASE", desc: "Delete selected drawing entity", run: () => deleteSelected() },
     { alias: "U", name: "UNDO", desc: "Undo last operation", run: () => undo() },
     { alias: "REDO", name: "REDO", desc: "Redo last operation", run: () => redo() },
@@ -3653,6 +3935,18 @@
       drawingMutate("/api/draft/undo", {}, "Drawing undone")
     );
     byId("drawDeleteBtn").addEventListener("click", deleteSelected);
+    byId("toolOffsetBtn")?.addEventListener("click", () => cadOffset());
+    byId("toolFilletBtn")?.addEventListener("click", () => cadFillet());
+    byId("toolChamferBtn")?.addEventListener("click", () => cadChamfer());
+    byId("toolMirrorBtn")?.addEventListener("click", () => cadMirror());
+    byId("toolRotateBtn")?.addEventListener("click", () => cadRotate());
+    byId("toolScaleBtn")?.addEventListener("click", () => cadScale());
+    byId("toolMoveBtn")?.addEventListener("click", () => cadMove());
+    byId("toolCopyBtn")?.addEventListener("click", () => cadCopy());
+    byId("toolExplodeBtn")?.addEventListener("click", () => cadExplode());
+    byId("toolDistBtn")?.addEventListener("click", () => cadDist());
+    byId("toolAreaBtn")?.addEventListener("click", () => cadArea());
+    byId("toolToSolidBtn")?.addEventListener("click", () => cadToSolid());
     byId("layerSelect").addEventListener("change", () => {
       drawState.layer = byId("layerSelect").value;
       syncDrawingControls();
