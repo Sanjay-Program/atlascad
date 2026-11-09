@@ -285,3 +285,29 @@ fn test_explode() -> Result<(), Box<dyn std::error::Error>> {
     assert!(draft.entity(r1).is_some());
     Ok(())
 }
+
+#[test]
+fn test_hatch_and_multiview() -> Result<(), Box<dyn std::error::Error>> {
+    let doc_id = DocumentId::new(7);
+    let mut draft = Draft::new("Test Drawing", doc_id, Unit::Millimeter);
+
+    // 20x20 square boundary
+    let square = [[0.0, 0.0], [20.0, 0.0], [20.0, 20.0], [0.0, 20.0]];
+
+    // Add ANSI31 crosshatch lines with 4.0 mm spacing
+    let hatch_ids = draft.add_hatch("0", &square, "ANSI31", 45.0, 4.0)?;
+    assert!(!hatch_ids.is_empty());
+    for id in &hatch_ids {
+        let ent = draft.entity(*id).ok_or("hatch line exists")?;
+        assert!(matches!(ent.kind, EntityKind::Line { .. }));
+    }
+
+    // Test NET grid hatch
+    let net_ids = draft.add_hatch("0", &square, "NET", 45.0, 4.0)?;
+    assert!(net_ids.len() > hatch_ids.len());
+
+    // Undo removes the hatch lines
+    draft.undo()?;
+    assert!(draft.entity(net_ids[0]).is_none());
+    Ok(())
+}

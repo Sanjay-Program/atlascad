@@ -3391,6 +3391,36 @@
     }
   }
 
+  async function cadHatch() {
+    if (!drawState.selected) {
+      toast("Please select a closed entity (rectangle, polyline) to hatch", true);
+      return;
+    }
+    const pat = prompt("Specify hatch pattern (ANSI31, NET):", "ANSI31");
+    if (!pat) return;
+    const spacingStr = prompt("Specify hatch line spacing (mm):", "3.0");
+    const spacing = parseFloat(spacingStr) || 3.0;
+    try {
+      await drawingMutate("/api/draft/hatch", {
+        entity_id: drawState.selected,
+        pattern: pat.trim().toUpperCase(),
+        angle_deg: 45.0,
+        spacing: spacing,
+      }, `Hatch pattern (${pat}) applied`);
+    } catch (e) {
+      toast(e.message, true);
+    }
+  }
+
+  async function cadMultiview() {
+    try {
+      await drawingMutate("/api/draft/multiview", {}, "Generated 4-View Orthographic Drawing with Sections!");
+      toast("Orthographic Multi-View drawing generated!");
+    } catch (e) {
+      toast(e.message, true);
+    }
+  }
+
   const autocadCommands = [
     { alias: "L", name: "LINE", desc: "Draw 2D line (2 clicks or coordinates)", run: () => setDrawTool("line") },
     { alias: "C", name: "CIRCLE", desc: "Draw 2D circle (centre, radius)", run: () => {
@@ -3421,6 +3451,10 @@
     { alias: "AA", name: "AREA", desc: "Measure enclosed area and perimeter", run: () => cadArea() },
     { alias: "LI", name: "LIST", desc: "List properties of selected entity", run: () => cadList() },
     { alias: "3D", name: "EXTDRAFT", desc: "Extrude 2D sketch profile into 3D solid", run: () => cadToSolid() },
+    { alias: "H", name: "HATCH", desc: "Crosshatch boundary with ANSI31 or NET pattern", run: () => cadHatch() },
+    { alias: "BH", name: "BHATCH", desc: "Boundary crosshatch with ANSI31 pattern", run: () => cadHatch() },
+    { alias: "MV", name: "MULTIVIEW", desc: "Generate 4-view orthographic drawing with cross-sections", run: () => cadMultiview() },
+    { alias: "ORTHO", name: "ORTHOGRAPHIC", desc: "Generate 4-view orthographic drawing with cross-sections", run: () => cadMultiview() },
     { alias: "E", name: "ERASE", desc: "Delete selected drawing entity", run: () => deleteSelected() },
     { alias: "U", name: "UNDO", desc: "Undo last operation", run: () => undo() },
     { alias: "REDO", name: "REDO", desc: "Redo last operation", run: () => redo() },
@@ -3946,7 +3980,9 @@
     byId("toolExplodeBtn")?.addEventListener("click", () => cadExplode());
     byId("toolDistBtn")?.addEventListener("click", () => cadDist());
     byId("toolAreaBtn")?.addEventListener("click", () => cadArea());
+    byId("toolHatchBtn")?.addEventListener("click", () => cadHatch());
     byId("toolToSolidBtn")?.addEventListener("click", () => cadToSolid());
+    byId("toolMultiviewBtn")?.addEventListener("click", () => cadMultiview());
     byId("layerSelect").addEventListener("change", () => {
       drawState.layer = byId("layerSelect").value;
       syncDrawingControls();

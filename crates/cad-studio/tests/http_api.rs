@@ -2944,5 +2944,26 @@ fn drafting_editing_endpoints_and_2d_to_3d_bridge() -> Result<(), Box<dyn std::e
     // The model now has the extruded solid! Volume must be strictly positive
     assert!(volume > 0.0);
 
+    // 7. Hatch closed rectangle with ANSI31 pattern
+    let hatch_resp = post(
+        addr,
+        "/api/draft/hatch",
+        &format!(r#"{{"entity_id":{rect_id},"pattern":"ANSI31","angle_deg":45.0,"spacing":4.0}}"#),
+    )?;
+    assert_eq!(hatch_resp.status, 200);
+    let hatch_payload = json(&hatch_resp)?;
+    let entities_after_hatch = hatch_payload["entities"].as_array().ok_or("entities")?;
+    assert!(entities_after_hatch.iter().any(|e| e["layer"] == "HATCH"));
+
+    // 8. Multi-View Orthographic Drawing Generator
+    let mv_resp = post(addr, "/api/draft/multiview", "{}")?;
+    assert_eq!(mv_resp.status, 200);
+    let mv_payload = json(&mv_resp)?;
+    let layers = mv_payload["layers"].as_array().ok_or("layers")?;
+    assert!(layers.iter().any(|l| l["name"] == "OUTLINE"));
+    assert!(layers.iter().any(|l| l["name"] == "SECTION"));
+    assert!(layers.iter().any(|l| l["name"] == "HATCH"));
+    assert!(layers.iter().any(|l| l["name"] == "DIMENSIONS"));
+
     Ok(())
 }

@@ -1053,3 +1053,111 @@ fn dist_sq(a: [f64; 2], b: [f64; 2]) -> f64 {
     let dy = b[1] - a[1];
     dx * dx + dy * dy
 }
+
+/// Generates crosshatch line segments inside a closed polygon boundary.
+///
+/// Implements standard CAD hatch patterns:
+/// - "ANSI31": parallel lines at `angle_deg` (default 45°) with `spacing` distance.
+/// - "NET": crosshatch grid with lines at `angle_deg` and `angle_deg + 90°`.
+///
+/// Uses scanline ray-casting algorithm to compute exact intersection segments within the polygon.
+pub fn generate_hatch_lines(
+    points: &[[f64; 2]],
+    pattern: &str,
+    angle_deg: f64,
+    spacing: f64,
+) -> Result<Vec<[f64; 4]>, DraftError> {
+    if points.len() < 3 {
+        return Err(DraftError::Invalid(
+            "hatch requires at least 3 points to form a closed boundary".into(),
+        ));
+    }
+    if !spacing.is_finite() || spacing <= 0.0 {
+        return Err(DraftError::Invalid(
+            "hatch spacing must be a positive finite number".into(),
+        ));
+    }
+    for p in points {
+        if !p[0].is_finite() || !p[1].is_finite() {
+            return Err(DraftError::Invalid(
+                "coordinates must be finite numbers".into(),
+            ));
+        }
+    }
+
+    let mut lines = Vec::new();
+    let is_net = pattern.eq_ignore_ascii_case("NET");
+
+    let generate_pass = |ang: f64| -> Vec<[f64; 4]> {
+        let rad = ang.to_radians();
+        let cos_a = rad.cos();
+        let sin_a = rad.sin();
+
+        // Rotate polygon points by -ang
+        let rot_pts: Vec<[f64; 2]> = points
+            .iter()
+            .map(|p| [p[0] * cos_a + p[1] * sin_a, -p[0] * sin_a + p[1] * cos_a])
+            .collect();
+
+        let mut min_y = f64::INFINITY;
+        let mut max_y = f64::NEG_INFINITY;
+        for p in &rot_pts {
+            if p[1] < min_y {
+                min_y = p[1];
+            }
+            if p[1] > max_y {
+                max_y = p[1];
+            }
+        }
+
+        let k_start = (min_y / spacing).ceil() as i64;
+        let k_end = (max_y / spacing).floor() as i64;
+
+        let n = rot_pts.len();
+        let mut pass_lines = Vec::new();
+
+        for k in k_start..=k_end {
+            let y_scan = (k as f64) * spacing;
+            let mut xs = Vec::new();
+
+            for i in 0..n {
+                let j = (i + 1) % n;
+                let p1 = rot_pts[i];
+                let p2 = rot_pts[j];
+
+                if (p1[1] <= y_scan && y_scan < p2[1]) || (p2[1] <= y_scan && y_scan < p1[1]) {
+                    let dy = p2[1] - p1[1];
+                    if dy.abs() > 1e-9 {
+                        let t = (y_scan - p1[1]) / dy;
+                        let x = p1[0] + t * (p2[0] - p1[0]);
+                        xs.push(x);
+                    }
+                }
+            }
+
+            xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+            for chunk in xs.chunks_exact(2) {
+                let x1 = chunk[0];
+                let x2 = chunk[1];
+                if (x2 - x1).abs() > 1e-6 {
+                    // Rotate back by +ang
+                    let orig_x1 = x1 * cos_a - y_scan * sin_a;
+                    let orig_y1 = x1 * sin_a + y_scan * cos_a;
+                    let orig_x2 = x2 * cos_a - y_scan * sin_a;
+                    let orig_y2 = x2 * sin_a + y_scan * cos_a;
+                    pass_lines.push([orig_x1, orig_y1, orig_x2, orig_y2]);
+                }
+            }
+        }
+
+        pass_lines
+    };
+
+    lines.extend(generate_pass(angle_deg));
+    if is_net {
+        lines.extend(generate_pass(angle_deg + 90.0));
+    }
+
+    Ok(lines)
+}

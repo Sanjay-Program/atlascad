@@ -1231,6 +1231,76 @@ impl StudioState {
         })
     }
 
+    fn drawing_hatch(&mut self, req: &DraftHatchRequest) -> Result<DraftView, StudioError> {
+        let pattern = req.pattern.as_deref().unwrap_or("ANSI31");
+        let angle = req.angle_deg.unwrap_or(45.0);
+        let spacing = req.spacing.unwrap_or(3.0);
+        let layer_name = req.layer.as_deref().unwrap_or("HATCH");
+
+        let points = if let Some(ent_id_num) = req.entity_id {
+            let ent_id =
+                EntityId::new(ent_id_num).map_err(|e| StudioError::BadRequest(e.to_string()))?;
+            let draft = self.drawing_mut()?;
+            let ent = draft
+                .entity(ent_id)
+                .ok_or_else(|| StudioError::BadRequest(format!("unknown entity {ent_id_num}")))?;
+            match &ent.kind {
+                cad_drafting::EntityKind::Rectangle {
+                    origin,
+                    width,
+                    height,
+                } => {
+                    let o = *origin;
+                    let w = *width;
+                    let h = *height;
+                    vec![o, [o[0] + w, o[1]], [o[0] + w, o[1] + h], [o[0], o[1] + h]]
+                }
+                cad_drafting::EntityKind::Polyline { points, closed } => {
+                    if !closed || points.len() < 3 {
+                        return Err(StudioError::BadRequest(
+                            "polyline must be closed to hatch".into(),
+                        ));
+                    }
+                    points.clone()
+                }
+                other => {
+                    return Err(StudioError::BadRequest(format!(
+                        "cannot hatch entity of kind `{}` (requires closed rectangle or polyline)",
+                        other.label()
+                    )));
+                }
+            }
+        } else if let Some(ref pts) = req.points {
+            if pts.len() < 3 {
+                return Err(StudioError::BadRequest(
+                    "hatch boundary requires at least 3 points".into(),
+                ));
+            }
+            pts.clone()
+        } else {
+            return Err(StudioError::BadRequest(
+                "hatch requires either entity_id or points".into(),
+            ));
+        };
+
+        {
+            let draft = self.drawing_mut()?;
+            if draft.layer(layer_name).is_none() {
+                draft.add_layer(layer_name, 2)?;
+            }
+            draft.add_hatch(layer_name, &points, pattern, angle, spacing)?;
+        }
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
+    fn drawing_multiview(&mut self) -> Result<DraftView, StudioError> {
+        let draft = cad_drafting::multiview_draft(&self.project)?;
+        self.drawing = Some(draft);
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
     /// Store the saved drawing's source revision in the project's embedded registry.
     ///
     /// This is what makes the pin survive a restart: before it existed only the in-memory session
@@ -2171,6 +2241,17 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             },
             Err(error) => error_response(&error),
         },
+        "/api/draft/hatch" => match parse_body::<DraftHatchRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_hatch(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/multiview" => match with_state(state, StudioState::drawing_multiview) {
+            Ok(payload) => to_json(200, &payload),
+            Err(error) => error_response(&error),
+        },
         "/api/engineering/review" => match parse_body::<ArtifactReviewRequest>(request) {
             Ok(body) => {
                 let id = match ArtifactId::new(body.id) {
@@ -2403,6 +2484,23 @@ struct DraftToSolidRequest {
     depth: f64,
     #[serde(default)]
     operation: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftHatchRequest {
+    #[serde(default)]
+    layer: Option<String>,
+    #[serde(default)]
+    entity_id: Option<u64>,
+    #[serde(default)]
+    points: Option<Vec<[f64; 2]>>,
+    #[serde(default)]
+    pattern: Option<String>,
+    #[serde(default)]
+    angle_deg: Option<f64>,
+    #[serde(default)]
+    spacing: Option<f64>,
 }
 
 /// A name for a new named revision.

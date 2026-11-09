@@ -48,8 +48,8 @@ mod sheet;
 pub use dxf::{DxfImport, ImportReport, MAX_DXF_BYTES, from_dxf};
 pub use edit::{
     AreaInquiry, DistanceInquiry, EntityProperties, chamfer_lines, explode_entity, fillet_lines,
-    line_intersection, measure_distance, measure_polygon_area, mirror_entity, offset_entity,
-    rotate_entity, scale_entity, translate_entity,
+    generate_hatch_lines, line_intersection, measure_distance, measure_polygon_area, mirror_entity,
+    offset_entity, rotate_entity, scale_entity, translate_entity,
 };
 pub use pdf::{PDF_VERSION, helvetica_width_pt, mm_to_pt, to_pdf};
 pub use sheet::{
@@ -597,6 +597,49 @@ impl Draft {
         closed: bool,
     ) -> Result<EntityId, DraftError> {
         self.add_entity(layer, EntityKind::Spline { points, closed })
+    }
+
+    /// Add crosshatch pattern lines inside a closed polygon boundary.
+    pub fn add_hatch(
+        &mut self,
+        layer: &str,
+        points: &[[f64; 2]],
+        pattern: &str,
+        angle_deg: f64,
+        spacing: f64,
+    ) -> Result<Vec<EntityId>, DraftError> {
+        let target = self
+            .layer(layer)
+            .ok_or_else(|| DraftError::UnknownLayer(layer.to_string()))?;
+        if target.locked {
+            return Err(DraftError::Invalid(format!("layer `{layer}` is locked")));
+        }
+        let segments = edit::generate_hatch_lines(points, pattern, angle_deg, spacing)?;
+        if segments.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        self.push_undo();
+        let mut ids = Vec::with_capacity(segments.len());
+        for seg in segments {
+            let id = EntityId::new(self.next_entity)
+                .map_err(|error| DraftError::Invalid(error.to_string()))?;
+            let next = self
+                .next_entity
+                .checked_add(1)
+                .ok_or_else(|| DraftError::Invalid("entity id space exhausted".into()))?;
+            self.next_entity = next;
+            self.entities.push(Entity {
+                id,
+                layer: layer.to_string(),
+                kind: EntityKind::Line {
+                    start: [seg[0], seg[1]],
+                    end: [seg[2], seg[3]],
+                },
+            });
+            ids.push(id);
+        }
+        Ok(ids)
     }
 
     /// Remove an entity. The layer must exist and be unlocked.
@@ -2411,6 +2454,222 @@ pub fn plan_draft(project: &cad_document::Project) -> Result<Draft, PlanError> {
     )?;
     // A plan arrives whole. Its construction is not a history the editor should be able to undo
     // through: the first undo in the panel must undo the user's first edit, not the generator.
+    draft.clear_history();
+    Ok(draft)
+}
+
+/// An orthographic multi-view engineering drawing of a 3D solid project:
+/// - Top View (Plan) with section cutting line A-A
+/// - Front View (Elevation) with dimensions and centerline
+/// - Right Side View (Profile) with dimensions and centerline
+/// - Section View A-A with ANSI31 45° crosshatch lines
+///
+/// Organized onto standard engineering layers:
+/// `OUTLINE` (visible geometry), `HIDDEN` (internal features), `CENTER` (centerlines),
+/// `SECTION` (cutting plane), `HATCH` (ANSI31 cross-hatching), `DIMENSIONS` (measurements),
+/// and `TEXT` (view annotations).
+pub fn multiview_draft(project: &cad_document::Project) -> Result<Draft, PlanError> {
+    let outline = plan_outline(project)?;
+    if outline.is_empty() {
+        return Err(PlanError::Project(cad_document::ProjectError::Invalid(
+            "empty plan outline".into(),
+        )));
+    }
+
+    // Determine bounding box of top view
+    let mut min_x = f64::INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    for p in &outline {
+        if p[0] < min_x {
+            min_x = p[0];
+        }
+        if p[1] < min_y {
+            min_y = p[1];
+        }
+        if p[0] > max_x {
+            max_x = p[0];
+        }
+        if p[1] > max_y {
+            max_y = p[1];
+        }
+    }
+    let w = (max_x - min_x).max(1.0);
+    let h = (max_y - min_y).max(1.0);
+
+    // Determine depth from project features or default
+    let depth = project
+        .features()
+        .first()
+        .and_then(|f| match &f.kind {
+            cad_document::FeatureKind::Extrude { depth_param, .. } => {
+                project.parameter(depth_param).ok()
+            }
+            _ => None,
+        })
+        .unwrap_or(20.0);
+
+    let spacing = (w.max(h) * 0.35).max(30.0);
+
+    let mut draft = Draft::new(
+        format!("{} Multi-View", project.name),
+        cad_contract::ids::DocumentId::new(1),
+        cad_contract::units::Unit::Millimeter,
+    );
+
+    // Standard engineering layers
+    draft.add_layer("OUTLINE", 7)?;
+    draft.add_layer("HIDDEN", 8)?;
+    draft.add_layer("CENTER", 1)?;
+    draft.add_layer("SECTION", 4)?;
+    draft.add_layer("HATCH", 2)?;
+    draft.add_layer("DIMENSIONS", 3)?;
+    draft.add_layer("TEXT", 7)?;
+
+    // 1. TOP VIEW (Plan) at [0, 0]
+    draft.add_entity(
+        "OUTLINE",
+        EntityKind::Polyline {
+            points: outline,
+            closed: true,
+        },
+    )?;
+
+    // Top view centerline
+    let mid_y = (min_y + max_y) * 0.5;
+    draft.add_entity(
+        "CENTER",
+        EntityKind::Line {
+            start: [min_x - 5.0, mid_y],
+            end: [max_x + 5.0, mid_y],
+        },
+    )?;
+
+    // Section cutting plane line A-A
+    draft.add_entity(
+        "SECTION",
+        EntityKind::Line {
+            start: [min_x - 10.0, mid_y],
+            end: [max_x + 10.0, mid_y],
+        },
+    )?;
+    draft.add_entity(
+        "TEXT",
+        EntityKind::Text {
+            at: [min_x - 14.0, mid_y - 2.0],
+            height: 4.0,
+            value: "A".into(),
+        },
+    )?;
+    draft.add_entity(
+        "TEXT",
+        EntityKind::Text {
+            at: [max_x + 11.0, mid_y - 2.0],
+            height: 4.0,
+            value: "A".into(),
+        },
+    )?;
+    draft.add_entity(
+        "TEXT",
+        EntityKind::Text {
+            at: [min_x, min_y - 8.0],
+            height: 3.5,
+            value: "TOP VIEW (PLAN)".into(),
+        },
+    )?;
+
+    // 2. FRONT VIEW (Elevation) placed below top view
+    let y_front = min_y - spacing - depth;
+    draft.add_rectangle("OUTLINE", [min_x, y_front], w, depth)?;
+    let mid_x = (min_x + max_x) * 0.5;
+    draft.add_entity(
+        "CENTER",
+        EntityKind::Line {
+            start: [mid_x, y_front - 5.0],
+            end: [mid_x, y_front + depth + 5.0],
+        },
+    )?;
+    draft.add_entity(
+        "DIMENSIONS",
+        EntityKind::Dimension {
+            start: [min_x, y_front],
+            end: [max_x, y_front],
+            offset: -8.0,
+            text: None,
+        },
+    )?;
+    draft.add_entity(
+        "DIMENSIONS",
+        EntityKind::Dimension {
+            start: [min_x, y_front],
+            end: [min_x, y_front + depth],
+            offset: 8.0,
+            text: None,
+        },
+    )?;
+    draft.add_entity(
+        "TEXT",
+        EntityKind::Text {
+            at: [min_x, y_front - 15.0],
+            height: 3.5,
+            value: "FRONT VIEW".into(),
+        },
+    )?;
+
+    // 3. RIGHT SIDE VIEW (Profile) placed to right of front view
+    let x_right = max_x + spacing;
+    draft.add_rectangle("OUTLINE", [x_right, y_front], h, depth)?;
+    let mid_rx = x_right + h * 0.5;
+    draft.add_entity(
+        "CENTER",
+        EntityKind::Line {
+            start: [mid_rx, y_front - 5.0],
+            end: [mid_rx, y_front + depth + 5.0],
+        },
+    )?;
+    draft.add_entity(
+        "DIMENSIONS",
+        EntityKind::Dimension {
+            start: [x_right, y_front],
+            end: [x_right + h, y_front],
+            offset: -8.0,
+            text: None,
+        },
+    )?;
+    draft.add_entity(
+        "TEXT",
+        EntityKind::Text {
+            at: [x_right, y_front - 15.0],
+            height: 3.5,
+            value: "RIGHT SIDE VIEW".into(),
+        },
+    )?;
+
+    // 4. SECTION VIEW A-A placed to right of top view
+    let sec_pts = vec![
+        [x_right, min_y],
+        [x_right + w, min_y],
+        [x_right + w, min_y + depth],
+        [x_right, min_y + depth],
+    ];
+    draft.add_entity(
+        "OUTLINE",
+        EntityKind::Polyline {
+            points: sec_pts.clone(),
+            closed: true,
+        },
+    )?;
+    draft.add_hatch("HATCH", &sec_pts, "ANSI31", 45.0, 3.0)?;
+    draft.add_entity(
+        "TEXT",
+        EntityKind::Text {
+            at: [x_right, min_y - 8.0],
+            height: 3.5,
+            value: "SECTION A-A (CROSS SECTION)".into(),
+        },
+    )?;
+
     draft.clear_history();
     Ok(draft)
 }

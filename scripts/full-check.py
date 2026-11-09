@@ -598,6 +598,16 @@ def drafting_section(studio: Studio) -> None:
     undone_bridge = studio.post("/api/undo")
     check(undone_bridge.status == 200, "undo of 2D to 3D solid extrusion succeeded")
 
+    # Crosshatch pattern
+    hatch_resp = studio.post("/api/draft/hatch", {"entity_id": r_id, "pattern": "ANSI31", "angle_deg": 45.0, "spacing": 4.0})
+    check(hatch_resp.status == 200, "crosshatch pattern ANSI31 generated")
+
+    # Multi-view orthographic drawing generator
+    mv_resp = studio.post("/api/draft/multiview", {})
+    check(mv_resp.status == 200, "multi-view orthographic drawing generated")
+    mv_layers = [l["name"] for l in mv_resp.json()["layers"]]
+    check("OUTLINE" in mv_layers and "SECTION" in mv_layers and "HATCH" in mv_layers, "multi-view drawing has standard layers")
+
     report("drafting")
 
 
