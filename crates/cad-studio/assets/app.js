@@ -1725,6 +1725,9 @@
   // Replace the drawing with the server's copy. The server is the authority: an edit is only real
   // once it has been accepted, so the panel never shows geometry the document does not hold.
   function applyDrawing(draft) {
+    if (draft && draft.draft) {
+      draft = draft.draft;
+    }
     app.drawing = draft;
     if (!drawState.layer || !(draft.layers || []).some((layer) => layer.name === drawState.layer)) {
       const layers = draft.layers || [];
@@ -1885,6 +1888,47 @@
       ],
       mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2],
       value: kind.text || formatNumber(length),
+    };
+  }
+
+  function radialDimensionGeometry(kind) {
+    const [cx, cy] = kind.center;
+    const [tx, ty] = kind.target;
+    const dx = tx - cx;
+    const dy = ty - cy;
+    const r = Math.hypot(dx, dy) || 1e-9;
+    const ux = dx / r;
+    const uy = dy / r;
+    const offset = kind.leader_offset != null ? kind.leader_offset : 15.0;
+    const elbow = [tx + ux * offset, ty + uy * offset];
+    const shoulderDx = ux >= 0 ? 6.0 : -6.0;
+    const shoulder = [elbow[0] + shoulderDx, elbow[1]];
+    const tick = Math.min(Math.max(r * 0.05, 0.5), 3.0);
+    const nx = -uy * tick * 0.5;
+    const ny = ux * tick * 0.5;
+
+    const lines = [];
+    if (kind.is_diameter) {
+      lines.push([[cx - ux * r, cy - uy * r], [tx, ty]]);
+    } else {
+      lines.push([[cx, cy], [tx, ty]]);
+    }
+    lines.push([[tx, ty], elbow]);
+    lines.push([elbow, shoulder]);
+    lines.push([
+      [tx - ux * tick + nx, ty - uy * tick + ny],
+      [tx, ty],
+    ]);
+    lines.push([
+      [tx - ux * tick - nx, ty - uy * tick - ny],
+      [tx, ty],
+    ]);
+
+    const valStr = kind.is_diameter ? `Ø ${(r * 2).toFixed(2)}` : `R ${r.toFixed(2)}`;
+    return {
+      lines,
+      textAt: [Math.min(elbow[0], shoulder[0]) + 1.0, shoulder[1] + 1.0],
+      value: kind.text || valStr,
     };
   }
 
@@ -2411,6 +2455,27 @@
         upright.append(label);
         continue;
       }
+      if (kind.kind === "radial_dimension") {
+        const geometry = radialDimensionGeometry(kind);
+        for (const [from, to] of geometry.lines) {
+          flip.append(svgNode("path", {
+            d: `M ${from[0]} ${from[1]} L ${to[0]} ${to[1]}`,
+            "data-entity-id": entity.id,
+            class: `drawing-dimension${selected ? " selected" : ""}`,
+          }));
+        }
+        const label = svgNode("text", {
+          x: geometry.textAt[0],
+          y: -geometry.textAt[1],
+          "font-size": Math.max(unitSize * 0.035, 1e-6),
+          "text-anchor": "start",
+          "data-entity-id": entity.id,
+          class: "drawing-text",
+        });
+        label.textContent = geometry.value;
+        upright.append(label);
+        continue;
+      }
       if (kind.kind === "point") {
         flip.append(svgNode("circle", {
           cx: kind.at[0],
@@ -2421,13 +2486,50 @@
         }));
         continue;
       }
+      if (kind.kind === "insert") {
+        const blocks = (drawing && drawing.blocks) || [];
+        const block = blocks.find((b) => (b.name || "").toLowerCase() === (kind.block_name || "").toLowerCase());
+        if (block && Array.isArray(block.entities)) {
+          const [posx, posy] = kind.position || [0, 0];
+          const [sx, sy] = kind.scale || [1, 1];
+          const rot = kind.rotation_degrees || 0;
+          const [bx, by] = block.base_point || [0, 0];
+          const group = svgNode("g", {
+            transform: `translate(${posx}, ${posy}) rotate(${rot}) scale(${sx}, ${sy}) translate(${-bx}, ${-by})`,
+            "data-entity-id": entity.id,
+            class: `drawing-insert${selected ? " selected" : ""}`,
+          });
+          for (const child of block.entities) {
+            const childD = drawingPath({ kind: child });
+            if (childD) {
+              group.append(svgNode("path", {
+                d: childD,
+                class: `drawing-entity${selected ? " selected" : ""}`,
+              }));
+            }
+          }
+          flip.append(group);
+        }
+        continue;
+      }
       const d = drawingPath(entity);
       if (!d) continue;
-      flip.append(svgNode("path", {
+      const strokeDash = layer && layer.linetype ? ({
+        hidden: "3,1.5",
+        center: "8,1.5,1.5,1.5",
+        phantom: "10,1.5,1.5,1.5,1.5,1.5",
+        dashed: "5,2",
+        dot: "0.5,1.5",
+      }[String(layer.linetype).toLowerCase()] || "") : "";
+      const pathAttrs = {
         d,
         "data-entity-id": entity.id,
         class: `drawing-entity${selected ? " selected" : ""}`,
-      }));
+      };
+      if (strokeDash) {
+        pathAttrs["stroke-dasharray"] = strokeDash;
+      }
+      flip.append(svgNode("path", pathAttrs));
     }
 
     // The shape being drawn: its points and the segments between them.
@@ -3744,6 +3846,303 @@ ${gcodeSample}`;
     }
   }
 
+  async function cadDimRadial(isDiameter = false) {
+    let entityId = drawState.selected || null;
+    let pickAngle = 45.0;
+    if (!entityId) {
+      const input = prompt(
+        isDiameter
+          ? "DIMDIAMETER: Enter Circle/Arc Entity ID to dimension (or leave empty to enter center & target):"
+          : "DIMRADIUS: Enter Circle/Arc Entity ID to dimension (or leave empty to enter center & target):"
+      );
+      if (input && input.trim()) {
+        entityId = parseInt(input.trim(), 10);
+      }
+    }
+
+    let payload;
+    if (entityId) {
+      const angleStr = prompt("Leader angle in degrees (default 45):", "45");
+      pickAngle = angleStr ? parseFloat(angleStr) || 45.0 : 45.0;
+      payload = {
+        layer: drawState.activeLayer || "0",
+        entity_id: entityId,
+        pick_angle_deg: pickAngle,
+        leader_offset: 15.0,
+        is_diameter: isDiameter,
+      };
+    } else {
+      const centerStr = prompt("Enter center point x,y (e.g. 50,50):", "0,0");
+      if (!centerStr) return;
+      const [cx, cy] = centerStr.split(",").map(parseFloat);
+      const targetStr = prompt("Enter rim target point x,y (e.g. 75,50):", "25,0");
+      if (!targetStr) return;
+      const [tx, ty] = targetStr.split(",").map(parseFloat);
+      payload = {
+        layer: drawState.activeLayer || "0",
+        center: [cx, cy],
+        target: [tx, ty],
+        leader_offset: 15.0,
+        is_diameter: isDiameter,
+      };
+    }
+
+    try {
+      const res = await api("/api/draft/dimension-radial", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      applyDraft(res);
+      toast(isDiameter ? "Diameter dimension added" : "Radius dimension added");
+    } catch (e) {
+      toast(e.message, true);
+    }
+  }
+
+  async function cadLinetype() {
+    const layerName = drawState.activeLayer || "0";
+    const ltype = prompt(
+      `Set linetype for layer '${layerName}' (continuous, hidden, center, phantom, dashed, dot):`,
+      "hidden"
+    );
+    if (!ltype) return;
+    try {
+      const res = await api("/api/draft/layer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: layerName,
+          linetype: ltype.trim().toLowerCase(),
+        }),
+      });
+      applyDraft(res);
+      toast(`Layer '${layerName}' linetype set to ${ltype.toUpperCase()}`);
+    } catch (e) {
+      toast(e.message, true);
+    }
+  }
+
+  async function cadBlock() {
+    const name = prompt("BLOCK: Enter block name:");
+    if (!name || !name.trim()) return;
+    const bpStr = prompt("BLOCK: Enter base point X, Y (default 0, 0):", "0, 0");
+    const bpParts = (bpStr || "0, 0").split(",").map((s) => parseFloat(s.trim()));
+    const base_point = [isNaN(bpParts[0]) ? 0 : bpParts[0], isNaN(bpParts[1]) ? 0 : bpParts[1]];
+    let entity_ids = [];
+    if (drawState.selected) {
+      entity_ids = [drawState.selected];
+    } else {
+      const idsStr = prompt("BLOCK: Enter comma-separated entity IDs (e.g. 1, 2):");
+      if (idsStr) {
+        entity_ids = idsStr.split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
+      }
+    }
+    if (!entity_ids.length) {
+      toast("BLOCK cancelled: No entities selected", true);
+      return;
+    }
+    drawingMutate("/api/draft/block", {
+      name: name.trim(),
+      base_point,
+      entity_ids,
+    }, `Block '${name.trim()}' created with ${entity_ids.length} entities`);
+  }
+
+  async function cadInsert() {
+    const blocks = (app.drawing && app.drawing.blocks) || [];
+    const blockNames = blocks.map((b) => b.name).join(", ");
+    const namePrompt = blockNames ? `INSERT: Enter block name (${blockNames}):` : "INSERT: Enter block name:";
+    const block_name = prompt(namePrompt);
+    if (!block_name || !block_name.trim()) return;
+    const posStr = prompt("INSERT: Enter insertion position X, Y (default 0, 0):", "0, 0");
+    const posParts = (posStr || "0, 0").split(",").map((s) => parseFloat(s.trim()));
+    const position = [isNaN(posParts[0]) ? 0 : posParts[0], isNaN(posParts[1]) ? 0 : posParts[1]];
+    const scaleStr = prompt("INSERT: Enter scale (e.g. 1 or 2, 2):", "1");
+    let scale = [1, 1];
+    if (scaleStr) {
+      const scParts = scaleStr.split(",").map((s) => parseFloat(s.trim()));
+      if (scParts.length === 1 && !isNaN(scParts[0])) {
+        scale = [scParts[0], scParts[0]];
+      } else if (scParts.length >= 2 && !isNaN(scParts[0]) && !isNaN(scParts[1])) {
+        scale = [scParts[0], scParts[1]];
+      }
+    }
+    const rotStr = prompt("INSERT: Enter rotation angle in degrees (default 0):", "0");
+    const rotation_degrees = parseFloat(rotStr) || 0;
+
+    drawingMutate("/api/draft/insert", {
+      layer: drawState.activeLayer || "0",
+      block_name: block_name.trim(),
+      position,
+      scale,
+      rotation_degrees,
+    }, `Block '${block_name.trim()}' inserted at [${position[0]}, ${position[1]}]`);
+  }
+
+  async function cadPurge() {
+    try {
+      const res = await drawingMutate("/api/draft/purge", {}, null);
+      if (res && res.report) {
+        const lCount = (res.report.purged_layers || []).length;
+        const bCount = (res.report.purged_blocks || []).length;
+        if (lCount === 0 && bCount === 0) {
+          toast("Purge: Drawing is already clean (0 unreferenced items)");
+        } else {
+          toast(`PURGE complete: Removed ${lCount} unused layer(s), ${bCount} unused block(s)`);
+        }
+      }
+    } catch (e) {
+      toast(e.message, true);
+    }
+  }
+
+  async function cadOverkill() {
+    const inputTol = prompt("OVERKILL: Enter tolerance in mm (default 0.0001):", "0.0001");
+    if (inputTol === null) return;
+    const tolerance = parseFloat(inputTol) || 0.0001;
+    try {
+      const res = await drawingMutate("/api/draft/overkill", { tolerance }, null);
+      if (res && res.report) {
+        const dCount = res.report.duplicate_entities_removed || 0;
+        const mCount = res.report.collinear_lines_merged || 0;
+        if (dCount === 0 && mCount === 0) {
+          toast("OVERKILL: No duplicate or overlapping geometry found");
+        } else {
+          toast(`OVERKILL complete: Deleted ${dCount} duplicate(s), merged ${mCount} collinear line(s)`);
+        }
+      }
+    } catch (e) {
+      toast(e.message, true);
+    }
+  }
+
+  async function cadDivide() {
+    let id = drawState.selected;
+    if (!id) {
+      const inputId = prompt("DIVIDE: Enter Entity ID to divide:", "");
+      if (!inputId) return;
+      id = parseInt(inputId, 10);
+    }
+    const inputSegs = prompt(`DIVIDE Entity #${id}: Enter number of segments (>= 2):`, "4");
+    if (!inputSegs) return;
+    const segments = parseInt(inputSegs, 10);
+    if (!segments || segments < 2) {
+      toast("Divide requires at least 2 segments", true);
+      return;
+    }
+    try {
+      const res = await drawingMutate("/api/draft/divide", { entity_id: id, segments }, null);
+      if (res && res.created_point_ids) {
+        toast(`DIVIDE: Created ${res.created_point_ids.length} points along Entity #${id}`);
+      }
+    } catch (e) {
+      toast(e.message, true);
+    }
+  }
+
+  async function cadMeasureInterval() {
+    let id = drawState.selected;
+    if (!id) {
+      const inputId = prompt("MEASURE: Enter Entity ID to measure intervals along:", "");
+      if (!inputId) return;
+      id = parseInt(inputId, 10);
+    }
+    const inputDist = prompt(`MEASURE Entity #${id}: Enter segment length interval in mm:`, "25.0");
+    if (!inputDist) return;
+    const interval = parseFloat(inputDist);
+    if (!interval || interval <= 0) {
+      toast("Interval must be positive", true);
+      return;
+    }
+    try {
+      const res = await drawingMutate("/api/draft/measure-interval", { entity_id: id, interval }, null);
+      if (res && res.created_point_ids) {
+        toast(`MEASURE: Placed ${res.created_point_ids.length} points at ${interval}mm intervals along Entity #${id}`);
+      }
+    } catch (e) {
+      toast(e.message, true);
+    }
+  }
+
+  async function cadMatchProp() {
+    let srcId = drawState.selected;
+    if (!srcId) {
+      const inputSrc = prompt("MATCHPROP: Enter source Entity ID to copy properties from:", "");
+      if (!inputSrc) return;
+      srcId = parseInt(inputSrc, 10);
+    }
+    const inputTargets = prompt(`MATCHPROP from Entity #${srcId}: Enter target Entity IDs (comma-separated):`, "");
+    if (!inputTargets) return;
+    const target_ids = inputTargets
+      .split(/[\s,]+/)
+      .map((s) => parseInt(s, 10))
+      .filter((n) => !isNaN(n) && n > 0);
+    if (target_ids.length === 0) {
+      toast("No valid target entities specified", true);
+      return;
+    }
+    try {
+      const res = await drawingMutate("/api/draft/match-properties", { source_id: srcId, target_ids }, null);
+      if (res) {
+        toast(`MATCHPROP: Updated properties of ${res.matched_count || 0} entity/entities`);
+      }
+    } catch (e) {
+      toast(e.message, true);
+    }
+  }
+
+  async function cadConstraintsSolve() {
+    toast("Parametric Constraint Engine: Solving geometric & dimensional relations...");
+    try {
+      const lines = (app.drawing?.entities || []).filter((e) => e.kind && e.kind.kind === "line");
+      if (lines.length === 0) {
+        toast("No lines in drawing to constrain. Draw lines with 'L' command first.", true);
+        return;
+      }
+      const points = [];
+      const ptMap = new Map();
+      function getPtIdx(pt) {
+        const key = `${pt[0].toFixed(3)},${pt[1].toFixed(3)}`;
+        if (ptMap.has(key)) return ptMap.get(key);
+        const idx = points.length;
+        points.push([pt[0], pt[1]]);
+        ptMap.set(key, idx);
+        return idx;
+      }
+      const lineDefs = [];
+      const updateMaps = [];
+      const constraints = [];
+      lines.forEach((l, idx) => {
+        const p1 = getPtIdx(l.kind.start);
+        const p2 = getPtIdx(l.kind.end);
+        lineDefs.push([p1, p2]);
+        updateMaps.push({ entity_id: l.id, line_index: idx });
+        const dx = Math.abs(l.kind.end[0] - l.kind.start[0]);
+        const dy = Math.abs(l.kind.end[1] - l.kind.start[1]);
+        if (dy < dx * 0.1) {
+          constraints.push({ Horizontal: idx });
+        } else if (dx < dy * 0.1) {
+          constraints.push({ Vertical: idx });
+        }
+      });
+      if (points.length > 0) {
+        constraints.push({ FixPoint: [0, points[0]] });
+      }
+      const res = await drawingMutate("/api/draft/constraints/solve", {
+        points,
+        lines: lineDefs,
+        constraints,
+        update_entities: updateMaps,
+      }, null);
+      if (res && res.solve) {
+        toast(`PARAMETRIC SOLVER: Converged in ${res.solve.iterations} iters, DOF status: ${res.dof.status} (free DOF: ${res.dof.total_dof})`);
+      }
+    } catch (e) {
+      toast(e.message, true);
+    }
+  }
+
   const autocadCommands = [
     { alias: "L", name: "LINE", desc: "Draw 2D line (2 clicks or coordinates)", run: () => setDrawTool("line") },
     { alias: "C", name: "CIRCLE", desc: "Draw 2D circle (centre, radius)", run: () => {
@@ -3759,6 +4158,12 @@ ${gcodeSample}`;
     { alias: "SPL", name: "SPLINE", desc: "Draw Catmull-Rom spline curve", run: () => setDrawTool("spline") },
     { alias: "PO", name: "POINT", desc: "Place 2D point entity", run: () => setDrawTool("point") },
     { alias: "DIM", name: "DIMALIGNED", desc: "Measure & dimension between 2 points", run: () => setDrawTool("dimension") },
+    { alias: "DRA", name: "DIMRADIUS", desc: "Create radial dimension for arc or circle", run: () => cadDimRadial(false) },
+    { alias: "DDI", name: "DIMDIAMETER", desc: "Create diameter dimension for circle or arc", run: () => cadDimRadial(true) },
+    { alias: "LTYPE", name: "LINETYPE", desc: "Set layer linetype (CONTINUOUS, HIDDEN, CENTER, PHANTOM, DASHED, DOT)", run: () => cadLinetype() },
+    { alias: "B", name: "BLOCK", desc: "Create reusable block definition from entities", run: () => cadBlock() },
+    { alias: "I", name: "INSERT", desc: "Insert reusable block instance", run: () => cadInsert() },
+    { alias: "INS", name: "INSERT", desc: "Insert reusable block instance", run: () => cadInsert() },
     { alias: "T", name: "TEXT", desc: "Place annotation text", run: () => setDrawTool("text") },
     { alias: "O", name: "OFFSET", desc: "Offset entity by distance (parallel/concentric)", run: () => cadOffset() },
     { alias: "TR", name: "TRIM", desc: "Trim line at cutting boundaries", run: () => cadTrim() },
@@ -3788,14 +4193,19 @@ ${gcodeSample}`;
     { alias: "BH", name: "BHATCH", desc: "Boundary crosshatch with ANSI31 pattern", run: () => cadHatch() },
     { alias: "MV", name: "MULTIVIEW", desc: "Generate 4-view orthographic drawing with cross-sections", run: () => cadMultiview() },
     { alias: "ORTHO", name: "ORTHOGRAPHIC", desc: "Generate 4-view orthographic drawing with cross-sections", run: () => cadMultiview() },
-    { alias: "DI", name: "DIST", desc: "Measure distance, delta & angle between points", run: () => cadDist() },
-    { alias: "AA", name: "AREA", desc: "Measure enclosed area and perimeter", run: () => cadArea() },
-    { alias: "LI", name: "LIST", desc: "List properties of selected entity", run: () => cadList() },
-    { alias: "3D", name: "EXTDRAFT", desc: "Extrude 2D sketch profile into 3D solid", run: () => cadToSolid() },
-    { alias: "H", name: "HATCH", desc: "Crosshatch boundary with ANSI31 or NET pattern", run: () => cadHatch() },
-    { alias: "BH", name: "BHATCH", desc: "Boundary crosshatch with ANSI31 pattern", run: () => cadHatch() },
-    { alias: "MV", name: "MULTIVIEW", desc: "Generate 4-view orthographic drawing with cross-sections", run: () => cadMultiview() },
-    { alias: "ORTHO", name: "ORTHOGRAPHIC", desc: "Generate 4-view orthographic drawing with cross-sections", run: () => cadMultiview() },
+    { alias: "PU", name: "PURGE", desc: "Purge unused layers and unreferenced blocks", run: () => cadPurge() },
+    { alias: "PURGE", name: "PURGE", desc: "Purge unused layers and unreferenced blocks", run: () => cadPurge() },
+    { alias: "OV", name: "OVERKILL", desc: "Delete duplicates and merge collinear lines", run: () => cadOverkill() },
+    { alias: "OVERKILL", name: "OVERKILL", desc: "Delete duplicates and merge collinear lines", run: () => cadOverkill() },
+    { alias: "DIV", name: "DIVIDE", desc: "Divide entity into equal segments by placing points", run: () => cadDivide() },
+    { alias: "DIVIDE", name: "DIVIDE", desc: "Divide entity into equal segments by placing points", run: () => cadDivide() },
+    { alias: "ME", name: "MEASURE", desc: "Place points at length intervals along entity", run: () => cadMeasureInterval() },
+    { alias: "MEASURE", name: "MEASURE", desc: "Place points at length intervals along entity", run: () => cadMeasureInterval() },
+    { alias: "MA", name: "MATCHPROP", desc: "Match layer and properties across entities", run: () => cadMatchProp() },
+    { alias: "MATCHPROP", name: "MATCHPROP", desc: "Match layer and properties across entities", run: () => cadMatchProp() },
+    { alias: "CON", name: "CONSTRAIN", desc: "Solve 2D geometric and dimensional parametric constraints", run: () => cadConstraintsSolve() },
+    { alias: "PARAMETRIC", name: "PARAMETRIC", desc: "Solve 2D geometric and dimensional parametric constraints", run: () => cadConstraintsSolve() },
+    { alias: "DOF", name: "DOF", desc: "Analyze degrees of freedom and solve constraints", run: () => cadConstraintsSolve() },
     { alias: "E", name: "ERASE", desc: "Delete selected drawing entity", run: () => deleteSelected() },
     { alias: "U", name: "UNDO", desc: "Undo last operation", run: () => undo() },
     { alias: "REDO", name: "REDO", desc: "Redo last operation", run: () => redo() },
@@ -4350,10 +4760,20 @@ ${gcodeSample}`;
     byId("toolJoinBtn")?.addEventListener("click", () => cadJoin());
     byId("toolArrayBtn")?.addEventListener("click", () => cadArray());
     byId("toolPolygonBtn")?.addEventListener("click", () => cadPolygon());
+    byId("toolDimRadiusBtn")?.addEventListener("click", () => cadDimRadial(false));
+    byId("toolDimDiameterBtn")?.addEventListener("click", () => cadDimRadial(true));
+    byId("toolBlockBtn")?.addEventListener("click", () => cadBlock());
+    byId("toolInsertBtn")?.addEventListener("click", () => cadInsert());
     byId("toolSectionBtn")?.addEventListener("click", () => cadSection());
     byId("toolDistBtn")?.addEventListener("click", () => cadDist());
     byId("toolAreaBtn")?.addEventListener("click", () => cadArea());
     byId("toolHatchBtn")?.addEventListener("click", () => cadHatch());
+    byId("toolPurgeBtn")?.addEventListener("click", () => cadPurge());
+    byId("toolOverkillBtn")?.addEventListener("click", () => cadOverkill());
+    byId("toolDivideBtn")?.addEventListener("click", () => cadDivide());
+    byId("toolMeasureIntervalBtn")?.addEventListener("click", () => cadMeasureInterval());
+    byId("toolMatchPropBtn")?.addEventListener("click", () => cadMatchProp());
+    byId("toolParametricBtn")?.addEventListener("click", () => cadConstraintsSolve());
     byId("toolToSolidBtn")?.addEventListener("click", () => cadToSolid());
     byId("toolToCamBtn")?.addEventListener("click", () => cadToCam());
     byId("toolMultiviewBtn")?.addEventListener("click", () => cadMultiview());

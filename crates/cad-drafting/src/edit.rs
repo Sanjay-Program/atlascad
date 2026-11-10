@@ -178,6 +178,19 @@ pub fn translate_entity(kind: &EntityKind, dx: f64, dy: f64) -> Result<EntityKin
             offset: *offset,
             text: text.clone(),
         },
+        EntityKind::RadialDimension {
+            center,
+            target,
+            leader_offset,
+            is_diameter,
+            text,
+        } => EntityKind::RadialDimension {
+            center: shift(center),
+            target: shift(target),
+            leader_offset: *leader_offset,
+            is_diameter: *is_diameter,
+            text: text.clone(),
+        },
         EntityKind::Rectangle {
             origin,
             width,
@@ -199,6 +212,17 @@ pub fn translate_entity(kind: &EntityKind, dx: f64, dy: f64) -> Result<EntityKin
         EntityKind::Spline { points, closed } => EntityKind::Spline {
             points: points.iter().map(shift).collect(),
             closed: *closed,
+        },
+        EntityKind::Insert {
+            block_name,
+            position,
+            scale,
+            rotation_degrees,
+        } => EntityKind::Insert {
+            block_name: block_name.clone(),
+            position: shift(position),
+            scale: *scale,
+            rotation_degrees: *rotation_degrees,
         },
     };
     Ok(res)
@@ -268,6 +292,19 @@ pub fn rotate_entity(
             offset: *offset,
             text: text.clone(),
         },
+        EntityKind::RadialDimension {
+            center,
+            target,
+            leader_offset,
+            is_diameter,
+            text,
+        } => EntityKind::RadialDimension {
+            center: rot(center),
+            target: rot(target),
+            leader_offset: *leader_offset,
+            is_diameter: *is_diameter,
+            text: text.clone(),
+        },
         EntityKind::Rectangle {
             origin,
             width,
@@ -323,6 +360,17 @@ pub fn rotate_entity(
         EntityKind::Spline { points, closed } => EntityKind::Spline {
             points: points.iter().map(rot).collect(),
             closed: *closed,
+        },
+        EntityKind::Insert {
+            block_name,
+            position,
+            scale,
+            rotation_degrees,
+        } => EntityKind::Insert {
+            block_name: block_name.clone(),
+            position: rot(position),
+            scale: *scale,
+            rotation_degrees: (rotation_degrees + angle_deg).rem_euclid(360.0),
         },
     };
     Ok(res)
@@ -387,6 +435,19 @@ pub fn scale_entity(
             offset: offset * factor,
             text: text.clone(),
         },
+        EntityKind::RadialDimension {
+            center,
+            target,
+            leader_offset,
+            is_diameter,
+            text,
+        } => EntityKind::RadialDimension {
+            center: sc(center),
+            target: sc(target),
+            leader_offset: leader_offset * factor.abs(),
+            is_diameter: *is_diameter,
+            text: text.clone(),
+        },
         EntityKind::Rectangle {
             origin,
             width,
@@ -408,6 +469,17 @@ pub fn scale_entity(
         EntityKind::Spline { points, closed } => EntityKind::Spline {
             points: points.iter().map(sc).collect(),
             closed: *closed,
+        },
+        EntityKind::Insert {
+            block_name,
+            position,
+            scale,
+            rotation_degrees,
+        } => EntityKind::Insert {
+            block_name: block_name.clone(),
+            position: sc(position),
+            scale: [scale[0] * factor, scale[1] * factor],
+            rotation_degrees: *rotation_degrees,
         },
     };
     Ok(res)
@@ -511,6 +583,19 @@ pub fn mirror_entity(
             offset: -offset,
             text: text.clone(),
         },
+        EntityKind::RadialDimension {
+            center,
+            target,
+            leader_offset,
+            is_diameter,
+            text,
+        } => EntityKind::RadialDimension {
+            center: mir(center),
+            target: mir(target),
+            leader_offset: *leader_offset,
+            is_diameter: *is_diameter,
+            text: text.clone(),
+        },
         EntityKind::Rectangle {
             origin,
             width,
@@ -560,6 +645,20 @@ pub fn mirror_entity(
             EntityKind::Spline {
                 points: mirrored,
                 closed: *closed,
+            }
+        }
+        EntityKind::Insert {
+            block_name,
+            position,
+            scale,
+            rotation_degrees,
+        } => {
+            let axis_angle_deg = dy.atan2(dx).to_degrees();
+            EntityKind::Insert {
+                block_name: block_name.clone(),
+                position: mir(position),
+                scale: [-scale[0], scale[1]],
+                rotation_degrees: (2.0 * axis_angle_deg - rotation_degrees).rem_euclid(360.0),
             }
         }
     };
@@ -727,7 +826,9 @@ pub fn offset_entity(
         | EntityKind::Spline { .. }
         | EntityKind::Point { .. }
         | EntityKind::Text { .. }
-        | EntityKind::Dimension { .. } => Err(DraftError::Invalid(format!(
+        | EntityKind::Dimension { .. }
+        | EntityKind::RadialDimension { .. }
+        | EntityKind::Insert { .. } => Err(DraftError::Invalid(format!(
             "offset is not supported on {}",
             kind.label()
         ))),
@@ -1592,6 +1693,8 @@ pub fn polar_array_entities(
                     EntityKind::Dimension { start, end, .. } => {
                         [(start[0] + end[0]) * 0.5, (start[1] + end[1]) * 0.5]
                     }
+                    EntityKind::RadialDimension { target, .. } => *target,
+                    EntityKind::Insert { position, .. } => *position,
                     EntityKind::Spline { points, .. } => {
                         let sx: f64 = points.iter().map(|p| p[0]).sum();
                         let sy: f64 = points.iter().map(|p| p[1]).sum();

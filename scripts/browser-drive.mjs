@@ -677,9 +677,8 @@ try {
   await drawingClick(0.6, 0.55);
   await waitFor(`document.getElementById("drawingEntities").textContent === "${entitiesBefore + 5}"`, 'the dimension');
 
+  await typeInto('#drawText', 'PLATE');
   await clickSelector('.draw-tools [data-tool="text"]', 'Text tool');
-  await clickSelector('#drawText', 'the text field');
-  await typeText('PLATE');
   await drawingClick(0.55, 0.25);
   await waitFor(`document.getElementById("drawingEntities").textContent === "${entitiesBefore + 6}"`, 'the text');
 
@@ -713,8 +712,7 @@ try {
   await clickSelector('#drawUndoBtn', 'drawing undo');
   await waitFor(`document.getElementById("drawingEntities").textContent === "${entitiesBefore + 5}"`, 'the drawing undo');
 
-  await clickSelector('#layerName', 'the layer name field');
-  await typeText('HOLES');
+  await typeInto('#layerName', 'HOLES');
   await clickSelector('#addLayerBtn', 'Add layer');
   await waitFor(
     `Array.from(document.querySelectorAll("#layerSelect option"), (o) => o.value).includes("HOLES")`,
@@ -763,8 +761,7 @@ try {
   // --- revisions, palette, save, export -------------------------------------------------------
   step('named revision: record, change the model, restore, delete');
   const baseline = await volumeMm3();
-  await clickSelector('#revisionName', 'the revision name field');
-  await typeText('drive baseline');
+  await typeInto('#revisionName', 'drive baseline');
   await clickSelector('#addRevisionBtn', 'Save revision');
   await waitFor('document.querySelectorAll("#revisions .revision-row").length === 1', 'the revision row');
   const revisionName = await evaluate('document.querySelector("#revisions .revision-name").textContent');

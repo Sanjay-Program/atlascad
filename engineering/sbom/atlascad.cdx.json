@@ -294,6 +294,29 @@
           }
         }
       ],
+      "name": "cad-constraints",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/cad-constraints@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
       "name": "cad-contract",
       "properties": [
         {

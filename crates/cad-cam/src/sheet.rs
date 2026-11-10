@@ -63,6 +63,7 @@ pub struct SetupSheet {
     pub wcs_z_axis: [f64; 3],
     pub tools: Vec<SheetTool>,
     pub operations: Vec<SheetOperation>,
+    pub material: Option<crate::feeds::Material>,
 }
 
 impl SetupSheet {
@@ -77,6 +78,90 @@ impl SetupSheet {
             wcs_z_axis: setup.wcs.z_axis,
             tools: Vec::new(),
             operations: Vec::new(),
+            material: None,
+        }
+    }
+
+    /// Attach a workpiece material for tool wear and cutting physics estimation.
+    pub fn with_material(mut self, material: crate::feeds::Material) -> Self {
+        self.material = Some(material);
+        self
+    }
+
+    /// Calculate tool wear estimates for all tools used in this setup based on the workpiece material.
+    pub fn tool_wear_estimates(
+        &self,
+        material: crate::feeds::Material,
+    ) -> Vec<(ToolId, crate::feeds::ToolWearEstimate)> {
+        let mut estimates = Vec::new();
+        for tool in &self.tools {
+            let cutting_time_min: f64 = self
+                .operations
+                .iter()
+                .filter(|op| op.tool_id == tool.id)
+                .map(|op| {
+                    if tool.feed_mm_min > 0.0 {
+                        op.cutting_mm / tool.feed_mm_min
+                    } else {
+                        op.estimated_minutes
+                    }
+                })
+                .sum();
+            let surface_speed = std::f64::consts::PI * tool.diameter_mm * tool.spindle_rpm / 1000.0;
+            let wear = material.estimate_tool_wear(surface_speed, cutting_time_min);
+            estimates.push((tool.id, wear));
+        }
+        estimates
+    }
+
+    /// Estimate kinematic cycle time across all operations in this setup.
+    pub fn kinematic_cycle_time(
+        &self,
+        limits: &crate::tool_path::KinematicLimits,
+    ) -> crate::tool_path::CycleTimeEstimate {
+        let mut cutting_seconds = 0.0;
+        let mut rapid_seconds = 0.0;
+        let accel_cut = limits.cutting_acceleration_mm_s2.max(10.0);
+        let accel_rapid = limits.rapid_acceleration_mm_s2.max(10.0);
+        let v_rapid = limits.rapid_feed_mm_min / 60.0;
+
+        for op in &self.operations {
+            let tool = self.tools.iter().find(|t| t.id == op.tool_id);
+            let feed_mm_min = tool.map(|t| t.feed_mm_min).unwrap_or(500.0);
+            let v_cut = (feed_mm_min / 60.0).max(0.1);
+
+            let avg_moves = op.moves.max(1) as f64;
+            let avg_cut_len = op.cutting_mm / avg_moves;
+            let avg_rapid_len = op.rapid_mm / avg_moves;
+
+            let d_acc_cut = (v_cut * v_cut) / accel_cut;
+            let t_cut_seg = if avg_cut_len >= d_acc_cut {
+                (v_cut / accel_cut) + (avg_cut_len / v_cut)
+            } else {
+                2.0 * (avg_cut_len / accel_cut).sqrt()
+            };
+            cutting_seconds += t_cut_seg * avg_moves;
+
+            let d_acc_rapid = (v_rapid * v_rapid) / accel_rapid;
+            let t_rapid_seg = if avg_rapid_len >= d_acc_rapid {
+                (v_rapid / accel_rapid) + (avg_rapid_len / v_rapid)
+            } else {
+                2.0 * (avg_rapid_len / accel_rapid).sqrt()
+            };
+            rapid_seconds += t_rapid_seg * avg_moves;
+        }
+
+        let spindle_dwell = limits.spindle_dwell_seconds * (self.operations.len().max(1) as f64);
+        let tool_change = limits.tool_change_seconds * (self.tools.len().saturating_sub(1) as f64);
+        let total_seconds = cutting_seconds + rapid_seconds + spindle_dwell + tool_change;
+
+        crate::tool_path::CycleTimeEstimate {
+            cutting_time_seconds: cutting_seconds,
+            rapid_time_seconds: rapid_seconds,
+            dwell_time_seconds: spindle_dwell,
+            tool_change_time_seconds: tool_change,
+            total_seconds,
+            total_minutes: total_seconds / 60.0,
         }
     }
 
@@ -189,6 +274,42 @@ impl SetupSheet {
                 max[2]
             ));
         }
+
+        if let Some(mat) = self.material {
+            out.push_str("\n## Kinematics & Tool Wear\n\n");
+            let limits = crate::tool_path::KinematicLimits::default();
+            let cycle = self.kinematic_cycle_time(&limits);
+            out.push_str(&format!(
+                "Workpiece material: **{}**\n\n\
+                 - Estimated Kinematic Cycle Time: **{:.2} min** ({:.1} s)\n\
+                 - Motion Breakdown: cutting {:.1} s, rapids {:.1} s, dwell {:.1} s, tool changes {:.1} s\n\n",
+                mat.label(),
+                cycle.total_minutes,
+                cycle.total_seconds,
+                cycle.cutting_time_seconds,
+                cycle.rapid_time_seconds,
+                cycle.dwell_time_seconds,
+                cycle.tool_change_time_seconds,
+            ));
+
+            out.push_str(
+                "| Tool | Surface Speed (m/min) | Cut Time (min) | Taylor Life (min) | Wear Fraction | Wear % | Remaining (min) |\n\
+                 |---|---|---|---|---|---|---|\n",
+            );
+            for (tool_id, wear) in self.tool_wear_estimates(mat) {
+                out.push_str(&format!(
+                    "| T{} | {:.1} | {:.2} | {:.1} | {:.4} | {:.2}% | {:.1} |\n",
+                    tool_id.get(),
+                    wear.surface_speed_m_min,
+                    wear.cutting_time_minutes,
+                    wear.tool_life_minutes,
+                    wear.wear_fraction,
+                    wear.wear_percent,
+                    wear.remaining_life_minutes,
+                ));
+            }
+        }
+
         out
     }
 }

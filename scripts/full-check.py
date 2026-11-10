@@ -660,6 +660,106 @@ def drafting_section(studio: Studio) -> None:
     check(cam_json["moves_count"] > 0 and cam_json["cutting_length_mm"] > 0.0, "CAM toolpath moves and cutting length positive")
     check("G01" in cam_json["gcode"] or "G1" in cam_json["gcode"], "emitted G-code contains linear feed moves")
 
+    # Radial and Diameter Dimensions & Layer Linetypes
+    lt_resp = studio.post("/api/draft/layer", {"name": "HIDDEN_LAYER", "color": 1, "linetype": "hidden"})
+    check(lt_resp.status == 200, "layer with linetype hidden created")
+    check(any(l["name"] == "HIDDEN_LAYER" and l.get("linetype") == "hidden" for l in lt_resp.json()["layers"]), "layer table records hidden linetype")
+
+    rad_dim_resp = studio.post("/api/draft/dimension-radial", {"entity_id": c2p_id, "pick_angle_deg": 45.0, "leader_offset": 12.0, "is_diameter": False})
+    check(rad_dim_resp.status == 200, "radial dimension created")
+    rad_json = rad_dim_resp.json()
+    check(rad_json["entities"][-1]["kind"]["kind"] == "radial_dimension" and not rad_json["entities"][-1]["kind"]["is_diameter"], "radial dimension entity verified")
+
+    dia_dim_resp = studio.post("/api/draft/dimension-radial", {"entity_id": c2p_id, "pick_angle_deg": 135.0, "leader_offset": 15.0, "is_diameter": True})
+    check(dia_dim_resp.status == 200, "diameter dimension created")
+    dia_json = dia_dim_resp.json()
+    check(dia_json["entities"][-1]["kind"]["kind"] == "radial_dimension" and dia_json["entities"][-1]["kind"]["is_diameter"], "diameter dimension entity verified")
+
+    # Reusable Blocks and Inserts (TASK-DRAFT-7)
+    blk_resp = studio.post("/api/draft/block", {"name": "CORNER_STAMP", "base_point": [0.0, 0.0], "entity_ids": [id_l1, id_l2]})
+    check(blk_resp.status == 200, "reusable block CORNER_STAMP created")
+    check(any(b["name"] == "CORNER_STAMP" for b in blk_resp.json().get("blocks", [])), "blocks list contains CORNER_STAMP")
+
+    ins_resp = studio.post("/api/draft/insert", {"block_name": "CORNER_STAMP", "position": [60.0, 60.0], "scale": [1.5, 1.5], "rotation_degrees": 90.0})
+    check(ins_resp.status == 200, "block insert placed")
+    ins_json = ins_resp.json()
+    ins_ent = ins_json["entities"][-1]
+    check(ins_ent["kind"]["kind"] == "insert" and ins_ent["kind"]["block_name"] == "CORNER_STAMP", "insert entity verified")
+    ins_id = ins_ent["id"]
+
+    exp_ins = studio.post("/api/draft/explode", {"id": ins_id})
+    check(exp_ins.status == 200, "insert exploded into constituent geometry")
+    check(not any(e["id"] == ins_id for e in exp_ins.json()["entities"]), "insert removed after explode")
+
+    undo_exp = studio.post("/api/draft/undo")
+    check(undo_exp.status == 200 and any(e["id"] == ins_id for e in undo_exp.json()["entities"]), "undo restored exploded insert")
+
+    # Advanced AutoCAD Drafting Operations & Parametric Constraints
+    # 1. PURGE: Unused layers and unused block definitions
+    p_lay = studio.post("/api/draft/layer", {"name": "PURGE_ME_LAYER", "color": 3})
+    check(p_lay.status == 200, "layer PURGE_ME_LAYER created")
+    p_pt = studio.post("/api/draft/entity", {"layer": "0", "kind": {"kind": "point", "at": [12.0, 12.0]}})
+    p_pt_id = p_pt.json()["entities"][-1]["id"]
+    p_blk = studio.post("/api/draft/block", {"name": "PURGE_ME_BLOCK", "base_point": [0.0, 0.0], "entity_ids": [p_pt_id]})
+    check(p_blk.status == 200, "block PURGE_ME_BLOCK created")
+
+    purge_resp = studio.post("/api/draft/purge", {})
+    check(purge_resp.status == 200, "purge endpoint succeeded")
+    purge_data = purge_resp.json()
+    check("PURGE_ME_LAYER" in purge_data["report"]["purged_layers"], "purge report lists PURGE_ME_LAYER")
+    check("PURGE_ME_BLOCK" in purge_data["report"]["purged_blocks"], "purge report lists PURGE_ME_BLOCK")
+
+    # 2. OVERKILL: Duplicate removal and collinear line merging
+    ok_l1 = studio.post("/api/draft/entity", {"layer": "0", "kind": {"kind": "line", "start": [0.0, 100.0], "end": [20.0, 100.0]}})
+    ok_l2 = studio.post("/api/draft/entity", {"layer": "0", "kind": {"kind": "line", "start": [20.0, 100.0], "end": [0.0, 100.0]}})
+    ok_ol1 = studio.post("/api/draft/entity", {"layer": "0", "kind": {"kind": "line", "start": [30.0, 100.0], "end": [50.0, 100.0]}})
+    ok_ol2 = studio.post("/api/draft/entity", {"layer": "0", "kind": {"kind": "line", "start": [40.0, 100.0], "end": [70.0, 100.0]}})
+    check(ok_l1.status == 200 and ok_l2.status == 200 and ok_ol1.status == 200 and ok_ol2.status == 200, "overkill test lines created")
+
+    overkill_resp = studio.post("/api/draft/overkill", {"tolerance": 0.001})
+    check(overkill_resp.status == 200, "overkill endpoint succeeded")
+    overkill_data = overkill_resp.json()
+    check(overkill_data["report"]["duplicate_entities_removed"] >= 1, "overkill removed duplicate line")
+    check(overkill_data["report"]["collinear_lines_merged"] >= 1, "overkill merged collinear lines")
+
+    # 3. DIVIDE: Equal segment division
+    div_line = studio.post("/api/draft/entity", {"layer": "0", "kind": {"kind": "line", "start": [0.0, 200.0], "end": [100.0, 200.0]}})
+    div_id = div_line.json()["entities"][-1]["id"]
+    div_resp = studio.post("/api/draft/divide", {"entity_id": div_id, "segments": 4})
+    check(div_resp.status == 200, "divide endpoint succeeded")
+    check(len(div_resp.json()["created_point_ids"]) == 3, "divide created 3 interior points for 4 segments")
+
+    # 4. MEASURE: Interval point placement along curve
+    me_resp = studio.post("/api/draft/measure-interval", {"entity_id": div_id, "interval": 30.0})
+    check(me_resp.status == 200, "measure-interval endpoint succeeded")
+    check(len(me_resp.json()["created_point_ids"]) == 3, "measure-interval created 3 points at 30mm spacing")
+
+    # 5. MATCHPROP: Property matching across entities
+    mp_layer = studio.post("/api/draft/layer", {"name": "MATCH_SOURCE_LAYER", "color": 5})
+    check(mp_layer.status == 200, "layer MATCH_SOURCE_LAYER created")
+    mp_src = studio.post("/api/draft/entity", {"layer": "MATCH_SOURCE_LAYER", "kind": {"kind": "point", "at": [1.0, 1.0]}})
+    mp_src_id = mp_src.json()["entities"][-1]["id"]
+    matchprop_resp = studio.post("/api/draft/match-properties", {"source_id": mp_src_id, "target_ids": [div_id]})
+    check(matchprop_resp.status == 200, "match-properties endpoint succeeded")
+    check(matchprop_resp.json()["matched_count"] == 1, "match-properties updated 1 target entity")
+    target_layer = next((e["layer"] for e in matchprop_resp.json()["draft"]["entities"] if e["id"] == div_id), None)
+    check(target_layer == "MATCH_SOURCE_LAYER", "target entity layer updated to source layer")
+
+    # 6. PARAMETRIC CONSTRAINTS: 2D Geometric & Dimensional Solver (cad-constraints)
+    solve_resp = studio.post("/api/draft/constraints/solve", {
+        "points": [[0.0, 0.0], [10.0, 2.0]],
+        "lines": [[0, 1]],
+        "constraints": [
+            {"FixPoint": [0, [0.0, 0.0]]},
+            {"Horizontal": 0}
+        ]
+    })
+    check(solve_resp.status == 200, "constraints solve endpoint succeeded")
+    solve_data = solve_resp.json()
+    check(solve_data["solve"]["converged"] is True, "parametric constraint solver converged")
+    check(solve_data["dof"]["status"] == "Under", "degrees of freedom status correctly identified as Under")
+    check(abs(solve_data["solved_points"][1][1]) < 1e-4, "horizontal constraint drove y2 to 0")
+
     report("drafting")
 
 
@@ -756,7 +856,7 @@ def export_section(studio: Studio) -> None:
 
 
 def simulation_section(studio: Studio) -> None:
-    section("simulation: linear static FEA, modal vibration frequencies, and 3-axis CAM toolpaths")
+    section("simulation: linear static FEA, modal vibration, steady-state thermal, and 3-axis CAM")
     # 1. Static FEA simulation
     fea = studio.post("/api/cae/static", {"material": "steel.1018", "voxel_size_mm": 5.0})
     check(fea.status == 200, f"the static FEA endpoint returns 200 (got {fea.status})")
@@ -777,12 +877,23 @@ def simulation_section(studio: Studio) -> None:
     f2 = modes[1].get("frequency_hz", 0.0)
     check(f2 >= f1, f"modes are ordered by frequency: {f1} <= {f2}")
 
-    # 3. 3-Axis CNC CAM toolpath generation
+    # 3. Steady-state thermal conduction FEA
+    thermal = studio.post("/api/cae/thermal", {"material": "steel.1018", "fixed_temp_hot_c": 100.0, "fixed_temp_cold_c": 20.0})
+    check(thermal.status == 200, f"the thermal endpoint returns 200 (got {thermal.status})")
+    thermal_data = thermal.json()
+    check(thermal_data.get("elements", 0) > 0, "thermal mesh has solid elements")
+    check(thermal_data.get("min_temperature_c", 0.0) <= 20.01, "minimum temperature matches cold boundary")
+    check(thermal_data.get("max_temperature_c", 0.0) >= 99.99, "maximum temperature matches hot boundary")
+    check(thermal_data.get("max_heat_flux_w_m2", 0.0) > 0.0, "conduction produces positive heat flux")
+
+    # 4. 3-Axis CNC CAM toolpath generation with kinematic cycle time and Taylor tool wear
     cam = studio.post("/api/cam/toolpaths", {"tool_diameter_mm": 6.0})
     check(cam.status == 200, f"the CAM endpoint returns 200 (got {cam.status})")
     cam_data = cam.json()
     check(cam_data.get("moves_count", 0) > 0, "CAM generates motion moves")
     check(cam_data.get("cutting_length_mm", 0.0) > 0.0, "cutting distance is non-zero")
+    check(cam_data.get("kinematic_cycle_time_seconds", 0.0) > 0.0, "kinematic cycle time is calculated")
+    check(cam_data.get("tool_wear_fraction", -1.0) >= 0.0, "Taylor tool wear fraction is calculated")
     check("G" in cam_data.get("gcode_preview", ""), "G-code preview is returned")
     report("simulation")
 

@@ -479,6 +479,182 @@ impl ModalStudy {
     }
 }
 
+/// A prescribed Dirichlet fixed temperature boundary condition on a plane.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FixedTemperature {
+    pub face: FaceSelection,
+    /// Prescribed temperature in degrees Celsius (or Kelvin).
+    pub temperature_c: f64,
+}
+
+impl FixedTemperature {
+    pub const fn new(face: FaceSelection, temperature_c: f64) -> Self {
+        FixedTemperature {
+            face,
+            temperature_c,
+        }
+    }
+}
+
+/// A total heat load (in Watts) distributed over the nodes of a selected plane.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HeatLoad {
+    pub face: FaceSelection,
+    /// Total heat rate in Watts (positive = into body).
+    pub heat_w: f64,
+}
+
+impl HeatLoad {
+    pub const fn new(face: FaceSelection, heat_w: f64) -> Self {
+        HeatLoad { face, heat_w }
+    }
+}
+
+/// A surface heat flux (in Watts/m²) applied over a selected boundary plane.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FaceHeatFlux {
+    pub face: FaceSelection,
+    /// Heat flux in W/m² (positive = into body).
+    pub flux_w_m2: f64,
+}
+
+impl FaceHeatFlux {
+    pub const fn new(face: FaceSelection, flux_w_m2: f64) -> Self {
+        FaceHeatFlux { face, flux_w_m2 }
+    }
+}
+
+/// A steady-state thermal conduction study.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ThermalStudy {
+    pub name: String,
+    /// Edge length of one hexahedral element, in millimetres.
+    pub voxel_size_mm: f64,
+    /// Material id from the shared material library.
+    pub material: String,
+    /// Fixed temperature boundary conditions.
+    pub fixed_temperatures: Vec<FixedTemperature>,
+    /// Applied surface heat loads in Watts.
+    #[serde(default)]
+    pub heat_loads: Vec<HeatLoad>,
+    /// Applied surface heat fluxes in W/m².
+    #[serde(default)]
+    pub heat_fluxes: Vec<FaceHeatFlux>,
+    /// Internal volumetric heat generation in W/m³.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub volumetric_heat_w_m3: Option<f64>,
+    #[serde(default)]
+    pub solver: SolverSettings,
+}
+
+impl ThermalStudy {
+    pub fn new(name: impl Into<String>, voxel_size_mm: f64, material: impl Into<String>) -> Self {
+        ThermalStudy {
+            name: name.into(),
+            voxel_size_mm,
+            material: material.into(),
+            fixed_temperatures: Vec::new(),
+            heat_loads: Vec::new(),
+            heat_fluxes: Vec::new(),
+            volumetric_heat_w_m3: None,
+            solver: SolverSettings::default(),
+        }
+    }
+
+    pub fn with_fixed_temperature(mut self, fixed: FixedTemperature) -> Self {
+        self.fixed_temperatures.push(fixed);
+        self
+    }
+
+    pub fn with_heat_load(mut self, load: HeatLoad) -> Self {
+        self.heat_loads.push(load);
+        self
+    }
+
+    pub fn with_heat_flux(mut self, flux: FaceHeatFlux) -> Self {
+        self.heat_fluxes.push(flux);
+        self
+    }
+
+    pub fn with_volumetric_heat(mut self, heat_w_m3: f64) -> Self {
+        self.volumetric_heat_w_m3 = Some(heat_w_m3);
+        self
+    }
+
+    pub fn validate(&self) -> Result<(), CaeError> {
+        let name = self.name.trim();
+        if name.is_empty() || name.chars().count() > 120 {
+            return Err(CaeError::Invalid(
+                "a study name must be 1..=120 characters".into(),
+            ));
+        }
+        if !self.voxel_size_mm.is_finite() || self.voxel_size_mm <= 0.0 {
+            return Err(CaeError::Invalid(format!(
+                "voxel size {} is not a positive length",
+                self.voxel_size_mm
+            )));
+        }
+        if self.material.trim().is_empty() {
+            return Err(CaeError::Invalid("the study names no material".into()));
+        }
+        if self.fixed_temperatures.is_empty() {
+            return Err(CaeError::Invalid(
+                "a steady-state thermal conduction study requires at least one fixed temperature boundary condition".into(),
+            ));
+        }
+        if self.fixed_temperatures.len() > 64 {
+            return Err(CaeError::Invalid(
+                "a study is limited to 64 fixed temperature boundary conditions".into(),
+            ));
+        }
+        for fix in &self.fixed_temperatures {
+            fix.face.validate("a fixed temperature")?;
+            if !fix.temperature_c.is_finite() {
+                return Err(CaeError::Invalid(
+                    "fixed temperature must be a finite float".into(),
+                ));
+            }
+        }
+        for heat in &self.heat_loads {
+            heat.face.validate("a heat load")?;
+            if !heat.heat_w.is_finite() {
+                return Err(CaeError::Invalid("heat load must be a finite float".into()));
+            }
+        }
+        for flux in &self.heat_fluxes {
+            flux.face.validate("a heat flux")?;
+            if !flux.flux_w_m2.is_finite() {
+                return Err(CaeError::Invalid("heat flux must be a finite float".into()));
+            }
+        }
+        if let Some(vol_q) = self.volumetric_heat_w_m3
+            && !vol_q.is_finite()
+        {
+            return Err(CaeError::Invalid(
+                "volumetric heat must be a finite float".into(),
+            ));
+        }
+        if !self.solver.relative_tolerance.is_finite()
+            || self.solver.relative_tolerance <= 0.0
+            || self.solver.relative_tolerance > 1.0e-2
+        {
+            return Err(CaeError::Invalid(
+                "the solver relative tolerance must be in (0, 1e-2]".into(),
+            ));
+        }
+        if self.solver.max_iterations == 0 || self.solver.max_iterations > 1_000_000 {
+            return Err(CaeError::Invalid(
+                "the solver iteration limit must be in 1..=1,000,000".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// The material values a result was computed with, so the result cannot drift from its inputs.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MaterialRef {
@@ -676,6 +852,45 @@ impl ModalResult {
             self.modes.len(),
             self.mesh.elements,
             self.mesh.voxel_size_mm,
+        )
+    }
+}
+
+/// The completed result of a steady-state thermal conduction analysis.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ThermalResult {
+    pub study: String,
+    pub quality_label: &'static str,
+    pub voxel_size_mm: f64,
+    pub element_count: usize,
+    pub node_count: usize,
+    pub material_name: String,
+    pub thermal_conductivity_w_m_k: f64,
+    pub min_temperature_c: f64,
+    pub max_temperature_c: f64,
+    pub avg_temperature_c: f64,
+    pub max_heat_flux_w_m2: f64,
+    pub avg_heat_flux_w_m2: f64,
+    pub total_reaction_heat_w: f64,
+    pub solver_iterations: usize,
+    pub solver_relative_residual: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nodal_temperatures: Option<Vec<f64>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub element_heat_fluxes: Option<Vec<[f64; 3]>>,
+    pub warnings: Vec<String>,
+}
+
+impl ThermalResult {
+    pub fn summary_line(&self) -> String {
+        format!(
+            "thermal: temp [{:.1}..{:.1}] °C (avg {:.1} °C), max flux {:.1} W/m², {} elements at {:.3} mm. {QUALITY_LABEL}",
+            self.min_temperature_c,
+            self.max_temperature_c,
+            self.avg_temperature_c,
+            self.max_heat_flux_w_m2,
+            self.element_count,
+            self.voxel_size_mm,
         )
     }
 }
@@ -1285,6 +1500,303 @@ pub fn run_modal(
             volume_error_ratio,
         },
         modes,
+        warnings,
+    })
+}
+
+/// Run a steady-state thermal conduction study on `mesh` with the study's material.
+pub fn run_thermal(
+    mesh: &Mesh,
+    study: &ThermalStudy,
+    library: &MaterialLibrary,
+) -> Result<ThermalResult, CaeError> {
+    run_thermal_with_fields(mesh, study, library, false)
+}
+
+/// Run a steady-state thermal conduction study on `mesh`, optionally retaining full nodal temperature and heat flux fields.
+pub fn run_thermal_with_fields(
+    mesh: &Mesh,
+    study: &ThermalStudy,
+    library: &MaterialLibrary,
+    include_fields: bool,
+) -> Result<ThermalResult, CaeError> {
+    study.validate()?;
+    let material = library
+        .get(&study.material)
+        .ok_or_else(|| CaeError::UnknownMaterial(study.material.clone()))?;
+    mesh.validate()
+        .map_err(|error| CaeError::Mesh(error.to_string()))?;
+    if !mesh.is_closed() {
+        return Err(CaeError::OpenMesh(mesh.open_edges()));
+    }
+    let conductivity = material
+        .thermal_conductivity_w_m_k
+        .ok_or_else(|| CaeError::MissingProperty(material.id.clone(), "thermal conductivity"))?;
+    if !conductivity.is_finite() || conductivity <= 0.0 {
+        return Err(CaeError::MissingProperty(
+            material.id.clone(),
+            "finite positive thermal conductivity",
+        ));
+    }
+
+    let source_volume = mesh.signed_volume().abs();
+    if !source_volume.is_finite() || source_volume <= 0.0 {
+        return Err(CaeError::Mesh(
+            "the mesh encloses no volume; check its orientation".into(),
+        ));
+    }
+
+    let grid = voxel::VoxelGrid::build(mesh, study.voxel_size_mm)?;
+    let node_counts = grid.node_counts();
+    let node_total = node_counts[0]
+        .checked_mul(node_counts[1])
+        .and_then(|value| value.checked_mul(node_counts[2]))
+        .ok_or_else(|| CaeError::Invalid("the node grid overflows".into()))?;
+    let elements = grid.element_count();
+    if elements == 0 {
+        return Err(CaeError::Invalid(
+            "the voxel mesh contains no solid elements".into(),
+        ));
+    }
+    if elements > MAX_STUDY_ELEMENTS || node_total > MAX_STUDY_NODES {
+        return Err(CaeError::TooLarge {
+            elements,
+            nodes: node_total,
+            max_elements: MAX_STUDY_ELEMENTS,
+            max_nodes: MAX_STUDY_NODES,
+        });
+    }
+
+    let mut positions = Vec::with_capacity(node_total);
+    for k in 0..node_counts[2] {
+        for j in 0..node_counts[1] {
+            for i in 0..node_counts[0] {
+                positions.push([
+                    grid.origin[0] + i as f64 * grid.cell,
+                    grid.origin[1] + j as f64 * grid.cell,
+                    grid.origin[2] + k as f64 * grid.cell,
+                ]);
+            }
+        }
+    }
+
+    let node = |i: usize, j: usize, k: usize| -> u32 {
+        (i + node_counts[0] * (j + node_counts[1] * k)) as u32
+    };
+    let [nx, ny, nz] = grid.counts;
+    let mut element_nodes = Vec::with_capacity(elements);
+    for k in 0..nz {
+        for j in 0..ny {
+            for i in 0..nx {
+                let index = i + nx * (j + ny * k);
+                if !grid.inside.get(index).copied().unwrap_or(false) {
+                    continue;
+                }
+                element_nodes.push([
+                    node(i, j, k),
+                    node(i + 1, j, k),
+                    node(i + 1, j + 1, k),
+                    node(i, j + 1, k),
+                    node(i, j, k + 1),
+                    node(i + 1, j, k + 1),
+                    node(i + 1, j + 1, k + 1),
+                    node(i, j + 1, k + 1),
+                ]);
+            }
+        }
+    }
+    if element_nodes.len() != elements {
+        return Err(CaeError::Invalid(
+            "the element table is inconsistent with the voxel mask".into(),
+        ));
+    }
+
+    let mut used = vec![false; node_total];
+    for nodes in &element_nodes {
+        for &node in nodes {
+            used[node as usize] = true;
+        }
+    }
+
+    let mut fixed_nodes = vec![false; node_total];
+    let mut prescribed_temp = vec![0.0; node_total];
+    for fix in &study.fixed_temperatures {
+        let selected = select_nodes(&positions, &used, &fix.face)
+            .map_err(|msg| CaeError::Invalid(format!("fixed temperature: {msg}")))?;
+        for idx in selected {
+            fixed_nodes[idx] = true;
+            prescribed_temp[idx] = fix.temperature_c;
+        }
+    }
+
+    let mut applied_heat = vec![0.0; node_total];
+    for load in &study.heat_loads {
+        let selected = select_nodes(&positions, &used, &load.face)
+            .map_err(|msg| CaeError::Invalid(format!("heat load: {msg}")))?;
+        let share = load.heat_w / (selected.len() as f64);
+        for idx in selected {
+            applied_heat[idx] += share;
+        }
+    }
+
+    for flux in &study.heat_fluxes {
+        let selected = select_nodes(&positions, &used, &flux.face)
+            .map_err(|msg| CaeError::Invalid(format!("heat flux: {msg}")))?;
+        let cell_m = grid.cell / 1000.0;
+        let face_area_m2 = cell_m * cell_m;
+        let axis = flux.face.axis.index();
+        let mut face_count = 0usize;
+        for nodes in &element_nodes {
+            let (f1, f2) = match flux.face.axis {
+                Axis::X => (
+                    [nodes[0], nodes[3], nodes[7], nodes[4]],
+                    [nodes[1], nodes[2], nodes[6], nodes[5]],
+                ),
+                Axis::Y => (
+                    [nodes[0], nodes[1], nodes[5], nodes[4]],
+                    [nodes[3], nodes[2], nodes[6], nodes[7]],
+                ),
+                Axis::Z => (
+                    [nodes[0], nodes[1], nodes[2], nodes[3]],
+                    [nodes[4], nodes[5], nodes[6], nodes[7]],
+                ),
+            };
+            let c1 = positions[f1[0] as usize][axis];
+            let c2 = positions[f2[0] as usize][axis];
+            if (c1 - flux.face.coordinate_mm).abs() <= flux.face.tolerance_mm {
+                face_count += 1;
+            }
+            if (c2 - flux.face.coordinate_mm).abs() <= flux.face.tolerance_mm {
+                face_count += 1;
+            }
+        }
+        let total_area_m2 = (face_count.max(1) as f64) * face_area_m2;
+        let total_w = flux.flux_w_m2 * total_area_m2;
+        let share = total_w / (selected.len() as f64);
+        for idx in selected {
+            applied_heat[idx] += share;
+        }
+    }
+
+    if let Some(vol_q) = study.volumetric_heat_w_m3 {
+        let cell_m = grid.cell / 1000.0;
+        let vol_m3 = cell_m.powi(3);
+        let heat_per_elem = vol_q * vol_m3;
+        let heat_per_node = heat_per_elem / 8.0;
+        for nodes in &element_nodes {
+            for &node in nodes {
+                applied_heat[node as usize] += heat_per_node;
+            }
+        }
+    }
+
+    // Fix unused nodes so they do not participate in the solve
+    for (idx, &is_used) in used.iter().enumerate() {
+        if !is_used {
+            fixed_nodes[idx] = true;
+            prescribed_temp[idx] = 0.0;
+            applied_heat[idx] = 0.0;
+        }
+    }
+
+    let local_k = fe::hex_thermal_conductivity(study.voxel_size_mm, conductivity);
+    let outcome = fe::solve_thermal(
+        &element_nodes,
+        &local_k,
+        &fixed_nodes,
+        &prescribed_temp,
+        &applied_heat,
+        &study.solver,
+    )
+    .map_err(|error| CaeError::Solver(error.to_string()))?;
+
+    let mut min_temp = f64::INFINITY;
+    let mut max_temp = f64::NEG_INFINITY;
+    let mut sum_temp = 0.0;
+    let mut used_node_count = 0usize;
+
+    for (idx, &is_used) in used.iter().enumerate() {
+        if is_used {
+            let t = outcome.temperatures[idx];
+            min_temp = min_temp.min(t);
+            max_temp = max_temp.max(t);
+            sum_temp += t;
+            used_node_count += 1;
+        }
+    }
+    let avg_temp = if used_node_count > 0 {
+        sum_temp / used_node_count as f64
+    } else {
+        0.0
+    };
+
+    let mut max_flux: f64 = 0.0;
+    let mut sum_flux = 0.0;
+    let mut element_fluxes = Vec::with_capacity(element_nodes.len());
+
+    for nodes in &element_nodes {
+        let mut te = [0.0; fe::ELEMENT_NODES];
+        for (i, &n) in nodes.iter().enumerate() {
+            te[i] = outcome.temperatures[n as usize];
+        }
+        let q = fe::centre_heat_flux(&te, study.voxel_size_mm, conductivity);
+        let mag = (q[0] * q[0] + q[1] * q[1] + q[2] * q[2]).sqrt();
+        max_flux = max_flux.max(mag);
+        sum_flux += mag;
+        element_fluxes.push(q);
+    }
+    let avg_flux = if !element_nodes.is_empty() {
+        sum_flux / element_nodes.len() as f64
+    } else {
+        0.0
+    };
+
+    let total_reaction_heat: f64 = outcome.reaction_heat.iter().sum();
+
+    let mut warnings = vec![
+        "The analysis mesh is a voxel (stair-step) hexahedral approximation of the tessellated surface."
+            .to_string(),
+        "Fixed temperatures are applied at matching mesh boundary nodes.".to_string(),
+        "Steady-state linear thermal conduction, Fourier law with isotropic conductivity."
+            .to_string(),
+        QUALITY_LABEL.to_string(),
+    ];
+
+    let voxel_volume_mm3 = elements as f64 * grid.cell.powi(3);
+    let volume_error_ratio = (voxel_volume_mm3 - source_volume).abs() / source_volume;
+    if volume_error_ratio > 0.05 {
+        warnings.push(format!(
+            "The voxel mesh volume differs from the body by {:.1}%; refine the voxel size before relying on absolute quantities.",
+            volume_error_ratio * 100.0
+        ));
+    }
+
+    Ok(ThermalResult {
+        study: study.name.clone(),
+        quality_label: QUALITY_LABEL,
+        voxel_size_mm: grid.cell,
+        element_count: elements,
+        node_count: used_node_count,
+        material_name: material.name.clone(),
+        thermal_conductivity_w_m_k: conductivity,
+        min_temperature_c: min_temp,
+        max_temperature_c: max_temp,
+        avg_temperature_c: avg_temp,
+        max_heat_flux_w_m2: max_flux,
+        avg_heat_flux_w_m2: avg_flux,
+        total_reaction_heat_w: total_reaction_heat,
+        solver_iterations: outcome.iterations,
+        solver_relative_residual: outcome.relative_residual,
+        nodal_temperatures: if include_fields {
+            Some(outcome.temperatures)
+        } else {
+            None
+        },
+        element_heat_fluxes: if include_fields {
+            Some(element_fluxes)
+        } else {
+            None
+        },
         warnings,
     })
 }

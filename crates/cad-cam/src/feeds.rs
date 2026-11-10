@@ -142,6 +142,81 @@ impl Material {
             .collect::<Vec<_>>()
             .join(", ")
     }
+
+    /// Taylor tool life equation parameters ($V_c \cdot T^n = C$) for standard solid carbide end mills.
+    pub const fn taylor_parameters(self) -> TaylorParameters {
+        match self {
+            Material::Aluminium => TaylorParameters { n: 0.35, c: 800.0 },
+            Material::Brass => TaylorParameters { n: 0.30, c: 500.0 },
+            Material::MildSteel => TaylorParameters { n: 0.25, c: 260.0 },
+            Material::StainlessSteel => TaylorParameters { n: 0.20, c: 180.0 },
+            Material::Acetal => TaylorParameters { n: 0.40, c: 1000.0 },
+            Material::Hardwood => TaylorParameters { n: 0.40, c: 1200.0 },
+        }
+    }
+
+    /// Estimate tool wear and expected life for cutting this material at `surface_speed_m_min` for `cutting_time_minutes`.
+    pub fn estimate_tool_wear(
+        self,
+        surface_speed_m_min: f64,
+        cutting_time_minutes: f64,
+    ) -> ToolWearEstimate {
+        let params = self.taylor_parameters();
+        // V_c * T^n = C => T = (C / V_c)^(1 / n)
+        let tool_life_minutes = if surface_speed_m_min > 0.0 && params.n > 0.0 && params.c > 0.0 {
+            (params.c / surface_speed_m_min)
+                .powf(1.0 / params.n)
+                .max(1.0e-3)
+        } else {
+            f64::INFINITY
+        };
+        let cutting_time = cutting_time_minutes.max(0.0);
+        let wear_fraction = if tool_life_minutes.is_finite() && tool_life_minutes > 0.0 {
+            (cutting_time / tool_life_minutes).max(0.0)
+        } else {
+            0.0
+        };
+        let wear_percent = (wear_fraction * 100.0).clamp(0.0, 1000.0);
+        let remaining_life_minutes = if tool_life_minutes.is_finite() {
+            (tool_life_minutes - cutting_time).max(0.0)
+        } else {
+            f64::INFINITY
+        };
+        ToolWearEstimate {
+            surface_speed_m_min,
+            cutting_time_minutes: cutting_time,
+            tool_life_minutes,
+            wear_fraction,
+            wear_percent,
+            remaining_life_minutes,
+        }
+    }
+}
+
+/// Taylor tool life equation constants ($V_c \cdot T^n = C$).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TaylorParameters {
+    /// Taylor tool life exponent $n$.
+    pub n: f64,
+    /// Cutting speed constant $C$ (m/min) for 1-minute tool life.
+    pub c: f64,
+}
+
+/// Estimate of tool wear and life based on Taylor's tool life equation.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ToolWearEstimate {
+    /// Surface cutting speed in metres per minute.
+    pub surface_speed_m_min: f64,
+    /// Active cutting time in minutes.
+    pub cutting_time_minutes: f64,
+    /// Theoretical tool life in minutes from Taylor's equation.
+    pub tool_life_minutes: f64,
+    /// Tool wear fraction (cutting_time / tool_life). 1.0 = 100% worn.
+    pub wear_fraction: f64,
+    /// Tool wear as a percentage (wear_fraction * 100%).
+    pub wear_percent: f64,
+    /// Estimated remaining useful life in minutes.
+    pub remaining_life_minutes: f64,
 }
 
 impl fmt::Display for Material {

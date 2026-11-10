@@ -156,6 +156,55 @@ The smoke Caddyfile answers on named sites (`http://localhost`, `https://localho
 issue against, so every handshake failed with `tlsv1 alert internal error` — measured, then fixed;
 the smoke now proves the TLS path instead of assuming it.
 
+## 2c. Multi-Document Production Stacking (Level One Operations)
+
+In production environments where multiple engineers or teams work on separate parts and assemblies
+simultaneously, the enterprise "Deploy Level One" pattern uses independent container stacks with
+shared reverse-proxy routing:
+
+### 1. Isolated Project Namespaces
+Each document stack is launched with an explicit Docker Compose project name (`-p <project>`),
+a dedicated loopback port, and its own named volumes and secrets:
+
+```sh
+# Stack 1: Structural Bracket
+STUDIO_PROJECT=cad-bracket \
+  STUDIO_BIND_PORT=7520 \
+  STUDIO_NAME=bracket \
+  STUDIO_TOKEN_FILE=/etc/atlas-tokens/bracket.token \
+  STUDIO_PUBLIC_HOST=bracket.cad.internal \
+  docker compose -p cad-bracket -f compose.yaml up -d --wait
+
+# Stack 2: Enclosure Housing
+STUDIO_PROJECT=cad-housing \
+  STUDIO_BIND_PORT=7521 \
+  STUDIO_NAME=housing \
+  STUDIO_TOKEN_FILE=/etc/atlas-tokens/housing.token \
+  STUDIO_PUBLIC_HOST=housing.cad.internal \
+  docker compose -p cad-housing -f compose.yaml up -d --wait
+```
+
+### 2. Failure Domain Isolation
+Because Atlas CAD Studio is strictly single-writer per process, multi-document stacking guarantees:
+- **Zero Cross-Contamination:** A memory-intensive mesh generation or simulation crash in `cad-bracket`
+  does not impact `cad-housing`.
+- **Per-Document Tokens:** Token leak or rotation on one document does not compromise other models.
+- **Independent Disaster Recovery:** `./backup.sh --volume cad-bracket_atlas-studio-data` snapshots
+  or restores the bracket without stopping or disturbing active editing sessions in `cad-housing`.
+
+### 3. Unified Caddy Subdomain Ingress
+A single frontend Caddy proxy routes TLS traffic across all document stacks:
+
+```caddy
+bracket.cad.internal {
+    reverse_proxy 127.0.0.1:7520
+}
+
+housing.cad.internal {
+    reverse_proxy 127.0.0.1:7521
+}
+```
+
 ## 3. systemd + Caddy (TLS, one public name)
 
 ```sh

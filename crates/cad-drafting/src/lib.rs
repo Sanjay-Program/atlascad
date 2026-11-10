@@ -104,6 +104,44 @@ pub enum DraftError {
     Io { path: String, message: String },
 }
 
+/// Standard CAD linetypes for layers and entities.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Linetype {
+    #[default]
+    Continuous,
+    Hidden,
+    Center,
+    Phantom,
+    Dashed,
+    Dot,
+}
+
+impl Linetype {
+    pub const fn name(&self) -> &'static str {
+        match self {
+            Self::Continuous => "CONTINUOUS",
+            Self::Hidden => "HIDDEN",
+            Self::Center => "CENTER",
+            Self::Phantom => "PHANTOM",
+            Self::Dashed => "DASHED",
+            Self::Dot => "DOT",
+        }
+    }
+
+    /// Dash pattern in millimetres [dash_len, space_len, ...] for vector plotting.
+    pub fn dash_pattern(&self) -> &'static [f64] {
+        match self {
+            Self::Continuous => &[],
+            Self::Hidden => &[3.0, 1.5],
+            Self::Center => &[8.0, 1.5, 1.5, 1.5],
+            Self::Phantom => &[10.0, 1.5, 1.5, 1.5, 1.5, 1.5],
+            Self::Dashed => &[5.0, 2.0],
+            Self::Dot => &[0.5, 1.5],
+        }
+    }
+}
+
 /// One drawing layer.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -118,6 +156,9 @@ pub struct Layer {
     /// Plotted line weight in millimetres. R12 has no line-weight table, so it is document data
     /// only, kept for a later DXF version rather than silently dropped on export.
     pub line_weight_mm: f64,
+    /// Standard CAD linetype.
+    #[serde(default)]
+    pub linetype: Linetype,
 }
 
 impl Layer {
@@ -128,6 +169,7 @@ impl Layer {
             visible: true,
             locked: false,
             line_weight_mm: 0.25,
+            linetype: Linetype::Continuous,
         }
     }
 }
@@ -177,6 +219,14 @@ pub enum EntityKind {
         offset: f64,
         text: Option<String>,
     },
+    /// A radial or diameter dimension on a circular arc or circle.
+    RadialDimension {
+        center: [f64; 2],
+        target: [f64; 2],
+        leader_offset: f64,
+        is_diameter: bool,
+        text: Option<String>,
+    },
     /// A rectangle defined by its orthogonal origin corner, width, and height.
     Rectangle {
         origin: [f64; 2],
@@ -194,6 +244,13 @@ pub enum EntityKind {
         points: Vec<[f64; 2]>,
         closed: bool,
     },
+    /// A reusable block insertion instance placed at `position`.
+    Insert {
+        block_name: String,
+        position: [f64; 2],
+        scale: [f64; 2],
+        rotation_degrees: f64,
+    },
 }
 
 impl EntityKind {
@@ -207,9 +264,11 @@ impl EntityKind {
             EntityKind::Polyline { .. } => "polyline",
             EntityKind::Text { .. } => "text",
             EntityKind::Dimension { .. } => "dimension",
+            EntityKind::RadialDimension { .. } => "radial_dimension",
             EntityKind::Rectangle { .. } => "rectangle",
             EntityKind::Ellipse { .. } => "ellipse",
             EntityKind::Spline { .. } => "spline",
+            EntityKind::Insert { .. } => "insert",
         }
     }
 
@@ -327,6 +386,35 @@ impl EntityKind {
                 }
                 Ok(())
             }
+            EntityKind::RadialDimension {
+                center,
+                target,
+                leader_offset,
+                text,
+                ..
+            } => {
+                validate_point(center)?;
+                validate_point(target)?;
+                let radius = (target[0] - center[0]).hypot(target[1] - center[1]);
+                if radius <= 1e-9 {
+                    return Err(DraftError::Invalid(
+                        "a radial dimension requires a non-zero radius".into(),
+                    ));
+                }
+                if !leader_offset.is_finite() {
+                    return Err(DraftError::Invalid(
+                        "a radial dimension leader offset must be finite".into(),
+                    ));
+                }
+                if let Some(text) = text
+                    && text.chars().count() > MAX_TEXT_CHARS
+                {
+                    return Err(DraftError::Invalid(format!(
+                        "a dimension label accepts at most {MAX_TEXT_CHARS} characters"
+                    )));
+                }
+                Ok(())
+            }
             EntityKind::Rectangle {
                 origin,
                 width,
@@ -375,6 +463,34 @@ impl EntityKind {
                 }
                 Ok(())
             }
+            EntityKind::Insert {
+                block_name,
+                position,
+                scale,
+                rotation_degrees,
+            } => {
+                validate_point(position)?;
+                if !scale[0].is_finite()
+                    || !scale[1].is_finite()
+                    || scale[0].abs() < 1e-9
+                    || scale[1].abs() < 1e-9
+                {
+                    return Err(DraftError::Invalid(
+                        "an insert scale must be non-zero finite numbers".into(),
+                    ));
+                }
+                if !rotation_degrees.is_finite() {
+                    return Err(DraftError::Invalid(
+                        "an insert rotation must be finite".into(),
+                    ));
+                }
+                if block_name.trim().is_empty() || block_name.len() > 64 {
+                    return Err(DraftError::Invalid(
+                        "a block name must be between 1 and 64 characters".into(),
+                    ));
+                }
+                Ok(())
+            }
         }
     }
 }
@@ -406,6 +522,29 @@ pub struct Entity {
     pub kind: EntityKind,
 }
 
+/// A reusable block definition with a base insertion point.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Block {
+    pub name: String,
+    pub base_point: [f64; 2],
+    pub entities: Vec<EntityKind>,
+}
+
+/// Summary report of unreferenced items removed by a PURGE operation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct PurgeReport {
+    pub purged_layers: Vec<String>,
+    pub purged_blocks: Vec<String>,
+}
+
+/// Summary report of entities removed or merged by an OVERKILL operation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct OverkillReport {
+    pub duplicate_entities_removed: usize,
+    pub collinear_lines_merged: usize,
+}
+
 /// The editable state an undo snapshot captures: layers, geometry and the id counter.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -413,6 +552,8 @@ struct Snapshot {
     layers: Vec<Layer>,
     entities: Vec<Entity>,
     next_entity: u64,
+    #[serde(default)]
+    blocks: Vec<Block>,
 }
 
 /// A 2D drawing.
@@ -425,6 +566,8 @@ pub struct Draft {
     layers: Vec<Layer>,
     entities: Vec<Entity>,
     next_entity: u64,
+    #[serde(default)]
+    blocks: Vec<Block>,
     #[serde(default)]
     undo: Vec<Snapshot>,
     #[serde(default)]
@@ -444,6 +587,7 @@ impl Draft {
             layers: vec![Layer::new(DEFAULT_LAYER, 7)],
             entities: Vec::new(),
             next_entity: 1,
+            blocks: Vec::new(),
             undo: Vec::new(),
             redo: Vec::new(),
         }
@@ -526,6 +670,14 @@ impl Draft {
         self.push_undo();
         let layer = self.layer_mut(name)?;
         layer.line_weight_mm = weight_mm;
+        Ok(())
+    }
+
+    /// Set a layer's standard CAD linetype.
+    pub fn set_layer_linetype(&mut self, name: &str, linetype: Linetype) -> Result<(), DraftError> {
+        self.push_undo();
+        let layer = self.layer_mut(name)?;
+        layer.linetype = linetype;
         Ok(())
     }
 
@@ -694,6 +846,190 @@ impl Draft {
         self.add_entity(layer, kind)
     }
 
+    /// Add a radial or diameter dimension.
+    pub fn add_radial_dimension(
+        &mut self,
+        layer: &str,
+        center: [f64; 2],
+        target: [f64; 2],
+        leader_offset: f64,
+        is_diameter: bool,
+        text: Option<String>,
+    ) -> Result<EntityId, DraftError> {
+        self.add_entity(
+            layer,
+            EntityKind::RadialDimension {
+                center,
+                target,
+                leader_offset,
+                is_diameter,
+                text,
+            },
+        )
+    }
+
+    /// Add a radial or diameter dimension picking an existing circle or arc by entity ID.
+    pub fn add_dimension_for_curve(
+        &mut self,
+        layer: &str,
+        entity_id: EntityId,
+        pick_angle_deg: f64,
+        leader_offset: f64,
+        is_diameter: bool,
+        text: Option<String>,
+    ) -> Result<EntityId, DraftError> {
+        let (center, radius) = match self.entity(entity_id).map(|e| &e.kind) {
+            Some(EntityKind::Circle { center, radius }) => (*center, *radius),
+            Some(EntityKind::Arc { center, radius, .. }) => (*center, *radius),
+            Some(other) => {
+                return Err(DraftError::Invalid(format!(
+                    "cannot add radial dimension to entity of kind `{}` (requires circle or arc)",
+                    other.label()
+                )));
+            }
+            None => return Err(DraftError::UnknownEntity(entity_id.get())),
+        };
+        let rad = pick_angle_deg.to_radians();
+        let target = [
+            center[0] + radius * rad.cos(),
+            center[1] + radius * rad.sin(),
+        ];
+        self.add_radial_dimension(layer, center, target, leader_offset, is_diameter, text)
+    }
+
+    /// Return all reusable block definitions in the drawing.
+    pub fn blocks(&self) -> &[Block] {
+        &self.blocks
+    }
+
+    /// Look up a block definition by name (case-insensitive).
+    pub fn block(&self, name: &str) -> Option<&Block> {
+        self.blocks
+            .iter()
+            .find(|b| b.name.eq_ignore_ascii_case(name.trim()))
+    }
+
+    /// Add a named reusable block definition storing entities relative to `base_point`.
+    pub fn add_block(
+        &mut self,
+        name: &str,
+        base_point: [f64; 2],
+        entities: Vec<EntityKind>,
+    ) -> Result<(), DraftError> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err(DraftError::Invalid("a block name must not be empty".into()));
+        }
+        if name.chars().count() > MAX_LAYER_NAME_CHARS {
+            return Err(DraftError::Invalid(format!(
+                "a block name accepts at most {MAX_LAYER_NAME_CHARS} characters"
+            )));
+        }
+        if self.block(name).is_some() {
+            return Err(DraftError::Invalid(format!(
+                "a block named `{name}` already exists"
+            )));
+        }
+        validate_point(&base_point)?;
+        if entities.is_empty() {
+            return Err(DraftError::Invalid(
+                "a block definition must contain at least one entity".into(),
+            ));
+        }
+        for ent in &entities {
+            ent.validate()?;
+        }
+        self.push_undo();
+        self.blocks.push(Block {
+            name: name.to_string(),
+            base_point,
+            entities,
+        });
+        Ok(())
+    }
+
+    /// Add a block insert entity placing block `block_name` at `position` with anisotropic `scale` and `rotation_degrees`.
+    pub fn add_insert(
+        &mut self,
+        layer: &str,
+        block_name: &str,
+        position: [f64; 2],
+        scale: [f64; 2],
+        rotation_degrees: f64,
+    ) -> Result<EntityId, DraftError> {
+        let bname = block_name.trim();
+        if self.block(bname).is_none() {
+            return Err(DraftError::Invalid(format!(
+                "referenced block `{bname}` does not exist"
+            )));
+        }
+        self.add_entity(
+            layer,
+            EntityKind::Insert {
+                block_name: bname.to_string(),
+                position,
+                scale,
+                rotation_degrees,
+            },
+        )
+    }
+
+    /// Explodes an insert entity into its component transformed entities on the insert's layer.
+    pub fn explode_insert(&mut self, id: EntityId) -> Result<Vec<EntityId>, DraftError> {
+        let position = self
+            .entities
+            .iter()
+            .position(|entity| entity.id == id)
+            .ok_or_else(|| DraftError::UnknownEntity(id.get()))?;
+        let entity = &self.entities[position];
+        let layer_name = entity.layer.clone();
+        if self.layer(&layer_name).is_some_and(|layer| layer.locked) {
+            return Err(DraftError::Invalid(format!(
+                "layer `{layer_name}` is locked, so its insert cannot be exploded"
+            )));
+        }
+        let (block_name, ins_pos, ins_scale, ins_rot) = match &entity.kind {
+            EntityKind::Insert {
+                block_name,
+                position,
+                scale,
+                rotation_degrees,
+            } => (block_name.clone(), *position, *scale, *rotation_degrees),
+            _ => {
+                return Err(DraftError::Invalid(
+                    "cannot explode an entity that is not an insert".into(),
+                ));
+            }
+        };
+        let block = self
+            .block(&block_name)
+            .ok_or_else(|| DraftError::Invalid(format!("block `{block_name}` not found")))?
+            .clone();
+
+        self.push_undo();
+        self.entities.remove(position);
+
+        let mut new_ids = Vec::with_capacity(block.entities.len());
+        for child in &block.entities {
+            let transformed =
+                transform_block_entity(child, block.base_point, ins_pos, ins_scale, ins_rot);
+            let new_id = EntityId::new(self.next_entity)
+                .map_err(|error| DraftError::Invalid(error.to_string()))?;
+            let next = self
+                .next_entity
+                .checked_add(1)
+                .ok_or_else(|| DraftError::Invalid("entity id space exhausted".into()))?;
+            self.next_entity = next;
+            self.entities.push(Entity {
+                id: new_id,
+                layer: layer_name.clone(),
+                kind: transformed,
+            });
+            new_ids.push(new_id);
+        }
+        Ok(new_ids)
+    }
+
     /// Remove an entity. The layer must exist and be unlocked.
     pub fn remove_entity(&mut self, id: EntityId) -> Result<(), DraftError> {
         let position = self
@@ -715,6 +1051,29 @@ impl Draft {
     /// Lookup an entity by id.
     pub fn entity(&self, id: EntityId) -> Option<&Entity> {
         self.entities.iter().find(|entity| entity.id == id)
+    }
+
+    /// Update the geometry kind of an existing entity on an unlocked layer.
+    pub fn update_entity_kind(
+        &mut self,
+        id: EntityId,
+        new_kind: EntityKind,
+    ) -> Result<(), DraftError> {
+        new_kind.validate()?;
+        let pos = self
+            .entities
+            .iter()
+            .position(|e| e.id == id)
+            .ok_or(DraftError::UnknownEntity(id.get()))?;
+        let layer_name = self.entities[pos].layer.clone();
+        if self.layer(&layer_name).is_some_and(|l| l.locked) {
+            return Err(DraftError::Invalid(format!(
+                "layer `{layer_name}` is locked"
+            )));
+        }
+        self.push_undo();
+        self.entities[pos].kind = new_kind;
+        Ok(())
     }
 
     /// Translate one or more entities by displacement (dx, dy).
@@ -1240,13 +1599,16 @@ impl Draft {
         Ok(target_id)
     }
 
-    /// Explodes compound entity `id` (Rectangle or Polyline) into fundamental Line entities.
+    /// Explodes compound entity `id` (Insert, Rectangle or Polyline) into fundamental entities.
     pub fn explode_entity(&mut self, id: EntityId) -> Result<Vec<EntityId>, DraftError> {
         let pos = self
             .entities
             .iter()
             .position(|e| e.id == id)
             .ok_or(DraftError::UnknownEntity(id.get()))?;
+        if matches!(self.entities[pos].kind, EntityKind::Insert { .. }) {
+            return self.explode_insert(id);
+        }
         let layer_name = self.entities[pos].layer.clone();
         let target_layer = self
             .layer(&layer_name)
@@ -1502,6 +1864,8 @@ impl Draft {
                         EntityKind::Dimension { start, end, .. } => {
                             [(start[0] + end[0]) * 0.5, (start[1] + end[1]) * 0.5]
                         }
+                        EntityKind::RadialDimension { target, .. } => *target,
+                        EntityKind::Insert { position, .. } => *position,
                         EntityKind::Spline { points, .. } => {
                             let sx: f64 = points.iter().map(|p| p[0]).sum();
                             let sy: f64 = points.iter().map(|p| p[1]).sum();
@@ -1576,6 +1940,351 @@ impl Draft {
         }
     }
 
+    fn alloc_entity_id(&mut self) -> Result<EntityId, DraftError> {
+        let id = EntityId::new(self.next_entity)
+            .map_err(|error| DraftError::Invalid(error.to_string()))?;
+        let next = self
+            .next_entity
+            .checked_add(1)
+            .ok_or_else(|| DraftError::Invalid("entity id space exhausted".into()))?;
+        self.next_entity = next;
+        Ok(id)
+    }
+
+    /// Purges unreferenced layers and unreferenced block definitions from the drawing,
+    /// matching AutoCAD PURGE behaviour. The default "0" layer is never purged.
+    pub fn purge(&mut self) -> PurgeReport {
+        use std::collections::HashSet;
+
+        let mut used_layers = HashSet::new();
+        for entity in &self.entities {
+            used_layers.insert(entity.layer.to_ascii_lowercase());
+        }
+
+        let mut purged_layers = Vec::new();
+        for layer in &self.layers {
+            if layer.name.eq_ignore_ascii_case(DEFAULT_LAYER) {
+                continue;
+            }
+            if !used_layers.contains(&layer.name.to_ascii_lowercase()) {
+                purged_layers.push(layer.name.clone());
+            }
+        }
+
+        let mut used_blocks = HashSet::new();
+        let mut queue = Vec::new();
+        for entity in &self.entities {
+            if let EntityKind::Insert { block_name, .. } = &entity.kind {
+                let lower = block_name.to_ascii_lowercase();
+                if used_blocks.insert(lower.clone()) {
+                    queue.push(lower);
+                }
+            }
+        }
+        while let Some(blk_name) = queue.pop() {
+            if let Some(blk) = self
+                .blocks
+                .iter()
+                .find(|b| b.name.eq_ignore_ascii_case(&blk_name))
+            {
+                for ek in &blk.entities {
+                    if let EntityKind::Insert { block_name, .. } = ek {
+                        let lower = block_name.to_ascii_lowercase();
+                        if used_blocks.insert(lower.clone()) {
+                            queue.push(lower);
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut purged_blocks = Vec::new();
+        for block in &self.blocks {
+            if !used_blocks.contains(&block.name.to_ascii_lowercase()) {
+                purged_blocks.push(block.name.clone());
+            }
+        }
+
+        if purged_layers.is_empty() && purged_blocks.is_empty() {
+            return PurgeReport::default();
+        }
+
+        self.push_undo();
+
+        let purged_layers_set: HashSet<String> = purged_layers
+            .iter()
+            .map(|s| s.to_ascii_lowercase())
+            .collect();
+        self.layers
+            .retain(|layer| !purged_layers_set.contains(&layer.name.to_ascii_lowercase()));
+
+        let purged_blocks_set: HashSet<String> = purged_blocks
+            .iter()
+            .map(|s| s.to_ascii_lowercase())
+            .collect();
+        self.blocks
+            .retain(|block| !purged_blocks_set.contains(&block.name.to_ascii_lowercase()));
+
+        PurgeReport {
+            purged_layers,
+            purged_blocks,
+        }
+    }
+
+    /// Deletes duplicate entities and merges collinear overlapping/touching lines on the same layer,
+    /// matching AutoCAD OVERKILL behaviour. Locked layers are protected and never modified.
+    pub fn overkill(&mut self, tolerance: Option<f64>) -> OverkillReport {
+        let tol = match tolerance {
+            Some(t) if t.is_finite() && t > 0.0 => t,
+            _ => 1e-4,
+        };
+
+        let locked_layers: std::collections::HashSet<String> = self
+            .layers
+            .iter()
+            .filter(|l| l.locked)
+            .map(|l| l.name.to_ascii_lowercase())
+            .collect();
+
+        let mut duplicate_entities_removed = 0;
+        let mut to_remove = std::collections::HashSet::new();
+
+        let n = self.entities.len();
+        for i in 0..n {
+            if to_remove.contains(&i) {
+                continue;
+            }
+            let e1 = &self.entities[i];
+            if locked_layers.contains(&e1.layer.to_ascii_lowercase()) {
+                continue;
+            }
+            for j in (i + 1)..n {
+                if to_remove.contains(&j) {
+                    continue;
+                }
+                let e2 = &self.entities[j];
+                if !e1.layer.eq_ignore_ascii_case(&e2.layer) {
+                    continue;
+                }
+                if entities_are_duplicate(&e1.kind, &e2.kind, tol) {
+                    to_remove.insert(j);
+                    duplicate_entities_removed += 1;
+                }
+            }
+        }
+
+        let mut current_entities = Vec::with_capacity(n.saturating_sub(duplicate_entities_removed));
+        for (idx, ent) in self.entities.iter().enumerate() {
+            if !to_remove.contains(&idx) {
+                current_entities.push(ent.clone());
+            }
+        }
+
+        let mut collinear_lines_merged = 0;
+        let mut changed = true;
+        while changed {
+            changed = false;
+            let count = current_entities.len();
+            'outer: for i in 0..count {
+                if locked_layers.contains(&current_entities[i].layer.to_ascii_lowercase()) {
+                    continue;
+                }
+                for j in (i + 1)..count {
+                    if !current_entities[i]
+                        .layer
+                        .eq_ignore_ascii_case(&current_entities[j].layer)
+                    {
+                        continue;
+                    }
+                    if let Some(merged_kind) = try_merge_collinear_lines(
+                        &current_entities[i].kind,
+                        &current_entities[j].kind,
+                        tol,
+                    ) {
+                        current_entities[i].kind = merged_kind;
+                        current_entities.remove(j);
+                        collinear_lines_merged += 1;
+                        changed = true;
+                        break 'outer;
+                    }
+                }
+            }
+        }
+
+        if duplicate_entities_removed == 0 && collinear_lines_merged == 0 {
+            return OverkillReport::default();
+        }
+
+        self.push_undo();
+        self.entities = current_entities;
+
+        OverkillReport {
+            duplicate_entities_removed,
+            collinear_lines_merged,
+        }
+    }
+
+    /// Divides an entity into `segments` equal lengths by placing Point entities along it,
+    /// matching AutoCAD DIVIDE behaviour.
+    pub fn divide(
+        &mut self,
+        entity_id: EntityId,
+        segments: usize,
+    ) -> Result<Vec<EntityId>, DraftError> {
+        if segments < 2 {
+            return Err(DraftError::Invalid(
+                "divide requires at least 2 segments".into(),
+            ));
+        }
+        let (layer_name, kind) = {
+            let ent = self
+                .entity(entity_id)
+                .ok_or(DraftError::UnknownEntity(entity_id.get()))?;
+            (ent.layer.clone(), ent.kind.clone())
+        };
+        if self.layer(&layer_name).is_some_and(|l| l.locked) {
+            return Err(DraftError::Invalid(format!(
+                "layer `{layer_name}` is locked, so it cannot be divided"
+            )));
+        }
+        let total_len = entity_length(&kind);
+        if total_len <= 0.0 || !total_len.is_finite() {
+            return Err(DraftError::Invalid("entity has no length to divide".into()));
+        }
+
+        let closed = is_entity_closed(&kind);
+        let num_points = if closed { segments } else { segments - 1 };
+        let mut sampled_points = Vec::with_capacity(num_points);
+
+        if closed {
+            for k in 0..segments {
+                let frac = (k as f64) / (segments as f64);
+                sampled_points.push(sample_curve_point(&kind, frac)?);
+            }
+        } else {
+            for k in 1..segments {
+                let frac = (k as f64) / (segments as f64);
+                sampled_points.push(sample_curve_point(&kind, frac)?);
+            }
+        }
+
+        self.push_undo();
+        let mut created_ids = Vec::with_capacity(sampled_points.len());
+        for pt in sampled_points {
+            let id = self.alloc_entity_id()?;
+            self.entities.push(Entity {
+                id,
+                layer: layer_name.clone(),
+                kind: EntityKind::Point { at: pt },
+            });
+            created_ids.push(id);
+        }
+
+        Ok(created_ids)
+    }
+
+    /// Measures an entity by placing Point entities at fixed interval distances along it,
+    /// matching AutoCAD MEASURE behaviour.
+    pub fn measure_intervals(
+        &mut self,
+        entity_id: EntityId,
+        interval: f64,
+    ) -> Result<Vec<EntityId>, DraftError> {
+        if interval <= 0.0 || !interval.is_finite() {
+            return Err(DraftError::Invalid(
+                "measurement interval must be a positive finite number".into(),
+            ));
+        }
+        let (layer_name, kind) = {
+            let ent = self
+                .entity(entity_id)
+                .ok_or(DraftError::UnknownEntity(entity_id.get()))?;
+            (ent.layer.clone(), ent.kind.clone())
+        };
+        if self.layer(&layer_name).is_some_and(|l| l.locked) {
+            return Err(DraftError::Invalid(format!(
+                "layer `{layer_name}` is locked, so it cannot be measured"
+            )));
+        }
+        let total_len = entity_length(&kind);
+        if total_len <= 0.0 || !total_len.is_finite() {
+            return Err(DraftError::Invalid(
+                "entity has no length to measure".into(),
+            ));
+        }
+
+        let mut points = Vec::new();
+        let mut d = interval;
+        while d < total_len - 1e-9 {
+            let frac = d / total_len;
+            points.push(sample_curve_point(&kind, frac)?);
+            d += interval;
+        }
+
+        if points.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        self.push_undo();
+        let mut created_ids = Vec::with_capacity(points.len());
+        for pt in points {
+            let id = self.alloc_entity_id()?;
+            self.entities.push(Entity {
+                id,
+                layer: layer_name.clone(),
+                kind: EntityKind::Point { at: pt },
+            });
+            created_ids.push(id);
+        }
+
+        Ok(created_ids)
+    }
+
+    /// Copies layer properties from source entity to target entities,
+    /// matching AutoCAD MATCHPROP behaviour.
+    pub fn match_properties(
+        &mut self,
+        source_id: EntityId,
+        target_ids: &[EntityId],
+    ) -> Result<usize, DraftError> {
+        let source_layer = self
+            .entity(source_id)
+            .ok_or(DraftError::UnknownEntity(source_id.get()))?
+            .layer
+            .clone();
+
+        let mut targets_to_update = Vec::new();
+        for &target_id in target_ids {
+            let target = self
+                .entity(target_id)
+                .ok_or(DraftError::UnknownEntity(target_id.get()))?;
+            if self.layer(&target.layer).is_some_and(|l| l.locked) {
+                return Err(DraftError::Invalid(format!(
+                    "target entity #{} is on locked layer `{}`",
+                    target_id.get(),
+                    target.layer
+                )));
+            }
+            if !target.layer.eq_ignore_ascii_case(&source_layer) {
+                targets_to_update.push(target_id);
+            }
+        }
+
+        if targets_to_update.is_empty() {
+            return Ok(0);
+        }
+
+        self.push_undo();
+        let count = targets_to_update.len();
+        for id in targets_to_update {
+            if let Some(pos) = self.entities.iter().position(|e| e.id == id) {
+                self.entities[pos].layer = source_layer.clone();
+            }
+        }
+
+        Ok(count)
+    }
+
     /// Drop the undo and redo history.
     ///
     /// Used when a drawing arrives whole rather than by editing — an import, for instance. Undoing
@@ -1611,13 +2320,49 @@ impl Draft {
         self.redo.len()
     }
 
+    /// Bounds of an individual entity, resolving reusable block geometry if it is an insert.
+    pub fn entity_bounds(&self, id: EntityId) -> Option<Bounds> {
+        let entity = self.entity(id)?;
+        Some(self.entity_kind_bounds(&entity.kind))
+    }
+
+    /// Evaluates the bounds of an entity kind, resolving blocks if it is an insert.
+    pub fn entity_kind_bounds(&self, kind: &EntityKind) -> Bounds {
+        match kind {
+            EntityKind::Insert {
+                block_name,
+                position,
+                scale,
+                rotation_degrees,
+            } => {
+                if let Some(block) = self.block(block_name) {
+                    let mut b: Option<Bounds> = None;
+                    for child in &block.entities {
+                        let transformed = transform_block_entity(
+                            child,
+                            block.base_point,
+                            *position,
+                            *scale,
+                            *rotation_degrees,
+                        );
+                        extend(&mut b, entity_bounds(&transformed));
+                    }
+                    b.unwrap_or([position[0], position[1], position[0], position[1]])
+                } else {
+                    [position[0], position[1], position[0], position[1]]
+                }
+            }
+            other => entity_bounds(other),
+        }
+    }
+
     /// Bounds of every entity, or `None` for an empty drawing. A hidden layer still counts: the
     /// geometry exists and a drawing that changes extents when a layer is switched off would be a
     /// surprise in a plot.
     pub fn bounds(&self) -> Option<Bounds> {
         let mut bounds: Option<Bounds> = None;
         for entity in &self.entities {
-            extend(&mut bounds, entity_bounds(&entity.kind));
+            extend(&mut bounds, self.entity_kind_bounds(&entity.kind));
         }
         bounds
     }
@@ -1632,11 +2377,13 @@ impl Draft {
         for entity in &self.entities {
             if matches!(
                 entity.kind,
-                EntityKind::Text { .. } | EntityKind::Dimension { .. }
+                EntityKind::Text { .. }
+                    | EntityKind::Dimension { .. }
+                    | EntityKind::RadialDimension { .. }
             ) {
                 continue;
             }
-            extend(&mut bounds, entity_bounds(&entity.kind));
+            extend(&mut bounds, self.entity_kind_bounds(&entity.kind));
         }
         bounds
     }
@@ -1645,7 +2392,34 @@ impl Draft {
     pub fn total_length(&self) -> f64 {
         self.entities
             .iter()
-            .map(|entity| entity_length(&entity.kind))
+            .map(|entity| match &entity.kind {
+                EntityKind::Insert {
+                    block_name,
+                    position,
+                    scale,
+                    rotation_degrees,
+                } => {
+                    if let Some(block) = self.block(block_name) {
+                        block
+                            .entities
+                            .iter()
+                            .map(|child| {
+                                let transformed = transform_block_entity(
+                                    child,
+                                    block.base_point,
+                                    *position,
+                                    *scale,
+                                    *rotation_degrees,
+                                );
+                                entity_length(&transformed)
+                            })
+                            .sum()
+                    } else {
+                        0.0
+                    }
+                }
+                other => entity_length(other),
+            })
             .sum()
     }
 
@@ -1782,7 +2556,8 @@ impl Draft {
 
         pair(&mut out, 0, "TABLE");
         pair(&mut out, 2, "LTYPE");
-        pair(&mut out, 70, "1");
+        pair(&mut out, 70, "6");
+        // CONTINUOUS
         pair(&mut out, 0, "LTYPE");
         pair(&mut out, 2, "CONTINUOUS");
         pair(&mut out, 70, "0");
@@ -1790,6 +2565,62 @@ impl Draft {
         pair(&mut out, 72, "65");
         pair(&mut out, 73, "0");
         pair(&mut out, 40, "0.0");
+        // HIDDEN
+        pair(&mut out, 0, "LTYPE");
+        pair(&mut out, 2, "HIDDEN");
+        pair(&mut out, 70, "0");
+        pair(&mut out, 3, "Hidden __ __ __ __ __ __ __ __ __ __");
+        pair(&mut out, 72, "65");
+        pair(&mut out, 73, "2");
+        pair(&mut out, 40, "9.525");
+        pair(&mut out, 49, "6.35");
+        pair(&mut out, 49, "-3.175");
+        // CENTER
+        pair(&mut out, 0, "LTYPE");
+        pair(&mut out, 2, "CENTER");
+        pair(&mut out, 70, "0");
+        pair(&mut out, 3, "Center ____ _ ____ _ ____ _ ____");
+        pair(&mut out, 72, "65");
+        pair(&mut out, 73, "4");
+        pair(&mut out, 40, "31.75");
+        pair(&mut out, 49, "19.05");
+        pair(&mut out, 49, "-6.35");
+        pair(&mut out, 49, "6.35");
+        pair(&mut out, 49, "-6.35");
+        // PHANTOM
+        pair(&mut out, 0, "LTYPE");
+        pair(&mut out, 2, "PHANTOM");
+        pair(&mut out, 70, "0");
+        pair(&mut out, 3, "Phantom ______ _ _ ______ _ _ ______");
+        pair(&mut out, 72, "65");
+        pair(&mut out, 73, "6");
+        pair(&mut out, 40, "38.1");
+        pair(&mut out, 49, "19.05");
+        pair(&mut out, 49, "-6.35");
+        pair(&mut out, 49, "6.35");
+        pair(&mut out, 49, "-6.35");
+        pair(&mut out, 49, "6.35");
+        pair(&mut out, 49, "-6.35");
+        // DASHED
+        pair(&mut out, 0, "LTYPE");
+        pair(&mut out, 2, "DASHED");
+        pair(&mut out, 70, "0");
+        pair(&mut out, 3, "Dashed __ __ __ __ __ __ __ __ __");
+        pair(&mut out, 72, "65");
+        pair(&mut out, 73, "2");
+        pair(&mut out, 40, "19.05");
+        pair(&mut out, 49, "12.7");
+        pair(&mut out, 49, "-6.35");
+        // DOT
+        pair(&mut out, 0, "LTYPE");
+        pair(&mut out, 2, "DOT");
+        pair(&mut out, 70, "0");
+        pair(&mut out, 3, "Dot . . . . . . . . . . . . . . . .");
+        pair(&mut out, 72, "65");
+        pair(&mut out, 73, "2");
+        pair(&mut out, 40, "6.35");
+        pair(&mut out, 49, "0.0");
+        pair(&mut out, 49, "-6.35");
         pair(&mut out, 0, "ENDTAB");
 
         pair(&mut out, 0, "TABLE");
@@ -1805,9 +2636,27 @@ impl Draft {
                 -i64::from(layer.color)
             };
             pair(&mut out, 62, &color.to_string());
-            pair(&mut out, 6, "CONTINUOUS");
+            pair(&mut out, 6, layer.linetype.name());
         }
         pair(&mut out, 0, "ENDTAB");
+        pair(&mut out, 0, "ENDSEC");
+
+        // BLOCKS
+        pair(&mut out, 0, "SECTION");
+        pair(&mut out, 2, "BLOCKS");
+        for block in &self.blocks {
+            pair(&mut out, 0, "BLOCK");
+            pair(&mut out, 8, "0");
+            pair(&mut out, 2, &block.name);
+            pair(&mut out, 70, "0");
+            point(&mut out, 10, block.base_point);
+            pair(&mut out, 3, &block.name);
+            for kind in &block.entities {
+                write_entity_kind(&mut out, "0", kind);
+            }
+            pair(&mut out, 0, "ENDBLK");
+            pair(&mut out, 8, "0");
+        }
         pair(&mut out, 0, "ENDSEC");
 
         // ENTITIES
@@ -1837,6 +2686,7 @@ impl Draft {
             layers: self.layers.clone(),
             entities: self.entities.clone(),
             next_entity: self.next_entity,
+            blocks: self.blocks.clone(),
         }
     }
 
@@ -1844,6 +2694,7 @@ impl Draft {
         self.layers = snapshot.layers;
         self.entities = snapshot.entities;
         self.next_entity = snapshot.next_entity;
+        self.blocks = snapshot.blocks;
     }
 
     fn push_undo(&mut self) {
@@ -2018,6 +2869,36 @@ fn entity_bounds(kind: &EntityKind) -> Bounds {
             }
             bounds.unwrap_or([start[0], start[1], end[0], end[1]])
         }
+        EntityKind::RadialDimension {
+            center,
+            target,
+            leader_offset,
+            is_diameter,
+            ..
+        } => {
+            let (dx, dy) = (target[0] - center[0], target[1] - center[1]);
+            let r = dx.hypot(dy);
+            let (ux, uy) = if r > 1e-9 {
+                (dx / r, dy / r)
+            } else {
+                (1.0, 0.0)
+            };
+            let elbow = [
+                target[0] + ux * leader_offset,
+                target[1] + uy * leader_offset,
+            ];
+            let shoulder_dx = if ux >= 0.0 { 6.0 } else { -6.0 };
+            let shoulder = [elbow[0] + shoulder_dx, elbow[1]];
+            let mut corners = vec![*center, *target, elbow, shoulder];
+            if *is_diameter {
+                corners.push([center[0] - ux * r, center[1] - uy * r]);
+            }
+            let mut bounds: Option<Bounds> = None;
+            for point in corners {
+                extend(&mut bounds, [point[0], point[1], point[0], point[1]]);
+            }
+            bounds.unwrap_or([center[0], center[1], target[0], target[1]])
+        }
         EntityKind::Polyline { points, .. } => {
             let mut bounds: Option<Bounds> = None;
             for point in points {
@@ -2054,6 +2935,7 @@ fn entity_bounds(kind: &EntityKind) -> Bounds {
             }
             bounds.unwrap_or([0.0, 0.0, 0.0, 0.0])
         }
+        EntityKind::Insert { position, .. } => [position[0], position[1], position[0], position[1]],
     }
 }
 
@@ -2103,7 +2985,10 @@ fn entity_length(kind: &EntityKind) -> f64 {
         }
         // Annotation has no drawn length: a dimension is a measurement of geometry that is already
         // counted, so adding it here would double-count the part.
-        EntityKind::Text { .. } | EntityKind::Dimension { .. } => 0.0,
+        EntityKind::Text { .. }
+        | EntityKind::Dimension { .. }
+        | EntityKind::RadialDimension { .. }
+        | EntityKind::Insert { .. } => 0.0,
     }
 }
 
@@ -2166,6 +3051,366 @@ fn distance(a: &[f64; 2], b: &[f64; 2]) -> f64 {
     dx.hypot(dy)
 }
 
+fn angles_approx_eq(a: f64, b: f64, tol_deg: f64) -> bool {
+    let diff = (a - b).rem_euclid(360.0);
+    diff <= tol_deg || (360.0 - diff) <= tol_deg
+}
+
+fn is_entity_closed(kind: &EntityKind) -> bool {
+    match kind {
+        EntityKind::Circle { .. } | EntityKind::Rectangle { .. } | EntityKind::Ellipse { .. } => {
+            true
+        }
+        EntityKind::Polyline { closed, .. } | EntityKind::Spline { closed, .. } => *closed,
+        _ => false,
+    }
+}
+
+pub(crate) fn sample_curve_point(kind: &EntityKind, fraction: f64) -> Result<[f64; 2], DraftError> {
+    let t = fraction.clamp(0.0, 1.0);
+    match kind {
+        EntityKind::Line { start, end } => Ok([
+            start[0] + t * (end[0] - start[0]),
+            start[1] + t * (end[1] - start[1]),
+        ]),
+        EntityKind::Circle { center, radius } => {
+            let angle = t * std::f64::consts::TAU;
+            Ok([
+                center[0] + radius * angle.cos(),
+                center[1] + radius * angle.sin(),
+            ])
+        }
+        EntityKind::Arc {
+            center,
+            radius,
+            start_degrees,
+            end_degrees,
+        } => {
+            let mut sweep = (end_degrees - start_degrees).rem_euclid(360.0);
+            if sweep == 0.0 && ((end_degrees - start_degrees).abs() > 1e-6) {
+                sweep = 360.0;
+            }
+            let angle = (start_degrees + t * sweep).to_radians();
+            Ok([
+                center[0] + radius * angle.cos(),
+                center[1] + radius * angle.sin(),
+            ])
+        }
+        EntityKind::Polyline { points, closed } => {
+            if points.is_empty() {
+                return Err(DraftError::Invalid("polyline has no points".into()));
+            }
+            if points.len() == 1 {
+                return Ok(points[0]);
+            }
+            let mut all_points = points.clone();
+            if *closed
+                && points.first() != points.last()
+                && let Some(first) = points.first()
+            {
+                all_points.push(*first);
+            }
+            let seg_lengths: Vec<f64> = all_points
+                .windows(2)
+                .map(|w| distance(&w[0], &w[1]))
+                .collect();
+            let total: f64 = seg_lengths.iter().sum();
+            if total <= 0.0 {
+                return Ok(all_points[0]);
+            }
+            let target_dist = t * total;
+            let mut accum = 0.0;
+            for (i, len) in seg_lengths.iter().enumerate() {
+                if accum + len >= target_dist || i == seg_lengths.len() - 1 {
+                    let seg_t = if *len > 1e-9 {
+                        (target_dist - accum) / len
+                    } else {
+                        0.0
+                    };
+                    let seg_t = seg_t.clamp(0.0, 1.0);
+                    let p0 = all_points[i];
+                    let p1 = all_points[i + 1];
+                    return Ok([
+                        p0[0] + seg_t * (p1[0] - p0[0]),
+                        p0[1] + seg_t * (p1[1] - p0[1]),
+                    ]);
+                }
+                accum += len;
+            }
+            Ok(all_points[all_points.len() - 1])
+        }
+        EntityKind::Rectangle {
+            origin,
+            width,
+            height,
+        } => {
+            let p0 = *origin;
+            let p1 = [origin[0] + width, origin[1]];
+            let p2 = [origin[0] + width, origin[1] + height];
+            let p3 = [origin[0], origin[1] + height];
+            let poly = EntityKind::Polyline {
+                points: vec![p0, p1, p2, p3],
+                closed: true,
+            };
+            sample_curve_point(&poly, t)
+        }
+        EntityKind::Ellipse {
+            center,
+            radius_x,
+            radius_y,
+        } => {
+            let angle = t * std::f64::consts::TAU;
+            Ok([
+                center[0] + radius_x * angle.cos(),
+                center[1] + radius_y * angle.sin(),
+            ])
+        }
+        EntityKind::Spline { points, closed } => {
+            let sampled = sample_spline(points, *closed, 16);
+            let poly = EntityKind::Polyline {
+                points: sampled,
+                closed: *closed,
+            };
+            sample_curve_point(&poly, t)
+        }
+        _ => Err(DraftError::Invalid(format!(
+            "entity kind `{}` cannot be divided or measured",
+            kind.label()
+        ))),
+    }
+}
+
+fn entities_are_duplicate(k1: &EntityKind, k2: &EntityKind, tol: f64) -> bool {
+    match (k1, k2) {
+        (EntityKind::Point { at: p1 }, EntityKind::Point { at: p2 }) => distance(p1, p2) <= tol,
+        (EntityKind::Line { start: s1, end: e1 }, EntityKind::Line { start: s2, end: e2 }) => {
+            (distance(s1, s2) <= tol && distance(e1, e2) <= tol)
+                || (distance(s1, e2) <= tol && distance(e1, s2) <= tol)
+        }
+        (
+            EntityKind::Circle {
+                center: c1,
+                radius: r1,
+            },
+            EntityKind::Circle {
+                center: c2,
+                radius: r2,
+            },
+        ) => distance(c1, c2) <= tol && (r1 - r2).abs() <= tol,
+        (
+            EntityKind::Arc {
+                center: c1,
+                radius: r1,
+                start_degrees: s1,
+                end_degrees: e1,
+            },
+            EntityKind::Arc {
+                center: c2,
+                radius: r2,
+                start_degrees: s2,
+                end_degrees: e2,
+            },
+        ) => {
+            distance(c1, c2) <= tol
+                && (r1 - r2).abs() <= tol
+                && angles_approx_eq(*s1, *s2, 0.01)
+                && angles_approx_eq(*e1, *e2, 0.01)
+        }
+        (
+            EntityKind::Rectangle {
+                origin: o1,
+                width: w1,
+                height: h1,
+            },
+            EntityKind::Rectangle {
+                origin: o2,
+                width: w2,
+                height: h2,
+            },
+        ) => distance(o1, o2) <= tol && (w1 - w2).abs() <= tol && (h1 - h2).abs() <= tol,
+        (
+            EntityKind::Ellipse {
+                center: c1,
+                radius_x: rx1,
+                radius_y: ry1,
+            },
+            EntityKind::Ellipse {
+                center: c2,
+                radius_x: rx2,
+                radius_y: ry2,
+            },
+        ) => distance(c1, c2) <= tol && (rx1 - rx2).abs() <= tol && (ry1 - ry2).abs() <= tol,
+        (
+            EntityKind::Polyline {
+                points: pts1,
+                closed: cl1,
+            },
+            EntityKind::Polyline {
+                points: pts2,
+                closed: cl2,
+            },
+        ) => {
+            if cl1 != cl2 || pts1.len() != pts2.len() {
+                false
+            } else {
+                pts1.iter()
+                    .zip(pts2.iter())
+                    .all(|(p1, p2)| distance(p1, p2) <= tol)
+            }
+        }
+        (
+            EntityKind::Spline {
+                points: pts1,
+                closed: cl1,
+            },
+            EntityKind::Spline {
+                points: pts2,
+                closed: cl2,
+            },
+        ) => {
+            if cl1 != cl2 || pts1.len() != pts2.len() {
+                false
+            } else {
+                pts1.iter()
+                    .zip(pts2.iter())
+                    .all(|(p1, p2)| distance(p1, p2) <= tol)
+            }
+        }
+        (
+            EntityKind::Text {
+                at: a1,
+                height: h1,
+                value: v1,
+            },
+            EntityKind::Text {
+                at: a2,
+                height: h2,
+                value: v2,
+            },
+        ) => distance(a1, a2) <= tol && (h1 - h2).abs() <= tol && v1 == v2,
+        (
+            EntityKind::Dimension {
+                start: s1,
+                end: e1,
+                offset: o1,
+                text: t1,
+            },
+            EntityKind::Dimension {
+                start: s2,
+                end: e2,
+                offset: o2,
+                text: t2,
+            },
+        ) => {
+            distance(s1, s2) <= tol && distance(e1, e2) <= tol && (o1 - o2).abs() <= tol && t1 == t2
+        }
+        (
+            EntityKind::RadialDimension {
+                center: c1,
+                target: t1,
+                leader_offset: lo1,
+                is_diameter: d1,
+                text: txt1,
+            },
+            EntityKind::RadialDimension {
+                center: c2,
+                target: t2,
+                leader_offset: lo2,
+                is_diameter: d2,
+                text: txt2,
+            },
+        ) => {
+            distance(c1, c2) <= tol
+                && distance(t1, t2) <= tol
+                && (lo1 - lo2).abs() <= tol
+                && d1 == d2
+                && txt1 == txt2
+        }
+        (
+            EntityKind::Insert {
+                block_name: b1,
+                position: p1,
+                scale: sc1,
+                rotation_degrees: r1,
+            },
+            EntityKind::Insert {
+                block_name: b2,
+                position: p2,
+                scale: sc2,
+                rotation_degrees: r2,
+            },
+        ) => {
+            b1.eq_ignore_ascii_case(b2)
+                && distance(p1, p2) <= tol
+                && (sc1[0] - sc2[0]).abs() <= tol
+                && (sc1[1] - sc2[1]).abs() <= tol
+                && angles_approx_eq(*r1, *r2, 0.01)
+        }
+        _ => false,
+    }
+}
+
+fn try_merge_collinear_lines(k1: &EntityKind, k2: &EntityKind, tol: f64) -> Option<EntityKind> {
+    let (s1, e1) = match k1 {
+        EntityKind::Line { start, end } => (*start, *end),
+        _ => return None,
+    };
+    let (s2, e2) = match k2 {
+        EntityKind::Line { start, end } => (*start, *end),
+        _ => return None,
+    };
+
+    let dx1 = e1[0] - s1[0];
+    let dy1 = e1[1] - s1[1];
+    let len1 = dx1.hypot(dy1);
+    if len1 < tol {
+        return None;
+    }
+    let u1 = [dx1 / len1, dy1 / len1];
+    let n1 = [-u1[1], u1[0]];
+
+    let dx2 = e2[0] - s2[0];
+    let dy2 = e2[1] - s2[1];
+    let len2 = dx2.hypot(dy2);
+    if len2 < tol {
+        return None;
+    }
+    let u2 = [dx2 / len2, dy2 / len2];
+
+    let dot = u1[0] * u2[0] + u1[1] * u2[1];
+    if (1.0 - dot.abs()) > 1e-4 {
+        return None;
+    }
+
+    let dist_s2 = ((s2[0] - s1[0]) * n1[0] + (s2[1] - s1[1]) * n1[1]).abs();
+    let dist_e2 = ((e2[0] - s1[0]) * n1[0] + (e2[1] - s1[1]) * n1[1]).abs();
+    if dist_s2 > tol || dist_e2 > tol {
+        return None;
+    }
+
+    let t_s1 = 0.0_f64;
+    let t_e1 = len1;
+    let t_s2 = (s2[0] - s1[0]) * u1[0] + (s2[1] - s1[1]) * u1[1];
+    let t_e2 = (e2[0] - s1[0]) * u1[0] + (e2[1] - s1[1]) * u1[1];
+
+    let min1 = t_s1.min(t_e1);
+    let max1 = t_s1.max(t_e1);
+    let min2 = t_s2.min(t_e2);
+    let max2 = t_s2.max(t_e2);
+
+    if min1.max(min2) > max1.min(max2) + tol {
+        return None;
+    }
+
+    let merged_min = min1.min(min2);
+    let merged_max = max1.max(max2);
+
+    let start = [s1[0] + merged_min * u1[0], s1[1] + merged_min * u1[1]];
+    let end = [s1[0] + merged_max * u1[0], s1[1] + merged_max * u1[1]];
+
+    Some(EntityKind::Line { start, end })
+}
+
 fn insunits(unit: Unit) -> i64 {
     match unit {
         Unit::Inch => 1,
@@ -2208,9 +3453,237 @@ fn number(value: f64) -> String {
     }
 }
 
+/// Transforms a child entity within a block definition into world coordinate space
+/// given the block's base point, insert position, anisotropic scale [sx, sy], and rotation in degrees.
+pub fn transform_block_entity(
+    kind: &EntityKind,
+    base_point: [f64; 2],
+    position: [f64; 2],
+    scale: [f64; 2],
+    rotation_degrees: f64,
+) -> EntityKind {
+    let rad = rotation_degrees.to_radians();
+    let cos_a = rad.cos();
+    let sin_a = rad.sin();
+
+    let transform_pt = |p: [f64; 2]| -> [f64; 2] {
+        let rx = p[0] - base_point[0];
+        let ry = p[1] - base_point[1];
+        let sx = rx * scale[0];
+        let sy = ry * scale[1];
+        let tx = sx * cos_a - sy * sin_a;
+        let ty = sx * sin_a + sy * cos_a;
+        [tx + position[0], ty + position[1]]
+    };
+
+    match kind {
+        EntityKind::Point { at } => EntityKind::Point {
+            at: transform_pt(*at),
+        },
+        EntityKind::Line { start, end } => EntityKind::Line {
+            start: transform_pt(*start),
+            end: transform_pt(*end),
+        },
+        EntityKind::Circle { center, radius } => {
+            let new_center = transform_pt(*center);
+            let sx_abs = scale[0].abs();
+            let sy_abs = scale[1].abs();
+            if (sx_abs - sy_abs).abs() < 1e-6 {
+                EntityKind::Circle {
+                    center: new_center,
+                    radius: radius * sx_abs,
+                }
+            } else {
+                EntityKind::Ellipse {
+                    center: new_center,
+                    radius_x: radius * sx_abs,
+                    radius_y: radius * sy_abs,
+                }
+            }
+        }
+        EntityKind::Arc {
+            center,
+            radius,
+            start_degrees,
+            end_degrees,
+        } => {
+            let new_center = transform_pt(*center);
+            let s_rad = start_degrees.to_radians();
+            let e_rad = end_degrees.to_radians();
+            let p_start = [
+                center[0] + radius * s_rad.cos(),
+                center[1] + radius * s_rad.sin(),
+            ];
+            let p_end = [
+                center[0] + radius * e_rad.cos(),
+                center[1] + radius * e_rad.sin(),
+            ];
+            let t_start = transform_pt(p_start);
+            let t_end = transform_pt(p_end);
+            let new_start = (t_start[1] - new_center[1])
+                .atan2(t_start[0] - new_center[0])
+                .to_degrees()
+                .rem_euclid(360.0);
+            let new_end = (t_end[1] - new_center[1])
+                .atan2(t_end[0] - new_center[0])
+                .to_degrees()
+                .rem_euclid(360.0);
+            let sx_abs = scale[0].abs();
+            let sy_abs = scale[1].abs();
+            if (sx_abs - sy_abs).abs() < 1e-6 {
+                let (ns, ne) = if (scale[0] < 0.0) ^ (scale[1] < 0.0) {
+                    (new_end, new_start)
+                } else {
+                    (new_start, new_end)
+                };
+                EntityKind::Arc {
+                    center: new_center,
+                    radius: radius * sx_abs,
+                    start_degrees: ns,
+                    end_degrees: ne,
+                }
+            } else {
+                let sweep = (end_degrees - start_degrees).rem_euclid(360.0);
+                let steps = 24.max((sweep / 15.0).ceil() as usize);
+                let mut pts = Vec::with_capacity(steps + 1);
+                for i in 0..=steps {
+                    let a = (start_degrees + sweep * (i as f64) / (steps as f64)).to_radians();
+                    let pt = [center[0] + radius * a.cos(), center[1] + radius * a.sin()];
+                    pts.push(transform_pt(pt));
+                }
+                EntityKind::Polyline {
+                    points: pts,
+                    closed: false,
+                }
+            }
+        }
+        EntityKind::Polyline { points, closed } => EntityKind::Polyline {
+            points: points.iter().copied().map(transform_pt).collect(),
+            closed: *closed,
+        },
+        EntityKind::Rectangle {
+            origin,
+            width,
+            height,
+        } => {
+            let p0 = *origin;
+            let p1 = [origin[0] + width, origin[1]];
+            let p2 = [origin[0] + width, origin[1] + height];
+            let p3 = [origin[0], origin[1] + height];
+            EntityKind::Polyline {
+                points: vec![
+                    transform_pt(p0),
+                    transform_pt(p1),
+                    transform_pt(p2),
+                    transform_pt(p3),
+                ],
+                closed: true,
+            }
+        }
+        EntityKind::Ellipse {
+            center,
+            radius_x,
+            radius_y,
+        } => {
+            let new_center = transform_pt(*center);
+            let sx_abs = scale[0].abs();
+            let sy_abs = scale[1].abs();
+            let rot_norm = rotation_degrees.rem_euclid(180.0);
+            if rot_norm < 1e-6 || (rot_norm - 90.0).abs() < 1e-6 {
+                let (rx, ry) = if (rot_norm - 90.0).abs() < 1e-6 {
+                    (radius_y * sy_abs, radius_x * sx_abs)
+                } else {
+                    (radius_x * sx_abs, radius_y * sy_abs)
+                };
+                EntityKind::Ellipse {
+                    center: new_center,
+                    radius_x: rx,
+                    radius_y: ry,
+                }
+            } else {
+                let steps = 32;
+                let mut pts = Vec::with_capacity(steps);
+                for i in 0..steps {
+                    let a = (i as f64) * std::f64::consts::TAU / (steps as f64);
+                    let pt = [
+                        center[0] + radius_x * a.cos(),
+                        center[1] + radius_y * a.sin(),
+                    ];
+                    pts.push(transform_pt(pt));
+                }
+                EntityKind::Polyline {
+                    points: pts,
+                    closed: true,
+                }
+            }
+        }
+        EntityKind::Spline { points, closed } => EntityKind::Spline {
+            points: points.iter().copied().map(transform_pt).collect(),
+            closed: *closed,
+        },
+        EntityKind::Text { at, height, value } => {
+            let avg_scale = (scale[0].abs() + scale[1].abs()) * 0.5;
+            EntityKind::Text {
+                at: transform_pt(*at),
+                height: height * avg_scale,
+                value: value.clone(),
+            }
+        }
+        EntityKind::Dimension {
+            start,
+            end,
+            offset,
+            text,
+        } => {
+            let avg_scale = (scale[0].abs() + scale[1].abs()) * 0.5;
+            EntityKind::Dimension {
+                start: transform_pt(*start),
+                end: transform_pt(*end),
+                offset: offset * avg_scale,
+                text: text.clone(),
+            }
+        }
+        EntityKind::RadialDimension {
+            center,
+            target,
+            leader_offset,
+            is_diameter,
+            text,
+        } => {
+            let avg_scale = (scale[0].abs() + scale[1].abs()) * 0.5;
+            EntityKind::RadialDimension {
+                center: transform_pt(*center),
+                target: transform_pt(*target),
+                leader_offset: leader_offset * avg_scale,
+                is_diameter: *is_diameter,
+                text: text.clone(),
+            }
+        }
+        EntityKind::Insert {
+            block_name,
+            position: child_pos,
+            scale: child_scale,
+            rotation_degrees: child_rot,
+        } => {
+            let new_pos = transform_pt(*child_pos);
+            let new_scale = [scale[0] * child_scale[0], scale[1] * child_scale[1]];
+            let new_rot = (rotation_degrees + child_rot).rem_euclid(360.0);
+            EntityKind::Insert {
+                block_name: block_name.clone(),
+                position: new_pos,
+                scale: new_scale,
+                rotation_degrees: new_rot,
+            }
+        }
+    }
+}
+
 fn write_entity(out: &mut String, entity: &Entity) {
-    let layer = entity.layer.as_str();
-    match &entity.kind {
+    write_entity_kind(out, entity.layer.as_str(), &entity.kind);
+}
+
+fn write_entity_kind(out: &mut String, layer: &str, kind: &EntityKind) {
+    match kind {
         EntityKind::Point { at } => {
             pair(out, 0, "POINT");
             pair(out, 8, layer);
@@ -2254,6 +3727,21 @@ fn write_entity(out: &mut String, entity: &Entity) {
             offset,
             text,
         } => write_dimension(out, layer, *start, *end, *offset, text.as_deref()),
+        EntityKind::RadialDimension {
+            center,
+            target,
+            leader_offset,
+            is_diameter,
+            text,
+        } => write_radial_dimension(
+            out,
+            layer,
+            *center,
+            *target,
+            *leader_offset,
+            *is_diameter,
+            text.as_deref(),
+        ),
         EntityKind::Polyline { points, closed } => {
             for pair_points in points.windows(2) {
                 pair(out, 0, "LINE");
@@ -2331,6 +3819,20 @@ fn write_entity(out: &mut String, entity: &Entity) {
                 point(out, 11, *first);
             }
         }
+        EntityKind::Insert {
+            block_name,
+            position,
+            scale,
+            rotation_degrees,
+        } => {
+            pair(out, 0, "INSERT");
+            pair(out, 8, layer);
+            pair(out, 2, block_name);
+            point(out, 10, *position);
+            pair(out, 41, &number(scale[0]));
+            pair(out, 42, &number(scale[1]));
+            pair(out, 50, &number(*rotation_degrees));
+        }
     }
 }
 
@@ -2383,6 +3885,71 @@ fn write_dimension(
     point(out, 10, mid);
     pair(out, 40, &number(height));
     pair(out, 1, &value);
+}
+
+fn write_radial_dimension(
+    out: &mut String,
+    layer: &str,
+    center: [f64; 2],
+    target: [f64; 2],
+    leader_offset: f64,
+    is_diameter: bool,
+    text: Option<&str>,
+) {
+    let (dx, dy) = (target[0] - center[0], target[1] - center[1]);
+    let radius = dx.hypot(dy);
+    if radius <= f64::EPSILON {
+        return;
+    }
+    let (ux, uy) = (dx / radius, dy / radius);
+    let elbow = [
+        target[0] + ux * leader_offset,
+        target[1] + uy * leader_offset,
+    ];
+    let shoulder_dx = if ux >= 0.0 { 6.0 } else { -6.0 };
+    let shoulder = [elbow[0] + shoulder_dx, elbow[1]];
+
+    let mut line = |from: [f64; 2], to: [f64; 2]| {
+        pair(out, 0, "LINE");
+        pair(out, 8, layer);
+        point(out, 10, from);
+        point(out, 11, to);
+    };
+
+    if is_diameter {
+        let opposite = [center[0] - ux * radius, center[1] - uy * radius];
+        line(opposite, target);
+    } else {
+        line(center, target);
+    }
+    line(target, elbow);
+    line(elbow, shoulder);
+
+    // Arrowhead ticks at target
+    let tick = (radius * 0.05).clamp(0.5, 3.0);
+    let (nx, ny) = (-uy * tick * 0.5, ux * tick * 0.5);
+    line(
+        [target[0] - ux * tick + nx, target[1] - uy * tick + ny],
+        target,
+    );
+    line(
+        [target[0] - ux * tick - nx, target[1] - uy * tick - ny],
+        target,
+    );
+
+    let height = 3.0;
+    let val_str = if is_diameter {
+        format!("%%c{}", number(radius * 2.0))
+    } else {
+        format!("R{}", number(radius))
+    };
+    let value = text.unwrap_or(&val_str);
+    let text_at = [shoulder[0].min(elbow[0]) + 1.0, shoulder[1] + 1.0];
+    pair(out, 0, "TEXT");
+    pair(out, 8, layer);
+    point(out, 10, text_at);
+    pair(out, 40, &number(height));
+    pair(out, 1, value);
 }
 
 #[cfg(test)]

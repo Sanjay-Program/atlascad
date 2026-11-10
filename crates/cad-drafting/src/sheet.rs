@@ -142,6 +142,7 @@ pub struct PlotLine {
     pub points: Vec<[f64; 2]>,
     pub width_mm: f64,
     pub closed: bool,
+    pub dash_pattern: Vec<f64>,
 }
 
 /// One text run in paper space. `height_mm` is the font size, not the box.
@@ -356,7 +357,9 @@ impl Sheet {
                 continue;
             }
             let width_mm = layer.map_or(0.25, |layer| layer.line_weight_mm);
-            if let Some(line) = entity_line(&entity.kind, &to_paper, width_mm) {
+            let dash_pattern = layer.map_or_else(Vec::new, |l| l.linetype.dash_pattern().to_vec());
+            if let Some(mut line) = entity_line(&entity.kind, &to_paper, width_mm) {
+                line.dash_pattern = dash_pattern.clone();
                 plot.lines.push(line);
             }
             match &entity.kind {
@@ -373,6 +376,44 @@ impl Sheet {
                     offset,
                     text,
                 } => dimension(&mut plot, *start, *end, *offset, text.as_deref(), &to_paper),
+                EntityKind::RadialDimension {
+                    center,
+                    target,
+                    leader_offset,
+                    is_diameter,
+                    text,
+                } => radial_dimension(
+                    &mut plot,
+                    *center,
+                    *target,
+                    *leader_offset,
+                    *is_diameter,
+                    text.as_deref(),
+                    scale,
+                    &to_paper,
+                ),
+                EntityKind::Insert {
+                    block_name,
+                    position,
+                    scale: ins_scale,
+                    rotation_degrees,
+                } => {
+                    if let Some(block) = draft.block(block_name) {
+                        for child in &block.entities {
+                            let transformed = crate::transform_block_entity(
+                                child,
+                                block.base_point,
+                                *position,
+                                *ins_scale,
+                                *rotation_degrees,
+                            );
+                            if let Some(mut line) = entity_line(&transformed, &to_paper, width_mm) {
+                                line.dash_pattern = dash_pattern.clone();
+                                plot.lines.push(line);
+                            }
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -419,6 +460,7 @@ impl Sheet {
             ],
             width_mm: 0.5,
             closed: true,
+            dash_pattern: Vec::new(),
         });
     }
 
@@ -461,6 +503,7 @@ impl Sheet {
                 points,
                 width_mm,
                 closed: false,
+                dash_pattern: Vec::new(),
             });
         }
 
@@ -587,17 +630,20 @@ where
                 points: vec![[x - 0.6, y], [x + 0.6, y]],
                 width_mm: width_mm.max(0.5),
                 closed: false,
+                dash_pattern: Vec::new(),
             })
         }
         EntityKind::Line { start, end } => Some(PlotLine {
             points: vec![to_paper(*start), to_paper(*end)],
             width_mm,
             closed: false,
+            dash_pattern: Vec::new(),
         }),
         EntityKind::Polyline { points, closed } => Some(PlotLine {
             points: points.iter().map(|point| to_paper(*point)).collect(),
             width_mm,
             closed: *closed,
+            dash_pattern: Vec::new(),
         }),
         EntityKind::Circle { center, radius } => {
             let steps = arc_steps(*radius);
@@ -614,6 +660,7 @@ where
                 points,
                 width_mm,
                 closed: true,
+                dash_pattern: Vec::new(),
             })
         }
         EntityKind::Arc {
@@ -638,6 +685,7 @@ where
                 points,
                 width_mm,
                 closed: false,
+                dash_pattern: Vec::new(),
             })
         }
         EntityKind::Rectangle {
@@ -653,6 +701,7 @@ where
                 points: vec![p0, p1, p2, p3],
                 width_mm,
                 closed: true,
+                dash_pattern: Vec::new(),
             })
         }
         EntityKind::Ellipse {
@@ -674,6 +723,7 @@ where
                 points,
                 width_mm,
                 closed: true,
+                dash_pattern: Vec::new(),
             })
         }
         EntityKind::Spline { points, closed } => {
@@ -683,10 +733,14 @@ where
                 points: paper_points,
                 width_mm,
                 closed: *closed,
+                dash_pattern: Vec::new(),
             })
         }
-        // Text and dimensions carry their own primitives.
-        EntityKind::Text { .. } | EntityKind::Dimension { .. } => None,
+        // Text, dimensions and inserts carry their own primitives or nested geometry.
+        EntityKind::Text { .. }
+        | EntityKind::Dimension { .. }
+        | EntityKind::RadialDimension { .. }
+        | EntityKind::Insert { .. } => None,
     }
 }
 
@@ -738,12 +792,14 @@ fn dimension<F>(
             points: vec![to_paper(from), to_paper(to)],
             width_mm: 0.18,
             closed: false,
+            dash_pattern: Vec::new(),
         });
     }
     plot.lines.push(PlotLine {
         points: vec![paper_a, paper_b],
         width_mm: 0.18,
         closed: false,
+        dash_pattern: Vec::new(),
     });
 
     // Ticks are 45-degree slashes, two millimetres long in paper space, which is legible at any scale.
@@ -756,6 +812,7 @@ fn dimension<F>(
             ],
             width_mm: 0.25,
             closed: false,
+            dash_pattern: Vec::new(),
         });
     }
 
@@ -769,6 +826,92 @@ fn dimension<F>(
         height_mm: 2.5,
         value,
         align: TextAlign::Center,
+        bold: false,
+    });
+}
+
+/// One radial or diameter dimension in paper space.
+#[allow(clippy::too_many_arguments)]
+fn radial_dimension<F>(
+    plot: &mut Plot,
+    center: [f64; 2],
+    target: [f64; 2],
+    leader_offset: f64,
+    is_diameter: bool,
+    text: Option<&str>,
+    _scale: f64,
+    to_paper: &F,
+) where
+    F: Fn([f64; 2]) -> [f64; 2],
+{
+    let (dx, dy) = (target[0] - center[0], target[1] - center[1]);
+    let radius = dx.hypot(dy);
+    if radius <= f64::EPSILON {
+        return;
+    }
+    let (ux, uy) = (dx / radius, dy / radius);
+    let elbow = [
+        target[0] + ux * leader_offset,
+        target[1] + uy * leader_offset,
+    ];
+    let shoulder_dx = if ux >= 0.0 { 6.0 } else { -6.0 };
+    let shoulder = [elbow[0] + shoulder_dx, elbow[1]];
+
+    let p_target = to_paper(target);
+    let p_elbow = to_paper(elbow);
+    let p_shoulder = to_paper(shoulder);
+
+    if is_diameter {
+        let opposite = [center[0] - ux * radius, center[1] - uy * radius];
+        plot.lines.push(PlotLine {
+            points: vec![to_paper(opposite), p_target],
+            width_mm: 0.18,
+            closed: false,
+            dash_pattern: Vec::new(),
+        });
+    } else {
+        plot.lines.push(PlotLine {
+            points: vec![to_paper(center), p_target],
+            width_mm: 0.18,
+            closed: false,
+            dash_pattern: Vec::new(),
+        });
+    }
+
+    // Leader line and shoulder
+    plot.lines.push(PlotLine {
+        points: vec![p_target, p_elbow, p_shoulder],
+        width_mm: 0.18,
+        closed: false,
+        dash_pattern: Vec::new(),
+    });
+
+    // Arrowhead ticks at target point (in paper space, 1.5mm)
+    let tick = 1.5;
+    let (nx, ny) = (-uy * tick * 0.5, ux * tick * 0.5);
+    plot.lines.push(PlotLine {
+        points: vec![
+            [p_target[0] - ux * tick + nx, p_target[1] - uy * tick + ny],
+            p_target,
+            [p_target[0] - ux * tick - nx, p_target[1] - uy * tick - ny],
+        ],
+        width_mm: 0.25,
+        closed: false,
+        dash_pattern: Vec::new(),
+    });
+
+    let val_str = if is_diameter {
+        format!("Ø {}", number(radius * 2.0))
+    } else {
+        format!("R {}", number(radius))
+    };
+    let value = text.map_or_else(|| val_str, ToString::to_string);
+    let text_x = p_elbow[0].min(p_shoulder[0]) + 0.5;
+    plot.texts.push(PlotText {
+        at: [text_x, p_shoulder[1] + 1.0],
+        height_mm: 2.5,
+        value,
+        align: TextAlign::Left,
         bold: false,
     });
 }

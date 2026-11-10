@@ -28,6 +28,50 @@ pub const POSITION_TOLERANCE_MM: f64 = 1.0e-6;
 /// The rate a rapid traverse is assumed to run at, for time estimates only, in mm/min.
 pub const RAPID_RATE_MM_MIN: f64 = 5_000.0;
 
+/// Machine kinematic limits and dwell delays for realistic cycle time estimation.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct KinematicLimits {
+    /// Maximum axis acceleration for cutting feed moves, mm/s².
+    pub cutting_acceleration_mm_s2: f64,
+    /// Maximum axis acceleration for rapid traverses, mm/s².
+    pub rapid_acceleration_mm_s2: f64,
+    /// Rapid traverse feed rate in mm/min.
+    pub rapid_feed_mm_min: f64,
+    /// Spindle start/ramp dwell in seconds.
+    pub spindle_dwell_seconds: f64,
+    /// Tool change dwell time in seconds.
+    pub tool_change_seconds: f64,
+}
+
+impl Default for KinematicLimits {
+    fn default() -> Self {
+        KinematicLimits {
+            cutting_acceleration_mm_s2: 1500.0,
+            rapid_acceleration_mm_s2: 2000.0,
+            rapid_feed_mm_min: RAPID_RATE_MM_MIN,
+            spindle_dwell_seconds: 2.0,
+            tool_change_seconds: 8.0,
+        }
+    }
+}
+
+/// Kinematic cycle time estimate with acceleration ramps, dwell, and tool changes.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CycleTimeEstimate {
+    /// Time spent actively cutting material, in seconds.
+    pub cutting_time_seconds: f64,
+    /// Time spent in non-cutting rapid positioning, in seconds.
+    pub rapid_time_seconds: f64,
+    /// Spindle acceleration and dwell delays, in seconds.
+    pub dwell_time_seconds: f64,
+    /// Tool change overhead, in seconds.
+    pub tool_change_time_seconds: f64,
+    /// Total cycle duration in seconds.
+    pub total_seconds: f64,
+    /// Total cycle duration in minutes.
+    pub total_minutes: f64,
+}
+
 /// An opaque toolpath identifier. Zero is reserved and is never issued.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ToolpathId(u64);
@@ -213,6 +257,58 @@ impl Toolpath {
             }
         }
         minutes
+    }
+
+    /// Exact kinematic cycle time accounting for axis acceleration ramps and spindle dwell.
+    pub fn kinematic_cycle_time(&self, limits: &KinematicLimits) -> CycleTimeEstimate {
+        let mut cutting_seconds = 0.0;
+        let mut rapid_seconds = 0.0;
+
+        for pair in self.points.windows(2) {
+            let length = distance(pair[0].position, pair[1].position);
+            if length <= POSITION_TOLERANCE_MM {
+                continue;
+            }
+            let is_cutting = pair[1].kind.is_cutting();
+            let feed_mm_min = if is_cutting {
+                pair[1].feed_mm_min
+            } else {
+                limits.rapid_feed_mm_min
+            };
+            let accel = if is_cutting {
+                limits.cutting_acceleration_mm_s2.max(10.0)
+            } else {
+                limits.rapid_acceleration_mm_s2.max(10.0)
+            };
+
+            if !feed_mm_min.is_finite() || feed_mm_min <= 0.0 {
+                continue;
+            }
+            let v = feed_mm_min / 60.0; // mm/s
+            let d_acc = (v * v) / accel;
+            let segment_time = if length >= d_acc {
+                (v / accel) + (length / v)
+            } else {
+                2.0 * (length / accel).sqrt()
+            };
+
+            if is_cutting {
+                cutting_seconds += segment_time;
+            } else {
+                rapid_seconds += segment_time;
+            }
+        }
+
+        let dwell = limits.spindle_dwell_seconds;
+        let total = cutting_seconds + rapid_seconds + dwell;
+        CycleTimeEstimate {
+            cutting_time_seconds: cutting_seconds,
+            rapid_time_seconds: rapid_seconds,
+            dwell_time_seconds: dwell,
+            tool_change_time_seconds: 0.0,
+            total_seconds: total,
+            total_minutes: total / 60.0,
+        }
     }
 
     /// Check the toolpath against the setup before any postprocessor touches it.

@@ -3172,3 +3172,367 @@ fn drafting_constructions_join_array_and_section_analysis() -> Result<(), Box<dy
 
     Ok(())
 }
+
+#[test]
+fn drafting_radial_dimensions_and_linetypes() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("rad_dim_test", [20.0, 20.0, 10.0])?;
+    let addr = handle.addr();
+
+    // 1. Add layer with hidden linetype
+    let l_resp = post(
+        addr,
+        "/api/draft/layer",
+        r#"{"name":"DASHED_LAYER","color":1,"linetype":"hidden"}"#,
+    )?;
+    assert_eq!(l_resp.status, 200);
+    let l_data = json(&l_resp)?;
+    let l_ent = l_data["layers"]
+        .as_array()
+        .ok_or("layers")?
+        .iter()
+        .find(|l| l["name"] == "DASHED_LAYER")
+        .ok_or("found layer")?;
+    assert_eq!(l_ent["linetype"], "hidden");
+
+    // 2. Add circle on DASHED_LAYER
+    let c_resp = post(
+        addr,
+        "/api/draft/construct",
+        r#"{"kind":"circle_2p","layer":"DASHED_LAYER","p1":[0.0,0.0],"p2":[40.0,0.0]}"#,
+    )?;
+    assert_eq!(c_resp.status, 200);
+    let c_data = json(&c_resp)?;
+    let circle_id = c_data["entities"]
+        .as_array()
+        .ok_or("entities")?
+        .last()
+        .ok_or("circle")?["id"]
+        .as_u64()
+        .ok_or("id")?;
+
+    // 3. Add Radius dimension for circle
+    let rad_resp = post(
+        addr,
+        "/api/draft/dimension-radial",
+        &format!(
+            r#"{{"entity_id":{circle_id},"pick_angle_deg":45.0,"leader_offset":12.0,"is_diameter":false}}"#
+        ),
+    )?;
+    assert_eq!(rad_resp.status, 200);
+    let rad_data = json(&rad_resp)?;
+    let rad_ent = rad_data["entities"]
+        .as_array()
+        .ok_or("entities")?
+        .last()
+        .ok_or("rad dim")?;
+    assert_eq!(rad_ent["kind"]["kind"], "radial_dimension");
+    assert_eq!(rad_ent["kind"]["is_diameter"], false);
+
+    // 4. Add Diameter dimension for circle
+    let dia_resp = post(
+        addr,
+        "/api/draft/dimension-radial",
+        &format!(
+            r#"{{"entity_id":{circle_id},"pick_angle_deg":135.0,"leader_offset":15.0,"is_diameter":true}}"#
+        ),
+    )?;
+    assert_eq!(dia_resp.status, 200);
+    let dia_data = json(&dia_resp)?;
+    let dia_ent = dia_data["entities"]
+        .as_array()
+        .ok_or("entities")?
+        .last()
+        .ok_or("dia dim")?;
+    assert_eq!(dia_ent["kind"]["is_diameter"], true);
+
+    // 5. Verify DXF export includes LTYPE table, DASHED_LAYER with HIDDEN, R20, %%c40
+    let dxf_resp = request(addr, "GET", "/api/export/dxf", &[], &[])?;
+    assert_eq!(dxf_resp.status, 200);
+    let dxf_text = String::from_utf8_lossy(&dxf_resp.body);
+    assert!(dxf_text.contains("LTYPE"));
+    assert!(dxf_text.contains("HIDDEN"));
+    assert!(dxf_text.contains("R20"));
+    assert!(dxf_text.contains("%%c40"));
+
+    Ok(())
+}
+
+#[test]
+fn drafting_blocks_and_inserts_api() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("blocks_api_test", [30.0, 30.0, 10.0])?;
+    let addr = handle.addr();
+
+    // 1. Create entities to define a block: two lines forming an L-bracket
+    let line1 = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"0","kind":{"kind":"line","start":[0.0,0.0],"end":[20.0,0.0]}}"#,
+    )?;
+    assert_eq!(line1.status, 200);
+    let l1_data = json(&line1)?;
+    let id1 = l1_data["entities"]
+        .as_array()
+        .ok_or("ents")?
+        .last()
+        .ok_or("e")?["id"]
+        .as_u64()
+        .ok_or("id")?;
+
+    let line2 = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"0","kind":{"kind":"line","start":[0.0,0.0],"end":[0.0,15.0]}}"#,
+    )?;
+    assert_eq!(line2.status, 200);
+    let l2_data = json(&line2)?;
+    let id2 = l2_data["entities"]
+        .as_array()
+        .ok_or("ents")?
+        .last()
+        .ok_or("e")?["id"]
+        .as_u64()
+        .ok_or("id")?;
+
+    // 2. Define block "L_BRACKET" from id1 and id2 with base point [0.0, 0.0]
+    let blk_resp = post(
+        addr,
+        "/api/draft/block",
+        &format!(r#"{{"name":"L_BRACKET","base_point":[0.0,0.0],"entity_ids":[{id1},{id2}]}}"#),
+    )?;
+    assert_eq!(blk_resp.status, 200);
+    let blk_data = json(&blk_resp)?;
+    let blocks = blk_data["blocks"].as_array().ok_or("blocks")?;
+    assert!(blocks.iter().any(|b| b["name"] == "L_BRACKET"));
+
+    // 3. Insert block instance placed at [50.0, 50.0] with scale [2.0, 2.0]
+    let ins_resp = post(
+        addr,
+        "/api/draft/insert",
+        r#"{"block_name":"L_BRACKET","position":[50.0,50.0],"scale":[2.0,2.0],"rotation_degrees":45.0}"#,
+    )?;
+    assert_eq!(ins_resp.status, 200);
+    let ins_data = json(&ins_resp)?;
+    let ins_ent = ins_data["entities"]
+        .as_array()
+        .ok_or("entities")?
+        .last()
+        .ok_or("insert")?;
+    assert_eq!(ins_ent["kind"]["kind"], "insert");
+    assert_eq!(ins_ent["kind"]["block_name"], "L_BRACKET");
+    let ins_id = ins_ent["id"].as_u64().ok_or("ins_id")?;
+
+    // 4. DXF export includes BLOCKS section and INSERT entity
+    let dxf_resp = request(addr, "GET", "/api/export/dxf", &[], &[])?;
+    assert_eq!(dxf_resp.status, 200);
+    let dxf_text = String::from_utf8_lossy(&dxf_resp.body);
+    assert!(dxf_text.contains("BLOCKS"));
+    assert!(dxf_text.contains("L_BRACKET"));
+    assert!(dxf_text.contains("INSERT"));
+
+    // 5. Explode the insert via /api/draft/explode
+    let exp_resp = post(addr, "/api/draft/explode", &format!(r#"{{"id":{ins_id}}}"#))?;
+    assert_eq!(exp_resp.status, 200);
+    let exp_data = json(&exp_resp)?;
+    // Exploding replaces the insert with the two lines
+    assert!(
+        !exp_data["entities"]
+            .as_array()
+            .ok_or("ents")?
+            .iter()
+            .any(|e| e["id"] == ins_id)
+    );
+
+    // 6. Undo restores the insert
+    let undo_resp = post(addr, "/api/draft/undo", "{}")?;
+    assert_eq!(undo_resp.status, 200);
+    let undo_data = json(&undo_resp)?;
+    assert!(
+        undo_data["entities"]
+            .as_array()
+            .ok_or("ents")?
+            .iter()
+            .any(|e| e["id"] == ins_id)
+    );
+
+    Ok(())
+}
+
+#[test]
+fn drafting_autocad_advanced_endpoints() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("autocad_adv_test", [20.0, 20.0, 10.0])?;
+    let addr = handle.addr();
+
+    // 1. Purge: Add unused layer and unused block, then purge
+    let l_resp = post(
+        addr,
+        "/api/draft/layer",
+        r#"{"name":"UNUSED_LAYER","color":2}"#,
+    )?;
+    assert_eq!(l_resp.status, 200);
+
+    let pt_resp = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"0","kind":{"kind":"point","at":[1.0,1.0]}}"#,
+    )?;
+    assert_eq!(pt_resp.status, 200);
+    let pt_id = json(&pt_resp)?["entities"]
+        .as_array()
+        .ok_or("ents")?
+        .last()
+        .ok_or("pt")?["id"]
+        .as_u64()
+        .ok_or("id")?;
+
+    let blk_resp = post(
+        addr,
+        "/api/draft/block",
+        &format!(r#"{{"name":"UNUSED_BLK","base_point":[0.0,0.0],"entity_ids":[{pt_id}]}}"#),
+    )?;
+    assert_eq!(blk_resp.status, 200);
+
+    let purge_resp = post(addr, "/api/draft/purge", "{}")?;
+    assert_eq!(purge_resp.status, 200);
+    let purge_data = json(&purge_resp)?;
+    assert_eq!(
+        purge_data["report"]["purged_layers"]
+            .as_array()
+            .ok_or("purged_layers")?,
+        &vec![serde_json::Value::String("UNUSED_LAYER".into())]
+    );
+    assert_eq!(
+        purge_data["report"]["purged_blocks"]
+            .as_array()
+            .ok_or("purged_blocks")?,
+        &vec![serde_json::Value::String("UNUSED_BLK".into())]
+    );
+
+    // 2. Overkill: Add duplicate line and collinear overlapping line
+    let _l1 = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"0","kind":{"kind":"line","start":[0.0,0.0],"end":[10.0,0.0]}}"#,
+    )?;
+    let _l2 = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"0","kind":{"kind":"line","start":[10.0,0.0],"end":[0.0,0.0]}}"#, // duplicate
+    )?;
+    let _ol1 = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"0","kind":{"kind":"line","start":[20.0,0.0],"end":[30.0,0.0]}}"#,
+    )?;
+    let _ol2 = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"0","kind":{"kind":"line","start":[25.0,0.0],"end":[40.0,0.0]}}"#, // overlapping collinear
+    )?;
+
+    let overkill_resp = post(addr, "/api/draft/overkill", r#"{"tolerance":0.001}"#)?;
+    assert_eq!(overkill_resp.status, 200);
+    let overkill_data = json(&overkill_resp)?;
+    assert_eq!(overkill_data["report"]["duplicate_entities_removed"], 1);
+    assert_eq!(overkill_data["report"]["collinear_lines_merged"], 1);
+
+    // 3. Divide: divide a 100mm line into 4 segments
+    let line_div = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"0","kind":{"kind":"line","start":[0.0,50.0],"end":[100.0,50.0]}}"#,
+    )?;
+    assert_eq!(line_div.status, 200);
+    let l_data = json(&line_div)?;
+    let line_id = l_data["entities"]
+        .as_array()
+        .ok_or("ents")?
+        .last()
+        .ok_or("line")?["id"]
+        .as_u64()
+        .ok_or("id")?;
+
+    let div_resp = post(
+        addr,
+        "/api/draft/divide",
+        &format!(r#"{{"entity_id":{line_id},"segments":4}}"#),
+    )?;
+    assert_eq!(div_resp.status, 200);
+    let div_data = json(&div_resp)?;
+    let div_points = div_data["created_point_ids"].as_array().ok_or("pt_ids")?;
+    assert_eq!(div_points.len(), 3); // 3 interior division points
+
+    // 4. Measure Interval: measure along the same line at 30mm intervals
+    let me_resp = post(
+        addr,
+        "/api/draft/measure-interval",
+        &format!(r#"{{"entity_id":{line_id},"interval":30.0}}"#),
+    )?;
+    assert_eq!(me_resp.status, 200);
+    let me_data = json(&me_resp)?;
+    let me_points = me_data["created_point_ids"].as_array().ok_or("me_pts")?;
+    assert_eq!(me_points.len(), 3); // 30, 60, 90
+
+    // 5. Match Properties: copy layer from source entity to target
+    let src_resp = post(
+        addr,
+        "/api/draft/layer",
+        r#"{"name":"SOURCE_LAYER","color":4}"#,
+    )?;
+    assert_eq!(src_resp.status, 200);
+    let ent_src = post(
+        addr,
+        "/api/draft/entity",
+        r#"{"layer":"SOURCE_LAYER","kind":{"kind":"point","at":[5.0,5.0]}}"#,
+    )?;
+    let src_id = json(&ent_src)?["entities"]
+        .as_array()
+        .ok_or("e")?
+        .last()
+        .ok_or("e")?["id"]
+        .as_u64()
+        .ok_or("id")?;
+
+    let match_resp = post(
+        addr,
+        "/api/draft/match-properties",
+        &format!(r#"{{"source_id":{src_id},"target_ids":[{line_id}]}}"#),
+    )?;
+    assert_eq!(match_resp.status, 200);
+    let match_data = json(&match_resp)?;
+    assert_eq!(match_data["matched_count"], 1);
+
+    // Verify target line is now on SOURCE_LAYER
+    let draft_ents = match_data["draft"]["entities"].as_array().ok_or("e")?;
+    let target_ent = draft_ents
+        .iter()
+        .find(|e| e["id"] == line_id)
+        .ok_or("target_ent")?;
+    assert_eq!(target_ent["layer"], "SOURCE_LAYER");
+
+    // 6. Constraint Solve via /api/draft/constraints/solve
+    // Solve a horizontal line from (0,0) to (10, 5) -> y2 must become 0
+    let solve_resp = post(
+        addr,
+        "/api/draft/constraints/solve",
+        r#"{
+            "points": [[0.0, 0.0], [10.0, 5.0]],
+            "lines": [[0, 1]],
+            "constraints": [
+                {"FixPoint": [0, [0.0, 0.0]]},
+                {"Horizontal": 0}
+            ]
+        }"#,
+    )?;
+    assert_eq!(solve_resp.status, 200);
+    let solve_data = json(&solve_resp)?;
+    assert_eq!(solve_data["solve"]["converged"], true);
+    assert_eq!(solve_data["dof"]["status"], "Under");
+    let solved_pts = solve_data["solved_points"].as_array().ok_or("pts")?;
+    let p1_y = solved_pts[1][1].as_f64().ok_or("y")?;
+    assert!(
+        p1_y.abs() < 1e-4,
+        "Horizontal constraint should make y2 = 0"
+    );
+
+    Ok(())
+}

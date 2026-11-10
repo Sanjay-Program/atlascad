@@ -93,6 +93,7 @@ fn content_stream(plot: &Plot) -> String {
     let mut content = String::new();
     content.push_str("q\n");
     let mut width: Option<f64> = None;
+    let mut dashed = false;
 
     for line in &plot.lines {
         if line.points.len() < 2 {
@@ -101,6 +102,18 @@ fn content_stream(plot: &Plot) -> String {
         if width != Some(line.width_mm) {
             content.push_str(&format!("{} w\n", number(mm_to_pt(line.width_mm))));
             width = Some(line.width_mm);
+        }
+        if !line.dash_pattern.is_empty() {
+            let pattern_str: Vec<String> = line
+                .dash_pattern
+                .iter()
+                .map(|&d| number(mm_to_pt(d)))
+                .collect();
+            content.push_str(&format!("[{}] 0 d\n", pattern_str.join(" ")));
+            dashed = true;
+        } else if dashed {
+            content.push_str("[] 0 d\n");
+            dashed = false;
         }
         content.push_str(&format!(
             "{} {} m\n",
@@ -118,6 +131,9 @@ fn content_stream(plot: &Plot) -> String {
             content.push_str("h\n");
         }
         content.push_str("S\n");
+    }
+    if dashed {
+        content.push_str("[] 0 d\n");
     }
 
     content.push_str("0 J 0 j\n");
@@ -401,6 +417,7 @@ mod tests {
             points: vec![[10.0, 10.0], [20.0, 20.0]],
             width_mm: 0.5,
             closed: true,
+            dash_pattern: Vec::new(),
         });
         plot.texts.push(PlotText {
             at: [50.0, 50.0],

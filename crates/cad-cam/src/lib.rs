@@ -41,7 +41,10 @@ pub mod tool;
 pub mod tool_path;
 pub mod tool_path_visitor;
 
-pub use feeds::{FeedsError, FeedsRequest, Material, RecommendedFeeds, recommend};
+pub use feeds::{
+    FeedsError, FeedsRequest, Material, RecommendedFeeds, TaylorParameters, ToolWearEstimate,
+    recommend,
+};
 pub use gcode::{PostError, PostFormat, Postprocessor};
 pub use pdf::setup_sheet_pdf;
 pub use setup::{Setup, SetupError, Stock, WorkCoordinate};
@@ -53,7 +56,10 @@ pub use tool::{
     CuttingCondition, Holder, Machine, MachineEnvelope, Tool, ToolError, ToolGeometry, ToolId,
     ToolLibrary,
 };
-pub use tool_path::{MoveKind, Toolpath, ToolpathError, ToolpathId, ToolpathPoint};
+pub use tool_path::{
+    CycleTimeEstimate, KinematicLimits, MoveKind, Toolpath, ToolpathError, ToolpathId,
+    ToolpathPoint,
+};
 pub use tool_path_visitor::{machine_name, show_toolpath, summarize};
 
 /// The crate version, recorded in a program's summary and its derived artifact.

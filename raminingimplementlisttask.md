@@ -10,14 +10,14 @@
 
 | Domain | Total Tasks | Verified `[x]` | Pending `[ ]` | Status |
 |---|:---:|:---:|:---:|:---:|
-| **1. 2D Drafting (AutoCAD Parity)** | 4 | 4 | 0 | **Verified** |
-| **2. 3D Parametric Modeling** | 4 | 4 | 0 | **Verified** |
-| **3. Manufacturing CAM (3-Axis CNC)** | 4 | 4 | 0 | **Verified** |
-| **4. Structural & Multiphysics CAE** | 4 | 4 | 0 | **Verified** |
+| **1. 2D Drafting (AutoCAD Parity)** | 8 | 8 | 0 | **Verified** |
+| **2. 3D Parametric Modeling** | 6 | 6 | 0 | **Verified** |
+| **3. Manufacturing CAM (3-Axis CNC)** | 5 | 5 | 0 | **Verified** |
+| **4. Structural & Multiphysics CAE** | 5 | 5 | 0 | **Verified** |
 | **5. Unified Engineering Model** | 3 | 3 | 0 | **Verified** |
 | **6. Enterprise Deployment & Operations** | 6 | 6 | 0 | **Verified** |
 | **7. Security & Governance** | 3 | 3 | 0 | **Verified** |
-| **Total** | **28** | **28** | **0** | **100% Complete** |
+| **Total** | **36** | **36** | **0** | **100% Complete** |
 
 ---
 
@@ -47,6 +47,36 @@
   - **Verification:** Interactive browser tests via CDP driver (`scripts/browser-drive.mjs`).
   - **Evidence:** Implemented in `crates/cad-studio/assets/app.js` with live snap markers (square, triangle, circle, diamond, cross, perpendicular, tangent, hourglass), polar angle tracking guidelines, F3/F10 hotkeys, and automated CDP assertions in `scripts/browser-drive.mjs`.
 
+- [x] **TASK-DRAFT-5: Radial and Diameter Dimensions (`DRA`, `DDI`) with Leader Geometry & DXF / PDF Export**
+  - **Scope:** `crates/cad-drafting`: Add `EntityKind::RadialDimension` with center, target point on arc/circle, leader line, radius $R$ or diameter $\varnothing$ symbol, DXF export, and vector PDF plotting. Studio CLI commands `DRA` / `DDI` and HTTP endpoint `/api/draft/dimension-radial`.
+  - **Acceptance:** Analytical radius/diameter calculation, text override, DXF export and vector PDF plotting with arrowheads and leaders.
+  - **Verification:** `cargo test -p cad-drafting` & `cargo test -p cad-studio`
+  - **Evidence:** 44 unit and 15 integration tests in `cad-drafting`, 38 tests in `cad-studio`, and full-check test suite verified.
+
+- [x] **TASK-DRAFT-6: AutoCAD Standard Linetypes (`LTYPE`) for Layers & Dash-Pattern Vector Plotting**
+  - **Scope:** `crates/cad-drafting`: Add `Linetype` enum (`Continuous`, `Hidden`, `Center`, `Phantom`, `Dashed`, `Dot`) to layers. Export AutoCAD standard `LTYPE` table in DXF. Emit vector PDF stroke dash-patterns (`setdash`). Web studio canvas line dash rendering.
+  - **Acceptance:** Layers support linetypes; DXF output includes standard dash definitions; PDF plots dashed strokes.
+  - **Verification:** `cargo test -p cad-drafting`
+  - **Evidence:** Verified DXF table exports (`LTYPE`, `CONTINUOUS`, `HIDDEN`, `CENTER`, `PHANTOM`, `DASHED`, `DOT`), PDF dash array operators `0 d`, and layer linetype persistence.
+
+- [x] **TASK-DRAFT-7: Reusable Block Definitions & Inserts (`BLOCK`, `INSERT`) with DXF Section**
+  - **Scope:** `crates/cad-drafting`: Block table storing named reusable entity groups with base insertion point. `EntityKind::Insert` supporting position, scale, and rotation. DXF `BLOCKS` and `INSERT` export, and block explode functionality.
+  - **Acceptance:** Block definition roundtrips, instantiations compute correct transformed bounds, DXF loads blocks properly.
+  - **Verification:** `cargo test -p cad-drafting` & `cargo test -p cad-studio`
+  - **Evidence:** Verified block definition and anisotropic insertion, transformed analytic bounds calculation, DXF R12 `BLOCKS` section and `INSERT` entity roundtrip, atomic explode operation with undo/redo reversibility, and studio API routes (`/api/draft/block`, `/api/draft/insert`). 16 integration tests and 44 unit tests pass in `cad-drafting`, 39 tests pass in `cad-studio`.
+
+- [x] **TASK-DRAFT-8: AutoCAD Utility Operations (`PURGE`, `OVERKILL`, `DIVIDE`, `MEASURE`, `MATCHPROP`)**
+  - **Scope:** `crates/cad-drafting`: Complete AutoCAD drawing maintenance and curve tools:
+    1. `PURGE` (`PU`): Scans layer and block references; removes unused layers (protecting default layer `0`) and unreferenced block definitions.
+    2. `OVERKILL` (`OV`): Eliminates duplicate entities within user tolerance and merges collinear overlapping/touching line segments into continuous spans.
+    3. `DIVIDE` (`DIV`): Divides curves (Line, Polyline, Circle, Arc, Ellipse, Rectangle, Spline) into $N$ equal segments by placing Point entities at analytical arc-length intervals ($N-1$ points for open curves, $N$ for closed).
+    4. `MEASURE` (`ME`): Places Point entities at fixed length distance intervals along curves.
+    5. `MATCHPROP` (`MA`): Copies layer properties from source entity to target entities.
+    All operations respect locked layer immutability and record reversible undo/redo snapshots.
+  - **Acceptance:** Purge removes unreferenced items and restores on undo; Overkill merges overlapping lines and deletes duplicates; Divide and Measure place points at exact mathematical coordinates.
+  - **Verification:** `cargo test -p cad-drafting` & `cargo test -p cad-studio --test http_api`
+  - **Evidence:** 64 tests in `cad-drafting` and 40 tests in `cad-studio` pass. Verified analytical point placement, collinear merge, block purge, layer synchronization, and HTTP routes (`/api/draft/purge`, `/api/draft/overkill`, `/api/draft/divide`, `/api/draft/measure-interval`, `/api/draft/match-properties`) across 300 assertions in `scripts/full-check.py`.
+
 ---
 
 ## 2. 3D Parametric Modeling & Feature History
@@ -75,6 +105,18 @@
   - **Verification:** `cargo test -p cad-document`
   - **Evidence:** Implemented named solid bodies (`body_id`), `Build.bodies`, `add_body_extrude`, `add_body_join_extrude`, `add_body_cut_extrude`, and `inter_body_clearance` Euclidean distance measurement in `cad-document`.
 
+- [x] **TASK-CAD-5: 2D Parametric Geometric & Dimensional Constraint Engine (`cad-constraints`)**
+  - **Scope:** Activate `crates/cad-constraints` in root workspace. Pure Rust zero-unsafe constraint model (Coincident, Concentric, Horizontal, Vertical, Parallel, Perpendicular, Tangent, EqualLength, EqualRadius, Distance, Angle, FixPoint) with damped least squares / Levenberg-Marquardt solver and Degrees-of-Freedom (DOF) analysis.
+  - **Acceptance:** Solves constrained 2D sketches within <5ms, detects conflicting/over-constrained systems with diagnostics, reports exact DOF count.
+  - **Verification:** `cargo test -p cad-constraints`
+  - **Evidence:** 8 unit and integration tests in `cad-constraints` verify all 16 constraint types (Horizontal, Vertical, Coincident, Parallel, Perpendicular, Tangent line/circles, Concentric, EqualLength, EqualRadius, Distance, PointLineDistance, Angle, FixPoint, FixLength, FixRadius), degrees of freedom status (`Unconstrained`, `Under`, `Fully`, `Over`, `Inconsistent`), redundant constraint detection via incremental Householder QR rank analysis, contradictory constraint conflict isolation, and performance solving complex 4-bar linkage systems within <1ms (target <5ms). Zero unsafe code (`#![forbid(unsafe_code)]`).
+
+- [x] **TASK-CAD-6: Integrated Parametric 2D Constraint Solver API & Studio Console Workflow**
+  - **Scope:** Connect `cad-constraints` to `crates/cad-studio` via `POST /api/draft/constraints/solve`. Provides automated constraint solving, DOF analysis, diagnostic error isolation, in-place entity coordinate updates with undo preservation, and browser command palette shortcuts (`CONSTRAIN`, `PARAMETRIC`, `DOF`).
+  - **Acceptance:** Solves parametric sketch constraints, updates draft entities in-place when requested, returns `SolveReport` and `DofReport`.
+  - **Verification:** `cargo test -p cad-studio --test http_api` & `python3 scripts/full-check.py`
+  - **Evidence:** Verified in `http_api.rs` (`drafting_autocad_advanced_endpoints`) driving horizontal line alignment ($y_2 \to 0$), reporting DOF status `Under`, rank analysis, and in-place entity mutation. Tested in `scripts/full-check.py` (300 assertions passing).
+
 ---
 
 ## 3. CNC Manufacturing & 3-Axis CAM
@@ -101,6 +143,12 @@
   - **Acceptance:** `atlas cam job` outputs `program.nc`, `setup.md`, `setup.pdf`, `stock-preview.txt`, and `summary.json`.
   - **Verification:** `cargo test -p cad-cli --test cam_tests`
   - **Evidence:** Tested end-to-end in CLI and container smoke tests.
+
+- [x] **TASK-CAM-5: Tool Wear Physics (Taylor Equation) & Machining Cycle Time Estimator**
+  - **Scope:** `crates/cad-cam`: Advanced cutting physics model using Taylor tool life equation ($V_c \cdot T^n = C$) for tool wear percentage estimation per setup, and exact kinematic cycle time estimation integrating linear feeds, circular interpolation, rapid traverse acceleration ramps, spindle dwell, and tool changes.
+  - **Acceptance:** Predicts cycle time within realistic kinematic bounds and reports tool wear fraction in `JobSummary` and setup sheets.
+  - **Verification:** `cargo test -p cad-cam`
+  - **Evidence:** 72 unit and integration tests in `cad-cam` pass. Verified analytical Taylor tool wear calculations across all 6 materials (Aluminium, Brass, Mild Steel, Stainless Steel, Acetal, Hardwood) with finite positive life and accurate wear fractions, kinematic cycle time modeling with trapezoidal and triangular acceleration ramp profiles (`Toolpath::kinematic_cycle_time`), and setup sheet Markdown rendering of `## Kinematics & Tool Wear` section in `crates/cad-cam/tests/taylor_kinematics_tests.rs`. Widespread CLI and Studio integration verified in `full-check.py`.
 
 ---
 
@@ -129,6 +177,12 @@
   - **Acceptance:** Recovers fundamental natural frequency of cantilever beam within 5% of analytical Euler-Bernoulli solution.
   - **Verification:** `cargo test -p cad-cae --test modal_tests`
   - **Evidence:** Verified cantilever beam ($60\times 10\times 10\text{ mm}$ steel 1018) fundamental frequency $f_1 = 2302.55\text{ Hz}$ matches Euler-Bernoulli analytic $f_1 = 2290.17\text{ Hz}$ within 0.54% (limit 5.0%), ascending mode ordering verified ($f_1 \le f_2 \le f_3$), and normalized mode shapes verified across 18 unit and integration tests in `cad-cae`.
+
+- [x] **TASK-CAE-5: Steady-State Thermal Conduction FEA Solver (Poisson/Laplace Thermal Gradients)**
+  - **Scope:** `crates/cad-cae`: Steady-state thermal conduction solver on Hex8 voxel mesh with isotropic conductivity $k$. Dirichlet fixed-temperature boundary conditions and Neumann heat flux / internal heat generation. Solves $[K_{th}]\{T\} = \{Q\}$ using Jacobi-PCG, calculates temperature field and heat flux vector field $\mathbf{q} = -k \nabla T$.
+  - **Acceptance:** Recovers exact 1D linear Fourier temperature distribution across pure conduction block.
+  - **Verification:** `cargo test -p cad-cae`
+  - **Evidence:** 21 unit and integration tests in `cad-cae` pass. Verified exact match against 1D Fourier analytical conduction ($q = -k \frac{\Delta T}{L}$) recovering 207,600 W/m² heat flux vector, min/max/average nodal temperatures, symmetric positive-definite Jacobi-PCG thermal solver, Neumann heat flux, and volumetric heat generation in `crates/cad-cae/tests/thermal_tests.rs`. Full HTTP API `/api/cae/thermal` integrated and asserted in `scripts/full-check.py`.
 
 ---
 

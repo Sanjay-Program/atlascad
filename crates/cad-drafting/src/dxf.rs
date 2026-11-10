@@ -27,7 +27,7 @@
 //! Malformed input is an error, not a shrug: an odd number of lines, a non-numeric group code, or a
 //! record missing a coordinate it needs all fail the import with the offending group named.
 
-use crate::{DEFAULT_LAYER, Draft, DraftError, EntityKind};
+use crate::{DEFAULT_LAYER, Draft, DraftError, EntityKind, Linetype};
 use cad_contract::ids::DocumentId;
 use cad_contract::units::Unit;
 
@@ -76,6 +76,7 @@ pub fn from_dxf(name: &str, document: DocumentId, text: &str) -> Result<DxfImpor
     let records = records(&pairs);
 
     let mut layers: Vec<ParsedLayer> = Vec::new();
+    let mut blocks: Vec<crate::Block> = Vec::new();
     let mut entities: Vec<(String, EntityKind)> = Vec::new();
     let mut skipped: Vec<(String, usize)> = Vec::new();
     let mut section = String::new();
@@ -113,6 +114,54 @@ pub fn from_dxf(name: &str, document: DocumentId, text: &str) -> Result<DxfImpor
                 }
                 index += 1;
             }
+            "BLOCK" if section == "BLOCKS" => {
+                let block_name = text_group(record, 2).unwrap_or_default().trim().to_string();
+                let bx = number_opt(record, 10).unwrap_or(0.0);
+                let by = number_opt(record, 20).unwrap_or(0.0);
+                let mut block_entities = Vec::new();
+                index += 1;
+                while index < records.len() {
+                    let inner = &records[index];
+                    if inner.kind == "ENDBLK" {
+                        index += 1;
+                        break;
+                    } else if inner.kind == "ENDSEC" {
+                        break;
+                    } else if inner.kind == "POLYLINE" {
+                        if let Ok((kind, consumed)) = polyline(&records, index, inner) {
+                            block_entities.push(kind);
+                            index += consumed;
+                        } else {
+                            index += 1;
+                        }
+                    } else if matches!(
+                        inner.kind.as_str(),
+                        "LINE"
+                            | "CIRCLE"
+                            | "ARC"
+                            | "POINT"
+                            | "LWPOLYLINE"
+                            | "TEXT"
+                            | "ELLIPSE"
+                            | "SPLINE"
+                    ) {
+                        if let Ok(kind) = entity(inner) {
+                            block_entities.push(kind);
+                        }
+                        index += 1;
+                    } else {
+                        index += 1;
+                    }
+                }
+                if !block_name.is_empty() && !block_entities.is_empty() {
+                    blocks.push(crate::Block {
+                        name: block_name,
+                        base_point: [bx, by],
+                        entities: block_entities,
+                    });
+                }
+                continue;
+            }
             "POLYLINE" if section == "ENTITIES" => {
                 let (kind, consumed) = polyline(&records, index, record)?;
                 entities.push((layer_of(record), kind));
@@ -126,6 +175,25 @@ pub fn from_dxf(name: &str, document: DocumentId, text: &str) -> Result<DxfImpor
                 if section == "ENTITIES" =>
             {
                 entities.push((layer_of(record), entity(record)?));
+                index += 1;
+            }
+            "INSERT" if section == "ENTITIES" => {
+                let layer = layer_of(record);
+                let block_name = text_group(record, 2).unwrap_or_default().trim().to_string();
+                let x = number_opt(record, 10).unwrap_or(0.0);
+                let y = number_opt(record, 20).unwrap_or(0.0);
+                let sx = number_opt(record, 41).unwrap_or(1.0);
+                let sy = number_opt(record, 42).unwrap_or(1.0);
+                let rot = number_opt(record, 50).unwrap_or(0.0);
+                entities.push((
+                    layer,
+                    EntityKind::Insert {
+                        block_name,
+                        position: [x, y],
+                        scale: [sx, sy],
+                        rotation_degrees: rot,
+                    },
+                ));
                 index += 1;
             }
             other if section == "ENTITIES" => {
@@ -148,11 +216,16 @@ pub fn from_dxf(name: &str, document: DocumentId, text: &str) -> Result<DxfImpor
             draft.set_layer_color(&layer.name, layer.color)?;
             draft.set_layer_visible(&layer.name, layer.visible)?;
             draft.set_layer_locked(&layer.name, false)?;
+            draft.set_layer_linetype(&layer.name, layer.linetype)?;
             continue;
         }
         draft.add_layer(&layer.name, layer.color)?;
         draft.set_layer_visible(&layer.name, layer.visible)?;
         draft.set_layer_locked(&layer.name, false)?;
+        draft.set_layer_linetype(&layer.name, layer.linetype)?;
+    }
+    for block in blocks {
+        let _ = draft.add_block(&block.name, block.base_point, block.entities);
     }
     for (layer, kind) in entities {
         if draft.layer(&layer).is_none() {
@@ -185,6 +258,7 @@ struct ParsedLayer {
     color: u8,
     visible: bool,
     locked: bool,
+    linetype: Linetype,
 }
 
 fn parsed_layer(record: &Record) -> Result<Option<ParsedLayer>, DraftError> {
@@ -211,11 +285,25 @@ fn parsed_layer(record: &Record) -> Result<Option<ParsedLayer>, DraftError> {
     let flags = number_opt(record, 70).unwrap_or(0.0);
     // Bit 4 of the layer flags means "locked".
     let locked = (flags.round() as i64) & 4 != 0;
+
+    let linetype = match text_group(record, 6)
+        .map(str::to_ascii_uppercase)
+        .as_deref()
+    {
+        Some("HIDDEN") => Linetype::Hidden,
+        Some("CENTER") => Linetype::Center,
+        Some("PHANTOM") => Linetype::Phantom,
+        Some("DASHED") => Linetype::Dashed,
+        Some("DOT") => Linetype::Dot,
+        _ => Linetype::Continuous,
+    };
+
     Ok(Some(ParsedLayer {
         name: name.to_string(),
         color,
         visible,
         locked,
+        linetype,
     }))
 }
 

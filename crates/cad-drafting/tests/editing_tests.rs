@@ -636,3 +636,500 @@ fn test_trim_and_extend() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+#[test]
+fn test_radial_and_diameter_dimensions() -> Result<(), Box<dyn std::error::Error>> {
+    let mut draft = Draft::new("Test Drawing", DocumentId::new(1), Unit::Millimeter);
+    let circle_id = draft.add_entity(
+        "0",
+        EntityKind::Circle {
+            center: [50.0, 50.0],
+            radius: 25.0,
+        },
+    )?;
+
+    // 1. Add Radius dimension at 45 degrees
+    let rad_dim_id = draft.add_dimension_for_curve("0", circle_id, 45.0, 15.0, false, None)?;
+    let rad_dim_kind = draft
+        .entity(rad_dim_id)
+        .ok_or("rad dim exists")?
+        .kind
+        .clone();
+    match &rad_dim_kind {
+        EntityKind::RadialDimension {
+            center,
+            target,
+            leader_offset,
+            is_diameter,
+            text,
+        } => {
+            assert!((center[0] - 50.0).abs() < 1e-5);
+            assert!((center[1] - 50.0).abs() < 1e-5);
+            assert!(!is_diameter);
+            assert_eq!(*leader_offset, 15.0);
+            assert!(text.is_none());
+            // Target is on circle at 45 deg
+            let rad_45 = 45.0_f64.to_radians();
+            let exp_x = 50.0 + 25.0 * rad_45.cos();
+            let exp_y = 50.0 + 25.0 * rad_45.sin();
+            assert!((target[0] - exp_x).abs() < 1e-4);
+            assert!((target[1] - exp_y).abs() < 1e-4);
+        }
+        _ => return Err("expected RadialDimension".into()),
+    }
+
+    // 2. Add Diameter dimension at 135 degrees
+    let dia_dim_id = draft.add_dimension_for_curve("0", circle_id, 135.0, 20.0, true, None)?;
+    let dia_dim = draft.entity(dia_dim_id).ok_or("dia dim exists")?;
+    match &dia_dim.kind {
+        EntityKind::RadialDimension { is_diameter, .. } => {
+            assert!(*is_diameter);
+        }
+        _ => return Err("expected RadialDimension".into()),
+    }
+
+    // 3. DXF export contains leader lines, ticks, R25 and %%c50 text
+    let dxf = draft.to_dxf();
+    assert!(dxf.contains("R25"));
+    assert!(dxf.contains("%%c50"));
+
+    // 4. Translate, rotate, scale, mirror transform checks
+    let shifted = cad_drafting::edit::translate_entity(&rad_dim_kind, 10.0, -5.0)?;
+    match shifted {
+        EntityKind::RadialDimension { center, target, .. } => {
+            assert!((center[0] - 60.0).abs() < 1e-5);
+            assert!((center[1] - 45.0).abs() < 1e-5);
+            let dist = (target[0] - center[0]).hypot(target[1] - center[1]);
+            assert!((dist - 25.0).abs() < 1e-4);
+        }
+        _ => return Err("expected shifted RadialDimension".into()),
+    }
+
+    Ok(())
+}
+
+#[test]
+fn test_layer_linetypes_and_dxf() -> Result<(), Box<dyn std::error::Error>> {
+    let mut draft = Draft::new("Test Drawing", DocumentId::new(1), Unit::Millimeter);
+    draft.add_layer("HIDDEN_LAYER", 1)?;
+    draft.set_layer_linetype("HIDDEN_LAYER", cad_drafting::Linetype::Hidden)?;
+
+    draft.add_layer("CENTER_LAYER", 3)?;
+    draft.set_layer_linetype("CENTER_LAYER", cad_drafting::Linetype::Center)?;
+
+    assert_eq!(
+        draft.layer("HIDDEN_LAYER").map(|l| l.linetype),
+        Some(cad_drafting::Linetype::Hidden)
+    );
+    assert_eq!(
+        draft.layer("CENTER_LAYER").map(|l| l.linetype),
+        Some(cad_drafting::Linetype::Center)
+    );
+
+    // DXF export verifies standard AutoCAD LTYPE tables
+    let dxf = draft.to_dxf();
+    assert!(dxf.contains("2\nLTYPE"));
+    assert!(dxf.contains("2\nCONTINUOUS"));
+    assert!(dxf.contains("2\nHIDDEN"));
+    assert!(dxf.contains("2\nCENTER"));
+    assert!(dxf.contains("2\nPHANTOM"));
+    assert!(dxf.contains("2\nDASHED"));
+    assert!(dxf.contains("2\nDOT"));
+
+    // DXF export layer table references linetypes
+    assert!(dxf.contains("2\nHIDDEN_LAYER\n70\n0\n62\n1\n6\nHIDDEN"));
+    assert!(dxf.contains("2\nCENTER_LAYER\n70\n0\n62\n3\n6\nCENTER"));
+
+    // Sheet vector PDF plotting generates dash array operators
+    draft.add_entity(
+        "HIDDEN_LAYER",
+        EntityKind::Line {
+            start: [0.0, 0.0],
+            end: [100.0, 0.0],
+        },
+    )?;
+    draft.add_entity(
+        "CENTER_LAYER",
+        EntityKind::Line {
+            start: [0.0, 50.0],
+            end: [100.0, 50.0],
+        },
+    )?;
+    let sheet = cad_drafting::Sheet::new("Plot");
+    let plot = sheet.plot(&draft)?;
+    let pdf_str = cad_drafting::to_pdf(&plot, "Plot");
+    assert!(pdf_str.contains(" 0 d\n"));
+
+    Ok(())
+}
+
+#[test]
+fn test_blocks_and_inserts() -> Result<(), Box<dyn std::error::Error>> {
+    let mut draft = Draft::new("Blocks Test", DocumentId::new(42), Unit::Millimeter);
+
+    // 1. Add Block definition: a bolt symbol with base point [0, 0]
+    let bolt_head = EntityKind::Rectangle {
+        origin: [-5.0, -2.5],
+        width: 10.0,
+        height: 5.0,
+    };
+    let bolt_shaft = EntityKind::Line {
+        start: [0.0, 2.5],
+        end: [0.0, 15.0],
+    };
+    let bolt_tip = EntityKind::Circle {
+        center: [0.0, 15.0],
+        radius: 2.0,
+    };
+    draft.add_block("BOLT_M4", [0.0, 0.0], vec![bolt_head, bolt_shaft, bolt_tip])?;
+
+    assert_eq!(draft.blocks().len(), 1);
+    assert_eq!(
+        draft.block("BOLT_M4").map(|b| b.name.as_str()),
+        Some("BOLT_M4")
+    );
+    assert_eq!(
+        draft.block("bolt_m4").map(|b| b.name.as_str()),
+        Some("BOLT_M4")
+    ); // Case-insensitive
+
+    // Duplicate block name rejected
+    assert!(
+        draft
+            .add_block(
+                "bolt_m4",
+                [0.0, 0.0],
+                vec![EntityKind::Point { at: [0.0, 0.0] }]
+            )
+            .is_err()
+    );
+
+    // 2. Insert Block at [100.0, 200.0] with scale [2.0, 2.0] and 0 rotation
+    let ins_id = draft.add_insert("0", "BOLT_M4", [100.0, 200.0], [2.0, 2.0], 0.0)?;
+    assert!(draft.entity(ins_id).is_some());
+
+    // 3. Verify transformed bounds
+    // Block local bounds:
+    // x from -5.0 to 5.0 (and circle x from -2.0 to 2.0) -> [-5.0, 5.0]
+    // y from -2.5 to 17.0 (shaft end 15.0 + radius 2.0 = 17.0) -> [-2.5, 17.0]
+    // Scaled by 2.0 and placed at [100, 200]:
+    // x: 100 + 2*(-5) = 90.0 to 100 + 2*(5) = 110.0
+    // y: 200 + 2*(-2.5) = 195.0 to 200 + 2*(17.0) = 234.0
+    let bounds = draft.bounds().ok_or("draft has bounds")?;
+    assert!((bounds[0] - 90.0).abs() < 1e-4);
+    assert!((bounds[1] - 195.0).abs() < 1e-4);
+    assert!((bounds[2] - 110.0).abs() < 1e-4);
+    assert!((bounds[3] - 234.0).abs() < 1e-4);
+
+    // Total drawn length calculates scaled entities
+    let length = draft.total_length();
+    assert!(length > 0.0);
+
+    // 4. Translate the insert
+    draft.translate_entities(&[ins_id], 10.0, -10.0)?;
+    let bounds2 = draft.bounds().ok_or("draft has bounds")?;
+    assert!((bounds2[0] - 100.0).abs() < 1e-4);
+    assert!((bounds2[1] - 185.0).abs() < 1e-4);
+
+    // 5. DXF roundtrip
+    let dxf = draft.to_dxf();
+    assert!(dxf.contains("2\nBLOCKS"));
+    assert!(dxf.contains("2\nBOLT_M4"));
+    assert!(dxf.contains("0\nINSERT"));
+    assert!(dxf.contains("2\nBOLT_M4"));
+
+    let imported = cad_drafting::from_dxf("Imported", DocumentId::new(43), &dxf)?;
+    assert_eq!(imported.draft.blocks().len(), 1);
+    assert_eq!(imported.draft.entities().len(), 1);
+    let imp_bounds = imported.draft.bounds().ok_or("imported has bounds")?;
+    assert!((imp_bounds[0] - bounds2[0]).abs() < 1e-4);
+    assert!((imp_bounds[1] - bounds2[1]).abs() < 1e-4);
+
+    // 6. Explode insert
+    let exploded_ids = draft.explode_entity(ins_id)?;
+    assert_eq!(exploded_ids.len(), 3); // 3 entities from the block definition
+    assert!(draft.entity(ins_id).is_none()); // Insert removed
+
+    // Exploded entities have the same bounds
+    let bounds3 = draft.bounds().ok_or("bounds after explode")?;
+    assert!((bounds3[0] - bounds2[0]).abs() < 1e-4);
+    assert!((bounds3[1] - bounds2[1]).abs() < 1e-4);
+
+    // 7. Undo restores Insert and removes exploded primitives
+    draft.undo()?;
+    assert!(draft.entity(ins_id).is_some());
+    for &eid in &exploded_ids {
+        assert!(draft.entity(eid).is_none());
+    }
+
+    Ok(())
+}
+
+#[test]
+fn autocad_purge_layers_and_blocks() -> Result<(), Box<dyn std::error::Error>> {
+    let mut draft = Draft::new("TestPurge", DocumentId::new(101), Unit::Millimeter);
+    draft.add_layer("ACTIVE", 1)?;
+    draft.add_layer("UNUSED_LAYER", 2)?;
+
+    // Add entity on ACTIVE
+    let l_id = draft.add_entity(
+        "ACTIVE",
+        EntityKind::Line {
+            start: [0.0, 0.0],
+            end: [10.0, 0.0],
+        },
+    )?;
+    assert_eq!(draft.layers().len(), 3); // 0, ACTIVE, UNUSED_LAYER
+
+    // Add unused block and used block
+    draft.add_block(
+        "USED_BLOCK",
+        [0.0, 0.0],
+        vec![EntityKind::Point { at: [0.0, 0.0] }],
+    )?;
+    draft.add_block(
+        "UNUSED_BLOCK",
+        [0.0, 0.0],
+        vec![EntityKind::Point { at: [1.0, 1.0] }],
+    )?;
+    draft.add_insert("ACTIVE", "USED_BLOCK", [5.0, 5.0], [1.0, 1.0], 0.0)?;
+
+    assert_eq!(draft.blocks().len(), 2);
+
+    // Purge
+    let report = draft.purge();
+    assert_eq!(report.purged_layers, vec!["UNUSED_LAYER".to_string()]);
+    assert_eq!(report.purged_blocks, vec!["UNUSED_BLOCK".to_string()]);
+
+    assert_eq!(draft.layers().len(), 2); // 0, ACTIVE
+    assert!(draft.layer("UNUSED_LAYER").is_none());
+    assert_eq!(draft.blocks().len(), 1); // USED_BLOCK kept
+    assert!(draft.block("UNUSED_BLOCK").is_none());
+
+    // Undo purge
+    draft.undo()?;
+    assert_eq!(draft.layers().len(), 3);
+    assert!(draft.layer("UNUSED_LAYER").is_some());
+    assert_eq!(draft.blocks().len(), 2);
+    assert!(draft.block("UNUSED_BLOCK").is_some());
+
+    // Redo purge
+    draft.redo()?;
+    assert_eq!(draft.layers().len(), 2);
+    assert_eq!(draft.blocks().len(), 1);
+
+    assert!(draft.entity(l_id).is_some());
+    Ok(())
+}
+
+#[test]
+fn autocad_overkill_duplicates_and_collinear_merge() -> Result<(), Box<dyn std::error::Error>> {
+    let mut draft = Draft::new("TestOverkill", DocumentId::new(102), Unit::Millimeter);
+
+    // Duplicate lines
+    let _l1 = draft.add_entity(
+        "0",
+        EntityKind::Line {
+            start: [0.0, 0.0],
+            end: [10.0, 0.0],
+        },
+    )?;
+    let _l2 = draft.add_entity(
+        "0",
+        EntityKind::Line {
+            start: [10.0, 0.0],
+            end: [0.0, 0.0], // reverse order duplicate
+        },
+    )?;
+
+    // Duplicate circles
+    let _c1 = draft.add_entity(
+        "0",
+        EntityKind::Circle {
+            center: [5.0, 5.0],
+            radius: 2.5,
+        },
+    )?;
+    let _c2 = draft.add_entity(
+        "0",
+        EntityKind::Circle {
+            center: [5.0, 5.0],
+            radius: 2.5,
+        },
+    )?;
+
+    // Collinear partially overlapping lines: (20, 0)-(30, 0) and (25, 0)-(40, 0)
+    let _ol1 = draft.add_entity(
+        "0",
+        EntityKind::Line {
+            start: [20.0, 0.0],
+            end: [30.0, 0.0],
+        },
+    )?;
+    let _ol2 = draft.add_entity(
+        "0",
+        EntityKind::Line {
+            start: [25.0, 0.0],
+            end: [40.0, 0.0],
+        },
+    )?;
+
+    assert_eq!(draft.entities().len(), 6);
+
+    let report = draft.overkill(Some(1e-4));
+    assert_eq!(report.duplicate_entities_removed, 2); // 1 line + 1 circle
+    assert_eq!(report.collinear_lines_merged, 1); // 2 overlapping lines merged into 1
+
+    assert_eq!(draft.entities().len(), 3); // 1 line + 1 circle + 1 merged line
+
+    // Verify merged line spans 20 to 40
+    let mut found_merged = false;
+    for ent in draft.entities() {
+        if let EntityKind::Line { start, end } = &ent.kind
+            && (start[0] - 20.0).abs() < 1e-4
+            && (end[0] - 40.0).abs() < 1e-4
+        {
+            found_merged = true;
+        }
+    }
+    assert!(
+        found_merged,
+        "Overkill should have merged lines into (20,0)-(40,0)"
+    );
+
+    // Undo overkill
+    draft.undo()?;
+    assert_eq!(draft.entities().len(), 6);
+
+    // Redo overkill
+    draft.redo()?;
+    assert_eq!(draft.entities().len(), 3);
+
+    Ok(())
+}
+
+#[test]
+fn autocad_divide_and_measure_curves() -> Result<(), Box<dyn std::error::Error>> {
+    let mut draft = Draft::new("TestDivMe", DocumentId::new(103), Unit::Millimeter);
+
+    // 1. Line divide (length = 100mm, divide into 4 segments -> 3 interior points at 25, 50, 75)
+    let line_id = draft.add_entity(
+        "0",
+        EntityKind::Line {
+            start: [0.0, 0.0],
+            end: [100.0, 0.0],
+        },
+    )?;
+
+    let pt_ids = draft.divide(line_id, 4)?;
+    assert_eq!(pt_ids.len(), 3);
+
+    let p0 = draft.entity(pt_ids[0]).ok_or("pt 0")?;
+    let p1 = draft.entity(pt_ids[1]).ok_or("pt 1")?;
+    let p2 = draft.entity(pt_ids[2]).ok_or("pt 2")?;
+
+    if let EntityKind::Point { at } = p0.kind {
+        assert!((at[0] - 25.0).abs() < 1e-4);
+        assert!((at[1] - 0.0).abs() < 1e-4);
+    } else {
+        return Err("expected point".into());
+    }
+
+    if let EntityKind::Point { at } = p1.kind {
+        assert!((at[0] - 50.0).abs() < 1e-4);
+    } else {
+        return Err("expected point".into());
+    }
+
+    if let EntityKind::Point { at } = p2.kind {
+        assert!((at[0] - 75.0).abs() < 1e-4);
+    } else {
+        return Err("expected point".into());
+    }
+
+    // 2. Circle divide (closed -> 4 points)
+    let circle_id = draft.add_entity(
+        "0",
+        EntityKind::Circle {
+            center: [0.0, 0.0],
+            radius: 10.0,
+        },
+    )?;
+
+    let circle_pts = draft.divide(circle_id, 4)?;
+    assert_eq!(circle_pts.len(), 4);
+
+    // 3. Measure intervals (line length = 100mm, interval = 30mm -> points at 30, 60, 90)
+    let measured_pts = draft.measure_intervals(line_id, 30.0)?;
+    assert_eq!(measured_pts.len(), 3);
+
+    let mp0 = draft.entity(measured_pts[0]).ok_or("mp0")?;
+    let mp1 = draft.entity(measured_pts[1]).ok_or("mp1")?;
+    let mp2 = draft.entity(measured_pts[2]).ok_or("mp2")?;
+
+    if let EntityKind::Point { at } = mp0.kind {
+        assert!((at[0] - 30.0).abs() < 1e-4);
+    }
+    if let EntityKind::Point { at } = mp1.kind {
+        assert!((at[0] - 60.0).abs() < 1e-4);
+    }
+    if let EntityKind::Point { at } = mp2.kind {
+        assert!((at[0] - 90.0).abs() < 1e-4);
+    }
+
+    // Undo measure removes the 3 measured points
+    draft.undo()?;
+    assert_eq!(draft.entities().len(), 2 + 3 + 4); // line + circle + 3 line_div + 4 circle_div
+
+    Ok(())
+}
+
+#[test]
+fn autocad_matchprop_properties() -> Result<(), Box<dyn std::error::Error>> {
+    let mut draft = Draft::new("TestMatchprop", DocumentId::new(104), Unit::Millimeter);
+    draft.add_layer("SOURCE_LAYER", 1)?;
+    draft.add_layer("TARGET_LAYER", 2)?;
+
+    let src_id = draft.add_entity(
+        "SOURCE_LAYER",
+        EntityKind::Line {
+            start: [0.0, 0.0],
+            end: [10.0, 0.0],
+        },
+    )?;
+    let tgt1_id = draft.add_entity(
+        "TARGET_LAYER",
+        EntityKind::Line {
+            start: [0.0, 10.0],
+            end: [10.0, 10.0],
+        },
+    )?;
+    let tgt2_id = draft.add_entity(
+        "TARGET_LAYER",
+        EntityKind::Circle {
+            center: [20.0, 20.0],
+            radius: 5.0,
+        },
+    )?;
+
+    assert_eq!(draft.entity(tgt1_id).ok_or("tgt1")?.layer, "TARGET_LAYER");
+    assert_eq!(draft.entity(tgt2_id).ok_or("tgt2")?.layer, "TARGET_LAYER");
+
+    let count = draft.match_properties(src_id, &[tgt1_id, tgt2_id])?;
+    assert_eq!(count, 2);
+
+    assert_eq!(draft.entity(tgt1_id).ok_or("tgt1")?.layer, "SOURCE_LAYER");
+    assert_eq!(draft.entity(tgt2_id).ok_or("tgt2")?.layer, "SOURCE_LAYER");
+
+    // Undo restores original layers
+    draft.undo()?;
+    assert_eq!(draft.entity(tgt1_id).ok_or("tgt1")?.layer, "TARGET_LAYER");
+    assert_eq!(draft.entity(tgt2_id).ok_or("tgt2")?.layer, "TARGET_LAYER");
+
+    // Redo reapplies matchprop
+    draft.redo()?;
+    assert_eq!(draft.entity(tgt1_id).ok_or("tgt1")?.layer, "SOURCE_LAYER");
+    assert_eq!(draft.entity(tgt2_id).ok_or("tgt2")?.layer, "SOURCE_LAYER");
+
+    Ok(())
+}

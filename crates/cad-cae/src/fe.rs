@@ -8,7 +8,7 @@
 //! bending on a coarse mesh, so a bending result converges from below and needs a mesh-convergence
 //! check. Stresses are recovered at the element centre only.
 
-use crate::SolverSettings;
+use crate::{CaeError, SolverSettings};
 
 pub(crate) const ELEMENT_NODES: usize = 8;
 pub(crate) const ELEMENT_DOFS: usize = 24;
@@ -581,6 +581,254 @@ pub(crate) fn solve_modal(
     Ok(ModalOutcome { modes })
 }
 
+/// The outcome of a steady-state thermal conduction solve.
+pub(crate) struct ThermalSolveOutcome {
+    pub temperatures: Vec<f64>,
+    pub iterations: usize,
+    pub relative_residual: f64,
+    pub reaction_heat: Vec<f64>,
+}
+
+/// Local thermal conductivity matrix, row-major 8x8, for a cube of side `side_mm` and conductivity in W/(m*K).
+pub(crate) fn hex_thermal_conductivity(side_mm: f64, conductivity_w_m_k: f64) -> Vec<f64> {
+    // In consistent mm units: 1 W/(m*K) = 1e-3 W/(mm*K).
+    let k_mm = conductivity_w_m_k * 1.0e-3;
+    let gauss = 1.0 / 3.0_f64.sqrt();
+    let det_j = (side_mm * 0.5).powi(3);
+    let scale = 2.0 / side_mm;
+    let mut stiffness = vec![0.0; ELEMENT_NODES * ELEMENT_NODES];
+    for &gx in &[-gauss, gauss] {
+        for &gy in &[-gauss, gauss] {
+            for &gz in &[-gauss, gauss] {
+                let point = [gx, gy, gz];
+                let mut dndx = [[0.0; 3]; ELEMENT_NODES];
+                for (node, grad) in dndx.iter_mut().enumerate() {
+                    let dn = shape_derivatives(node, point);
+                    grad[0] = dn[0] * scale;
+                    grad[1] = dn[1] * scale;
+                    grad[2] = dn[2] * scale;
+                }
+                for i in 0..ELEMENT_NODES {
+                    for j in 0..ELEMENT_NODES {
+                        let dot_grad = dndx[i][0] * dndx[j][0]
+                            + dndx[i][1] * dndx[j][1]
+                            + dndx[i][2] * dndx[j][2];
+                        stiffness[i * ELEMENT_NODES + j] += k_mm * dot_grad * det_j;
+                    }
+                }
+            }
+        }
+    }
+    stiffness
+}
+
+/// Heat flux vector q = -k * grad(T) at the element centre in W/m².
+pub(crate) fn centre_heat_flux(
+    te: &[f64; ELEMENT_NODES],
+    side_mm: f64,
+    conductivity_w_m_k: f64,
+) -> [f64; 3] {
+    let scale = 2.0 / side_mm;
+    let mut grad_t = [0.0; 3];
+    for (node, &temp) in te.iter().enumerate() {
+        let dn = shape_derivatives(node, [0.0, 0.0, 0.0]);
+        grad_t[0] += dn[0] * scale * temp;
+        grad_t[1] += dn[1] * scale * temp;
+        grad_t[2] += dn[2] * scale * temp;
+    }
+    // grad_t is K/mm. In K/m: grad_t * 1000.0.
+    // q = -k * grad_t in W/m^2.
+    [
+        -conductivity_w_m_k * grad_t[0] * 1000.0,
+        -conductivity_w_m_k * grad_t[1] * 1000.0,
+        -conductivity_w_m_k * grad_t[2] * 1000.0,
+    ]
+}
+
+fn apply_thermal(
+    element_nodes: &[[u32; ELEMENT_NODES]],
+    local_k: &[f64],
+    t: &[f64],
+    fixed: &[bool],
+    out: &mut [f64],
+) {
+    out.fill(0.0);
+    let mut te = [0.0; ELEMENT_NODES];
+    let mut qe = [0.0; ELEMENT_NODES];
+    for nodes in element_nodes {
+        for (local_i, &node) in nodes.iter().enumerate() {
+            te[local_i] = t[node as usize];
+        }
+        for (i, val) in qe.iter_mut().enumerate() {
+            let row_start = i * ELEMENT_NODES;
+            let mut sum = 0.0;
+            for (j, &temp) in te.iter().enumerate() {
+                sum += local_k[row_start + j] * temp;
+            }
+            *val = sum;
+        }
+        for (local_i, &node) in nodes.iter().enumerate() {
+            out[node as usize] += qe[local_i];
+        }
+    }
+    for (val, &is_fixed) in out.iter_mut().zip(fixed.iter()) {
+        if is_fixed {
+            *val = 0.0;
+        }
+    }
+}
+
+fn diagonal_thermal(
+    element_nodes: &[[u32; ELEMENT_NODES]],
+    local_k: &[f64],
+    num_nodes: usize,
+) -> Vec<f64> {
+    let mut diag = vec![0.0; num_nodes];
+    for nodes in element_nodes {
+        for (local_i, &node) in nodes.iter().enumerate() {
+            diag[node as usize] += local_k[local_i * ELEMENT_NODES + local_i];
+        }
+    }
+    diag
+}
+
+pub(crate) fn solve_thermal(
+    element_nodes: &[[u32; ELEMENT_NODES]],
+    local_k: &[f64],
+    fixed_nodes: &[bool],
+    prescribed_temp: &[f64],
+    applied_heat: &[f64],
+    settings: &SolverSettings,
+) -> Result<ThermalSolveOutcome, CaeError> {
+    let num_nodes = fixed_nodes.len();
+
+    // Initial internal heat flow from prescribed temperatures: K * T_0
+    let mut kt0 = vec![0.0; num_nodes];
+    let mut te = [0.0; ELEMENT_NODES];
+    let mut qe = [0.0; ELEMENT_NODES];
+    for nodes in element_nodes {
+        for (local_i, &node) in nodes.iter().enumerate() {
+            te[local_i] = prescribed_temp[node as usize];
+        }
+        for (i, val) in qe.iter_mut().enumerate() {
+            let row_start = i * ELEMENT_NODES;
+            let mut sum = 0.0;
+            for (j, &temp) in te.iter().enumerate() {
+                sum += local_k[row_start + j] * temp;
+            }
+            *val = sum;
+        }
+        for (local_i, &node) in nodes.iter().enumerate() {
+            kt0[node as usize] += qe[local_i];
+        }
+    }
+
+    // Residual on free nodes: r = Q - K * T_0
+    let mut r = vec![0.0; num_nodes];
+    for i in 0..num_nodes {
+        if !fixed_nodes[i] {
+            r[i] = applied_heat[i] - kt0[i];
+        }
+    }
+
+    let initial_norm = norm(&r);
+    if initial_norm < 1.0e-12 {
+        return Ok(ThermalSolveOutcome {
+            temperatures: prescribed_temp.to_vec(),
+            iterations: 0,
+            relative_residual: 0.0,
+            reaction_heat: kt0,
+        });
+    }
+
+    let diag = diagonal_thermal(element_nodes, local_k, num_nodes);
+    let mut inv_diag = vec![0.0; num_nodes];
+    for (idx, (&d, &fixed)) in diag.iter().zip(fixed_nodes.iter()).enumerate() {
+        if !fixed && d > 1.0e-12 {
+            inv_diag[idx] = 1.0 / d;
+        }
+    }
+
+    let mut z = vec![0.0; num_nodes];
+    for i in 0..num_nodes {
+        z[i] = inv_diag[i] * r[i];
+    }
+    let mut p = z.clone();
+    let mut delta_t = vec![0.0; num_nodes];
+    let mut rz = dot(&r, &z);
+    let mut ap = vec![0.0; num_nodes];
+    let mut iterations = 0;
+    let mut relative_residual = 1.0;
+
+    for iter in 0..settings.max_iterations {
+        iterations = iter + 1;
+        apply_thermal(element_nodes, local_k, &p, fixed_nodes, &mut ap);
+        let pap = dot(&p, &ap);
+        if pap.abs() < 1.0e-30 {
+            break;
+        }
+        let alpha = rz / pap;
+        for i in 0..num_nodes {
+            delta_t[i] += alpha * p[i];
+            r[i] -= alpha * ap[i];
+        }
+
+        let res_norm = norm(&r);
+        relative_residual = res_norm / initial_norm;
+        if relative_residual < settings.relative_tolerance {
+            break;
+        }
+
+        for i in 0..num_nodes {
+            z[i] = inv_diag[i] * r[i];
+        }
+        let rz_new = dot(&r, &z);
+        let beta = rz_new / rz;
+        rz = rz_new;
+        for i in 0..num_nodes {
+            p[i] = z[i] + beta * p[i];
+        }
+    }
+
+    let mut temperatures = vec![0.0; num_nodes];
+    for i in 0..num_nodes {
+        temperatures[i] = prescribed_temp[i] + delta_t[i];
+    }
+
+    // Reaction heat calculation at fixed nodes
+    let mut total_kt = vec![0.0; num_nodes];
+    for nodes in element_nodes {
+        for (local_i, &node) in nodes.iter().enumerate() {
+            te[local_i] = temperatures[node as usize];
+        }
+        for (i, val) in qe.iter_mut().enumerate() {
+            let row_start = i * ELEMENT_NODES;
+            let mut sum = 0.0;
+            for (j, &temp) in te.iter().enumerate() {
+                sum += local_k[row_start + j] * temp;
+            }
+            *val = sum;
+        }
+        for (local_i, &node) in nodes.iter().enumerate() {
+            total_kt[node as usize] += qe[local_i];
+        }
+    }
+
+    let mut reaction_heat = vec![0.0; num_nodes];
+    for i in 0..num_nodes {
+        if fixed_nodes[i] {
+            reaction_heat[i] = total_kt[i] - applied_heat[i];
+        }
+    }
+
+    Ok(ThermalSolveOutcome {
+        temperatures,
+        iterations,
+        relative_residual,
+        reaction_heat,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::{ELEMENT_DOFS, Elasticity, centre_stress, hex_stiffness, von_mises};
@@ -654,5 +902,47 @@ mod tests {
         assert!(stress[1].abs() < 1.0e-6 * expected);
         assert!(stress[2].abs() < 1.0e-6 * expected);
         assert!((von_mises(&stress) - expected).abs() < 1.0e-6 * expected);
+    }
+
+    #[test]
+    fn thermal_conductivity_matrix_is_symmetric_and_conserves_heat() {
+        let k = 50.0; // W/(m*K)
+        let k_mat = super::hex_thermal_conductivity(2.0, k);
+        for row in 0..8 {
+            for col in 0..8 {
+                let a = k_mat[row * 8 + col];
+                let b = k_mat[col * 8 + row];
+                assert!((a - b).abs() < 1.0e-12, "symmetry failed at {row},{col}");
+            }
+        }
+
+        // Uniform temperature produces zero heat flow
+        let uniform = [25.0; 8];
+        for row in 0..8 {
+            let mut flow = 0.0;
+            for col in 0..8 {
+                flow += k_mat[row * 8 + col] * uniform[col];
+            }
+            assert!(
+                flow.abs() < 1.0e-12,
+                "uniform temp must produce zero net flow"
+            );
+        }
+
+        // 1D linear temperature gradient: T(x) = 100 - 10 * x (x in 0..2 mm)
+        // At x=0, T=100; at x=2, T=80. dT/dx = -20 K / 2 mm = -10 K/mm = -10,000 K/m.
+        // Heat flux q_x = -k * dT/dx = -50 * (-10,000) = +500,000 W/m².
+        let linear_t = [
+            100.0, 80.0, 80.0, 100.0, // bottom face (z=-1)
+            100.0, 80.0, 80.0, 100.0, // top face (z=+1)
+        ];
+        let q = super::centre_heat_flux(&linear_t, 2.0, k);
+        assert!(
+            (q[0] - 500_000.0).abs() < 1.0e-6,
+            "q_x should match Fourier law: got {}",
+            q[0]
+        );
+        assert!(q[1].abs() < 1.0e-6, "q_y should be zero: got {}", q[1]);
+        assert!(q[2].abs() < 1.0e-6, "q_z should be zero: got {}", q[2]);
     }
 }

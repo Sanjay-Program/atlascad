@@ -84,7 +84,7 @@ STACKS=(
     "kernel-opencascade-rs|kernels/opencascade-rs|OpenCASCADE C++ build via occt-sys/cmake"
     "app-cadcraft|apps/cadcraft|git dependencies from github.com/storytold/craft-libs"
     "app-solidcraft|apps/solidcraft|~2.5 GB RSS for solidcraft-kernel; needs memory"
-    "crate-cad-constraints|crates/cad-constraints|manifest only: no src/ and no [lib]/[bin], so cargo cannot parse it|known"
+    "crate-cad-constraints|crates/cad-constraints|parametric 2D constraint solver (pure Rust)"
 )
 
 results=()

@@ -356,6 +356,8 @@ struct DraftView {
     unit: String,
     layers: Vec<cad_drafting::Layer>,
     entities: Vec<cad_drafting::Entity>,
+    #[serde(default)]
+    blocks: Vec<cad_drafting::Block>,
     /// `[min_x, min_y, max_x, max_y]`, or null for an empty drawing.
     bounds: Option<[f64; 4]>,
     total_length: f64,
@@ -844,6 +846,7 @@ impl StudioState {
             unit: draft.header.units.symbol().to_string(),
             layers: draft.layers().to_vec(),
             entities: draft.entities().to_vec(),
+            blocks: draft.blocks().to_vec(),
             bounds: draft.bounds(),
             total_length: draft.total_length(),
             source: if self.drawing_file.is_some() {
@@ -983,6 +986,13 @@ impl StudioState {
                     .is_some_and(|layer| layer.locked != locked)
             {
                 draft.set_layer_locked(&request.name, locked)?;
+            }
+            if let Some(linetype) = request.linetype
+                && draft
+                    .layer(&request.name)
+                    .is_some_and(|layer| layer.linetype != linetype)
+            {
+                draft.set_layer_linetype(&request.name, linetype)?;
             }
         }
         self.drawing_edited = true;
@@ -1624,6 +1634,291 @@ impl StudioState {
         Ok(resp)
     }
 
+    fn drawing_radial_dimension(
+        &mut self,
+        req: &DraftRadialDimensionRequest,
+    ) -> Result<DraftView, StudioError> {
+        let layer_name = req.layer.as_deref().unwrap_or(cad_drafting::DEFAULT_LAYER);
+        let leader_offset = req.leader_offset.unwrap_or(15.0);
+        let is_diameter = req.is_diameter.unwrap_or(false);
+
+        {
+            let draft = self.drawing_mut()?;
+            if let Some(raw_id) = req.entity_id {
+                let ent_id =
+                    EntityId::new(raw_id).map_err(|e| StudioError::BadRequest(e.to_string()))?;
+                let pick_angle = req.pick_angle_deg.unwrap_or(45.0);
+                draft.add_dimension_for_curve(
+                    layer_name,
+                    ent_id,
+                    pick_angle,
+                    leader_offset,
+                    is_diameter,
+                    req.text.clone(),
+                )?;
+            } else if let (Some(center), Some(target)) = (req.center, req.target) {
+                draft.add_radial_dimension(
+                    layer_name,
+                    center,
+                    target,
+                    leader_offset,
+                    is_diameter,
+                    req.text.clone(),
+                )?;
+            } else {
+                return Err(StudioError::BadRequest(
+                    "radial dimension requires either entity_id (of arc/circle) or center and target points".into(),
+                ));
+            }
+        }
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
+    fn drawing_add_block(&mut self, req: &DraftBlockRequest) -> Result<DraftView, StudioError> {
+        let entities = {
+            let draft = self.drawing_mut()?;
+            let mut ents = Vec::new();
+            for &id_raw in &req.entity_ids {
+                let id =
+                    EntityId::new(id_raw).map_err(|e| StudioError::BadRequest(e.to_string()))?;
+                let ent = draft
+                    .entity(id)
+                    .ok_or_else(|| StudioError::BadRequest(format!("entity {id_raw} not found")))?;
+                ents.push(ent.kind.clone());
+            }
+            ents
+        };
+        {
+            let draft = self.drawing_mut()?;
+            draft.add_block(&req.name, req.base_point, entities)?;
+        }
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
+    fn drawing_add_insert(&mut self, req: &DraftInsertRequest) -> Result<DraftView, StudioError> {
+        let layer = req.layer.as_deref().unwrap_or(cad_drafting::DEFAULT_LAYER);
+        let scale = req.scale.unwrap_or([1.0, 1.0]);
+        let rotation = req.rotation_degrees.unwrap_or(0.0);
+        {
+            let draft = self.drawing_mut()?;
+            draft.add_insert(layer, &req.block_name, req.position, scale, rotation)?;
+        }
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
+    fn drawing_purge(&mut self) -> Result<DraftPurgeResponse, StudioError> {
+        let report = {
+            let draft = self.drawing_mut()?;
+            draft.purge()
+        };
+        if !report.purged_layers.is_empty() || !report.purged_blocks.is_empty() {
+            self.drawing_edited = true;
+        }
+        let draft = self.draft_payload()?;
+        Ok(DraftPurgeResponse { report, draft })
+    }
+
+    fn drawing_overkill(
+        &mut self,
+        req: &DraftOverkillRequest,
+    ) -> Result<DraftOverkillResponse, StudioError> {
+        let report = {
+            let draft = self.drawing_mut()?;
+            draft.overkill(req.tolerance)
+        };
+        if report.duplicate_entities_removed > 0 || report.collinear_lines_merged > 0 {
+            self.drawing_edited = true;
+        }
+        let draft = self.draft_payload()?;
+        Ok(DraftOverkillResponse { report, draft })
+    }
+
+    fn drawing_divide(
+        &mut self,
+        req: &DraftDivideRequest,
+    ) -> Result<DraftDivideResponse, StudioError> {
+        let ent_id =
+            EntityId::new(req.entity_id).map_err(|e| StudioError::BadRequest(e.to_string()))?;
+        let created_point_ids = {
+            let draft = self.drawing_mut()?;
+            draft.divide(ent_id, req.segments)?
+        };
+        self.drawing_edited = true;
+        let draft = self.draft_payload()?;
+        Ok(DraftDivideResponse {
+            created_point_ids: created_point_ids.into_iter().map(|id| id.get()).collect(),
+            draft,
+        })
+    }
+
+    fn drawing_measure_interval(
+        &mut self,
+        req: &DraftMeasureIntervalRequest,
+    ) -> Result<DraftMeasureIntervalResponse, StudioError> {
+        let ent_id =
+            EntityId::new(req.entity_id).map_err(|e| StudioError::BadRequest(e.to_string()))?;
+        let created_point_ids = {
+            let draft = self.drawing_mut()?;
+            draft.measure_intervals(ent_id, req.interval)?
+        };
+        self.drawing_edited = true;
+        let draft = self.draft_payload()?;
+        Ok(DraftMeasureIntervalResponse {
+            created_point_ids: created_point_ids.into_iter().map(|id| id.get()).collect(),
+            draft,
+        })
+    }
+
+    fn drawing_match_properties(
+        &mut self,
+        req: &DraftMatchPropertiesRequest,
+    ) -> Result<DraftMatchPropertiesResponse, StudioError> {
+        let src_id =
+            EntityId::new(req.source_id).map_err(|e| StudioError::BadRequest(e.to_string()))?;
+        let target_ids: Result<Vec<EntityId>, _> = req
+            .target_ids
+            .iter()
+            .map(|&id| EntityId::new(id).map_err(|e| StudioError::BadRequest(e.to_string())))
+            .collect();
+        let target_ids = target_ids?;
+        let matched_count = {
+            let draft = self.drawing_mut()?;
+            draft.match_properties(src_id, &target_ids)?
+        };
+        if matched_count > 0 {
+            self.drawing_edited = true;
+        }
+        let draft = self.draft_payload()?;
+        Ok(DraftMatchPropertiesResponse {
+            matched_count,
+            draft,
+        })
+    }
+
+    fn drawing_solve_constraints(
+        &mut self,
+        req: &DraftConstraintsSolveRequest,
+    ) -> Result<DraftConstraintsSolveResponse, StudioError> {
+        let mut sys = cad_constraints::SketchSystem::new();
+        let mut point_ids = Vec::with_capacity(req.points.len());
+        for pt in &req.points {
+            point_ids.push(sys.add_point(pt[0], pt[1]));
+        }
+
+        let mut line_ids = Vec::with_capacity(req.lines.len());
+        for l in &req.lines {
+            if l[0] >= point_ids.len() || l[1] >= point_ids.len() {
+                return Err(StudioError::BadRequest(
+                    "invalid point index in line".into(),
+                ));
+            }
+            let lid = sys
+                .add_line(point_ids[l[0]], point_ids[l[1]])
+                .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+            line_ids.push(lid);
+        }
+
+        let mut circle_ids = Vec::with_capacity(req.circles.len());
+        for c in &req.circles {
+            if c.center >= point_ids.len() {
+                return Err(StudioError::BadRequest(
+                    "invalid center point index in circle".into(),
+                ));
+            }
+            let cid = sys
+                .add_circle(point_ids[c.center], c.radius)
+                .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+            circle_ids.push(cid);
+        }
+
+        for c in &req.constraints {
+            sys.add_constraint(c.clone())
+                .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+        }
+
+        let dof = sys.dof_analysis();
+
+        let options = cad_constraints::SolveOptions {
+            max_iterations: req.max_iterations.unwrap_or(100),
+            tolerance: req.tolerance.unwrap_or(1e-8),
+        };
+
+        let solve = sys
+            .solve_with_options(&options)
+            .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+
+        let solved_points: Vec<[f64; 2]> = sys.points().iter().map(|p| [p.x, p.y]).collect();
+
+        let mut updated_entities = Vec::new();
+        let mut draft_view = None;
+
+        if let Some(ref mappings) = req.update_entities
+            && solve.converged
+        {
+            self.ensure_drawing()?;
+            let draft = self
+                .drawing
+                .as_mut()
+                .ok_or_else(|| StudioError::BadRequest("the drawing is unavailable".into()))?;
+
+            for map in mappings {
+                let eid = EntityId::new(map.entity_id)
+                    .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+
+                if let Some(l_idx) = map.line_index {
+                    if l_idx < line_ids.len() {
+                        let l = sys.line(line_ids[l_idx]).ok_or_else(|| {
+                            StudioError::BadRequest("line not found in solved system".into())
+                        })?;
+                        let p1 = sys
+                            .point(l.p1)
+                            .ok_or_else(|| StudioError::BadRequest("point not found".into()))?;
+                        let p2 = sys
+                            .point(l.p2)
+                            .ok_or_else(|| StudioError::BadRequest("point not found".into()))?;
+                        let new_kind = cad_drafting::EntityKind::Line {
+                            start: [p1.x, p1.y],
+                            end: [p2.x, p2.y],
+                        };
+                        draft.update_entity_kind(eid, new_kind)?;
+                        updated_entities.push(map.entity_id);
+                    }
+                } else if let Some(c_idx) = map.circle_index
+                    && c_idx < circle_ids.len()
+                {
+                    let c = sys.circle(circle_ids[c_idx]).ok_or_else(|| {
+                        StudioError::BadRequest("circle not found in solved system".into())
+                    })?;
+                    let center = sys
+                        .point(c.center)
+                        .ok_or_else(|| StudioError::BadRequest("point not found".into()))?;
+                    let new_kind = cad_drafting::EntityKind::Circle {
+                        center: [center.x, center.y],
+                        radius: c.radius,
+                    };
+                    draft.update_entity_kind(eid, new_kind)?;
+                    updated_entities.push(map.entity_id);
+                }
+            }
+
+            if !updated_entities.is_empty() {
+                self.drawing_edited = true;
+                draft_view = Some(self.draft_payload()?);
+            }
+        }
+
+        Ok(DraftConstraintsSolveResponse {
+            solve,
+            dof,
+            solved_points,
+            updated_entities,
+            draft: draft_view,
+        })
+    }
+
     /// Store the saved drawing's source revision in the project's embedded registry.
     ///
     /// This is what makes the pin survive a restart: before it existed only the in-memory session
@@ -1837,6 +2132,74 @@ impl StudioState {
         }))
     }
 
+    fn cae_thermal(
+        &mut self,
+        request: &CaeThermalRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        if self.project.features().is_empty() {
+            return Err(StudioError::BadRequest(
+                "this project has no solid to analyze".into(),
+            ));
+        }
+        let build = self
+            .project
+            .build_with_cache(&mut self.kernel, &mut self.cache)?;
+        if let Some(failure) = build.failed {
+            return Err(StudioError::BadRequest(format!(
+                "feature {} cannot be rebuilt: {}",
+                failure.id, failure.message
+            )));
+        }
+        let mesh = build.mesh.ok_or_else(|| {
+            StudioError::BadRequest("this project has no solid to analyze".into())
+        })?;
+
+        let mut min = [f64::INFINITY; 3];
+        let mut max = [f64::NEG_INFINITY; 3];
+        for p in &mesh.positions {
+            for i in 0..3 {
+                min[i] = min[i].min(p[i]);
+                max[i] = max[i].max(p[i]);
+            }
+        }
+        let span_x = (max[0] - min[0]).max(1.0);
+        let voxel_size = request
+            .voxel_size_mm
+            .unwrap_or_else(|| (span_x / 10.0).clamp(2.5, 10.0));
+
+        let t_hot = request.fixed_temp_hot_c.unwrap_or(100.0);
+        let t_cold = request.fixed_temp_cold_c.unwrap_or(20.0);
+
+        let study = cad_cae::ThermalStudy::new("studio-thermal", voxel_size, &request.material)
+            .with_fixed_temperature(cad_cae::FixedTemperature::new(
+                cad_cae::FaceSelection::new(cad_cae::Axis::X, min[0]),
+                t_hot,
+            ))
+            .with_fixed_temperature(cad_cae::FixedTemperature::new(
+                cad_cae::FaceSelection::new(cad_cae::Axis::X, max[0]),
+                t_cold,
+            ));
+
+        let library = cad_engineering_model::MaterialLibrary::standard();
+        let result = cad_cae::run_thermal(&mesh, &study, &library)
+            .map_err(|e| StudioError::BadRequest(format!("CAE thermal error: {e}")))?;
+
+        Ok(serde_json::json!({
+            "study": result.study,
+            "voxel_size_mm": result.voxel_size_mm,
+            "elements": result.element_count,
+            "nodes": result.node_count,
+            "min_temperature_c": result.min_temperature_c,
+            "max_temperature_c": result.max_temperature_c,
+            "avg_temperature_c": result.avg_temperature_c,
+            "max_heat_flux_w_m2": result.max_heat_flux_w_m2,
+            "avg_heat_flux_w_m2": result.avg_heat_flux_w_m2,
+            "quality": result.quality_label,
+            "summary": result.summary_line(),
+            "warnings": result.warnings,
+        }))
+    }
+
     fn cam_toolpaths(&mut self, request: &CamRequest) -> Result<serde_json::Value, StudioError> {
         if self.project.features().is_empty() {
             return Err(StudioError::BadRequest(
@@ -1910,12 +2273,22 @@ impl StudioState {
             .map_err(|e| StudioError::BadRequest(format!("CAM post error: {e}")))?;
         let preview_lines: Vec<&str> = gcode.lines().take(25).collect();
 
+        let limits = cad_cam::KinematicLimits::default();
+        let cycle_time = toolpath.kinematic_cycle_time(&limits);
+        let alu_wear = cad_cam::Material::Aluminium.estimate_tool_wear(
+            std::f64::consts::PI * tool_dia * tool.cutting.spindle_rpm / 1000.0,
+            toolpath.estimated_minutes(),
+        );
+
         Ok(serde_json::json!({
             "tool_name": tool.name,
             "moves_count": toolpath.points.len(),
             "cutting_length_mm": toolpath.cutting_length_mm(),
             "rapid_length_mm": toolpath.rapid_length_mm(),
             "estimated_minutes": toolpath.estimated_minutes(),
+            "kinematic_cycle_time_seconds": cycle_time.total_seconds,
+            "tool_wear_fraction": alu_wear.wear_fraction,
+            "tool_wear_percent": alu_wear.wear_percent,
             "summary": summary,
             "gcode_preview": preview_lines.join("\n"),
         }))
@@ -2624,6 +2997,70 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             },
             Err(error) => error_response(&error),
         },
+        "/api/draft/dimension-radial" => match parse_body::<DraftRadialDimensionRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_radial_dimension(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/block" => match parse_body::<DraftBlockRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_add_block(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/insert" => match parse_body::<DraftInsertRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_add_insert(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/purge" => match with_state(state, StudioState::drawing_purge) {
+            Ok(payload) => to_json(200, &payload),
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/overkill" => match parse_body_or_default::<DraftOverkillRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_overkill(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/divide" => match parse_body::<DraftDivideRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_divide(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/measure-interval" => match parse_body::<DraftMeasureIntervalRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_measure_interval(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/match-properties" => match parse_body::<DraftMatchPropertiesRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_match_properties(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/constraints/solve" => {
+            match parse_body::<DraftConstraintsSolveRequest>(request) {
+                Ok(body) => {
+                    match with_state(state, |state| state.drawing_solve_constraints(&body)) {
+                        Ok(payload) => to_json(200, &payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
+                Err(error) => error_response(&error),
+            }
+        }
         "/api/engineering/review" => match parse_body::<ArtifactReviewRequest>(request) {
             Ok(body) => {
                 let id = match ArtifactId::new(body.id) {
@@ -2706,6 +3143,13 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             },
             Err(error) => error_response(&error),
         },
+        "/api/cae/thermal" => match parse_body_or_default::<CaeThermalRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.cae_thermal(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
         "/api/cam/toolpaths" => match parse_body_or_default::<CamRequest>(request) {
             Ok(body) => match with_state(state, |state| state.cam_toolpaths(&body)) {
                 Ok(payload) => to_json(200, &payload),
@@ -2777,6 +3221,154 @@ struct DrawingLayerRequest {
     visible: Option<bool>,
     #[serde(default)]
     locked: Option<bool>,
+    #[serde(default)]
+    linetype: Option<cad_drafting::Linetype>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftRadialDimensionRequest {
+    #[serde(default)]
+    layer: Option<String>,
+    #[serde(default)]
+    center: Option<[f64; 2]>,
+    #[serde(default)]
+    target: Option<[f64; 2]>,
+    #[serde(default)]
+    entity_id: Option<u64>,
+    #[serde(default)]
+    pick_angle_deg: Option<f64>,
+    #[serde(default)]
+    leader_offset: Option<f64>,
+    #[serde(default)]
+    is_diameter: Option<bool>,
+    #[serde(default)]
+    text: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftBlockRequest {
+    name: String,
+    base_point: [f64; 2],
+    #[serde(default)]
+    entity_ids: Vec<u64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftInsertRequest {
+    #[serde(default)]
+    layer: Option<String>,
+    block_name: String,
+    position: [f64; 2],
+    #[serde(default)]
+    scale: Option<[f64; 2]>,
+    #[serde(default)]
+    rotation_degrees: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
+struct DraftPurgeResponse {
+    report: cad_drafting::PurgeReport,
+    draft: DraftView,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+struct DraftOverkillRequest {
+    #[serde(default)]
+    tolerance: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
+struct DraftOverkillResponse {
+    report: cad_drafting::OverkillReport,
+    draft: DraftView,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftDivideRequest {
+    entity_id: u64,
+    segments: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct DraftDivideResponse {
+    created_point_ids: Vec<u64>,
+    draft: DraftView,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftMeasureIntervalRequest {
+    entity_id: u64,
+    interval: f64,
+}
+
+#[derive(Debug, Serialize)]
+struct DraftMeasureIntervalResponse {
+    created_point_ids: Vec<u64>,
+    draft: DraftView,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftMatchPropertiesRequest {
+    source_id: u64,
+    target_ids: Vec<u64>,
+}
+
+#[derive(Debug, Serialize)]
+struct DraftMatchPropertiesResponse {
+    matched_count: usize,
+    draft: DraftView,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftConstraintsSolveRequest {
+    #[serde(default)]
+    points: Vec<[f64; 2]>,
+    #[serde(default)]
+    lines: Vec<[usize; 2]>,
+    #[serde(default)]
+    circles: Vec<DraftConstraintCircleInput>,
+    #[serde(default)]
+    constraints: Vec<cad_constraints::ConstraintKind>,
+    #[serde(default)]
+    update_entities: Option<Vec<DraftConstraintEntityMap>>,
+    #[serde(default)]
+    max_iterations: Option<usize>,
+    #[serde(default)]
+    tolerance: Option<f64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftConstraintCircleInput {
+    center: usize,
+    radius: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftConstraintEntityMap {
+    entity_id: u64,
+    #[serde(default)]
+    line_index: Option<usize>,
+    #[serde(default)]
+    circle_index: Option<usize>,
+}
+
+#[derive(Debug, Serialize)]
+struct DraftConstraintsSolveResponse {
+    solve: cad_constraints::SolveReport,
+    dof: cad_constraints::DofReport,
+    solved_points: Vec<[f64; 2]>,
+    updated_entities: Vec<u64>,
+    draft: Option<DraftView>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -3422,6 +4014,27 @@ struct CaeModalRequest {
     voxel_size_mm: Option<f64>,
     #[serde(default)]
     num_modes: Option<usize>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CaeThermalRequest {
+    #[serde(default = "default_steel")]
+    material: String,
+    #[serde(default)]
+    voxel_size_mm: Option<f64>,
+    #[serde(default = "default_temp_hot")]
+    fixed_temp_hot_c: Option<f64>,
+    #[serde(default = "default_temp_cold")]
+    fixed_temp_cold_c: Option<f64>,
+}
+
+fn default_temp_hot() -> Option<f64> {
+    Some(100.0)
+}
+
+fn default_temp_cold() -> Option<f64> {
+    Some(20.0)
 }
 
 #[derive(Debug, Default, Deserialize)]

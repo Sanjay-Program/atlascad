@@ -138,6 +138,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "cad-constraints"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "cad-contract"
 version = "0.1.0"
 dependencies = [
@@ -221,6 +229,7 @@ version = "0.1.0"
 dependencies = [
  "cad-cae",
  "cad-cam",
+ "cad-constraints",
  "cad-contract",
  "cad-document",
  "cad-drafting",

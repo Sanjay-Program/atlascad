@@ -22,10 +22,10 @@
 
 use cad_cae::{Axis, FaceLoad, FaceSelection, StaticStudy, Support, parse_study, run_static};
 use cad_cam::{
-    CuttingCondition, FeedsRequest, Holder, Machine, MachineEnvelope, Material, MaterialRemoval,
-    Operation, PostFormat, Postprocessor, Setup, SetupSheet, Stock, Tool, ToolGeometry, ToolId,
-    Toolpath, ToolpathId, WorkCoordinate, check_holder_clearance, generate, recommend,
-    setup_sheet_pdf,
+    CuttingCondition, FeedsRequest, Holder, KinematicLimits, Machine, MachineEnvelope, Material,
+    MaterialRemoval, Operation, PostFormat, Postprocessor, Setup, SetupSheet, Stock, Tool,
+    ToolGeometry, ToolId, Toolpath, ToolpathId, WorkCoordinate, check_holder_clearance, generate,
+    recommend, setup_sheet_pdf,
 };
 use cad_cli::{
     BoxSpec, Built, CliError, build_box, build_union, draft_plan_view, draft_summary, draft_to_dxf,
@@ -1135,6 +1135,12 @@ struct CamJobSummary {
     cutting_mm: f64,
     rapid_mm: f64,
     estimated_minutes: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cycle_time_seconds: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_wear_fraction: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_wear_percent: Option<f64>,
     removed_mm3: f64,
     removal_fraction: f64,
     files: Vec<String>,
@@ -1762,6 +1768,9 @@ fn cmd_cam_job(arguments: &[String]) -> Result<i32, CliError> {
     write_atomic(&program_path, gcode.as_bytes())?;
 
     let mut sheet = SetupSheet::new(program, &setup);
+    if let Some(material) = inputs.material {
+        sheet = sheet.with_material(material);
+    }
     for (name, toolpath) in &operations {
         sheet.add_operation(name.clone(), &tool, toolpath);
     }
@@ -1827,6 +1836,27 @@ fn cmd_cam_job(arguments: &[String]) -> Result<i32, CliError> {
             .iter()
             .map(|toolpath| toolpath.estimated_minutes())
             .sum(),
+        cycle_time_seconds: {
+            let limits = KinematicLimits::default();
+            Some(
+                segments
+                    .iter()
+                    .map(|tp| tp.kinematic_cycle_time(&limits).total_seconds)
+                    .sum(),
+            )
+        },
+        tool_wear_fraction: inputs.material.and_then(|mat| {
+            sheet
+                .tool_wear_estimates(mat)
+                .first()
+                .map(|(_, wear)| wear.wear_fraction)
+        }),
+        tool_wear_percent: inputs.material.and_then(|mat| {
+            sheet
+                .tool_wear_estimates(mat)
+                .first()
+                .map(|(_, wear)| wear.wear_percent)
+        }),
         removed_mm3: removal.removed_volume_mm3(),
         removal_fraction: removal.removal_fraction(),
         files: vec![
