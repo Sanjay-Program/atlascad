@@ -1535,6 +1535,12 @@ kbd {
   color: var(--accent);
 }
 
+.drawing-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 /* ---------- simulation and cam HUD ---------- */
 
 .sim-hud-card {

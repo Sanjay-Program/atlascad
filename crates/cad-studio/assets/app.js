@@ -3195,6 +3195,11 @@
     if (!app.viewport) return;
     app.viewport.wireframe = !app.viewport.wireframe;
     byId("wireBtn").setAttribute("aria-pressed", String(app.viewport.wireframe));
+    const badge = byId("statusWireIndicator");
+    if (badge) {
+      badge.textContent = `WIRE: ${app.viewport.wireframe ? "ON" : "OFF"}`;
+      badge.classList.toggle("active", app.viewport.wireframe);
+    }
     app.viewport.requestFrame();
     log(`Wireframe ${app.viewport.wireframe ? "on" : "off"}`);
   }
@@ -3203,6 +3208,11 @@
     if (!app.viewport) return;
     app.viewport.grid = !app.viewport.grid;
     byId("gridBtn").setAttribute("aria-pressed", String(app.viewport.grid));
+    const badge = byId("statusGridIndicator");
+    if (badge) {
+      badge.textContent = `GRID: ${app.viewport.grid ? "ON" : "OFF"}`;
+      badge.classList.toggle("active", app.viewport.grid);
+    }
     app.viewport.uploadSceneLines();
     app.viewport.requestFrame();
     log(`Grid ${app.viewport.grid ? "on" : "off"}`);
@@ -4336,6 +4346,21 @@ ${gcodeSample}`;
       toast(`Polar Tracking ${drawState.polar ? "ON" : "OFF"}`);
     }},
     { alias: "Z", name: "ZOOM", desc: "Zoom to fit model in viewport", run: () => fit() },
+    { alias: "ZE", name: "ZOOMEXTENTS", desc: "Zoom drawing sheet and 3D viewport to extents", run: () => {
+      fit();
+      drawState.viewZoom = 1.0;
+      drawState.viewPan = [0, 0];
+      if (app.drawing) renderDrawing(app.drawing);
+      toast("Zoom extents: viewport and drawing reset");
+    }},
+    { alias: "FIT", name: "FIT", desc: "Zoom drawing sheet and 3D viewport to extents", run: () => {
+      fit();
+      drawState.viewZoom = 1.0;
+      drawState.viewPan = [0, 0];
+      if (app.drawing) renderDrawing(app.drawing);
+      toast("Zoom extents: viewport and drawing reset");
+    }},
+    { alias: "F7", name: "GRID", desc: "Toggle ground grid display", run: () => toggleGrid() },
     { alias: "W", name: "WIREFRAME", desc: "Toggle wireframe mesh mode", run: () => toggleWireframe() },
     { alias: "G", name: "GRID", desc: "Toggle ground grid", run: () => toggleGrid() },
     { alias: "EXT", name: "EXTRUDE", desc: "3D extrude selected sketch", run: () => extrudeSketch("new_body") },
@@ -5028,6 +5053,34 @@ ${gcodeSample}`;
     byId("fitBtn").addEventListener("click", fit);
     byId("wireBtn").addEventListener("click", toggleWireframe);
     byId("gridBtn").addEventListener("click", toggleGrid);
+    byId("statusGridIndicator")?.addEventListener("click", toggleGrid);
+    byId("statusWireIndicator")?.addEventListener("click", toggleWireframe);
+    byId("statusOsnapIndicator")?.addEventListener("click", () => {
+      drawState.osnap = !drawState.osnap;
+      byId("osnapToggleBtn")?.setAttribute("aria-pressed", String(drawState.osnap));
+      const badge = byId("statusOsnapIndicator");
+      if (badge) {
+        badge.textContent = `OSNAP: ${drawState.osnap ? "ON" : "OFF"}`;
+        badge.classList.toggle("active", drawState.osnap);
+      }
+      toast(`Object Snap ${drawState.osnap ? "ON" : "OFF"}`);
+    });
+    byId("statusPolarIndicator")?.addEventListener("click", () => {
+      drawState.polar = !drawState.polar;
+      byId("polarToggleBtn")?.setAttribute("aria-pressed", String(drawState.polar));
+      const badge = byId("statusPolarIndicator");
+      if (badge) {
+        badge.textContent = `POLAR: ${drawState.polar ? "ON" : "OFF"}`;
+        badge.classList.toggle("active", drawState.polar);
+      }
+      toast(`Polar Tracking ${drawState.polar ? "ON" : "OFF"}`);
+    });
+    byId("drawingZoomFitBtn")?.addEventListener("click", () => {
+      drawState.viewZoom = 1.0;
+      drawState.viewPan = [0, 0];
+      if (app.drawing) renderDrawing(app.drawing);
+      toast("Drawing fitted to window");
+    });
     document.querySelectorAll(".axis-gizmo button").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -5200,6 +5253,12 @@ ${gcodeSample}`;
           badge.classList.toggle("active", drawState.osnap);
         }
         toast(`Object Snap ${drawState.osnap ? "ON" : "OFF"}`);
+        return;
+      }
+      if (event.key === "F7") {
+        event.preventDefault();
+        toggleGrid();
+        toast(`Grid ${app.viewport && app.viewport.grid ? "ON" : "OFF"}`);
         return;
       }
       if (event.key === "F10") {

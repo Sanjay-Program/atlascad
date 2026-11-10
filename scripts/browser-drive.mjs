@@ -548,6 +548,16 @@ try {
   check(gridBefore !== gridAfter, `G did not toggle the grid (${gridBefore} → ${gridAfter})`);
   await pressKey('g', { text: 'g' });
 
+  // Orientation Gizmo
+  await clickSelector('#axisGizmo button[data-axis="top"]', 'Gizmo Top view');
+  await clickSelector('#axisGizmo button[data-axis="iso"]', 'Gizmo Iso view');
+
+  // Status bar clickable badges
+  await clickSelector('#statusWireIndicator', 'Status Wire Badge');
+  check((await evaluate('document.getElementById("statusWireIndicator").textContent')) === 'WIRE: ON', 'status wire badge is on');
+  await clickSelector('#statusWireIndicator', 'Status Wire Badge back');
+  check((await evaluate('document.getElementById("statusWireIndicator").textContent')) === 'WIRE: OFF', 'status wire badge is off');
+
   step('the tree selects a feature and the parameters belong to it');
   await clickSelector('#tree .tree-item:nth-child(2)', 'the extrude row');
   const selected = await evaluate(`({
@@ -710,6 +720,8 @@ try {
   const polarOn = await evaluate('document.getElementById("polarToggleBtn").getAttribute("aria-pressed")');
   check(polarOn === "true", `polar did not toggle on: ${polarOn}`);
 
+  await clickSelector('#drawingZoomFitBtn', 'Drawing Zoom Fit');
+
   step('drawing undo removes the last entity, and a layer can be added, hidden and locked');
   await clickSelector('#drawUndoBtn', 'drawing undo');
   await waitFor(`document.getElementById("drawingEntities").textContent === "${entitiesBefore + 5}"`, 'the drawing undo');
@@ -823,6 +835,12 @@ try {
     'document.getElementById("dirtyBadge").textContent.trim() === "saved"',
     'the saved badge'
   );
+
+  // Simulation HUD launcher check
+  await clickSelector('#simBtn', 'Simulation Launcher');
+  await waitFor('!document.getElementById("simulationHud").hidden', 'the simulation HUD open');
+  await clickSelector('#simHudCloseBtn', 'Close Simulation HUD');
+  await waitFor('document.getElementById("simulationHud").hidden', 'the simulation HUD closed');
 
   step('Export STL downloads a binary STL whose parsed volume matches the model');
   const shownVolume = await volumeMm3();
