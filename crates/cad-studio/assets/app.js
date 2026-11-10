@@ -390,7 +390,17 @@
         canvas.focus({ preventScroll: true });
       });
       canvas.addEventListener("pointermove", (event) => {
-        if (!this.pointer || this.pointer.id !== event.pointerId) return;
+        if (!this.ready) return;
+        if (!this.pointer || this.pointer.id !== event.pointerId) {
+          try {
+            const pt = this.groundAt(event.clientX, event.clientY);
+            if (pt) {
+              const coordsEl = byId("statusCoords");
+              if (coordsEl) coordsEl.textContent = `X: ${pt[0].toFixed(3)}, Y: ${pt[1].toFixed(3)}, Z: 0.000`;
+            }
+          } catch (_) {}
+          return;
+        }
         const dx = event.clientX - this.pointer.x;
         const dy = event.clientY - this.pointer.y;
         this.pointer.x = event.clientX;
@@ -779,12 +789,15 @@
     // The point under the cursor on the z = 0 drawing plane, in millimetres, or null when the
     // view is edge-on to the plane (where the ray has no single intersection).
     groundAt(clientX, clientY) {
+      if (!this.ready || !this.camera || !this.canvas) return null;
       const rect = this.canvas.getBoundingClientRect();
-      if (rect.width < 1 || rect.height < 1) return null;
+      if (!rect || rect.width < 1 || rect.height < 1) return null;
       const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
       const ndcY = 1 - ((clientY - rect.top) / rect.height) * 2;
       const eye = this.eye();
-      const forward = normalize(subtract(this.camera.target, eye));
+      if (!eye || !Array.isArray(eye) || eye.length < 3) return null;
+      const target = this.camera.target || [0, 0, 0];
+      const forward = normalize(subtract(target, eye));
       let right = cross(forward, [0, 0, 1]);
       if (lengthOf(right) < 0.001) right = [0, 1, 0];
       right = normalize(right);
@@ -799,6 +812,10 @@
       const t = -eye[2] / direction[2];
       if (!Number.isFinite(t) || t <= 1e-6) return null;
       return [eye[0] + direction[0] * t, eye[1] + direction[1] * t];
+    }
+
+    groundPlanePoint(clientX, clientY) {
+      return this.groundAt(clientX, clientY);
     }
 
     pickAt(clientX, clientY) {
@@ -1702,6 +1719,8 @@
     activeSnap: null,
     polarHit: null,
     snapOverride: null,
+    viewZoom: 1.0,
+    viewPan: [0, 0],
   };
 
   async function refreshDrawing() {
@@ -2404,10 +2423,19 @@
     const pad = unitSize * 0.08;
     byId("drawingExtents").textContent = `${formatNumber(width)} × ${formatNumber(height)} ${draft.unit}`;
 
+    const baseW = width + pad * 2;
+    const baseH = height + pad * 2;
+    const zoom = drawState.viewZoom || 1.0;
+    const pan = drawState.viewPan || [0, 0];
+    const zoomW = baseW / zoom;
+    const zoomH = baseH / zoom;
+    const centerX = (minX + maxX) / 2 + pan[0];
+    const centerY = -(minY + maxY) / 2 + pan[1];
+
     const svg = svgNode("svg", {
       // The document is y-up and SVG is y-down, so the geometry group is mirrored and the viewBox
       // covers the mirrored range. Text is placed in a second, upright group.
-      viewBox: `${minX - pad} ${-maxY - pad} ${width + pad * 2} ${height + pad * 2}`,
+      viewBox: `${centerX - zoomW / 2} ${centerY - zoomH / 2} ${zoomW} ${zoomH}`,
       preserveAspectRatio: "xMidYMid meet",
       role: "application",
       "aria-label": `Drawing of ${draft.name}`,
@@ -2595,6 +2623,13 @@
     const locked = byId("layerLockBtn");
     locked.textContent = layer && layer.locked ? "Locked" : "Unlocked";
     locked.setAttribute("aria-pressed", String(Boolean(layer) && layer.locked));
+    const linetypeSelect = byId("layerLinetypeSelect");
+    if (linetypeSelect && layer) {
+      const lt = typeof layer.linetype === "string"
+        ? layer.linetype
+        : (layer.linetype && typeof layer.linetype === "object" && layer.linetype.kind ? layer.linetype.kind : "continuous");
+      linetypeSelect.value = (lt || "continuous").toLowerCase();
+    }
     byId("polylineActions").hidden =
       (drawState.tool !== "polyline" && drawState.tool !== "spline") || drawState.points.length === 0;
     byId("saveDrawingBtn").disabled = app.busy || !draft;
@@ -3303,6 +3338,77 @@
     } catch (e) {
       toast(`CAM error: ${e.message}`, true);
     }
+  }
+
+  async function runCaeThermal() {
+    toast("Running Steady-State Thermal Conduction FEA solver...");
+    try {
+      const data = await api("/api/cae/thermal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          material: "steel.1018",
+          fixed_temp_hot_c: 100.0,
+          fixed_temp_cold_c: 20.0,
+        }),
+      });
+      showSimulationHud("Steady-State Thermal Conduction FEA", `
+        <div class="sim-metric-grid">
+          <div class="sim-metric-box">
+            <div class="label">Temperature Range</div>
+            <div class="value" style="color: #ff9800;">${data.min_temperature_c.toFixed(1)}°C — ${data.max_temperature_c.toFixed(1)}°C</div>
+          </div>
+          <div class="sim-metric-box">
+            <div class="label">Avg Temperature</div>
+            <div class="value">${data.avg_temperature_c.toFixed(1)}°C</div>
+          </div>
+          <div class="sim-metric-box">
+            <div class="label">Max Heat Flux Vector</div>
+            <div class="value">${(data.max_heat_flux_w_m2 / 1000).toFixed(1)} kW/m²</div>
+          </div>
+          <div class="sim-metric-box">
+            <div class="label">Hex8 Elements / Nodes</div>
+            <div class="value">${data.elements} / ${data.nodes}</div>
+          </div>
+        </div>
+        <p class="hint">${data.summary}</p>
+        <p class="hint" style="color: var(--warning); margin-top: 8px;">${data.quality}</p>
+      `);
+      toast(`Thermal Analysis Complete: Max Heat Flux ${(data.max_heat_flux_w_m2 / 1000).toFixed(1)} kW/m²`);
+    } catch (e) {
+      toast(`Thermal error: ${e.message}`, true);
+    }
+  }
+
+  function openSimLauncher() {
+    showSimulationHud("Engineering Multiphysics & CAM", `
+      <div class="sim-launcher-grid">
+        <div class="sim-launcher-card" id="simCardStatic">
+          <h4>Linear Static Stress FEA</h4>
+          <p>Compute von Mises stress distribution, displacement field, and factor of safety on Hex8 voxel mesh.</p>
+          <button type="button" class="button wide" id="launchStaticBtn">Run Static FEA</button>
+        </div>
+        <div class="sim-launcher-card" id="simCardModal">
+          <h4>Dynamic Modal Vibration</h4>
+          <p>Solve natural resonant frequencies (f1, f2, f3) and dynamic mode shapes via Lanczos eigenvalue analysis.</p>
+          <button type="button" class="button wide" id="launchModalBtn">Run Modal Analysis</button>
+        </div>
+        <div class="sim-launcher-card" id="simCardThermal">
+          <h4>Steady-State Thermal Conduction</h4>
+          <p>Solve Fourier thermal gradient [K_th]{T} = {Q}, nodal temperature field, and heat flux vectors.</p>
+          <button type="button" class="button wide" id="launchThermalBtn">Run Thermal Conduction</button>
+        </div>
+        <div class="sim-launcher-card" id="simCardCam">
+          <h4>3-Axis CNC Machining & G-Code</h4>
+          <p>Generate roughing and contouring toolpaths, collision checks, feeds & speeds, and exportable G-code.</p>
+          <button type="button" class="button wide" id="launchCamBtn">Generate CNC Toolpaths</button>
+        </div>
+      </div>
+    `);
+    byId("launchStaticBtn")?.addEventListener("click", () => runCaeStatic());
+    byId("launchModalBtn")?.addEventListener("click", () => runCaeModal());
+    byId("launchThermalBtn")?.addEventListener("click", () => runCaeThermal());
+    byId("launchCamBtn")?.addEventListener("click", () => runCamToolpaths());
   }
 
   function showSimulationHud(title, htmlContent) {
@@ -4236,6 +4342,18 @@ ${gcodeSample}`;
     { alias: "REV", name: "REVOLVE", desc: "3D revolve selected sketch", run: () => revolveSketch("new_body") },
     { alias: "FEA", name: "STATIC", desc: "Run linear static FEA (stress & deflection)", run: () => runCaeStatic() },
     { alias: "MODAL", name: "VIBRATION", desc: "Run dynamic modal natural frequency analysis", run: () => runCaeModal() },
+    { alias: "HEAT", name: "THERMAL", desc: "Run steady-state thermal conduction FEA", run: () => runCaeThermal() },
+    { alias: "THERMAL", name: "THERMAL", desc: "Run steady-state thermal conduction FEA", run: () => runCaeThermal() },
+    { alias: "SIM", name: "SIMULATION", desc: "Open Engineering Multiphysics & CAM simulation launcher", run: () => openSimLauncher() },
+    { alias: "SIMULATION", name: "SIMULATION", desc: "Open Engineering Multiphysics & CAM simulation launcher", run: () => openSimLauncher() },
+    { alias: "A", name: "ARC", desc: "Draw arc or circle segment", run: () => setDrawTool("circle") },
+    { alias: "ARC", name: "ARC", desc: "Draw arc or circle segment", run: () => setDrawTool("circle") },
+    { alias: "MT", name: "MTEXT", desc: "Place multiline annotation text", run: () => setDrawTool("text") },
+    { alias: "MTEXT", name: "MTEXT", desc: "Place multiline annotation text", run: () => setDrawTool("text") },
+    { alias: "P", name: "PAN", desc: "Pan view (Middle drag in 2D, Shift drag in 3D)", run: () => toast("Pan: drag with middle mouse button or Shift+drag") },
+    { alias: "PAN", name: "PAN", desc: "Pan view (Middle drag in 2D, Shift drag in 3D)", run: () => toast("Pan: drag with middle mouse button or Shift+drag") },
+    { alias: "RE", name: "REGEN", desc: "Regenerate drawing and 3D graphics", run: () => { refreshDrawing(); if (app.viewport) app.viewport.requestFrame(); toast("Regenerated display graphics"); } },
+    { alias: "REGEN", name: "REGEN", desc: "Regenerate drawing and 3D graphics", run: () => { refreshDrawing(); if (app.viewport) app.viewport.requestFrame(); toast("Regenerated display graphics"); } },
     { alias: "CAM", name: "GCODE", desc: "Generate 3-axis CNC toolpaths & G-code", run: () => runCamToolpaths() },
     { alias: "DXF", name: "DXFOUT", desc: "Export plan drawing as AutoCAD R12 DXF", run: () => exportDxf() },
     { alias: "PDF", name: "PLOT", desc: "Plot drawing as ISO/ANSI vector sheet", run: () => plotPdf() },
@@ -4325,6 +4443,31 @@ ${gcodeSample}`;
   }
 
   function parseCoordinateString(text) {
+    // Relative Polar: @dist<angle
+    if (text.startsWith("@") && text.includes("<")) {
+      const parts = text.slice(1).split("<");
+      if (parts.length === 2) {
+        const dist = parseFloat(parts[0]);
+        const angleDeg = parseFloat(parts[1]);
+        if (!isNaN(dist) && !isNaN(angleDeg)) {
+          const rad = angleDeg * (Math.PI / 180);
+          const base = drawState.points.length ? drawState.points[drawState.points.length - 1] : [0, 0];
+          return [Math.round((base[0] + dist * Math.cos(rad)) * 1000) / 1000, Math.round((base[1] + dist * Math.sin(rad)) * 1000) / 1000];
+        }
+      }
+    }
+    // Absolute Polar: dist<angle
+    if (!text.startsWith("@") && text.includes("<")) {
+      const parts = text.split("<");
+      if (parts.length === 2) {
+        const dist = parseFloat(parts[0]);
+        const angleDeg = parseFloat(parts[1]);
+        if (!isNaN(dist) && !isNaN(angleDeg)) {
+          const rad = angleDeg * (Math.PI / 180);
+          return [Math.round((dist * Math.cos(rad)) * 1000) / 1000, Math.round((dist * Math.sin(rad)) * 1000) / 1000];
+        }
+      }
+    }
     if (text.startsWith("@")) {
       const parts = text.slice(1).trim().split(/[\s,]+/);
       if (parts.length === 2) {
@@ -4390,7 +4533,9 @@ ${gcodeSample}`;
       { label: "Drawing: delete selected entity (DEL)", hint: "Erase", keywords: "delete erase del remove entity", run: () => deleteSelected(), disabled: !project },
       { label: "CAE: Run linear static structural FEA (FEA)", hint: "stress/deflection", keywords: "cae fea static stress deflection simulation", run: () => runCaeStatic(), disabled: !project || project.features.length === 0 },
       { label: "CAE: Run dynamic modal vibration analysis (MODAL)", hint: "frequencies", keywords: "cae modal vibration frequency natural modes", run: () => runCaeModal(), disabled: !project || project.features.length === 0 },
+      { label: "CAE: Run steady-state thermal conduction FEA (THERMAL)", hint: "heat flux", keywords: "cae thermal heat conduction temperature fea", run: () => runCaeThermal(), disabled: !project || project.features.length === 0 },
       { label: "CAM: Generate 3-axis CNC toolpaths & G-code (CAM)", hint: "milling/gcode", keywords: "cam cnc toolpath gcode machining milling", run: () => runCamToolpaths(), disabled: !project || project.features.length === 0 },
+      { label: "Engineering: Open Multiphysics & CAM Simulation Launcher", hint: "simulation", keywords: "simulation fea modal thermal cam gcode multiphysics", run: () => openSimLauncher() },
       { label: "Save a named revision", hint: "snapshot", keywords: "revision snapshot named save checkpoint", run: () => addRevision(), disabled: !project },
       ...(project && Array.isArray(project.revisions)
         ? project.revisions.map((revision) => ({
@@ -4569,13 +4714,67 @@ ${gcodeSample}`;
       button.addEventListener("click", () => setDrawTool(button.dataset.tool));
     }
     const preview = byId("drawingPreview");
+    let isPanningDrawing = false;
+    let panStart = [0, 0];
+
+    preview.addEventListener("wheel", (event) => {
+      const svg = preview.querySelector("svg");
+      if (!svg || !app.drawing) return;
+      event.preventDefault();
+      const factor = Math.exp(-event.deltaY * 0.0015);
+      drawState.viewZoom = Math.min(50, Math.max(0.1, (drawState.viewZoom || 1.0) * factor));
+      renderDrawing(app.drawing);
+    }, { passive: false });
+
+    preview.addEventListener("pointerdown", (event) => {
+      if (event.button === 1 || (event.button === 0 && event.altKey)) {
+        isPanningDrawing = true;
+        panStart = [event.clientX, event.clientY];
+        preview.setPointerCapture(event.pointerId);
+        event.preventDefault();
+      }
+    });
+
+    preview.addEventListener("pointerup", (event) => {
+      if (isPanningDrawing) {
+        isPanningDrawing = false;
+        try { preview.releasePointerCapture(event.pointerId); } catch (_) {}
+      }
+    });
+
+    preview.addEventListener("dblclick", () => {
+      drawState.viewZoom = 1.0;
+      drawState.viewPan = [0, 0];
+      if (app.drawing) renderDrawing(app.drawing);
+    });
+
     preview.addEventListener("pointermove", (event) => {
+      if (isPanningDrawing) {
+        const svg = preview.querySelector("svg");
+        if (svg && panStart) {
+          const box = svg.viewBox && svg.viewBox.baseVal;
+          const rect = svg.getBoundingClientRect();
+          if (box && box.width > 0 && box.height > 0 && rect && rect.width > 0 && rect.height > 0) {
+            const scale = Math.min(rect.width / box.width, rect.height / box.height);
+            if (scale > 0 && Number.isFinite(scale)) {
+              const dx = event.clientX - panStart[0];
+              const dy = event.clientY - panStart[1];
+              panStart = [event.clientX, event.clientY];
+              if (!drawState.viewPan) drawState.viewPan = [0, 0];
+              drawState.viewPan[0] -= dx / scale;
+              drawState.viewPan[1] += dy / scale;
+              renderDrawing(app.drawing);
+            }
+          }
+        }
+        return;
+      }
       const svg = preview.querySelector("svg");
       if (!svg || !app.drawing || drawState.tool === "select") {
         if (drawState.activeSnap || drawState.polarHit) {
           drawState.activeSnap = null;
           drawState.polarHit = null;
-          updateSnapOverlay(svg);
+          if (svg) updateSnapOverlay(svg);
         }
         return;
       }
@@ -4611,6 +4810,7 @@ ${gcodeSample}`;
     });
 
     preview.addEventListener("click", (event) => {
+      if (event.button !== 0 || event.altKey) return;
       const svg = preview.querySelector("svg");
       if (!svg || !app.drawing) return;
       if (drawState.tool === "select") {
@@ -4804,6 +5004,15 @@ ${gcodeSample}`;
       const layer = drawingLayer(byId("layerSelect").value);
       setLayerFlag("locked", !(layer && layer.locked));
     });
+    byId("layerLinetypeSelect")?.addEventListener("change", (e) => {
+      const layerName = byId("layerSelect").value;
+      if (layerName) {
+        drawingMutate("/api/draft/layer", {
+          name: layerName,
+          linetype: e.target.value,
+        }, `Linetype set to ${e.target.value}`);
+      }
+    });
     byId("addLayerBtn").addEventListener("click", addLayer);
     byId("layerName").addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
@@ -4814,10 +5023,18 @@ ${gcodeSample}`;
     byId("saveDrawingBtn").addEventListener("click", saveDrawing);
     byId("plotPdfBtn").addEventListener("click", plotPdf);
     byId("paletteBtn").addEventListener("click", openPalette);
+    byId("simBtn")?.addEventListener("click", openSimLauncher);
     byId("themeBtn").addEventListener("click", toggleTheme);
     byId("fitBtn").addEventListener("click", fit);
     byId("wireBtn").addEventListener("click", toggleWireframe);
     byId("gridBtn").addEventListener("click", toggleGrid);
+    document.querySelectorAll(".axis-gizmo button").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const view = btn.dataset.axis;
+        if (view) setView(view);
+      });
+    });
     byId("clearLog").addEventListener("click", () => {
       byId("log").textContent = "";
     });

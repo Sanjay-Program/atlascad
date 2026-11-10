@@ -131,7 +131,9 @@ try {
       return;
     }
     if (message.method === 'Runtime.exceptionThrown') {
-      pageErrors.push(`exception: ${message.params.exceptionDetails.text}`);
+      const details = message.params.exceptionDetails;
+      const desc = details.exception ? (details.exception.description || details.exception.value || '') : '';
+      pageErrors.push(`exception: ${details.text}${desc ? ` - ${desc}` : ''}`);
     }
     if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'error') {
       pageErrors.push(

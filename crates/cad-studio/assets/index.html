@@ -26,6 +26,7 @@
       <button id="saveBtn" class="button ghost" title="Save project (Ctrl+S)">Save</button>
       <button id="exportBtn" class="button ghost" title="Export binary STL">Export STL</button>
       <button id="exportDxfBtn" class="button ghost" title="Download the plan drawing as DXF R12">Export DXF</button>
+      <button id="simBtn" class="button ghost" title="Engineering Simulation & Multiphysics (FEA / Modal / Thermal / CAM)">Simulation</button>
       <button id="paletteBtn" class="button command" title="Command palette (Ctrl+K)">
         <span>Commands</span><kbd>Ctrl K</kbd>
       </button>
@@ -214,10 +215,11 @@
         <button type="button" id="drawCancel" class="button ghost small">Cancel</button>
         <span class="draw-hint">Click the z = 0 plane to place points · Enter closes · Esc cancels</span>
       </div>
-      <div class="axis-gizmo" aria-hidden="true">
-        <span class="axis axis-z">Z</span>
-        <span class="axis axis-x">X</span>
-        <span class="axis axis-y">Y</span>
+      <div class="axis-gizmo" id="axisGizmo" role="toolbar" aria-label="View Orientation Gizmo" title="Click axes to align view: X (Right), Y (Front), Z (Top), Center (Iso)">
+        <button type="button" class="axis axis-z" data-axis="top" title="Top view (Z)">Z</button>
+        <button type="button" class="axis axis-x" data-axis="right" title="Right view (X)">X</button>
+        <button type="button" class="axis axis-y" data-axis="front" title="Front view (Y)">Y</button>
+        <button type="button" class="axis axis-center" data-axis="iso" title="Isometric view (Center)">•</button>
       </div>
       <div id="viewportNotice" class="viewport-notice" hidden>
         <h3>No geometry yet</h3>
@@ -328,6 +330,17 @@
         <div class="field">
           <label for="layerSelect">Layer</label>
           <select id="layerSelect"></select>
+        </div>
+        <div class="field">
+          <label for="layerLinetypeSelect">Linetype</label>
+          <select id="layerLinetypeSelect" title="Layer Linetype (AutoCAD LTYPE)">
+            <option value="continuous">Continuous —————</option>
+            <option value="hidden">Hidden - - - - -</option>
+            <option value="center">Center — · — · —</option>
+            <option value="phantom">Phantom — · · — · · —</option>
+            <option value="dashed">Dashed —— —— ——</option>
+            <option value="dot">Dot ·············</option>
+          </select>
         </div>
         <div class="field-row">
           <button type="button" id="layerVisibleBtn" class="button ghost" aria-pressed="true">On</button>
