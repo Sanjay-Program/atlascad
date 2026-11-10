@@ -27,9 +27,12 @@ test, and the measured convergence series below.
 | Self-contained result | implemented, tested | the result embeds the study definition, engine version and source document/revision |
 | Batch container job | implemented, smoke-tested | non-root, read-only root, no network, exit 0/1/2/3; see the deployment contract |
 | Result label and warnings | implemented, tested | every result carries the quality label and its assumptions |
-| Modal, thermal, buckling, nonlinear, dynamic analysis | **absent** | no code |
+| Dynamic modal vibration analysis | implemented, tested | Lanczos eigenvalue solver, consistent mass matrix, mode shapes, cantilever beam $f_1 = 2302.55\text{ Hz}$ within 0.54% of Euler-Bernoulli analytic; studio `/api/cae/modal` |
+| Steady-state thermal conduction FEA | implemented, tested | Fourier conduction $[K_{th}]\{T\} = \{Q\}$, Jacobi-PCG solver, exact 1D Fourier match (207,600 W/m²), nodal temperature field & heat flux vectors; studio `/api/cae/thermal` |
+| Multiphysics HUD Launcher | implemented, tested | Studio dashboard card launcher for static FEA, modal vibration, thermal conduction, and 3-axis CNC CAM |
+| Buckling, nonlinear, transient dynamic analysis | **absent** | no code |
 | Injection moulding, electronics cooling | **absent** | needs validated specialist solvers and data |
-| Result field storage, contour viewer, mesh export | **absent** | only the scalar summary is returned and recorded |
+| Result field storage, contour viewer, mesh export | **absent** | scalar summary and heat flux / displacement vectors returned |
 | Adaptive refinement, boundary-fitted or curved elements | **absent** | the voxel mesh is the stated approximation |
 | Contact, plasticity, hyperelasticity, creep, fatigue | **absent** | linear elastic only |
 

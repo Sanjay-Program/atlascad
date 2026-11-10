@@ -93,8 +93,8 @@ stepover, stepdown or resolution.
 * **No machine simulation.** Feeds and speeds are typical starting values per material and tool,
   clamped to the machine limits; they are not a tool-vendor datasheet, and no program has been
   tested against a controller or a real cut.
-* **No GUI and no persistence.** A toolpath is the output of a command; the engineering-model
-  registry keeps summaries, never moves.
+* **Studio GUI integration.** Available via Studio Multiphysics HUD (`/api/cam/toolpaths`) and direct 2D drafting profile generator (`/api/draft/cam/profile`). Program files and setup sheets download directly in browser.
+* **Toolpath persistence.** The engineering-model registry records toolpath summaries and timestamps at the design revision.
 * **No produced program has been run.** The fixtures prove the text is what the postprocessor
   intends, not that a controller accepts it.
 
