@@ -133,12 +133,12 @@ fn usage() {
     println!(
         "  atlas cam gcode --size X,Y,Z [--depth MM] [--stepover MM] [--tool MM] [--format grbl|linuxcnc|mach3]"
     );
+    println!("                  [--program NAME] --out FILE.nc");
     println!(
         "  atlas mass-properties --file PROJECT.zcad [--body NAME] [--material NAME] [--density KG_M3]"
     );
     println!("  atlas interference --file PROJECT.zcad");
     println!("  atlas bom --file PROJECT.zcad [--material NAME] [--density KG_M3]");
-    println!("                  [--program NAME] --out FILE.nc");
     println!(
         "  atlas cam job --size X,Y,Z --out-dir DIR [--part PART.stl] [--tool MM] [--stepover MM]"
     );
