@@ -34,6 +34,196 @@
     </nav>
   </header>
 
+  <nav class="autocad-ribbon" role="toolbar" aria-label="AutoCAD Ribbon">
+    <div class="ribbon-tabs" role="tablist">
+      <button type="button" class="ribbon-tab active" data-tab="home" role="tab" aria-selected="true">Home</button>
+      <button type="button" class="ribbon-tab" data-tab="solid" role="tab" aria-selected="false">Solid 3D</button>
+      <button type="button" class="ribbon-tab" data-tab="draw" role="tab" aria-selected="false">Draw 2D</button>
+      <button type="button" class="ribbon-tab" data-tab="modify" role="tab" aria-selected="false">Modify</button>
+      <button type="button" class="ribbon-tab" data-tab="annotate" role="tab" aria-selected="false">Annotate</button>
+      <button type="button" class="ribbon-tab" data-tab="simulate" role="tab" aria-selected="false">Simulation</button>
+      <button type="button" class="ribbon-tab" data-tab="output" role="tab" aria-selected="false">Output</button>
+    </div>
+    <div class="ribbon-content">
+      <div class="ribbon-panel active" id="ribbonHome">
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Draw</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn" id="rbLineBtn" title="Line (L)">
+              <span class="rb-icon">╱</span><span>Line</span>
+            </button>
+            <button type="button" class="ribbon-btn" id="rbPolyBtn" title="Polyline (PL)">
+              <span class="rb-icon">⎍</span><span>Poly</span>
+            </button>
+            <button type="button" class="ribbon-btn" id="rbCircleBtn" title="Circle (C)">
+              <span class="rb-icon">◯</span><span>Circle</span>
+            </button>
+            <button type="button" class="ribbon-btn" id="rbRectBtn" title="Rectangle (REC)">
+              <span class="rb-icon">▭</span><span>Rect</span>
+            </button>
+          </div>
+        </div>
+        <div class="ribbon-separator"></div>
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">3D Modeling</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn primary" id="rbExtrudeBtn" title="Extrude (EXT)">
+              <span class="rb-icon">⬡</span><span>Extrude</span>
+            </button>
+            <button type="button" class="ribbon-btn" id="rbCutBtn" title="Cut / Subtract (SU)">
+              <span class="rb-icon">⊖</span><span>Cut</span>
+            </button>
+            <button type="button" class="ribbon-btn" id="rbRevolveBtn" title="Revolve (REV)">
+              <span class="rb-icon">↻</span><span>Revolve</span>
+            </button>
+            <button type="button" class="ribbon-btn" id="rbBoxBtn" title="3D Box (BOX)">
+              <span class="rb-icon">⊞</span><span>Box</span>
+            </button>
+          </div>
+        </div>
+        <div class="ribbon-separator"></div>
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Modify</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn" id="rbOffsetBtn" title="Offset (O)">
+              <span class="rb-icon">⇉</span><span>Offset</span>
+            </button>
+            <button type="button" class="ribbon-btn" id="rbFilletBtn" title="Fillet (F)">
+              <span class="rb-icon">╭</span><span>Fillet</span>
+            </button>
+            <button type="button" class="ribbon-btn" id="rbTrimBtn" title="Trim (TR)">
+              <span class="rb-icon">✂</span><span>Trim</span>
+            </button>
+            <button type="button" class="ribbon-btn" id="rbMirrorBtn" title="Mirror (MI)">
+              <span class="rb-icon">⇋</span><span>Mirror</span>
+            </button>
+          </div>
+        </div>
+        <div class="ribbon-separator"></div>
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Annotate & Engineering</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn" id="rbDimBtn" title="Dimension (DIM)">
+              <span class="rb-icon">↔</span><span>Dim</span>
+            </button>
+            <button type="button" class="ribbon-btn" id="rbMassPropBtn" title="Mass Properties (MASSPROP)">
+              <span class="rb-icon">⚖</span><span>MassProp</span>
+            </button>
+            <button type="button" class="ribbon-btn" id="rbBomBtn" title="Bill of Materials (BOM)">
+              <span class="rb-icon">📋</span><span>BOM</span>
+            </button>
+            <button type="button" class="ribbon-btn" id="rbFeaBtn" title="FEA Simulation (FEA)">
+              <span class="rb-icon">⚡</span><span>FEA</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="ribbon-panel" id="ribbonSolid">
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Primitives</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn" id="rbSolidBoxBtn" title="Box (BOX)"><span class="rb-icon">⊞</span><span>Box</span></button>
+            <button type="button" class="ribbon-btn" id="rbSolidCylBtn" title="Cylinder (CYL)"><span class="rb-icon">◓</span><span>Cylinder</span></button>
+          </div>
+        </div>
+        <div class="ribbon-separator"></div>
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Features</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn primary" id="rbSolidExtrudeBtn" title="Extrude (EXT)"><span class="rb-icon">⬡</span><span>Extrude</span></button>
+            <button type="button" class="ribbon-btn" id="rbSolidCutBtn" title="Cut / Subtract (SU)"><span class="rb-icon">⊖</span><span>Cut</span></button>
+            <button type="button" class="ribbon-btn" id="rbSolidJoinBtn" title="Join / Union (UNI)"><span class="rb-icon">⊕</span><span>Join</span></button>
+            <button type="button" class="ribbon-btn" id="rbSolidRevolveBtn" title="Revolve (REV)"><span class="rb-icon">↻</span><span>Revolve</span></button>
+          </div>
+        </div>
+        <div class="ribbon-separator"></div>
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Inquiry</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn" id="rbSolidMpBtn" title="Mass Properties (MASSPROP)"><span class="rb-icon">⚖</span><span>MassProp</span></button>
+            <button type="button" class="ribbon-btn" id="rbSolidInfBtn" title="Interference Detection (INTERFERE)"><span class="rb-icon">⚠</span><span>Interfere</span></button>
+            <button type="button" class="ribbon-btn" id="rbSolidBomBtn" title="Bill of Materials (BOM)"><span class="rb-icon">📋</span><span>BOM</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="ribbon-panel" id="ribbonDraw">
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">2D Draw Entities</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn" id="rbDrawLineBtn" title="Line (L)"><span class="rb-icon">╱</span><span>Line</span></button>
+            <button type="button" class="ribbon-btn" id="rbDrawPolyBtn" title="Polyline (PL)"><span class="rb-icon">⎍</span><span>Poly</span></button>
+            <button type="button" class="ribbon-btn" id="rbDrawCircleBtn" title="Circle (C)"><span class="rb-icon">◯</span><span>Circle</span></button>
+            <button type="button" class="ribbon-btn" id="rbDrawArcBtn" title="Arc (A)"><span class="rb-icon">◠</span><span>Arc</span></button>
+            <button type="button" class="ribbon-btn" id="rbDrawRectBtn" title="Rectangle (REC)"><span class="rb-icon">▭</span><span>Rect</span></button>
+            <button type="button" class="ribbon-btn" id="rbDrawPolygonBtn" title="Polygon (POL)"><span class="rb-icon">⬡</span><span>Polygon</span></button>
+            <button type="button" class="ribbon-btn" id="rbDrawEllipseBtn" title="Ellipse (EL)"><span class="rb-icon">⬭</span><span>Ellipse</span></button>
+            <button type="button" class="ribbon-btn" id="rbDrawSplineBtn" title="Spline (SPL)"><span class="rb-icon">∿</span><span>Spline</span></button>
+            <button type="button" class="ribbon-btn" id="rbDrawPointBtn" title="Point (PO)"><span class="rb-icon">•</span><span>Point</span></button>
+            <button type="button" class="ribbon-btn" id="rbDrawHatchBtn" title="Hatch (H)"><span class="rb-icon">▦</span><span>Hatch</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="ribbon-panel" id="ribbonModify">
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Modify Tools</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn" id="rbModOffsetBtn" title="Offset (O)"><span class="rb-icon">⇉</span><span>Offset</span></button>
+            <button type="button" class="ribbon-btn" id="rbModFilletBtn" title="Fillet (F)"><span class="rb-icon">╭</span><span>Fillet</span></button>
+            <button type="button" class="ribbon-btn" id="rbModChamferBtn" title="Chamfer (CHA)"><span class="rb-icon">╱</span><span>Chamfer</span></button>
+            <button type="button" class="ribbon-btn" id="rbModTrimBtn" title="Trim (TR)"><span class="rb-icon">✂</span><span>Trim</span></button>
+            <button type="button" class="ribbon-btn" id="rbModExtendBtn" title="Extend (EX)"><span class="rb-icon">⇥</span><span>Extend</span></button>
+            <button type="button" class="ribbon-btn" id="rbModMirrorBtn" title="Mirror (MI)"><span class="rb-icon">⇋</span><span>Mirror</span></button>
+            <button type="button" class="ribbon-btn" id="rbModRotateBtn" title="Rotate (RO)"><span class="rb-icon">⟳</span><span>Rotate</span></button>
+            <button type="button" class="ribbon-btn" id="rbModScaleBtn" title="Scale (SC)"><span class="rb-icon">⤢</span><span>Scale</span></button>
+            <button type="button" class="ribbon-btn" id="rbModMoveBtn" title="Move (M)"><span class="rb-icon">✥</span><span>Move</span></button>
+            <button type="button" class="ribbon-btn" id="rbModCopyBtn" title="Copy (CO)"><span class="rb-icon">⧉</span><span>Copy</span></button>
+            <button type="button" class="ribbon-btn" id="rbModJoinBtn" title="Join (J)"><span class="rb-icon">⚯</span><span>Join</span></button>
+            <button type="button" class="ribbon-btn" id="rbModExplodeBtn" title="Explode (X)"><span class="rb-icon">💥</span><span>Explode</span></button>
+            <button type="button" class="ribbon-btn" id="rbModArrayBtn" title="Array (AR)"><span class="rb-icon">⊞</span><span>Array</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="ribbon-panel" id="ribbonAnnotate">
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Dimensions & Text</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn" id="rbAnnDimBtn" title="Linear Dimension (DIM)"><span class="rb-icon">↔</span><span>Dim</span></button>
+            <button type="button" class="ribbon-btn" id="rbAnnRadBtn" title="Radius Dimension (DRA)"><span class="rb-icon">⊘</span><span>RadDim</span></button>
+            <button type="button" class="ribbon-btn" id="rbAnnDiaBtn" title="Diameter Dimension (DDI)"><span class="rb-icon">⌀</span><span>DiaDim</span></button>
+            <button type="button" class="ribbon-btn" id="rbAnnTextBtn" title="Text (TEXT)"><span class="rb-icon">T</span><span>Text</span></button>
+            <button type="button" class="ribbon-btn" id="rbAnnDistBtn" title="Distance (DI)"><span class="rb-icon">📏</span><span>Dist</span></button>
+            <button type="button" class="ribbon-btn" id="rbAnnAreaBtn" title="Area (AA)"><span class="rb-icon">📐</span><span>Area</span></button>
+            <button type="button" class="ribbon-btn" id="rbAnnSecBtn" title="Section Properties (SEC)"><span class="rb-icon">📊</span><span>SecProps</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="ribbon-panel" id="ribbonSimulate">
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Simulation & CAE</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn primary" id="rbSimFeaBtn" title="Static FEA (FEA)"><span class="rb-icon">⚡</span><span>Linear FEA</span></button>
+            <button type="button" class="ribbon-btn" id="rbSimModalBtn" title="Modal Dynamic Vibration (MODAL)"><span class="rb-icon">〰</span><span>Modal</span></button>
+            <button type="button" class="ribbon-btn" id="rbSimThermalBtn" title="Steady Thermal Conduction (HEAT)"><span class="rb-icon">🔥</span><span>Thermal</span></button>
+            <button type="button" class="ribbon-btn" id="rbSimHudBtn" title="Open Simulation HUD"><span class="rb-icon">🖥</span><span>HUD</span></button>
+            <button type="button" class="ribbon-btn" id="rbSimCamBtn" title="3-Axis CNC Toolpaths (CAM)"><span class="rb-icon">⚙</span><span>CAM G-code</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="ribbon-panel" id="ribbonOutput">
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Export & Plot</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn" id="rbOutDxfBtn" title="Export AutoCAD R12 DXF (DXF)"><span class="rb-icon">📄</span><span>DXF</span></button>
+            <button type="button" class="ribbon-btn" id="rbOutPdfBtn" title="Plot PDF Sheet (PLOT)"><span class="rb-icon">🖨</span><span>Plot PDF</span></button>
+            <button type="button" class="ribbon-btn" id="rbOutStlBtn" title="Export Binary 3D STL (STL)"><span class="rb-icon">🧊</span><span>Export STL</span></button>
+            <button type="button" class="ribbon-btn" id="rbOutSaveBtn" title="Save Project (QSAVE)"><span class="rb-icon">💾</span><span>Save</span></button>
+            <button type="button" class="ribbon-btn" id="rbOutMultiviewBtn" title="4-View Orthographic Drawing"><span class="rb-icon">⊞</span><span>Multi-View</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
   <main class="workspace">
     <aside class="panel panel-left" aria-label="Project browser">
       <section class="panel-section">
@@ -195,8 +385,73 @@
       </section>
     </aside>
 
-    <section class="viewport-shell">
+    <section class="viewport-shell" id="viewportShell">
       <canvas id="viewport" tabindex="0" aria-label="3D viewport. Drag to orbit, right-drag or Shift-drag to pan, scroll to zoom, click a face to inspect it. While drawing a polyline, click to place points on the z = 0 plane."></canvas>
+      
+      <!-- AutoCAD Visual Style & Projection Header -->
+      <div class="viewport-style-badge" id="viewportStyleBadge">
+        <span class="style-item" id="styleProjBadge" title="Projection: Isometric / Orthographic">[-] [Custom]</span>
+        <span class="style-item" id="styleVisualBadge" title="Visual Style: Shaded with Edges">[Shaded with Edges]</span>
+      </div>
+
+      <!-- AutoCAD UCS Icon (User Coordinate System) -->
+      <div class="autocad-ucs-icon" id="autocadUcsIcon" title="AutoCAD WCS / UCS Coordinate System">
+        <svg viewBox="0 0 64 64" width="64" height="64" class="ucs-svg">
+          <defs>
+            <marker id="arrowRed" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto">
+              <polygon points="0 0, 6 3, 0 6" fill="#e53935" />
+            </marker>
+            <marker id="arrowGreen" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto">
+              <polygon points="0 0, 6 3, 0 6" fill="#43a047" />
+            </marker>
+            <marker id="arrowBlue" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto">
+              <polygon points="0 0, 6 3, 0 6" fill="#1e88e5" />
+            </marker>
+          </defs>
+          <line x1="16" y1="46" x2="48" y2="46" stroke="#e53935" stroke-width="2.5" marker-end="url(#arrowRed)" />
+          <line x1="16" y1="46" x2="16" y2="14" stroke="#43a047" stroke-width="2.5" marker-end="url(#arrowGreen)" />
+          <line x1="16" y1="46" x2="38" y2="24" stroke="#1e88e5" stroke-width="2.5" marker-end="url(#arrowBlue)" />
+          <rect x="13" y="43" width="6" height="6" fill="rgba(255,255,255,0.12)" stroke="#b0bec5" stroke-width="1.2" />
+          <text x="50" y="50" fill="#e53935" font-size="11" font-weight="bold" font-family="monospace">X</text>
+          <text x="12" y="10" fill="#43a047" font-size="11" font-weight="bold" font-family="monospace">Y</text>
+          <text x="40" y="22" fill="#1e88e5" font-size="11" font-weight="bold" font-family="monospace">Z</text>
+          <text x="18" y="58" fill="#90caf9" font-size="8" font-weight="bold" font-family="monospace">WCS</text>
+        </svg>
+      </div>
+
+      <!-- AutoCAD Dynamic Input HUD Tooltip -->
+      <div class="dynamic-input-hud" id="dynamicInputHud" hidden>
+        <span class="dyn-coord-val" id="dynCoordVal">X: 0.000, Y: 0.000</span>
+      </div>
+
+      <!-- AutoCAD Model vs Layout Tabs Bar -->
+      <div class="autocad-layout-bar" role="tablist" aria-label="AutoCAD Layout Space">
+        <button type="button" class="layout-tab active" id="tabModel" role="tab" aria-selected="true" title="Model Space: 3D CAD modeling viewport">
+          <span class="tab-icon">⬡</span> Model
+        </button>
+        <button type="button" class="layout-tab" id="tabLayout1" role="tab" aria-selected="false" title="Layout 1: 2D Drafting Sheet & Drawing Editor">
+          <span class="tab-icon">◫</span> Layout 1
+        </button>
+        <button type="button" class="layout-tab" id="tabLayout2" role="tab" aria-selected="false" title="Layout 2: Multi-View Orthographic Drawing">
+          <span class="tab-icon">⊞</span> Layout 2
+        </button>
+      </div>
+
+      <!-- Full Drawing Sheet View (Paper Space) -->
+      <div id="layoutSheetView" class="layout-sheet-view" hidden>
+        <div class="sheet-viewport-toolbar">
+          <div class="sheet-title-badge">Layout 1 — Plan Drawing Sheet (Paper Space)</div>
+          <div class="sheet-view-actions">
+            <button type="button" class="button ghost small" id="mainSheetFitBtn" title="Zoom to fit sheet (Z+E)">Fit Sheet</button>
+            <button type="button" class="button ghost small" id="mainSheetPlotBtn" title="Plot PDF Sheet">Plot PDF</button>
+            <button type="button" class="button ghost small" id="mainSheetDxfBtn" title="Export DXF">Export DXF</button>
+            <button type="button" class="button small" id="returnModelBtn" title="Return to Model Space">⬡ Model (3D)</button>
+          </div>
+        </div>
+        <div id="fullDrawingContainer" class="full-drawing-container">
+          <div id="fullDrawingCanvas" class="full-drawing-canvas"></div>
+        </div>
+      </div>
       <div class="view-toolbar" role="toolbar" aria-label="Viewport controls">
         <button type="button" data-view="iso" title="Isometric view (4)">Iso</button>
         <button type="button" data-view="front" title="Front view (1)">Front</button>
@@ -430,8 +685,14 @@
   </main>
 
   <div id="commandLineBar" class="command-line-bar" role="region" aria-label="AutoCAD Command Prompt">
-    <span class="command-prompt-label">Command:</span>
-    <input type="text" id="commandPromptInput" class="command-prompt-input" autocomplete="off" spellcheck="false" placeholder="Type command (L, C, REC, EL, PL, SPL, DIM, EXT, FEA, MODAL, CAM, HELP) or coordinates (10,20)" />
+    <div class="command-history-log" id="commandHistoryLog">
+      <div class="history-line" id="commandHistoryLine1">AutoCAD Command Line active. Type command (e.g. L, C, REC, EXT, CUT, JOIN, REV, DIM, MASSPROP, BOM) or coordinates.</div>
+      <div class="history-line" id="commandHistoryLine2"></div>
+    </div>
+    <div class="command-input-row">
+      <span class="command-prompt-label">Command:</span>
+      <input type="text" id="commandPromptInput" class="command-prompt-input" autocomplete="off" spellcheck="false" placeholder="Type a command (L, C, REC, EXT, CUT, JOIN, REV, DIM, FEA, HELP) or coordinates (10,20)" />
+    </div>
     <div id="commandSuggestions" class="command-suggestions" hidden></div>
   </div>
 
@@ -439,10 +700,12 @@
     <span id="statusMessage" class="status-message">Connecting…</span>
     <span class="spacer"></span>
     <span id="statusCoords" class="status-item" title="Cursor Coordinates">X: 0.000, Y: 0.000</span>
+    <button type="button" id="statusModeIndicator" class="status-badge active" title="Toggle Model Space (3D) / Paper Space (2D)">MODEL</button>
     <button type="button" id="statusGridIndicator" class="status-badge active" title="F7 / G: Toggle Ground Grid">GRID: ON</button>
     <button type="button" id="statusWireIndicator" class="status-badge" title="W: Toggle Wireframe Mesh">WIRE: OFF</button>
     <button type="button" id="statusOsnapIndicator" class="status-badge active" title="F3: Toggle Object Snap">OSNAP: ON</button>
     <button type="button" id="statusPolarIndicator" class="status-badge active" title="F10: Toggle Polar Tracking">POLAR: ON</button>
+    <button type="button" id="statusDynIndicator" class="status-badge active" title="F12: Toggle Dynamic Input HUD">DYN: ON</button>
     <span id="statusPick" class="status-item">—</span>
     <span id="statusGeometry" class="status-item">—</span>
     <span id="statusUnits" class="status-item">mm</span>

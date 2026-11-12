@@ -56,7 +56,7 @@ body {
 body {
   margin: 0;
   display: grid;
-  grid-template-rows: var(--topbar) minmax(0, 1fr) auto var(--statusbar);
+  grid-template-rows: var(--topbar) auto minmax(0, 1fr) auto var(--statusbar);
   background: var(--bg);
   color: var(--text);
   font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -225,7 +225,7 @@ kbd {
 
 .workspace {
   display: grid;
-  grid-template-columns: 272px minmax(0, 1fr) 304px;
+  grid-template-columns: 294px minmax(0, 1fr) 324px;
   min-height: 0;
 }
 
@@ -649,10 +649,12 @@ kbd {
 .field select,
 .field input {
   width: 100%;
-  padding: 5px 7px;
+  padding: 5px 6px;
+  font-size: 11.5px;
   border: 1px solid var(--border);
   border-radius: 5px;
   background: var(--panel-raised);
+  min-width: 0;
 }
 
 /* ---------- share ---------- */
@@ -1650,3 +1652,302 @@ kbd {
   margin: 0 0 14px 0;
   flex-grow: 1;
 }
+
+/* ==========================================================================
+   AutoCAD Professional UI / UX System
+   ========================================================================== */
+
+/* ---------- AutoCAD Ribbon Bar ---------- */
+.autocad-ribbon {
+  background: var(--panel-raised);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  z-index: 15;
+  user-select: none;
+}
+
+.ribbon-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px 12px 0;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.ribbon-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  padding: 4px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.ribbon-tab:hover {
+  color: var(--text);
+  background: var(--panel-hover);
+}
+
+.ribbon-tab.active {
+  color: var(--accent);
+  background: var(--panel-raised);
+  border-color: var(--border);
+  border-bottom-color: var(--panel-raised);
+  margin-bottom: -1px;
+}
+
+.ribbon-content {
+  padding: 4px 12px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.ribbon-panel {
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.ribbon-panel.active {
+  display: flex;
+}
+
+.ribbon-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.ribbon-group-title {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.ribbon-buttons {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.ribbon-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  min-width: 48px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.ribbon-btn:hover {
+  background: var(--panel-hover);
+  border-color: var(--border);
+}
+
+.ribbon-btn.primary {
+  background: var(--accent-soft);
+  border-color: rgba(90, 169, 255, 0.3);
+  color: var(--accent-strong);
+}
+
+.ribbon-btn .rb-icon {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.ribbon-separator {
+  width: 1px;
+  height: 34px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+/* ---------- AutoCAD Layout Tabs Bar ---------- */
+.autocad-layout-bar {
+  position: absolute;
+  left: 14px;
+  bottom: 8px;
+  display: flex;
+  gap: 2px;
+  z-index: 10;
+  background: rgba(16, 22, 32, 0.88);
+  backdrop-filter: blur(4px);
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.layout-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.layout-tab:hover {
+  color: var(--text);
+  background: var(--panel-hover);
+}
+
+.layout-tab.active {
+  background: var(--panel-raised);
+  color: var(--accent);
+  border-color: var(--border-strong);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.layout-tab .tab-icon {
+  font-size: 12px;
+}
+
+/* ---------- AutoCAD UCS & Viewport Style ---------- */
+.autocad-ucs-icon {
+  position: absolute;
+  left: 14px;
+  bottom: 44px;
+  pointer-events: none;
+  z-index: 8;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+}
+
+.viewport-style-badge {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  display: flex;
+  gap: 6px;
+  z-index: 8;
+  pointer-events: none;
+  font-family: "SFMono-Regular", "Cascadia Code", monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  background: rgba(16, 22, 32, 0.7);
+  backdrop-filter: blur(4px);
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.viewport-style-badge .style-item {
+  color: var(--accent);
+}
+
+/* ---------- Dynamic Input HUD Tooltip ---------- */
+.dynamic-input-hud {
+  position: absolute;
+  pointer-events: none;
+  z-index: 25;
+  background: rgba(16, 22, 32, 0.88);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 3px 7px;
+  font-family: "SFMono-Regular", "Cascadia Code", monospace;
+  font-size: 11px;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  transform: translate(14px, 14px);
+  white-space: nowrap;
+}
+
+/* ---------- Command History Log ---------- */
+.command-history-log {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0 3px 0;
+  font-size: 11px;
+  color: var(--muted);
+  width: 100%;
+  max-height: 42px;
+  overflow: hidden;
+}
+
+.command-history-log .history-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.command-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+/* ---------- Full Drawing Sheet View ---------- */
+.layout-sheet-view {
+  position: absolute;
+  inset: 0;
+  background: var(--canvas);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+}
+
+.sheet-viewport-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 14px;
+  background: var(--panel-raised);
+  border-bottom: 1px solid var(--border);
+}
+
+.sheet-title-badge {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.sheet-view-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.full-drawing-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #181c24;
+}
+
+.full-drawing-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.full-drawing-canvas svg {
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+

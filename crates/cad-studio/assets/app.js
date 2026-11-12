@@ -391,14 +391,17 @@
       });
       canvas.addEventListener("pointermove", (event) => {
         if (!this.ready) return;
-        if (!this.pointer || this.pointer.id !== event.pointerId) {
-          try {
-            const pt = this.groundAt(event.clientX, event.clientY);
-            if (pt) {
-              const coordsEl = byId("statusCoords");
-              if (coordsEl) coordsEl.textContent = `X: ${pt[0].toFixed(3)}, Y: ${pt[1].toFixed(3)}, Z: 0.000`;
+        try {
+          const pt = this.groundAt(event.clientX, event.clientY);
+          if (pt) {
+            const coordsEl = byId("statusCoords");
+            if (coordsEl) coordsEl.textContent = `X: ${pt[0].toFixed(3)}, Y: ${pt[1].toFixed(3)}, Z: 0.000`;
+            if (typeof updateDynamicInput === "function") {
+              updateDynamicInput(event.clientX, event.clientY, pt);
             }
-          } catch (_) {}
+          }
+        } catch (_) {}
+        if (!this.pointer || this.pointer.id !== event.pointerId) {
           return;
         }
         const dx = event.clientX - this.pointer.x;
@@ -422,6 +425,10 @@
       });
       canvas.addEventListener("pointercancel", () => {
         this.pointer = null;
+      });
+      canvas.addEventListener("pointerleave", () => {
+        const hud = byId("dynamicInputHud");
+        if (hud) hud.hidden = true;
       });
       canvas.addEventListener("wheel", (event) => {
         if (!this.ready) return;
@@ -1397,14 +1404,10 @@
       byId("addFeatureBtn").textContent = "Add extrude";
     }
     operationSelect.replaceChildren();
-    const newBody = document.createElement("option");
-    newBody.value = "new_body";
-    newBody.textContent = "New body";
-    const join = document.createElement("option");
-    join.value = "join";
-    join.textContent = "Join";
-    operationSelect.append(newBody);
     if (hasBody) {
+      const join = document.createElement("option");
+      join.value = "join";
+      join.textContent = "Join";
       operationSelect.append(join);
       if (supportsDifference) {
         const cut = document.createElement("option");
@@ -1412,13 +1415,18 @@
         cut.textContent = "Cut";
         operationSelect.append(cut);
       }
-      if (![...operationSelect.options].some((option) => option.value === operationSelect.value)) {
+      if (operationSelect.value !== "cut") {
         operationSelect.value = "join";
       }
       byId("createHint").textContent = supportsDifference
-        ? "This project has one body; a new feature joins it or cuts from it."
-        : "This project has one body; a new feature joins it. Cut is unavailable because the active kernel does not advertise boolean difference.";
+        ? "This project has a 3D body; new features join to it or cut from it."
+        : "This project has a 3D body; new features join to it.";
     } else {
+      const newBody = document.createElement("option");
+      newBody.value = "new_body";
+      newBody.textContent = "New body";
+      operationSelect.append(newBody);
+      operationSelect.value = "new_body";
       byId("createHint").textContent =
         "The first feature starts the body; later features join it. A revolve turns the sketch a full turn about one of its own axes.";
     }
@@ -2582,6 +2590,9 @@
     svg.append(flip, upright, snapLayer);
     preview.append(svg);
     updateSnapOverlay(svg);
+    if (typeof syncFullDrawingCanvas === "function") {
+      syncFullDrawingCanvas();
+    }
   }
 
   // ---------------------------------------------------------------------------------------
@@ -2986,7 +2997,12 @@
     }
     const sketchId = Number(byId("newFeatureSketch").value);
     const kind = byId("newFeatureKind").value;
-    const operation = byId("newFeatureOperation").value;
+    const hasBody = Boolean(project && project.features && project.features.length);
+    let operation = byId("newFeatureOperation").value;
+    if (hasBody && (!operation || operation === "new_body")) {
+      operation = "join";
+      byId("newFeatureOperation").value = "join";
+    }
     if (!Number.isInteger(sketchId) || sketchId <= 0) {
       toast("Pick a sketch first.", true);
       return;
@@ -3171,7 +3187,9 @@
     const sketch = activeSketch();
     if (sketch) byId("newFeatureSketch").value = String(sketch.id);
     byId("newFeatureKind").value = "extrude";
-    byId("newFeatureOperation").value = operation;
+    const hasBody = Boolean(app.project && app.project.features && app.project.features.length);
+    const op = operation ? (hasBody && operation === "new_body" ? "join" : operation) : (hasBody ? "join" : "new_body");
+    byId("newFeatureOperation").value = op;
     await addFeature();
   }
 
@@ -3179,7 +3197,9 @@
     const sketch = activeSketch();
     if (sketch) byId("newFeatureSketch").value = String(sketch.id);
     byId("newFeatureKind").value = "revolve";
-    byId("newFeatureOperation").value = operation;
+    const hasBody = Boolean(app.project && app.project.features && app.project.features.length);
+    const op = operation ? (hasBody && operation === "new_body" ? "join" : operation) : (hasBody ? "join" : "new_body");
+    byId("newFeatureOperation").value = op;
     await addFeature();
   }
 
@@ -4529,8 +4549,43 @@ ${gcodeSample}`;
     { alias: "F7", name: "GRID", desc: "Toggle ground grid display", run: () => toggleGrid() },
     { alias: "W", name: "WIREFRAME", desc: "Toggle wireframe mesh mode", run: () => toggleWireframe() },
     { alias: "G", name: "GRID", desc: "Toggle ground grid", run: () => toggleGrid() },
-    { alias: "EXT", name: "EXTRUDE", desc: "3D extrude selected sketch", run: () => extrudeSketch("new_body") },
-    { alias: "REV", name: "REVOLVE", desc: "3D revolve selected sketch", run: () => revolveSketch("new_body") },
+    { alias: "EXT", name: "EXTRUDE", desc: "3D extrude selected sketch", run: () => extrudeSketch() },
+    { alias: "EXTRUDE", name: "EXTRUDE", desc: "3D extrude selected sketch", run: () => extrudeSketch() },
+    { alias: "REV", name: "REVOLVE", desc: "3D revolve selected sketch", run: () => revolveSketch() },
+    { alias: "REVOLVE", name: "REVOLVE", desc: "3D revolve selected sketch", run: () => revolveSketch() },
+    { alias: "JOIN", name: "JOIN", desc: "3D Join or 2D combine entities into polyline", run: () => {
+      if (drawState.tool !== "select" || !app.drawing) extrudeSketch("join");
+      else cadJoin();
+    }},
+    { alias: "CUT", name: "SUBTRACT", desc: "3D Cut / subtract extrude from body", run: () => extrudeSketch("cut") },
+    { alias: "SU", name: "SUBTRACT", desc: "3D Cut / subtract feature from body", run: () => extrudeSketch("cut") },
+    { alias: "SUBTRACT", name: "SUBTRACT", desc: "3D Cut / subtract feature from body", run: () => extrudeSketch("cut") },
+    { alias: "UNI", name: "UNION", desc: "3D Union / join extrude to body", run: () => extrudeSketch("join") },
+    { alias: "UNION", name: "UNION", desc: "3D Union / join extrude to body", run: () => extrudeSketch("join") },
+    { alias: "BOX", name: "BOX", desc: "Create 3D rectangular solid box", run: async () => {
+      byId("newSketchKind").value = "rectangle";
+      byId("newSketchKind").dispatchEvent(new Event("change"));
+      await addSketch();
+      await extrudeSketch();
+    }},
+    { alias: "CYL", name: "CYLINDER", desc: "Create 3D circular cylinder", run: async () => {
+      byId("newSketchKind").value = "circle";
+      byId("newSketchKind").dispatchEvent(new Event("change"));
+      await addSketch();
+      await extrudeSketch();
+    }},
+    { alias: "CYLINDER", name: "CYLINDER", desc: "Create 3D circular cylinder", run: async () => {
+      byId("newSketchKind").value = "circle";
+      byId("newSketchKind").dispatchEvent(new Event("change"));
+      await addSketch();
+      await extrudeSketch();
+    }},
+    { alias: "MODEL", name: "TILEMODE", desc: "Switch to Model Space (3D viewport)", run: () => switchLayoutTab("model") },
+    { alias: "LAYOUT", name: "LAYOUT", desc: "Switch to Paper Space (Layout 1 drawing sheet)", run: () => switchLayoutTab("layout1") },
+    { alias: "PAPER", name: "TILEMODE", desc: "Switch to Paper Space (Layout 1 drawing sheet)", run: () => switchLayoutTab("layout1") },
+    { alias: "TILEMODE", name: "TILEMODE", desc: "Toggle Model Space / Paper Space", run: () => toggleModelPaper() },
+    { alias: "DYN", name: "DYNMODE", desc: "Toggle AutoCAD Dynamic Input HUD", run: () => toggleDynamicInput() },
+    { alias: "F12", name: "DYNMODE", desc: "Toggle AutoCAD Dynamic Input HUD", run: () => toggleDynamicInput() },
     { alias: "MP", name: "MASSPROP", desc: "Calculate 3D physical mass properties and moments of inertia", run: () => runMassProperties() },
     { alias: "MASSPROP", name: "MASSPROP", desc: "Calculate 3D physical mass properties and moments of inertia", run: () => runMassProperties() },
     { alias: "PROPERTIES", name: "MASSPROP", desc: "Display physical mass properties and center of gravity", run: () => runMassProperties() },
@@ -4561,6 +4616,126 @@ ${gcodeSample}`;
     { alias: "QSAVE", name: "SAVE", desc: "Save project and drawing", run: () => save() },
     { alias: "HELP", name: "?", desc: "Show keyboard shortcuts & command reference", run: () => openHelp() },
   ];
+
+  let currentLayoutSpace = "model";
+  let dynamicInputEnabled = true;
+
+  function printCliHistory(msg) {
+    const line1 = byId("commandHistoryLine1");
+    const line2 = byId("commandHistoryLine2");
+    if (line1 && line2) {
+      line1.textContent = line2.textContent || line1.textContent;
+      line2.textContent = msg;
+    }
+  }
+
+  function updateDynamicInput(clientX, clientY, pt) {
+    const hud = byId("dynamicInputHud");
+    const val = byId("dynCoordVal");
+    if (!hud || !val) return;
+    if (!dynamicInputEnabled) {
+      hud.hidden = true;
+      return;
+    }
+    const rect = byId("viewport").getBoundingClientRect();
+    hud.style.left = `${clientX - rect.left + 16}px`;
+    hud.style.top = `${clientY - rect.top + 16}px`;
+    val.textContent = `X: ${pt[0].toFixed(2)}, Y: ${pt[1].toFixed(2)}`;
+    hud.hidden = false;
+  }
+
+  function toggleDynamicInput() {
+    dynamicInputEnabled = !dynamicInputEnabled;
+    const badge = byId("statusDynIndicator");
+    if (badge) {
+      badge.textContent = `DYN: ${dynamicInputEnabled ? "ON" : "OFF"}`;
+      badge.classList.toggle("active", dynamicInputEnabled);
+    }
+    const hud = byId("dynamicInputHud");
+    if (hud && !dynamicInputEnabled) hud.hidden = true;
+    printCliHistory(`Command: DYNMODE ${dynamicInputEnabled ? "1 (ON)" : "0 (OFF)"}`);
+    toast(`Dynamic Input (DYNMODE) ${dynamicInputEnabled ? "ON" : "OFF"}`);
+  }
+
+  function switchRibbonTab(tabName) {
+    document.querySelectorAll(".ribbon-tab").forEach((t) => {
+      const active = t.dataset.tab === tabName;
+      t.classList.toggle("active", active);
+      t.setAttribute("aria-selected", String(active));
+    });
+    document.querySelectorAll(".ribbon-panel").forEach((p) => {
+      p.classList.toggle("active", p.id.toLowerCase() === `ribbon${tabName}`);
+    });
+  }
+
+  function syncFullDrawingCanvas() {
+    const full = byId("fullDrawingCanvas");
+    const previewSvg = byId("drawingPreview")?.querySelector("svg");
+    if (!full || !previewSvg) return;
+    full.textContent = "";
+    const cloned = previewSvg.cloneNode(true);
+    cloned.style.width = "100%";
+    cloned.style.height = "100%";
+    cloned.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    full.appendChild(cloned);
+  }
+
+  function switchLayoutTab(tab) {
+    currentLayoutSpace = tab;
+    const tabM = byId("tabModel");
+    const tabL1 = byId("tabLayout1");
+    const tabL2 = byId("tabLayout2");
+    const sheetView = byId("layoutSheetView");
+    const viewport = byId("viewport");
+    const modeBadge = byId("statusModeIndicator");
+
+    if (tab === "model") {
+      tabM?.classList.add("active");
+      tabL1?.classList.remove("active");
+      tabL2?.classList.remove("active");
+      if (sheetView) sheetView.hidden = true;
+      if (viewport) viewport.style.display = "block";
+      if (modeBadge) {
+        modeBadge.textContent = "MODEL";
+        modeBadge.classList.add("active");
+      }
+      switchRibbonTab("home");
+      if (app.viewport) app.viewport.requestFrame();
+      printCliHistory("Command: TILEMODE 1 (Model Space active)");
+      toast("Model Space: 3D CAD modeling");
+    } else if (tab === "layout1") {
+      tabM?.classList.remove("active");
+      tabL1?.classList.add("active");
+      tabL2?.classList.remove("active");
+      if (sheetView) sheetView.hidden = false;
+      if (viewport) viewport.style.display = "none";
+      if (modeBadge) {
+        modeBadge.textContent = "PAPER";
+        modeBadge.classList.remove("active");
+      }
+      switchRibbonTab("draw");
+      syncFullDrawingCanvas();
+      printCliHistory("Command: LAYOUT 1 (Paper Space active)");
+      toast("Paper Space: 2D Drafting Sheet");
+    } else if (tab === "layout2") {
+      tabM?.classList.remove("active");
+      tabL1?.classList.remove("active");
+      tabL2?.classList.add("active");
+      if (sheetView) sheetView.hidden = false;
+      if (viewport) viewport.style.display = "none";
+      cadMultiview();
+      syncFullDrawingCanvas();
+      printCliHistory("Command: MV (4-View Orthographic Layout active)");
+    }
+  }
+
+  function toggleModelPaper() {
+    if (currentLayoutSpace === "model") {
+      switchLayoutTab("layout1");
+    } else {
+      switchLayoutTab("model");
+    }
+  }
 
   function handleCliInput(rawText) {
     const text = rawText.trim();
@@ -4593,6 +4768,7 @@ ${gcodeSample}`;
       const coordPoint = parseCoordinateString(text);
       if (coordPoint) {
         placeDrawingPoint(coordPoint);
+        printCliHistory(`Specified point: (${coordPoint[0]}, ${coordPoint[1]})`);
         toast(`Specified point: (${coordPoint[0]}, ${coordPoint[1]})`);
         return;
       }
@@ -4618,6 +4794,7 @@ ${gcodeSample}`;
       document.querySelectorAll(".snap-pill").forEach((b) => {
         b.classList.toggle("active", b.dataset.snap === snapMap[upper]);
       });
+      printCliHistory(`Single-shot Snap: ${drawState.snapOverride}`);
       toast(`Single-shot Snap: ${drawState.snapOverride}`);
       return;
     }
@@ -4625,6 +4802,7 @@ ${gcodeSample}`;
     const matched = autocadCommands.find((c) => c.alias === upper || c.name === upper);
     if (matched) {
       lastExecutedCommand = matched;
+      printCliHistory(`Command: ${matched.name} — ${matched.desc}`);
       matched.run();
       toast(`Command: ${matched.name} (${matched.desc})`);
       return;
@@ -4634,11 +4812,13 @@ ${gcodeSample}`;
     const prefixMatched = autocadCommands.find((c) => c.name.startsWith(upper) || c.alias.startsWith(upper));
     if (prefixMatched) {
       lastExecutedCommand = prefixMatched;
+      printCliHistory(`Command: ${prefixMatched.name} — ${prefixMatched.desc}`);
       prefixMatched.run();
       toast(`Command: ${prefixMatched.name} (${prefixMatched.desc})`);
       return;
     }
 
+    printCliHistory(`Unknown command: "${text}". Type HELP for reference.`);
     toast(`Unknown command: "${text}". Type HELP for reference.`, true);
   }
 
@@ -5180,6 +5360,113 @@ ${gcodeSample}`;
     byId("toolToSolidBtn")?.addEventListener("click", () => cadToSolid());
     byId("toolToCamBtn")?.addEventListener("click", () => cadToCam());
     byId("toolMultiviewBtn")?.addEventListener("click", () => cadMultiview());
+
+    // AutoCAD Ribbon Tab Switching & Action Buttons
+    document.querySelectorAll(".ribbon-tab").forEach((btn) => {
+      btn.addEventListener("click", () => switchRibbonTab(btn.dataset.tab));
+    });
+    byId("rbLineBtn")?.addEventListener("click", () => setDrawTool("line"));
+    byId("rbPolyBtn")?.addEventListener("click", () => setDrawTool("polyline"));
+    byId("rbCircleBtn")?.addEventListener("click", () => setDrawTool("circle"));
+    byId("rbRectBtn")?.addEventListener("click", () => setDrawTool("rectangle"));
+    byId("rbExtrudeBtn")?.addEventListener("click", () => extrudeSketch());
+    byId("rbCutBtn")?.addEventListener("click", () => extrudeSketch("cut"));
+    byId("rbRevolveBtn")?.addEventListener("click", () => revolveSketch());
+    byId("rbBoxBtn")?.addEventListener("click", () => {
+      byId("newSketchKind").value = "rectangle";
+      byId("newSketchKind").dispatchEvent(new Event("change"));
+      addSketch().then(() => extrudeSketch());
+    });
+    byId("rbOffsetBtn")?.addEventListener("click", () => cadOffset());
+    byId("rbFilletBtn")?.addEventListener("click", () => cadFillet());
+    byId("rbTrimBtn")?.addEventListener("click", () => cadTrim());
+    byId("rbMirrorBtn")?.addEventListener("click", () => cadMirror());
+    byId("rbDimBtn")?.addEventListener("click", () => setDrawTool("dimension"));
+    byId("rbMassPropBtn")?.addEventListener("click", () => runMassProperties());
+    byId("rbBomBtn")?.addEventListener("click", () => runBom());
+    byId("rbFeaBtn")?.addEventListener("click", () => runCaeStatic());
+
+    byId("rbSolidBoxBtn")?.addEventListener("click", () => {
+      byId("newSketchKind").value = "rectangle";
+      byId("newSketchKind").dispatchEvent(new Event("change"));
+      addSketch().then(() => extrudeSketch());
+    });
+    byId("rbSolidCylBtn")?.addEventListener("click", () => {
+      byId("newSketchKind").value = "circle";
+      byId("newSketchKind").dispatchEvent(new Event("change"));
+      addSketch().then(() => extrudeSketch());
+    });
+    byId("rbSolidExtrudeBtn")?.addEventListener("click", () => extrudeSketch());
+    byId("rbSolidCutBtn")?.addEventListener("click", () => extrudeSketch("cut"));
+    byId("rbSolidJoinBtn")?.addEventListener("click", () => extrudeSketch("join"));
+    byId("rbSolidRevolveBtn")?.addEventListener("click", () => revolveSketch());
+    byId("rbSolidMpBtn")?.addEventListener("click", () => runMassProperties());
+    byId("rbSolidInfBtn")?.addEventListener("click", () => runInterferenceCheck());
+    byId("rbSolidBomBtn")?.addEventListener("click", () => runBom());
+
+    byId("rbDrawLineBtn")?.addEventListener("click", () => setDrawTool("line"));
+    byId("rbDrawPolyBtn")?.addEventListener("click", () => setDrawTool("polyline"));
+    byId("rbDrawCircleBtn")?.addEventListener("click", () => setDrawTool("circle"));
+    byId("rbDrawArcBtn")?.addEventListener("click", () => setDrawTool("circle"));
+    byId("rbDrawRectBtn")?.addEventListener("click", () => setDrawTool("rectangle"));
+    byId("rbDrawPolygonBtn")?.addEventListener("click", () => cadPolygon());
+    byId("rbDrawEllipseBtn")?.addEventListener("click", () => setDrawTool("ellipse"));
+    byId("rbDrawSplineBtn")?.addEventListener("click", () => setDrawTool("spline"));
+    byId("rbDrawPointBtn")?.addEventListener("click", () => setDrawTool("point"));
+    byId("rbDrawHatchBtn")?.addEventListener("click", () => cadHatch());
+
+    byId("rbModOffsetBtn")?.addEventListener("click", () => cadOffset());
+    byId("rbModFilletBtn")?.addEventListener("click", () => cadFillet());
+    byId("rbModChamferBtn")?.addEventListener("click", () => cadChamfer());
+    byId("rbModTrimBtn")?.addEventListener("click", () => cadTrim());
+    byId("rbModExtendBtn")?.addEventListener("click", () => cadExtend());
+    byId("rbModMirrorBtn")?.addEventListener("click", () => cadMirror());
+    byId("rbModRotateBtn")?.addEventListener("click", () => cadRotate());
+    byId("rbModScaleBtn")?.addEventListener("click", () => cadScale());
+    byId("rbModMoveBtn")?.addEventListener("click", () => cadMove());
+    byId("rbModCopyBtn")?.addEventListener("click", () => cadCopy());
+    byId("rbModJoinBtn")?.addEventListener("click", () => cadJoin());
+    byId("rbModExplodeBtn")?.addEventListener("click", () => cadExplode());
+    byId("rbModArrayBtn")?.addEventListener("click", () => cadArray());
+
+    byId("rbAnnDimBtn")?.addEventListener("click", () => setDrawTool("dimension"));
+    byId("rbAnnRadBtn")?.addEventListener("click", () => cadDimRadial(false));
+    byId("rbAnnDiaBtn")?.addEventListener("click", () => cadDimRadial(true));
+    byId("rbAnnTextBtn")?.addEventListener("click", () => setDrawTool("text"));
+    byId("rbAnnDistBtn")?.addEventListener("click", () => cadDist());
+    byId("rbAnnAreaBtn")?.addEventListener("click", () => cadArea());
+    byId("rbAnnSecBtn")?.addEventListener("click", () => cadSection());
+
+    byId("rbSimFeaBtn")?.addEventListener("click", () => runCaeStatic());
+    byId("rbSimModalBtn")?.addEventListener("click", () => runCaeModal());
+    byId("rbSimThermalBtn")?.addEventListener("click", () => runCaeThermal());
+    byId("rbSimHudBtn")?.addEventListener("click", () => openSimLauncher());
+    byId("rbSimCamBtn")?.addEventListener("click", () => runCamToolpaths());
+
+    byId("rbOutDxfBtn")?.addEventListener("click", () => exportDxf());
+    byId("rbOutPdfBtn")?.addEventListener("click", () => plotPdf());
+    byId("rbOutStlBtn")?.addEventListener("click", () => exportStl());
+    byId("rbOutSaveBtn")?.addEventListener("click", () => save());
+    byId("rbOutMultiviewBtn")?.addEventListener("click", () => cadMultiview());
+
+    // AutoCAD Model vs Layout Tabs Bar
+    byId("tabModel")?.addEventListener("click", () => switchLayoutTab("model"));
+    byId("tabLayout1")?.addEventListener("click", () => switchLayoutTab("layout1"));
+    byId("tabLayout2")?.addEventListener("click", () => switchLayoutTab("layout2"));
+    byId("returnModelBtn")?.addEventListener("click", () => switchLayoutTab("model"));
+    byId("mainSheetFitBtn")?.addEventListener("click", () => {
+      drawState.viewZoom = 1.0;
+      drawState.viewPan = [0, 0];
+      if (app.drawing) renderDrawing(app.drawing);
+      syncFullDrawingCanvas();
+      toast("Sheet zoom extents");
+    });
+    byId("mainSheetPlotBtn")?.addEventListener("click", () => plotPdf());
+    byId("mainSheetDxfBtn")?.addEventListener("click", () => exportDxf());
+
+    // Status Bar indicators
+    byId("statusModeIndicator")?.addEventListener("click", () => toggleModelPaper());
+    byId("statusDynIndicator")?.addEventListener("click", () => toggleDynamicInput());
     document.querySelectorAll(".snap-pill").forEach((btn) => {
       btn.addEventListener("click", () => {
         const snapType = btn.dataset.snap;
@@ -5450,6 +5737,11 @@ ${gcodeSample}`;
           badge.classList.toggle("active", drawState.polar);
         }
         toast(`Polar Tracking ${drawState.polar ? "ON" : "OFF"}`);
+        return;
+      }
+      if (event.key === "F12") {
+        event.preventDefault();
+        toggleDynamicInput();
         return;
       }
       if (event.key === "Escape") {
