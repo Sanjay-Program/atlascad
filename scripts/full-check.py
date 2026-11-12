@@ -787,6 +787,31 @@ def engineering_section(studio: Studio) -> None:
           "an unknown artifact is refused")
     check(studio.post("/api/engineering/review", {"id": 1, "revision": 0}).status == 400,
           "a zero revision is refused")
+
+    # Physical Mass Properties (MASSPROP), Multi-Body Interference (INTERFERE), and BOM
+    mp_resp = studio.get("/api/mass-properties")
+    check(mp_resp.status == 200, f"/api/mass-properties answered {mp_resp.status}")
+    mp_data = mp_resp.json()
+    check(mp_data["geometric"]["volume_mm3"] > 0, "mass properties volume is positive")
+    check(len(mp_data["geometric"]["centroid_mm"]) == 3, "mass properties has 3D centroid")
+    check(len(mp_data["geometric"]["principal_moments"]) == 3, "mass properties has 3 principal moments")
+    check(mp_data["physical"]["mass_kg"] > 0, "physical mass scaled by density is positive")
+
+    mp_post = studio.post("/api/mass-properties", {"density_kg_m3": 2700.0})
+    check(mp_post.status == 200, "POST /api/mass-properties succeeded")
+    check(mp_post.json()["material"]["density_kg_m3"] == 2700.0, "custom density recorded")
+
+    inf_resp = studio.get("/api/interference")
+    check(inf_resp.status == 200, f"/api/interference answered {inf_resp.status}")
+    inf_data = inf_resp.json()
+    check(inf_data["clashes_detected"] >= 0, "interference check reports clash count")
+
+    bom_resp = studio.get("/api/bom")
+    check(bom_resp.status == 200, f"/api/bom answered {bom_resp.status}")
+    bom_data = bom_resp.json()
+    check(bom_data["total_items"] >= 1, "BOM contains items")
+    check(bom_data["total_mass_kg"] > 0, "BOM total mass is positive")
+
     report("engineering")
 
 

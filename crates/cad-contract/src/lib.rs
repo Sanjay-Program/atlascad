@@ -51,6 +51,6 @@ pub use capability::{Capability, CapabilitySet, KernelInfo};
 pub use error::{ErrorKind, KernelError, Result};
 pub use ids::{DocumentId, EntityId};
 pub use kernel::{BooleanOp, Kernel, SolidId};
-pub use mesh::{Aabb3, Mesh};
+pub use mesh::{Aabb3, MassProperties, Mesh, PhysicalMassReport};
 pub use tol::Tolerance;
 pub use units::Unit;

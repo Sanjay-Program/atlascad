@@ -3536,3 +3536,49 @@ fn drafting_autocad_advanced_endpoints() -> Result<(), Box<dyn std::error::Error
 
     Ok(())
 }
+
+#[test]
+fn mass_properties_interference_and_bom_api() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("mass_prop_test", [20.0, 20.0, 10.0])?;
+    let addr = handle.addr();
+
+    // 1. GET /api/mass-properties
+    let resp = request(addr, "GET", "/api/mass-properties", &[], &[])?;
+    assert_eq!(resp.status, 200);
+    let data = json(&resp)?;
+    let vol = data["geometric"]["volume_mm3"].as_f64().ok_or("vol")?;
+    assert!(vol > 0.0);
+    let mass = data["physical"]["mass_kg"].as_f64().ok_or("mass")?;
+    assert!(mass > 0.0);
+    let centroid = data["geometric"]["centroid_mm"]
+        .as_array()
+        .ok_or("centroid")?;
+    assert_eq!(centroid.len(), 3);
+    let pm = data["geometric"]["principal_moments"]
+        .as_array()
+        .ok_or("pm")?;
+    assert_eq!(pm.len(), 3);
+
+    // 2. POST /api/mass-properties with custom density (Aluminum 2700 kg/m3)
+    let post_resp = post(addr, "/api/mass-properties", r#"{"density_kg_m3": 2700.0}"#)?;
+    assert_eq!(post_resp.status, 200);
+    let post_data = json(&post_resp)?;
+    let p_mass = post_data["physical"]["mass_kg"].as_f64().ok_or("pmass")?;
+    let expected_mass = vol * 2700.0 * 1e-9;
+    assert!((p_mass - expected_mass).abs() < 1e-6);
+
+    // 3. GET /api/interference
+    let inf_resp = request(addr, "GET", "/api/interference", &[], &[])?;
+    assert_eq!(inf_resp.status, 200);
+    let inf_data = json(&inf_resp)?;
+    assert_eq!(inf_data["clashes_detected"].as_u64(), Some(0));
+
+    // 4. GET /api/bom
+    let bom_resp = request(addr, "GET", "/api/bom", &[], &[])?;
+    assert_eq!(bom_resp.status, 200);
+    let bom_data = json(&bom_resp)?;
+    assert!(bom_data["total_items"].as_u64().unwrap_or(0) >= 1);
+    assert!(bom_data["total_mass_kg"].as_f64().unwrap_or(0.0) > 0.0);
+
+    Ok(())
+}

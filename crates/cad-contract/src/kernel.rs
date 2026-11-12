@@ -14,7 +14,7 @@
 
 use crate::capability::{Capability, KernelInfo};
 use crate::error::{KernelError, Result};
-use crate::mesh::{Aabb3, Mesh};
+use crate::mesh::{Aabb3, MassProperties, Mesh};
 use crate::tol::DEFAULT_LINEAR_MM;
 
 /// An opaque solid handle issued by a kernel instance.
@@ -229,6 +229,17 @@ pub trait Kernel {
         mesh.bounding_box()
             .ok_or_else(|| KernelError::Failed("solid produced no geometry".into()))
     }
+
+    /// Mass properties and inertial characteristics in millimetres.
+    ///
+    /// Computes volume, surface area, center of gravity (centroid), inertia tensor, principal moments,
+    /// principal axes, and radii of gyration from the solid's tessellation.
+    fn mass_properties(&self, solid: SolidId) -> Result<MassProperties> {
+        let mesh = self.tessellate(solid, DEFAULT_LINEAR_MM)?;
+        mesh.mass_properties().ok_or_else(|| {
+            KernelError::Failed("cannot compute mass properties for open or empty geometry".into())
+        })
+    }
 }
 
 #[cfg(test)]
@@ -354,6 +365,22 @@ mod tests {
         if let Ok(bb) = bb {
             assert_eq!(bb.min, [0.0; 3]);
             assert_eq!(bb.max, [1.0, 1.0, 1.0]);
+        }
+    }
+
+    #[test]
+    fn provided_mass_properties_works() {
+        let mut k = UnitCubeKernel::new();
+        let Ok(id) = k.extrude(&square(), 5.0) else {
+            return;
+        };
+        let mp = k.mass_properties(id);
+        assert!(mp.is_ok());
+        if let Ok(mp) = mp {
+            assert!((mp.volume_mm3 - 1.0).abs() < 1e-9);
+            assert!((mp.centroid_mm[0] - 0.5).abs() < 1e-9);
+            assert!((mp.centroid_mm[1] - 0.5).abs() < 1e-9);
+            assert!((mp.centroid_mm[2] - 0.5).abs() < 1e-9);
         }
     }
 

@@ -244,11 +244,324 @@ impl Mesh {
         }
         bb.is_valid().then_some(bb)
     }
+
+    /// Exact closed-form mass properties via the divergence theorem.
+    ///
+    /// Computes volume, surface area, center of gravity (centroid), inertia tensor about origin and
+    /// centroid, principal moments and axes (via Jacobi eigenvalue decomposition), and radii of gyration.
+    /// Returns `None` if the mesh is empty or degenerates to zero volume.
+    pub fn mass_properties(&self) -> Option<MassProperties> {
+        if self.triangles.is_empty() || self.positions.is_empty() {
+            return None;
+        }
+
+        let mut total_det = 0.0;
+        let mut c_acc = [0.0; 3];
+        let mut t_acc = [[0.0; 3]; 3];
+
+        for tri in &self.triangles {
+            let (Some(a), Some(b), Some(c)) = (
+                self.positions.get(tri[0] as usize),
+                self.positions.get(tri[1] as usize),
+                self.positions.get(tri[2] as usize),
+            ) else {
+                continue;
+            };
+
+            let cross = [
+                b[1] * c[2] - b[2] * c[1],
+                b[2] * c[0] - b[0] * c[2],
+                b[0] * c[1] - b[1] * c[0],
+            ];
+            let det = a[0] * cross[0] + a[1] * cross[1] + a[2] * cross[2];
+            total_det += det;
+
+            for k in 0..3 {
+                c_acc[k] += det * (a[k] + b[k] + c[k]);
+            }
+
+            for i in 0..3 {
+                for j in i..3 {
+                    let term = a[i] * a[j]
+                        + b[i] * b[j]
+                        + c[i] * c[j]
+                        + (a[i] + b[i] + c[i]) * (a[j] + b[j] + c[j]);
+                    let val = (det / 120.0) * term;
+                    t_acc[i][j] += val;
+                    if i != j {
+                        t_acc[j][i] += val;
+                    }
+                }
+            }
+        }
+
+        if total_det.abs() < 1e-12 {
+            return None;
+        }
+
+        let sign = if total_det < 0.0 { -1.0 } else { 1.0 };
+        let volume_mm3 = total_det * sign / 6.0;
+        let centroid_mm = [
+            c_acc[0] / (4.0 * total_det),
+            c_acc[1] / (4.0 * total_det),
+            c_acc[2] / (4.0 * total_det),
+        ];
+
+        let mut t_origin = [[0.0; 3]; 3];
+        let mut t_cent = [[0.0; 3]; 3];
+        for i in 0..3 {
+            for j in 0..3 {
+                let to = t_acc[i][j] * sign;
+                t_origin[i][j] = to;
+                t_cent[i][j] = to - volume_mm3 * centroid_mm[i] * centroid_mm[j];
+            }
+        }
+
+        let make_inertia_tensor = |t: [[f64; 3]; 3]| -> [[f64; 3]; 3] {
+            [
+                [t[1][1] + t[2][2], -t[0][1], -t[0][2]],
+                [-t[1][0], t[0][0] + t[2][2], -t[1][2]],
+                [-t[2][0], -t[2][1], t[0][0] + t[1][1]],
+            ]
+        };
+
+        let inertia_tensor_origin = make_inertia_tensor(t_origin);
+        let inertia_tensor_centroid = make_inertia_tensor(t_cent);
+
+        let (mut principal_moments, principal_axes) = jacobi_symmetric_3x3(inertia_tensor_centroid);
+        for m in &mut principal_moments {
+            if *m < 0.0 {
+                *m = 0.0;
+            }
+        }
+
+        let calc_radii = |tensor: [[f64; 3]; 3]| -> [f64; 3] {
+            [
+                (tensor[0][0].max(0.0) / volume_mm3).sqrt(),
+                (tensor[1][1].max(0.0) / volume_mm3).sqrt(),
+                (tensor[2][2].max(0.0) / volume_mm3).sqrt(),
+            ]
+        };
+
+        let radii_of_gyration_origin = calc_radii(inertia_tensor_origin);
+        let radii_of_gyration_centroid = calc_radii(inertia_tensor_centroid);
+        let radii_of_gyration_principal = [
+            (principal_moments[0] / volume_mm3).sqrt(),
+            (principal_moments[1] / volume_mm3).sqrt(),
+            (principal_moments[2] / volume_mm3).sqrt(),
+        ];
+
+        Some(MassProperties {
+            volume_mm3,
+            surface_area_mm2: self.surface_area(),
+            centroid_mm,
+            inertia_tensor_centroid,
+            inertia_tensor_origin,
+            principal_moments,
+            principal_axes,
+            radii_of_gyration_centroid,
+            radii_of_gyration_origin,
+            radii_of_gyration_principal,
+        })
+    }
+}
+
+/// Mass properties and inertial characteristics of a 3D geometry.
+///
+/// Geometric volume properties are in millimetre units (mm, mm³, mm⁵).
+/// Physical properties scaled with material density are available via [`MassProperties::with_density`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MassProperties {
+    /// Total enclosed volume in mm³.
+    pub volume_mm3: f64,
+    /// Total external surface area in mm².
+    pub surface_area_mm2: f64,
+    /// Center of gravity / centroid `[x, y, z]` in mm.
+    pub centroid_mm: [f64; 3],
+    /// Inertia tensor relative to centroid `[[Ixx, -Ixy, -Ixz], [-Iyx, Iyy, -Iyz], [-Izx, -Izy, Izz]]` in mm⁵.
+    pub inertia_tensor_centroid: [[f64; 3]; 3],
+    /// Inertia tensor relative to origin in mm⁵.
+    pub inertia_tensor_origin: [[f64; 3]; 3],
+    /// Principal moments of inertia `[I1, I2, I3]` in mm⁵ sorted in ascending order.
+    pub principal_moments: [f64; 3],
+    /// Normalized principal axes of inertia `[v1, v2, v3]`, each `[x, y, z]`.
+    pub principal_axes: [[f64; 3]; 3],
+    /// Radii of gyration relative to centroid `[kx, ky, kz]` in mm.
+    pub radii_of_gyration_centroid: [f64; 3],
+    /// Radii of gyration relative to origin `[kx, ky, kz]` in mm.
+    pub radii_of_gyration_origin: [f64; 3],
+    /// Radii of gyration relative to principal axes `[k1, k2, k3]` in mm.
+    pub radii_of_gyration_principal: [f64; 3],
+}
+
+impl MassProperties {
+    /// Scale mass properties by material density (given in kg/m³).
+    ///
+    /// Since 1 m³ = 10⁹ mm³, mass (kg) = volume (mm³) * density (kg/m³) * 10⁻⁹.
+    /// Mass moment of inertia (kg·mm²) = geometric moment (mm⁵) * density (kg/m³) * 10⁻⁹.
+    pub fn with_density(&self, density_kg_m3: f64) -> PhysicalMassReport {
+        let density = if density_kg_m3.is_finite() && density_kg_m3 > 0.0 {
+            density_kg_m3
+        } else {
+            0.0
+        };
+        let scale = density * 1e-9;
+        let mass_kg = (self.volume_mm3 * scale).max(0.0);
+        let mass_g = mass_kg * 1000.0;
+
+        let scale_tensor = |m: [[f64; 3]; 3]| -> [[f64; 3]; 3] {
+            [
+                [m[0][0] * scale, m[0][1] * scale, m[0][2] * scale],
+                [m[1][0] * scale, m[1][1] * scale, m[1][2] * scale],
+                [m[2][0] * scale, m[2][1] * scale, m[2][2] * scale],
+            ]
+        };
+
+        let principal_mass_moments = [
+            (self.principal_moments[0] * scale).max(0.0),
+            (self.principal_moments[1] * scale).max(0.0),
+            (self.principal_moments[2] * scale).max(0.0),
+        ];
+
+        PhysicalMassReport {
+            density_kg_m3: density,
+            mass_kg,
+            mass_g,
+            volume_mm3: self.volume_mm3,
+            surface_area_mm2: self.surface_area_mm2,
+            centroid_mm: self.centroid_mm,
+            mass_inertia_centroid: scale_tensor(self.inertia_tensor_centroid),
+            mass_inertia_origin: scale_tensor(self.inertia_tensor_origin),
+            principal_mass_moments,
+            principal_axes: self.principal_axes,
+            radii_of_gyration_centroid: self.radii_of_gyration_centroid,
+            radii_of_gyration_origin: self.radii_of_gyration_origin,
+            radii_of_gyration_principal: self.radii_of_gyration_principal,
+        }
+    }
+}
+
+/// Physical mass properties scaled by material density.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PhysicalMassReport {
+    /// Material density in kg/m³.
+    pub density_kg_m3: f64,
+    /// Total mass in kilograms (kg).
+    pub mass_kg: f64,
+    /// Total mass in grams (g).
+    pub mass_g: f64,
+    /// Volume in mm³.
+    pub volume_mm3: f64,
+    /// Surface area in mm².
+    pub surface_area_mm2: f64,
+    /// Centroid in mm.
+    pub centroid_mm: [f64; 3],
+    /// Mass moments of inertia about centroid in kg·mm².
+    pub mass_inertia_centroid: [[f64; 3]; 3],
+    /// Mass moments of inertia about origin in kg·mm².
+    pub mass_inertia_origin: [[f64; 3]; 3],
+    /// Principal mass moments of inertia `[I1, I2, I3]` in kg·mm².
+    pub principal_mass_moments: [f64; 3],
+    /// Normalized principal axes of inertia.
+    pub principal_axes: [[f64; 3]; 3],
+    /// Radii of gyration about centroid in mm.
+    pub radii_of_gyration_centroid: [f64; 3],
+    /// Radii of gyration about origin in mm.
+    pub radii_of_gyration_origin: [f64; 3],
+    /// Radii of gyration about principal axes in mm.
+    pub radii_of_gyration_principal: [f64; 3],
+}
+
+/// Jacobi eigenvalue algorithm for 3x3 real symmetric matrices.
+///
+/// Returns sorted eigenvalues in ascending order and corresponding orthonormal eigenvectors.
+pub fn jacobi_symmetric_3x3(mut a: [[f64; 3]; 3]) -> ([f64; 3], [[f64; 3]; 3]) {
+    let mut v = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+
+    for _sweep in 0..50 {
+        let off_diag_sq = a[0][1] * a[0][1] + a[0][2] * a[0][2] + a[1][2] * a[1][2];
+        if off_diag_sq < 1e-24 {
+            break;
+        }
+
+        for p in 0..2 {
+            for q in (p + 1)..3 {
+                let apq = a[p][q];
+                if apq.abs() < 1e-15 {
+                    continue;
+                }
+                let app = a[p][p];
+                let aqq = a[q][q];
+                let tau = (aqq - app) / (2.0 * apq);
+                let t = if tau >= 0.0 {
+                    1.0 / (tau + (1.0 + tau * tau).sqrt())
+                } else {
+                    -1.0 / (-tau + (1.0 + tau * tau).sqrt())
+                };
+                let c = 1.0 / (1.0 + t * t).sqrt();
+                let s = t * c;
+                let h = t * apq;
+
+                a[p][p] -= h;
+                a[q][q] += h;
+                a[p][q] = 0.0;
+                a[q][p] = 0.0;
+
+                for r in 0..3 {
+                    if r != p && r != q {
+                        let arp = a[r][p];
+                        let arq = a[r][q];
+                        a[r][p] = c * arp - s * arq;
+                        a[p][r] = a[r][p];
+                        a[r][q] = s * arp + c * arq;
+                        a[q][r] = a[r][q];
+                    }
+                    let vrp = v[r][p];
+                    let vrq = v[r][q];
+                    v[r][p] = c * vrp - s * vrq;
+                    v[r][q] = s * vrp + c * vrq;
+                }
+            }
+        }
+    }
+
+    let mut ev = [a[0][0], a[1][1], a[2][2]];
+    let mut axes = [
+        [v[0][0], v[1][0], v[2][0]],
+        [v[0][1], v[1][1], v[2][1]],
+        [v[0][2], v[1][2], v[2][2]],
+    ];
+
+    if ev[0] > ev[1] {
+        ev.swap(0, 1);
+        axes.swap(0, 1);
+    }
+    if ev[1] > ev[2] {
+        ev.swap(1, 2);
+        axes.swap(1, 2);
+    }
+    if ev[0] > ev[1] {
+        ev.swap(0, 1);
+        axes.swap(0, 1);
+    }
+
+    // Ensure right-handed coordinate frame: axes[0] x axes[1] . axes[2] > 0
+    let cross = [
+        axes[0][1] * axes[1][2] - axes[0][2] * axes[1][1],
+        axes[0][2] * axes[1][0] - axes[0][0] * axes[1][2],
+        axes[0][0] * axes[1][1] - axes[0][1] * axes[1][0],
+    ];
+    let dot = cross[0] * axes[2][0] + cross[1] * axes[2][1] + cross[2] * axes[2][2];
+    if dot < 0.0 {
+        axes[2] = [-axes[2][0], -axes[2][1], -axes[2][2]];
+    }
+
+    (ev, axes)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Aabb3, Mesh, MeshError};
+    use super::{Aabb3, Mesh, MeshError, jacobi_symmetric_3x3};
 
     /// A unit cube (1 mm³) as 12 triangles, outward-oriented.
     fn unit_cube() -> Mesh {
@@ -403,5 +716,124 @@ mod tests {
         let mesh = unit_cube();
         let json = serde_json::to_string(&mesh).unwrap_or_default();
         assert_eq!(serde_json::from_str::<Mesh>(&json).ok(), Some(mesh));
+    }
+
+    #[test]
+    fn jacobi_3x3_known_matrix() {
+        let m = [[2.0, 1.0, 0.0], [1.0, 2.0, 0.0], [0.0, 0.0, 5.0]];
+        let (ev, axes) = jacobi_symmetric_3x3(m);
+        assert!((ev[0] - 1.0).abs() < 1e-10);
+        assert!((ev[1] - 3.0).abs() < 1e-10);
+        assert!((ev[2] - 5.0).abs() < 1e-10);
+
+        // Verify M * v = lambda * v for each eigenpair
+        for i in 0..3 {
+            let lam = ev[i];
+            let v = [axes[i][0], axes[i][1], axes[i][2]];
+            let mv = [
+                m[0][0] * v[0] + m[0][1] * v[1] + m[0][2] * v[2],
+                m[1][0] * v[0] + m[1][1] * v[1] + m[1][2] * v[2],
+                m[2][0] * v[0] + m[2][1] * v[1] + m[2][2] * v[2],
+            ];
+            for j in 0..3 {
+                assert!((mv[j] - lam * v[j]).abs() < 1e-9);
+            }
+        }
+    }
+
+    #[test]
+    fn mass_properties_of_unit_cube() {
+        let cube = unit_cube();
+        let Some(props) = cube.mass_properties() else {
+            assert_eq!("cube.mass_properties", "returned Some");
+            return;
+        };
+        assert!((props.volume_mm3 - 1.0).abs() < 1e-12);
+        assert!((props.surface_area_mm2 - 6.0).abs() < 1e-12);
+        assert!((props.centroid_mm[0] - 0.5).abs() < 1e-12);
+        assert!((props.centroid_mm[1] - 0.5).abs() < 1e-12);
+        assert!((props.centroid_mm[2] - 0.5).abs() < 1e-12);
+
+        // Diagonal moments about centroid for unit cube are 1/6
+        let expected_i = 1.0 / 6.0;
+        assert!((props.inertia_tensor_centroid[0][0] - expected_i).abs() < 1e-10);
+        assert!((props.inertia_tensor_centroid[1][1] - expected_i).abs() < 1e-10);
+        assert!((props.inertia_tensor_centroid[2][2] - expected_i).abs() < 1e-10);
+
+        // Off-diagonals about centroid must be near zero
+        assert!(props.inertia_tensor_centroid[0][1].abs() < 1e-10);
+        assert!(props.inertia_tensor_centroid[0][2].abs() < 1e-10);
+        assert!(props.inertia_tensor_centroid[1][2].abs() < 1e-10);
+
+        // Principal moments
+        for i in 0..3 {
+            assert!((props.principal_moments[i] - expected_i).abs() < 1e-10);
+            assert!((props.radii_of_gyration_centroid[i] - (expected_i).sqrt()).abs() < 1e-10);
+        }
+    }
+
+    #[test]
+    fn mass_properties_of_rectangular_prism() {
+        // Box of 10 x 20 x 30 mm
+        let (w, d, h) = (10.0, 20.0, 30.0);
+        let positions = vec![
+            [0.0, 0.0, 0.0],
+            [w, 0.0, 0.0],
+            [w, d, 0.0],
+            [0.0, d, 0.0],
+            [0.0, 0.0, h],
+            [w, 0.0, h],
+            [w, d, h],
+            [0.0, d, h],
+        ];
+        let triangles = vec![
+            [0, 2, 1],
+            [0, 3, 2], // bottom (z = 0)
+            [4, 5, 6],
+            [4, 6, 7], // top (z = h)
+            [0, 1, 5],
+            [0, 5, 4], // y = 0
+            [1, 2, 6],
+            [1, 6, 5], // x = w
+            [2, 3, 7],
+            [2, 7, 6], // y = d
+            [3, 0, 4],
+            [3, 4, 7], // x = 0
+        ];
+        let prism = Mesh {
+            positions,
+            triangles,
+            normals: Vec::new(),
+        };
+
+        let Some(props) = prism.mass_properties() else {
+            assert_eq!("prism.mass_properties", "returned Some");
+            return;
+        };
+        let expected_vol = w * d * h; // 6000
+        assert!((props.volume_mm3 - expected_vol).abs() < 1e-9);
+        assert!((props.centroid_mm[0] - w * 0.5).abs() < 1e-9);
+        assert!((props.centroid_mm[1] - d * 0.5).abs() < 1e-9);
+        assert!((props.centroid_mm[2] - h * 0.5).abs() < 1e-9);
+
+        let exp_ixx = expected_vol * (d * d + h * h) / 12.0; // 6000 * 1300 / 12 = 650000
+        let exp_iyy = expected_vol * (w * w + h * h) / 12.0; // 6000 * 1000 / 12 = 500000
+        let exp_izz = expected_vol * (w * w + d * d) / 12.0; // 6000 * 500 / 12 = 250000
+
+        assert!((props.inertia_tensor_centroid[0][0] - exp_ixx).abs() < 1e-6);
+        assert!((props.inertia_tensor_centroid[1][1] - exp_iyy).abs() < 1e-6);
+        assert!((props.inertia_tensor_centroid[2][2] - exp_izz).abs() < 1e-6);
+
+        // Principal moments sorted ascending: 250000, 500000, 650000
+        assert!((props.principal_moments[0] - exp_izz).abs() < 1e-6);
+        assert!((props.principal_moments[1] - exp_iyy).abs() < 1e-6);
+        assert!((props.principal_moments[2] - exp_ixx).abs() < 1e-6);
+
+        // Density scale: Structural steel 7850 kg/m³
+        let physical = props.with_density(7850.0);
+        let exp_mass_kg = expected_vol * 7850.0 * 1e-9;
+        assert!((physical.mass_kg - exp_mass_kg).abs() < 1e-9);
+        assert!((physical.mass_g - exp_mass_kg * 1000.0).abs() < 1e-6);
+        assert!((physical.mass_inertia_centroid[0][0] - exp_ixx * 7850.0 * 1e-9).abs() < 1e-6);
     }
 }

@@ -2293,6 +2293,91 @@ impl StudioState {
             "gcode_preview": preview_lines.join("\n"),
         }))
     }
+
+    fn mass_properties_payload(
+        &mut self,
+        body_id: Option<&str>,
+        material_id: Option<&str>,
+        density_override: Option<f64>,
+    ) -> Result<serde_json::Value, StudioError> {
+        let build = self
+            .project
+            .build_with_cache(&mut self.kernel, &mut self.cache)?;
+        if let Some(failure) = build.failed {
+            return Err(StudioError::BadRequest(format!(
+                "feature {} cannot be rebuilt: {}",
+                failure.id, failure.message
+            )));
+        }
+
+        let standard_lib = MaterialLibrary::standard();
+        let (mat_name, density) = if let Some(d) = density_override {
+            ("Custom Density", d)
+        } else if let Some(m_id) = material_id {
+            match standard_lib.get(m_id) {
+                Some(m) => (m.name.as_str(), m.density_kg_m3),
+                None => ("AISI 1018 Steel", 7850.0),
+            }
+        } else {
+            ("AISI 1018 Steel", 7850.0)
+        };
+
+        let (target_id, mass_props) = if let Some(bid) = body_id {
+            let props = build.body_mass_properties(bid).ok_or_else(|| {
+                StudioError::BadRequest(format!("body '{bid}' not found or has no volume"))
+            })?;
+            (bid.to_string(), props)
+        } else {
+            let props = build.mass_properties().ok_or_else(|| {
+                StudioError::BadRequest("no solid geometry found in project".into())
+            })?;
+            ("active_part".to_string(), props)
+        };
+
+        let physical = mass_props.with_density(density);
+
+        Ok(serde_json::json!({
+            "target": target_id,
+            "material": {
+                "name": mat_name,
+                "density_kg_m3": density,
+            },
+            "geometric": mass_props,
+            "physical": physical,
+        }))
+    }
+
+    fn interference_payload(&mut self) -> Result<serde_json::Value, StudioError> {
+        let build = self
+            .project
+            .build_with_cache(&mut self.kernel, &mut self.cache)?;
+        if let Some(failure) = build.failed {
+            return Err(StudioError::BadRequest(format!(
+                "feature {} cannot be rebuilt: {}",
+                failure.id, failure.message
+            )));
+        }
+        let report = build.interference_check();
+        serde_json::to_value(&report).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn bom_payload(
+        &mut self,
+        material_name: Option<&str>,
+        density_override: Option<f64>,
+    ) -> Result<serde_json::Value, StudioError> {
+        let build = self
+            .project
+            .build_with_cache(&mut self.kernel, &mut self.cache)?;
+        if let Some(failure) = build.failed {
+            return Err(StudioError::BadRequest(format!(
+                "feature {} cannot be rebuilt: {}",
+                failure.id, failure.message
+            )));
+        }
+        let bom = build.bill_of_materials(material_name, density_override);
+        serde_json::to_value(&bom).map_err(|e| StudioError::Json(e.to_string()))
+    }
 }
 
 fn export_name(name: &str) -> String {
@@ -2689,6 +2774,35 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
                 ),
             Err(error) => error_response(&error),
         },
+        ("GET", "/api/mass-properties") => {
+            let query = request.path.clone();
+            let body = query_text(&query, "body");
+            let material = query_text(&query, "material");
+            let density = query_param(&query, "density").and_then(|d| d.parse::<f64>().ok());
+            match with_state(state, |state| {
+                state.mass_properties_payload(body.as_deref(), material.as_deref(), density)
+            }) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            }
+        }
+        ("GET", "/api/interference") => {
+            match with_state(state, |state| state.interference_payload()) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            }
+        }
+        ("GET", "/api/bom") => {
+            let query = request.path.clone();
+            let material = query_text(&query, "material");
+            let density = query_param(&query, "density").and_then(|d| d.parse::<f64>().ok());
+            match with_state(state, |state| {
+                state.bom_payload(material.as_deref(), density)
+            }) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            }
+        }
         ("POST", path) if path.starts_with("/api/") => {
             match require_same_origin(request, port, shared).and_then(|()| require_json(request)) {
                 Ok(()) => post_route(state, request),
@@ -3152,6 +3266,19 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         },
         "/api/cam/toolpaths" => match parse_body_or_default::<CamRequest>(request) {
             Ok(body) => match with_state(state, |state| state.cam_toolpaths(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/mass-properties" => match parse_body_or_default::<MassPropertiesRequest>(request) {
+            Ok(body) => match with_state(state, |state| {
+                state.mass_properties_payload(
+                    body.body.as_deref(),
+                    body.material.as_deref(),
+                    body.density_kg_m3,
+                )
+            }) {
                 Ok(payload) => to_json(200, &payload),
                 Err(error) => error_response(&error),
             },
@@ -3994,6 +4121,17 @@ fn parse_body_or_default<T: serde::de::DeserializeOwned + Default>(
     } else {
         serde_json::from_slice(&request.body).map_err(StudioError::from)
     }
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MassPropertiesRequest {
+    #[serde(default)]
+    body: Option<String>,
+    #[serde(default)]
+    material: Option<String>,
+    #[serde(default)]
+    density_kg_m3: Option<f64>,
 }
 
 #[derive(Debug, Default, Deserialize)]

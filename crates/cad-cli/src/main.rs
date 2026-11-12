@@ -74,6 +74,9 @@ fn run() -> Result<i32, CliError> {
         "artifacts" => cmd_artifacts(&rest),
         "cae" => cmd_cae(&rest),
         "cam" => cmd_cam(&rest),
+        "mass-properties" | "massprop" => cmd_mass_properties(&rest),
+        "interference" | "interfere" => cmd_interference(&rest),
+        "bom" => cmd_bom(&rest),
         "help" | "--help" | "-h" => {
             usage();
             Ok(0)
@@ -130,6 +133,11 @@ fn usage() {
     println!(
         "  atlas cam gcode --size X,Y,Z [--depth MM] [--stepover MM] [--tool MM] [--format grbl|linuxcnc|mach3]"
     );
+    println!(
+        "  atlas mass-properties --file PROJECT.zcad [--body NAME] [--material NAME] [--density KG_M3]"
+    );
+    println!("  atlas interference --file PROJECT.zcad");
+    println!("  atlas bom --file PROJECT.zcad [--material NAME] [--density KG_M3]");
     println!("                  [--program NAME] --out FILE.nc");
     println!(
         "  atlas cam job --size X,Y,Z --out-dir DIR [--part PART.stl] [--tool MM] [--stepover MM]"
@@ -1938,6 +1946,106 @@ fn record_toolpath(
         path.display()
     );
     Ok(())
+}
+
+/// `atlas mass-properties --file part.zcad [--body NAME] [--material NAME] [--density KG_M3]`
+fn cmd_mass_properties(arguments: &[String]) -> Result<i32, CliError> {
+    let flags = Flags::parse(arguments)?;
+    let (_path, project) = load_project(&flags)?;
+    let mut kernel = TruckKernel::new();
+    let build = project
+        .build(&mut kernel)
+        .map_err(|e| CliError::Input(format!("cannot rebuild project: {e}")))?;
+    if let Some(failure) = build.failed {
+        return Err(CliError::Input(format!(
+            "feature {} failed to rebuild: {}",
+            failure.id, failure.message
+        )));
+    }
+
+    let standard_lib = MaterialLibrary::standard();
+    let density_override = flags.get("--density").and_then(|d| d.parse::<f64>().ok());
+    let material_name = flags.get("--material");
+
+    let (mat_name, density) = if let Some(d) = density_override {
+        ("Custom Density", d)
+    } else if let Some(m_id) = material_name {
+        match standard_lib.get(m_id) {
+            Some(m) => (m.name.as_str(), m.density_kg_m3),
+            None => (m_id, 7850.0),
+        }
+    } else {
+        ("AISI 1018 Steel", 7850.0)
+    };
+
+    let body_name = flags.get("--body");
+    let (target_id, mass_props) = if let Some(bid) = body_name {
+        let props = build
+            .body_mass_properties(bid)
+            .ok_or_else(|| CliError::Input(format!("body '{bid}' not found or has no volume")))?;
+        (bid.to_string(), props)
+    } else {
+        let props = build.mass_properties().ok_or_else(|| {
+            CliError::Input("project has no solid geometry or zero volume".into())
+        })?;
+        ("active_part".to_string(), props)
+    };
+
+    let physical = mass_props.with_density(density);
+    let output = serde_json::json!({
+        "target": target_id,
+        "material": {
+            "name": mat_name,
+            "density_kg_m3": density,
+        },
+        "geometric": mass_props,
+        "physical": physical,
+    });
+
+    print_json(&output)?;
+    Ok(0)
+}
+
+/// `atlas interference --file part.zcad`
+fn cmd_interference(arguments: &[String]) -> Result<i32, CliError> {
+    let flags = Flags::parse(arguments)?;
+    let (_path, project) = load_project(&flags)?;
+    let mut kernel = TruckKernel::new();
+    let build = project
+        .build(&mut kernel)
+        .map_err(|e| CliError::Input(format!("cannot rebuild project: {e}")))?;
+    if let Some(failure) = build.failed {
+        return Err(CliError::Input(format!(
+            "feature {} failed to rebuild: {}",
+            failure.id, failure.message
+        )));
+    }
+
+    let report = build.interference_check();
+    print_json(&report)?;
+    Ok(0)
+}
+
+/// `atlas bom --file part.zcad [--material NAME] [--density KG_M3]`
+fn cmd_bom(arguments: &[String]) -> Result<i32, CliError> {
+    let flags = Flags::parse(arguments)?;
+    let (_path, project) = load_project(&flags)?;
+    let mut kernel = TruckKernel::new();
+    let build = project
+        .build(&mut kernel)
+        .map_err(|e| CliError::Input(format!("cannot rebuild project: {e}")))?;
+    if let Some(failure) = build.failed {
+        return Err(CliError::Input(format!(
+            "feature {} failed to rebuild: {}",
+            failure.id, failure.message
+        )));
+    }
+
+    let density_override = flags.get("--density").and_then(|d| d.parse::<f64>().ok());
+    let material_name = flags.get("--material");
+    let bom = build.bill_of_materials(material_name, density_override);
+    print_json(&bom)?;
+    Ok(0)
 }
 
 fn cam_error(error: impl std::fmt::Display) -> CliError {

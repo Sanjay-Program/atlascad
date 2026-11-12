@@ -20,7 +20,9 @@ when code, a test and a recorded limitation exist. The detailed research matrix 
 | Drawing | Plan of the model, editable drawing document with layers, text, linear dimensions, radial/diameter dimensions, DXF, A4–A0/Letter titled PDF | 64 `cad-drafting` tests, CLI and browser workflows |
 | AutoCAD Drafting | Fillet, Chamfer, Offset, Trim, Extend, Join, Array, Polygon, Mirror, Rotate, Scale, Move, Copy, Explode, Blocks, Inserts, Linetypes, Purge, Overkill, Divide, Measure, MatchProp, Crosshatch ANSI31/NET, 4-view orthographic generator, Section properties | 64 `cad-drafting` tests, 44 `cad-studio` tests |
 | 2D Constraints | Pure Rust 2D parametric geometric & dimensional constraint engine with Levenberg-Marquardt solver, QR rank analysis, and DOF diagnostic reports | `cad-constraints`, studio `/api/draft/constraints/solve` |
-| Multi-Body | Named independent solid bodies (`body_id`), targeted feature operations, inter-body clearance distance measurement | `cad-document`, tests in `multi_body_tests` |
+| Multi-Body | Named independent solid bodies (`body_id`), targeted feature operations, inter-body clearance distance measurement, and pairwise interference / collision clash detection (`INTERFERE`) | `cad-document`, tests in `multi_body_tests`, `/api/interference` |
+| Mass Properties | Analytical divergence-theorem mass properties, centroid, inertia tensor, Jacobi 3x3 principal moments/axes, radii of gyration, physical mass scaled with material density (`MASSPROP`) | `cad-contract`, `cad-kernel-truck`, tests in `mesh.rs`, `/api/mass-properties` |
+| Bill of Materials | Assembly Bill of Materials (BOM) itemizing components, bounding box dimensions, materials, volume, and physical mass rollups (`BOM`) | `cad-document`, `cad-studio`, `/api/bom`, `atlas bom` |
 | Patterns & Mirrors | 3D feature arrays (linear cut array, circular radial cut array, planar mirror cut) with rebuild cache invalidation | `cad-document`, tests in `pattern_tests` |
 | Display | WebGL viewport with orbit/pan/zoom/fit/standard views, interactive orientation gizmo (Top/Right/Front/Iso), status bar controls (GRID, WIRE, OSNAP, POLAR), wireframe, picking | 146 headless CDP browser assertions, zero console errors |
 | Identity | Document id, revision, units, tolerance, stable entity ids, entity-level diff (`diff_revision`) | `cad-contract`, `.zcad` schema |
@@ -28,7 +30,7 @@ when code, a test and a recorded limitation exist. The detailed research matrix 
 
 ## Known limits that define the boundary
 
-* **Assemblies & joints.** Multi-body parts are supported with clearance measurements; 3D kinematics/assembly joints and BOM tables are not yet implemented.
+* **Assemblies & joints.** Multi-body parts are supported with clearance measurements, pairwise clash detection (`INTERFERE`), and automated Bill of Materials (`BOM`) generation; 3D kinematics/assembly mate joints are not yet implemented.
 * **No 3D B-Rep fillet, chamfer, shell, sweep or loft.** Fillets, chamfers and offsets are fully supported on 2D profiles and sketches; 3D B-Rep edge filleting is absent.
 * **No STEP/IGES/3MF/OBJ/glTF/IFC interchange.** DXF (R12) and binary STL are the geometry formats written; DXF is read.
 * **Kernel limits are recorded, not hidden.** A boss fully inside a plate, tangent contact,

@@ -95,5 +95,22 @@ fn cli_project_create_edit_undo_redo_reopen_and_export_work_across_processes()
     let mesh = read_stl_binary(&bytes)?;
     mesh.validate()?;
     assert!((mesh.signed_volume() - 800.0).abs() < 1e-6);
+
+    // Test atlas mass-properties
+    let mp_out = invoke(&["mass-properties", "--file", &project_arg])?;
+    let mp_val: serde_json::Value = serde_json::from_slice(&mp_out.stdout)?;
+    assert!((mp_val["geometric"]["volume_mm3"].as_f64().unwrap_or(0.0) - 800.0).abs() < 1e-4);
+    assert!(mp_val["physical"]["mass_kg"].as_f64().unwrap_or(0.0) > 0.0);
+
+    // Test atlas interference
+    let inf_out = invoke(&["interference", "--file", &project_arg])?;
+    let inf_val: serde_json::Value = serde_json::from_slice(&inf_out.stdout)?;
+    assert_eq!(inf_val["clashes_detected"].as_u64(), Some(0));
+
+    // Test atlas bom
+    let bom_out = invoke(&["bom", "--file", &project_arg])?;
+    let bom_val: serde_json::Value = serde_json::from_slice(&bom_out.stdout)?;
+    assert!(bom_val["total_items"].as_u64().unwrap_or(0) >= 1);
+
     Ok(())
 }

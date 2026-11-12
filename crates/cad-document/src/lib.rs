@@ -38,7 +38,7 @@
 use cad_contract::document::{DocumentError, DocumentHeader, Revision};
 use cad_contract::ids::{DocumentId, EntityId};
 use cad_contract::kernel::{Kernel, SolidId, validate_profile};
-use cad_contract::mesh::Mesh;
+use cad_contract::mesh::{Aabb3, MassProperties, Mesh};
 use cad_contract::tol::Tolerance;
 use cad_contract::units::Unit;
 use cad_engineering_model::{
@@ -712,6 +712,270 @@ impl Build {
             .max(0.0);
         Some((dx * dx + dy * dy + dz * dz).sqrt())
     }
+
+    /// Mass properties of the active build geometry (single body or primary solid).
+    pub fn mass_properties(&self) -> Option<MassProperties> {
+        self.mesh.as_ref().and_then(|m| m.mass_properties())
+    }
+
+    /// Mass properties for a specific named body in a multi-body document.
+    pub fn body_mass_properties(&self, body_id: &str) -> Option<MassProperties> {
+        self.bodies
+            .iter()
+            .find(|b| b.id == body_id)
+            .and_then(|b| b.mesh.mass_properties())
+    }
+
+    /// Comprehensive pairwise interference and clearance analysis across all bodies.
+    pub fn interference_check(&self) -> InterferenceCheckResult {
+        let total_bodies = self.bodies.len();
+        if total_bodies < 2 {
+            return InterferenceCheckResult {
+                total_bodies,
+                total_pairs_checked: 0,
+                clashes_detected: 0,
+                pairs: Vec::new(),
+            };
+        }
+
+        let mut pairs = Vec::new();
+        let mut clashes_detected = 0;
+
+        for i in 0..total_bodies {
+            for j in (i + 1)..total_bodies {
+                let body_a = &self.bodies[i];
+                let body_b = &self.bodies[j];
+
+                let box_a = body_a.mesh.bounding_box();
+                let box_b = body_b.mesh.bounding_box();
+
+                match (box_a, box_b) {
+                    (Some(ba), Some(bb)) => {
+                        let overlap_min = [
+                            ba.min[0].max(bb.min[0]),
+                            ba.min[1].max(bb.min[1]),
+                            ba.min[2].max(bb.min[2]),
+                        ];
+                        let overlap_max = [
+                            ba.max[0].min(bb.max[0]),
+                            ba.max[1].min(bb.max[1]),
+                            ba.max[2].min(bb.max[2]),
+                        ];
+
+                        let sx = (overlap_max[0] - overlap_min[0]).max(0.0);
+                        let sy = (overlap_max[1] - overlap_min[1]).max(0.0);
+                        let sz = (overlap_max[2] - overlap_min[2]).max(0.0);
+
+                        let tol = 1e-4;
+                        let does_overlap = overlap_max[0] > overlap_min[0] + tol
+                            && overlap_max[1] > overlap_min[1] + tol
+                            && overlap_max[2] > overlap_min[2] + tol;
+
+                        if does_overlap {
+                            clashes_detected += 1;
+                            let clash_vol = sx * sy * sz;
+                            pairs.push(InterferencePair {
+                                body_a: body_a.id.clone(),
+                                body_b: body_b.id.clone(),
+                                interferes: true,
+                                clearance_mm: 0.0,
+                                overlap_box: Some(Aabb3 {
+                                    min: overlap_min,
+                                    max: overlap_max,
+                                }),
+                                approximate_clash_volume_mm3: Some(clash_vol),
+                            });
+                        } else {
+                            let dx = (bb.min[0] - ba.max[0]).max(ba.min[0] - bb.max[0]).max(0.0);
+                            let dy = (bb.min[1] - ba.max[1]).max(ba.min[1] - bb.max[1]).max(0.0);
+                            let dz = (bb.min[2] - ba.max[2]).max(ba.min[2] - bb.max[2]).max(0.0);
+                            let clearance = (dx * dx + dy * dy + dz * dz).sqrt();
+                            pairs.push(InterferencePair {
+                                body_a: body_a.id.clone(),
+                                body_b: body_b.id.clone(),
+                                interferes: false,
+                                clearance_mm: clearance,
+                                overlap_box: None,
+                                approximate_clash_volume_mm3: None,
+                            });
+                        }
+                    }
+                    _ => {
+                        pairs.push(InterferencePair {
+                            body_a: body_a.id.clone(),
+                            body_b: body_b.id.clone(),
+                            interferes: false,
+                            clearance_mm: f64::INFINITY,
+                            overlap_box: None,
+                            approximate_clash_volume_mm3: None,
+                        });
+                    }
+                }
+            }
+        }
+
+        let total_pairs_checked = pairs.len();
+        InterferenceCheckResult {
+            total_bodies,
+            total_pairs_checked,
+            clashes_detected,
+            pairs,
+        }
+    }
+
+    /// Generate an engineering Bill of Materials (BOM) itemizing components and mass properties.
+    pub fn bill_of_materials(
+        &self,
+        default_material_name: Option<&str>,
+        default_density_kg_m3: Option<f64>,
+    ) -> BillOfMaterials {
+        let mat_name = default_material_name.unwrap_or("AISI 1018 Steel");
+        let density = default_density_kg_m3.unwrap_or(7850.0);
+        let mat_id = mat_name.to_lowercase().replace(' ', "-");
+
+        let mut items = Vec::new();
+        let mut total_vol = 0.0;
+        let mut total_mass = 0.0;
+
+        if !self.bodies.is_empty() {
+            for (idx, body) in self.bodies.iter().enumerate() {
+                let props = body.mesh.mass_properties();
+                let vol = props
+                    .as_ref()
+                    .map(|p| p.volume_mm3)
+                    .unwrap_or(body.volume_mm3);
+                let area = props.as_ref().map(|p| p.surface_area_mm2).unwrap_or(0.0);
+                let mass = vol * density * 1e-9;
+                let bbox_size = body
+                    .mesh
+                    .bounding_box()
+                    .map(|b| b.size())
+                    .unwrap_or([0.0; 3]);
+
+                total_vol += vol;
+                total_mass += mass;
+
+                items.push(BomItem {
+                    item_number: idx + 1,
+                    body_id: body.id.clone(),
+                    material_id: mat_id.clone(),
+                    material_name: mat_name.to_string(),
+                    density_kg_m3: density,
+                    quantity: 1,
+                    volume_mm3: vol,
+                    mass_kg: mass,
+                    surface_area_mm2: area,
+                    bounding_box_mm: bbox_size,
+                });
+            }
+        } else if let Some(mesh) = &self.mesh {
+            let props = mesh.mass_properties();
+            let vol = props
+                .as_ref()
+                .map(|p| p.volume_mm3)
+                .unwrap_or_else(|| mesh.signed_volume().abs());
+            let area = props.as_ref().map(|p| p.surface_area_mm2).unwrap_or(0.0);
+            let mass = vol * density * 1e-9;
+            let bbox_size = mesh.bounding_box().map(|b| b.size()).unwrap_or([0.0; 3]);
+
+            total_vol += vol;
+            total_mass += mass;
+
+            items.push(BomItem {
+                item_number: 1,
+                body_id: "Part 1".to_string(),
+                material_id: mat_id,
+                material_name: mat_name.to_string(),
+                density_kg_m3: density,
+                quantity: 1,
+                volume_mm3: vol,
+                mass_kg: mass,
+                surface_area_mm2: area,
+                bounding_box_mm: bbox_size,
+            });
+        }
+
+        let total_quantity = items.iter().map(|it| it.quantity).sum();
+        let total_items = items.len();
+
+        BillOfMaterials {
+            total_items,
+            total_quantity,
+            total_volume_mm3: total_vol,
+            total_mass_kg: total_mass,
+            items,
+        }
+    }
+}
+
+/// A detected pair in multi-body interference / collision detection.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InterferencePair {
+    /// First body identifier.
+    pub body_a: String,
+    /// Second body identifier.
+    pub body_b: String,
+    /// Whether the two bodies intersect geometrically.
+    pub interferes: bool,
+    /// Clearance distance in mm (0.0 if interfering).
+    pub clearance_mm: f64,
+    /// Axis-aligned bounding box of the interference volume, if intersecting.
+    pub overlap_box: Option<Aabb3>,
+    /// Approximate clash volume in mm³, if intersecting.
+    pub approximate_clash_volume_mm3: Option<f64>,
+}
+
+/// Assembly-wide interference and clearance inspection report.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InterferenceCheckResult {
+    /// Total number of distinct solid bodies inspected.
+    pub total_bodies: usize,
+    /// Total number of pairwise candidate checks performed.
+    pub total_pairs_checked: usize,
+    /// Number of detected collisions/interferences.
+    pub clashes_detected: usize,
+    /// Detailed reports for each pair.
+    pub pairs: Vec<InterferencePair>,
+}
+
+/// A line item in an engineering Bill of Materials (BOM).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BomItem {
+    /// Item sequence number (1-indexed).
+    pub item_number: usize,
+    /// Body or component identifier.
+    pub body_id: String,
+    /// Assigned material identifier.
+    pub material_id: String,
+    /// Assigned material display name.
+    pub material_name: String,
+    /// Density in kg/m³.
+    pub density_kg_m3: f64,
+    /// Quantity of this component in the assembly.
+    pub quantity: usize,
+    /// Enclosed volume in mm³.
+    pub volume_mm3: f64,
+    /// Computed physical mass in kilograms (kg).
+    pub mass_kg: f64,
+    /// External surface area in mm².
+    pub surface_area_mm2: f64,
+    /// Outer bounding box extents `[length, width, height]` in mm.
+    pub bounding_box_mm: [f64; 3],
+}
+
+/// Bill of Materials (BOM) summary for an assembly or multi-body part.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BillOfMaterials {
+    /// Number of unique line items.
+    pub total_items: usize,
+    /// Total part count across all items.
+    pub total_quantity: usize,
+    /// Total aggregate volume in mm³.
+    pub total_volume_mm3: f64,
+    /// Total aggregate physical mass in kilograms (kg).
+    pub total_mass_kg: f64,
+    /// The individual BOM entries.
+    pub items: Vec<BomItem>,
 }
 
 /// Most cached prefixes kept alive at once.
@@ -3991,7 +4255,6 @@ mod tests {
     use cad_contract::capability::{Capability, CapabilitySet, KernelInfo};
     use cad_contract::error::KernelError;
     use cad_contract::kernel::{BooleanOp, SolidId};
-    use cad_contract::mesh::Mesh;
     use std::collections::BTreeMap;
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -6912,6 +7175,69 @@ mod tests {
 
         // Clearance between nonexistent body is None
         assert_eq!(build.inter_body_clearance("chassis", "phantom"), None);
+
+        // Interference check when clearance > 0: 0 clashes detected
+        let check = build.interference_check();
+        assert_eq!(check.total_bodies, 2);
+        assert_eq!(check.total_pairs_checked, 1);
+        assert_eq!(check.clashes_detected, 0);
+        assert!(!check.pairs[0].interferes);
+        assert_eq!(check.pairs[0].clearance_mm, 15.0);
+
+        // Mass properties on specific body
+        let chassis_props = build.body_mass_properties("chassis");
+        assert!(chassis_props.is_some());
+        if let Some(props) = chassis_props {
+            assert!((props.volume_mm3 - 25_000.0).abs() < 1e-6);
+        }
+
+        // Bill of Materials
+        let bom = build.bill_of_materials(Some("6061-T6 Aluminium"), Some(2700.0));
+        assert_eq!(bom.total_items, 2);
+        assert_eq!(bom.total_quantity, 2);
+        assert_eq!(bom.total_volume_mm3, 37_500.0);
+        assert_eq!(bom.items[0].body_id, "chassis");
+        assert_eq!(bom.items[1].body_id, "cover");
+        let expected_mass = 37_500.0 * 2700.0 * 1e-9;
+        assert!((bom.total_mass_kg - expected_mass).abs() < 1e-6);
+
+        Ok(())
+    }
+
+    #[test]
+    fn multibody_interference_detects_clashes() -> TestResult {
+        let mut project = Project::new("clash_test", DocumentId::new(1), Unit::Millimeter);
+        project.add_parameter("w", 20.0)?;
+        project.add_parameter("h", 20.0)?;
+        project.add_parameter("t", 10.0)?;
+
+        // Body 1 at z = 0..10
+        let sk1 = project.add_rectangle_sketch("w", "h", [0.0, 0.0])?;
+        project.add_body_extrude(sk1, "t", "part_a")?;
+
+        // Body 2 at z = 5..15 (overlapping z=5..10)
+        let sk2 = project.add_sketch_on_plane(
+            SketchProfile::Rectangle {
+                width_param: "w".into(),
+                height_param: "h".into(),
+            },
+            [0.0, 0.0],
+            5.0,
+        )?;
+        project.add_body_extrude(sk2, "t", "part_b")?;
+
+        let mut kernel = PatternTestKernel::new();
+        let build = project.build(&mut kernel)?;
+        assert!(build.is_complete());
+
+        let check = build.interference_check();
+        assert_eq!(check.total_bodies, 2);
+        assert_eq!(check.total_pairs_checked, 1);
+        assert_eq!(check.clashes_detected, 1);
+        assert!(check.pairs[0].interferes);
+        assert_eq!(check.pairs[0].clearance_mm, 0.0);
+        assert!(check.pairs[0].overlap_box.is_some());
+        assert!(check.pairs[0].approximate_clash_volume_mm3.unwrap_or(0.0) > 0.0);
 
         Ok(())
     }

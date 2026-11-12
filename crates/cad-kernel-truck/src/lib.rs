@@ -753,6 +753,7 @@ impl Kernel for TruckKernel {
                 Capability::BooleanIntersection,
                 Capability::Transform,
                 Capability::Tessellate,
+                Capability::MassProperties,
             ]),
         )
     }
@@ -1204,6 +1205,7 @@ mod tests {
         assert!(info.supports(Capability::Transform));
         // Revolve is claimed because it is measured: see the cylinder and annulus tests below.
         assert!(info.supports(Capability::Revolve));
+        assert!(info.supports(Capability::MassProperties));
         // Not implemented, so not advertised.
         assert!(!info.supports(Capability::Fillet));
         assert!(!info.supports(Capability::Sweep));
@@ -1819,5 +1821,22 @@ mod tests {
         let mut kernel = TruckKernel::new();
         let id = kernel.extrude(&square(10.0), 5.0)?;
         close(volume(&kernel, id)?, 500.0, 1e-6, "unbudgeted volume")
+    }
+
+    #[test]
+    fn mass_properties_of_extruded_solid() -> TestResult {
+        let mut kernel = TruckKernel::new();
+        // 10 x 10 mm profile extruded 5 mm -> 500 mm³
+        let id = kernel.extrude(&square(10.0), 5.0)?;
+        let props = kernel.mass_properties(id)?;
+        close(props.volume_mm3, 500.0, 1e-4, "extruded volume")?;
+        close(props.centroid_mm[0], 5.0, 1e-4, "centroid X")?;
+        close(props.centroid_mm[1], 5.0, 1e-4, "centroid Y")?;
+        close(props.centroid_mm[2], 2.5, 1e-4, "centroid Z")?;
+
+        let physical = props.with_density(7850.0);
+        let expected_mass_kg = 500.0 * 7850.0 * 1e-9;
+        close(physical.mass_kg, expected_mass_kg, 1e-7, "physical mass kg")?;
+        Ok(())
     }
 }

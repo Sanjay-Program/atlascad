@@ -3390,9 +3390,172 @@
     }
   }
 
+  async function runMassProperties() {
+    toast("Calculating 3D Physical Mass Properties & Inertia...");
+    try {
+      const data = await api("/api/mass-properties");
+      const geom = data.geometric;
+      const phys = data.physical;
+      const mat = data.material;
+      const pm = geom.principal_moments;
+      const rg = geom.radii_of_gyration_centroid;
+      const cog = geom.centroid_mm;
+
+      showSimulationHud("3D Physical Mass Properties & Center of Gravity", `
+        <div class="sim-metric-grid">
+          <div class="sim-metric-box">
+            <div class="label">Total Mass</div>
+            <div class="value" style="color: var(--accent);">${phys.mass_kg < 1.0 ? phys.mass_g.toFixed(2) + " g" : phys.mass_kg.toFixed(4) + " kg"}</div>
+          </div>
+          <div class="sim-metric-box">
+            <div class="label">Volume</div>
+            <div class="value">${geom.volume_mm3.toLocaleString(undefined, { maximumFractionDigits: 2 })} mm³</div>
+          </div>
+          <div class="sim-metric-box">
+            <div class="label">Surface Area</div>
+            <div class="value">${geom.surface_area_mm2.toLocaleString(undefined, { maximumFractionDigits: 2 })} mm²</div>
+          </div>
+          <div class="sim-metric-box">
+            <div class="label">Material & Density</div>
+            <div class="value" style="font-size: 15px;">${mat.name} (${mat.density_kg_m3} kg/m³)</div>
+          </div>
+        </div>
+
+        <h4 style="margin: 12px 0 6px 0; font-size: 14px;">Center of Gravity / Centroid (mm)</h4>
+        <div class="sim-metric-grid" style="grid-template-columns: repeat(3, 1fr);">
+          <div class="sim-metric-box"><div class="label">X_cg</div><div class="value">${cog[0].toFixed(3)} mm</div></div>
+          <div class="sim-metric-box"><div class="label">Y_cg</div><div class="value">${cog[1].toFixed(3)} mm</div></div>
+          <div class="sim-metric-box"><div class="label">Z_cg</div><div class="value">${cog[2].toFixed(3)} mm</div></div>
+        </div>
+
+        <h4 style="margin: 12px 0 6px 0; font-size: 14px;">Principal Moments of Inertia (mm⁵) & Radii of Gyration (mm)</h4>
+        <table class="sim-hud-table">
+          <thead>
+            <tr><th>Axis</th><th>Principal Moment (mm⁵)</th><th>Mass Moment (kg·mm²)</th><th>Radius of Gyration (mm)</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>I₁ (Min)</strong></td><td>${pm[0].toExponential(3)}</td><td>${phys.principal_mass_moments[0].toExponential(3)}</td><td>${rg[0].toFixed(2)} mm</td></tr>
+            <tr><td><strong>I₂ (Mid)</strong></td><td>${pm[1].toExponential(3)}</td><td>${phys.principal_mass_moments[1].toExponential(3)}</td><td>${rg[1].toFixed(2)} mm</td></tr>
+            <tr><td><strong>I₃ (Max)</strong></td><td>${pm[2].toExponential(3)}</td><td>${phys.principal_mass_moments[2].toExponential(3)}</td><td>${rg[2].toFixed(2)} mm</td></tr>
+          </tbody>
+        </table>
+      `);
+      toast(`MASSPROP: Mass = ${phys.mass_kg.toFixed(4)} kg, Volume = ${geom.volume_mm3.toFixed(1)} mm³`);
+    } catch (e) {
+      toast(`MASSPROP error: ${e.message}`, true);
+    }
+  }
+
+  async function runInterferenceCheck() {
+    toast("Running Multi-Body Collision & Clearance Analysis...");
+    try {
+      const data = await api("/api/interference");
+      const pairsRows = data.pairs && data.pairs.length > 0
+        ? data.pairs.map((p) => `
+            <tr>
+              <td><strong>${p.body_a} ↔ ${p.body_b}</strong></td>
+              <td><span style="color: ${p.interferes ? 'var(--danger, #ff4444)' : 'var(--success, #00c853)'}; font-weight: bold;">${p.interferes ? '⚠ CLASH' : '✓ CLEAR'}</span></td>
+              <td>${p.clearance_mm.toFixed(3)} mm</td>
+              <td>${p.approximate_clash_volume_mm3 ? p.approximate_clash_volume_mm3.toFixed(2) + ' mm³' : '—'}</td>
+            </tr>
+          `).join("")
+        : `<tr><td colspan="4" style="text-align: center; color: var(--muted);">Single-body part (no interference pairs)</td></tr>`;
+
+      showSimulationHud("Multi-Body Interference & Clearance Analysis", `
+        <div class="sim-metric-grid">
+          <div class="sim-metric-box">
+            <div class="label">Bodies Inspected</div>
+            <div class="value">${data.total_bodies}</div>
+          </div>
+          <div class="sim-metric-box">
+            <div class="label">Pairs Checked</div>
+            <div class="value">${data.total_pairs_checked}</div>
+          </div>
+          <div class="sim-metric-box">
+            <div class="label">Clashes Detected</div>
+            <div class="value" style="color: ${data.clashes_detected > 0 ? 'var(--danger, #ff4444)' : 'var(--success, #00c853)'};">${data.clashes_detected}</div>
+          </div>
+        </div>
+
+        <table class="sim-hud-table" style="margin-top: 12px;">
+          <thead>
+            <tr><th>Component Pair</th><th>Status</th><th>Clearance (mm)</th><th>Clash Volume</th></tr>
+          </thead>
+          <tbody>${pairsRows}</tbody>
+        </table>
+      `);
+      toast(`INTERFERE: ${data.clashes_detected} clashes detected across ${data.total_pairs_checked} pairs`);
+    } catch (e) {
+      toast(`INTERFERE error: ${e.message}`, true);
+    }
+  }
+
+  async function runBom() {
+    toast("Generating Assembly Bill of Materials (BOM)...");
+    try {
+      const data = await api("/api/bom");
+      const itemsRows = data.items.map((it) => `
+        <tr>
+          <td><strong>${it.item_number}</strong></td>
+          <td><strong>${it.body_id}</strong></td>
+          <td>${it.material_name}</td>
+          <td>${it.bounding_box_mm[0].toFixed(1)} × ${it.bounding_box_mm[1].toFixed(1)} × ${it.bounding_box_mm[2].toFixed(1)}</td>
+          <td>${it.volume_mm3.toLocaleString(undefined, { maximumFractionDigits: 1 })} mm³</td>
+          <td>${it.mass_kg.toFixed(4)} kg</td>
+        </tr>
+      `).join("");
+
+      showSimulationHud("Assembly Bill of Materials (BOM)", `
+        <div class="sim-metric-grid">
+          <div class="sim-metric-box">
+            <div class="label">Total Items</div>
+            <div class="value">${data.total_items}</div>
+          </div>
+          <div class="sim-metric-box">
+            <div class="label">Total Quantity</div>
+            <div class="value">${data.total_quantity}</div>
+          </div>
+          <div class="sim-metric-box">
+            <div class="label">Total Volume</div>
+            <div class="value">${data.total_volume_mm3.toLocaleString(undefined, { maximumFractionDigits: 1 })} mm³</div>
+          </div>
+          <div class="sim-metric-box">
+            <div class="label">Total Assembly Mass</div>
+            <div class="value" style="color: var(--accent);">${data.total_mass_kg.toFixed(4)} kg</div>
+          </div>
+        </div>
+
+        <table class="sim-hud-table" style="margin-top: 12px;">
+          <thead>
+            <tr><th>#</th><th>Part / Body</th><th>Material</th><th>Dimensions (mm)</th><th>Volume</th><th>Mass</th></tr>
+          </thead>
+          <tbody>${itemsRows}</tbody>
+        </table>
+      `);
+      toast(`BOM: ${data.total_items} items, Total Mass = ${data.total_mass_kg.toFixed(4)} kg`);
+    } catch (e) {
+      toast(`BOM error: ${e.message}`, true);
+    }
+  }
+
   function openSimLauncher() {
-    showSimulationHud("Engineering Multiphysics & CAM", `
+    showSimulationHud("Engineering Multiphysics & Physical Analysis", `
       <div class="sim-launcher-grid">
+        <div class="sim-launcher-card" id="simCardMassProp">
+          <h4>3D Mass Properties & Inertia</h4>
+          <p>Compute exact volume, surface area, center of gravity (centroid), inertia tensor, and radii of gyration.</p>
+          <button type="button" class="button wide" id="launchMassPropBtn">Compute Mass Properties</button>
+        </div>
+        <div class="sim-launcher-card" id="simCardInterfere">
+          <h4>Multi-Body Interference & Clearance</h4>
+          <p>Assembly clash detection between solid bodies, minimum clearance distances, and collision volumes.</p>
+          <button type="button" class="button wide" id="launchInterfereBtn">Check Interference</button>
+        </div>
+        <div class="sim-launcher-card" id="simCardBom">
+          <h4>Assembly Bill of Materials (BOM)</h4>
+          <p>Generate itemized component parts list with bounding box dimensions, materials, and mass rollups.</p>
+          <button type="button" class="button wide" id="launchBomBtn">Generate BOM</button>
+        </div>
         <div class="sim-launcher-card" id="simCardStatic">
           <h4>Linear Static Stress FEA</h4>
           <p>Compute von Mises stress distribution, displacement field, and factor of safety on Hex8 voxel mesh.</p>
@@ -3415,6 +3578,9 @@
         </div>
       </div>
     `);
+    byId("launchMassPropBtn")?.addEventListener("click", () => runMassProperties());
+    byId("launchInterfereBtn")?.addEventListener("click", () => runInterferenceCheck());
+    byId("launchBomBtn")?.addEventListener("click", () => runBom());
     byId("launchStaticBtn")?.addEventListener("click", () => runCaeStatic());
     byId("launchModalBtn")?.addEventListener("click", () => runCaeModal());
     byId("launchThermalBtn")?.addEventListener("click", () => runCaeThermal());
@@ -4365,6 +4531,15 @@ ${gcodeSample}`;
     { alias: "G", name: "GRID", desc: "Toggle ground grid", run: () => toggleGrid() },
     { alias: "EXT", name: "EXTRUDE", desc: "3D extrude selected sketch", run: () => extrudeSketch("new_body") },
     { alias: "REV", name: "REVOLVE", desc: "3D revolve selected sketch", run: () => revolveSketch("new_body") },
+    { alias: "MP", name: "MASSPROP", desc: "Calculate 3D physical mass properties and moments of inertia", run: () => runMassProperties() },
+    { alias: "MASSPROP", name: "MASSPROP", desc: "Calculate 3D physical mass properties and moments of inertia", run: () => runMassProperties() },
+    { alias: "PROPERTIES", name: "MASSPROP", desc: "Display physical mass properties and center of gravity", run: () => runMassProperties() },
+    { alias: "INF", name: "INTERFERE", desc: "Check multi-body clearance and collision interference", run: () => runInterferenceCheck() },
+    { alias: "INTERFERE", name: "INTERFERE", desc: "Check multi-body clearance and collision interference", run: () => runInterferenceCheck() },
+    { alias: "CLASH", name: "INTERFERE", desc: "Check multi-body clearance and collision interference", run: () => runInterferenceCheck() },
+    { alias: "BOM", name: "BOM", desc: "Generate assembly Bill of Materials", run: () => runBom() },
+    { alias: "BILLOFMATERIALS", name: "BOM", desc: "Generate assembly Bill of Materials", run: () => runBom() },
+    { alias: "PARTSLIST", name: "BOM", desc: "Generate assembly Bill of Materials", run: () => runBom() },
     { alias: "FEA", name: "STATIC", desc: "Run linear static FEA (stress & deflection)", run: () => runCaeStatic() },
     { alias: "MODAL", name: "VIBRATION", desc: "Run dynamic modal natural frequency analysis", run: () => runCaeModal() },
     { alias: "HEAT", name: "THERMAL", desc: "Run steady-state thermal conduction FEA", run: () => runCaeThermal() },
@@ -4560,6 +4735,9 @@ ${gcodeSample}`;
       { label: "CAE: Run dynamic modal vibration analysis (MODAL)", hint: "frequencies", keywords: "cae modal vibration frequency natural modes", run: () => runCaeModal(), disabled: !project || project.features.length === 0 },
       { label: "CAE: Run steady-state thermal conduction FEA (THERMAL)", hint: "heat flux", keywords: "cae thermal heat conduction temperature fea", run: () => runCaeThermal(), disabled: !project || project.features.length === 0 },
       { label: "CAM: Generate 3-axis CNC toolpaths & G-code (CAM)", hint: "milling/gcode", keywords: "cam cnc toolpath gcode machining milling", run: () => runCamToolpaths(), disabled: !project || project.features.length === 0 },
+      { label: "Physical: 3D Mass Properties & Inertia (MASSPROP)", hint: "mass/cog", keywords: "massprop properties physical mass volume centroid cog inertia", run: () => runMassProperties(), disabled: !project || project.features.length === 0 },
+      { label: "Assembly: Multi-Body Interference & Clash Check (INTERFERE)", hint: "clash/clearance", keywords: "interfere interference clash clearance collision collision check", run: () => runInterferenceCheck(), disabled: !project },
+      { label: "Engineering: Bill of Materials (BOM)", hint: "parts list", keywords: "bom bill of materials parts list quantity mass", run: () => runBom(), disabled: !project },
       { label: "Engineering: Open Multiphysics & CAM Simulation Launcher", hint: "simulation", keywords: "simulation fea modal thermal cam gcode multiphysics", run: () => openSimLauncher() },
       { label: "Save a named revision", hint: "snapshot", keywords: "revision snapshot named save checkpoint", run: () => addRevision(), disabled: !project },
       ...(project && Array.isArray(project.revisions)
