@@ -4,7 +4,7 @@
 //!
 //! It runs a **linear static structural analysis** on a watertight tessellated solid:
 //!
-//! 1. classify a regular grid of voxels inside the closed triangle mesh ([`crate::voxel`]);
+//! 1. classify a regular grid of voxels inside the closed triangle mesh;
 //! 2. build an 8-node hexahedral finite-element mesh from the solid voxels;
 //! 3. assemble an isotropic linear-elastic stiffness matrix and solve `K u = f` with a
 //!    Jacobi-preconditioned conjugate gradient solver;

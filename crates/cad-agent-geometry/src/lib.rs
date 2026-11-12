@@ -1,4 +1,4 @@
-//! The geometry-ops agent: the first concrete [`Agent`](cad_agent_api::agent::Agent) in this
+//! The geometry-ops agent: the first concrete [`Agent`] in this
 //! workspace.
 //!
 //! The agent runtime existed before this crate, but nothing exercised it end to end: there was a

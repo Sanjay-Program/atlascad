@@ -3,7 +3,7 @@
 //! Deliberately small. Every operation here is one that *both* a B-rep kernel and a future
 //! mesh-based kernel can implement, and every one is exercised by the truck adapter's tests. Anything
 //! kernel-specific (fillets, sheet metal, spline surfaces) is reached through the adapter's own API
-//! after checking [`Capability`](crate::capability::Capability), not through this trait — a trait
+//! after checking [`Capability`], not through this trait — a trait
 //! that tried to express everything would either exclude the best kernel or flatten its abilities.
 //!
 //! # Handles vs identities

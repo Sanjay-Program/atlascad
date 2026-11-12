@@ -15,7 +15,7 @@
 //! # Panics
 //!
 //! A panic inside truck would otherwise take the application down. Every call into truck runs
-//! under [`guarded`], which turns a panic into [`KernelError::Internal`]; this mirrors the
+//! under `guarded`, which turns a panic into [`KernelError::Internal`]; this mirrors the
 //! `guard` SolidCraft already ships. No method in this crate panics on caller input.
 //!
 //! # Thread safety

@@ -1,6 +1,6 @@
 //! The CadAgent runtime.
 //!
-//! [`cad-agent-api`] defines what an agent *is*; this crate is the process-side machinery that
+//! [`cad_agent_api`] defines what an agent *is*; this crate is the process-side machinery that
 //! decides whether it may run at all:
 //!
 //! * [`registry::Registry`] — the discovered → registered → ready lifecycle. An agent reaches
