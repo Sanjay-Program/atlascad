@@ -1951,3 +1951,457 @@ kbd {
   cursor: crosshair;
 }
 
+/* =====================================================================
+   UX ENHANCEMENTS — Feature Timeline, Context Menu, Toast, Overlay
+   ===================================================================== */
+
+/* ---------- Feature History Timeline Bar (Fusion 360 style) ---------- */
+.feature-timeline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  min-height: 36px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.feature-timeline::-webkit-scrollbar {
+  height: 4px;
+}
+
+.feature-timeline::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.feature-timeline::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 2px;
+}
+
+.timeline-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding-right: 6px;
+  border-right: 1px solid var(--border);
+}
+
+.feature-timeline-pills {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.feature-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.feature-pill:hover {
+  background: var(--panel-hover);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.feature-pill.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.feature-pill .pill-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* ---------- Right-Click Context Menu ---------- */
+.ctx-menu {
+  position: fixed;
+  z-index: 9000;
+  background: #12192b;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
+  padding: 4px 0;
+  min-width: 200px;
+  backdrop-filter: blur(8px);
+  user-select: none;
+}
+
+.ctx-menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ctx-menu-section-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  padding: 6px 12px 2px;
+  text-transform: uppercase;
+}
+
+.ctx-menu-item {
+  padding: 7px 14px;
+  font-size: 12.5px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.1s;
+}
+
+.ctx-menu-item:hover {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.ctx-menu-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* ---------- Multi-Toast Container ---------- */
+.toast-container {
+  position: fixed;
+  bottom: calc(var(--statusbar) + 40px);
+  right: 20px;
+  z-index: 8000;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  pointer-events: none;
+  max-width: 340px;
+}
+
+.toast-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #fff;
+  background: #1e2a3d;
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+  animation: toast-slide-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.toast-item.toast-info {
+  border-left: 3px solid var(--accent);
+}
+
+.toast-item.toast-success {
+  border-left: 3px solid var(--success);
+  background: #0f231a;
+}
+
+.toast-item.toast-error {
+  border-left: 3px solid var(--danger);
+  background: #231218;
+}
+
+.toast-item.toast-warn {
+  border-left: 3px solid var(--warning);
+  background: #231f0d;
+}
+
+.toast-item.toast-hiding {
+  animation: toast-slide-out 0.2s ease forwards;
+}
+
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes toast-slide-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(60px);
+  }
+}
+
+.toast-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ---------- Shortcuts Overlay (? key) ---------- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 8500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(3px);
+}
+
+.overlay-card {
+  position: relative;
+  z-index: 1;
+  background: var(--panel-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px 24px;
+  max-width: 560px;
+  width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.shortcuts-card .shortcut-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  font-size: 12.5px;
+  margin-top: 10px;
+}
+
+.shortcuts-card .shortcut-grid dt {
+  font-family: "SFMono-Regular", "Cascadia Code", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  align-self: start;
+}
+
+.shortcuts-card .shortcut-grid dd {
+  margin: 0;
+  color: var(--text);
+  align-self: center;
+}
+
+/* ---------- Face Properties Section ---------- */
+.face-properties {
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.face-props-head {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+/* ---------- Collapsible Left Panel Sections ---------- */
+.collapsible-section .section-body {
+  overflow: hidden;
+  transition: max-height 0.25s ease;
+}
+
+.collapsible-section.collapsed .section-body {
+  display: none;
+}
+
+.section-collapse-btn {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 3px;
+  line-height: 1;
+  transition: color 0.1s, transform 0.2s;
+  margin-left: auto;
+}
+
+.section-collapse-btn:hover {
+  color: var(--text);
+  background: var(--panel-hover);
+}
+
+.collapsible-section.collapsed .section-collapse-btn {
+  transform: rotate(-90deg);
+}
+
+/* ---------- Left Panel: wider, no truncation ---------- */
+.panel-left {
+  min-width: 260px;
+}
+
+.panel-left .field label {
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.panel-left select option {
+  white-space: nowrap;
+}
+
+/* =====================================================================
+   AUTODESK 3D VIEWCUBE NAVIGATION WIDGET
+   ===================================================================== */
+.autodesk-viewcube-container {
+  position: absolute;
+  top: 48px;
+  right: 18px;
+  width: 90px;
+  height: 90px;
+  z-index: 10;
+  user-select: none;
+  pointer-events: auto;
+}
+
+.viewcube-home-btn {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 12;
+  transition: all 0.15s ease;
+}
+
+.viewcube-home-btn:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.viewcube-compass-ring {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 1px dashed var(--border);
+  pointer-events: none;
+}
+
+.compass-label {
+  position: absolute;
+  font-size: 8px;
+  font-weight: 700;
+  font-family: monospace;
+  color: var(--muted);
+}
+.compass-n { top: 1px; left: 50%; transform: translateX(-50%); }
+.compass-s { bottom: 1px; left: 50%; transform: translateX(-50%); }
+.compass-e { right: 2px; top: 50%; transform: translateY(-50%); }
+.compass-w { left: 2px; top: 50%; transform: translateY(-50%); }
+
+.viewcube-scene {
+  width: 80px;
+  height: 80px;
+  margin: 5px auto;
+  perspective: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewcube-cube {
+  width: 44px;
+  height: 44px;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.08s ease-out;
+  cursor: pointer;
+}
+
+.vc-face {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  background: rgba(30, 42, 58, 0.88);
+  border: 1.5px solid rgba(144, 202, 249, 0.45);
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.4);
+  color: #d1d5db;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backface-visibility: visible;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.vc-face:hover {
+  background: rgba(33, 150, 243, 0.75);
+  border-color: #64b5f6;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(33, 150, 243, 0.6);
+}
+
+.vc-top    { transform: rotateX(90deg) translateZ(22px); }
+.vc-bottom { transform: rotateX(-90deg) translateZ(22px); }
+.vc-front  { transform: translateZ(22px); }
+.vc-back   { transform: rotateY(180deg) translateZ(22px); }
+.vc-left   { transform: rotateY(-90deg) translateZ(22px); }
+.vc-right  { transform: rotateY(90deg) translateZ(22px); }
+
+

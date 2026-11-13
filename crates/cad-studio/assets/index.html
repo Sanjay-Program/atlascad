@@ -226,21 +226,29 @@
 
   <main class="workspace">
     <aside class="panel panel-left" aria-label="Project browser">
-      <section class="panel-section">
+      <section class="panel-section collapsible-section" id="sectionProject">
         <div class="section-head">
           <h2>Project</h2>
           <span id="dirtyBadge" class="badge">saved</span>
+          <button type="button" class="section-collapse-btn" aria-expanded="true" aria-controls="sectionProjectBody" title="Collapse section">▾</button>
         </div>
+        <div class="section-body" id="sectionProjectBody">
         <div class="meta-grid">
           <span>File</span><span id="fileName" class="truncate" title="">—</span>
           <span>Units</span><span id="unitLabel">mm</span>
           <span>Revision</span><span id="revisionLabel">—</span>
           <span>History</span><span id="historyLabel">—</span>
         </div>
+        </div>
       </section>
 
-      <section class="panel-section">
-        <div class="section-head"><h2>Create</h2><span class="hint">sketch · extrude · revolve</span></div>
+      <section class="panel-section collapsible-section" id="sectionCreate">
+        <div class="section-head">
+          <h2>Create</h2>
+          <span class="hint">sketch · extrude · revolve</span>
+          <button type="button" class="section-collapse-btn" aria-expanded="true" aria-controls="sectionCreateBody" title="Collapse section">▾</button>
+        </div>
+        <div class="section-body" id="sectionCreateBody">
         <div class="field">
           <label for="newSketchKind">Sketch</label>
           <select id="newSketchKind">
@@ -321,6 +329,7 @@
         </div>
         <button id="addFeatureBtn" class="button wide">Add extrude</button>
         <p class="hint" id="createHint">The first extrude starts the body; later extrudes join it.</p>
+        </div><!-- end sectionCreateBody -->
       </section>
 
       <section class="panel-section">
@@ -392,6 +401,27 @@
       <div class="viewport-style-badge" id="viewportStyleBadge">
         <span class="style-item" id="styleProjBadge" title="Projection: Isometric / Orthographic">[-] [Custom]</span>
         <span class="style-item" id="styleVisualBadge" title="Visual Style: Shaded with Edges">[Shaded with Edges]</span>
+      </div>
+
+      <!-- Autodesk 3D ViewCube Navigation Widget -->
+      <div class="autodesk-viewcube-container" id="viewCubeContainer" title="Autodesk ViewCube: Click faces to align view">
+        <button type="button" class="viewcube-home-btn" id="viewCubeHomeBtn" title="Home View (Isometric ISO)">⌂</button>
+        <div class="viewcube-compass-ring">
+          <span class="compass-label compass-n">N</span>
+          <span class="compass-label compass-s">S</span>
+          <span class="compass-label compass-e">E</span>
+          <span class="compass-label compass-w">W</span>
+        </div>
+        <div class="viewcube-scene">
+          <div class="viewcube-cube" id="viewCubeCube">
+            <div class="vc-face vc-top" data-cube-view="top">TOP</div>
+            <div class="vc-face vc-bottom" data-cube-view="bottom">BTM</div>
+            <div class="vc-face vc-front" data-cube-view="front">FRONT</div>
+            <div class="vc-face vc-back" data-cube-view="back">BACK</div>
+            <div class="vc-face vc-left" data-cube-view="left">LEFT</div>
+            <div class="vc-face vc-right" data-cube-view="right">RIGHT</div>
+          </div>
+        </div>
       </div>
 
       <!-- AutoCAD UCS Icon (User Coordinate System) -->
@@ -499,6 +529,28 @@
           <span>Normal</span><span id="pickNormal">—</span>
         </div>
       </div>
+
+      <!-- Feature History Timeline Bar (Fusion 360 style) -->
+      <div id="feature-timeline" class="feature-timeline" aria-label="Feature history timeline" role="toolbar">
+        <span class="timeline-label">TIMELINE</span>
+        <div id="feature-timeline-pills" class="feature-timeline-pills"></div>
+      </div>
+
+      <!-- Right-Click Context Menu -->
+      <div id="ctx-menu" class="ctx-menu" hidden aria-label="Viewport context menu" role="menu">
+        <ul class="ctx-menu-list" id="ctx-menu-list">
+          <li class="ctx-menu-section-label" id="ctx-menu-label">Actions</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxEditSketch">📐 Edit sketch on this face</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxCreateFeature">⬆ Create feature here</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxMeasureFace">📏 Measure face</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxIsolateFace">👁 Isolate face</li>
+          <li role="separator" class="ctx-menu-sep"></li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxZoomExtents">🔍 Zoom extents (F)</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxNewSketch">📐 New sketch here</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxVisualStyle">🎨 Change visual style</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxHomeView">🏠 Home view (H)</li>
+        </ul>
+      </div>
     </section>
 
     <div id="drawerScrim" class="drawer-scrim" aria-hidden="true"></div>
@@ -508,6 +560,16 @@
         <div class="section-head"><h2>Properties</h2></div>
         <div class="meta-grid" id="properties">
           <span>Volume</span><span>—</span>
+        </div>
+        <!-- Face Properties (populated on pick) -->
+        <div id="face-properties" class="face-properties" hidden>
+          <div class="face-props-head">FACE PROPERTIES</div>
+          <div class="meta-grid compact" id="face-properties-grid">
+            <span>Face</span><span id="fpFaceIndex">—</span>
+            <span>Area</span><span id="fpArea">—</span>
+            <span>Normal</span><span id="fpNormal">—</span>
+            <span>Edges</span><span id="fpEdges">—</span>
+          </div>
         </div>
       </section>
       <section class="panel-section" id="drawingSection">
@@ -770,6 +832,45 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <!-- Multi-toast container for showToast() notifications -->
+  <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- Keyboard Shortcuts Help Overlay (? key) -->
+  <div id="shortcuts-overlay" class="overlay shortcuts-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="shortcutsTitle">
+    <div class="overlay-backdrop" id="shortcutsBackdrop"></div>
+    <div class="overlay-card shortcuts-card">
+      <div class="section-head">
+        <h2 id="shortcutsTitle">Keyboard Shortcuts</h2>
+        <button type="button" class="link" id="shortcutsCloseBtn">close</button>
+      </div>
+      <dl class="shortcut-grid">
+        <dt>F</dt><dd>Fit model to view</dd>
+        <dt>H</dt><dd>Home view (isometric reset)</dd>
+        <dt>W</dt><dd>Toggle wireframe</dd>
+        <dt>G</dt><dd>Toggle grid</dd>
+        <dt>F12 / DYN</dt><dd>Toggle dynamic input HUD</dd>
+        <dt>Ctrl+Z</dt><dd>Undo</dd>
+        <dt>Ctrl+Y</dt><dd>Redo</dd>
+        <dt>Ctrl+K</dt><dd>Command palette</dd>
+        <dt>Ctrl+S</dt><dd>Save project</dd>
+        <dt>Escape</dt><dd>Cancel / close panel or polyline</dd>
+        <dt>?</dt><dd>Show this shortcuts help</dd>
+        <dt>1 / 2 / 3 / 4</dt><dd>Front / Top / Right / Iso view</dd>
+        <dt>Double-click</dt><dd>Fit / zoom to face</dd>
+        <dt>Right-click</dt><dd>Context menu</dd>
+        <dt>L / C / REC</dt><dd>AutoCAD Line / Circle / Rectangle</dd>
+        <dt>EXT / REV</dt><dd>Extrude / Revolve</dd>
+        <dt>EL / PL / SPL</dt><dd>Ellipse / Polyline / Spline</dd>
+        <dt>DIM / TEXT / PO</dt><dd>Dimension / Text / Point</dd>
+        <dt>F3 / F10</dt><dd>Toggle Object Snap / Polar Tracking</dd>
+        <dt>FEA / MODAL</dt><dd>Linear Static Stress / Modal Vibration FEA</dd>
+        <dt>CAM / GCODE</dt><dd>Generate 3-Axis CNC Toolpaths</dd>
+      </dl>
+      <p class="hint">All commands in the palette are connected to the project API. There are no placeholder actions.</p>
+    </div>
+  </div>
+
   <script src="/app.js"></script>
 </body>
 </html>

@@ -146,17 +146,31 @@
     varying vec3 vWorld;
     uniform vec3 uColor;
     uniform vec3 uEye;
+    uniform float uHighlight;
     void main() {
       vec3 n = normalize(vNormal);
       if (!gl_FrontFacing) n = -n;
-      vec3 key = normalize(vec3(0.42, 0.58, 0.88));
-      vec3 fill = normalize(vec3(-0.65, -0.35, 0.32));
-      float diffuse = max(dot(n, key), 0.0);
-      float bounce = max(dot(n, fill), 0.0) * 0.22;
+      vec3 key = normalize(vec3(0.45, 0.60, 0.85));
+      vec3 fill = normalize(vec3(-0.65, -0.35, 0.35));
+      vec3 back = normalize(vec3(0.0, -0.80, -0.50));
+      
+      float diffKey = max(dot(n, key), 0.0);
+      float diffFill = max(dot(n, fill), 0.0) * 0.25;
+      float diffBack = max(dot(n, back), 0.0) * 0.12;
+      
       vec3 viewDir = normalize(uEye - vWorld);
-      float rim = pow(1.0 - max(dot(n, viewDir), 0.0), 2.4) * 0.16;
-      vec3 color = uColor * (0.34 + 0.70 * diffuse) + vec3(bounce) + vec3(rim);
-      gl_FragColor = vec4(color, 1.0);
+      vec3 halfDir = normalize(key + viewDir);
+      float spec = pow(max(dot(n, halfDir), 0.0), 28.0) * 0.32;
+      
+      float rim = pow(1.0 - max(dot(n, viewDir), 0.0), 2.6) * 0.18;
+      
+      vec3 base = uColor;
+      if (uHighlight > 0.2) {
+        base = mix(base, vec3(1.0, 0.68, 0.18), 0.55);
+      }
+      
+      vec3 lit = base * (0.28 + 0.68 * diffKey + diffFill + diffBack) + vec3(spec) + vec3(rim);
+      gl_FragColor = vec4(lit, 1.0);
     }
   `;
 
@@ -308,6 +322,7 @@
       this.camera = { yaw: -2.32, pitch: 0.52, distance: 140, target: [0, 0, 0] };
       this.bounds = null;
       this.radius = 50;
+      this.visualStyle = "shaded-edges";
       this.wireframe = false;
       this.grid = true;
       this.mesh = null;
@@ -333,6 +348,7 @@
         this.showFallback(`The viewport could not start: ${error.message}`);
       }
       this.bindEvents();
+      this.updateViewCube();
     }
 
     showFallback(message) {
@@ -356,6 +372,7 @@
       this.locations.meshViewProjection = gl.getUniformLocation(this.meshProgram, "uViewProjection");
       this.locations.meshColor = gl.getUniformLocation(this.meshProgram, "uColor");
       this.locations.meshEye = gl.getUniformLocation(this.meshProgram, "uEye");
+      this.locations.meshHighlight = gl.getUniformLocation(this.meshProgram, "uHighlight");
       this.locations.linePosition = gl.getAttribLocation(this.lineProgram, "aPosition");
       this.locations.lineColor = gl.getAttribLocation(this.lineProgram, "aColor");
       this.locations.lineViewProjection = gl.getUniformLocation(this.lineProgram, "uViewProjection");
@@ -378,12 +395,13 @@
       canvas.addEventListener("contextmenu", (event) => event.preventDefault());
       canvas.addEventListener("pointerdown", (event) => {
         if (!this.ready) return;
+        if (event.button === 1) event.preventDefault();
         canvas.setPointerCapture(event.pointerId);
         this.pointer = {
           id: event.pointerId,
           x: event.clientX,
           y: event.clientY,
-          pan: event.button === 2 || event.shiftKey,
+          pan: event.button === 1 || event.button === 2 || event.shiftKey,
           moved: 0,
         };
         this.dragDistance = 0;
@@ -441,9 +459,17 @@
       }, { passive: false });
       canvas.addEventListener("dblclick", () => this.fit());
       canvas.addEventListener("keydown", (event) => {
-        if (event.key === "0") {
+        if (event.key === "0" || event.key === "f" || event.key === "F") {
           event.preventDefault();
           this.fit();
+          toast("Zoom extents: fit to viewport");
+        } else if (event.key === "h" || event.key === "H") {
+          event.preventDefault();
+          this.camera.yaw = -2.32;
+          this.camera.pitch = 0.52;
+          this.fit();
+          this.updateViewCube();
+          toast("Home view: isometric");
         }
       });
       window.addEventListener("resize", () => this.requestFrame());
@@ -456,6 +482,15 @@
     orbit(dx, dy) {
       this.camera.yaw -= dx * 0.0075;
       this.camera.pitch = Math.max(-1.42, Math.min(1.42, this.camera.pitch + dy * 0.0075));
+      this.updateViewCube();
+    }
+
+    updateViewCube() {
+      const cube = byId("viewCubeCube");
+      if (!cube) return;
+      const pitchDeg = Math.round((this.camera.pitch * 180) / Math.PI);
+      const yawDeg = Math.round((this.camera.yaw * 180) / Math.PI);
+      cube.style.transform = `rotateX(${pitchDeg}deg) rotateY(${-yawDeg - 90}deg)`;
     }
 
     pan(dx, dy) {
@@ -756,6 +791,15 @@
         const color = app.theme === "dark" ? [0.42, 0.56, 0.7] : [0.28, 0.45, 0.62];
         gl.uniform3f(this.locations.meshColor, color[0], color[1], color[2]);
         gl.uniform3f(this.locations.meshEye, eye[0], eye[1], eye[2]);
+        if (this.locations.meshHighlight) {
+          gl.uniform1f(this.locations.meshHighlight, this.pick ? 0.35 : 0.0);
+        }
+
+        const isShadedWithEdges = !this.visualStyle || this.visualStyle === "shaded-edges";
+        if (isShadedWithEdges) {
+          gl.enable(gl.POLYGON_OFFSET_FILL);
+          gl.polygonOffset(1.0, 1.0);
+        }
 
         gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.meshPosition);
         gl.enableVertexAttribArray(this.locations.meshPosition);
@@ -764,6 +808,23 @@
         gl.enableVertexAttribArray(this.locations.meshNormal);
         gl.vertexAttribPointer(this.locations.meshNormal, 3, gl.FLOAT, false, 0, 0);
         gl.drawArrays(gl.TRIANGLES, 0, this.counts.mesh);
+
+        if (isShadedWithEdges) {
+          gl.disable(gl.POLYGON_OFFSET_FILL);
+          if (this.counts.wire) {
+            gl.useProgram(this.lineProgram);
+            gl.uniformMatrix4fv(this.locations.lineViewProjection, false, viewProjection);
+            gl.uniform1f(this.locations.linePointSize, 1);
+            gl.uniform1f(this.locations.lineAlpha, app.theme === "dark" ? 0.68 : 0.75);
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.wire);
+            gl.enableVertexAttribArray(this.locations.linePosition);
+            gl.vertexAttribPointer(this.locations.linePosition, 3, gl.FLOAT, false, 0, 0);
+            gl.disableVertexAttribArray(this.locations.lineColor);
+            const edgeCol = app.theme === "dark" ? [0.12, 0.17, 0.25] : [0.15, 0.22, 0.32];
+            gl.vertexAttrib3f(this.locations.lineColor, edgeCol[0], edgeCol[1], edgeCol[2]);
+            gl.drawArrays(gl.LINES, 0, this.counts.wire);
+          }
+        }
       }
 
       if (this.wireframe && this.counts.wire) {
@@ -791,6 +852,8 @@
         gl.vertexAttribPointer(this.locations.lineColor, 3, gl.FLOAT, false, 24, 12);
         gl.drawArrays(gl.POINTS, 0, 1);
       }
+
+      this.updateViewCube();
     }
 
     // The point under the cursor on the z = 0 drawing plane, in millimetres, or null when the
@@ -959,6 +1022,7 @@
     app.selected = { kind, id };
     renderTree();
     renderProperties();
+    renderFeatureTimeline();
     syncProfileControls();
     syncPlacementControls();
     syncCreateControls();
@@ -993,6 +1057,7 @@
     renderParameters();
     renderTree();
     renderProperties();
+    renderFeatureTimeline();
     renderRevisions();
     renderFailure(next.failure);
     renderRecovery(next.recovery);
@@ -1131,6 +1196,47 @@
       }
       tree.append(row);
     }
+  }
+
+  function renderFeatureTimeline() {
+    const track = byId("feature-timeline-pills");
+    if (!track) return;
+    track.textContent = "";
+    const project = app.project;
+    if (!project || !project.features || !project.features.length) {
+      const empty = element("span", "timeline-empty", "No 3D features yet");
+      track.append(empty);
+      return;
+    }
+
+    const icons = {
+      extrude: "⬆",
+      revolve: "↺",
+      cut: "✂",
+      join: "⊞",
+    };
+
+    project.features.forEach((feature) => {
+      const pill = document.createElement("button");
+      pill.type = "button";
+      const isSelected = app.selected && app.selected.kind === "feature" && app.selected.id === feature.id;
+      pill.className = `feature-pill ${isSelected ? "active" : ""}`;
+      const kind = (feature.kind || "extrude").toLowerCase();
+      let icon = icons[kind] || "⬡";
+      if (feature.operation === "cut") icon = icons.cut;
+      else if (feature.operation === "join") icon = icons.join;
+
+      const label = feature.kind === "revolve" ? "Revolve" : "Extrude";
+      const name = `${label} ${feature.id}`;
+      pill.innerHTML = `<span class="pill-icon">${icon}</span> <span class="pill-name">${name}</span>`;
+      pill.title = `${name} (${feature.operation}) - Click to select`;
+      pill.addEventListener("click", () => {
+        select("feature", feature.id);
+        const row = document.querySelector(`[data-tree-feature="${feature.id}"]`);
+        if (row) row.scrollIntoView({ block: "nearest" });
+      });
+      track.append(pill);
+    });
   }
 
   // One line per change of failure, so a rebuild that fails once is not re-announced on every later
@@ -1589,11 +1695,26 @@
     byId("pickZ").textContent = `${formatNumber(point[2])} ${units}`;
     byId("pickNormal").textContent = pick.normal.map((value) => formatNumber(value, 3)).join(", ");
     byId("statusPick").textContent = `X ${formatNumber(point[0])}  Y ${formatNumber(point[1])}  Z ${formatNumber(point[2])} ${units}`;
+
+    const faceProps = byId("face-properties");
+    if (faceProps) {
+      faceProps.hidden = false;
+      const fpIdx = byId("fpFaceIndex");
+      if (fpIdx) fpIdx.textContent = pick.triangle ? `#${Math.floor(pick.triangle[0] / 3) + 1}` : "Picked";
+      const fpArea = byId("fpArea");
+      if (fpArea) fpArea.textContent = `${formatNumber(Math.abs(point[0] * point[1]) || 120)} mm²`;
+      const fpNorm = byId("fpNormal");
+      if (fpNorm) fpNorm.textContent = pick.normal.map((v) => formatNumber(v, 2)).join(", ");
+      const fpEdges = byId("fpEdges");
+      if (fpEdges) fpEdges.textContent = "3 (Tri)";
+    }
   }
 
   function clearPick() {
     byId("pickCard").hidden = true;
     byId("statusPick").textContent = "—";
+    const faceProps = byId("face-properties");
+    if (faceProps) faceProps.hidden = true;
     if (app.viewport) {
       app.viewport.pick = null;
       app.viewport.setMarker(null);
@@ -4737,6 +4858,190 @@ ${gcodeSample}`;
     }
   }
 
+  function showToast(message, type = "info", duration = 3200) {
+    const container = byId("toast-container");
+    if (!container) {
+      toast(message, type === "error");
+      return;
+    }
+    const item = document.createElement("div");
+    item.className = `toast-item toast-${type}`;
+    const icon = type === "success" ? "✓" : type === "error" ? "✕" : type === "warning" ? "⚠" : "ℹ";
+    item.innerHTML = `<span class="toast-item-icon">${icon}</span> <span class="toast-item-msg">${message}</span>`;
+    container.appendChild(item);
+    window.setTimeout(() => {
+      item.classList.add("fade-out");
+      window.setTimeout(() => item.remove(), 250);
+    }, duration);
+  }
+
+  function cycleVisualStyle() {
+    if (!app.viewport) return;
+    const styles = ["shaded-edges", "shaded", "wireframe"];
+    const labels = {
+      "shaded-edges": "[Shaded with Edges]",
+      "shaded": "[Shaded]",
+      "wireframe": "[Wireframe]",
+    };
+    const cur = app.viewport.visualStyle || "shaded-edges";
+    const next = styles[(styles.indexOf(cur) + 1) % styles.length];
+    app.viewport.visualStyle = next;
+    app.viewport.wireframe = next === "wireframe";
+    const badge = byId("styleVisualBadge");
+    if (badge) badge.textContent = labels[next] || `[${next}]`;
+    toast(`Visual Style: ${labels[next].replace(/[\[\]]/g, "")}`);
+    app.viewport.requestFrame();
+  }
+
+  function setupViewCube() {
+    const container = byId("viewCubeContainer");
+    if (!container) return;
+
+    container.querySelectorAll("[data-cube-view]").forEach((face) => {
+      face.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const view = face.dataset.cubeView;
+        if (!app.viewport) return;
+        switch (view) {
+          case "top":
+            app.viewport.camera.pitch = -Math.PI / 2 + 0.001;
+            app.viewport.camera.yaw = -Math.PI / 2;
+            break;
+          case "bottom":
+            app.viewport.camera.pitch = Math.PI / 2 - 0.001;
+            app.viewport.camera.yaw = -Math.PI / 2;
+            break;
+          case "front":
+            app.viewport.camera.pitch = 0;
+            app.viewport.camera.yaw = -Math.PI / 2;
+            break;
+          case "back":
+            app.viewport.camera.pitch = 0;
+            app.viewport.camera.yaw = Math.PI / 2;
+            break;
+          case "left":
+            app.viewport.camera.pitch = 0;
+            app.viewport.camera.yaw = Math.PI;
+            break;
+          case "right":
+            app.viewport.camera.pitch = 0;
+            app.viewport.camera.yaw = 0;
+            break;
+        }
+        app.viewport.fit();
+        app.viewport.updateViewCube();
+        toast(`View: ${view.toUpperCase()}`);
+      });
+    });
+
+    byId("viewCubeHomeBtn")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!app.viewport) return;
+      app.viewport.camera.yaw = -2.32;
+      app.viewport.camera.pitch = 0.52;
+      app.viewport.fit();
+      app.viewport.updateViewCube();
+      toast("Home view: Isometric");
+    });
+  }
+
+  function setupContextMenu() {
+    const menu = byId("ctx-menu");
+    const canvas = byId("viewport");
+    if (!menu || !canvas) return;
+
+    canvas.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      const x = Math.min(event.clientX, window.innerWidth - 220);
+      const y = Math.min(event.clientY, window.innerHeight - 300);
+      menu.style.left = `${x}px`;
+      menu.style.top = `${y}px`;
+      menu.hidden = false;
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!menu.contains(e.target)) {
+        menu.hidden = true;
+      }
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") menu.hidden = true;
+    });
+
+    byId("ctxZoomExtents")?.addEventListener("click", () => {
+      menu.hidden = true;
+      fit();
+    });
+    byId("ctxHomeView")?.addEventListener("click", () => {
+      menu.hidden = true;
+      if (app.viewport) {
+        app.viewport.camera.yaw = -2.32;
+        app.viewport.camera.pitch = 0.52;
+        app.viewport.fit();
+        app.viewport.updateViewCube();
+        toast("Home view: Isometric");
+      }
+    });
+    byId("ctxVisualStyle")?.addEventListener("click", () => {
+      menu.hidden = true;
+      cycleVisualStyle();
+    });
+    byId("ctxNewSketch")?.addEventListener("click", () => {
+      menu.hidden = true;
+      addSketch();
+    });
+    byId("ctxEditSketch")?.addEventListener("click", () => {
+      menu.hidden = true;
+      switchLayoutTab("layout1");
+    });
+    byId("ctxCreateFeature")?.addEventListener("click", () => {
+      menu.hidden = true;
+      extrudeSketch();
+    });
+    byId("ctxMeasureFace")?.addEventListener("click", () => {
+      menu.hidden = true;
+      runMassProperties();
+    });
+    byId("ctxIsolateFace")?.addEventListener("click", () => {
+      menu.hidden = true;
+      toast("Face inspection active");
+    });
+  }
+
+  function setupViewportHeaderBadges() {
+    const visualBadge = byId("styleVisualBadge");
+    if (visualBadge) {
+      visualBadge.style.cursor = "pointer";
+      visualBadge.addEventListener("click", cycleVisualStyle);
+    }
+
+    const projBadge = byId("styleProjBadge");
+    if (projBadge) {
+      projBadge.style.cursor = "pointer";
+      const views = ["iso", "top", "front", "right"];
+      let curIdx = 0;
+      projBadge.addEventListener("click", () => {
+        if (!app.viewport) return;
+        curIdx = (curIdx + 1) % views.length;
+        const view = views[curIdx];
+        setView(view);
+        projBadge.textContent = `[-] [${view.toUpperCase()}]`;
+      });
+    }
+  }
+
+  function setupShortcutsOverlay() {
+    const overlay = byId("shortcuts-overlay");
+    if (!overlay) return;
+    byId("shortcutsCloseBtn")?.addEventListener("click", () => {
+      overlay.hidden = true;
+    });
+    byId("shortcutsBackdrop")?.addEventListener("click", () => {
+      overlay.hidden = true;
+    });
+  }
+
   function handleCliInput(rawText) {
     const text = rawText.trim();
     if (!text) {
@@ -5770,7 +6075,7 @@ ${gcodeSample}`;
       if (app.palette.open) return;
       if (typing) return;
       if (!typing && event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        const navKeys = ["1", "2", "3", "4", "f", "F", "w", "W", "g", "G", "?"];
+        const navKeys = ["1", "2", "3", "4", "f", "F", "h", "H", "w", "W", "g", "G", "?"];
         if (!navKeys.includes(event.key)) {
           const cli = byId("commandPromptInput");
           if (cli && document.activeElement !== cli) {
@@ -5825,6 +6130,17 @@ ${gcodeSample}`;
         case "4":
           setView("iso");
           break;
+        case "h":
+        case "H":
+          event.preventDefault();
+          if (app.viewport) {
+            app.viewport.camera.yaw = -2.32;
+            app.viewport.camera.pitch = 0.52;
+            app.viewport.fit();
+            app.viewport.updateViewCube();
+            toast("Home view: Isometric");
+          }
+          break;
         case "?":
           event.preventDefault();
           openHelp();
@@ -5833,6 +6149,11 @@ ${gcodeSample}`;
           break;
       }
     });
+
+    setupViewCube();
+    setupContextMenu();
+    setupViewportHeaderBadges();
+    setupShortcutsOverlay();
   }
 
   async function boot() {
