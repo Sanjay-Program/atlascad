@@ -4803,6 +4803,124 @@ ${gcodeSample}`;
     }
   }
 
+  function wireFullDrawingEvents() {
+    const full = byId("fullDrawingCanvas");
+    if (!full || full.dataset.eventsWired) return;
+    full.dataset.eventsWired = "true";
+
+    let isPanningSheet = false;
+    let sheetPanStart = [0, 0];
+
+    full.addEventListener("wheel", (event) => {
+      const svg = full.querySelector("svg");
+      if (!svg || !app.drawing) return;
+      event.preventDefault();
+      const factor = Math.exp(-event.deltaY * 0.0015);
+      drawState.viewZoom = Math.min(50, Math.max(0.1, (drawState.viewZoom || 1.0) * factor));
+      renderDrawing(app.drawing);
+    }, { passive: false });
+
+    full.addEventListener("pointerdown", (event) => {
+      if (event.button === 1 || (event.button === 0 && event.altKey)) {
+        isPanningSheet = true;
+        sheetPanStart = [event.clientX, event.clientY];
+        full.setPointerCapture(event.pointerId);
+        event.preventDefault();
+      }
+    });
+
+    full.addEventListener("pointerup", (event) => {
+      if (isPanningSheet) {
+        isPanningSheet = false;
+        try { full.releasePointerCapture(event.pointerId); } catch (_) {}
+      }
+    });
+
+    full.addEventListener("dblclick", () => {
+      drawState.viewZoom = 1.0;
+      drawState.viewPan = [0, 0];
+      if (app.drawing) renderDrawing(app.drawing);
+    });
+
+    full.addEventListener("pointermove", (event) => {
+      if (isPanningSheet) {
+        const svg = full.querySelector("svg");
+        if (svg && sheetPanStart) {
+          const box = svg.viewBox && svg.viewBox.baseVal;
+          const rect = svg.getBoundingClientRect();
+          if (box && box.width > 0 && box.height > 0 && rect && rect.width > 0 && rect.height > 0) {
+            const scale = Math.min(rect.width / box.width, rect.height / box.height);
+            if (scale > 0 && Number.isFinite(scale)) {
+              const dx = event.clientX - sheetPanStart[0];
+              const dy = event.clientY - sheetPanStart[1];
+              sheetPanStart = [event.clientX, event.clientY];
+              if (!drawState.viewPan) drawState.viewPan = [0, 0];
+              drawState.viewPan[0] -= dx / scale;
+              drawState.viewPan[1] += dy / scale;
+              renderDrawing(app.drawing);
+            }
+          }
+        }
+        return;
+      }
+      const svg = full.querySelector("svg");
+      if (!svg || !app.drawing || drawState.tool === "select") {
+        if (drawState.activeSnap || drawState.polarHit) {
+          drawState.activeSnap = null;
+          drawState.polarHit = null;
+          if (svg) updateSnapOverlay(svg);
+        }
+        return;
+      }
+      const rawPoint = modelPointFromEvent(svg, event);
+      if (!rawPoint) return;
+      const coordsEl = byId("statusCoords");
+      if (coordsEl) coordsEl.textContent = `X: ${rawPoint[0].toFixed(3)}, Y: ${rawPoint[1].toFixed(3)}`;
+      const box = svg.viewBox.baseVal;
+      const rect = svg.getBoundingClientRect();
+      const scale = Math.min(rect.width / box.width, rect.height / box.height);
+
+      const basePoint = drawState.points.length ? drawState.points[drawState.points.length - 1] : null;
+      let snap = null;
+      if (drawState.osnap || drawState.snapOverride) {
+        snap = findObjectSnap(app.drawing, rawPoint, basePoint, scale, 12);
+      }
+      let polar = null;
+      if (!snap && drawState.polar && basePoint) {
+        polar = findPolarTracking(basePoint, rawPoint, scale, 12);
+      }
+      drawState.activeSnap = snap;
+      drawState.polarHit = polar;
+      updateSnapOverlay(svg);
+    });
+
+    full.addEventListener("click", (event) => {
+      if (event.button !== 0 || event.altKey) return;
+      const svg = full.querySelector("svg");
+      if (!svg || !app.drawing) return;
+      if (drawState.tool === "select") {
+        const target = event.target;
+        const node = target && typeof target.closest === "function"
+          ? target.closest("[data-entity-id]")
+          : null;
+        drawState.selected = node ? Number(node.dataset.entityId) : null;
+        renderDrawing(app.drawing);
+        return;
+      }
+      let point = modelPointFromEvent(svg, event);
+      if (drawState.activeSnap) {
+        point = drawState.activeSnap.point;
+      } else if (drawState.polarHit) {
+        point = drawState.polarHit.point;
+      }
+      if (point) placeDrawingPoint(point);
+      if (drawState.snapOverride) {
+        drawState.snapOverride = null;
+        document.querySelectorAll(".snap-pill").forEach((b) => b.classList.remove("active"));
+      }
+    });
+  }
+
   function syncFullDrawingCanvas() {
     const full = byId("fullDrawingCanvas");
     const previewSvg = byId("drawingPreview")?.querySelector("svg");
@@ -4823,6 +4941,8 @@ ${gcodeSample}`;
       const tbScale = byId("tbScale");
       if (tbScale) tbScale.textContent = `1:1 (${app.project.units || "mm"})`;
     }
+
+    wireFullDrawingEvents();
   }
 
   function switchLayoutTab(tab, syncRibbon = true) {
@@ -5466,7 +5586,10 @@ ${gcodeSample}`;
     byId("copyShareBtn").addEventListener("click", copyShareLink);
     byId("recoveryDiscard").addEventListener("click", discardRecovery);
     byId("exportBtn").addEventListener("click", exportStl);
+    byId("exportDxfBtn")?.addEventListener("click", exportDxf);
     byId("downloadDxfBtn").addEventListener("click", exportDxf);
+    byId("timelineStepUndo")?.addEventListener("click", undo);
+    byId("timelineStepRedo")?.addEventListener("click", redo);
     for (const button of document.querySelectorAll(".draw-tools [data-tool]")) {
       button.addEventListener("click", () => setDrawTool(button.dataset.tool));
     }
