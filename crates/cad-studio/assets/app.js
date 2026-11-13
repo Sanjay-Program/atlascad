@@ -4778,7 +4778,7 @@ ${gcodeSample}`;
     toast(`Dynamic Input (DYNMODE) ${dynamicInputEnabled ? "ON" : "OFF"}`);
   }
 
-  function switchRibbonTab(tabName) {
+  function switchRibbonTab(tabName, syncLayout = true) {
     document.querySelectorAll(".ribbon-tab").forEach((t) => {
       const active = t.dataset.tab === tabName;
       t.classList.toggle("active", active);
@@ -4787,6 +4787,20 @@ ${gcodeSample}`;
     document.querySelectorAll(".ribbon-panel").forEach((p) => {
       p.classList.toggle("active", p.id.toLowerCase() === `ribbon${tabName}`);
     });
+
+    if (syncLayout) {
+      if (tabName === "home" || tabName === "solid") {
+        if (currentLayoutSpace !== "model") switchLayoutTab("model", false);
+      } else if (tabName === "draw" || tabName === "modify") {
+        if (currentLayoutSpace !== "layout1") switchLayoutTab("layout1", false);
+      } else if (tabName === "annotate") {
+        if (currentLayoutSpace !== "layout2" && currentLayoutSpace !== "layout1") switchLayoutTab("layout1", false);
+      } else if (tabName === "simulate") {
+        openSimLauncher();
+      } else if (tabName === "output") {
+        switchRightPanelTab("revisions");
+      }
+    }
   }
 
   function syncFullDrawingCanvas() {
@@ -4799,10 +4813,21 @@ ${gcodeSample}`;
     cloned.style.height = "100%";
     cloned.setAttribute("preserveAspectRatio", "xMidYMid meet");
     full.appendChild(cloned);
+
+    // Update AutoCAD Title Block
+    if (app.project) {
+      const tbProj = byId("tbProjectName");
+      if (tbProj) tbProj.textContent = app.project.name || "Untitled Part";
+      const tbRev = byId("tbRevision");
+      if (tbRev) tbRev.textContent = `REV ${app.project.revision || 1}`;
+      const tbScale = byId("tbScale");
+      if (tbScale) tbScale.textContent = `1:1 (${app.project.units || "mm"})`;
+    }
   }
 
-  function switchLayoutTab(tab) {
+  function switchLayoutTab(tab, syncRibbon = true) {
     currentLayoutSpace = tab;
+    document.body.dataset.workspaceMode = tab;
     const tabM = byId("tabModel");
     const tabL1 = byId("tabLayout1");
     const tabL2 = byId("tabLayout2");
@@ -4820,8 +4845,12 @@ ${gcodeSample}`;
         modeBadge.textContent = "MODEL";
         modeBadge.classList.add("active");
       }
-      switchRibbonTab("home");
-      if (app.viewport) app.viewport.requestFrame();
+      if (syncRibbon) switchRibbonTab("home", false);
+      if (app.viewport) {
+        app.viewport.requestFrame();
+        app.viewport.updateViewCube();
+      }
+      switchRightPanelTab("properties");
       printCliHistory("Command: TILEMODE 1 (Model Space active)");
       toast("Model Space: 3D CAD modeling");
     } else if (tab === "layout1") {
@@ -4834,8 +4863,9 @@ ${gcodeSample}`;
         modeBadge.textContent = "PAPER";
         modeBadge.classList.remove("active");
       }
-      switchRibbonTab("draw");
+      if (syncRibbon) switchRibbonTab("draw", false);
       syncFullDrawingCanvas();
+      switchRightPanelTab("drawing");
       printCliHistory("Command: LAYOUT 1 (Paper Space active)");
       toast("Paper Space: 2D Drafting Sheet");
     } else if (tab === "layout2") {
@@ -4844,10 +4874,49 @@ ${gcodeSample}`;
       tabL2?.classList.add("active");
       if (sheetView) sheetView.hidden = false;
       if (viewport) viewport.style.display = "none";
+      if (syncRibbon) switchRibbonTab("annotate", false);
       cadMultiview();
       syncFullDrawingCanvas();
+      switchRightPanelTab("drawing");
       printCliHistory("Command: MV (4-View Orthographic Layout active)");
     }
+  }
+
+  function switchLeftPanelTab(cat) {
+    document.querySelectorAll("[data-left-cat]").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.leftCat === cat);
+      btn.setAttribute("aria-selected", String(btn.dataset.leftCat === cat));
+    });
+    if (cat === "create") {
+      byId("sectionCreate")?.scrollIntoView({ block: "nearest" });
+    } else if (cat === "tree") {
+      byId("tree")?.scrollIntoView({ block: "nearest" });
+    } else if (cat === "params") {
+      byId("parameters")?.scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  function switchRightPanelTab(cat) {
+    document.querySelectorAll("[data-right-cat]").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.rightCat === cat);
+      btn.setAttribute("aria-selected", String(btn.dataset.rightCat === cat));
+    });
+    if (cat === "properties") {
+      byId("properties")?.scrollIntoView({ block: "nearest" });
+    } else if (cat === "drawing") {
+      byId("drawingSection")?.scrollIntoView({ block: "nearest" });
+    } else if (cat === "revisions") {
+      byId("revisionsSection")?.scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  function setupPanelCategoryTabs() {
+    document.querySelectorAll("[data-left-cat]").forEach((btn) => {
+      btn.addEventListener("click", () => switchLeftPanelTab(btn.dataset.leftCat));
+    });
+    document.querySelectorAll("[data-right-cat]").forEach((btn) => {
+      btn.addEventListener("click", () => switchRightPanelTab(btn.dataset.rightCat));
+    });
   }
 
   function toggleModelPaper() {
@@ -6154,6 +6223,7 @@ ${gcodeSample}`;
     setupContextMenu();
     setupViewportHeaderBadges();
     setupShortcutsOverlay();
+    setupPanelCategoryTabs();
   }
 
   async function boot() {

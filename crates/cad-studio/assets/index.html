@@ -226,6 +226,14 @@
 
   <main class="workspace">
     <aside class="panel panel-left" aria-label="Project browser">
+      <!-- Left Panel Category Tabs -->
+      <div class="panel-category-tabs" id="leftPanelCatTabs" role="tablist" aria-label="Project Browser Categories">
+        <button type="button" class="panel-cat-tab active" data-left-cat="create" role="tab" aria-selected="true" title="Create sketches and 3D features">Create</button>
+        <button type="button" class="panel-cat-tab" data-left-cat="tree" role="tab" aria-selected="false" title="Parametric model history tree">Tree</button>
+        <button type="button" class="panel-cat-tab" data-left-cat="params" role="tab" aria-selected="false" title="Parametric dimensions and constraints">Params</button>
+        <button type="button" class="panel-cat-tab" data-left-cat="all" role="tab" aria-selected="false" title="Show all sections">All</button>
+      </div>
+
       <section class="panel-section collapsible-section" id="sectionProject">
         <div class="section-head">
           <h2>Project</h2>
@@ -479,7 +487,40 @@
           </div>
         </div>
         <div id="fullDrawingContainer" class="full-drawing-container">
-          <div id="fullDrawingCanvas" class="full-drawing-canvas"></div>
+          <div class="drawing-sheet-wrapper" id="drawingSheetWrapper">
+            <div id="fullDrawingCanvas" class="full-drawing-canvas"></div>
+            <!-- AutoCAD Standard ISO / ANSI Title Block Overlay -->
+            <div class="autocad-title-block" id="autocadTitleBlock">
+              <div class="tb-row tb-header">
+                <div class="tb-brand">ATLAS CAD ENGINEERING</div>
+                <div class="tb-approval"><span class="tb-pill">APPROVED</span></div>
+              </div>
+              <div class="tb-row tb-meta-top">
+                <div class="tb-cell tb-grow">
+                  <span class="tb-caption">PROJECT NAME</span>
+                  <strong id="tbProjectName" class="tb-val">—</strong>
+                </div>
+                <div class="tb-cell">
+                  <span class="tb-caption">REVISION</span>
+                  <strong id="tbRevision" class="tb-val">—</strong>
+                </div>
+              </div>
+              <div class="tb-row tb-meta-bottom">
+                <div class="tb-cell">
+                  <span class="tb-caption">SCALE</span>
+                  <span id="tbScale" class="tb-val">1:1 (mm)</span>
+                </div>
+                <div class="tb-cell">
+                  <span class="tb-caption">PROJECTION</span>
+                  <span class="tb-val">THIRD ANGLE (⌖)</span>
+                </div>
+                <div class="tb-cell">
+                  <span class="tb-caption">SHEET</span>
+                  <span class="tb-val">1 OF 1 (A3)</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="view-toolbar" role="toolbar" aria-label="Viewport controls">
@@ -556,6 +597,14 @@
     <div id="drawerScrim" class="drawer-scrim" aria-hidden="true"></div>
 
     <aside class="panel panel-right" aria-label="Properties and activity">
+      <!-- Right Panel Category Tabs -->
+      <div class="panel-category-tabs" id="rightPanelCatTabs" role="tablist" aria-label="Inspector Categories">
+        <button type="button" class="panel-cat-tab active" data-right-cat="properties" role="tab" aria-selected="true" title="Physical and geometric properties">Properties</button>
+        <button type="button" class="panel-cat-tab" data-right-cat="drawing" role="tab" aria-selected="false" title="2D Drafting sheet and tools">2D Sheet</button>
+        <button type="button" class="panel-cat-tab" data-right-cat="revisions" role="tab" aria-selected="false" title="Version history and backups">Revisions</button>
+        <button type="button" class="panel-cat-tab" data-right-cat="all" role="tab" aria-selected="false" title="Show all inspector sections">All</button>
+      </div>
+
       <section class="panel-section">
         <div class="section-head"><h2>Properties</h2></div>
         <div class="meta-grid" id="properties">
