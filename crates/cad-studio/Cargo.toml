@@ -26,6 +26,7 @@ atlas-audit.workspace = true
 atlas-compliance.workspace = true
 atlas-job-queue.workspace = true
 atlas-organization.workspace = true
+atlas-additive.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 

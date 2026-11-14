@@ -444,6 +444,7 @@ fn init_default_dependency_graph() -> atlas_dependency_graph::graph::DependencyG
     let dwg = NodeId::new("drawing-sheet");
     let cam = NodeId::new("cam-toolpaths");
     let bim = NodeId::new("bim-coordination");
+    let additive = NodeId::new("additive-slicing");
 
     graph.add_node(DependencyNode::new(
         geom.clone(),
@@ -480,6 +481,11 @@ fn init_default_dependency_graph() -> atlas_dependency_graph::graph::DependencyG
         "OpenBIM & IFC Model",
         NodeKind::BimCoordination,
     ));
+    graph.add_node(DependencyNode::new(
+        additive.clone(),
+        "3D Slicing & Additive Toolpaths",
+        NodeKind::CamToolpath,
+    ));
 
     let _ = graph.add_dependency(
         geom.clone(),
@@ -502,6 +508,11 @@ fn init_default_dependency_graph() -> atlas_dependency_graph::graph::DependencyG
         geom.clone(),
         bim.clone(),
         DependencyReason::GeometricBoundary,
+    );
+    let _ = graph.add_dependency(
+        geom.clone(),
+        additive.clone(),
+        DependencyReason::ToolpathSurface,
     );
 
     graph
@@ -2670,6 +2681,272 @@ impl StudioState {
         let bom = build.bill_of_materials(material_name, density_override);
         serde_json::to_value(&bom).map_err(|e| StudioError::Json(e.to_string()))
     }
+
+    fn additive_slice(
+        &mut self,
+        request: &AdditiveSliceRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        if self.project.features().is_empty() {
+            return Err(StudioError::BadRequest(
+                "this project has no solid to slice".into(),
+            ));
+        }
+        let build = self
+            .project
+            .build_with_cache(&mut self.kernel, &mut self.cache)?;
+        if let Some(failure) = build.failed {
+            return Err(StudioError::BadRequest(format!(
+                "feature {} cannot be rebuilt: {}",
+                failure.id, failure.message
+            )));
+        }
+        let mesh = build
+            .mesh
+            .ok_or_else(|| StudioError::BadRequest("this project has no solid to slice".into()))?;
+
+        let mut min = [f64::INFINITY; 3];
+        let mut max = [f64::NEG_INFINITY; 3];
+        for p in &mesh.positions {
+            for i in 0..3 {
+                min[i] = min[i].min(p[i]);
+                max[i] = max[i].max(p[i]);
+            }
+        }
+
+        let mut settings = atlas_additive::settings::SlicerSettings::default();
+        if let Some(lh) = request.layer_height_mm {
+            settings.layer_height_mm = lh.clamp(0.05, 0.80);
+        }
+        if let Some(lw) = request.line_width_mm {
+            settings.line_width_mm = lw.clamp(0.2, 1.2);
+        }
+        if let Some(inf) = request.infill_density {
+            settings.infill_density = inf.clamp(0.0, 1.0);
+        }
+        if let Some(ref pat) = request.infill_pattern {
+            settings.infill_pattern = match pat.to_lowercase().as_str() {
+                "grid" => atlas_additive::settings::InfillPattern::Grid,
+                "honeycomb" => atlas_additive::settings::InfillPattern::Honeycomb,
+                "gyroid" => atlas_additive::settings::InfillPattern::Gyroid,
+                "concentric" => atlas_additive::settings::InfillPattern::Concentric,
+                _ => atlas_additive::settings::InfillPattern::Rectilinear,
+            };
+        }
+        if let Some(speed) = request.print_speed_mm_s {
+            settings.print_speed_mm_s = speed.clamp(10.0, 300.0);
+        }
+        if let Some(nt) = request.nozzle_temp_c {
+            settings.nozzle_temp_c = nt;
+        }
+        if let Some(bt) = request.bed_temp_c {
+            settings.bed_temp_c = bt;
+        }
+        if let Some(ref d) = request.dialect {
+            settings.dialect = match d.to_lowercase().as_str() {
+                "klipper" => atlas_additive::settings::PrinterDialect::Klipper,
+                "reprap" => atlas_additive::settings::PrinterDialect::RepRap,
+                "prusa" => atlas_additive::settings::PrinterDialect::Prusa,
+                _ => atlas_additive::settings::PrinterDialect::Marlin,
+            };
+        }
+
+        let sliced = atlas_additive::slicer::slice_solid_bounds(
+            &self.project.name,
+            min[0],
+            min[1],
+            min[2],
+            max[0],
+            max[1],
+            max[2],
+            &settings,
+        );
+
+        self.mark_node_current("additive-slicing", "slicing-completed");
+
+        serde_json::to_value(&sliced).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_cfd(&mut self, req: &SimCfdRequest) -> Result<serde_json::Value, StudioError> {
+        let fluid = match req.fluid.as_deref().unwrap_or("water") {
+            "air" => atlas_simulation_core::cfd::FluidProperties::air_20c(),
+            "oil" => atlas_simulation_core::cfd::FluidProperties::engine_oil_40c(),
+            _ => atlas_simulation_core::cfd::FluidProperties::water_20c(),
+        };
+        let prob = atlas_simulation_core::cfd::PipeFlowProblem {
+            diameter_m: req.diameter_m.unwrap_or(0.05),
+            length_m: req.length_m.unwrap_or(10.0),
+            velocity_m_s: req.velocity_m_s.unwrap_or(1.5),
+            roughness_m: 0.000045,
+            fluid,
+        };
+        let res =
+            atlas_simulation_core::cfd::solve_pipe_flow(&prob).map_err(StudioError::BadRequest)?;
+        self.mark_node_current("cfd-aerodynamics", "cfd-converged");
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_aerodynamics(&mut self, req: &SimAeroRequest) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::aerodynamics::WingAeroProblem {
+            wing_area_m2: req.wing_area_m2.unwrap_or(16.0),
+            aspect_ratio: req.aspect_ratio.unwrap_or(7.8),
+            oswald_efficiency: 0.85,
+            angle_of_attack_deg: req.angle_of_attack_deg.unwrap_or(4.5),
+            zero_lift_aoa_deg: -1.2,
+            airspeed_m_s: req.airspeed_m_s.unwrap_or(68.0),
+            altitude_m: 1200.0,
+            cd0_profile_drag: 0.024,
+        };
+        let res = atlas_simulation_core::aerodynamics::solve_wing_aerodynamics(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_chemical(&mut self, req: &SimChemicalRequest) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::chemical::FlashProblem {
+            temperature_k: req.temperature_k.unwrap_or(315.0),
+            pressure_bar: req.pressure_bar.unwrap_or(4.5),
+            components: vec![
+                atlas_simulation_core::chemical::ChemicalComponent {
+                    name: "Propane".to_string(),
+                    feed_mole_fraction_z: 0.35,
+                    equilibrium_k_value: 3.2,
+                },
+                atlas_simulation_core::chemical::ChemicalComponent {
+                    name: "Isobutane".to_string(),
+                    feed_mole_fraction_z: 0.35,
+                    equilibrium_k_value: 1.4,
+                },
+                atlas_simulation_core::chemical::ChemicalComponent {
+                    name: "n-Pentane".to_string(),
+                    feed_mole_fraction_z: 0.30,
+                    equilibrium_k_value: 0.42,
+                },
+            ],
+        };
+        let res = atlas_simulation_core::chemical::solve_rachford_rice_flash(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_molecular(
+        &mut self,
+        _req: &SimMolecularRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::molecular::MolecularDynamicsProblem {
+            atoms: vec![
+                atlas_simulation_core::molecular::Atom {
+                    id: 1,
+                    element: "Ar".to_string(),
+                    mass_amu: 39.948,
+                    position_angstrom: [0.0, 0.0, 0.0],
+                    velocity_angstrom_ps: [0.01, 0.0, 0.0],
+                },
+                atlas_simulation_core::molecular::Atom {
+                    id: 2,
+                    element: "Ar".to_string(),
+                    mass_amu: 39.948,
+                    position_angstrom: [3.8, 0.0, 0.0],
+                    velocity_angstrom_ps: [-0.01, 0.0, 0.0],
+                },
+            ],
+            force_field: atlas_simulation_core::molecular::LennardJonesParam::argon(),
+            time_step_ps: 0.002,
+            steps: 20,
+        };
+        let res = atlas_simulation_core::molecular::run_molecular_dynamics(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_robotics(&mut self, req: &SimRoboticsRequest) -> Result<serde_json::Value, StudioError> {
+        let default_angles = vec![15.0, 30.0, 45.0];
+        let angles = req.joint_angles_deg.as_ref().unwrap_or(&default_angles);
+        let t1 = angles.first().copied().unwrap_or(0.0).to_radians();
+        let t2 = angles.get(1).copied().unwrap_or(0.0).to_radians();
+        let t3 = angles.get(2).copied().unwrap_or(0.0).to_radians();
+
+        let prob = atlas_simulation_core::robotics::RobotKinematicsProblem {
+            robot_name: "Atlas-6DOF Industrial Manipulator".to_string(),
+            links: vec![
+                atlas_simulation_core::robotics::DhLink::new(
+                    "Base J1".to_string(),
+                    t1,
+                    0.4,
+                    0.0,
+                    std::f64::consts::FRAC_PI_2,
+                ),
+                atlas_simulation_core::robotics::DhLink::new(
+                    "Arm J2".to_string(),
+                    t2,
+                    0.0,
+                    0.6,
+                    0.0,
+                ),
+                atlas_simulation_core::robotics::DhLink::new(
+                    "Forearm J3".to_string(),
+                    t3,
+                    0.0,
+                    0.5,
+                    std::f64::consts::FRAC_PI_2,
+                ),
+            ],
+        };
+        let res = atlas_simulation_core::robotics::solve_robot_kinematics(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_powerflow(
+        &mut self,
+        req: &SimPowerFlowRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::power_flow::PowerFlowProblem {
+            base_mva: 100.0,
+            lines: vec![atlas_simulation_core::power_flow::TransmissionLine {
+                from_bus: 1,
+                to_bus: 2,
+                resistance_pu: 0.015,
+                reactance_pu: 0.065,
+            }],
+            p_load_mw: req.p_load_mw.unwrap_or(45.0),
+            q_load_mvar: req.q_load_mvar.unwrap_or(18.0),
+            v_slack_pu: 1.02,
+        };
+        let res = atlas_simulation_core::power_flow::solve_power_flow(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_generative(
+        &mut self,
+        req: &SimGenerativeRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::generative::TopologyOptProblem {
+            grid_nx: 24,
+            grid_ny: 12,
+            target_volume_fraction: req.volume_fraction.unwrap_or(0.35),
+            penalization_power_p: 3.0,
+            max_iterations: req.iterations.unwrap_or(12),
+            filter_radius_elements: 1.5,
+        };
+        let res = atlas_simulation_core::generative::solve_topology_optimization(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_geotechnical(
+        &mut self,
+        req: &SimGeotechRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::geotechnical::RetainingWallProblem {
+            wall_height_m: req.wall_height_m.unwrap_or(5.0),
+            soil: atlas_simulation_core::geotechnical::SoilProperties::dense_sand(),
+            water_table_depth_m: None,
+        };
+        let res = atlas_simulation_core::geotechnical::solve_retaining_wall_pressures(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
 }
 
 fn export_name(name: &str) -> String {
@@ -3767,6 +4044,69 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             },
             Err(error) => error_response(&error),
         },
+        "/api/additive/slice" => match parse_body_or_default::<AdditiveSliceRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.additive_slice(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/cfd" => match parse_body_or_default::<SimCfdRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_cfd(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/aerodynamics" => match parse_body_or_default::<SimAeroRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_aerodynamics(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/chemical" => match parse_body_or_default::<SimChemicalRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_chemical(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/molecular" => match parse_body_or_default::<SimMolecularRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_molecular(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/robotics" => match parse_body_or_default::<SimRoboticsRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_robotics(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/powerflow" => match parse_body_or_default::<SimPowerFlowRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_powerflow(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/generative" => match parse_body_or_default::<SimGenerativeRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_generative(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/geotechnical" => match parse_body_or_default::<SimGeotechRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_geotechnical(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
         _ => error_response(&StudioError::NotFound),
     }
 }
@@ -4779,4 +5119,96 @@ struct EcoRequest {
     pub description: String,
     #[serde(default)]
     pub approve: Option<bool>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AdditiveSliceRequest {
+    #[serde(default)]
+    pub layer_height_mm: Option<f64>,
+    #[serde(default)]
+    pub line_width_mm: Option<f64>,
+    #[serde(default)]
+    pub infill_density: Option<f64>,
+    #[serde(default)]
+    pub infill_pattern: Option<String>,
+    #[serde(default)]
+    pub print_speed_mm_s: Option<f64>,
+    #[serde(default)]
+    pub nozzle_temp_c: Option<f64>,
+    #[serde(default)]
+    pub bed_temp_c: Option<f64>,
+    #[serde(default)]
+    pub dialect: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimCfdRequest {
+    #[serde(default)]
+    pub diameter_m: Option<f64>,
+    #[serde(default)]
+    pub length_m: Option<f64>,
+    #[serde(default)]
+    pub velocity_m_s: Option<f64>,
+    #[serde(default)]
+    pub fluid: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimAeroRequest {
+    #[serde(default)]
+    pub airspeed_m_s: Option<f64>,
+    #[serde(default)]
+    pub angle_of_attack_deg: Option<f64>,
+    #[serde(default)]
+    pub wing_area_m2: Option<f64>,
+    #[serde(default)]
+    pub aspect_ratio: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimChemicalRequest {
+    #[serde(default)]
+    pub temperature_k: Option<f64>,
+    #[serde(default)]
+    pub pressure_bar: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimMolecularRequest {}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimRoboticsRequest {
+    #[serde(default)]
+    pub joint_angles_deg: Option<Vec<f64>>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimPowerFlowRequest {
+    #[serde(default)]
+    pub p_load_mw: Option<f64>,
+    #[serde(default)]
+    pub q_load_mvar: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimGenerativeRequest {
+    #[serde(default)]
+    pub volume_fraction: Option<f64>,
+    #[serde(default)]
+    pub iterations: Option<usize>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimGeotechRequest {
+    #[serde(default)]
+    pub wall_height_m: Option<f64>,
 }

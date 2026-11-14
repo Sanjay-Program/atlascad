@@ -3671,12 +3671,12 @@ fn dependency_graph_invalidation_api() -> Result<(), Box<dyn std::error::Error>>
     let (_dir, _path, handle) = fixture("depgraph", [20.0, 20.0, 10.0])?;
     let addr = handle.addr();
 
-    // 1. Initial GET /api/graph: all 7 nodes present, 6 edges, 0 stale nodes
+    // 1. Initial GET /api/graph: all 8 nodes present, 7 edges, 0 stale nodes
     let resp = request(addr, "GET", "/api/graph", &[], &[])?;
     assert_eq!(resp.status, 200);
     let graph = json(&resp)?;
-    assert_eq!(graph["node_count"], 7);
-    assert_eq!(graph["edge_count"], 6);
+    assert_eq!(graph["node_count"], 8);
+    assert_eq!(graph["edge_count"], 7);
     assert_eq!(graph["stale_count"], 0);
     assert_eq!(graph["is_stale"], false);
 
@@ -3879,6 +3879,144 @@ fn enterprise_saas_audit_report_and_jobs_api() -> Result<(), Box<dyn std::error:
     assert_eq!(updated_audit_data["integrity_verified"], true);
     let updated_count = updated_audit_data["count"].as_u64().ok_or("new count")?;
     assert!(updated_count > count);
+
+    Ok(())
+}
+
+#[test]
+fn additive_manufacturing_slicing_api() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("additive_test", [30.0, 20.0, 10.0])?;
+    let addr = handle.addr();
+
+    let slice_resp = post(
+        addr,
+        "/api/additive/slice",
+        r#"{"layer_height_mm": 0.20, "infill_density": 0.20, "infill_pattern": "honeycomb", "dialect": "marlin"}"#,
+    )?;
+    assert_eq!(slice_resp.status, 200);
+    let sliced = json(&slice_resp)?;
+
+    assert_eq!(sliced["model_name"], "additive_test");
+    let layers = sliced["layers"].as_array().ok_or("layers")?;
+    assert!(!layers.is_empty());
+    assert!(layers.len() >= 40);
+
+    let estimation = &sliced["estimation"];
+    let print_time = estimation["total_print_time_seconds"]
+        .as_f64()
+        .ok_or("time")?;
+    assert!(print_time > 0.0);
+
+    let filament_mass = estimation["filament_mass_grams"].as_f64().ok_or("mass")?;
+    assert!(filament_mass > 0.0);
+
+    let gcode = sliced["gcode"].as_str().ok_or("gcode")?;
+    assert!(gcode.contains("G21"));
+    assert!(gcode.contains(";LAYER:0"));
+    assert!(gcode.contains("M104 S0"));
+
+    Ok(())
+}
+
+#[test]
+fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("sim_multi_test", [25.0, 25.0, 10.0])?;
+    let addr = handle.addr();
+
+    // 1. CFD Pipe Hydraulics
+    let cfd_resp = post(
+        addr,
+        "/api/sim/cfd",
+        r#"{"diameter_m": 0.05, "length_m": 12.0, "velocity_m_s": 1.2, "fluid": "water"}"#,
+    )?;
+    assert_eq!(cfd_resp.status, 200);
+    let cfd = json(&cfd_resp)?;
+    assert_eq!(cfd["status"], "Converged");
+    let re = cfd["scalar_metrics"]["reynolds_number"]
+        .as_f64()
+        .ok_or("re")?;
+    assert!(re > 1000.0);
+
+    // 2. Aerodynamics Wing Lift/Drag
+    let aero_resp = post(
+        addr,
+        "/api/sim/aerodynamics",
+        r#"{"wing_area_m2": 15.0, "aspect_ratio": 8.0, "angle_of_attack_deg": 5.0, "airspeed_m_s": 70.0}"#,
+    )?;
+    assert_eq!(aero_resp.status, 200);
+    let aero = json(&aero_resp)?;
+    let cl = aero["scalar_metrics"]["lift_coefficient_cl"]
+        .as_f64()
+        .ok_or("cl")?;
+    let ld = aero["scalar_metrics"]["lift_to_drag_ratio"]
+        .as_f64()
+        .ok_or("ld")?;
+    assert!(cl > 0.3);
+    assert!(ld > 10.0);
+
+    // 3. Chemical Rachford-Rice Flash
+    let chem_resp = post(
+        addr,
+        "/api/sim/chemical",
+        r#"{"temperature_k": 315.0, "pressure_bar": 4.5}"#,
+    )?;
+    assert_eq!(chem_resp.status, 200);
+    let chem = json(&chem_resp)?;
+    let beta = chem["scalar_metrics"]["vapor_fraction_beta"]
+        .as_f64()
+        .ok_or("beta")?;
+    assert!(beta > 0.0 && beta < 1.0);
+
+    // 4. Robotics DH Kinematics
+    let robot_resp = post(
+        addr,
+        "/api/sim/robotics",
+        r#"{"joint_angles_deg": [20.0, 40.0, -30.0]}"#,
+    )?;
+    assert_eq!(robot_resp.status, 200);
+    let robot = json(&robot_resp)?;
+    let reach = robot["scalar_metrics"]["total_reach_m"]
+        .as_f64()
+        .ok_or("reach")?;
+    assert!(reach > 0.5);
+
+    // 5. Electrical AC Power Flow
+    let pflow_resp = post(
+        addr,
+        "/api/sim/powerflow",
+        r#"{"p_load_mw": 50.0, "q_load_mvar": 20.0}"#,
+    )?;
+    assert_eq!(pflow_resp.status, 200);
+    let pflow = json(&pflow_resp)?;
+    let v2 = pflow["scalar_metrics"]["receiving_bus_voltage_pu"]
+        .as_f64()
+        .ok_or("v2")?;
+    assert!(v2 > 0.85 && v2 < 1.05);
+
+    // 6. Generative SIMP Topology Optimization
+    let gen_resp = post(
+        addr,
+        "/api/sim/generative",
+        r#"{"volume_fraction": 0.35, "iterations": 10}"#,
+    )?;
+    assert_eq!(gen_resp.status, 200);
+    let generative_data = json(&gen_resp)?;
+    let vol = generative_data["scalar_metrics"]["volume_fraction_achieved"]
+        .as_f64()
+        .ok_or("vol")?;
+    assert!((vol - 0.35).abs() < 0.05);
+
+    // 7. Geotechnical Retaining Wall
+    let geo_resp = post(addr, "/api/sim/geotechnical", r#"{"wall_height_m": 4.5}"#)?;
+    assert_eq!(geo_resp.status, 200);
+    let geo = json(&geo_resp)?;
+    let ka = geo["scalar_metrics"]["active_coefficient_ka"]
+        .as_f64()
+        .ok_or("ka")?;
+    let kp = geo["scalar_metrics"]["passive_coefficient_kp"]
+        .as_f64()
+        .ok_or("kp")?;
+    assert!((ka * kp - 1.0).abs() < 1e-3);
 
     Ok(())
 }

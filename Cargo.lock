@@ -24,6 +24,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "220a2c618ab466efe41d0eace94dfeff1c35e3aa47891bdb95e1c0fefffd3c99"
 
 [[package]]
+name = "atlas-additive"
+version = "0.1.0"
+dependencies = [
+ "atlas-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "atlas-audit"
 version = "0.1.0"
 dependencies = [
@@ -329,6 +339,7 @@ dependencies = [
 name = "cad-studio"
 version = "0.1.0"
 dependencies = [
+ "atlas-additive",
  "atlas-audit",
  "atlas-compliance",
  "atlas-core",

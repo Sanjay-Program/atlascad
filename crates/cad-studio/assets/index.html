@@ -489,6 +489,9 @@
       <button type="button" class="wb-tab" data-workbench="cam" role="tab" aria-selected="false" title="CAM & CNC Machining (Toolpaths, Feeds & Speeds, G-Code)">
         <span class="wb-icon">⚙️</span><span class="wb-text">CAM Machining</span>
       </button>
+      <button type="button" class="wb-tab" data-workbench="additive" role="tab" aria-selected="false" title="3D Slicing & Additive Manufacturing (Infill, Layers, G-Code)">
+        <span class="wb-icon">🖨️</span><span class="wb-text">3D Slicing &amp; Additive</span>
+      </button>
       <button type="button" class="wb-tab" data-workbench="bim" role="tab" aria-selected="false" title="OpenBIM Architectural Studio (IFC4, Schedules, Takeoffs)">
         <span class="wb-icon">🏛️</span><span class="wb-text">OpenBIM Studio</span>
       </button>
@@ -1060,6 +1063,14 @@
                 <option value="static" selected>Linear Static Stress (FEA)</option>
                 <option value="modal">Modal Natural Frequency</option>
                 <option value="thermal">Steady-State Thermal</option>
+                <option value="cfd">CFD Pipe Network Hydraulics</option>
+                <option value="aerodynamics">Subsonic &amp; Supersonic Aerodynamics</option>
+                <option value="chemical">Chemical VLE Flash Equilibrium</option>
+                <option value="molecular">Molecular Dynamics (LJ Potential)</option>
+                <option value="robotics">Robotics DH Kinematics (6-DOF)</option>
+                <option value="powerflow">Electrical AC Grid Power Flow</option>
+                <option value="generative">Generative SIMP Topology Optimization</option>
+                <option value="geotechnical">Geotechnical Earth Pressure</option>
               </select>
             </div>
             <div class="wb-group">
@@ -1449,6 +1460,127 @@ C1 out 0 100n
                   <strong class="m-val" id="ecadPhaseVal">-80.9°</strong>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dedicated 3D Slicing & Additive Manufacturing Studio -->
+      <div id="additiveWorkbenchView" class="workbench-view additive-workbench-view" hidden role="region" aria-label="3D Slicing & Additive Manufacturing Studio">
+        <div class="wb-header">
+          <div class="wb-title-wrap">
+            <span class="wb-title-icon">🖨️</span>
+            <div>
+              <h3>3D Slicing &amp; Additive Manufacturing Studio</h3>
+              <span class="wb-subtitle">Cross-Sectional Slicing · Volumetric Extrusion · TPMS Gyroid Infill · Multi-Dialect G-Code</span>
+            </div>
+          </div>
+          <div class="wb-header-actions">
+            <span class="wb-status-badge" id="additiveStatusBadge">Geometry Loaded</span>
+            <button type="button" class="button primary small" id="additiveSliceBtn">⚡ Slice 3D Solid</button>
+            <button type="button" class="button ghost small" id="additiveDownloadGcodeBtn">💾 Download G-Code</button>
+          </div>
+        </div>
+        <div class="wb-body-split">
+          <div class="wb-control-pane">
+            <div class="wb-group">
+              <label for="additiveLayerHeight">Layer Height (Resolution)</label>
+              <div class="wb-slider-header">
+                <span class="hint">Vertical slice step</span>
+                <span id="additiveLayerHeightVal">0.20 mm</span>
+              </div>
+              <input type="range" id="additiveLayerHeight" min="0.10" max="0.40" step="0.02" value="0.20">
+            </div>
+            <div class="wb-group">
+              <label for="additiveInfillDensity">Infill Density</label>
+              <div class="wb-slider-header">
+                <span class="hint">Interior volume fill</span>
+                <span id="additiveInfillDensityVal">20%</span>
+              </div>
+              <input type="range" id="additiveInfillDensity" min="0" max="100" step="5" value="20">
+            </div>
+            <div class="wb-group">
+              <label for="additiveInfillPattern">Infill Pattern Algorithm</label>
+              <select id="additiveInfillPattern" class="wb-select">
+                <option value="rectilinear" selected>Rectilinear (Alternating 45°/135°)</option>
+                <option value="grid">Grid (Orthogonal Cross-Hatch)</option>
+                <option value="honeycomb">Honeycomb (Hexagonal Cellular)</option>
+                <option value="gyroid">Gyroid (TPMS Harmonic Surface)</option>
+                <option value="concentric">Concentric (Offset Contours)</option>
+              </select>
+            </div>
+            <div class="wb-group">
+              <label for="additiveMaterialSelect">Filament Material</label>
+              <select id="additiveMaterialSelect" class="wb-select">
+                <option value="pla" selected>PLA (210°C Nozzle / 60°C Bed / 1.24 g/cm³)</option>
+                <option value="petg">PETG (240°C Nozzle / 80°C Bed / 1.27 g/cm³)</option>
+                <option value="abs">ABS (250°C Nozzle / 100°C Bed / 1.04 g/cm³)</option>
+              </select>
+            </div>
+            <div class="wb-group">
+              <label for="additiveFirmwareDialect">Target 3D Printer Firmware</label>
+              <select id="additiveFirmwareDialect" class="wb-select">
+                <option value="marlin" selected>Marlin / RepRap (Standard ISO)</option>
+                <option value="klipper">Klipper (High-Speed Kinematics)</option>
+                <option value="prusa">Prusa-Marlin (Mini / MK3S / MK4)</option>
+                <option value="reprap">RepRapFirmware (Duet3D)</option>
+              </select>
+            </div>
+            <div class="wb-group">
+              <label>Nozzle &amp; Extrusion Parameters</label>
+              <div class="wb-fixtures-box">
+                <div class="wb-fixture-row">
+                  <span>Nozzle Diameter:</span>
+                  <input type="number" id="additiveNozzleDia" value="0.40" step="0.1" class="wb-input compact"> mm
+                </div>
+                <div class="wb-fixture-row">
+                  <span>Line Width:</span>
+                  <input type="number" id="additiveLineWidth" value="0.44" step="0.02" class="wb-input compact"> mm
+                </div>
+                <div class="wb-fixture-row">
+                  <span>Print Speed:</span>
+                  <input type="number" id="additivePrintSpeed" value="60" step="5" class="wb-input compact"> mm/s
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="wb-display-pane">
+            <div class="wb-cam-metrics-card">
+              <div class="wb-card-title">Additive Slicing Kinematics &amp; Consumables</div>
+              <div class="wb-metrics-row">
+                <div class="wb-metric-box">
+                  <span class="m-label">Print Duration</span>
+                  <strong class="m-val" id="additivePrintTimeVal">—</strong>
+                </div>
+                <div class="wb-metric-box">
+                  <span class="m-label">Filament Mass</span>
+                  <strong class="m-val" id="additiveFilamentMassVal">—</strong>
+                </div>
+                <div class="wb-metric-box">
+                  <span class="m-label">Total Layers</span>
+                  <strong class="m-val" id="additiveTotalLayersVal">—</strong>
+                </div>
+                <div class="wb-metric-box">
+                  <span class="m-label">Est. Cost (USD)</span>
+                  <strong class="m-val" id="additiveCostVal">—</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="wb-group" style="margin-top: 10px;">
+              <div class="wb-slider-header">
+                <label for="additiveLayerScrubber">Interactive Layer Height Scrubber</label>
+                <span id="additiveCurrentLayerLabel">Layer 0 / 0 (Z: 0.00 mm)</span>
+              </div>
+              <input type="range" id="additiveLayerScrubber" min="0" max="0" value="0" style="width: 100%;">
+            </div>
+
+            <div class="wb-gcode-container" style="margin-top: 10px;">
+              <div class="wb-gcode-header">
+                <span>G-Code Machine Instructions (ISO 3D Print Program)</span>
+                <button type="button" class="link small" id="additiveCopyGcodeBtn">Copy G-Code</button>
+              </div>
+              <pre class="wb-gcode-viewer" id="additiveGcodeViewer" style="height: 240px;">Click "Slice 3D Solid" to generate high-precision multi-layer G-code toolpaths.</pre>
             </div>
           </div>
         </div>

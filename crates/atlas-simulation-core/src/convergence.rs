@@ -31,6 +31,15 @@ impl Default for ConvergenceMonitor {
 }
 
 impl ConvergenceMonitor {
+    pub fn new(tolerance: f64) -> Self {
+        Self {
+            is_converged: false,
+            total_iterations: 0,
+            final_residual: tolerance,
+            history: Vec::new(),
+        }
+    }
+
     pub fn record(&mut self, iteration: u32, residual: f64, elapsed_ms: u64, tolerance: f64) {
         self.total_iterations = iteration;
         self.final_residual = residual;
