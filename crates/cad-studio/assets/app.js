@@ -6813,6 +6813,317 @@ ${gcodeSample}`;
     });
   }
 
+  /* =====================================================================
+     ENTERPRISE SAAS SUITE ($10K/MO WORKSTATION)
+     ===================================================================== */
+  async function openEnterpriseModal(tab = "audit") {
+    const modal = byId("enterpriseModal");
+    if (!modal) return;
+    modal.hidden = false;
+    switchEnterpriseTab(tab);
+  }
+
+  function closeEnterpriseModal() {
+    const modal = byId("enterpriseModal");
+    if (modal) modal.hidden = true;
+  }
+
+  function switchEnterpriseTab(tabName) {
+    const tabs = document.querySelectorAll(".enterprise-tab");
+    tabs.forEach(t => {
+      const match = t.getAttribute("data-ent-tab") === tabName;
+      t.classList.toggle("active", match);
+      t.setAttribute("aria-selected", match ? "true" : "false");
+    });
+
+    const views = {
+      audit: byId("entViewAudit"),
+      report: byId("entViewReport"),
+      jobs: byId("entViewJobs"),
+      org: byId("entViewOrg"),
+    };
+
+    Object.entries(views).forEach(([k, el]) => {
+      if (el) {
+        const match = k === tabName;
+        el.hidden = !match;
+        el.classList.toggle("active", match);
+      }
+    });
+
+    if (tabName === "audit") loadEnterpriseAudit();
+    else if (tabName === "report") loadEnterpriseReport();
+    else if (tabName === "jobs") loadEnterpriseJobs();
+    else if (tabName === "org") loadEnterpriseOrg();
+  }
+
+  async function loadEnterpriseAudit() {
+    const tbody = byId("entAuditTableBody");
+    if (!tbody) return;
+    try {
+      const data = await api("/api/audit");
+      const isVerified = data.integrity_verified;
+      const statusText = byId("entChainStatusText");
+      if (statusText) {
+        statusText.textContent = isVerified ? "VERIFIED (100% MATHEMATICAL GUARANTEE)" : "WARNING: INTEGRITY CHECK FAILED";
+        statusText.style.color = isVerified ? "#10b981" : "#ef4444";
+      }
+
+      const pillsContainer = byId("entStandardsPills");
+      if (pillsContainer && data.compliance_evaluations) {
+        pillsContainer.innerHTML = data.compliance_evaluations.map(ev => `
+          <span class="badge compliant">${escapeHtml(ev.standard)}: ${escapeHtml(ev.status)}</span>
+        `).join("");
+      }
+
+      tbody.innerHTML = (data.entries || []).map(e => `
+        <tr>
+          <td><strong>#${e.sequence}</strong></td>
+          <td>${new Date(e.timestamp_unix * 1000).toLocaleTimeString()}</td>
+          <td><code>${escapeHtml(e.actor)}</code></td>
+          <td><span class="badge">${escapeHtml(e.action)}</span></td>
+          <td>${escapeHtml(e.entity_type)}:${escapeHtml(e.entity_id)}</td>
+          <td><code title="${escapeHtml(e.signature_hash)}">${escapeHtml(e.signature_hash.substring(0, 20))}…</code></td>
+        </tr>
+      `).join("");
+    } catch (err) {
+      log(`Failed to load audit trail: ${err.message}`, "error");
+    }
+  }
+
+  async function loadEnterpriseReport() {
+    try {
+      const rep = await api("/api/report");
+      const projTitle = byId("entReportProjectTitle");
+      if (projTitle) {
+        projTitle.textContent = `${rep.project_name} — Rev ${rep.revision} Certification Dossier`;
+      }
+
+      const massEl = byId("entMassPropsContent");
+      if (massEl && rep.mass_properties) {
+        const m = rep.mass_properties;
+        massEl.innerHTML = `
+          <div class="ent-prop-row"><span>Material:</span><strong>${escapeHtml(m.material_name)}</strong></div>
+          <div class="ent-prop-row"><span>Mass:</span><strong>${m.mass_kg.toFixed(4)} kg</strong></div>
+          <div class="ent-prop-row"><span>Volume:</span><strong>${m.volume_mm3.toLocaleString()} mm³</strong></div>
+          <div class="ent-prop-row"><span>Density:</span><strong>${m.density_kg_m3} kg/m³</strong></div>
+          <div class="ent-prop-row"><span>Center of Gravity:</span><strong>[${m.center_of_gravity_mm.map(v => v.toFixed(2)).join(", ")}] mm</strong></div>
+        `;
+      }
+
+      const structEl = byId("entStructuralContent");
+      if (structEl && rep.structural) {
+        const s = rep.structural;
+        structEl.innerHTML = `
+          <div class="ent-prop-row"><span>Max von Mises Stress:</span><strong>${s.max_von_mises_mpa.toFixed(1)} MPa</strong></div>
+          <div class="ent-prop-row"><span>Yield Strength:</span><strong>${s.yield_strength_mpa.toFixed(1)} MPa</strong></div>
+          <div class="ent-prop-row"><span>Factor of Safety (FoS):</span><strong style="color: #10b981;">${s.factor_of_safety.toFixed(2)} (Req: ≥ ${s.required_min_fos.toFixed(2)})</strong></div>
+          <div class="ent-prop-row"><span>Compliance Status:</span><strong style="color: #10b981;">${escapeHtml(s.compliance_status)}</strong></div>
+          <div class="ent-prop-row"><span>FEA Solver Engine:</span><strong>${escapeHtml(s.solver_provenance)}</strong></div>
+        `;
+      }
+
+      const bomEl = byId("entBomContent");
+      if (bomEl && rep.bom) {
+        const b = rep.bom;
+        bomEl.innerHTML = `
+          <table class="ent-table">
+            <thead>
+              <tr><th>Part Number</th><th>Description</th><th>Material</th><th>Qty</th><th>Unit Mass</th><th>Extended Cost</th></tr>
+            </thead>
+            <tbody>
+              ${(b.items || []).map(item => `
+                <tr>
+                  <td><code>${escapeHtml(item.part_number)}</code></td>
+                  <td>${escapeHtml(item.description)}</td>
+                  <td>${escapeHtml(item.material)}</td>
+                  <td>${item.quantity}</td>
+                  <td>${item.unit_mass_kg.toFixed(3)} kg</td>
+                  <td>$${item.extended_cost_usd.toFixed(2)}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4"><strong>Totals: ${b.total_parts_count} part(s)</strong></td>
+                <td><strong>${b.total_mass_kg.toFixed(3)} kg</strong></td>
+                <td><strong style="color: #10b981;">$${b.total_estimated_cost_usd.toFixed(2)} USD</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        `;
+      }
+
+      const signsEl = byId("entSignOffsContent");
+      if (signsEl && rep.sign_offs) {
+        signsEl.innerHTML = rep.sign_offs.map(sign => `
+          <div class="ent-signoff-card">
+            <div><strong>${escapeHtml(sign.role)} Sign-off</strong></div>
+            <div>${escapeHtml(sign.user_name)}</div>
+            <div style="color: var(--muted);">${escapeHtml(sign.user_email)}</div>
+            <div style="margin-top: 6px;"><span class="badge compliant">${escapeHtml(sign.decision)}</span></div>
+            <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">Sig: <code>${escapeHtml(sign.signature_hash)}</code></div>
+          </div>
+        `).join("");
+      }
+    } catch (err) {
+      log(`Failed to load compliance report: ${err.message}`, "error");
+    }
+  }
+
+  async function loadEnterpriseJobs() {
+    const tbody = byId("entJobsTableBody");
+    if (!tbody) return;
+    try {
+      const data = await api("/api/jobs");
+      const activeCount = byId("entActiveJobsCount");
+      const totalCount = byId("entTotalJobsCount");
+      if (activeCount) activeCount.textContent = data.active_count ?? 0;
+      if (totalCount) totalCount.textContent = data.total_count ?? 0;
+
+      tbody.innerHTML = (data.jobs || []).map(j => `
+        <tr>
+          <td><code>${escapeHtml(j.job_id)}</code></td>
+          <td><strong>${escapeHtml(j.engine_id)}</strong></td>
+          <td>${escapeHtml(j.job_type)}</td>
+          <td><span class="badge">${escapeHtml(j.priority)}</span></td>
+          <td><span class="badge ${j.status === "running" ? "busy" : (j.status === "queued" ? "warn" : "")}">${escapeHtml(j.status)}</span></td>
+          <td>${j.cpu_cores_allocated} Cores · ${j.memory_mb_allocated} MB</td>
+          <td>
+            ${j.status === "queued" || j.status === "running" ? `
+              <button type="button" class="button small danger" onclick="cancelHpcJob('${escapeHtml(j.job_id)}')">Cancel</button>
+            ` : `<span style="color: var(--muted);">Finished</span>`}
+          </td>
+        </tr>
+      `).join("");
+    } catch (err) {
+      log(`Failed to load HPC jobs: ${err.message}`, "error");
+    }
+  }
+
+  window.cancelHpcJob = async function(jobId) {
+    try {
+      await api("/api/jobs/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job_id: jobId }),
+      });
+      toast(`Cancelled HPC Job ${jobId}`);
+      await loadEnterpriseJobs();
+    } catch (err) {
+      toast(`Failed to cancel job: ${err.message}`, true);
+    }
+  };
+
+  async function loadEnterpriseOrg() {
+    try {
+      const org = await api("/api/org");
+      const tierBadge = byId("enterpriseTierBadge");
+      if (tierBadge) tierBadge.textContent = org.tier || "Enterprise 10k";
+
+      const hpcLabel = byId("entHpcUsageLabel");
+      if (hpcLabel) hpcLabel.textContent = `${(org.hpc_core_hours_used || 0).toLocaleString()} / ${(org.hpc_core_hours_quota || 0).toLocaleString()} hrs`;
+
+      const storageLabel = byId("entStorageUsageLabel");
+      if (storageLabel) storageLabel.textContent = `${(org.storage_used_gb || 0).toFixed(1)} / ${(org.storage_quota_gb || 0).toLocaleString()} GB`;
+
+      const memTable = byId("entMembersTable");
+      if (memTable && org.members) {
+        const membersList = Object.values(org.members);
+        memTable.innerHTML = `
+          <table class="ent-table">
+            <thead>
+              <tr><th>Member</th><th>Email</th><th>Engineering Role</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              ${membersList.map(m => `
+                <tr>
+                  <td><strong>${escapeHtml(m.display_name)}</strong></td>
+                  <td><code>${escapeHtml(m.email)}</code></td>
+                  <td><span class="badge">${escapeHtml(m.role)}</span></td>
+                  <td><span class="badge compliant">${escapeHtml(m.status)}</span></td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+      }
+    } catch (err) {
+      log(`Failed to load organization data: ${err.message}`, "error");
+    }
+  }
+
+  function setupEnterpriseModal() {
+    byId("enterpriseSaasBtn")?.addEventListener("click", () => openEnterpriseModal("audit"));
+    byId("rbEnterpriseAuditBtn")?.addEventListener("click", () => openEnterpriseModal("audit"));
+    byId("rbEnterpriseReportBtn")?.addEventListener("click", () => openEnterpriseModal("report"));
+    byId("rbEnterpriseJobsBtn")?.addEventListener("click", () => openEnterpriseModal("jobs"));
+    byId("rbEnterpriseOrgBtn")?.addEventListener("click", () => openEnterpriseModal("org"));
+
+    byId("enterpriseCloseBtn")?.addEventListener("click", closeEnterpriseModal);
+    byId("enterpriseBackdrop")?.addEventListener("click", closeEnterpriseModal);
+
+    const tabs = document.querySelectorAll(".enterprise-tab");
+    tabs.forEach(tab => {
+      tab.addEventListener("click", () => {
+        const tabName = tab.getAttribute("data-ent-tab");
+        if (tabName) switchEnterpriseTab(tabName);
+      });
+    });
+
+    byId("entDispatchJobBtn")?.addEventListener("click", async () => {
+      const engine = byId("entJobEngineSelect")?.value || "calculix";
+      const priority = byId("entJobPrioritySelect")?.value || "normal";
+      toast(`Submitting HPC job to ${engine}…`);
+      try {
+        const res = await api("/api/jobs/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            engine_id: engine,
+            job_type: "multiphysics_simulation",
+            priority: priority,
+          }),
+        });
+        toast(`Dispatched HPC job ${res.job_id}`);
+        await loadEnterpriseJobs();
+      } catch (err) {
+        toast(`Failed to dispatch job: ${err.message}`, true);
+      }
+    });
+
+    byId("entEcoForm")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const title = byId("entEcoTitle")?.value.trim();
+      const desc = byId("entEcoDesc")?.value.trim();
+      const approve = byId("entEcoApproveImmediately")?.checked ?? true;
+      if (!title || !desc) return;
+
+      toast("Submitting Engineering Change Order…");
+      try {
+        const res = await api("/api/eco", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: title,
+            description: desc,
+            approve: approve,
+          }),
+        });
+        toast(`ECO ${res.eco_id} ${res.status.toUpperCase()} by ${res.approved_by || "System"}`);
+        byId("entEcoTitle").value = "";
+        byId("entEcoDesc").value = "";
+        await loadEnterpriseAudit();
+      } catch (err) {
+        toast(`Failed to submit ECO: ${err.message}`, true);
+      }
+    });
+
+    byId("entPrintReportBtn")?.addEventListener("click", () => {
+      window.print();
+    });
+  }
+
   function setupDisciplineRibbons() {
     // BIM Actions
     byId("rbBimWallBtn")?.addEventListener("click", () => { setDrawTool("polyline"); toast("BIM: Draw wall baseline with polyline"); });
@@ -8220,6 +8531,7 @@ ${gcodeSample}`;
     setupResultViewerHud();
     setupEngineManagerModal();
     setupDisciplineRibbons();
+    setupEnterpriseModal();
   }
 
   async function boot() {

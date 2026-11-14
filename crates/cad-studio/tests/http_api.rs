@@ -3789,3 +3789,96 @@ fn engine_discovery_guides_and_benchmark_api() -> Result<(), Box<dyn std::error:
 
     Ok(())
 }
+
+#[test]
+fn enterprise_saas_audit_report_and_jobs_api() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("saas_enterprise_test", [20.0, 20.0, 10.0])?;
+    let addr = handle.addr();
+
+    // 1. GET /api/audit: verify cryptographic immutable audit trail
+    let audit_resp = request(addr, "GET", "/api/audit", &[], &[])?;
+    assert_eq!(audit_resp.status, 200);
+    let audit_data = json(&audit_resp)?;
+    assert_eq!(audit_data["integrity_verified"], true);
+    let count = audit_data["count"].as_u64().ok_or("count")?;
+    assert!(count >= 1);
+    let evals = audit_data["compliance_evaluations"]
+        .as_array()
+        .ok_or("evals")?;
+    assert_eq!(evals.len(), 3);
+
+    // 2. GET /api/report: verify engineering compliance certification package
+    let rep_resp = request(addr, "GET", "/api/report", &[], &[])?;
+    assert_eq!(rep_resp.status, 200);
+    let rep_data = json(&rep_resp)?;
+    assert!(
+        rep_data["mass_properties"]["mass_kg"]
+            .as_f64()
+            .ok_or("mass")?
+            > 0.0
+    );
+    assert_eq!(rep_data["mass_properties"]["density_kg_m3"], 2700.0);
+    let fos = rep_data["structural"]["factor_of_safety"]
+        .as_f64()
+        .ok_or("fos")?;
+    assert!(fos >= 1.5);
+    assert!(!rep_data["bom"]["items"].as_array().ok_or("bom")?.is_empty());
+    assert_eq!(rep_data["sign_offs"].as_array().ok_or("signoffs")?.len(), 3);
+
+    // 3. GET /api/org: verify enterprise organization quotas and role-based permissions
+    let org_resp = request(addr, "GET", "/api/org", &[], &[])?;
+    assert_eq!(org_resp.status, 200);
+    let org_data = json(&org_resp)?;
+    assert_eq!(org_data["tier"], "Enterprise 10k");
+    assert_eq!(org_data["hpc_core_hours_quota"], 25000);
+    assert_eq!(org_data["storage_quota_gb"], 5000);
+
+    // 4. POST /api/jobs/submit: dispatch HPC simulation
+    let submit_resp = post(
+        addr,
+        "/api/jobs/submit",
+        r#"{"engine_id":"calculix","job_type":"nonlinear_fea","priority":"high","parameters":{"mesh_elements":150000}}"#,
+    )?;
+    assert_eq!(submit_resp.status, 200);
+    let submit_data = json(&submit_resp)?;
+    let job_id = submit_data["job_id"].as_str().ok_or("job_id")?;
+    assert_eq!(submit_data["status"], "queued");
+
+    // 5. GET /api/jobs: verify job is in queue
+    let jobs_resp = request(addr, "GET", "/api/jobs", &[], &[])?;
+    assert_eq!(jobs_resp.status, 200);
+    let jobs_data = json(&jobs_resp)?;
+    let job_list = jobs_data["jobs"].as_array().ok_or("jobs")?;
+    assert!(job_list.iter().any(|j| j["job_id"] == job_id));
+
+    // 6. POST /api/jobs/cancel: cancel simulation job
+    let cancel_resp = post(
+        addr,
+        "/api/jobs/cancel",
+        &format!(r#"{{"job_id":"{job_id}"}}"#),
+    )?;
+    assert_eq!(cancel_resp.status, 200);
+    let cancel_data = json(&cancel_resp)?;
+    assert_eq!(cancel_data["cancelled"], true);
+
+    // 7. POST /api/eco: initiate and approve Engineering Change Order
+    let eco_resp = post(
+        addr,
+        "/api/eco",
+        r#"{"title":"Weight reduction pocket","description":"Pocket depth increased by 2mm for mass savings","approve":true}"#,
+    )?;
+    assert_eq!(eco_resp.status, 200);
+    let eco_data = json(&eco_resp)?;
+    assert_eq!(eco_data["status"], "approved");
+    assert_eq!(eco_data["approved_by"], "chief_architect@atlascad.com");
+
+    // 8. Re-check audit trail to verify ECO approval recorded
+    let updated_audit_resp = request(addr, "GET", "/api/audit", &[], &[])?;
+    assert_eq!(updated_audit_resp.status, 200);
+    let updated_audit_data = json(&updated_audit_resp)?;
+    assert_eq!(updated_audit_data["integrity_verified"], true);
+    let updated_count = updated_audit_data["count"].as_u64().ok_or("new count")?;
+    assert!(updated_count > count);
+
+    Ok(())
+}

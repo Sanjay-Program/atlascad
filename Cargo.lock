@@ -24,6 +24,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "220a2c618ab466efe41d0eace94dfeff1c35e3aa47891bdb95e1c0fefffd3c99"
 
 [[package]]
+name = "atlas-audit"
+version = "0.1.0"
+dependencies = [
+ "atlas-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "atlas-compliance"
+version = "0.1.0"
+dependencies = [
+ "atlas-audit",
+ "atlas-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "atlas-core"
 version = "0.1.0"
 dependencies = [
@@ -58,6 +79,27 @@ name = "atlas-feature-tree"
 version = "0.1.0"
 dependencies = [
  "atlas-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "atlas-job-queue"
+version = "0.1.0"
+dependencies = [
+ "atlas-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "atlas-organization"
+version = "0.1.0"
+dependencies = [
+ "atlas-core",
+ "cad-entitlements",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -287,9 +329,13 @@ dependencies = [
 name = "cad-studio"
 version = "0.1.0"
 dependencies = [
+ "atlas-audit",
+ "atlas-compliance",
  "atlas-core",
  "atlas-dependency-graph",
  "atlas-engine-manager",
+ "atlas-job-queue",
+ "atlas-organization",
  "atlas-simulation-core",
  "cad-cae",
  "cad-cam",

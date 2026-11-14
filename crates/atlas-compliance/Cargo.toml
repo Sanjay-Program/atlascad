@@ -1,0 +1,17 @@
+[package]
+name = "atlas-compliance"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+atlas-core = { path = "../atlas-core" }
+atlas-audit = { path = "../atlas-audit" }
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true

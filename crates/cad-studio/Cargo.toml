@@ -22,6 +22,10 @@ atlas-core.workspace = true
 atlas-dependency-graph.workspace = true
 atlas-simulation-core.workspace = true
 atlas-engine-manager.workspace = true
+atlas-audit.workspace = true
+atlas-compliance.workspace = true
+atlas-job-queue.workspace = true
+atlas-organization.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
