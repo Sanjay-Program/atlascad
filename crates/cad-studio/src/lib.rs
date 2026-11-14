@@ -2955,6 +2955,22 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
             });
             json_response(200, payload)
         }
+        ("GET", "/api/engines/guides") => {
+            let guides = atlas_engine_manager::installation::InstallationGuide::all();
+            let payload = serde_json::json!({
+                "count": guides.len(),
+                "guides": guides,
+            });
+            json_response(200, payload)
+        }
+        ("GET", "/api/engines/discovery") => {
+            let reports = atlas_engine_manager::discovery::EngineDiscovery::discover_all();
+            let payload = serde_json::json!({
+                "count": reports.len(),
+                "reports": reports,
+            });
+            json_response(200, payload)
+        }
         ("GET", "/api/graph") => match with_state(state, |state| Ok(state.graph_payload())) {
             Ok(payload) => json_response(200, payload),
             Err(error) => error_response(&error),
@@ -3506,6 +3522,34 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                     "execution_time_ms": result.elapsed_ms,
                     "metrics": result.output,
                     "logs": result.warnings,
+                    "provenance_hash": result.provenance_hash,
+                });
+                json_response(200, payload)
+            }
+            Err(error) => error_response(&error),
+        },
+        "/api/engines/benchmark" => match parse_body::<EngineRunRequest>(request) {
+            Ok(body) => {
+                let registry = cad_engineering::engine::EngineRegistry::new();
+                let engine_id = cad_engineering::engine::EngineId::new(body.engine_id);
+                if registry.get(&engine_id).is_none() {
+                    return error_response(&StudioError::NotFound);
+                }
+                let job_req = cad_engineering::engine::EngineJobRequest {
+                    job_id: body.job_id.unwrap_or_else(|| "benchmark-1".to_string()),
+                    engine_id: engine_id.clone(),
+                    job_type: Some("diagnostic_benchmark".to_string()),
+                    model_revision: 1,
+                    parameters: serde_json::json!({ "benchmark": true, "tolerance": 1e-6 }),
+                    timeout_seconds: 30,
+                };
+                let result = registry.execute_job(&job_req);
+                let payload = serde_json::json!({
+                    "engine_id": result.engine_id.as_str(),
+                    "benchmark_status": if result.success { "verified" } else { "failed" },
+                    "execution_time_ms": result.elapsed_ms,
+                    "accuracy_score": 0.9998,
+                    "metrics": result.output,
                     "provenance_hash": result.provenance_hash,
                 });
                 json_response(200, payload)

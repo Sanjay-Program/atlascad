@@ -34,6 +34,11 @@ Thumbs.db
 *.zcad.autosave
 *.zcad.backup
 *.tar.gz.sha256
+
+# Third-party upstream downloaded sources and build trees
+/third_party/sources/
+/third_party/build/
+
 # Update-signing and other private key material. The public half is embedded in
 # `apps/solidcraft/crates/ui-egui/src/update/install.rs`, so nothing here is needed to build.
 /secrets/

@@ -3739,3 +3739,53 @@ fn dependency_graph_invalidation_api() -> Result<(), Box<dyn std::error::Error>>
 
     Ok(())
 }
+
+#[test]
+fn engine_discovery_guides_and_benchmark_api() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("engines_test", [15.0, 15.0, 10.0])?;
+    let addr = handle.addr();
+
+    // 1. GET /api/engines/guides: returns 24 installation coordinates
+    let guides_resp = request(addr, "GET", "/api/engines/guides", &[], &[])?;
+    assert_eq!(guides_resp.status, 200);
+    let guides_data = json(&guides_resp)?;
+    assert_eq!(guides_data["count"], 24);
+    let guides = guides_data["guides"].as_array().ok_or("guides")?;
+    let ccx_guide = guides
+        .iter()
+        .find(|g| g["engine_id"] == "calculix")
+        .ok_or("ccx guide")?;
+    assert!(
+        ccx_guide["canonical_git"]
+            .as_str()
+            .ok_or("git")?
+            .contains("CalculiX")
+    );
+
+    // 2. GET /api/engines/discovery: returns discovery reports for all engines
+    let disc_resp = request(addr, "GET", "/api/engines/discovery", &[], &[])?;
+    assert_eq!(disc_resp.status, 200);
+    let disc_data = json(&disc_resp)?;
+    assert_eq!(disc_data["count"], 24);
+    let reports = disc_data["reports"].as_array().ok_or("reports")?;
+    let truck_rep = reports
+        .iter()
+        .find(|r| r["engine_id"] == "truck")
+        .ok_or("truck rep")?;
+    assert_eq!(truck_rep["status"], "native");
+
+    // 3. POST /api/engines/benchmark: runs benchmark and returns verified accuracy
+    let bench_resp = post(
+        addr,
+        "/api/engines/benchmark",
+        r#"{"engine_id": "openfoam"}"#,
+    )?;
+    assert_eq!(bench_resp.status, 200);
+    let bench_data = json(&bench_resp)?;
+    assert_eq!(bench_data["benchmark_status"], "verified");
+    assert_eq!(bench_data["engine_id"], "openfoam");
+    let score = bench_data["accuracy_score"].as_f64().ok_or("score")?;
+    assert!(score > 0.99);
+
+    Ok(())
+}

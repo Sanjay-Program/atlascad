@@ -16,7 +16,7 @@ pub mod prelude {
     pub use crate::adapters::EngineAdapter;
     pub use crate::capability::SolverCapability;
     pub use crate::configuration::EngineConfig;
-    pub use crate::discovery::EngineDiscovery;
+    pub use crate::discovery::{EngineDiscovery, EngineDiscoveryReport};
     pub use crate::installation::InstallationGuide;
     pub use crate::registry::EngineManager;
     pub use cad_engineering::engine::{

@@ -6545,6 +6545,8 @@ ${gcodeSample}`;
     if (modal) modal.hidden = true;
   }
 
+  let cachedDiscovery = null;
+
   async function loadEnginesTable() {
     const tbody = byId("engineTableBody");
     if (!tbody) return;
@@ -6554,16 +6556,25 @@ ${gcodeSample}`;
         const res = await api("/api/engines");
         cachedEngines = res.engines || [];
       }
-      renderEnginesTable(cachedEngines);
+      try {
+        const discRes = await api("/api/engines/discovery");
+        cachedDiscovery = discRes.reports || [];
+      } catch (_) {}
+      renderEnginesTable(cachedEngines, cachedDiscovery);
     } catch (err) {
       log(`Failed to load engine registry: ${err.message}`, "error");
     }
   }
 
-  function renderEnginesTable(engines) {
+  function renderEnginesTable(engines, discovery = null) {
     const tbody = byId("engineTableBody");
     if (!tbody) return;
     tbody.innerHTML = "";
+
+    const discMap = new Map();
+    if (discovery && Array.isArray(discovery)) {
+      discovery.forEach(d => discMap.set(d.engine_id, d));
+    }
 
     const search = byId("engineSearchInput")?.value.toLowerCase().trim() || "";
     const discFilter = byId("engineDisciplineFilter")?.value || "all";
@@ -6612,14 +6623,39 @@ ${gcodeSample}`;
 
       const tdStatus = document.createElement("td");
       tdStatus.id = `engStatus_${eng.id}`;
-      tdStatus.innerHTML = `<span class="engine-status-pill status-healthy">● Available</span>`;
+      const disc = discMap.get(eng.id);
+      let statusHtml = `<span class="engine-status-pill status-healthy">● Available</span>`;
+      if (disc) {
+        if (disc.status === "native") {
+          statusHtml = `<span class="engine-status-pill status-healthy" title="In-process Rust solver">● Native Rust</span>`;
+        } else if (disc.status === "installed") {
+          statusHtml = `<span class="engine-status-pill status-healthy" title="Installed at: ${disc.executable_path}">● Installed</span>`;
+        } else if (disc.status === "source_acquired") {
+          statusHtml = `<span class="engine-status-pill" style="color:#38bdf8" title="Source acquired at: ${disc.source_path}">● Acquired</span>`;
+        } else {
+          statusHtml = `<span class="engine-status-pill" style="color:#fdba74" title="Ready to acquire or install">○ Ready</span>`;
+        }
+      }
+      tdStatus.innerHTML = statusHtml;
 
       const tdActions = document.createElement("td");
       tdActions.className = "engine-actions-cell";
 
+      const btnGuide = document.createElement("button");
+      btnGuide.className = "button small ghost";
+      btnGuide.textContent = "Guide";
+      btnGuide.title = `View installation & acquisition coordinates for ${eng.name}`;
+      btnGuide.addEventListener("click", () => showEngineGuide(eng.id));
+
+      const btnBench = document.createElement("button");
+      btnBench.className = "button small ghost";
+      btnBench.textContent = "Benchmark";
+      btnBench.title = `Run analytical benchmark validation on ${eng.name}`;
+      btnBench.addEventListener("click", () => runEngineBenchmark(eng.id));
+
       const btnTest = document.createElement("button");
       btnTest.className = "button small ghost";
-      btnTest.textContent = "Test";
+      btnTest.textContent = "Health";
       btnTest.title = `Health check for ${eng.name}`;
       btnTest.addEventListener("click", () => testEngineHealth(eng.id));
 
@@ -6629,10 +6665,61 @@ ${gcodeSample}`;
       btnRun.title = `Execute standard solve with ${eng.name}`;
       btnRun.addEventListener("click", () => runDisciplineEngine(eng.id));
 
-      tdActions.append(btnTest, btnRun);
+      tdActions.append(btnGuide, btnBench, btnTest, btnRun);
       tr.append(tdName, tdDisc, tdTier, tdVer, tdStatus, tdActions);
       tbody.appendChild(tr);
     });
+  }
+
+  async function runEngineBenchmark(engineId) {
+    const consoleLog = byId("engineConsoleLog");
+    if (consoleLog) {
+      consoleLog.textContent = `[BENCHMARK] Executing diagnostic analytical verification benchmark for '${engineId}'…\n`;
+    }
+    toast(`Running benchmark for ${engineId}…`);
+    try {
+      const res = await api("/api/engines/benchmark", {
+        method: "POST",
+        body: JSON.stringify({ engine_id: engineId })
+      });
+      if (consoleLog) {
+        consoleLog.textContent += `Benchmark Status: ${res.benchmark_status.toUpperCase()}\n` +
+          `Execution Time: ${res.execution_time_ms} ms\n` +
+          `Accuracy Score: ${(res.accuracy_score * 100).toFixed(2)}%\n` +
+          `Provenance Hash: ${res.provenance_hash}\n` +
+          `Metrics:\n${JSON.stringify(res.metrics, null, 2)}\n`;
+      }
+      toast(`Benchmark ${engineId}: ${res.benchmark_status} (${(res.accuracy_score * 100).toFixed(2)}% accuracy)`);
+    } catch (err) {
+      if (consoleLog) consoleLog.textContent += `Benchmark failed: ${err.message}\n`;
+      toast(`Benchmark error: ${err.message}`, true);
+    }
+  }
+
+  async function showEngineGuide(engineId) {
+    const consoleLog = byId("engineConsoleLog");
+    try {
+      const res = await api("/api/engines/guides");
+      const guide = (res.guides || []).find(g => g.engine_id === engineId);
+      if (!guide) {
+        toast("No guide found for this engine", true);
+        return;
+      }
+      if (consoleLog) {
+        consoleLog.textContent = `=== INSTALLATION & ACQUISITION GUIDE [${guide.name}] ===\n` +
+          `Canonical Git: ${guide.canonical_git}\n` +
+          `Pinned Release: ${guide.pinned_tag}\n\n` +
+          (guide.package_ubuntu_debian ? `Ubuntu / Debian:  ${guide.package_ubuntu_debian}\n` : '') +
+          (guide.package_fedora_rhel ? `Fedora / RHEL:    ${guide.package_fedora_rhel}\n` : '') +
+          (guide.package_arch_aur ? `Arch Linux / AUR: ${guide.package_arch_aur}\n` : '') +
+          (guide.package_macos_brew ? `macOS Homebrew:   ${guide.package_macos_brew}\n` : '') +
+          (guide.docker_image ? `Docker Container: ${guide.docker_image}\n` : '') +
+          `\nCLI Acquisition Command:\n` +
+          `  python3 scripts/acquire-upstream.py --acquire ${guide.engine_id}\n`;
+      }
+    } catch (err) {
+      toast(`Failed to load guide: ${err.message}`, true);
+    }
   }
 
   async function testEngineHealth(engineId) {
