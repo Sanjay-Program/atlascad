@@ -2582,6 +2582,7 @@ impl StudioState {
             "tool_wear_percent": alu_wear.wear_percent,
             "summary": summary,
             "gcode_preview": preview_lines.join("\n"),
+            "gcode": gcode,
         }))
     }
 

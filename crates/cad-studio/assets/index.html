@@ -470,6 +470,37 @@
     </div>
   </nav>
 
+  <!-- Top-Level Multi-Disciplinary Engineering Workbenches Bar -->
+  <nav class="enterprise-workbench-bar" role="tablist" aria-label="Engineering Workbenches">
+    <div class="wb-brand-badge">
+      <span class="wb-brand-logo">▲</span>
+      <span class="wb-brand-name">AtlasCAD Workstation</span>
+    </div>
+    <div class="wb-tabs-list">
+      <button type="button" class="wb-tab active" data-workbench="cad3d" role="tab" aria-selected="true" title="3D Parametric CAD & Solid Modeling">
+        <span class="wb-icon">🧊</span><span class="wb-text">3D CAD Modeling</span>
+      </button>
+      <button type="button" class="wb-tab" data-workbench="drafting2d" role="tab" aria-selected="false" title="2D Drafting, Detailing & Multi-Sheet Layouts">
+        <span class="wb-icon">📐</span><span class="wb-text">2D Drafting &amp; Sheets</span>
+      </button>
+      <button type="button" class="wb-tab" data-workbench="cae" role="tab" aria-selected="false" title="CAE Multiphysics Simulation (FEA, Modal, Thermal, CFD)">
+        <span class="wb-icon">⚡</span><span class="wb-text">CAE Simulation</span>
+      </button>
+      <button type="button" class="wb-tab" data-workbench="cam" role="tab" aria-selected="false" title="CAM & CNC Machining (Toolpaths, Feeds & Speeds, G-Code)">
+        <span class="wb-icon">⚙️</span><span class="wb-text">CAM Machining</span>
+      </button>
+      <button type="button" class="wb-tab" data-workbench="bim" role="tab" aria-selected="false" title="OpenBIM Architectural Studio (IFC4, Schedules, Takeoffs)">
+        <span class="wb-icon">🏛️</span><span class="wb-text">OpenBIM Studio</span>
+      </button>
+      <button type="button" class="wb-tab" data-workbench="ecad" role="tab" aria-selected="false" title="ECAD & SPICE Circuit Simulator (Schematics, Oscilloscope)">
+        <span class="wb-icon">🔌</span><span class="wb-text">ECAD &amp; SPICE</span>
+      </button>
+      <button type="button" class="wb-tab" data-workbench="enterprise" role="tab" aria-selected="false" title="Enterprise SaaS Hub (Audit Trail, Cert Reports, HPC Queue, Org & ECO)">
+        <span class="wb-icon">🛡️</span><span class="wb-text">Enterprise Hub</span>
+      </button>
+    </div>
+  </nav>
+
   <main class="workspace">
     <aside class="panel panel-left" aria-label="Project browser">
       <!-- Left Panel Category Tabs -->
@@ -1001,6 +1032,424 @@
           <div class="rv-actions">
             <button type="button" id="rvExportCsvBtn" class="button ghost small" title="Export CSV Data">Export CSV</button>
             <button type="button" id="rvViewReportBtn" class="button small" title="View Solvers Output">View Log</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dedicated CAE Multiphysics Simulation Workbench -->
+      <div id="caeWorkbenchView" class="workbench-view cae-workbench-view" hidden role="region" aria-label="CAE Simulation Workbench">
+        <div class="wb-header">
+          <div class="wb-title-wrap">
+            <span class="wb-title-icon">⚡</span>
+            <div>
+              <h3>CAE Multiphysics Simulation Studio</h3>
+              <span class="wb-subtitle">Linear Static FEA · Modal Frequencies · Steady-State Thermal · CFD Fluid Flow</span>
+            </div>
+          </div>
+          <div class="wb-header-actions">
+            <span class="wb-status-badge" id="caeStatusBadge">Mesh Ready</span>
+            <button type="button" class="button primary small" id="caeRunSolveBtn">▶ Solve Multiphysics Study</button>
+            <button type="button" class="button ghost small" id="caeDispatchClusterBtn">Dispatch to HPC Cluster</button>
+          </div>
+        </div>
+        <div class="wb-body-split">
+          <div class="wb-control-pane">
+            <div class="wb-group">
+              <label for="caeStudyTypeSelect">Study Physics</label>
+              <select id="caeStudyTypeSelect" class="wb-select">
+                <option value="static" selected>Linear Static Stress (FEA)</option>
+                <option value="modal">Modal Natural Frequency</option>
+                <option value="thermal">Steady-State Thermal</option>
+              </select>
+            </div>
+            <div class="wb-group">
+              <label for="caeMaterialSelect">Material Assignment</label>
+              <select id="caeMaterialSelect" class="wb-select">
+                <option value="steel.1018" selected>AISI 1018 Cold-Drawn Steel (E=205 GPa, Sy=370 MPa)</option>
+                <option value="aluminum.6061-t6">6061-T6 Aluminium (E=68.9 GPa, Sy=276 MPa)</option>
+                <option value="titanium.ti-6al-4v">Ti-6Al-4V Titanium Alloy (E=114 GPa, Sy=880 MPa)</option>
+                <option value="copper.c11000">C11000 Electrolytic Copper (E=117 GPa, Sy=70 MPa)</option>
+                <option value="abs.general">General-Purpose ABS Polymer (E=2.3 GPa, Sy=40 MPa)</option>
+              </select>
+            </div>
+            <div class="wb-group">
+              <div class="wb-slider-header">
+                <label for="caeVoxelSlider">Mesh Refinement (Voxel Size)</label>
+                <span id="caeVoxelValLabel">2.0 mm</span>
+              </div>
+              <input type="range" id="caeVoxelSlider" min="1.0" max="6.0" step="0.5" value="2.0">
+            </div>
+            <div class="wb-group">
+              <label>Boundary Conditions &amp; Load Fixtures</label>
+              <div class="wb-fixtures-box">
+                <div class="wb-fixture-row">
+                  <span>Fixed Support Face:</span>
+                  <select id="caeSupportFaceSelect" class="wb-select compact">
+                    <option value="min_x" selected>Min-X Boundary Face</option>
+                    <option value="max_x">Max-X Boundary Face</option>
+                    <option value="min_z">Min-Z Bottom Face</option>
+                  </select>
+                </div>
+                <div class="wb-fixture-row">
+                  <span>Applied Force (Fz):</span>
+                  <input type="number" id="caeForceInput" value="-100.0" step="10" class="wb-input compact"> N
+                </div>
+                <div class="wb-fixture-row">
+                  <span>Temperature Delta:</span>
+                  <input type="number" id="caeTempDeltaInput" value="50.0" step="5" class="wb-input compact"> K
+                </div>
+              </div>
+            </div>
+            <div class="wb-group">
+              <label>Deformation Visualization Scale</label>
+              <div class="wb-btn-group" id="caeDeformScaleGroup">
+                <button type="button" class="btn-toggle active" data-scale="1">1×</button>
+                <button type="button" class="btn-toggle" data-scale="5">5×</button>
+                <button type="button" class="btn-toggle" data-scale="10">10×</button>
+                <button type="button" class="btn-toggle" data-scale="50">50×</button>
+              </div>
+            </div>
+          </div>
+          <div class="wb-display-pane">
+            <div class="wb-results-summary-card" id="caeResultsCard">
+              <div class="wb-card-title">FEA Convergence &amp; Yield Criteria</div>
+              <div class="wb-metrics-row">
+                <div class="wb-metric-box">
+                  <span class="m-label">Peak Von Mises</span>
+                  <strong class="m-val" id="caePeakStressVal">—</strong>
+                </div>
+                <div class="wb-metric-box">
+                  <span class="m-label">Max Displacement</span>
+                  <strong class="m-val" id="caeMaxDispVal">—</strong>
+                </div>
+                <div class="wb-metric-box">
+                  <span class="m-label">Factor of Safety</span>
+                  <strong class="m-val" id="caeFosVal">—</strong>
+                </div>
+                <div class="wb-metric-box">
+                  <span class="m-label">Elements / DoF</span>
+                  <strong class="m-val" id="caeElementsVal">—</strong>
+                </div>
+              </div>
+              <div class="wb-stress-colorbar">
+                <div class="colorbar-legend">
+                  <span>0.0 MPa</span>
+                  <span id="caeMidStressLabel">Mid</span>
+                  <span id="caeMaxStressLabel">Max</span>
+                </div>
+                <div class="colorbar-gradient-bar"></div>
+              </div>
+            </div>
+            <div class="wb-console-box">
+              <div class="wb-console-head">
+                <span>Solver Execution &amp; Residual Log</span>
+                <button type="button" class="link small" id="caeClearConsoleBtn">Clear</button>
+              </div>
+              <pre class="wb-console-output" id="caeConsoleOutput">AtlasCAD Finite Element Solver Engine initialized. Select study type, set boundary conditions, and click "Solve Multiphysics Study".</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dedicated CAM & CNC Machining Workbench -->
+      <div id="camWorkbenchView" class="workbench-view cam-workbench-view" hidden role="region" aria-label="CAM & CNC Machining Workbench">
+        <div class="wb-header">
+          <div class="wb-title-wrap">
+            <span class="wb-title-icon">⚙️</span>
+            <div>
+              <h3>CAM &amp; CNC Machining Studio</h3>
+              <span class="wb-subtitle">3-Axis Milling · 3D Surface Contouring · Toolpaths · Feeds &amp; Speeds · G-Code</span>
+            </div>
+          </div>
+          <div class="wb-header-actions">
+            <button type="button" class="button primary small" id="camGenerateToolpathsBtn">⚙ Generate Toolpaths</button>
+            <button type="button" class="button ghost small" id="camDownloadGcodeBtn">Download G-Code (.nc)</button>
+            <button type="button" class="button ghost small" id="camCopyGcodeBtn">Copy G-Code</button>
+          </div>
+        </div>
+        <div class="wb-body-split">
+          <div class="wb-control-pane">
+            <div class="wb-group">
+              <label for="camMachineSelect">CNC Machine &amp; Postprocessor</label>
+              <select id="camMachineSelect" class="wb-select">
+                <option value="linuxcnc" selected>LinuxCNC / Machinekit (ISO Standard G-Code)</option>
+                <option value="grbl">GRBL / Candle (Hobby &amp; Light Industrial)</option>
+                <option value="fanuc">Fanuc 0i / Haas VF Series VMC</option>
+                <option value="mach3">Mach3 / Mach4 Mill</option>
+              </select>
+            </div>
+            <div class="wb-group">
+              <label for="camToolSelect">Cutting Tool</label>
+              <select id="camToolSelect" class="wb-select">
+                <option value="6.0" selected>⌀6.0mm 4-Flute Solid Carbide Flat Endmill</option>
+                <option value="4.0">⌀4.0mm 2-Flute Carbide Ballnose (Surface Finishing)</option>
+                <option value="50.0">⌀50.0mm 5-Insert Indexable Face Mill</option>
+                <option value="12.0">⌀12.0mm 45° Chamfer Cutter</option>
+                <option value="3.2">⌀3.2mm HSS High-Speed Twist Drill</option>
+              </select>
+            </div>
+            <div class="wb-group">
+              <label for="camOperationSelect">Machining Strategy</label>
+              <select id="camOperationSelect" class="wb-select">
+                <option value="facing" selected>Face Milling (Top Plane Clearing)</option>
+                <option value="roughing">Adaptive Pocket Roughing</option>
+                <option value="finishing">3D Surface Parallel Finishing</option>
+                <option value="chamfer">Edge Chamfering &amp; Deburring</option>
+              </select>
+            </div>
+            <div class="wb-group">
+              <label>Cutting Feeds &amp; Speeds</label>
+              <div class="wb-fixtures-box">
+                <div class="wb-fixture-row">
+                  <span>Spindle Speed:</span>
+                  <input type="number" id="camSpindleRpmInput" value="6000" step="250" class="wb-input compact"> RPM
+                </div>
+                <div class="wb-fixture-row">
+                  <span>Cutting Feed:</span>
+                  <input type="number" id="camFeedrateInput" value="850" step="50" class="wb-input compact"> mm/min
+                </div>
+                <div class="wb-fixture-row">
+                  <span>Stepover (ae):</span>
+                  <input type="number" id="camStepoverInput" value="4.2" step="0.2" class="wb-input compact"> mm
+                </div>
+                <div class="wb-fixture-row">
+                  <span>Stepdown (ap):</span>
+                  <input type="number" id="camStepdownInput" value="1.0" step="0.2" class="wb-input compact"> mm
+                </div>
+              </div>
+            </div>
+            <div class="wb-group">
+              <label>Raw Stock Envelope</label>
+              <div class="wb-fixtures-box">
+                <div class="wb-fixture-row">
+                  <span>Material Stock:</span>
+                  <span class="wb-stock-tag">Aluminium 6061-T6 Extruded Billet</span>
+                </div>
+                <div class="wb-fixture-row">
+                  <span>XY Padding:</span>
+                  <input type="number" id="camStockPaddingXy" value="5.0" step="1.0" class="wb-input compact"> mm
+                </div>
+                <div class="wb-fixture-row">
+                  <span>Z Top Stock:</span>
+                  <input type="number" id="camStockPaddingZ" value="2.0" step="0.5" class="wb-input compact"> mm
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="wb-display-pane">
+            <div class="wb-cam-metrics-card">
+              <div class="wb-card-title">Machining Diagnostics &amp; Kinematics</div>
+              <div class="wb-metrics-row">
+                <div class="wb-metric-box">
+                  <span class="m-label">Cycle Time</span>
+                  <strong class="m-val" id="camCycleTimeVal">—</strong>
+                </div>
+                <div class="wb-metric-box">
+                  <span class="m-label">Cutting Dist</span>
+                  <strong class="m-val" id="camCutDistVal">—</strong>
+                </div>
+                <div class="wb-metric-box">
+                  <span class="m-label">Rapid Moves</span>
+                  <strong class="m-val" id="camRapidDistVal">—</strong>
+                </div>
+                <div class="wb-metric-box">
+                  <span class="m-label">Taylor Wear Index</span>
+                  <strong class="m-val" id="camToolWearVal">—</strong>
+                </div>
+              </div>
+            </div>
+            <div class="wb-gcode-editor-box">
+              <div class="wb-gcode-header">
+                <span>G-Code Program Preview (<span id="camGcodeLineCount">0</span> lines)</span>
+                <span class="wb-gcode-mode">Work Coordinate G54 · Unit G21 Metric</span>
+              </div>
+              <textarea class="wb-gcode-editor" id="camGcodeText" readonly placeholder="Click 'Generate Toolpaths' to compute toolpath trajectories and post-process G-code…"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dedicated OpenBIM & Architectural Studio -->
+      <div id="bimWorkbenchView" class="workbench-view bim-workbench-view" hidden role="region" aria-label="OpenBIM Architectural Studio">
+        <div class="wb-header">
+          <div class="wb-title-wrap">
+            <span class="wb-title-icon">🏛️</span>
+            <div>
+              <h3>OpenBIM Architectural Studio</h3>
+              <span class="wb-subtitle">IFC4 Project Schema · Spatial Hierarchy · Component Schedules · Quantity Takeoff</span>
+            </div>
+          </div>
+          <div class="wb-header-actions">
+            <button type="button" class="button ghost small" id="bimExportIfcBtn">Export IFC4 File</button>
+            <button type="button" class="button ghost small" id="bimImportIfcBtn">Import IFC Model</button>
+          </div>
+        </div>
+        <div class="wb-body-split">
+          <div class="wb-control-pane">
+            <div class="wb-group">
+              <label>IFC4 Spatial Structure</label>
+              <div class="wb-bim-tree" id="bimSpatialTree">
+                <div class="bim-node root">🏢 Project: AtlasCAD High-Rise Facility</div>
+                <div class="bim-node site">├── 🌍 Site: Urban Commercial Sector 7</div>
+                <div class="bim-node building">│   ├── 🏛 Building: Tower A (Engineering Lab)</div>
+                <div class="bim-node storey active">│   │   ├── 📐 Storey 1: Ground Floor (Elevation +0.000m)</div>
+                <div class="bim-node leaf">│   │   │   ├── 🧱 IfcWallStandardCase [8 Elements]</div>
+                <div class="bim-node leaf">│   │   │   ├── ▬ IfcSlab [2 Slabs - 200mm Concrete]</div>
+                <div class="bim-node leaf">│   │   │   ├── 🏛 IfcColumn [12 Columns - W310x107]</div>
+                <div class="bim-node leaf">│   │   │   └── 🚪 IfcDoor [6 Double-Leaf Fire Doors]</div>
+              </div>
+            </div>
+            <div class="wb-group">
+              <label>Add Architectural Component</label>
+              <div class="wb-bim-add-form">
+                <select id="bimAddElementType" class="wb-select">
+                  <option value="wall">IfcWall (Standard Cavity Wall)</option>
+                  <option value="slab">IfcSlab (Reinforced Concrete Floor)</option>
+                  <option value="column">IfcColumn (Structural Steel Column)</option>
+                  <option value="beam">IfcBeam (Universal Steel Beam)</option>
+                </select>
+                <div class="wb-fixture-row" style="margin-top: 6px;">
+                  <span>Thickness / Span:</span>
+                  <input type="number" id="bimElementParam" value="250.0" step="25" class="wb-input compact"> mm
+                </div>
+                <button type="button" class="button primary small" id="bimAddElementBtn" style="margin-top: 8px;">+ Place Architectural Element</button>
+              </div>
+            </div>
+          </div>
+          <div class="wb-display-pane">
+            <div class="wb-bim-schedule-card">
+              <div class="wb-card-title">Live Bill of Quantities &amp; Material Schedule</div>
+              <div class="ent-table-container" style="max-height: 320px;">
+                <table class="ent-table" id="bimScheduleTable">
+                  <thead>
+                    <tr><th>IFC Entity</th><th>Count / Length</th><th>Net Volume / Area</th><th>Material Spec</th><th>Estimated Cost (USD)</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td><code>IfcWallStandardCase</code></td><td>8 walls (96.4 m)</td><td>192.8 m² / 48.2 m³</td><td>C30/37 Concrete + Insulation</td><td>$38,560.00</td></tr>
+                    <tr><td><code>IfcSlab</code></td><td>2 floor slabs</td><td>480.0 m² / 96.0 m³</td><td>Reinforced Concrete 200mm</td><td>$43,200.00</td></tr>
+                    <tr><td><code>IfcColumn</code></td><td>12 columns</td><td>36.0 m / 14,800 kg</td><td>ASTM A992 Grade 50 Structural Steel</td><td>$29,600.00</td></tr>
+                    <tr><td><code>IfcBeam</code></td><td>16 beams</td><td>84.0 m / 18,200 kg</td><td>ASTM A992 Grade 50 Structural Steel</td><td>$36,400.00</td></tr>
+                    <tr><td><code>IfcDoor</code></td><td>6 units</td><td>24.0 m² aperture</td><td>Solid Timber Core Fire Rated (FD60)</td><td>$7,200.00</td></tr>
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colspan="4"><strong>Total Estimated Direct Construction Cost:</strong></td>
+                      <td><strong style="color: #10b981;">$154,960.00 USD</strong></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+            <div class="wb-console-box">
+              <div class="wb-console-head"><span>IfcOpenShell Validation Diagnostics</span></div>
+              <pre class="wb-console-output">IFC4 ADD2 TC1 Schema validated. GlobalId identifiers conform to ISO/IEC 11578. Geometric representations match SweptSolid topology.</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dedicated ECAD & Electronic Circuit Studio -->
+      <div id="ecadWorkbenchView" class="workbench-view ecad-workbench-view" hidden role="region" aria-label="ECAD & SPICE Circuit Studio">
+        <div class="wb-header">
+          <div class="wb-title-wrap">
+            <span class="wb-title-icon">🔌</span>
+            <div>
+              <h3>ECAD &amp; SPICE Electronic Circuit Studio</h3>
+              <span class="wb-subtitle">Schematic Capture · Netlist Synthesizer · Dual-Trace Oscilloscope · Bode Frequency Analyzer</span>
+            </div>
+          </div>
+          <div class="wb-header-actions">
+            <button type="button" class="button primary small" id="ecadRunSimulationBtn">▶ Run SPICE Simulation</button>
+            <button type="button" class="button ghost small" id="ecadExportNetlistBtn">Export SPICE Netlist</button>
+          </div>
+        </div>
+        <div class="wb-body-split">
+          <div class="wb-control-pane">
+            <div class="wb-group">
+              <label>Circuit Topology &amp; Component Parameters</label>
+              <div class="wb-fixtures-box">
+                <div class="wb-fixture-row">
+                  <span>Input Signal:</span>
+                  <select id="ecadSignalTypeSelect" class="wb-select compact">
+                    <option value="sine" selected>Sinusoidal AC Waveform</option>
+                    <option value="square">Square Wave Pulse</option>
+                    <option value="step">Step Transient Response</option>
+                  </select>
+                </div>
+                <div class="wb-fixture-row">
+                  <span>Input Frequency:</span>
+                  <input type="number" id="ecadFreqInput" value="1000" min="10" max="100000" step="100" class="wb-input compact"> Hz
+                </div>
+                <div class="wb-fixture-row">
+                  <span>Peak Amplitude:</span>
+                  <input type="number" id="ecadAmpInput" value="5.0" min="0.5" max="24.0" step="0.5" class="wb-input compact"> V
+                </div>
+                <div class="wb-fixture-row">
+                  <span>Resistor R1:</span>
+                  <input type="number" id="ecadR1Input" value="10.0" min="1.0" max="100.0" step="1.0" class="wb-input compact"> kΩ
+                </div>
+                <div class="wb-fixture-row">
+                  <span>Capacitor C1:</span>
+                  <input type="number" id="ecadC1Input" value="100.0" min="10.0" max="1000.0" step="10.0" class="wb-input compact"> nF
+                </div>
+              </div>
+            </div>
+            <div class="wb-group">
+              <label>Generated SPICE Netlist</label>
+              <textarea class="wb-gcode-editor" id="ecadNetlistText" style="height: 120px; font-size: 10px;" readonly>* AtlasCAD SPICE Simulation Netlist
+V1 in 0 SIN(0 5.0 1000)
+R1 in out 10k
+C1 out 0 100n
+.tran 0.01m 5m
+.ac dec 10 10 100k
+.end</textarea>
+            </div>
+          </div>
+          <div class="wb-display-pane">
+            <div class="wb-oscilloscope-card">
+              <div class="wb-oscilloscope-header">
+                <span>Dual-Trace Waveform Oscilloscope (5.0 ms window)</span>
+                <div class="osc-legend">
+                  <span class="trace-badge ch1">CH1: Vin (Input 5Vpk)</span>
+                  <span class="trace-badge ch2">CH2: Vout (Filtered RC)</span>
+                </div>
+              </div>
+              <div class="wb-oscilloscope-screen" id="ecadOscilloscopeScreen">
+                <!-- SVG Waveform generated dynamically -->
+                <svg id="ecadWaveformSvg" width="100%" height="220" viewBox="0 0 600 220" preserveAspectRatio="none">
+                  <defs>
+                    <pattern id="grid" width="30" height="22" patternUnits="userSpaceOnUse">
+                      <path d="M 30 0 L 0 0 0 22" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+                    </pattern>
+                  </defs>
+                  <rect width="100%" height="100%" fill="#0a0f18"/>
+                  <rect width="100%" height="100%" fill="url(#grid)"/>
+                  <line x1="0" y1="110" x2="600" y2="110" stroke="rgba(255,255,255,0.25)" stroke-dasharray="4,4"/>
+                  <path id="svgTraceInput" d="" fill="none" stroke="#00e5ff" stroke-width="2.2"/>
+                  <path id="svgTraceOutput" d="" fill="none" stroke="#76ff03" stroke-width="2.2"/>
+                </svg>
+              </div>
+            </div>
+            <div class="wb-cam-metrics-card">
+              <div class="wb-metrics-row">
+                <div class="wb-metric-box">
+                  <span class="m-label">Cutoff Frequency (fc)</span>
+                  <strong class="m-val" id="ecadCutoffVal">159.15 Hz</strong>
+                </div>
+                <div class="wb-metric-box">
+                  <span class="m-label">Output Amplitude</span>
+                  <strong class="m-val" id="ecadOutAmpVal">0.78 V</strong>
+                </div>
+                <div class="wb-metric-box">
+                  <span class="m-label">Attenuation</span>
+                  <strong class="m-val" id="ecadAttenVal">-16.1 dB</strong>
+                </div>
+                <div class="wb-metric-box">
+                  <span class="m-label">Phase Shift</span>
+                  <strong class="m-val" id="ecadPhaseVal">-80.9°</strong>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
