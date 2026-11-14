@@ -3,13 +3,16 @@
 //! Standardized engineering simulation problem definitions, boundary conditions,
 //! materials, solver settings, convergence telemetry, and analytical validation.
 
+pub mod acoustics;
 pub mod aerodynamics;
+pub mod aeroelasticity;
 pub mod biomedical;
 pub mod boundary_conditions;
 pub mod building_physics;
 pub mod cfd;
 pub mod chemical;
 pub mod convergence;
+pub mod digital_twin;
 pub mod electromagnetics;
 pub mod engine;
 pub mod execution;
@@ -23,15 +26,18 @@ pub mod power_flow;
 pub mod problem;
 pub mod provenance;
 pub mod robotics;
+pub mod solar;
 pub mod solver_settings;
 pub mod structural;
 pub mod thermal_stress;
 pub mod validation;
 
 pub mod prelude {
+    pub use crate::acoustics::{AcousticsProblem, solve_acoustics};
     pub use crate::aerodynamics::{
         NormalShockProblem, WingAeroProblem, solve_normal_shock, solve_wing_aerodynamics,
     };
+    pub use crate::aeroelasticity::{AeroelasticProblem, solve_aeroelastic_viv};
     pub use crate::biomedical::{
         HemodynamicsRequest, HemodynamicsResult, OrthopedicBoneRequest, OrthopedicBoneResult,
         solve_hemodynamics, solve_orthopedic_bone,
@@ -43,6 +49,9 @@ pub mod prelude {
     pub use crate::cfd::{FluidProperties, PipeFlowProblem, solve_pipe_flow};
     pub use crate::chemical::{ChemicalComponent, FlashProblem, solve_rachford_rice_flash};
     pub use crate::convergence::{ConvergenceMonitor, IterationTelemetry};
+    pub use crate::digital_twin::{
+        DigitalTwinProblem, StrainRosetteTelemetry, StressCycleBlock, solve_digital_twin,
+    };
     pub use crate::electromagnetics::{MicrostripProblem, solve_microstrip_line};
     pub use crate::engine::SimulationEngineAdapter;
     pub use crate::execution::{SimulationResult, SimulationStatus};
@@ -67,10 +76,11 @@ pub mod prelude {
     };
     pub use crate::problem::{AnalysisType, SimulationProblem};
     pub use crate::robotics::{
-        DhLink, IkResult, RobotKinematicsProblem, compute_forward_transforms,
-        compute_geometric_jacobian, compute_manipulability, solve_dls_inverse_kinematics,
-        solve_robot_kinematics,
+        DhLink, IkResult, QuinticTrajectoryProblem, RobotKinematicsProblem,
+        compute_forward_transforms, compute_geometric_jacobian, compute_manipulability,
+        solve_dls_inverse_kinematics, solve_quintic_trajectory, solve_robot_kinematics,
     };
+    pub use crate::solar::{SolarPvProblem, solve_solar_pv};
     pub use crate::solver_settings::SolverSettings;
     pub use crate::structural::{
         BucklingProblem, ColumnEndCondition, CompositeLaminateProblem, FatigueProblem,

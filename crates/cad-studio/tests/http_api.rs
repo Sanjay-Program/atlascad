@@ -4180,5 +4180,72 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let sup = json(&sup_resp)?;
     assert!(sup.get("requires_support").is_some());
 
+    // 17. Digital Twin Real-Time Strain Rosette & Palmgren-Miner Damage
+    let dt_resp = post(
+        addr,
+        "/api/sim/digital_twin",
+        r#"{"strain_a_microstrain": 450.0, "strain_b_microstrain": 200.0, "strain_c_microstrain": -150.0}"#,
+    )?;
+    assert_eq!(dt_resp.status, 200);
+    let dt = json(&dt_resp)?;
+    let vm = dt["scalar_metrics"]["von_mises_stress_mpa"]
+        .as_f64()
+        .ok_or("vm")?;
+    assert!(vm > 50.0 && vm < 200.0);
+    let damage = dt["scalar_metrics"]["cumulative_fatigue_damage_d"]
+        .as_f64()
+        .ok_or("damage")?;
+    assert!((damage - 0.25).abs() < 1e-3);
+
+    // 18. Architectural Acoustics & Sound Transmission Class
+    let ac_resp = post(
+        addr,
+        "/api/sim/acoustics",
+        r#"{"surface_mass_density_kg_m2": 35.0, "exterior_noise_dba": 72.0}"#,
+    )?;
+    assert_eq!(ac_resp.status, 200);
+    let ac = json(&ac_resp)?;
+    let stc = ac["scalar_metrics"]["stc_rating"].as_f64().ok_or("stc")?;
+    assert!((30.0..=50.0).contains(&stc));
+
+    // 19. Photovoltaic Solar Radiation & Energy Yield
+    let sol_resp = post(
+        addr,
+        "/api/sim/solar",
+        r#"{"array_area_m2": 120.0, "module_efficiency": 0.21, "surface_tilt_deg": 35.0}"#,
+    )?;
+    assert_eq!(sol_resp.status, 200);
+    let sol = json(&sol_resp)?;
+    let mwh = sol["scalar_metrics"]["annual_energy_yield_mwh"]
+        .as_f64()
+        .ok_or("mwh")?;
+    assert!(mwh > 20.0 && mwh < 45.0);
+
+    // 20. Aeroelasticity & Vortex-Induced Vibration
+    let aero_resp = post(
+        addr,
+        "/api/sim/aeroelasticity",
+        r#"{"diameter_m": 2.5, "natural_frequency_hz": 1.2, "flow_velocity_m_s": 15.0}"#,
+    )?;
+    assert_eq!(aero_resp.status, 200);
+    let aero = json(&aero_resp)?;
+    let fs = aero["scalar_metrics"]["shedding_frequency_hz"]
+        .as_f64()
+        .ok_or("fs")?;
+    assert!((fs - 1.20).abs() < 1e-2);
+
+    // 21. 6-DOF Quintic Spline Minimum-Jerk Trajectory
+    let traj_resp = post(
+        addr,
+        "/api/sim/robotics_trajectory",
+        r#"{"duration_s": 2.5, "time_steps": 50}"#,
+    )?;
+    assert_eq!(traj_resp.status, 200);
+    let traj = json(&traj_resp)?;
+    let v_max = traj["scalar_metrics"]["max_joint_velocity_rad_s"]
+        .as_f64()
+        .ok_or("v_max")?;
+    assert!(v_max > 0.5 && v_max < 3.0);
+
     Ok(())
 }

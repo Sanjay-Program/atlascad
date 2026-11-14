@@ -7374,6 +7374,21 @@ ${gcodeSample}`;
         } else if (studyType === "building_physics") {
           endpoint = "/api/sim/building_physics";
           body = { wall_area_m2: 120.0 };
+        } else if (studyType === "digital_twin") {
+          endpoint = "/api/sim/digital_twin";
+          body = { strain_a_microstrain: 450.0, strain_b_microstrain: 200.0, strain_c_microstrain: -150.0 };
+        } else if (studyType === "acoustics") {
+          endpoint = "/api/sim/acoustics";
+          body = { surface_mass_density_kg_m2: 35.0, exterior_noise_dba: 72.0 };
+        } else if (studyType === "solar") {
+          endpoint = "/api/sim/solar";
+          body = { array_area_m2: 120.0, module_efficiency: 0.21, surface_tilt_deg: 35.0 };
+        } else if (studyType === "aeroelasticity") {
+          endpoint = "/api/sim/aeroelasticity";
+          body = { diameter_m: 2.5, natural_frequency_hz: 1.20, flow_velocity_m_s: 15.0 };
+        } else if (studyType === "robotics_trajectory") {
+          endpoint = "/api/sim/robotics_trajectory";
+          body = { duration_s: 2.5, time_steps: 50 };
         }
 
         const res = await api(endpoint, {
@@ -7478,6 +7493,47 @@ ${gcodeSample}`;
               fos.style.color = (m.u_value_w_m2_k <= 0.15) ? "#10b981" : "#3b82f6";
             }
             if (elCount) elCount.textContent = `Loss: ${(m.annual_heat_loss_kwh / 1000)?.toFixed(1)} MWh`;
+          } else if (studyType === "digital_twin") {
+            if (peak) peak.textContent = `σ_vM: ${m.von_mises_stress_mpa?.toFixed(1)} MPa`;
+            if (disp) disp.textContent = `RUL: ${m.remaining_useful_life_pct?.toFixed(1)}%`;
+            if (fos) {
+              fos.textContent = (m.factor_of_safety_yield >= 1.5) ? `FoS: ${m.factor_of_safety_yield?.toFixed(2)} (Healthy)` : `FoS: ${m.factor_of_safety_yield?.toFixed(2)} (High Stress)`;
+              fos.style.color = (m.factor_of_safety_yield >= 1.5) ? "#10b981" : "#f59e0b";
+            }
+            if (elCount) elCount.textContent = `D = ${m.cumulative_fatigue_damage_d?.toFixed(3)}`;
+          } else if (studyType === "acoustics") {
+            if (peak) peak.textContent = `STC ${m.stc_rating?.toFixed(0)}`;
+            if (disp) disp.textContent = `TL 500: ${m.tl_at_500_hz_db?.toFixed(1)} dB`;
+            if (fos) {
+              fos.textContent = `Indoor: ${m.indoor_noise_level_dba?.toFixed(1)} dBA`;
+              fos.style.color = (m.indoor_noise_level_dba <= 40.0) ? "#10b981" : "#3b82f6";
+            }
+            if (elCount) elCount.textContent = `Δ: -${m.noise_attenuation_dba?.toFixed(1)} dBA`;
+          } else if (studyType === "solar") {
+            if (peak) peak.textContent = `${m.annual_energy_yield_mwh?.toFixed(1)} MWh/yr`;
+            if (disp) disp.textContent = `${m.installed_capacity_kwp?.toFixed(1)} kWp`;
+            if (fos) {
+              fos.textContent = `${m.specific_yield_kwh_per_kwp?.toFixed(0)} kWh/kWp`;
+              fos.style.color = "#10b981";
+            }
+            if (elCount) elCount.textContent = `${m.annual_co2_offset_tonnes?.toFixed(1)} t CO₂`;
+          } else if (studyType === "aeroelasticity") {
+            if (peak) peak.textContent = `f_s: ${m.shedding_frequency_hz?.toFixed(2)} Hz`;
+            if (disp) disp.textContent = `y_max: ${m.peak_amplitude_mm?.toFixed(1)} mm`;
+            if (fos) {
+              const inLockIn = m.is_in_lock_in_band > 0.5;
+              fos.textContent = inLockIn ? `Lock-In (v/vc=${m.velocity_ratio_v_over_vcrit?.toFixed(2)})` : "Off-Resonance";
+              fos.style.color = inLockIn ? "#f59e0b" : "#10b981";
+            }
+            if (elCount) elCount.textContent = `Sc = ${m.scruton_number?.toFixed(1)}`;
+          } else if (studyType === "robotics_trajectory") {
+            if (peak) peak.textContent = `v_max: ${m.max_joint_velocity_deg_s?.toFixed(1)} °/s`;
+            if (disp) disp.textContent = `a_max: ${m.max_joint_accel_rad_s2?.toFixed(2)} rad/s²`;
+            if (fos) {
+              fos.textContent = "Minimum-Jerk";
+              fos.style.color = "#10b981";
+            }
+            if (elCount) elCount.textContent = `T = ${m.trajectory_duration_s?.toFixed(1)} s (${m.discrete_time_steps} pts)`;
           }
 
           if (consoleOut) {

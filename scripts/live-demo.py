@@ -557,6 +557,61 @@ def run_live_demo() -> None:
         check("requires_support" in supp, "Overhang support analysis returned structured result")
         print(f"  ✓ 11.17 Additive Supports: Requires Supports = {supp['requires_support']}, Overhang Facets = {supp['critical_facet_count']}, Support Vol = {supp['estimated_support_volume_mm3']:.1f} mm³")
 
+        # 11.18 Digital Twin Strain Rosette & Palmgren-Miner Cumulative Damage
+        dt = http_request(port, "POST", "/api/sim/digital_twin", body={
+            "strain_a_microstrain": 450.0,
+            "strain_b_microstrain": 200.0,
+            "strain_c_microstrain": -150.0
+        })
+        vm = dt["scalar_metrics"]["von_mises_stress_mpa"]
+        rul = dt["scalar_metrics"]["remaining_useful_life_pct"]
+        check(vm > 50.0, f"Triaxial strain rosette plane stress resolved ({vm:.1f} MPa)")
+        check(rul > 50.0, f"Palmgren-Miner remaining useful life verified ({rul:.1f}%)")
+        print(f"  ✓ 11.18 Digital Twin: σ_vM = {vm:.1f} MPa, FoS = {dt['scalar_metrics']['factor_of_safety_yield']:.2f}, Miner D = {dt['scalar_metrics']['cumulative_fatigue_damage_d']:.3f}, RUL = {rul:.1f}%")
+
+        # 11.19 Architectural Acoustics & Sound Transmission Class (ISO 12354-1 / ASTM E90)
+        ac = http_request(port, "POST", "/api/sim/acoustics", body={
+            "surface_mass_density_kg_m2": 35.0,
+            "exterior_noise_dba": 72.0
+        })
+        stc = ac["scalar_metrics"]["stc_rating"]
+        check(stc >= 30.0, f"ASTM E413 Sound Transmission Class rating computed (STC {stc:.0f})")
+        check(ac["scalar_metrics"]["indoor_noise_level_dba"] < 50.0, "Indoor sound attenuation verified")
+        print(f"  ✓ 11.19 Acoustics: STC {stc:.0f}, TL @ 500Hz = {ac['scalar_metrics']['tl_at_500_hz_db']:.1f} dB, Indoor Level = {ac['scalar_metrics']['indoor_noise_level_dba']:.1f} dBA (Δ = -{ac['scalar_metrics']['noise_attenuation_dba']:.1f} dBA)")
+
+        # 11.20 Photovoltaic Solar Radiation & Energy Yield (HDKR Model)
+        solar = http_request(port, "POST", "/api/sim/solar", body={
+            "array_area_m2": 120.0,
+            "module_efficiency": 0.21,
+            "surface_tilt_deg": 35.0
+        })
+        mwh = solar["scalar_metrics"]["annual_energy_yield_mwh"]
+        check(mwh > 20.0, f"Annual PV AC electricity generation calculated ({mwh:.1f} MWh/yr)")
+        check(solar["scalar_metrics"]["annual_co2_offset_tonnes"] > 10.0, "Grid carbon avoidance verified")
+        print(f"  ✓ 11.20 Solar Architecture: DC Capacity = {solar['scalar_metrics']['installed_capacity_kwp']:.1f} kWp, Yield = {mwh:.1f} MWh/yr, CO2 Offset = {solar['scalar_metrics']['annual_co2_offset_tonnes']:.1f} t/yr")
+
+        # 11.21 Aeroelastic Vortex-Induced Vibration & Strouhal Resonance (Scruton Number)
+        aero = http_request(port, "POST", "/api/sim/aeroelasticity", body={
+            "diameter_m": 2.5,
+            "natural_frequency_hz": 1.20,
+            "flow_velocity_m_s": 15.0
+        })
+        fs = aero["scalar_metrics"]["shedding_frequency_hz"]
+        scruton = aero["scalar_metrics"]["scruton_number"]
+        check(abs(fs - 1.20) < 1e-2, f"Strouhal vortex shedding frequency solved ({fs:.2f} Hz)")
+        check(scruton > 5.0, f"Scruton mass-damping parameter evaluated (Sc = {scruton:.1f})")
+        print(f"  ✓ 11.21 Aeroelastic VIV: Shedding f_s = {fs:.2f} Hz, v_crit = {aero['scalar_metrics']['critical_velocity_m_s']:.1f} m/s, Sc = {scruton:.1f}, y_max = {aero['scalar_metrics']['peak_amplitude_mm']:.1f} mm")
+
+        # 11.22 Robotics 6-DOF Quintic Spline Minimum-Jerk Trajectory
+        traj = http_request(port, "POST", "/api/sim/robotics_trajectory", body={
+            "duration_s": 2.5,
+            "time_steps": 50
+        })
+        v_max = traj["scalar_metrics"]["max_joint_velocity_rad_s"]
+        check(v_max > 0.5, f"Smooth minimum-jerk trajectory bounded velocity verified ({v_max:.2f} rad/s)")
+        check(traj["scalar_metrics"]["discrete_time_steps"] == 50.0, "Trajectory discretized correctly")
+        print(f"  ✓ 11.22 Robotics Trajectory: Duration = {traj['scalar_metrics']['trajectory_duration_s']:.1f}s, Peak Vel = {traj['scalar_metrics']['max_joint_velocity_deg_s']:.1f} °/s, Max Jerk = {traj['scalar_metrics']['max_joint_jerk_rad_s3']:.1f} rad/s³")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

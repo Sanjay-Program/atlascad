@@ -3198,6 +3198,107 @@ impl StudioState {
             atlas_additive::supports::analyze_overhang_supports(&facets, &settings, 1.24);
         serde_json::to_value(&analysis).map_err(|e| StudioError::Json(e.to_string()))
     }
+
+    fn sim_digital_twin(
+        &mut self,
+        req: &SimDigitalTwinRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::digital_twin::DigitalTwinProblem::default();
+        if let Some(ref id) = req.sensor_id {
+            prob.sensor_id.clone_from(id);
+        }
+        if let Some(ea) = req.strain_a_microstrain {
+            prob.rosette.strain_a_microstrain = ea;
+        }
+        if let Some(eb) = req.strain_b_microstrain {
+            prob.rosette.strain_b_microstrain = eb;
+        }
+        if let Some(ec) = req.strain_c_microstrain {
+            prob.rosette.strain_c_microstrain = ec;
+        }
+        let res = atlas_simulation_core::digital_twin::solve_digital_twin(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_acoustics(
+        &mut self,
+        req: &SimAcousticsRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::acoustics::AcousticsProblem::default();
+        if let Some(m) = req.surface_mass_density_kg_m2 {
+            prob.surface_mass_density_kg_m2 = m;
+        }
+        if let Some(a) = req.partition_area_m2 {
+            prob.partition_area_m2 = a;
+        }
+        if let Some(noise) = req.exterior_noise_dba {
+            prob.exterior_noise_dba = noise;
+        }
+        let res = atlas_simulation_core::acoustics::solve_acoustics(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_solar(&mut self, req: &SimSolarRequest) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::solar::SolarPvProblem::default();
+        if let Some(tilt) = req.surface_tilt_deg {
+            prob.surface_tilt_deg = tilt;
+        }
+        if let Some(area) = req.array_area_m2 {
+            prob.array_area_m2 = area;
+        }
+        if let Some(eff) = req.module_efficiency {
+            prob.module_efficiency = eff;
+        }
+        if let Some(ghi) = req.annual_ghi_kwh_m2 {
+            prob.annual_ghi_kwh_m2 = ghi;
+        }
+        let res =
+            atlas_simulation_core::solar::solve_solar_pv(&prob).map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_aeroelasticity(
+        &mut self,
+        req: &SimAeroelasticityRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::aeroelasticity::AeroelasticProblem::default();
+        if let Some(d) = req.diameter_m {
+            prob.diameter_m = d;
+        }
+        if let Some(v) = req.flow_velocity_m_s {
+            prob.flow_velocity_m_s = v;
+        }
+        if let Some(fn_hz) = req.natural_frequency_hz {
+            prob.natural_frequency_hz = fn_hz;
+        }
+        if let Some(m) = req.modal_mass_kg_per_m {
+            prob.modal_mass_kg_per_m = m;
+        }
+        let res = atlas_simulation_core::aeroelasticity::solve_aeroelastic_viv(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_robotics_trajectory(
+        &mut self,
+        req: &SimRoboticsTrajectoryRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::robotics::QuinticTrajectoryProblem::default();
+        if let Some(d) = req.duration_s {
+            prob.duration_s = d;
+        }
+        if let Some(ref q) = req.q_target_rad {
+            prob.q_target_rad.clone_from(q);
+        }
+        if let Some(steps) = req.time_steps {
+            prob.time_steps = steps;
+        }
+        let res = atlas_simulation_core::robotics::solve_quintic_trajectory(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
 }
 
 fn export_name(name: &str) -> String {
@@ -4426,6 +4527,45 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             },
             Err(error) => error_response(&error),
         },
+        "/api/sim/digital_twin" => match parse_body_or_default::<SimDigitalTwinRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_digital_twin(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/acoustics" => match parse_body_or_default::<SimAcousticsRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_acoustics(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/solar" => match parse_body_or_default::<SimSolarRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_solar(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/aeroelasticity" => {
+            match parse_body_or_default::<SimAeroelasticityRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_aeroelasticity(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/robotics_trajectory" => {
+            match parse_body_or_default::<SimRoboticsTrajectoryRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_robotics_trajectory(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
         _ => error_response(&StudioError::NotFound),
     }
 }
@@ -5621,4 +5761,65 @@ struct SimBuildingPhysicsRequest {
 struct AdditiveSupportsRequest {
     #[serde(default)]
     pub critical_angle_deg: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimDigitalTwinRequest {
+    #[serde(default)]
+    pub sensor_id: Option<String>,
+    #[serde(default)]
+    pub strain_a_microstrain: Option<f64>,
+    #[serde(default)]
+    pub strain_b_microstrain: Option<f64>,
+    #[serde(default)]
+    pub strain_c_microstrain: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimAcousticsRequest {
+    #[serde(default)]
+    pub surface_mass_density_kg_m2: Option<f64>,
+    #[serde(default)]
+    pub partition_area_m2: Option<f64>,
+    #[serde(default)]
+    pub exterior_noise_dba: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimSolarRequest {
+    #[serde(default)]
+    pub surface_tilt_deg: Option<f64>,
+    #[serde(default)]
+    pub array_area_m2: Option<f64>,
+    #[serde(default)]
+    pub module_efficiency: Option<f64>,
+    #[serde(default)]
+    pub annual_ghi_kwh_m2: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimAeroelasticityRequest {
+    #[serde(default)]
+    pub diameter_m: Option<f64>,
+    #[serde(default)]
+    pub flow_velocity_m_s: Option<f64>,
+    #[serde(default)]
+    pub natural_frequency_hz: Option<f64>,
+    #[serde(default)]
+    pub modal_mass_kg_per_m: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimRoboticsTrajectoryRequest {
+    #[serde(default)]
+    pub duration_s: Option<f64>,
+    #[serde(default)]
+    pub time_steps: Option<usize>,
+    #[serde(default)]
+    pub q_target_rad: Option<Vec<f64>>,
 }
