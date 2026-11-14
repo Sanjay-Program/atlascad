@@ -200,7 +200,8 @@ impl EngineRegistry {
             capabilities: vec![EngineCapability::CadBrep],
             available: true,
             binary_path: None,
-            description: "Pure-Rust boundary-representation solid geometric modeling kernel.".to_string(),
+            description: "Pure-Rust boundary-representation solid geometric modeling kernel."
+                .to_string(),
         });
 
         self.register(EngineInfo {
@@ -264,7 +265,8 @@ impl EngineRegistry {
             capabilities: vec![EngineCapability::MeshGeneration],
             available: true,
             binary_path: Some("/usr/bin/gmsh".to_string()),
-            description: "High-performance automated 2D and 3D finite element mesh generator.".to_string(),
+            description: "High-performance automated 2D and 3D finite element mesh generator."
+                .to_string(),
         });
 
         // CalculiX
@@ -283,7 +285,8 @@ impl EngineRegistry {
             ],
             available: true,
             binary_path: Some("/usr/bin/ccx".to_string()),
-            description: "Implicit non-linear finite element structural and thermal solver.".to_string(),
+            description: "Implicit non-linear finite element structural and thermal solver."
+                .to_string(),
         });
 
         // OpenFOAM
@@ -298,7 +301,9 @@ impl EngineRegistry {
             capabilities: vec![EngineCapability::CfdIncompressible],
             available: true,
             binary_path: Some("/opt/openfoam11/bin/simpleFoam".to_string()),
-            description: "Computational fluid dynamics, turbulence modeling, and multiphase flow simulation.".to_string(),
+            description:
+                "Computational fluid dynamics, turbulence modeling, and multiphase flow simulation."
+                    .to_string(),
         });
 
         // SU2
@@ -328,7 +333,9 @@ impl EngineRegistry {
             capabilities: vec![EngineCapability::BimIfc],
             available: true,
             binary_path: Some("/usr/bin/IfcConvert".to_string()),
-            description: "OpenBIM parser, geometry extractor, and serializer for IFC2x3 and IFC4 schemas.".to_string(),
+            description:
+                "OpenBIM parser, geometry extractor, and serializer for IFC2x3 and IFC4 schemas."
+                    .to_string(),
         });
 
         // OpenSees
@@ -358,7 +365,9 @@ impl EngineRegistry {
             capabilities: vec![EngineCapability::FeaThermal],
             available: true,
             binary_path: Some("/usr/bin/energyplus".to_string()),
-            description: "Whole-building annual energy simulation, thermal comfort modeling, and HVAC loads.".to_string(),
+            description:
+                "Whole-building annual energy simulation, thermal comfort modeling, and HVAC loads."
+                    .to_string(),
         });
 
         // ngspice
@@ -373,7 +382,8 @@ impl EngineRegistry {
             capabilities: vec![EngineCapability::SpiceSimulation],
             available: true,
             binary_path: Some("/usr/bin/ngspice".to_string()),
-            description: "Mixed-signal analog, digital, and RF SPICE electronic circuit simulator.".to_string(),
+            description: "Mixed-signal analog, digital, and RF SPICE electronic circuit simulator."
+                .to_string(),
         });
 
         // KiCad CLI
@@ -388,7 +398,9 @@ impl EngineRegistry {
             capabilities: vec![EngineCapability::PcbDrc],
             available: true,
             binary_path: Some("/usr/bin/kicad-cli".to_string()),
-            description: "Schematic parity validation, PCB design rule checks (DRC), and Gerber export.".to_string(),
+            description:
+                "Schematic parity validation, PCB design rule checks (DRC), and Gerber export."
+                    .to_string(),
         });
 
         // pandapower
@@ -433,7 +445,9 @@ impl EngineRegistry {
             capabilities: vec![EngineCapability::ChemicalKinetics],
             available: true,
             binary_path: None,
-            description: "Chemical kinetics, thermodynamic equilibrium, and 1D laminar combustion flames.".to_string(),
+            description:
+                "Chemical kinetics, thermodynamic equilibrium, and 1D laminar combustion flames."
+                    .to_string(),
         });
 
         // DWSIM
@@ -591,7 +605,10 @@ impl EngineRegistry {
             ExecutionModel::InProcess => EngineHealthReport {
                 engine_id: id.clone(),
                 healthy: true,
-                message: format!("Engine '{}' ready in-process (AtlasCAD runtime)", engine.name),
+                message: format!(
+                    "Engine '{}' ready in-process (AtlasCAD runtime)",
+                    engine.name
+                ),
                 detected_version: Some(engine.version.clone()),
                 ping_ms: 1,
             },
@@ -601,7 +618,10 @@ impl EngineRegistry {
                 let status_msg = if exists {
                     format!("Executable present at '{}'", bin_path)
                 } else {
-                    format!("Simulated engine adapter active (binary at '{}' not local, fallback adapter enabled)", bin_path)
+                    format!(
+                        "Simulated engine adapter active (binary at '{}' not local, fallback adapter enabled)",
+                        bin_path
+                    )
                 };
                 EngineHealthReport {
                     engine_id: id.clone(),
@@ -723,7 +743,10 @@ impl EngineRegistry {
         };
 
         let elapsed = start.elapsed().as_millis() as u64;
-        let provenance = format!("{:016x}", req.model_revision.wrapping_mul(0x517cc1b727220a95));
+        let provenance = format!(
+            "{:016x}",
+            req.model_revision.wrapping_mul(0x517cc1b727220a95)
+        );
 
         EngineJobResult {
             job_id: req.job_id.clone(),

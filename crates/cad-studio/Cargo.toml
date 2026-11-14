@@ -18,6 +18,10 @@ cad-engineering = { path = "../cad-engineering" }
 cad-cae.workspace = true
 cad-cam.workspace = true
 cad-constraints.workspace = true
+atlas-core.workspace = true
+atlas-dependency-graph.workspace = true
+atlas-simulation-core.workspace = true
+atlas-engine-manager.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 

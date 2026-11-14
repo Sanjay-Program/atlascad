@@ -12,10 +12,7 @@ pub enum CoreEvent {
         operation: String,
     },
     /// A solver job was initiated.
-    JobStarted {
-        job_id: String,
-        engine_id: String,
-    },
+    JobStarted { job_id: String, engine_id: String },
     /// A solver job completed successfully.
     JobCompleted {
         job_id: String,
@@ -29,10 +26,7 @@ pub enum CoreEvent {
         error: String,
     },
     /// Engineering workspace switched.
-    WorkspaceChanged {
-        previous: String,
-        current: String,
-    },
+    WorkspaceChanged { previous: String, current: String },
 }
 
 /// Simple in-memory event dispatcher recording recent notifications.

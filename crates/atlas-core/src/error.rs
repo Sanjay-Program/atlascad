@@ -19,10 +19,7 @@ pub enum CoreError {
 
     /// Subsystem is in an invalid lifecycle state.
     #[error("Invalid state transition: current={current}, attempted={attempted}")]
-    InvalidState {
-        current: String,
-        attempted: String,
-    },
+    InvalidState { current: String, attempted: String },
 
     /// Validation failure on input or model data.
     #[error("Validation failed: {0}")]

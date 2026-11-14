@@ -43,6 +43,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "atlas-engine-manager"
+version = "0.1.0"
+dependencies = [
+ "atlas-core",
+ "cad-engineering",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "atlas-feature-tree"
+version = "0.1.0"
+dependencies = [
+ "atlas-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "atlas-project"
+version = "0.1.0"
+dependencies = [
+ "atlas-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "atlas-simulation-core"
 version = "0.1.0"
 dependencies = [
@@ -256,6 +287,10 @@ dependencies = [
 name = "cad-studio"
 version = "0.1.0"
 dependencies = [
+ "atlas-core",
+ "atlas-dependency-graph",
+ "atlas-engine-manager",
+ "atlas-simulation-core",
  "cad-cae",
  "cad-cam",
  "cad-constraints",

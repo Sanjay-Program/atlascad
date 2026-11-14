@@ -39,7 +39,10 @@ impl InvalidationEngine {
             }
 
             if let Some(node) = nodes.get_mut(&current) {
-                node.mark_stale(format!("Upstream dependency '{}' changed: {}", root, reason));
+                node.mark_stale(format!(
+                    "Upstream dependency '{}' changed: {}",
+                    root, reason
+                ));
                 affected.push(current.clone());
             }
 

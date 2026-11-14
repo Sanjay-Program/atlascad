@@ -3598,10 +3598,7 @@ fn engines_ecosystem_api() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(engines.len(), 24);
 
     // Verify key engines exist across disciplines
-    let ids: Vec<&str> = engines
-        .iter()
-        .filter_map(|e| e["id"].as_str())
-        .collect();
+    let ids: Vec<&str> = engines.iter().filter_map(|e| e["id"].as_str()).collect();
     assert!(ids.contains(&"openfoam"));
     assert!(ids.contains(&"calculix"));
     assert!(ids.contains(&"ngspice"));
@@ -3619,19 +3616,33 @@ fn engines_ecosystem_api() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(h_data["engine_id"], "calculix");
 
     // 3. POST /api/engines/health (unknown engine)
-    let bad_health = post(addr, "/api/engines/health", r#"{"engine_id": "nonexistent"}"#)?;
+    let bad_health = post(
+        addr,
+        "/api/engines/health",
+        r#"{"engine_id": "nonexistent"}"#,
+    )?;
     assert_eq!(bad_health.status, 404);
 
     // 4. POST /api/engines/run for FEA (CalculiX)
-    let fea_resp = post(addr, "/api/engines/run", r#"{"engine_id": "calculix", "job_type": "static_fea"}"#)?;
+    let fea_resp = post(
+        addr,
+        "/api/engines/run",
+        r#"{"engine_id": "calculix", "job_type": "static_fea"}"#,
+    )?;
     assert_eq!(fea_resp.status, 200);
     let fea_data = json(&fea_resp)?;
     assert_eq!(fea_data["status"], "converged");
-    let peak_stress = fea_data["metrics"]["max_von_mises_mpa"].as_f64().ok_or("stress")?;
+    let peak_stress = fea_data["metrics"]["max_von_mises_mpa"]
+        .as_f64()
+        .ok_or("stress")?;
     assert!(peak_stress > 0.0);
 
     // 5. POST /api/engines/run for Power Flow (pandapower)
-    let power_resp = post(addr, "/api/engines/run", r#"{"engine_id": "pandapower", "job_type": "ac_load_flow"}"#)?;
+    let power_resp = post(
+        addr,
+        "/api/engines/run",
+        r#"{"engine_id": "pandapower", "job_type": "ac_load_flow"}"#,
+    )?;
     assert_eq!(power_resp.status, 200);
     let power_data = json(&power_resp)?;
     assert_eq!(power_data["status"], "converged");
@@ -3639,12 +3650,92 @@ fn engines_ecosystem_api() -> Result<(), Box<dyn std::error::Error>> {
     assert!(vm_pu > 0.9);
 
     // 6. POST /api/engines/run for ECAD (ngspice)
-    let spice_resp = post(addr, "/api/engines/run", r#"{"engine_id": "ngspice", "job_type": "transient_analysis"}"#)?;
+    let spice_resp = post(
+        addr,
+        "/api/engines/run",
+        r#"{"engine_id": "ngspice", "job_type": "transient_analysis"}"#,
+    )?;
     assert_eq!(spice_resp.status, 200);
     let spice_data = json(&spice_resp)?;
     assert_eq!(spice_data["status"], "converged");
-    let v_peak = spice_data["metrics"]["v_out_peak_v"].as_f64().ok_or("v_peak")?;
+    let v_peak = spice_data["metrics"]["v_out_peak_v"]
+        .as_f64()
+        .ok_or("v_peak")?;
     assert!(v_peak > 0.0);
+
+    Ok(())
+}
+
+#[test]
+fn dependency_graph_invalidation_api() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("depgraph", [20.0, 20.0, 10.0])?;
+    let addr = handle.addr();
+
+    // 1. Initial GET /api/graph: all 7 nodes present, 6 edges, 0 stale nodes
+    let resp = request(addr, "GET", "/api/graph", &[], &[])?;
+    assert_eq!(resp.status, 200);
+    let graph = json(&resp)?;
+    assert_eq!(graph["node_count"], 7);
+    assert_eq!(graph["edge_count"], 6);
+    assert_eq!(graph["stale_count"], 0);
+    assert_eq!(graph["is_stale"], false);
+
+    // 2. Initial recompute plan is empty because nothing is stale
+    let plan_resp = request(addr, "GET", "/api/graph/plan", &[], &[])?;
+    assert_eq!(plan_resp.status, 200);
+    let plan_data = json(&plan_resp)?;
+    assert_eq!(plan_data["count"], 0);
+
+    // 3. Modifying a CAD parameter triggers DAG invalidation
+    let edit_resp = post(addr, "/api/parameter", r#"{"id":"depth","value":25.0}"#)?;
+    assert_eq!(edit_resp.status, 200);
+
+    // 4. Verify GET /api/graph shows stale nodes
+    let stale_resp = request(addr, "GET", "/api/graph", &[], &[])?;
+    assert_eq!(stale_resp.status, 200);
+    let stale_graph = json(&stale_resp)?;
+    let stale_count = stale_graph["stale_count"].as_u64().ok_or("stale_count")?;
+    assert!(stale_count >= 6);
+    assert_eq!(stale_graph["is_stale"], true);
+
+    // 5. GET /api/graph/plan now returns topological recomputation order
+    let active_plan_resp = request(addr, "GET", "/api/graph/plan", &[], &[])?;
+    assert_eq!(active_plan_resp.status, 200);
+    let active_plan = json(&active_plan_resp)?;
+    let count = active_plan["count"].as_u64().ok_or("count")?;
+    assert!(count >= 6);
+
+    // 6. Running a solver (e.g. CalculiX FEA) marks fea-structural node Current
+    let fea_run = post(
+        addr,
+        "/api/engines/run",
+        r#"{"engine_id": "calculix", "job_type": "static_fea"}"#,
+    )?;
+    assert_eq!(fea_run.status, 200);
+    let graph_after_fea = json(&request(addr, "GET", "/api/graph", &[], &[])?)?;
+    let nodes = graph_after_fea["nodes"].as_array().ok_or("nodes array")?;
+    let fea_node = nodes
+        .iter()
+        .find(|n| n["id"] == "fea-structural")
+        .ok_or("fea node")?;
+    assert_eq!(fea_node["state"], "Current");
+
+    // 7. Manual invalidation endpoint POST /api/graph/invalidate
+    let manual_inv = post(
+        addr,
+        "/api/graph/invalidate",
+        r#"{"node_id":"cad-geometry","reason":"User triggered full invalidate"}"#,
+    )?;
+    assert_eq!(manual_inv.status, 200);
+    let inv_data = json(&manual_inv)?;
+    assert_eq!(inv_data["invalidated_node"], "cad-geometry");
+    assert!(
+        inv_data["affected_nodes"]
+            .as_array()
+            .ok_or("affected")?
+            .len()
+            >= 6
+    );
 
     Ok(())
 }

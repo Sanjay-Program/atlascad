@@ -1163,6 +1163,7 @@
     renderShare(next.share);
     syncProfileControls();
     syncPlacementControls();
+    checkDependencyGraph();
     syncCreateControls();
     updateGeometryStatus();
     clearPick();
@@ -6426,6 +6427,7 @@ ${gcodeSample}`;
     if (metricDof) metricDof.textContent = metrics.dof ? Number(metrics.dof).toLocaleString() : (metrics.nodes ? Number(metrics.nodes).toLocaleString() : "4,820");
 
     hud.hidden = false;
+    checkDependencyGraph();
     if (app.viewport) app.viewport.requestFrame();
   }
 
@@ -6434,8 +6436,66 @@ ${gcodeSample}`;
     if (hud) hud.hidden = true;
   }
 
+  async function checkDependencyGraph() {
+    try {
+      const graph = await api("/api/graph");
+      updateGraphStatus(graph);
+    } catch (_) {
+      // Non-blocking
+    }
+  }
+
+  function updateGraphStatus(graph) {
+    const banner = byId("rvStaleBanner");
+    if (!banner) return;
+    if (graph && graph.is_stale) {
+      banner.hidden = false;
+      const count = graph.stale_count || 0;
+      const text = byId("rvStaleText");
+      if (text) text.textContent = `⚠️ ${count} Results Stale — Geometry Modified`;
+    } else {
+      banner.hidden = true;
+    }
+  }
+
+  async function recomputeStaleSolvers() {
+    const btn = byId("rvRecomputeBtn");
+    if (btn) btn.disabled = true;
+    try {
+      toast("Recomputing stale engineering analyses...");
+      const planRes = await api("/api/graph/plan");
+      const plan = planRes.plan || [];
+      for (const nodeId of plan) {
+        if (nodeId === "cad-geometry") continue;
+        if (nodeId === "fea-structural") {
+          await api("/api/engines/run", {
+            method: "POST",
+            body: { engine_id: "calculix", job_type: "static_fea" }
+          });
+        } else if (nodeId === "cfd-aerodynamics") {
+          await api("/api/engines/run", {
+            method: "POST",
+            body: { engine_id: "openfoam", job_type: "incompressible_ras" }
+          });
+        } else if (nodeId === "cam-toolpaths") {
+          await api("/api/engines/run", {
+            method: "POST",
+            body: { engine_id: "opencam", job_type: "adaptive_clearing" }
+          });
+        }
+      }
+      toast("All stale engineering analyses recomputed");
+      await checkDependencyGraph();
+    } catch (err) {
+      toast(`Recompute error: ${err.message}`, true);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
   function setupResultViewerHud() {
     byId("rvHudCloseBtn")?.addEventListener("click", hideResultViewerHud);
+    byId("rvRecomputeBtn")?.addEventListener("click", recomputeStaleSolvers);
 
     byId("rvExportCsvBtn")?.addEventListener("click", () => {
       if (!activeResultData) {

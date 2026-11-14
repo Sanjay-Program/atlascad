@@ -429,6 +429,84 @@ struct StatePayload {
 // State
 // ---------------------------------------------------------------------------------------------
 
+fn init_default_dependency_graph() -> atlas_dependency_graph::graph::DependencyGraph {
+    use atlas_core::identifiers::NodeId;
+    use atlas_dependency_graph::edge::DependencyReason;
+    use atlas_dependency_graph::graph::DependencyGraph;
+    use atlas_dependency_graph::node::{DependencyNode, NodeKind};
+
+    let mut graph = DependencyGraph::new();
+
+    let geom = NodeId::new("cad-geometry");
+    let mesh = NodeId::new("fem-mesh");
+    let fea = NodeId::new("fea-structural");
+    let cfd = NodeId::new("cfd-aerodynamics");
+    let dwg = NodeId::new("drawing-sheet");
+    let cam = NodeId::new("cam-toolpaths");
+    let bim = NodeId::new("bim-coordination");
+
+    graph.add_node(DependencyNode::new(
+        geom.clone(),
+        "Solid CAD Geometry",
+        NodeKind::Geometry,
+    ));
+    graph.add_node(DependencyNode::new(
+        mesh.clone(),
+        "Discretized FEA/CFD Mesh",
+        NodeKind::Mesh,
+    ));
+    graph.add_node(DependencyNode::new(
+        fea.clone(),
+        "CalculiX Structural FEA",
+        NodeKind::FeaSimulation,
+    ));
+    graph.add_node(DependencyNode::new(
+        cfd.clone(),
+        "OpenFOAM Aerodynamics",
+        NodeKind::CfdSimulation,
+    ));
+    graph.add_node(DependencyNode::new(
+        dwg.clone(),
+        "2D Engineering Drawing",
+        NodeKind::Drawing,
+    ));
+    graph.add_node(DependencyNode::new(
+        cam.clone(),
+        "3-Axis CNC Toolpaths",
+        NodeKind::CamToolpath,
+    ));
+    graph.add_node(DependencyNode::new(
+        bim.clone(),
+        "OpenBIM & IFC Model",
+        NodeKind::BimCoordination,
+    ));
+
+    let _ = graph.add_dependency(
+        geom.clone(),
+        mesh.clone(),
+        DependencyReason::SpatialDiscretization,
+    );
+    let _ = graph.add_dependency(
+        mesh.clone(),
+        fea.clone(),
+        DependencyReason::PropertyAggregation,
+    );
+    let _ = graph.add_dependency(
+        mesh.clone(),
+        cfd.clone(),
+        DependencyReason::PropertyAggregation,
+    );
+    let _ = graph.add_dependency(geom.clone(), dwg.clone(), DependencyReason::ProjectionView);
+    let _ = graph.add_dependency(geom.clone(), cam.clone(), DependencyReason::ToolpathSurface);
+    let _ = graph.add_dependency(
+        geom.clone(),
+        bim.clone(),
+        DependencyReason::GeometricBoundary,
+    );
+
+    graph
+}
+
 struct StudioState {
     project: Project,
     path: PathBuf,
@@ -462,6 +540,8 @@ struct StudioState {
     /// result is not a design edit, so it must not move the revision, but the project file still
     /// differs from disk and has to be marked unsaved.
     artifacts_changed: bool,
+    /// Engineering dependency graph tracking provenance and downstream invalidation.
+    dependency_graph: atlas_dependency_graph::graph::DependencyGraph,
 }
 
 impl StudioState {
@@ -486,6 +566,7 @@ impl StudioState {
             drawing_edited: false,
             drawing_revision: None,
             artifacts_changed: false,
+            dependency_graph: init_default_dependency_graph(),
         };
         // Evaluate once at startup so a broken project is refused before a URL is printed.
         let _ = state.payload()?;
@@ -701,6 +782,8 @@ impl StudioState {
                 return Err(error);
             }
         };
+        // Invalidate downstream engineering artifacts in the dependency graph
+        self.invalidate_geometry("Parametric CAD model modified");
         self.autosave();
         let mut payload = payload;
         payload.recovery = self.recovery_view();
@@ -758,6 +841,61 @@ impl StudioState {
         self.recovered = None;
         self.autosave_error = None;
         self.payload()
+    }
+
+    fn invalidate_geometry(&mut self, reason: &str) -> Vec<atlas_core::identifiers::NodeId> {
+        let geom_id = atlas_core::identifiers::NodeId::new("cad-geometry");
+        self.dependency_graph.invalidate(&geom_id, reason)
+    }
+
+    fn invalidate_node(
+        &mut self,
+        node_id: &str,
+        reason: &str,
+    ) -> Vec<atlas_core::identifiers::NodeId> {
+        let id = atlas_core::identifiers::NodeId::new(node_id);
+        self.dependency_graph.invalidate(&id, reason)
+    }
+
+    fn mark_node_current(&mut self, node_id: &str, provenance_hash: &str) {
+        let id = atlas_core::identifiers::NodeId::new(node_id);
+        if let Some(node) = self.dependency_graph.get_node_mut(&id) {
+            node.mark_current(provenance_hash.to_string());
+        }
+    }
+
+    fn graph_payload(&self) -> serde_json::Value {
+        let nodes: Vec<_> = self.dependency_graph.nodes().values().cloned().collect();
+        let edges = self.dependency_graph.edges().to_vec();
+        let stale_count = nodes
+            .iter()
+            .filter(|n| {
+                matches!(
+                    n.state,
+                    atlas_dependency_graph::node::NodeState::Stale { .. }
+                )
+            })
+            .count();
+        serde_json::json!({
+            "nodes": nodes,
+            "edges": edges,
+            "node_count": nodes.len(),
+            "edge_count": edges.len(),
+            "stale_count": stale_count,
+            "is_stale": stale_count > 0,
+        })
+    }
+
+    fn graph_recompute_plan(&self) -> Result<serde_json::Value, StudioError> {
+        let order = self
+            .dependency_graph
+            .plan_recomputation()
+            .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+        let plan_strings: Vec<String> = order.iter().map(|id| id.as_str().to_string()).collect();
+        Ok(serde_json::json!({
+            "plan": plan_strings,
+            "count": plan_strings.len(),
+        }))
     }
 
     /// Where this project's drawing is saved: the project's own stem with a `.zdraft` extension.
@@ -2048,6 +2186,9 @@ impl StudioState {
         let result = cad_cae::run_static(&mesh, &study, &library)
             .map_err(|e| StudioError::BadRequest(format!("CAE simulation error: {e}")))?;
 
+        self.mark_node_current("fem-mesh", "mesh-converged");
+        self.mark_node_current("fea-structural", "fea-converged");
+
         Ok(serde_json::json!({
             "study": result.study,
             "voxel_size_mm": result.mesh.voxel_size_mm,
@@ -2279,6 +2420,8 @@ impl StudioState {
             std::f64::consts::PI * tool_dia * tool.cutting.spindle_rpm / 1000.0,
             toolpath.estimated_minutes(),
         );
+
+        self.mark_node_current("cam-toolpaths", "cam-generated");
 
         Ok(serde_json::json!({
             "tool_name": tool.name,
@@ -2812,6 +2955,15 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
             });
             json_response(200, payload)
         }
+        ("GET", "/api/graph") => match with_state(state, |state| Ok(state.graph_payload())) {
+            Ok(payload) => json_response(200, payload),
+            Err(error) => error_response(&error),
+        },
+        ("GET", "/api/graph/plan") => match with_state(state, |state| state.graph_recompute_plan())
+        {
+            Ok(payload) => json_response(200, payload),
+            Err(error) => error_response(&error),
+        },
         ("POST", path) if path.starts_with("/api/") => {
             match require_same_origin(request, port, shared).and_then(|()| require_json(request)) {
                 Ok(()) => post_route(state, request),
@@ -3330,6 +3482,22 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                     timeout_seconds: body.timeout_seconds.unwrap_or(60),
                 };
                 let result = registry.execute_job(&job_req);
+                if result.success {
+                    let target_node = match result.engine_id.as_str() {
+                        "calculix" => Some("fea-structural"),
+                        "openfoam" => Some("cfd-aerodynamics"),
+                        "opencam" => Some("cam-toolpaths"),
+                        "gmsh" => Some("fem-mesh"),
+                        "ifcopenshell" => Some("bim-coordination"),
+                        _ => None,
+                    };
+                    if let Some(node_id) = target_node {
+                        let _ = with_state(state, |s| {
+                            s.mark_node_current(node_id, &result.provenance_hash);
+                            Ok(())
+                        });
+                    }
+                }
                 let payload = serde_json::json!({
                     "job_id": result.job_id,
                     "engine_id": result.engine_id.as_str(),
@@ -3341,6 +3509,29 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                     "provenance_hash": result.provenance_hash,
                 });
                 json_response(200, payload)
+            }
+            Err(error) => error_response(&error),
+        },
+        "/api/graph/invalidate" => match parse_body_or_default::<InvalidateRequest>(request) {
+            Ok(body) => {
+                let node_id = body.node_id.unwrap_or_else(|| "cad-geometry".to_string());
+                let reason = body
+                    .reason
+                    .unwrap_or_else(|| "Manual user invalidation".to_string());
+                match with_state(state, |state| {
+                    let affected = state.invalidate_node(&node_id, &reason);
+                    let affected_str: Vec<String> =
+                        affected.iter().map(|id| id.as_str().to_string()).collect();
+                    Ok(serde_json::json!({
+                        "invalidated_node": node_id,
+                        "reason": reason,
+                        "affected_nodes": affected_str,
+                        "graph": state.graph_payload(),
+                    }))
+                }) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                }
             }
             Err(error) => error_response(&error),
         },
@@ -4321,4 +4512,13 @@ struct EngineRunRequest {
     parameters: Option<serde_json::Value>,
     #[serde(default)]
     timeout_seconds: Option<u64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct InvalidateRequest {
+    #[serde(default)]
+    node_id: Option<String>,
+    #[serde(default)]
+    reason: Option<String>,
 }

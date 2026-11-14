@@ -9,16 +9,19 @@ pub enum BoundaryCondition {
     FixedSupport { surface_id: String },
 
     /// Prescribed surface pressure in Pascals.
-    PressureLoad { surface_id: String, pressure_pa: f64 },
-
-    /// Concentrated force vector in Newtons.
-    ForceLoad {
-        node_id: String,
-        force_n: [f64; 3],
+    PressureLoad {
+        surface_id: String,
+        pressure_pa: f64,
     },
 
+    /// Concentrated force vector in Newtons.
+    ForceLoad { node_id: String, force_n: [f64; 3] },
+
     /// Constant surface temperature in Kelvin.
-    FixedTemperature { surface_id: String, temperature_k: f64 },
+    FixedTemperature {
+        surface_id: String,
+        temperature_k: f64,
+    },
 
     /// Constant surface heat flux in Watts per square meter.
     HeatFlux { surface_id: String, flux_w_m2: f64 },

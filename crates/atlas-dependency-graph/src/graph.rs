@@ -7,10 +7,11 @@ use crate::node::{DependencyNode, NodeState};
 use crate::scheduler::DependencyScheduler;
 use atlas_core::error::CoreError;
 use atlas_core::identifiers::NodeId;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 /// Complete dependency graph coordinating all engineering artifacts.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct DependencyGraph {
     nodes: HashMap<NodeId, DependencyNode>,
     /// Outgoing edges: Source -> `Vec<Target>` (Target depends on Source)
@@ -61,8 +62,7 @@ impl DependencyGraph {
             .entry(target.clone())
             .or_default()
             .push(source.clone());
-        self.edges
-            .push(DependencyEdge::new(source, target, reason));
+        self.edges.push(DependencyEdge::new(source, target, reason));
 
         Ok(())
     }
@@ -103,6 +103,16 @@ impl DependencyGraph {
     pub fn edge_count(&self) -> usize {
         self.edges.len()
     }
+
+    /// Retrieve all nodes in the graph.
+    pub fn nodes(&self) -> &HashMap<NodeId, DependencyNode> {
+        &self.nodes
+    }
+
+    /// Retrieve all edges in the graph.
+    pub fn edges(&self) -> &[DependencyEdge] {
+        &self.edges
+    }
 }
 
 #[cfg(test)]
@@ -121,18 +131,74 @@ mod tests {
         let dwg = NodeId::new("drawing-sheet");
         let cam = NodeId::new("cnc-toolpath");
 
-        graph.add_node(DependencyNode::new(geom.clone(), "Solid CAD Model", NodeKind::Geometry));
-        graph.add_node(DependencyNode::new(mesh.clone(), "FEM Tetrahedral Mesh", NodeKind::Mesh));
-        graph.add_node(DependencyNode::new(fea.clone(), "CalculiX Structural FEA", NodeKind::FeaSimulation));
-        graph.add_node(DependencyNode::new(cfd.clone(), "OpenFOAM Aerodynamics", NodeKind::CfdSimulation));
-        graph.add_node(DependencyNode::new(dwg.clone(), "4-View Orthographic Drawing", NodeKind::Drawing));
-        graph.add_node(DependencyNode::new(cam.clone(), "3-Axis CNC Toolpath", NodeKind::CamToolpath));
+        graph.add_node(DependencyNode::new(
+            geom.clone(),
+            "Solid CAD Model",
+            NodeKind::Geometry,
+        ));
+        graph.add_node(DependencyNode::new(
+            mesh.clone(),
+            "FEM Tetrahedral Mesh",
+            NodeKind::Mesh,
+        ));
+        graph.add_node(DependencyNode::new(
+            fea.clone(),
+            "CalculiX Structural FEA",
+            NodeKind::FeaSimulation,
+        ));
+        graph.add_node(DependencyNode::new(
+            cfd.clone(),
+            "OpenFOAM Aerodynamics",
+            NodeKind::CfdSimulation,
+        ));
+        graph.add_node(DependencyNode::new(
+            dwg.clone(),
+            "4-View Orthographic Drawing",
+            NodeKind::Drawing,
+        ));
+        graph.add_node(DependencyNode::new(
+            cam.clone(),
+            "3-Axis CNC Toolpath",
+            NodeKind::CamToolpath,
+        ));
 
-        assert!(graph.add_dependency(geom.clone(), mesh.clone(), DependencyReason::SpatialDiscretization).is_ok());
-        assert!(graph.add_dependency(mesh.clone(), fea.clone(), DependencyReason::PropertyAggregation).is_ok());
-        assert!(graph.add_dependency(mesh.clone(), cfd.clone(), DependencyReason::PropertyAggregation).is_ok());
-        assert!(graph.add_dependency(geom.clone(), dwg.clone(), DependencyReason::ProjectionView).is_ok());
-        assert!(graph.add_dependency(geom.clone(), cam.clone(), DependencyReason::ToolpathSurface).is_ok());
+        assert!(
+            graph
+                .add_dependency(
+                    geom.clone(),
+                    mesh.clone(),
+                    DependencyReason::SpatialDiscretization
+                )
+                .is_ok()
+        );
+        assert!(
+            graph
+                .add_dependency(
+                    mesh.clone(),
+                    fea.clone(),
+                    DependencyReason::PropertyAggregation
+                )
+                .is_ok()
+        );
+        assert!(
+            graph
+                .add_dependency(
+                    mesh.clone(),
+                    cfd.clone(),
+                    DependencyReason::PropertyAggregation
+                )
+                .is_ok()
+        );
+        assert!(
+            graph
+                .add_dependency(geom.clone(), dwg.clone(), DependencyReason::ProjectionView)
+                .is_ok()
+        );
+        assert!(
+            graph
+                .add_dependency(geom.clone(), cam.clone(), DependencyReason::ToolpathSurface)
+                .is_ok()
+        );
 
         assert_eq!(graph.node_count(), 6);
         assert_eq!(graph.edge_count(), 5);
