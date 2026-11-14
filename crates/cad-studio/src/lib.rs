@@ -3299,6 +3299,64 @@ impl StudioState {
             .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
+
+    fn sim_composite_failure(
+        &mut self,
+        req: &SimCompositeFailureRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::structural::CompositeFailureProblem::default();
+        if let Some(s1) = req.sigma_1_mpa {
+            prob.sigma_1_pa = s1 * 1.0e6;
+        }
+        if let Some(s2) = req.sigma_2_mpa {
+            prob.sigma_2_pa = s2 * 1.0e6;
+        }
+        if let Some(s12) = req.tau_12_mpa {
+            prob.tau_12_pa = s12 * 1.0e6;
+        }
+        let res = atlas_simulation_core::structural::solve_composite_failure(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_rainflow(&mut self, req: &SimRainflowRequest) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::rainflow::RainflowProblem::default();
+        if let Some(ref hist) = req.stress_history_mpa {
+            prob.stress_history_mpa.clone_from(hist);
+        }
+        let res = atlas_simulation_core::rainflow::solve_rainflow_fatigue(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_fsi(&mut self, req: &SimFsiRequest) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::fsi::FsiProblem::default();
+        if let Some(l) = req.length_m {
+            prob.length_m = l;
+        }
+        if let Some(v) = req.fluid_velocity_m_s {
+            prob.fluid_velocity_m_s = v;
+        }
+        let res = atlas_simulation_core::fsi::solve_fsi_coupled(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_cavitation(
+        &mut self,
+        req: &SimCavitationRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::cavitation::CavitationProblem::default();
+        if let Some(t) = req.fluid_temp_c {
+            prob.fluid_temp_c = t;
+        }
+        if let Some(h) = req.total_head_m {
+            prob.total_head_m = h;
+        }
+        let res = atlas_simulation_core::cavitation::solve_cavitation_npsh(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
 }
 
 fn export_name(name: &str) -> String {
@@ -4566,6 +4624,36 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                 Err(error) => error_response(&error),
             }
         }
+        "/api/sim/composite_failure" => {
+            match parse_body_or_default::<SimCompositeFailureRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_composite_failure(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/rainflow" => match parse_body_or_default::<SimRainflowRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_rainflow(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/fsi" => match parse_body_or_default::<SimFsiRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_fsi(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/cavitation" => match parse_body_or_default::<SimCavitationRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_cavitation(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
         _ => error_response(&StudioError::NotFound),
     }
 }
@@ -5822,4 +5910,40 @@ struct SimRoboticsTrajectoryRequest {
     pub time_steps: Option<usize>,
     #[serde(default)]
     pub q_target_rad: Option<Vec<f64>>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimCompositeFailureRequest {
+    #[serde(default)]
+    pub sigma_1_mpa: Option<f64>,
+    #[serde(default)]
+    pub sigma_2_mpa: Option<f64>,
+    #[serde(default)]
+    pub tau_12_mpa: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimRainflowRequest {
+    #[serde(default)]
+    pub stress_history_mpa: Option<Vec<f64>>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimFsiRequest {
+    #[serde(default)]
+    pub length_m: Option<f64>,
+    #[serde(default)]
+    pub fluid_velocity_m_s: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimCavitationRequest {
+    #[serde(default)]
+    pub fluid_temp_c: Option<f64>,
+    #[serde(default)]
+    pub total_head_m: Option<f64>,
 }

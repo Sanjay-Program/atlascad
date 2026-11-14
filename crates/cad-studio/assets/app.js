@@ -7389,6 +7389,18 @@ ${gcodeSample}`;
         } else if (studyType === "robotics_trajectory") {
           endpoint = "/api/sim/robotics_trajectory";
           body = { duration_s: 2.5, time_steps: 50 };
+        } else if (studyType === "composite_failure") {
+          endpoint = "/api/sim/composite_failure";
+          body = { sigma_1_mpa: 600.0, sigma_2_mpa: 20.0, tau_12_mpa: 30.0 };
+        } else if (studyType === "rainflow") {
+          endpoint = "/api/sim/rainflow";
+          body = { stress_history_mpa: [0.0, 30.0, -20.0, 40.0, -40.0, 20.0, -10.0, 10.0, -30.0, 0.0] };
+        } else if (studyType === "fsi") {
+          endpoint = "/api/sim/fsi";
+          body = { length_m: 6.0, fluid_velocity_m_s: 3.5 };
+        } else if (studyType === "cavitation") {
+          endpoint = "/api/sim/cavitation";
+          body = { fluid_temp_c: 60.0, total_head_m: 45.0 };
         }
 
         const res = await api(endpoint, {
@@ -7534,6 +7546,40 @@ ${gcodeSample}`;
               fos.style.color = "#10b981";
             }
             if (elCount) elCount.textContent = `T = ${m.trajectory_duration_s?.toFixed(1)} s (${m.discrete_time_steps} pts)`;
+          } else if (studyType === "composite_failure") {
+            if (peak) peak.textContent = `TW SR: ${m.tsai_wu_strength_ratio?.toFixed(2)}`;
+            if (disp) disp.textContent = `TH SR: ${m.tsai_hill_strength_ratio?.toFixed(2)}`;
+            if (fos) {
+              const safe = m.is_safe > 0.5;
+              fos.textContent = safe ? "Lamina Safe (FPF Pass)" : "Failure Predicted";
+              fos.style.color = safe ? "#10b981" : "#ef4444";
+            }
+            if (elCount) elCount.textContent = `FI: ${m.tsai_wu_failure_index?.toFixed(3)}`;
+          } else if (studyType === "rainflow") {
+            if (peak) peak.textContent = `Δσ_max: ${m.max_stress_range_mpa?.toFixed(1)} MPa`;
+            if (disp) disp.textContent = `Cycles: ${m.extracted_cycle_count?.toFixed(1)}`;
+            if (fos) {
+              fos.textContent = `RUL: ${m.remaining_useful_life_pct?.toFixed(1)}%`;
+              fos.style.color = (m.remaining_useful_life_pct > 90.0) ? "#10b981" : "#f59e0b";
+            }
+            if (elCount) elCount.textContent = `D = ${m.cumulative_fatigue_damage?.toFixed(5)}`;
+          } else if (studyType === "fsi") {
+            if (peak) peak.textContent = `δ_tip: ${m.coupled_tip_deflection_mm?.toFixed(1)} mm`;
+            if (disp) disp.textContent = `σ_root: ${m.root_bending_stress_mpa?.toFixed(1)} MPa`;
+            if (fos) {
+              fos.textContent = `Yield FoS: ${m.factor_of_safety_yield?.toFixed(2)}`;
+              fos.style.color = (m.factor_of_safety_yield >= 1.2) ? "#10b981" : "#ef4444";
+            }
+            if (elCount) elCount.textContent = `${m.fsi_iterations} Iterations`;
+          } else if (studyType === "cavitation") {
+            if (peak) peak.textContent = `NPSHa: ${m.npsh_available_m?.toFixed(2)} m`;
+            if (disp) disp.textContent = `NPSHr: ${m.npsh_required_m?.toFixed(2)} m`;
+            if (fos) {
+              const safe = m.is_safe > 0.5;
+              fos.textContent = safe ? `Margin: +${m.npsh_margin_m?.toFixed(2)} m (Safe)` : "Cavitation Risk!";
+              fos.style.color = safe ? "#10b981" : "#ef4444";
+            }
+            if (elCount) elCount.textContent = `CR: ${m.cavitation_ratio?.toFixed(2)}x`;
           }
 
           if (consoleOut) {

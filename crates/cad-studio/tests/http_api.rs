@@ -4247,5 +4247,77 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         .ok_or("v_max")?;
     assert!(v_max > 0.5 && v_max < 3.0);
 
+    // 22. Composite Failure Criterion (Tsai-Wu / Tsai-Hill)
+    let comp_resp = post(
+        addr,
+        "/api/sim/composite_failure",
+        r#"{"sigma_1_mpa": 600.0, "sigma_2_mpa": 20.0, "tau_12_mpa": 30.0}"#,
+    )?;
+    assert_eq!(comp_resp.status, 200);
+    let comp = json(&comp_resp)?;
+    let sr_tw = comp["scalar_metrics"]["tsai_wu_strength_ratio"]
+        .as_f64()
+        .ok_or("sr_tw")?;
+    assert!(sr_tw > 1.0);
+    let comp_safe = comp["scalar_metrics"]["is_safe"]
+        .as_f64()
+        .ok_or("comp_safe")?;
+    assert_eq!(comp_safe, 1.0);
+
+    // 23. ASTM E1049 Rainflow Cycle Counting & Fatigue
+    let rain_resp = post(
+        addr,
+        "/api/sim/rainflow",
+        r#"{"stress_history_mpa": [0.0, 30.0, -20.0, 40.0, -40.0, 20.0, -10.0, 10.0, -30.0, 0.0]}"#,
+    )?;
+    assert_eq!(rain_resp.status, 200);
+    let rain = json(&rain_resp)?;
+    let max_range = rain["scalar_metrics"]["max_stress_range_mpa"]
+        .as_f64()
+        .ok_or("max_range")?;
+    assert!((max_range - 80.0).abs() < 1e-3);
+    let cycles = rain["scalar_metrics"]["extracted_cycle_count"]
+        .as_f64()
+        .ok_or("cycles")?;
+    assert!(cycles >= 3.0);
+
+    // 24. Two-Way Coupled Fluid-Structure Interaction (Coupled FSI)
+    let fsi_resp = post(
+        addr,
+        "/api/sim/fsi",
+        r#"{"length_m": 6.0, "fluid_velocity_m_s": 3.5}"#,
+    )?;
+    assert_eq!(fsi_resp.status, 200);
+    let fsi = json(&fsi_resp)?;
+    let defl_mm = fsi["scalar_metrics"]["coupled_tip_deflection_mm"]
+        .as_f64()
+        .ok_or("defl_mm")?;
+    assert!(defl_mm > 5.0);
+    let fsi_safe = fsi["scalar_metrics"]["is_safe"]
+        .as_f64()
+        .ok_or("fsi_safe")?;
+    assert_eq!(fsi_safe, 1.0);
+
+    // 25. Turbomachinery Cavitation & NPSH
+    let cav_resp = post(
+        addr,
+        "/api/sim/cavitation",
+        r#"{"fluid_temp_c": 60.0, "total_head_m": 45.0}"#,
+    )?;
+    assert_eq!(cav_resp.status, 200);
+    let cav = json(&cav_resp)?;
+    let npsha = cav["scalar_metrics"]["npsh_available_m"]
+        .as_f64()
+        .ok_or("npsha")?;
+    assert!(npsha > 8.0);
+    let cr = cav["scalar_metrics"]["cavitation_ratio"]
+        .as_f64()
+        .ok_or("cr")?;
+    assert!(cr > 2.0);
+    let cav_safe = cav["scalar_metrics"]["is_safe"]
+        .as_f64()
+        .ok_or("cav_safe")?;
+    assert_eq!(cav_safe, 1.0);
+
     Ok(())
 }

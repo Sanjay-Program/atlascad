@@ -398,6 +398,193 @@ pub fn solve_composite_laminate(
     })
 }
 
+/// Unidirectional composite lamina ultimate strength limits.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LaminaStrengthLimits {
+    pub xt_pa: f64,    // Longitudinal tensile strength (fiber tension)
+    pub xc_pa: f64,    // Longitudinal compressive strength (fiber compression)
+    pub yt_pa: f64,    // Transverse tensile strength (matrix tension)
+    pub yc_pa: f64,    // Transverse compressive strength (matrix compression)
+    pub s_pa: f64,     // In-plane shear strength
+    pub f12_star: f64, // Tsai-Wu interaction coefficient (-0.50 typical)
+}
+
+impl Default for LaminaStrengthLimits {
+    fn default() -> Self {
+        // High-strength Carbon/Epoxy tape (e.g. AS4/3501-6)
+        Self {
+            xt_pa: 1800.0e6, // 1800 MPa
+            xc_pa: 1200.0e6, // 1200 MPa
+            yt_pa: 50.0e6,   // 50 MPa
+            yc_pa: 180.0e6,  // 180 MPa
+            s_pa: 80.0e6,    // 80 MPa
+            f12_star: -0.50,
+        }
+    }
+}
+
+/// Problem definition for composite lamina failure assessment.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CompositeFailureProblem {
+    pub strengths: LaminaStrengthLimits,
+    pub sigma_1_pa: f64, // Applied longitudinal stress (fiber direction)
+    pub sigma_2_pa: f64, // Applied transverse stress
+    pub tau_12_pa: f64,  // Applied in-plane shear stress
+}
+
+impl Default for CompositeFailureProblem {
+    fn default() -> Self {
+        Self {
+            strengths: LaminaStrengthLimits::default(),
+            sigma_1_pa: 600.0e6, // 600 MPa (tension along fiber)
+            sigma_2_pa: 20.0e6,  // 20 MPa (transverse tension)
+            tau_12_pa: 30.0e6,   // 30 MPa shear
+        }
+    }
+}
+
+/// Solves composite failure criteria: Tsai-Wu tensor polynomial, Tsai-Hill, and Maximum Stress.
+pub fn solve_composite_failure(prob: &CompositeFailureProblem) -> Result<SimulationResult, String> {
+    let lim = &prob.strengths;
+    if lim.xt_pa <= 0.0
+        || lim.xc_pa <= 0.0
+        || lim.yt_pa <= 0.0
+        || lim.yc_pa <= 0.0
+        || lim.s_pa <= 0.0
+    {
+        return Err("Strength limits must be positive non-zero values".to_string());
+    }
+
+    let s1 = prob.sigma_1_pa;
+    let s2 = prob.sigma_2_pa;
+    let s12 = prob.tau_12_pa;
+
+    // Tsai-Wu Tensor Coefficients:
+    let f1 = (1.0 / lim.xt_pa) - (1.0 / lim.xc_pa);
+    let f11 = 1.0 / (lim.xt_pa * lim.xc_pa);
+    let f2 = (1.0 / lim.yt_pa) - (1.0 / lim.yc_pa);
+    let f22 = 1.0 / (lim.yt_pa * lim.yc_pa);
+    let f66 = 1.0 / (lim.s_pa * lim.s_pa);
+    let f12 = lim.f12_star * (f11 * f22).sqrt();
+
+    // Tsai-Wu Failure Index:
+    let fi_tsai_wu =
+        f1 * s1 + f2 * s2 + f11 * s1 * s1 + f22 * s2 * s2 + f66 * s12 * s12 + 2.0 * f12 * s1 * s2;
+
+    // Tsai-Wu Strength Ratio R: a * R^2 + b * R - 1 = 0
+    let a_tw = f11 * s1 * s1 + f22 * s2 * s2 + f66 * s12 * s12 + 2.0 * f12 * s1 * s2;
+    let b_tw = f1 * s1 + f2 * s2;
+    let sr_tsai_wu = if a_tw > 1e-18 {
+        let disc = (b_tw * b_tw + 4.0 * a_tw).max(0.0);
+        (-b_tw + disc.sqrt()) / (2.0 * a_tw)
+    } else {
+        100.0
+    };
+
+    // Tsai-Hill Criterion:
+    let x_hill = if s1 >= 0.0 { lim.xt_pa } else { lim.xc_pa };
+    let y_hill = if s2 >= 0.0 { lim.yt_pa } else { lim.yc_pa };
+    let fi_tsai_hill = (s1 / x_hill).powi(2) - (s1 * s2) / (x_hill * x_hill)
+        + (s2 / y_hill).powi(2)
+        + (s12 / lim.s_pa).powi(2);
+    let sr_tsai_hill = if fi_tsai_hill > 1e-12 {
+        1.0 / fi_tsai_hill.sqrt()
+    } else {
+        100.0
+    };
+
+    // Maximum Stress Criterion:
+    let r1 = if s1 > 0.0 {
+        lim.xt_pa / s1
+    } else if s1 < 0.0 {
+        lim.xc_pa / s1.abs()
+    } else {
+        1000.0
+    };
+    let r2 = if s2 > 0.0 {
+        lim.yt_pa / s2
+    } else if s2 < 0.0 {
+        lim.yc_pa / s2.abs()
+    } else {
+        1000.0
+    };
+    let r12 = if s12.abs() > 0.0 {
+        lim.s_pa / s12.abs()
+    } else {
+        1000.0
+    };
+    let sr_max_stress = r1.min(r2).min(r12);
+    let fi_max_stress = if sr_max_stress > 0.0 {
+        1.0 / sr_max_stress
+    } else {
+        0.0
+    };
+
+    let is_safe = fi_tsai_wu < 1.0 && fi_tsai_hill < 1.0 && fi_max_stress < 1.0;
+
+    let val = AnalyticalComparison::assess(
+        "Tsai-Wu Longitudinal Tension Limit Identity",
+        f1 * lim.xt_pa + f11 * lim.xt_pa * lim.xt_pa,
+        1.0,
+    );
+
+    let mut metrics = HashMap::new();
+    metrics.insert("tsai_wu_failure_index".to_string(), fi_tsai_wu);
+    metrics.insert("tsai_wu_strength_ratio".to_string(), sr_tsai_wu);
+    metrics.insert("tsai_hill_failure_index".to_string(), fi_tsai_hill);
+    metrics.insert("tsai_hill_strength_ratio".to_string(), sr_tsai_hill);
+    metrics.insert("max_stress_failure_index".to_string(), fi_max_stress);
+    metrics.insert("max_stress_strength_ratio".to_string(), sr_max_stress);
+    metrics.insert("is_safe".to_string(), if is_safe { 1.0 } else { 0.0 });
+    metrics.insert("sigma_1_mpa".to_string(), s1 / 1e6);
+    metrics.insert("sigma_2_mpa".to_string(), s2 / 1e6);
+    metrics.insert("tau_12_mpa".to_string(), s12 / 1e6);
+
+    let mut conv = ConvergenceMonitor::new(1e-6);
+    conv.record(1, sr_tsai_wu, 1, 1e-4);
+
+    let logs = vec![
+        format!(
+            "Composite Lamina Failure Assessment: σ₁ = {:.1} MPa, σ₂ = {:.1} MPa, τ₁₂ = {:.1} MPa",
+            s1 / 1e6,
+            s2 / 1e6,
+            s12 / 1e6
+        ),
+        format!(
+            "Tsai-Wu Tensor Polynomial: FI = {:.4} -> Strength Ratio R = {:.2}",
+            fi_tsai_wu, sr_tsai_wu
+        ),
+        format!(
+            "Tsai-Hill Yield Criterion: FI = {:.4} -> Strength Ratio R = {:.2}",
+            fi_tsai_hill, sr_tsai_hill
+        ),
+        format!(
+            "Maximum Stress Criterion:  FI = {:.4} -> Strength Ratio R = {:.2}",
+            fi_max_stress, sr_max_stress
+        ),
+        format!(
+            "Integrity Status: {}",
+            if is_safe {
+                "First-Ply Failure Pass (Intact Lamina)"
+            } else {
+                "Ply Failure Exceeded (Damage Incurred)"
+            }
+        ),
+    ];
+
+    Ok(SimulationResult {
+        problem_id: "composite-failure".to_string(),
+        engine_id: "atlas-structural".to_string(),
+        status: SimulationStatus::Converged,
+        execution_time_ms: 1,
+        scalar_metrics: metrics,
+        convergence: conv,
+        validation: Some(val),
+        provenance: SimulationProvenance::new("atlas-structural", "0.1.0"),
+        logs,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -456,6 +643,41 @@ mod tests {
             .unwrap_or(0.0);
         // For balanced symmetric [0/45/-45/90]s quasi-isotropic laminate, Ex == Ey
         assert!((ex - ey).abs() < 0.1);
+        Ok(())
+    }
+
+    #[test]
+    fn test_tsai_wu_composite_failure() -> Result<(), String> {
+        let prob = CompositeFailureProblem::default();
+        let res = solve_composite_failure(&prob)?;
+        assert_eq!(res.status, SimulationStatus::Converged);
+
+        let fi_tw = res
+            .scalar_metrics
+            .get("tsai_wu_failure_index")
+            .copied()
+            .unwrap_or(10.0);
+        let sr_tw = res
+            .scalar_metrics
+            .get("tsai_wu_strength_ratio")
+            .copied()
+            .unwrap_or(0.0);
+        let fi_th = res
+            .scalar_metrics
+            .get("tsai_hill_failure_index")
+            .copied()
+            .unwrap_or(10.0);
+        let is_safe = res.scalar_metrics.get("is_safe").copied().unwrap_or(0.0);
+
+        assert!(fi_tw < 1.0, "Tsai-Wu failure index must be safe: {}", fi_tw);
+        assert!(
+            fi_th < 1.0,
+            "Tsai-Hill failure index must be safe: {}",
+            fi_th
+        );
+        assert!(sr_tw > 1.0, "Strength ratio must exceed 1.0: {}", sr_tw);
+        assert_eq!(is_safe, 1.0);
+
         Ok(())
     }
 }

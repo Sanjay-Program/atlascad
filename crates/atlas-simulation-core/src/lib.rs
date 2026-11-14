@@ -9,6 +9,7 @@ pub mod aeroelasticity;
 pub mod biomedical;
 pub mod boundary_conditions;
 pub mod building_physics;
+pub mod cavitation;
 pub mod cfd;
 pub mod chemical;
 pub mod convergence;
@@ -16,6 +17,7 @@ pub mod digital_twin;
 pub mod electromagnetics;
 pub mod engine;
 pub mod execution;
+pub mod fsi;
 pub mod generative;
 pub mod geotechnical;
 pub mod marine;
@@ -25,6 +27,7 @@ pub mod molecular;
 pub mod power_flow;
 pub mod problem;
 pub mod provenance;
+pub mod rainflow;
 pub mod robotics;
 pub mod solar;
 pub mod solver_settings;
@@ -46,6 +49,7 @@ pub mod prelude {
     pub use crate::building_physics::{
         BuildingAssemblyProblem, BuildingLayer, solve_building_u_value,
     };
+    pub use crate::cavitation::{CavitationProblem, solve_cavitation_npsh};
     pub use crate::cfd::{FluidProperties, PipeFlowProblem, solve_pipe_flow};
     pub use crate::chemical::{ChemicalComponent, FlashProblem, solve_rachford_rice_flash};
     pub use crate::convergence::{ConvergenceMonitor, IterationTelemetry};
@@ -55,6 +59,7 @@ pub mod prelude {
     pub use crate::electromagnetics::{MicrostripProblem, solve_microstrip_line};
     pub use crate::engine::SimulationEngineAdapter;
     pub use crate::execution::{SimulationResult, SimulationStatus};
+    pub use crate::fsi::{FsiProblem, solve_fsi_coupled};
     pub use crate::generative::{
         GenerativeMesh, GenerativeSolution, TopologyOptProblem, filter_sensitivities,
         reconstruct_generative_mesh, solve_topology_optimization,
@@ -75,6 +80,9 @@ pub mod prelude {
         solve_power_flow, y_bus_frobenius_norm,
     };
     pub use crate::problem::{AnalysisType, SimulationProblem};
+    pub use crate::rainflow::{
+        RainflowCycle, RainflowProblem, count_rainflow_cycles, solve_rainflow_fatigue,
+    };
     pub use crate::robotics::{
         DhLink, IkResult, QuinticTrajectoryProblem, RobotKinematicsProblem,
         compute_forward_transforms, compute_geometric_jacobian, compute_manipulability,
@@ -83,8 +91,9 @@ pub mod prelude {
     pub use crate::solar::{SolarPvProblem, solve_solar_pv};
     pub use crate::solver_settings::SolverSettings;
     pub use crate::structural::{
-        BucklingProblem, ColumnEndCondition, CompositeLaminateProblem, FatigueProblem,
-        OrthotropicLamina, solve_column_buckling, solve_composite_laminate, solve_fatigue_safety,
+        BucklingProblem, ColumnEndCondition, CompositeFailureProblem, CompositeLaminateProblem,
+        FatigueProblem, LaminaStrengthLimits, OrthotropicLamina, solve_column_buckling,
+        solve_composite_failure, solve_composite_laminate, solve_fatigue_safety,
     };
     pub use crate::thermal_stress::{
         BimetalStripProblem, ThermalStressProblem, solve_bimetal_deflection, solve_thermal_stress,
