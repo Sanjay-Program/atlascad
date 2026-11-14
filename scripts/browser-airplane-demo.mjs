@@ -296,6 +296,33 @@ try {
   check(nukeFos.includes('ICRP Safe'), `ICRP radiological safety verified (${nukeFos})`);
   console.log(`    ✓ Nuclear Shielding Solved: ${nukeText}, ${nukeFos}`);
 
+  // 3g. Dynamic Parameter Form & Piping Water Hammer Solver
+  logStep('Testing dynamic physics parameters and Piping Water Hammer solver...');
+  await setInputValue('#caeStudyTypeSelect', 'water_hammer');
+  await sleep(150);
+  const whParamTitle = await evaluate('document.getElementById("caeStudyParamsTitle").textContent');
+  check(whParamTitle.includes('Water Hammer'), `Dynamic parameter title updated (${whParamTitle})`);
+  await setInputValue('#caeParam1Input', '3.2'); // Initial velocity
+  await setInputValue('#caeParam2Input', '950.0'); // Section length
+  await setInputValue('#caeParam3Input', '0.8'); // Rapid valve closure
+  await clickSelector('#caeRunSolveBtn', 'Solve Water Hammer');
+  await sleep(300);
+  const whSurge = await evaluate('document.getElementById("caePeakStressVal").textContent');
+  check(whSurge.includes('Surge:'), `Water hammer pressure surge computed (${whSurge})`);
+  console.log(`    ✓ Piping Water Hammer Solved with user parameters: ${whSurge}`);
+
+  // 3h. Master 27-Domain Multiphysics Suite Execution
+  logStep('Executing 27-Domain Enterprise Multiphysics Suite (#caeRunAllSuiteBtn)...');
+  await clickSelector('#caeRunAllSuiteBtn', 'Run 27-Domain Suite');
+  await sleep(500);
+  const suiteBadge = await evaluate('document.getElementById("caeStatusBadge").textContent');
+  check(suiteBadge.includes('27/27 Verified Pass'), `Multiphysics suite status badge verified (${suiteBadge})`);
+  const suiteLog = await evaluate('document.getElementById("caeConsoleOutput").textContent');
+  check(suiteLog.includes('27-DOMAIN AUDIT DOSSIER'), 'Console contains 27-domain audit dossier');
+  check(suiteLog.includes('AS9100 Rev D'), 'Console verifies AS9100 Rev D aerospace compliance');
+  check(suiteLog.includes('ICRP-103'), 'Console verifies ICRP-103 nuclear radiation compliance');
+  console.log('    ✓ 27-Domain Multiphysics Suite: 27/27 Domains Verified, AS9100 & ICRP-103 compliant');
+
   await takeScreenshot('05-cae-results-verified');
 
   // --- Step 4: Switch to CAM & CNC Machining Studio ---
