@@ -704,6 +704,26 @@ def run_live_demo() -> None:
         check(daf > 1.3, f"Dynamic Amplification Factor verified ({daf:.2f}x)")
         print(f"  ✓ 11.30 Shock Response Spectrum: Maxi-Max = {srs_peak_g:.1f} g at {srs['scalar_metrics']['peak_response_frequency_hz']:.0f} Hz (DAF = {daf:.2f}x), Pv = {srs['scalar_metrics']['pseudo_velocity_m_s']:.2f} m/s")
 
+        # 11.31 Type-Safe Dimensional Units & Physical Conversions
+        u_conv = http_request(port, "POST", "/api/units/convert", body={
+            "value": 2.5,
+            "category": "length",
+            "from_unit": "in",
+            "to_unit": "mm"
+        })
+        mm_val = u_conv["converted_value"]
+        check(abs(mm_val - 63.5) < 1e-6, f"Type-safe length conversion verified ({mm_val:.1f} mm)")
+
+        p_conv = http_request(port, "POST", "/api/units/convert", body={
+            "value": 10.0,
+            "category": "pressure",
+            "from_unit": "bar",
+            "to_unit": "psi"
+        })
+        psi_val = p_conv["converted_value"]
+        check(abs(psi_val - 145.038) < 1e-1, f"Type-safe pressure conversion verified ({psi_val:.1f} psi)")
+        print(f"  ✓ 11.31 Dimensional Units: 2.5 in = {mm_val:.1f} mm, 10.0 bar = {psi_val:.1f} psi (SI Base Transposed)")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

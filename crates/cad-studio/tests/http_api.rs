@@ -4385,5 +4385,26 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         .ok_or("daf")?;
     assert!(daf > 1.3 && daf < 1.9);
 
+    // 30. Dimensional Units & Conversions (Length & Pressure)
+    let unit_resp = post(
+        addr,
+        "/api/units/convert",
+        r#"{"value": 1.0, "category": "length", "from_unit": "in", "to_unit": "mm"}"#,
+    )?;
+    assert_eq!(unit_resp.status, 200);
+    let unit_json = json(&unit_resp)?;
+    let converted = unit_json["converted_value"].as_f64().ok_or("converted")?;
+    assert!((converted - 25.4).abs() < 1e-6);
+
+    let press_resp = post(
+        addr,
+        "/api/units/convert",
+        r#"{"value": 10.0, "category": "pressure", "from_unit": "bar", "to_unit": "psi"}"#,
+    )?;
+    assert_eq!(press_resp.status, 200);
+    let press_json = json(&press_resp)?;
+    let psi = press_json["converted_value"].as_f64().ok_or("psi")?;
+    assert!((psi - 145.038).abs() < 1e-1);
+
     Ok(())
 }

@@ -3439,6 +3439,106 @@ impl StudioState {
             .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
+
+    fn convert_units(
+        &mut self,
+        req: &UnitConvertRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let val = req.value;
+        let cat = req.category.to_lowercase();
+        let from = req.from_unit.to_lowercase();
+        let to = req.to_unit.to_lowercase();
+
+        let (converted, si_base) = match cat.as_str() {
+            "length" => {
+                let parse_u = |s: &str| match s {
+                    "mm" | "millimeter" => Some(atlas_core::prelude::LengthUnit::Millimeter),
+                    "cm" | "centimeter" => Some(atlas_core::prelude::LengthUnit::Centimeter),
+                    "m" | "meter" => Some(atlas_core::prelude::LengthUnit::Meter),
+                    "km" | "kilometer" => Some(atlas_core::prelude::LengthUnit::Kilometer),
+                    "in" | "inch" => Some(atlas_core::prelude::LengthUnit::Inch),
+                    "ft" | "foot" => Some(atlas_core::prelude::LengthUnit::Foot),
+                    "yd" | "yard" => Some(atlas_core::prelude::LengthUnit::Yard),
+                    "mil" => Some(atlas_core::prelude::LengthUnit::Mil),
+                    _ => None,
+                };
+                let u_from = parse_u(&from).ok_or_else(|| {
+                    StudioError::BadRequest(format!("Unknown length unit: {}", from))
+                })?;
+                let u_to = parse_u(&to).ok_or_else(|| {
+                    StudioError::BadRequest(format!("Unknown length unit: {}", to))
+                })?;
+                let si = val * u_from.to_meters_factor();
+                let res = u_from.convert_to(val, u_to);
+                (res, si)
+            }
+            "pressure" | "stress" => {
+                let parse_u = |s: &str| match s {
+                    "pa" | "pascal" => Some(atlas_core::prelude::PressureUnit::Pascal),
+                    "kpa" | "kilopascal" => Some(atlas_core::prelude::PressureUnit::Kilopascal),
+                    "mpa" | "megapascal" => Some(atlas_core::prelude::PressureUnit::Megapascal),
+                    "gpa" | "gigapascal" => Some(atlas_core::prelude::PressureUnit::Gigapascal),
+                    "bar" => Some(atlas_core::prelude::PressureUnit::Bar),
+                    "psi" => Some(atlas_core::prelude::PressureUnit::Psi),
+                    "ksi" => Some(atlas_core::prelude::PressureUnit::Ksi),
+                    "atm" => Some(atlas_core::prelude::PressureUnit::Atmosphere),
+                    _ => None,
+                };
+                let u_from = parse_u(&from).ok_or_else(|| {
+                    StudioError::BadRequest(format!("Unknown pressure unit: {}", from))
+                })?;
+                let u_to = parse_u(&to).ok_or_else(|| {
+                    StudioError::BadRequest(format!("Unknown pressure unit: {}", to))
+                })?;
+                let si = val * u_from.to_pascals_factor();
+                let res = u_from.convert_to(val, u_to);
+                (res, si)
+            }
+            "temperature" => {
+                let t = match from.as_str() {
+                    "k" | "kelvin" => atlas_core::prelude::Temperature::from_kelvin(val),
+                    "c" | "celsius" => atlas_core::prelude::Temperature::from_celsius(val),
+                    "f" | "fahrenheit" => atlas_core::prelude::Temperature::from_fahrenheit(val),
+                    _ => {
+                        return Err(StudioError::BadRequest(format!(
+                            "Unknown temperature unit: {}",
+                            from
+                        )));
+                    }
+                }
+                .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+                let si = t.as_kelvin();
+                let res = match to.as_str() {
+                    "k" | "kelvin" => t.as_kelvin(),
+                    "c" | "celsius" => t.as_celsius(),
+                    "f" | "fahrenheit" => t.as_fahrenheit(),
+                    _ => {
+                        return Err(StudioError::BadRequest(format!(
+                            "Unknown temperature unit: {}",
+                            to
+                        )));
+                    }
+                };
+                (res, si)
+            }
+            _ => {
+                return Err(StudioError::BadRequest(format!(
+                    "Unsupported unit category: {}",
+                    cat
+                )));
+            }
+        };
+
+        let resp = serde_json::json!({
+            "category": cat,
+            "from_unit": from,
+            "to_unit": to,
+            "input_value": val,
+            "converted_value": converted,
+            "si_base_value": si_base,
+        });
+        Ok(resp)
+    }
 }
 
 fn export_name(name: &str) -> String {
@@ -4770,6 +4870,13 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                 Err(error) => error_response(&error),
             }
         }
+        "/api/units/convert" => match parse_body::<UnitConvertRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.convert_units(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
         _ => error_response(&StudioError::NotFound),
     }
 }
@@ -6110,4 +6217,13 @@ struct SimShockResponseRequest {
     pub pulse_duration_ms: Option<f64>,
     #[serde(default)]
     pub damping_ratio: Option<f64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UnitConvertRequest {
+    pub value: f64,
+    pub category: String,
+    pub from_unit: String,
+    pub to_unit: String,
 }

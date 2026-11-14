@@ -9,6 +9,7 @@ pub mod error;
 pub mod events;
 pub mod identifiers;
 pub mod lifecycle;
+pub mod units;
 pub mod version;
 
 pub mod prelude {
@@ -18,5 +19,6 @@ pub mod prelude {
     pub use crate::events::{CoreEvent, EventJournal};
     pub use crate::identifiers::{DocumentId, EntityId, NodeId, TaskId, WorkspaceId};
     pub use crate::lifecycle::{LifecycleManager, LifecycleState};
+    pub use crate::units::{Force, Length, LengthUnit, Pressure, PressureUnit, Temperature};
     pub use crate::version::AtlasVersion;
 }
