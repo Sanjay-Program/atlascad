@@ -7401,6 +7401,18 @@ ${gcodeSample}`;
         } else if (studyType === "cavitation") {
           endpoint = "/api/sim/cavitation";
           body = { fluid_temp_c: 60.0, total_head_m: 45.0 };
+        } else if (studyType === "elastoplasticity") {
+          endpoint = "/api/sim/elastoplasticity";
+          body = { applied_strain_pct: 1.5, yield_strength_mpa: 880.0 };
+        } else if (studyType === "heat_exchanger") {
+          endpoint = "/api/sim/heat_exchanger";
+          body = { hot_inlet_temp_c: 90.0, cold_inlet_temp_c: 20.0, area_m2: 18.0 };
+        } else if (studyType === "water_hammer") {
+          endpoint = "/api/sim/water_hammer";
+          body = { length_m: 800.0, initial_velocity_m_s: 2.8, valve_closure_time_s: 1.2 };
+        } else if (studyType === "shock_response") {
+          endpoint = "/api/sim/shock_response";
+          body = { peak_acceleration_g: 50.0, pulse_duration_ms: 11.0 };
         }
 
         const res = await api(endpoint, {
@@ -7580,6 +7592,40 @@ ${gcodeSample}`;
               fos.style.color = safe ? "#10b981" : "#ef4444";
             }
             if (elCount) elCount.textContent = `CR: ${m.cavitation_ratio?.toFixed(2)}x`;
+          } else if (studyType === "elastoplasticity") {
+            if (peak) peak.textContent = `σ_RO: ${m.ramberg_osgood_stress_mpa?.toFixed(1)} MPa`;
+            if (disp) disp.textContent = `ε_p: ${m.plastic_strain_pct?.toFixed(2)}%`;
+            if (fos) {
+              const inPlastic = m.is_in_plastic_regime > 0.5;
+              fos.textContent = inPlastic ? `Plastic Flow (${m.secant_modulus_gpa?.toFixed(1)} GPa)` : "Elastic";
+              fos.style.color = inPlastic ? "#f59e0b" : "#10b981";
+            }
+            if (elCount) elCount.textContent = `Wp: ${m.plastic_dissipation_mj_m3?.toFixed(2)} MJ/m³`;
+          } else if (studyType === "heat_exchanger") {
+            if (peak) peak.textContent = `Q: ${m.heat_duty_kw?.toFixed(1)} kW`;
+            if (disp) disp.textContent = `ε: ${(m.effectiveness * 100)?.toFixed(1)}%`;
+            if (fos) {
+              fos.textContent = `NTU: ${m.ntu?.toFixed(2)} (Cr = ${m.capacity_ratio_cr?.toFixed(2)})`;
+              fos.style.color = "#10b981";
+            }
+            if (elCount) elCount.textContent = `Hot Out: ${m.hot_outlet_temp_c?.toFixed(1)} °C`;
+          } else if (studyType === "water_hammer") {
+            if (peak) peak.textContent = `Surge: +${m.joukowsky_surge_pressure_bar?.toFixed(1)} bar`;
+            if (disp) disp.textContent = `Peak: ${m.peak_pressure_bar?.toFixed(1)} bar`;
+            if (fos) {
+              const safe = m.is_safe > 0.5;
+              fos.textContent = safe ? `ASME Pass (FoS = ${m.factor_of_safety_yield?.toFixed(2)})` : "Surge Overstress!";
+              fos.style.color = safe ? "#10b981" : "#ef4444";
+            }
+            if (elCount) elCount.textContent = `a = ${m.wave_speed_m_s?.toFixed(0)} m/s`;
+          } else if (studyType === "shock_response") {
+            if (peak) peak.textContent = `Peak SRS: ${m.peak_srs_acceleration_g?.toFixed(1)} g`;
+            if (disp) disp.textContent = `DAF: ${m.dynamic_amplification_factor?.toFixed(2)}x`;
+            if (fos) {
+              fos.textContent = `Resonance: ${m.peak_response_frequency_hz?.toFixed(0)} Hz`;
+              fos.style.color = "#10b981";
+            }
+            if (elCount) elCount.textContent = `Pv: ${m.pseudo_velocity_m_s?.toFixed(2)} m/s`;
           }
 
           if (consoleOut) {

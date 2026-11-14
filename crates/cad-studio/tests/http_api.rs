@@ -4319,5 +4319,71 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         .ok_or("cav_safe")?;
     assert_eq!(cav_safe, 1.0);
 
+    // 26. Nonlinear Elastoplasticity & Hardening
+    let ep_resp = post(
+        addr,
+        "/api/sim/elastoplasticity",
+        r#"{"applied_strain_pct": 1.5, "yield_strength_mpa": 880.0}"#,
+    )?;
+    assert_eq!(ep_resp.status, 200);
+    let ep = json(&ep_resp)?;
+    let ro_stress = ep["scalar_metrics"]["ramberg_osgood_stress_mpa"]
+        .as_f64()
+        .ok_or("ro_stress")?;
+    assert!(ro_stress > 900.0 && ro_stress < 1150.0);
+    let in_plastic = ep["scalar_metrics"]["is_in_plastic_regime"]
+        .as_f64()
+        .ok_or("in_plastic")?;
+    assert_eq!(in_plastic, 1.0);
+
+    // 27. Convection Heat Exchanger ε-NTU
+    let hx_resp = post(
+        addr,
+        "/api/sim/heat_exchanger",
+        r#"{"hot_inlet_temp_c": 90.0, "cold_inlet_temp_c": 20.0, "area_m2": 18.0}"#,
+    )?;
+    assert_eq!(hx_resp.status, 200);
+    let hx = json(&hx_resp)?;
+    let q_kw = hx["scalar_metrics"]["heat_duty_kw"]
+        .as_f64()
+        .ok_or("q_kw")?;
+    assert!(q_kw > 400.0 && q_kw < 900.0);
+    let eps = hx["scalar_metrics"]["effectiveness"]
+        .as_f64()
+        .ok_or("eps")?;
+    assert!(eps > 0.40 && eps < 0.95);
+
+    // 28. Water Hammer & Pressure Surge
+    let wh_resp = post(
+        addr,
+        "/api/sim/water_hammer",
+        r#"{"length_m": 800.0, "initial_velocity_m_s": 2.8, "valve_closure_time_s": 1.2}"#,
+    )?;
+    assert_eq!(wh_resp.status, 200);
+    let wh = json(&wh_resp)?;
+    let surge_bar = wh["scalar_metrics"]["joukowsky_surge_pressure_bar"]
+        .as_f64()
+        .ok_or("surge_bar")?;
+    assert!(surge_bar > 20.0 && surge_bar < 50.0);
+    let wh_safe = wh["scalar_metrics"]["is_safe"].as_f64().ok_or("wh_safe")?;
+    assert_eq!(wh_safe, 1.0);
+
+    // 29. Shock Response Spectrum (SRS)
+    let srs_resp = post(
+        addr,
+        "/api/sim/shock_response",
+        r#"{"peak_acceleration_g": 50.0, "pulse_duration_ms": 11.0}"#,
+    )?;
+    assert_eq!(srs_resp.status, 200);
+    let srs = json(&srs_resp)?;
+    let peak_g = srs["scalar_metrics"]["peak_srs_acceleration_g"]
+        .as_f64()
+        .ok_or("peak_g")?;
+    assert!(peak_g > 65.0 && peak_g < 95.0);
+    let daf = srs["scalar_metrics"]["dynamic_amplification_factor"]
+        .as_f64()
+        .ok_or("daf")?;
+    assert!(daf > 1.3 && daf < 1.9);
+
     Ok(())
 }

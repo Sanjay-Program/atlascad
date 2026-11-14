@@ -14,12 +14,14 @@ pub mod cfd;
 pub mod chemical;
 pub mod convergence;
 pub mod digital_twin;
+pub mod elastoplasticity;
 pub mod electromagnetics;
 pub mod engine;
 pub mod execution;
 pub mod fsi;
 pub mod generative;
 pub mod geotechnical;
+pub mod heat_exchanger;
 pub mod marine;
 pub mod materials;
 pub mod model;
@@ -29,11 +31,13 @@ pub mod problem;
 pub mod provenance;
 pub mod rainflow;
 pub mod robotics;
+pub mod shock_response;
 pub mod solar;
 pub mod solver_settings;
 pub mod structural;
 pub mod thermal_stress;
 pub mod validation;
+pub mod water_hammer;
 
 pub mod prelude {
     pub use crate::acoustics::{AcousticsProblem, solve_acoustics};
@@ -56,6 +60,7 @@ pub mod prelude {
     pub use crate::digital_twin::{
         DigitalTwinProblem, StrainRosetteTelemetry, StressCycleBlock, solve_digital_twin,
     };
+    pub use crate::elastoplasticity::{ElastoplasticProblem, solve_elastoplasticity};
     pub use crate::electromagnetics::{MicrostripProblem, solve_microstrip_line};
     pub use crate::engine::SimulationEngineAdapter;
     pub use crate::execution::{SimulationResult, SimulationStatus};
@@ -67,6 +72,7 @@ pub mod prelude {
     pub use crate::geotechnical::{
         RetainingWallProblem, SoilProperties, solve_retaining_wall_pressures,
     };
+    pub use crate::heat_exchanger::{FlowArrangement, HeatExchangerProblem, solve_heat_exchanger};
     pub use crate::marine::{
         AiryWaveRequest, AiryWaveResult, MarineHydrostaticsRequest, MarineHydrostaticsResult,
         solve_airy_wave, solve_hydrostatics,
@@ -88,6 +94,7 @@ pub mod prelude {
         compute_forward_transforms, compute_geometric_jacobian, compute_manipulability,
         solve_dls_inverse_kinematics, solve_quintic_trajectory, solve_robot_kinematics,
     };
+    pub use crate::shock_response::{ShockResponseProblem, solve_shock_response_spectrum};
     pub use crate::solar::{SolarPvProblem, solve_solar_pv};
     pub use crate::solver_settings::SolverSettings;
     pub use crate::structural::{
@@ -99,4 +106,5 @@ pub mod prelude {
         BimetalStripProblem, ThermalStressProblem, solve_bimetal_deflection, solve_thermal_stress,
     };
     pub use crate::validation::{AnalyticalComparison, ValidationStatus};
+    pub use crate::water_hammer::{WaterHammerProblem, solve_water_hammer};
 }

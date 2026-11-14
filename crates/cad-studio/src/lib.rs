@@ -3357,6 +3357,88 @@ impl StudioState {
             .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
+
+    fn sim_elastoplasticity(
+        &mut self,
+        req: &SimElastoplasticRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::elastoplasticity::ElastoplasticProblem::default();
+        if let Some(ref mat) = req.material_name {
+            prob.material_name.clone_from(mat);
+        }
+        if let Some(eps) = req.applied_strain_pct {
+            prob.applied_strain = eps / 100.0;
+        }
+        if let Some(sy) = req.yield_strength_mpa {
+            prob.yield_strength_pa = sy * 1.0e6;
+        }
+        if let Some(e) = req.elastic_modulus_gpa {
+            prob.elastic_modulus_pa = e * 1.0e9;
+        }
+        let res = atlas_simulation_core::elastoplasticity::solve_elastoplasticity(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_heat_exchanger(
+        &mut self,
+        req: &SimHeatExchangerRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::heat_exchanger::HeatExchangerProblem::default();
+        if let Some(th) = req.hot_inlet_temp_c {
+            prob.hot_inlet_temp_c = th;
+        }
+        if let Some(tc) = req.cold_inlet_temp_c {
+            prob.cold_inlet_temp_c = tc;
+        }
+        if let Some(a) = req.area_m2 {
+            prob.area_m2 = a;
+        }
+        if let Some(u) = req.overall_u_w_m2_k {
+            prob.overall_u_w_m2_k = u;
+        }
+        let res = atlas_simulation_core::heat_exchanger::solve_heat_exchanger(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_water_hammer(
+        &mut self,
+        req: &SimWaterHammerRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::water_hammer::WaterHammerProblem::default();
+        if let Some(l) = req.length_m {
+            prob.length_m = l;
+        }
+        if let Some(v0) = req.initial_velocity_m_s {
+            prob.initial_velocity_m_s = v0;
+        }
+        if let Some(tv) = req.valve_closure_time_s {
+            prob.valve_closure_time_s = tv;
+        }
+        let res = atlas_simulation_core::water_hammer::solve_water_hammer(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_shock_response(
+        &mut self,
+        req: &SimShockResponseRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::shock_response::ShockResponseProblem::default();
+        if let Some(a0) = req.peak_acceleration_g {
+            prob.peak_acceleration_g = a0;
+        }
+        if let Some(tau) = req.pulse_duration_ms {
+            prob.pulse_duration_ms = tau;
+        }
+        if let Some(zeta) = req.damping_ratio {
+            prob.damping_ratio = zeta;
+        }
+        let res = atlas_simulation_core::shock_response::solve_shock_response_spectrum(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
 }
 
 fn export_name(name: &str) -> String {
@@ -4654,6 +4736,40 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             },
             Err(error) => error_response(&error),
         },
+        "/api/sim/elastoplasticity" => {
+            match parse_body_or_default::<SimElastoplasticRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_elastoplasticity(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/heat_exchanger" => {
+            match parse_body_or_default::<SimHeatExchangerRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_heat_exchanger(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/water_hammer" => match parse_body_or_default::<SimWaterHammerRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_water_hammer(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/shock_response" => {
+            match parse_body_or_default::<SimShockResponseRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_shock_response(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
         _ => error_response(&StudioError::NotFound),
     }
 }
@@ -5946,4 +6062,52 @@ struct SimCavitationRequest {
     pub fluid_temp_c: Option<f64>,
     #[serde(default)]
     pub total_head_m: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimElastoplasticRequest {
+    #[serde(default)]
+    pub material_name: Option<String>,
+    #[serde(default)]
+    pub applied_strain_pct: Option<f64>,
+    #[serde(default)]
+    pub yield_strength_mpa: Option<f64>,
+    #[serde(default)]
+    pub elastic_modulus_gpa: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimHeatExchangerRequest {
+    #[serde(default)]
+    pub hot_inlet_temp_c: Option<f64>,
+    #[serde(default)]
+    pub cold_inlet_temp_c: Option<f64>,
+    #[serde(default)]
+    pub area_m2: Option<f64>,
+    #[serde(default)]
+    pub overall_u_w_m2_k: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimWaterHammerRequest {
+    #[serde(default)]
+    pub length_m: Option<f64>,
+    #[serde(default)]
+    pub initial_velocity_m_s: Option<f64>,
+    #[serde(default)]
+    pub valve_closure_time_s: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimShockResponseRequest {
+    #[serde(default)]
+    pub peak_acceleration_g: Option<f64>,
+    #[serde(default)]
+    pub pulse_duration_ms: Option<f64>,
+    #[serde(default)]
+    pub damping_ratio: Option<f64>,
 }
