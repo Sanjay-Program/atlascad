@@ -1071,6 +1071,8 @@
                 <option value="powerflow">Electrical AC Grid Power Flow</option>
                 <option value="generative">Generative SIMP Topology Optimization</option>
                 <option value="geotechnical">Geotechnical Earth Pressure</option>
+                <option value="biomedical">Biomedical Hemodynamics &amp; Biomechanics</option>
+                <option value="marine">Marine Hydrostatics &amp; Ocean Wave Dynamics</option>
               </select>
             </div>
             <div class="wb-group">
@@ -1183,7 +1185,9 @@
             <div class="wb-group">
               <label for="camMachineSelect">CNC Machine &amp; Postprocessor</label>
               <select id="camMachineSelect" class="wb-select">
-                <option value="linuxcnc" selected>LinuxCNC / Machinekit (ISO Standard G-Code)</option>
+                <option value="linuxcnc" selected>LinuxCNC / Machinekit (3-Axis ISO Standard)</option>
+                <option value="4axis">4-Axis Trunnion Rotary Mill (A-Axis Indexing)</option>
+                <option value="5axis">5-Axis Simultaneous VMC (AC Swivel/Trunnion)</option>
                 <option value="grbl">GRBL / Candle (Hobby &amp; Light Industrial)</option>
                 <option value="fanuc">Fanuc 0i / Haas VF Series VMC</option>
                 <option value="mach3">Mach3 / Mach4 Mill</option>
@@ -1203,6 +1207,9 @@
               <label for="camOperationSelect">Machining Strategy</label>
               <select id="camOperationSelect" class="wb-select">
                 <option value="facing" selected>Face Milling (Top Plane Clearing)</option>
+                <option value="contour">2D Contour Profile Milling</option>
+                <option value="rotary4">4-Axis Rotary Cylindrical Continuous</option>
+                <option value="multiaxis5">5-Axis Simultaneous Swarf &amp; Normal</option>
                 <option value="roughing">Adaptive Pocket Roughing</option>
                 <option value="finishing">3D Surface Parallel Finishing</option>
                 <option value="chamfer">Edge Chamfering &amp; Deburring</option>

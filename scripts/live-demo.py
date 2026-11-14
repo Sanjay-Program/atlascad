@@ -211,6 +211,24 @@ def run_live_demo() -> None:
         print(f"  ✓ CAM Toolpaths: {cam['moves_count']} moves, {cam['cutting_length_mm']:.1f} mm cut distance, cycle time = {cam['kinematic_cycle_time_seconds']:.1f}s")
         print(f"  ✓ G-Code Generated: {len(cam['gcode'].splitlines())} lines (LinuxCNC / GRBL ISO standard)")
 
+        # Multi-Axis CAM: 4-Axis Rotary and 5-Axis Simultaneous
+        cam_4axis = http_request(port, "POST", "/api/cam/toolpaths", body={
+            "machine": "4axis",
+            "operation": "rotary4",
+            "depth_mm": 1.0
+        })
+        check(cam_4axis["machine"] == "4-axis indexing", "4-Axis rotary kinematics setup verified")
+        check(cam_4axis["moves_count"] > 5, "4-Axis rotary cylindrical passes generated")
+
+        cam_5axis = http_request(port, "POST", "/api/cam/toolpaths", body={
+            "machine": "5axis",
+            "operation": "multiaxis5",
+            "depth_mm": 1.0
+        })
+        check(cam_5axis["machine"] == "5-axis simultaneous", "5-Axis simultaneous kinematics verified")
+        check("I" in cam_5axis["gcode"] and "K" in cam_5axis["gcode"], "5-Axis (I, J, K) orientation vectors emitted in G-Code")
+        print(f"  ✓ Multi-Axis CNC: 4-Axis Rotary ({cam_4axis['moves_count']} moves) & 5-Axis Simultaneous ({cam_5axis['moves_count']} moves, IJK vectors)")
+
         # ---------------------------------------------------------------------
         # DEMO 5: OpenBIM Architectural Studio
         # ---------------------------------------------------------------------
@@ -434,6 +452,33 @@ def run_live_demo() -> None:
         check(thrust > 0.0, "Active lateral thrust force calculated")
         check(abs(ka * kp - 1.0) < 1e-3, "Rankine reciprocal identity Ka * Kp = 1.0 verified")
         print(f"  ✓ 11.8 Geotechnical: Active Thrust = {thrust:.1f} kN/m, Ka = {ka:.3f}, Kp = {kp:.3f} (Ka*Kp = {ka*kp:.4f})")
+
+        # 11.9 Biomedical Engineering & Hemodynamics
+        bio = http_request(port, "POST", "/api/sim/biomedical", body={
+            "arterial_elastic_modulus_pa": 800000.0,
+            "wall_thickness_m": 0.001,
+            "lumen_radius_m": 0.012
+        })
+        pwv = bio["hemodynamics"]["pulse_wave_velocity_m_s"]
+        bone_fos = bio["orthopedic_bone"]["factor_of_safety"]
+        check(4.0 < pwv < 8.0, f"Moens-Korteweg arterial pulse wave velocity verified (PWV = {pwv:.2f} m/s)")
+        check(bio["hemodynamics"]["is_physiologically_valid"], "Arterial physiology within validated bounds")
+        check(bone_fos > 1.2, f"Cortical bone combined stress FoS verified ({bone_fos:.2f})")
+        print(f"  ✓ 11.9 Biomedical: Arterial PWV = {pwv:.2f} m/s, Womersley = {bio['hemodynamics']['womersley_number']:.1f}, Bone FoS = {bone_fos:.2f}")
+
+        # 11.10 Marine Hydrodynamics & Ocean Wave Mechanics
+        marine = http_request(port, "POST", "/api/sim/marine", body={
+            "hull_length_m": 50.0,
+            "hull_beam_m": 10.0,
+            "hull_draft_m": 3.0,
+            "heel_angle_deg": 5.0
+        })
+        gm = marine["hydrostatics"]["metacentric_height_gm_m"]
+        w_len = marine["airy_wave"]["wavelength_m"]
+        check(gm > 0.5, f"Naval intact transverse stability verified (GM = {gm:.2f} m)")
+        check(marine["hydrostatics"]["is_statically_stable"], "IMO intact stability code satisfied")
+        check(w_len > 80.0, f"Airy linear wave dispersion solved (lambda = {w_len:.1f} m)")
+        print(f"  ✓ 11.10 Marine Hydrodynamics: GM = {gm:.2f} m, Disp = {marine['hydrostatics']['displacement_tonnes']:.0f} t, Wave λ = {w_len:.1f} m")
 
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")

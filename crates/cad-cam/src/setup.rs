@@ -45,10 +45,10 @@ impl WorkCoordinate {
 
     /// Map a work point into machine coordinates.
     ///
-    /// Only a z-up 3-axis mill is supported by this crate; a tilted WCS or another machine family is
-    /// refused rather than silently approximated.
+    /// Supported milling machine families (3-axis, 4-axis, 5-axis) map work coordinates
+    /// to machine coordinates relative to the WCS origin.
     pub fn to_machine(&self, work: [f64; 3], machine: Machine) -> Result<[f64; 3], SetupError> {
-        if machine != Machine::Milling3Axis {
+        if !machine.is_milling() {
             return Err(SetupError::UnsupportedMachine(machine));
         }
         if self.z_axis[0].abs() > 1.0e-9
@@ -222,7 +222,7 @@ impl Setup {
         wcs: WorkCoordinate,
         clearance_mm: f64,
     ) -> Result<Self, SetupError> {
-        if machine != Machine::Milling3Axis {
+        if !machine.is_milling() {
             return Err(SetupError::UnsupportedMachine(machine));
         }
         if !clearance_mm.is_finite() || clearance_mm <= stock.max[2] {

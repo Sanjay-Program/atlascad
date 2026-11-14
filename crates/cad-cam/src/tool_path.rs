@@ -144,6 +144,9 @@ pub struct ToolpathPoint {
     pub kind: MoveKind,
     /// Feed rate for a cutting move, mm/min.
     pub feed_mm_min: f64,
+    /// Optional tool axis orientation vector (I, J, K) for 4-axis and 5-axis machining.
+    /// Default is None (implied standard spindle vector [0, 0, 1]).
+    pub orientation: Option<[f64; 3]>,
 }
 
 impl ToolpathPoint {
@@ -153,6 +156,7 @@ impl ToolpathPoint {
             position,
             kind: MoveKind::Rapid,
             feed_mm_min: 0.0,
+            orientation: None,
         }
     }
 
@@ -162,6 +166,7 @@ impl ToolpathPoint {
             position,
             kind: MoveKind::Feed,
             feed_mm_min,
+            orientation: None,
         }
     }
 
@@ -171,7 +176,24 @@ impl ToolpathPoint {
             position,
             kind: MoveKind::Plunge,
             feed_mm_min,
+            orientation: None,
         }
+    }
+
+    /// Attach a tool axis orientation vector (I, J, K) for multi-axis machining.
+    pub fn with_orientation(mut self, ijk: [f64; 3]) -> Self {
+        let length = (ijk[0] * ijk[0] + ijk[1] * ijk[1] + ijk[2] * ijk[2]).sqrt();
+        if length > 1.0e-12 {
+            self.orientation = Some([ijk[0] / length, ijk[1] / length, ijk[2] / length]);
+        } else {
+            self.orientation = Some([0.0, 0.0, 1.0]);
+        }
+        self
+    }
+
+    /// Return the tool axis unit vector, defaulting to vertical [0, 0, 1].
+    pub fn orientation_vector(&self) -> [f64; 3] {
+        self.orientation.unwrap_or([0.0, 0.0, 1.0])
     }
 }
 
@@ -336,6 +358,13 @@ impl Toolpath {
             for axis in 0..3 {
                 if !point.position[axis].is_finite() {
                     return Err(ToolpathError::NonFinite { index, axis });
+                }
+            }
+            if let Some(orient) = point.orientation {
+                for (axis, &val) in orient.iter().enumerate() {
+                    if !val.is_finite() {
+                        return Err(ToolpathError::NonFinite { index, axis });
+                    }
                 }
             }
             if !point.feed_mm_min.is_finite() || point.feed_mm_min < 0.0 {

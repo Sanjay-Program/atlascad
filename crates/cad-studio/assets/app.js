@@ -416,6 +416,8 @@
       this.buffers.scene = gl.createBuffer();
       this.buffers.wire = gl.createBuffer();
       this.buffers.marker = gl.createBuffer();
+      this.buffers.overlayLines = gl.createBuffer();
+      this.counts.overlayLines = 0;
       gl.enable(gl.DEPTH_TEST);
       gl.depthFunc(gl.LEQUAL);
       gl.enable(gl.BLEND);
@@ -735,6 +737,21 @@
       this.requestFrame();
     }
 
+    setOverlayLines(lines) {
+      if (!this.ready) return;
+      const gl = this.gl;
+      if (!lines || lines.length === 0) {
+        this.counts.overlayLines = 0;
+        this.requestFrame();
+        return;
+      }
+      const data = new Float32Array(lines);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.overlayLines);
+      gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+      this.counts.overlayLines = lines.length / 6;
+      this.requestFrame();
+    }
+
     fit() {
       if (!this.bounds && !this.mesh) return;
       let bounds = this.bounds;
@@ -928,6 +945,19 @@
         gl.disableVertexAttribArray(this.locations.lineColor);
         gl.vertexAttrib3f(this.locations.lineColor, 0.62, 0.74, 0.88);
         gl.drawArrays(gl.LINES, 0, this.counts.wire);
+      }
+
+      if (this.counts.overlayLines) {
+        gl.useProgram(this.lineProgram);
+        gl.uniformMatrix4fv(this.locations.lineViewProjection, false, viewProjection);
+        gl.uniform1f(this.locations.linePointSize, 2);
+        gl.uniform1f(this.locations.lineAlpha, 0.95);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.overlayLines);
+        gl.enableVertexAttribArray(this.locations.linePosition);
+        gl.enableVertexAttribArray(this.locations.lineColor);
+        gl.vertexAttribPointer(this.locations.linePosition, 3, gl.FLOAT, false, 24, 0);
+        gl.vertexAttribPointer(this.locations.lineColor, 3, gl.FLOAT, false, 24, 12);
+        gl.drawArrays(gl.LINES, 0, this.counts.overlayLines);
       }
 
       if (this.pick && this.counts.marker) {
@@ -7156,6 +7186,7 @@ ${gcodeSample}`;
         if (viewport) viewport.style.display = "block";
         if (viewCube) viewCube.hidden = false;
         if (navBar) navBar.hidden = false;
+        app.viewport?.setOverlayLines([]);
         switchRibbonTab("home");
         switchEngineeringWorkspace("mechanical");
         toast("Activated: 3D CAD Parametric Modeling");
@@ -7166,6 +7197,7 @@ ${gcodeSample}`;
           layoutSheet.hidden = false;
           switchAutocadLayoutTab("tabLayout1");
         }
+        app.viewport?.setOverlayLines([]);
         switchRibbonTab("draw");
         switchEngineeringWorkspace("drafting");
         toast("Activated: 2D Drafting & Paper Space Layouts");
@@ -7175,6 +7207,7 @@ ${gcodeSample}`;
         if (layoutSheet) layoutSheet.hidden = true;
         const caeV = byId("caeWorkbenchView");
         if (caeV) caeV.hidden = false;
+        app.viewport?.setOverlayLines([]);
         switchRibbonTab("simulate");
         switchEngineeringWorkspace("simulation");
         toast("Activated: CAE Multiphysics Simulation Workbench");
@@ -7184,6 +7217,11 @@ ${gcodeSample}`;
         if (layoutSheet) layoutSheet.hidden = true;
         const camV = byId("camWorkbenchView");
         if (camV) camV.hidden = false;
+        if (cachedCamPoints && cachedCamPoints.length > 0) {
+          renderCamToolpaths(cachedCamPoints);
+        } else {
+          app.viewport?.setOverlayLines([]);
+        }
         switchRibbonTab("simulate");
         switchEngineeringWorkspace("manufacturing");
         toast("Activated: CAM & CNC Machining Studio");
@@ -7193,6 +7231,14 @@ ${gcodeSample}`;
         if (layoutSheet) layoutSheet.hidden = true;
         const addV = byId("additiveWorkbenchView");
         if (addV) addV.hidden = false;
+        if (cachedSlicedModel) {
+          const idx = parseInt(byId("additiveLayerScrubber")?.value || "0", 10);
+          renderSliceLayers(cachedSlicedModel, idx, true);
+        }
+        switchRibbonTab("simulate");
+        switchEngineeringWorkspace("manufacturing");
+        toast("Activated: 3D Slicing & Additive Manufacturing Studio");
+        break;
         switchRibbonTab("simulate");
         switchEngineeringWorkspace("manufacturing");
         toast("Activated: 3D Slicing & Additive Manufacturing Studio");
@@ -7304,6 +7350,12 @@ ${gcodeSample}`;
         } else if (studyType === "geotechnical") {
           endpoint = "/api/sim/geotechnical";
           body = { wall_height_m: 5.0 };
+        } else if (studyType === "biomedical") {
+          endpoint = "/api/sim/biomedical";
+          body = { arterial_elastic_modulus_pa: 800000.0, wall_thickness_m: 0.001, lumen_radius_m: 0.012 };
+        } else if (studyType === "marine") {
+          endpoint = "/api/sim/marine";
+          body = { hull_length_m: 50.0, hull_beam_m: 10.0, hull_draft_m: 3.0, heel_angle_deg: 5.0 };
         }
 
         const res = await api(endpoint, {
@@ -7370,6 +7422,34 @@ ${gcodeSample}`;
             if (res.validation) {
               consoleOut.textContent += `[Validation] ${res.validation.metric_name}: Error = ${res.validation.error_percent.toFixed(3)}% (${res.validation.status})\n`;
             }
+          }
+        } else if (res.hemodynamics) {
+          const h = res.hemodynamics;
+          const b = res.orthopedic_bone;
+          const peak = byId("caePeakStressVal");
+          const disp = byId("caeMaxDispVal");
+          const fos = byId("caeFosVal");
+          const elCount = byId("caeElementsVal");
+          if (peak) peak.textContent = `PWV: ${h.pulse_wave_velocity_m_s?.toFixed(2)} m/s`;
+          if (disp) disp.textContent = `Womersley: ${h.womersley_number?.toFixed(1)}`;
+          if (fos) { fos.textContent = `Bone FoS: ${b.factor_of_safety?.toFixed(2)}`; fos.style.color = "#10b981"; }
+          if (elCount) elCount.textContent = `Delay: ${h.wave_transit_time_ms?.toFixed(1)} ms`;
+          if (consoleOut) {
+            consoleOut.textContent += `\n[Biomedical] PWV = ${h.pulse_wave_velocity_m_s} m/s · ${h.flow_regime}\n[Orthopedic] Peak Bone Stress: ${b.peak_combined_stress_mpa} MPa · FoS: ${b.factor_of_safety} (${b.status})`;
+          }
+        } else if (res.hydrostatics) {
+          const hy = res.hydrostatics;
+          const w = res.airy_wave;
+          const peak = byId("caePeakStressVal");
+          const disp = byId("caeMaxDispVal");
+          const fos = byId("caeFosVal");
+          const elCount = byId("caeElementsVal");
+          if (peak) peak.textContent = `GM: ${hy.metacentric_height_gm_m?.toFixed(2)} m`;
+          if (disp) disp.textContent = `Disp: ${hy.displacement_tonnes?.toFixed(0)} t`;
+          if (fos) { fos.textContent = hy.is_statically_stable ? "IMO Stable" : "Unstable"; fos.style.color = hy.is_statically_stable ? "#10b981" : "#ef4444"; }
+          if (elCount) elCount.textContent = `Wave λ: ${w.wavelength_m?.toFixed(1)} m`;
+          if (consoleOut) {
+            consoleOut.textContent += `\n[Hydrostatics] Disp: ${hy.displacement_tonnes} tonnes · GM: ${hy.metacentric_height_gm_m} m · GZ: ${hy.righting_lever_gz_m} m · Moment: ${hy.righting_moment_kn_m} kN·m\n[Wave] T = 8.0s · λ = ${w.wavelength_m} m · Celerity = ${w.wave_celerity_m_s} m/s (${w.regime})`;
           }
         } else {
           // Standard structural / modal / thermal FEA
@@ -7446,9 +7526,37 @@ ${gcodeSample}`;
 
   // --- CAM Workbench Logic ---
   let cachedGcode = "";
+  let cachedCamPoints = [];
+
+  function renderCamToolpaths(points) {
+    if (!app.viewport || !points || points.length < 2) return;
+    const lines = [];
+    for (let i = 1; i < points.length; i++) {
+      const p0 = points[i - 1].position;
+      const p1 = points[i].position;
+      const kind = points[i].kind;
+
+      let color;
+      if (kind === "rapid") {
+        color = [0.95, 0.85, 0.2]; // Yellow rapid traverse
+      } else if (kind === "plunge") {
+        color = [1.0, 0.35, 0.15]; // Orange-red plunge
+      } else {
+        color = [0.15, 0.85, 1.0]; // Cyan cutting feed
+      }
+
+      lines.push(
+        p0[0], p0[1], p0[2], color[0], color[1], color[2],
+        p1[0], p1[1], p1[2], color[0], color[1], color[2]
+      );
+    }
+    app.viewport.setOverlayLines(lines);
+  }
 
   function setupCamWorkbenchControllers() {
     byId("camGenerateToolpathsBtn")?.addEventListener("click", async () => {
+      const machine = byId("camMachineSelect")?.value || "linuxcnc";
+      const operation = byId("camOperationSelect")?.value || "facing";
       const toolDia = parseFloat(byId("camToolSelect")?.value || "6.0");
       const stepover = parseFloat(byId("camStepoverInput")?.value || "4.2");
       const depth = parseFloat(byId("camStepdownInput")?.value || "1.0");
@@ -7459,11 +7567,16 @@ ${gcodeSample}`;
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            machine: machine,
+            operation: operation,
             tool_diameter_mm: toolDia,
             stepover_mm: stepover,
             depth_mm: depth,
           }),
         });
+
+        cachedCamPoints = res.points || [];
+        renderCamToolpaths(cachedCamPoints);
 
         const ct = byId("camCycleTimeVal");
         if (ct) ct.textContent = `${(res.kinematic_cycle_time_seconds / 60).toFixed(1)} min (${Math.round(res.kinematic_cycle_time_seconds)}s)`;
@@ -7481,7 +7594,7 @@ ${gcodeSample}`;
         const lineCount = byId("camGcodeLineCount");
         if (lineCount) lineCount.textContent = cachedGcode.split("\n").length;
 
-        toast(`CAM Toolpaths Generated: ${res.moves_count} moves`);
+        toast(`CAM Toolpaths Generated (${res.machine || "3-Axis"} · ${res.operation || "Facing"}): ${res.moves_count} moves`);
       } catch (err) {
         toast(`CAM generation failed: ${err.message}`, true);
       }
@@ -7649,6 +7762,42 @@ ${gcodeSample}`;
   let cachedAdditiveGcode = "";
   let cachedSlicedModel = null;
 
+  function renderSliceLayers(slicedModel, maxLayerIdx, showAccumulated = true) {
+    if (!app.viewport || !slicedModel || !slicedModel.layers || slicedModel.layers.length === 0) return;
+    const lines = [];
+    const layers = slicedModel.layers;
+    const targetIdx = Math.min(Math.max(0, maxLayerIdx), layers.length - 1);
+    const startIdx = showAccumulated ? 0 : targetIdx;
+
+    for (let i = startIdx; i <= targetIdx; i++) {
+      const layer = layers[i];
+      const z = layer.z_height_mm;
+      const isTop = (i === targetIdx);
+
+      const wallColor = isTop ? [0.15, 0.90, 0.95] : [0.08, 0.45, 0.50];
+      const infillColor = isTop ? [0.95, 0.25, 0.75] : [0.50, 0.12, 0.40];
+
+      if (layer.wall_moves) {
+        for (const seg of layer.wall_moves) {
+          lines.push(
+            seg.start[0], seg.start[1], z, wallColor[0], wallColor[1], wallColor[2],
+            seg.end[0], seg.end[1], z, wallColor[0], wallColor[1], wallColor[2]
+          );
+        }
+      }
+
+      if (layer.infill_moves) {
+        for (const seg of layer.infill_moves) {
+          lines.push(
+            seg.start[0], seg.start[1], z, infillColor[0], infillColor[1], infillColor[2],
+            seg.end[0], seg.end[1], z, infillColor[0], infillColor[1], infillColor[2]
+          );
+        }
+      }
+    }
+    app.viewport.setOverlayLines(lines);
+  }
+
   function setupAdditiveWorkbenchControllers() {
     byId("additiveLayerHeight")?.addEventListener("input", (e) => {
       const valLabel = byId("additiveLayerHeightVal");
@@ -7703,6 +7852,8 @@ ${gcodeSample}`;
           if (lbl) lbl.textContent = `Layer 0 / ${res.layers.length - 1} (Z: ${res.layers[0].z_height_mm.toFixed(2)} mm)`;
         }
 
+        renderSliceLayers(cachedSlicedModel, 0, true);
+
         const gcodeViewer = byId("additiveGcodeViewer");
         if (gcodeViewer) {
           const preview = (res.gcode || "").split("\n").slice(0, 40).join("\n");
@@ -7729,6 +7880,7 @@ ${gcodeSample}`;
         if (lbl) {
           lbl.textContent = `Layer ${idx} / ${cachedSlicedModel.layers.length - 1} (Z: ${l.z_height_mm.toFixed(2)} mm, Extrusion: ${l.extrusion_distance_mm.toFixed(1)} mm)`;
         }
+        renderSliceLayers(cachedSlicedModel, idx, true);
       }
     });
 

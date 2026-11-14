@@ -126,19 +126,39 @@
   - **Task 3.5.2.1:** Standard simulation problem adapters for CalculiX, OpenFOAM, SU2, ngspice, pandapower, Cantera, MuJoCo.
   - **Task 3.5.2.2:** Analytical validation against exact closed-form engineering solutions with error percentage metrics.
 
+### Module 3.6: Biomedical Engineering & Biomechanics
+- **Sub-Module 3.6.1: Arterial Hemodynamics & Pulse Wave Propagation**
+  - **Task 3.6.1.1:** Moens-Korteweg Pulse Wave Velocity (PWV) solver: $c_0 = \sqrt{\frac{E h}{2 R \rho}}$.
+  - **Task 3.6.1.2:** Womersley number oscillatory flow regime calculation: $\alpha = R \sqrt{\frac{\omega \rho}{\mu}}$.
+- **Sub-Module 3.6.2: Orthopedic Biomechanics & Long Bone Stress**
+  - **Task 3.6.2.1:** Combined compressive axial and bending stress calculation in hollow cylindrical cortical bones: $\sigma = \frac{P}{A} + \frac{M c}{I}$.
+  - **Task 3.6.2.2:** Factor of safety derivation against clinical cortical bone yield strength.
+
+### Module 3.7: Marine Engineering & Ocean Hydrodynamics
+- **Sub-Module 3.7.1: Intact Naval Hydrostatics & Transverse Stability**
+  - **Task 3.7.1.1:** Displaced volume $\nabla$, Morrish vertical center of buoyancy $KB = T (5/6 - C_b/3)$, and metacentric radius $BM = I_T / \nabla$.
+  - **Task 3.7.1.2:** Initial metacentric height $GM = KB + BM - KG$, righting lever $GZ(\theta) = GM \sin\theta$, and righting moment $M_R$.
+- **Sub-Module 3.7.2: Airy Linear Surface Gravity Wave Dispersion**
+  - **Task 3.7.2.1:** Exact dispersion relation solver: $\omega^2 = g k \tanh(kd)$ via Newton-Raphson iteration with Fenton-McKee initial estimate.
+  - **Task 3.7.2.2:** Depth regime classification (Deep, Intermediate, Shallow water) and peak surface horizontal orbital velocity.
+
 ---
 
 ## Phase 4: Advanced Subtractive & Multi-Axis CAM
 
 ### Module 4.1: Advanced Multi-Axis Toolpaths
 - **Sub-Module 4.1.1: 4-Axis Rotary & 5-Axis Simultaneous Milling**
-  - **Task 4.1.1.1:** Tool center point (TCP) management and orientation vector parametrization $(I, J, K)$.
-  - **Task 4.1.1.2:** Adaptive clearance and trochoidal milling trajectory generation for high-efficiency machining.
+  - **Task 4.1.1.1:** Tool center point (TCP) management and orientation vector parametrization $(I, J, K)$ on `ToolpathPoint`.
+  - **Task 4.1.1.2:** 4-Axis rotary cylindrical indexed and continuous spiral trajectory generation with tool orientation vectors pointing to rotation axis.
+  - **Task 4.1.1.3:** 5-Axis simultaneous contouring with surface normal $(I, J, K)$ tool orientation vectors.
+  - **Task 4.1.1.4:** Multi-axis G-Code emission with modal $(I, J, K)$ orientation words and tool change sequencing.
 
 ### Module 4.2: Collision Avoidance & Kinematic Simulation
 - **Sub-Module 4.2.1: Tool Holder & Fixture Clearance Verification**
-  - **Task 4.2.1.1:** Convex hull clearance checking between tool holder, spindle head, clamps, and stock geometry.
+  - **Task 4.2.1.1:** Heightmap stock carved collision checking between tool holder, spindle head, clamps, and stock geometry.
   - **Task 4.2.1.2:** Rapid traverse gouge avoidance and safe clearance retract planes.
+- **Sub-Module 4.2.2: Live 3D Viewport Toolpath Visualization**
+  - **Task 4.2.2.1:** WebGL overlay line buffer rendering color-coded rapid (yellow), plunge (orange-red), and cutting feed (cyan) moves in real time.
 
 ---
 

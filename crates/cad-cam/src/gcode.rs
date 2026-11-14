@@ -178,6 +178,16 @@ impl Postprocessor {
                 words.push(format!("X{}", number_text(point.position[0])));
                 words.push(format!("Y{}", number_text(point.position[1])));
                 words.push(format!("Z{}", number_text(point.position[2])));
+                if let Some(orient) = point.orientation {
+                    let non_vertical = orient[0].abs() > 1.0e-6
+                        || orient[1].abs() > 1.0e-6
+                        || (orient[2] - 1.0).abs() > 1.0e-6;
+                    if non_vertical {
+                        words.push(format!("I{}", number_text(orient[0])));
+                        words.push(format!("J{}", number_text(orient[1])));
+                        words.push(format!("K{}", number_text(orient[2])));
+                    }
+                }
                 if point.kind.is_cutting() {
                     let changed = last_feed
                         .map(|feed| (feed - point.feed_mm_min).abs() > 1.0e-9)

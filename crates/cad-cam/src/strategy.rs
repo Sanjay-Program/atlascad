@@ -19,7 +19,7 @@ use cad_contract::mesh::Mesh;
 use crate::setup::{Setup, Stock};
 use crate::simulation::MaterialRemoval;
 use crate::surface::HeightField;
-use crate::tool::{Machine, Tool, ToolGeometry, ToolId};
+use crate::tool::{Tool, ToolGeometry, ToolId};
 use crate::tool_path::{
     MoveKind, POSITION_TOLERANCE_MM, Toolpath, ToolpathError, ToolpathId, ToolpathPoint,
 };
@@ -129,6 +129,19 @@ pub enum Operation {
         /// Height-field sampling resolution, millimetres.
         resolution_mm: f64,
     },
+    /// 4-Axis rotary continuous or indexed milling along a cylinder / stock axis
+    Rotary4Axis {
+        cylinder_radius_mm: f64,
+        axial_length_mm: f64,
+        rotary_step_deg: f64,
+        depth_mm: f64,
+    },
+    /// 5-Axis simultaneous contouring with surface normal orientation vectors
+    MultiAxis5 {
+        profile: Vec<[f64; 3]>,
+        tool_orientations: Vec<[f64; 3]>,
+        depth_mm: f64,
+    },
 }
 
 impl Operation {
@@ -144,6 +157,8 @@ impl Operation {
             Operation::Finish3D { .. } => "3D finishing",
             Operation::FinishWalls { .. } => "wall finishing",
             Operation::Rest3D { .. } => "rest machining",
+            Operation::Rotary4Axis { .. } => "4-axis rotary",
+            Operation::MultiAxis5 { .. } => "5-axis simultaneous",
         }
     }
 
@@ -156,7 +171,9 @@ impl Operation {
             | Operation::Contour { depth_mm, .. }
             | Operation::Pocket { depth_mm, .. }
             | Operation::Drill { depth_mm, .. }
-            | Operation::Slot { depth_mm, .. } => Some(*depth_mm),
+            | Operation::Slot { depth_mm, .. }
+            | Operation::Rotary4Axis { depth_mm, .. }
+            | Operation::MultiAxis5 { depth_mm, .. } => Some(*depth_mm),
             Operation::Rough3D { .. }
             | Operation::Finish3D { .. }
             | Operation::FinishWalls { .. }
@@ -172,7 +189,7 @@ pub fn generate(
     tool: &Tool,
     id: ToolpathId,
 ) -> Result<Toolpath, ToolpathError> {
-    if setup.machine != Machine::Milling3Axis {
+    if !setup.machine.is_milling() {
         return Err(ToolpathError::UnsupportedMachine(setup.machine));
     }
     tool.validate()
@@ -267,6 +284,22 @@ pub fn generate(
                     depth_mm,
                     stepdown_mm,
                 } => planner.slot(*start, *end, *depth_mm, *stepdown_mm)?,
+                Operation::Rotary4Axis {
+                    cylinder_radius_mm,
+                    axial_length_mm,
+                    rotary_step_deg,
+                    depth_mm,
+                } => planner.rotary_4axis(
+                    *cylinder_radius_mm,
+                    *axial_length_mm,
+                    *rotary_step_deg,
+                    *depth_mm,
+                )?,
+                Operation::MultiAxis5 {
+                    profile,
+                    tool_orientations,
+                    depth_mm,
+                } => planner.multi_axis_5(profile, tool_orientations, *depth_mm)?,
                 Operation::Rough3D { .. }
                 | Operation::Finish3D { .. }
                 | Operation::FinishWalls { .. }
@@ -421,6 +454,13 @@ impl<'a> Planner<'a> {
     fn feed(&mut self, position: [f64; 3]) {
         self.points
             .push(ToolpathPoint::feed(position, self.tool.cutting.feed_mm_min));
+    }
+
+    fn feed_with_orientation(&mut self, position: [f64; 3], orientation: [f64; 3]) {
+        self.points.push(
+            ToolpathPoint::feed(position, self.tool.cutting.feed_mm_min)
+                .with_orientation(orientation),
+        );
     }
 
     /// Rapid to the clearance plane over an xy point, then plunge to `z`.
@@ -638,6 +678,103 @@ impl<'a> Planner<'a> {
             self.feed([end[0], end[1], z]);
             self.retract();
         }
+        Ok(())
+    }
+
+    fn rotary_4axis(
+        &mut self,
+        cylinder_radius_mm: f64,
+        axial_length_mm: f64,
+        rotary_step_deg: f64,
+        depth_mm: f64,
+    ) -> Result<(), ToolpathError> {
+        if !cylinder_radius_mm.is_finite()
+            || cylinder_radius_mm <= 0.0
+            || !axial_length_mm.is_finite()
+            || axial_length_mm <= 0.0
+            || !depth_mm.is_finite()
+            || depth_mm <= 0.0
+        {
+            return Err(ToolpathError::InvalidParameter(
+                "rotary 4-axis parameters must be positive and finite".into(),
+            ));
+        }
+        let step_deg = rotary_step_deg.clamp(1.0, 90.0);
+        let num_angular_steps = (360.0 / step_deg).ceil() as usize;
+        let cut_radius = (cylinder_radius_mm - depth_mm).max(0.1);
+
+        let stock_margin = 1.0;
+        let start_x = (self.setup.stock.min[0] + stock_margin).min(self.setup.stock.max[0]);
+        let end_x = (start_x + axial_length_mm).min(self.setup.stock.max[0] - stock_margin);
+        if end_x <= start_x + POSITION_TOLERANCE_MM {
+            return Err(ToolpathError::InvalidParameter(
+                "axial length exceeds stock envelope in X".into(),
+            ));
+        }
+
+        let center_y = (self.setup.stock.min[1] + self.setup.stock.max[1]) * 0.5;
+        let center_z = (self.setup.stock.min[2] + self.setup.stock.max[2]) * 0.5;
+        let initial_z = (center_z + cut_radius).max(self.setup.stock.min[2]);
+
+        self.enter([start_x, center_y], initial_z);
+
+        for step in 0..num_angular_steps {
+            let angle_rad = (step as f64 * step_deg).to_radians();
+            let cos_a = angle_rad.cos();
+            let sin_a = angle_rad.sin();
+
+            let y = center_y + cut_radius * sin_a;
+            let z = (center_z + cut_radius * cos_a).max(self.setup.stock.min[2]);
+            let orient = [0.0, -sin_a, -cos_a];
+
+            let x_target = if step % 2 == 0 { end_x } else { start_x };
+            self.feed_with_orientation([x_target, y, z], orient);
+
+            if step + 1 < num_angular_steps {
+                let next_angle_rad = ((step + 1) as f64 * step_deg).to_radians();
+                let next_y = center_y + cut_radius * next_angle_rad.sin();
+                let next_z =
+                    (center_z + cut_radius * next_angle_rad.cos()).max(self.setup.stock.min[2]);
+                let next_orient = [0.0, -next_angle_rad.sin(), -next_angle_rad.cos()];
+                self.feed_with_orientation([x_target, next_y, next_z], next_orient);
+            }
+        }
+        self.retract();
+        Ok(())
+    }
+
+    fn multi_axis_5(
+        &mut self,
+        profile: &[[f64; 3]],
+        tool_orientations: &[[f64; 3]],
+        depth_mm: f64,
+    ) -> Result<(), ToolpathError> {
+        if profile.len() < 2 || profile.len() != tool_orientations.len() {
+            return Err(ToolpathError::InvalidParameter(
+                "multi-axis 5 strategy requires at least 2 profile points with matching orientations".into(),
+            ));
+        }
+        for (idx, pt) in profile.iter().enumerate() {
+            for axis in 0..3 {
+                if !pt[axis].is_finite() || !tool_orientations[idx][axis].is_finite() {
+                    return Err(ToolpathError::InvalidParameter(
+                        "multi-axis 5 coordinates and orientations must be finite".into(),
+                    ));
+                }
+            }
+        }
+        let first = profile[0];
+        let cut_z = (first[2] - depth_mm).max(self.setup.stock.min[2]);
+
+        self.enter([first[0], first[1]], cut_z);
+
+        for i in 1..profile.len() {
+            let pt = profile[i];
+            let orient = tool_orientations[i];
+            let z = (pt[2] - depth_mm).max(self.setup.stock.min[2]);
+            self.feed_with_orientation([pt[0], pt[1], z], orient);
+        }
+        self.retract();
         Ok(())
     }
 

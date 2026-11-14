@@ -2820,7 +2820,7 @@ fn cae_and_cam_endpoints_execute_on_solid_model() -> Result<(), Box<dyn std::err
         .ok_or("f1 should be a float")?;
     assert!(f1 > 0.0);
 
-    // 3. Run CAM toolpath generation
+    // 3. Run CAM toolpath generation (Standard 3-axis Facing)
     let cam_resp = post(
         addr,
         "/api/cam/toolpaths",
@@ -2834,6 +2834,34 @@ fn cae_and_cam_endpoints_execute_on_solid_model() -> Result<(), Box<dyn std::err
         .as_str()
         .ok_or("gcode_preview should be a string")?;
     assert!(gcode.contains('G'));
+    assert!(cam_json["points"].as_array().is_some());
+
+    // 4. Run 4-Axis Rotary CAM toolpath generation
+    let cam_4axis_resp = post(
+        addr,
+        "/api/cam/toolpaths",
+        r#"{"machine": "4axis", "operation": "rotary4", "depth_mm": 1.0}"#,
+    )?;
+    assert_eq!(cam_4axis_resp.status, 200);
+    let cam_4axis_json = json(&cam_4axis_resp)?;
+    assert_eq!(cam_4axis_json["machine"], "4-axis indexing");
+    assert_eq!(cam_4axis_json["operation"], "4-axis rotary");
+    assert!(cam_4axis_json["moves_count"].as_u64().unwrap_or(0) > 5);
+
+    // 5. Run 5-Axis Simultaneous CAM toolpath generation
+    let cam_5axis_resp = post(
+        addr,
+        "/api/cam/toolpaths",
+        r#"{"machine": "5axis", "operation": "multiaxis5", "depth_mm": 1.0}"#,
+    )?;
+    assert_eq!(cam_5axis_resp.status, 200);
+    let cam_5axis_json = json(&cam_5axis_resp)?;
+    assert_eq!(cam_5axis_json["machine"], "5-axis simultaneous");
+    assert_eq!(cam_5axis_json["operation"], "5-axis simultaneous");
+    let gcode_5axis = cam_5axis_json["gcode"].as_str().ok_or("gcode string")?;
+    assert!(gcode_5axis.contains('I'));
+    assert!(gcode_5axis.contains('J'));
+    assert!(gcode_5axis.contains('K'));
 
     Ok(())
 }
@@ -4017,6 +4045,42 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         .as_f64()
         .ok_or("kp")?;
     assert!((ka * kp - 1.0).abs() < 1e-3);
+
+    // 8. Biomedical Hemodynamics & Biomechanics
+    let bio_resp = post(
+        addr,
+        "/api/sim/biomedical",
+        r#"{"arterial_elastic_modulus_pa": 800000.0, "wall_thickness_m": 0.001, "lumen_radius_m": 0.012}"#,
+    )?;
+    assert_eq!(bio_resp.status, 200);
+    let bio = json(&bio_resp)?;
+    let pwv = bio["hemodynamics"]["pulse_wave_velocity_m_s"]
+        .as_f64()
+        .ok_or("pwv")?;
+    assert!(pwv > 4.0 && pwv < 8.0);
+    assert_eq!(bio["hemodynamics"]["is_physiologically_valid"], true);
+    let bone_fos = bio["orthopedic_bone"]["factor_of_safety"]
+        .as_f64()
+        .ok_or("bone_fos")?;
+    assert!(bone_fos > 1.5);
+
+    // 9. Marine Hydrostatics & Airy Ocean Wave
+    let marine_resp = post(
+        addr,
+        "/api/sim/marine",
+        r#"{"hull_length_m": 50.0, "hull_beam_m": 10.0, "hull_draft_m": 3.0, "heel_angle_deg": 5.0}"#,
+    )?;
+    assert_eq!(marine_resp.status, 200);
+    let marine = json(&marine_resp)?;
+    let gm = marine["hydrostatics"]["metacentric_height_gm_m"]
+        .as_f64()
+        .ok_or("gm")?;
+    assert!(gm > 0.5);
+    assert_eq!(marine["hydrostatics"]["is_statically_stable"], true);
+    let wavelength = marine["airy_wave"]["wavelength_m"]
+        .as_f64()
+        .ok_or("wavelength")?;
+    assert!(wavelength > 80.0 && wavelength < 110.0);
 
     Ok(())
 }

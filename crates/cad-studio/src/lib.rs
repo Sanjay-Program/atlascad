@@ -2533,8 +2533,15 @@ impl StudioState {
         let stock_max = [max[0] + margin, max[1] + margin, max[2] + 2.0];
         let stock = cad_cam::Stock::new(stock_min, stock_max)
             .map_err(|e| StudioError::BadRequest(format!("CAM stock error: {e}")))?;
+
+        let machine = match request.machine.as_deref() {
+            Some("4axis") | Some("milling4axis") => cad_cam::Machine::Milling4Axis,
+            Some("5axis") | Some("milling5axis") => cad_cam::Machine::Milling5Axis,
+            _ => cad_cam::Machine::Milling3Axis,
+        };
+
         let setup = cad_cam::Setup::new(
-            cad_cam::Machine::Milling3Axis,
+            machine,
             cad_cam::MachineEnvelope::default_mill(),
             stock,
             cad_cam::WorkCoordinate::standard(),
@@ -2557,17 +2564,79 @@ impl StudioState {
         )
         .map_err(|e| StudioError::BadRequest(format!("CAM tool error: {e}")))?;
 
-        let op = cad_cam::Operation::Facing {
-            depth_mm: request.depth_mm.unwrap_or(1.0),
-            stepover_mm: request.stepover_mm.unwrap_or(tool_dia * 0.7),
+        let depth = request.depth_mm.unwrap_or(1.0);
+        let stepover = request.stepover_mm.unwrap_or(tool_dia * 0.7);
+        let op_type = request.operation.as_deref().unwrap_or("facing");
+
+        let op = match op_type {
+            "rotary4" | "4axis" => {
+                let cyl_radius = ((stock_max[1] - stock_min[1]) * 0.5)
+                    .min((stock_max[2] - stock_min[2]) * 0.5)
+                    .max(5.0);
+                let length = (stock_max[0] - stock_min[0] - 10.0).max(10.0);
+                cad_cam::Operation::Rotary4Axis {
+                    cylinder_radius_mm: cyl_radius,
+                    axial_length_mm: length,
+                    rotary_step_deg: 30.0,
+                    depth_mm: depth,
+                }
+            }
+            "multiaxis5" | "5axis" => {
+                let x0 = stock_min[0] + 5.0;
+                let x1 = stock_max[0] - 5.0;
+                let y0 = stock_min[1] + 5.0;
+                let y1 = stock_max[1] - 5.0;
+                let z = stock_max[2];
+                let profile = vec![
+                    [x0, y0, z],
+                    [(x0 + x1) * 0.5, y0, z],
+                    [x1, (y0 + y1) * 0.5, z],
+                    [x1, y1, z],
+                ];
+                let orientations = vec![
+                    [0.0, 0.05, 0.998],
+                    [0.05, 0.05, 0.997],
+                    [0.08, 0.02, 0.996],
+                    [0.1, 0.0, 0.995],
+                ];
+                cad_cam::Operation::MultiAxis5 {
+                    profile,
+                    tool_orientations: orientations,
+                    depth_mm: depth,
+                }
+            }
+            "contour" => {
+                let profile = vec![
+                    [min[0], min[1]],
+                    [max[0], min[1]],
+                    [max[0], max[1]],
+                    [min[0], max[1]],
+                ];
+                cad_cam::Operation::Contour {
+                    profile,
+                    depth_mm: depth,
+                    stepdown_mm: depth,
+                    offset_mm: 0.0,
+                }
+            }
+            _ => cad_cam::Operation::Facing {
+                depth_mm: depth,
+                stepover_mm: stepover,
+            },
         };
+
         let path_id = cad_cam::ToolpathId::new(1)
             .ok_or_else(|| StudioError::BadRequest("invalid path id".into()))?;
         let toolpath = cad_cam::generate(&op, &setup, &tool, path_id)
             .map_err(|e| StudioError::BadRequest(format!("CAM generation error: {e}")))?;
 
         let summary = cad_cam::summarize(&toolpath, &setup);
-        let post = cad_cam::Postprocessor::new(cad_cam::PostFormat::LinuxCnc, "STUDIO_PROG");
+        let post_fmt = match request.post_format.as_deref() {
+            Some("grbl") => cad_cam::PostFormat::Grbl,
+            Some("mach3") => cad_cam::PostFormat::Mach3,
+            _ => cad_cam::PostFormat::LinuxCnc,
+        };
+        let post = cad_cam::Postprocessor::new(post_fmt, "STUDIO_PROG");
         let gcode = post
             .emit(&toolpath, &setup)
             .map_err(|e| StudioError::BadRequest(format!("CAM post error: {e}")))?;
@@ -2580,9 +2649,24 @@ impl StudioState {
             toolpath.estimated_minutes(),
         );
 
+        let points_summary: Vec<serde_json::Value> = toolpath
+            .points
+            .iter()
+            .map(|p| {
+                serde_json::json!({
+                    "position": p.position,
+                    "kind": p.kind.name(),
+                    "feed": p.feed_mm_min,
+                    "orientation": p.orientation,
+                })
+            })
+            .collect();
+
         self.mark_node_current("cam-toolpaths", "cam-generated");
 
         Ok(serde_json::json!({
+            "machine": machine.to_string(),
+            "operation": op.name(),
             "tool_name": tool.name,
             "moves_count": toolpath.points.len(),
             "cutting_length_mm": toolpath.cutting_length_mm(),
@@ -2594,6 +2678,7 @@ impl StudioState {
             "summary": summary,
             "gcode_preview": preview_lines.join("\n"),
             "gcode": gcode,
+            "points": points_summary,
         }))
     }
 
@@ -2946,6 +3031,63 @@ impl StudioState {
         let res = atlas_simulation_core::geotechnical::solve_retaining_wall_pressures(&prob)
             .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_biomedical(
+        &mut self,
+        req: &SimBiomedicalRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::biomedical::HemodynamicsRequest::default();
+        if let Some(e) = req.arterial_elastic_modulus_pa {
+            prob.arterial_elastic_modulus_pa = e;
+        }
+        if let Some(h) = req.wall_thickness_m {
+            prob.wall_thickness_m = h;
+        }
+        if let Some(r) = req.lumen_radius_m {
+            prob.lumen_radius_m = r;
+        }
+        if let Some(hr) = req.heart_rate_bpm {
+            prob.heart_rate_bpm = hr;
+        }
+        let hemo = atlas_simulation_core::biomedical::solve_hemodynamics(&prob)
+            .map_err(StudioError::BadRequest)?;
+        let bone_prob = atlas_simulation_core::biomedical::OrthopedicBoneRequest::default();
+        let bone = atlas_simulation_core::biomedical::solve_orthopedic_bone(&bone_prob)
+            .map_err(StudioError::BadRequest)?;
+        Ok(serde_json::json!({
+            "hemodynamics": hemo,
+            "orthopedic_bone": bone,
+        }))
+    }
+
+    fn sim_marine(&mut self, req: &SimMarineRequest) -> Result<serde_json::Value, StudioError> {
+        let mut hydro_prob = atlas_simulation_core::marine::MarineHydrostaticsRequest::default();
+        if let Some(l) = req.hull_length_m {
+            hydro_prob.hull_length_m = l;
+        }
+        if let Some(b) = req.hull_beam_m {
+            hydro_prob.hull_beam_m = b;
+        }
+        if let Some(t) = req.hull_draft_m {
+            hydro_prob.hull_draft_m = t;
+        }
+        if let Some(heel) = req.heel_angle_deg {
+            hydro_prob.heel_angle_deg = heel;
+        }
+        let hydro = atlas_simulation_core::marine::solve_hydrostatics(&hydro_prob)
+            .map_err(StudioError::BadRequest)?;
+        let wave_prob = atlas_simulation_core::marine::AiryWaveRequest {
+            wave_period_s: req.wave_period_s.unwrap_or(8.0),
+            water_depth_m: 35.0,
+            wave_height_m: 2.0,
+        };
+        let wave = atlas_simulation_core::marine::solve_airy_wave(&wave_prob)
+            .map_err(StudioError::BadRequest)?;
+        Ok(serde_json::json!({
+            "hydrostatics": hydro,
+            "airy_wave": wave,
+        }))
     }
 }
 
@@ -4107,6 +4249,20 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             },
             Err(error) => error_response(&error),
         },
+        "/api/sim/biomedical" => match parse_body_or_default::<SimBiomedicalRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_biomedical(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/marine" => match parse_body_or_default::<SimMarineRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_marine(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
         _ => error_response(&StudioError::NotFound),
     }
 }
@@ -5007,6 +5163,12 @@ struct CamRequest {
     stepover_mm: Option<f64>,
     #[serde(default)]
     depth_mm: Option<f64>,
+    #[serde(default)]
+    operation: Option<String>,
+    #[serde(default)]
+    machine: Option<String>,
+    #[serde(default)]
+    post_format: Option<String>,
 }
 
 fn default_steel() -> String {
@@ -5211,4 +5373,32 @@ struct SimGenerativeRequest {
 struct SimGeotechRequest {
     #[serde(default)]
     pub wall_height_m: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimBiomedicalRequest {
+    #[serde(default)]
+    pub arterial_elastic_modulus_pa: Option<f64>,
+    #[serde(default)]
+    pub wall_thickness_m: Option<f64>,
+    #[serde(default)]
+    pub lumen_radius_m: Option<f64>,
+    #[serde(default)]
+    pub heart_rate_bpm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimMarineRequest {
+    #[serde(default)]
+    pub hull_length_m: Option<f64>,
+    #[serde(default)]
+    pub hull_beam_m: Option<f64>,
+    #[serde(default)]
+    pub hull_draft_m: Option<f64>,
+    #[serde(default)]
+    pub heel_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub wave_period_s: Option<f64>,
 }

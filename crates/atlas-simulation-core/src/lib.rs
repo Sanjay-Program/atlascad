@@ -4,6 +4,7 @@
 //! materials, solver settings, convergence telemetry, and analytical validation.
 
 pub mod aerodynamics;
+pub mod biomedical;
 pub mod boundary_conditions;
 pub mod cfd;
 pub mod chemical;
@@ -12,6 +13,7 @@ pub mod engine;
 pub mod execution;
 pub mod generative;
 pub mod geotechnical;
+pub mod marine;
 pub mod materials;
 pub mod model;
 pub mod molecular;
@@ -26,6 +28,10 @@ pub mod prelude {
     pub use crate::aerodynamics::{
         NormalShockProblem, WingAeroProblem, solve_normal_shock, solve_wing_aerodynamics,
     };
+    pub use crate::biomedical::{
+        HemodynamicsRequest, HemodynamicsResult, OrthopedicBoneRequest, OrthopedicBoneResult,
+        solve_hemodynamics, solve_orthopedic_bone,
+    };
     pub use crate::boundary_conditions::BoundaryCondition;
     pub use crate::cfd::{FluidProperties, PipeFlowProblem, solve_pipe_flow};
     pub use crate::chemical::{ChemicalComponent, FlashProblem, solve_rachford_rice_flash};
@@ -35,6 +41,10 @@ pub mod prelude {
     pub use crate::generative::{TopologyOptProblem, solve_topology_optimization};
     pub use crate::geotechnical::{
         RetainingWallProblem, SoilProperties, solve_retaining_wall_pressures,
+    };
+    pub use crate::marine::{
+        AiryWaveRequest, AiryWaveResult, MarineHydrostaticsRequest, MarineHydrostaticsResult,
+        solve_airy_wave, solve_hydrostatics,
     };
     pub use crate::materials::SimulationMaterial;
     pub use crate::molecular::{
