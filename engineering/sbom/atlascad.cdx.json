@@ -67,6 +67,75 @@
     {
       "licenses": [
         {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
+      "name": "atlas-core",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/atlas-core@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
+      "name": "atlas-dependency-graph",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/atlas-dependency-graph@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
+      "name": "atlas-simulation-core",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/atlas-simulation-core@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
           "expression": "Apache-2.0 OR MIT"
         }
       ],

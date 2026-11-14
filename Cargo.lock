@@ -24,6 +24,35 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "220a2c618ab466efe41d0eace94dfeff1c35e3aa47891bdb95e1c0fefffd3c99"
 
 [[package]]
+name = "atlas-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "atlas-dependency-graph"
+version = "0.1.0"
+dependencies = [
+ "atlas-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "atlas-simulation-core"
+version = "0.1.0"
+dependencies = [
+ "atlas-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

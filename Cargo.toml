@@ -17,6 +17,9 @@ members = [
     "crates/cad-cae",
     "crates/cad-cam",
     "crates/cad-constraints",
+    "crates/atlas-core",
+    "crates/atlas-dependency-graph",
+    "crates/atlas-simulation-core",
 ]
 # The reference and kernel checkouts are independent repositories with their own histories and
 # manifests. Without this, this workspace root would claim any nested package whose manifest has no
@@ -45,6 +48,9 @@ cad-drafting = { path = "crates/cad-drafting" }
 cad-cae = { path = "crates/cad-cae" }
 cad-cam = { path = "crates/cad-cam" }
 cad-constraints = { path = "crates/cad-constraints" }
+atlas-core = { path = "crates/atlas-core" }
+atlas-dependency-graph = { path = "crates/atlas-dependency-graph" }
+atlas-simulation-core = { path = "crates/atlas-simulation-core" }
 
 # Same pinned versions the SolidCraft kernel uses, so measurements describe the
 # kernel this platform actually ships rather than a different release.
