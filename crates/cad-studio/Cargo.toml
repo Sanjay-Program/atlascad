@@ -14,6 +14,7 @@ cad-kernel-truck.workspace = true
 cad-io.workspace = true
 cad-drafting.workspace = true
 cad-engineering-model.workspace = true
+cad-engineering = { path = "../cad-engineering" }
 cad-cae.workspace = true
 cad-cam.workspace = true
 cad-constraints.workspace = true

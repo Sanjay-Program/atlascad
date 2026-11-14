@@ -2803,6 +2803,15 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
                 Err(error) => error_response(&error),
             }
         }
+        ("GET", "/api/engines") => {
+            let registry = cad_engineering::engine::EngineRegistry::new();
+            let list = registry.list();
+            let payload = serde_json::json!({
+                "count": list.len(),
+                "engines": list,
+            });
+            json_response(200, payload)
+        }
         ("POST", path) if path.starts_with("/api/") => {
             match require_same_origin(request, port, shared).and_then(|()| require_json(request)) {
                 Ok(()) => post_route(state, request),
@@ -3282,6 +3291,57 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                 Ok(payload) => to_json(200, &payload),
                 Err(error) => error_response(&error),
             },
+            Err(error) => error_response(&error),
+        },
+        "/api/engines/health" => match parse_body::<EngineHealthRequest>(request) {
+            Ok(body) => {
+                let registry = cad_engineering::engine::EngineRegistry::new();
+                let engine_id = cad_engineering::engine::EngineId::new(body.engine_id);
+                if registry.get(&engine_id).is_none() {
+                    return error_response(&StudioError::NotFound);
+                }
+                let report = registry.test_health(&engine_id);
+                let payload = serde_json::json!({
+                    "engine_id": report.engine_id.as_str(),
+                    "status": if report.healthy { "healthy" } else { "degraded" },
+                    "details": report.message,
+                    "latency_ms": report.ping_ms,
+                    "detected_version": report.detected_version,
+                    "timestamp": 1700000000u64,
+                });
+                json_response(200, payload)
+            }
+            Err(error) => error_response(&error),
+        },
+        "/api/engines/run" => match parse_body::<EngineRunRequest>(request) {
+            Ok(body) => {
+                let registry = cad_engineering::engine::EngineRegistry::new();
+                let engine_id = cad_engineering::engine::EngineId::new(body.engine_id);
+                let engine_info = match registry.get(&engine_id) {
+                    Some(info) => info.clone(),
+                    None => return error_response(&StudioError::NotFound),
+                };
+                let job_req = cad_engineering::engine::EngineJobRequest {
+                    job_id: body.job_id.unwrap_or_else(|| "job-1".to_string()),
+                    engine_id: engine_id.clone(),
+                    job_type: body.job_type,
+                    model_revision: 1,
+                    parameters: body.parameters.unwrap_or_else(|| serde_json::json!({})),
+                    timeout_seconds: body.timeout_seconds.unwrap_or(60),
+                };
+                let result = registry.execute_job(&job_req);
+                let payload = serde_json::json!({
+                    "job_id": result.job_id,
+                    "engine_id": result.engine_id.as_str(),
+                    "discipline": format!("{:?}", engine_info.discipline).to_lowercase(),
+                    "status": if result.success { "converged" } else { "failed" },
+                    "execution_time_ms": result.elapsed_ms,
+                    "metrics": result.output,
+                    "logs": result.warnings,
+                    "provenance_hash": result.provenance_hash,
+                });
+                json_response(200, payload)
+            }
             Err(error) => error_response(&error),
         },
         _ => error_response(&StudioError::NotFound),
@@ -4241,4 +4301,24 @@ pub fn default_project(name: &str, size: [f64; 3]) -> Result<Project, StudioErro
         cad_contract::units::Unit::Millimeter,
         size,
     )?)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EngineHealthRequest {
+    engine_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EngineRunRequest {
+    #[serde(default)]
+    job_id: Option<String>,
+    engine_id: String,
+    #[serde(default)]
+    job_type: Option<String>,
+    #[serde(default)]
+    parameters: Option<serde_json::Value>,
+    #[serde(default)]
+    timeout_seconds: Option<u64>,
 }

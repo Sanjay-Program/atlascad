@@ -28,6 +28,7 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 pub mod diff;
+pub mod engine;
 pub mod fingerprint;
 pub mod manifest;
 pub mod model;

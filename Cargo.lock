@@ -233,6 +233,7 @@ dependencies = [
  "cad-contract",
  "cad-document",
  "cad-drafting",
+ "cad-engineering",
  "cad-engineering-model",
  "cad-io",
  "cad-kernel-truck",

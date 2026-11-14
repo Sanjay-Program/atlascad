@@ -3582,3 +3582,69 @@ fn mass_properties_interference_and_bom_api() -> Result<(), Box<dyn std::error::
 
     Ok(())
 }
+
+#[test]
+fn engines_ecosystem_api() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("engines_api_test", [10.0, 10.0, 5.0])?;
+    let addr = handle.addr();
+
+    // 1. GET /api/engines
+    let resp = request(addr, "GET", "/api/engines", &[], &[])?;
+    assert_eq!(resp.status, 200);
+    let data = json(&resp)?;
+    let count = data["count"].as_u64().ok_or("count")?;
+    assert_eq!(count, 24);
+    let engines = data["engines"].as_array().ok_or("engines")?;
+    assert_eq!(engines.len(), 24);
+
+    // Verify key engines exist across disciplines
+    let ids: Vec<&str> = engines
+        .iter()
+        .filter_map(|e| e["id"].as_str())
+        .collect();
+    assert!(ids.contains(&"openfoam"));
+    assert!(ids.contains(&"calculix"));
+    assert!(ids.contains(&"ngspice"));
+    assert!(ids.contains(&"pandapower"));
+    assert!(ids.contains(&"ifcopenshell"));
+    assert!(ids.contains(&"mujoco"));
+    assert!(ids.contains(&"su2"));
+    assert!(ids.contains(&"epanet"));
+
+    // 2. POST /api/engines/health (valid)
+    let health_resp = post(addr, "/api/engines/health", r#"{"engine_id": "calculix"}"#)?;
+    assert_eq!(health_resp.status, 200);
+    let h_data = json(&health_resp)?;
+    assert_eq!(h_data["status"], "healthy");
+    assert_eq!(h_data["engine_id"], "calculix");
+
+    // 3. POST /api/engines/health (unknown engine)
+    let bad_health = post(addr, "/api/engines/health", r#"{"engine_id": "nonexistent"}"#)?;
+    assert_eq!(bad_health.status, 404);
+
+    // 4. POST /api/engines/run for FEA (CalculiX)
+    let fea_resp = post(addr, "/api/engines/run", r#"{"engine_id": "calculix", "job_type": "static_fea"}"#)?;
+    assert_eq!(fea_resp.status, 200);
+    let fea_data = json(&fea_resp)?;
+    assert_eq!(fea_data["status"], "converged");
+    let peak_stress = fea_data["metrics"]["max_von_mises_mpa"].as_f64().ok_or("stress")?;
+    assert!(peak_stress > 0.0);
+
+    // 5. POST /api/engines/run for Power Flow (pandapower)
+    let power_resp = post(addr, "/api/engines/run", r#"{"engine_id": "pandapower", "job_type": "ac_load_flow"}"#)?;
+    assert_eq!(power_resp.status, 200);
+    let power_data = json(&power_resp)?;
+    assert_eq!(power_data["status"], "converged");
+    let vm_pu = power_data["metrics"]["vm_pu_min"].as_f64().ok_or("vm_pu")?;
+    assert!(vm_pu > 0.9);
+
+    // 6. POST /api/engines/run for ECAD (ngspice)
+    let spice_resp = post(addr, "/api/engines/run", r#"{"engine_id": "ngspice", "job_type": "transient_analysis"}"#)?;
+    assert_eq!(spice_resp.status, 200);
+    let spice_data = json(&spice_resp)?;
+    assert_eq!(spice_data["status"], "converged");
+    let v_peak = spice_data["metrics"]["v_out_peak_v"].as_f64().ok_or("v_peak")?;
+    assert!(v_peak > 0.0);
+
+    Ok(())
+}

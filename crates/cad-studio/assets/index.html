@@ -18,6 +18,33 @@
       <span class="brand-tag">studio</span>
     </div>
     <div class="doc-title" id="docTitle" title="Project name">Loading…</div>
+    <div class="workspace-switcher-wrap" title="Switch Engineering Discipline Workspace">
+      <label for="workspaceSelect" class="workspace-label">Workspace:</label>
+      <select id="workspaceSelect" class="workspace-select" aria-label="Engineering Workspace">
+        <optgroup label="Mechanical & Drafting">
+          <option value="drafting" selected>Drafting & 2D Engineering</option>
+          <option value="mechanical">Mechanical CAD & Parametric</option>
+          <option value="assembly">Assemblies & Mechanisms</option>
+          <option value="simulation">Structural FEA & Multiphysics</option>
+          <option value="manufacturing">Manufacturing & CNC CAM</option>
+        </optgroup>
+        <optgroup label="Civil & Architecture">
+          <option value="bim">Architecture & OpenBIM (IFC)</option>
+          <option value="civil">Civil & Structural Frames</option>
+        </optgroup>
+        <optgroup label="Electrical & Electronics">
+          <option value="electronics">Electronics & ECAD (SPICE / PCB)</option>
+          <option value="power">Electrical Power Systems & Grids</option>
+        </optgroup>
+        <optgroup label="Process & Scientific">
+          <option value="chemical">Chemical & Process Flowsheet</option>
+          <option value="cfd">Fluid Dynamics & Aerodynamics</option>
+          <option value="robotics">Robotics & Kinematics</option>
+          <option value="aerospace">Aerospace & Flight Dynamics</option>
+          <option value="environmental">Geoscience & Water Hydraulics</option>
+        </optgroup>
+      </select>
+    </div>
     <nav class="top-actions" aria-label="Document actions">
       <button id="projectBtn" class="icon-button drawer-button" title="Project panel" aria-label="Toggle project panel" aria-expanded="false">▤</button>
       <button id="inspectorBtn" class="icon-button drawer-button" title="Inspector" aria-label="Toggle inspector panel" aria-expanded="false">ⓘ</button>
@@ -27,6 +54,7 @@
       <button id="exportBtn" class="button ghost" title="Export binary STL">Export STL</button>
       <button id="exportDxfBtn" class="button ghost" title="Download the plan drawing as DXF R12">Export DXF</button>
       <button id="simBtn" class="button ghost" title="Engineering Simulation & Multiphysics (FEA / Modal / Thermal / CAM)">Simulation</button>
+      <button id="engineManagerBtn" class="button ghost" title="Open Engineering Engine Manager & Solvers">Engines</button>
       <button id="paletteBtn" class="button command" title="Command palette (Ctrl+K)">
         <span>Commands</span><kbd>Ctrl K</kbd>
       </button>
@@ -42,6 +70,13 @@
       <button type="button" class="ribbon-tab" data-tab="modify" role="tab" aria-selected="false">Modify</button>
       <button type="button" class="ribbon-tab" data-tab="annotate" role="tab" aria-selected="false">Annotate</button>
       <button type="button" class="ribbon-tab" data-tab="simulate" role="tab" aria-selected="false">Simulation</button>
+      <button type="button" class="ribbon-tab" data-tab="bim" role="tab" aria-selected="false">OpenBIM</button>
+      <button type="button" class="ribbon-tab" data-tab="electronics" role="tab" aria-selected="false">Electronics</button>
+      <button type="button" class="ribbon-tab" data-tab="power" role="tab" aria-selected="false">Power Systems</button>
+      <button type="button" class="ribbon-tab" data-tab="chemical" role="tab" aria-selected="false">Chemical</button>
+      <button type="button" class="ribbon-tab" data-tab="robotics" role="tab" aria-selected="false">Robotics</button>
+      <button type="button" class="ribbon-tab" data-tab="aero" role="tab" aria-selected="false">Aerospace</button>
+      <button type="button" class="ribbon-tab" data-tab="environmental" role="tab" aria-selected="false">Geoscience & Water</button>
       <button type="button" class="ribbon-tab" data-tab="output" role="tab" aria-selected="false">Output</button>
       <button type="button" class="ribbon-tab" data-tab="automate" role="tab" aria-selected="false">Automate & AI</button>
     </div>
@@ -270,6 +305,154 @@
             <button type="button" class="ribbon-btn" id="rbAutomateSolveBtn" title="Solve 2D Constraints (CON / DOF)"><span class="rb-icon">⚙</span><span>Solve DOF</span></button>
             <button type="button" class="ribbon-btn" id="rbAutomateOverkillBtn" title="Clean Overkill & Duplicates (OV)"><span class="rb-icon">🧹</span><span>Overkill</span></button>
             <button type="button" class="ribbon-btn" id="rbAutomatePurgeBtn" title="Purge Unused Blocks & Layers (PU)"><span class="rb-icon">🗑</span><span>Purge</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="ribbon-panel" id="ribbonBim">
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">BIM Elements</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn primary" id="rbBimWallBtn" title="Architectural Wall (WALL)"><span class="rb-icon">🧱</span><span>Wall</span></button>
+            <button type="button" class="ribbon-btn" id="rbBimSlabBtn" title="Floor Slab (SLAB)"><span class="rb-icon">▬</span><span>Slab</span></button>
+            <button type="button" class="ribbon-btn" id="rbBimColumnBtn" title="Structural Column (COL)"><span class="rb-icon">🏛</span><span>Column</span></button>
+            <button type="button" class="ribbon-btn" id="rbBimBeamBtn" title="Structural Beam (BEAM)"><span class="rb-icon">━</span><span>Beam</span></button>
+            <button type="button" class="ribbon-btn" id="rbBimDoorBtn" title="Door Opening (DOOR)"><span class="rb-icon">🚪</span><span>Door</span></button>
+            <button type="button" class="ribbon-btn" id="rbBimWindowBtn" title="Window Opening (WIN)"><span class="rb-icon">🪟</span><span>Window</span></button>
+          </div>
+        </div>
+        <div class="ribbon-separator"></div>
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">IFC & Energy</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn" id="rbBimIfcImportBtn" title="Import IFC Model (IfcOpenShell)"><span class="rb-icon">📥</span><span>Import IFC</span></button>
+            <button type="button" class="ribbon-btn" id="rbBimIfcExportBtn" title="Export IFC4 Standard (IFC)"><span class="rb-icon">📤</span><span>Export IFC</span></button>
+            <button type="button" class="ribbon-btn primary" id="rbBimEnergyBtn" title="Run EnergyPlus Thermal Building Simulation"><span class="rb-icon">☀️</span><span>EnergyPlus</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="ribbon-panel" id="ribbonElectronics">
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Schematic Components</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn" id="rbEcadResistorBtn" title="Resistor (R)"><span class="rb-icon">⚡</span><span>Resistor</span></button>
+            <button type="button" class="ribbon-btn" id="rbEcadCapacitorBtn" title="Capacitor (C)"><span class="rb-icon">⫴</span><span>Capacitor</span></button>
+            <button type="button" class="ribbon-btn" id="rbEcadInductorBtn" title="Inductor (L)"><span class="rb-icon">∿</span><span>Inductor</span></button>
+            <button type="button" class="ribbon-btn" id="rbEcadDiodeBtn" title="Diode / Transistor"><span class="rb-icon">⏵|</span><span>Diode</span></button>
+            <button type="button" class="ribbon-btn" id="rbEcadGndBtn" title="Ground Node (GND)"><span class="rb-icon">⏚</span><span>GND</span></button>
+            <button type="button" class="ribbon-btn" id="rbEcadNetBtn" title="Electrical Net / Wire (WIRE)"><span class="rb-icon">〰</span><span>Net Wire</span></button>
+          </div>
+        </div>
+        <div class="ribbon-separator"></div>
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Simulation & ECAD</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn primary" id="rbNgspiceRunBtn" title="Run ngspice AC/DC/Transient Solver (SPICE)"><span class="rb-icon">📊</span><span>Run SPICE</span></button>
+            <button type="button" class="ribbon-btn" id="rbKicadDrcBtn" title="Run KiCad Design Rule Check (DRC)"><span class="rb-icon">✓</span><span>KiCad DRC</span></button>
+            <button type="button" class="ribbon-btn" id="rbEcadNetlistBtn" title="Generate SPICE / KiCad Netlist"><span class="rb-icon">📋</span><span>Netlist</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="ribbon-panel" id="ribbonPower">
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Grid Network</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn" id="rbPowerBusBtn" title="Substation Bus Node"><span class="rb-icon">▮</span><span>Bus</span></button>
+            <button type="button" class="ribbon-btn" id="rbPowerBranchBtn" title="Transmission Line / Cable"><span class="rb-icon">━━</span><span>Line</span></button>
+            <button type="button" class="ribbon-btn" id="rbPowerTrafoBtn" title="2-Winding Transformer"><span class="rb-icon">ꝏ</span><span>Transformer</span></button>
+            <button type="button" class="ribbon-btn" id="rbPowerGenBtn" title="Generator / PV / Wind Source"><span class="rb-icon">⚙</span><span>Generator</span></button>
+            <button type="button" class="ribbon-btn" id="rbPowerLoadBtn" title="Grid Load / Consumer"><span class="rb-icon">⬇</span><span>Load</span></button>
+          </div>
+        </div>
+        <div class="ribbon-separator"></div>
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Power Flow & Solvers</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn primary" id="rbPandaRunBtn" title="Run pandapower AC Load Flow Analysis (POWER)"><span class="rb-icon">⚡</span><span>pandapower</span></button>
+            <button type="button" class="ribbon-btn" id="rbOpendssRunBtn" title="Run OpenDSS Distribution Simulation"><span class="rb-icon">🔌</span><span>OpenDSS</span></button>
+            <button type="button" class="ribbon-btn" id="rbPowerShortCircuitBtn" title="IEC 60909 Short-Circuit Analysis"><span class="rb-icon">💥</span><span>Short-Circuit</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="ribbon-panel" id="ribbonChemical">
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Process Flowsheet</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn" id="rbChemStreamBtn" title="Material / Energy Stream"><span class="rb-icon">➔</span><span>Stream</span></button>
+            <button type="button" class="ribbon-btn" id="rbChemMixerBtn" title="Mixer / Splitter Unit"><span class="rb-icon">⋈</span><span>Mixer</span></button>
+            <button type="button" class="ribbon-btn" id="rbChemReactorBtn" title="Chemical Reactor (CSTR / PFR)"><span class="rb-icon">⚗</span><span>Reactor</span></button>
+            <button type="button" class="ribbon-btn" id="rbChemColumnBtn" title="Distillation / Absorption Column"><span class="rb-icon">▯</span><span>Column</span></button>
+            <button type="button" class="ribbon-btn" id="rbChemHeatExBtn" title="Heat Exchanger Unit"><span class="rb-icon">♨</span><span>Heat Ex</span></button>
+          </div>
+        </div>
+        <div class="ribbon-separator"></div>
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Thermodynamics & Kinetics</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn primary" id="rbChemicalRunBtn" title="Run Cantera Chemical Kinetics & Combustion"><span class="rb-icon">🧪</span><span>Cantera</span></button>
+            <button type="button" class="ribbon-btn" id="rbDwsimEqBtn" title="Run DWSIM Thermodynamic VLE Equilibrium"><span class="rb-icon">⚖</span><span>DWSIM</span></button>
+            <button type="button" class="ribbon-btn" id="rbChemPhaseBtn" title="Phase Envelope & Flash Calculation"><span class="rb-icon">📈</span><span>Flash Calc</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="ribbon-panel" id="ribbonRobotics">
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Kinematics & Links</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn" id="rbRobotBaseBtn" title="Base Robot Link"><span class="rb-icon">⚓</span><span>Base Link</span></button>
+            <button type="button" class="ribbon-btn" id="rbRobotRevJointBtn" title="Revolute / Rotary Joint"><span class="rb-icon">🔄</span><span>Revolute</span></button>
+            <button type="button" class="ribbon-btn" id="rbRobotPrismJointBtn" title="Prismatic / Sliding Joint"><span class="rb-icon">⇥</span><span>Prismatic</span></button>
+            <button type="button" class="ribbon-btn" id="rbRobotGripperBtn" title="End Effector / Gripper"><span class="rb-icon">🤏</span><span>End Effector</span></button>
+            <button type="button" class="ribbon-btn" id="rbRobotUrdfBtn" title="Import / Export URDF Robot Description"><span class="rb-icon">🤖</span><span>URDF</span></button>
+          </div>
+        </div>
+        <div class="ribbon-separator"></div>
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Physics & Motion</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn primary" id="rbRobotRunBtn" title="Run MuJoCo Forward Dynamics & Contact Physics"><span class="rb-icon">🏃</span><span>MuJoCo Sim</span></button>
+            <button type="button" class="ribbon-btn" id="rbRobotIkBtn" title="Analytical & Numerical Inverse Kinematics (IK)"><span class="rb-icon">🎯</span><span>Inverse Kin</span></button>
+            <button type="button" class="ribbon-btn" id="rbRobotTrajBtn" title="Trajectory Optimization & Collision Avoidance"><span class="rb-icon">🛣</span><span>Trajectory</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="ribbon-panel" id="ribbonAero">
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Aero Geometry</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn primary" id="rbAeroAirfoilBtn" title="Parametric NACA 4/5-Digit Airfoil"><span class="rb-icon">🪽</span><span>NACA Foil</span></button>
+            <button type="button" class="ribbon-btn" id="rbAeroWingBtn" title="Swept & Tapered 3D Wing Surface"><span class="rb-icon">✈</span><span>Wing</span></button>
+            <button type="button" class="ribbon-btn" id="rbAeroFuselageBtn" title="Fuselage Lofting"><span class="rb-icon">🚀</span><span>Fuselage</span></button>
+            <button type="button" class="ribbon-btn" id="rbAeroVspBtn" title="OpenVSP Parametric Vehicle (.vsp3)"><span class="rb-icon">📐</span><span>OpenVSP</span></button>
+          </div>
+        </div>
+        <div class="ribbon-separator"></div>
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">CFD & Aerodynamics</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn primary" id="rbAeroRunBtn" title="Run SU2 Compressible Navier-Stokes Solver"><span class="rb-icon">💨</span><span>SU2 Solver</span></button>
+            <button type="button" class="ribbon-btn" id="rbAeroPolarBtn" title="Compute Lift/Drag Polar Curve (Cl vs Cd)"><span class="rb-icon">📉</span><span>Lift/Drag Polar</span></button>
+            <button type="button" class="ribbon-btn" id="rbAeroPanelBtn" title="3D Vortex Lattice / Panel Method"><span class="rb-icon">🌐</span><span>Panel Method</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="ribbon-panel" id="ribbonEnvironmental">
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Water Network Elements</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn" id="rbEnvJunctionBtn" title="Water Junction Node"><span class="rb-icon">◉</span><span>Junction</span></button>
+            <button type="button" class="ribbon-btn" id="rbEnvPipeBtn" title="Pressurized Water Pipe"><span class="rb-icon">━</span><span>Pipe</span></button>
+            <button type="button" class="ribbon-btn" id="rbEnvTankBtn" title="Storage Reservoir / Tank"><span class="rb-icon">🛢</span><span>Tank</span></button>
+            <button type="button" class="ribbon-btn" id="rbEnvPumpBtn" title="Booster Pump"><span class="rb-icon">⚙</span><span>Pump</span></button>
+            <button type="button" class="ribbon-btn" id="rbEnvValveBtn" title="Pressure Reducing Valve (PRV)"><span class="rb-icon">⧓</span><span>Valve</span></button>
+          </div>
+        </div>
+        <div class="ribbon-separator"></div>
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Hydraulic & Water Quality</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn primary" id="rbEpanetRunBtn" title="Run EPANET Pressurized Water Distribution Solver"><span class="rb-icon">💧</span><span>EPANET Run</span></button>
+            <button type="button" class="ribbon-btn" id="rbSwmmRunBtn" title="Run EPA SWMM Stormwater & Urban Drainage"><span class="rb-icon">🌧</span><span>SWMM Runoff</span></button>
+            <button type="button" class="ribbon-btn" id="rbEnvWaterAgeBtn" title="Simulate Water Age & Chlorine Residual"><span class="rb-icon">🔬</span><span>Water Quality</span></button>
           </div>
         </div>
       </div>
@@ -752,6 +935,60 @@
           <li role="menuitem" class="ctx-menu-item" id="ctxHomeView">🏠 Home view (H)</li>
         </ul>
       </div>
+
+      <!-- Multidisciplinary Solver Result Viewer HUD -->
+      <div id="resultViewerHud" class="result-viewer-hud" hidden role="region" aria-label="Simulation & Solver Results">
+        <div class="hud-header">
+          <div class="hud-title-wrap">
+            <span class="hud-icon" id="rvHudIcon">📊</span>
+            <h3 id="rvHudTitle">Simulation Result</h3>
+          </div>
+          <button type="button" class="hud-close-btn" id="rvHudCloseBtn" title="Close (Esc)">✕</button>
+        </div>
+        <div class="hud-body">
+          <div class="rv-meta-row">
+            <span class="rv-solver-tag" id="rvSolverTag">CalculiX FEA</span>
+            <span class="rv-status-tag" id="rvStatusTag">Converged</span>
+            <span class="rv-time-tag" id="rvTimeTag">142 ms</span>
+          </div>
+          <div class="rv-scalar-display">
+            <div class="rv-scalar-header">
+              <span id="rvScalarLabel">Von Mises Stress</span>
+              <span id="rvScalarUnit">[MPa]</span>
+            </div>
+            <div class="rv-colorbar">
+              <div class="rv-colorbar-gradient"></div>
+              <div class="rv-colorbar-labels">
+                <span id="rvValMin">0.00</span>
+                <span id="rvValMid">48.25</span>
+                <span id="rvValMax">96.50</span>
+              </div>
+            </div>
+          </div>
+          <div class="rv-metrics-grid">
+            <div class="rv-metric-item">
+              <span class="rv-m-label">Peak Value</span>
+              <span class="rv-m-val" id="rvMetricPeak">96.50 MPa</span>
+            </div>
+            <div class="rv-metric-item">
+              <span class="rv-m-label">Mean Value</span>
+              <span class="rv-m-val" id="rvMetricMean">32.14 MPa</span>
+            </div>
+            <div class="rv-metric-item">
+              <span class="rv-m-label">Safety Factor</span>
+              <span class="rv-m-val" id="rvMetricSafety">2.59</span>
+            </div>
+            <div class="rv-metric-item">
+              <span class="rv-m-label">DoF / Nodes</span>
+              <span class="rv-m-val" id="rvMetricDof">4,820</span>
+            </div>
+          </div>
+          <div class="rv-actions">
+            <button type="button" id="rvExportCsvBtn" class="button ghost small" title="Export CSV Data">Export CSV</button>
+            <button type="button" id="rvViewReportBtn" class="button small" title="View Solvers Output">View Log</button>
+          </div>
+        </div>
+      </div>
     </section>
 
     <div id="drawerScrim" class="drawer-scrim" aria-hidden="true"></div>
@@ -1205,6 +1442,63 @@
         <button type="button" id="nvSaveCurrentBtn" class="button small">Save Current View</button>
       </div>
       <ul id="namedViewsList" class="named-views-list"></ul>
+    </div>
+  </div>
+
+  <!-- Open-Source Engineering Engine Manager Modal (ENGINES / ENG) -->
+  <div id="engineManagerModal" class="palette engine-manager-modal" hidden role="dialog" aria-modal="true" aria-labelledby="engineManagerTitle">
+    <div class="palette-backdrop" id="engineManagerBackdrop"></div>
+    <div class="palette-card engine-manager-card">
+      <div class="section-head">
+        <div class="engine-head-left">
+          <h2 id="engineManagerTitle">Open-Source Engineering Engine Manager</h2>
+          <span class="engine-count-badge" id="engineCountBadge">24 Upstream Solvers</span>
+        </div>
+        <button type="button" class="link" id="engineManagerCloseBtn">close</button>
+      </div>
+      <p class="engine-desc">
+        AtlasCAD native orchestration layer integrating 24 verified open-source simulation, modeling, and scientific computing engines with process isolation and license compliance.
+      </p>
+      <div class="engine-filter-bar">
+        <input type="text" id="engineSearchInput" class="engine-search-input" placeholder="Search engines (e.g. OpenFOAM, CalculiX, ngspice, pandapower)…" maxlength="50">
+        <select id="engineDisciplineFilter" class="engine-discipline-select" aria-label="Filter by discipline">
+          <option value="all" selected>All Disciplines</option>
+          <option value="mechanical">Mechanical & FEA</option>
+          <option value="cfd">CFD & Aerodynamics</option>
+          <option value="bim">Architecture & BIM</option>
+          <option value="electronics">Electronics & ECAD</option>
+          <option value="power">Electrical Power Systems</option>
+          <option value="chemical">Chemical & Process</option>
+          <option value="robotics">Robotics & Multibody</option>
+          <option value="aerospace">Aerospace</option>
+          <option value="environmental">Environmental & Water</option>
+        </select>
+        <button type="button" id="engineCheckAllHealthBtn" class="button small">Check Health</button>
+      </div>
+      <div class="engine-table-container">
+        <table class="engine-table" id="engineTable">
+          <thead>
+            <tr>
+              <th>Engine</th>
+              <th>Discipline</th>
+              <th>License & Isolation</th>
+              <th>Upstream Version</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="engineTableBody">
+            <!-- Dynamically populated from /api/engines -->
+          </tbody>
+        </table>
+      </div>
+      <div class="engine-console-card">
+        <div class="engine-console-header">
+          <span class="console-title">Engine Execution Console & Diagnostics</span>
+          <button type="button" class="link small" id="engineClearConsoleBtn">Clear</button>
+        </div>
+        <pre id="engineConsoleLog" class="engine-console-log">Ready. Select an engine and click "Run Job" or "Test Health" to verify integration.</pre>
+      </div>
     </div>
   </div>
 
