@@ -724,6 +724,79 @@ def run_live_demo() -> None:
         check(abs(psi_val - 145.038) < 1e-1, f"Type-safe pressure conversion verified ({psi_val:.1f} psi)")
         print(f"  ✓ 11.31 Dimensional Units: 2.5 in = {mm_val:.1f} mm, 10.0 bar = {psi_val:.1f} psi (SI Base Transposed)")
 
+        # 11.32 Automotive & EV Battery Pack Electrochemistry & Thermal Runaway
+        ev_pack = http_request(port, "POST", "/api/sim/battery_ev", body={
+            "pack_current_a": 200.0,
+            "state_of_charge": 0.80
+        })
+        check(ev_pack["status"] == "Converged", "Li-ion battery Thevenin model converged")
+        v_pack = ev_pack["scalar_metrics"]["pack_terminal_voltage_v"]
+        t_cell = ev_pack["scalar_metrics"]["cell_equilibrium_temp_c"]
+        runaway_margin = ev_pack["scalar_metrics"]["thermal_runaway_margin_c"]
+        check(v_pack > 650.0, f"800V architecture pack voltage verified ({v_pack:.1f} V)")
+        check(runaway_margin > 80.0, f"Thermal runaway safety margin confirmed (+{runaway_margin:.1f} °C)")
+        print(f"  ✓ 11.32 Battery EV: Pack = {v_pack:.1f} V, Cap = {ev_pack['scalar_metrics']['pack_capacity_kwh']:.1f} kWh, Temp = {t_cell:.1f} °C, Runaway Margin = +{runaway_margin:.1f} °C (Thermally Stable)")
+
+        # 11.33 EV Vehicle Road-Load Dynamics & WLTP Driving Range
+        veh = http_request(port, "POST", "/api/sim/vehicle_dynamics", body={
+            "velocity_kmh": 110.0,
+            "drag_coefficient": 0.208
+        })
+        f_trac = veh["scalar_metrics"]["total_tractive_force_n"]
+        p_batt = veh["scalar_metrics"]["battery_power_draw_kw"]
+        range_km = veh["scalar_metrics"]["estimated_range_km"]
+        check(f_trac > 350.0, f"Tractive road-load force evaluated ({f_trac:.0f} N)")
+        check(range_km > 450.0, f"WLTP highway cruising range verified ({range_km:.0f} km)")
+        print(f"  ✓ 11.33 EV Dynamics: F_trac = {f_trac:.0f} N, Power = {p_batt:.1f} kW, Consumption = {veh['scalar_metrics']['energy_consumption_kwh_per_100km']:.1f} kWh/100km, Range = {range_km:.0f} km")
+
+        # 11.34 Environmental Atmospheric Dispersion (Pasquill-Gifford Gaussian Plume)
+        plume = http_request(port, "POST", "/api/sim/environmental", body={
+            "emission_rate_g_s": 150.0,
+            "stack_height_m": 65.0,
+            "downwind_distance_m": 1500.0
+        })
+        c_rec = plume["scalar_metrics"]["concentration_at_receptor_mg_m3"]
+        x_peak = plume["scalar_metrics"]["peak_ground_distance_m"]
+        check(c_rec > 0.01, f"Receptor air pollution concentration computed ({c_rec:.3f} mg/m³)")
+        check(plume["scalar_metrics"]["exceeds_regulatory_threshold"] == 0.0, "Environmental impact complies with ambient limits")
+        print(f"  ✓ 11.34 Atmospheric Dispersion: Receptor = {c_rec:.3f} mg/m³, Peak Ground = {plume['scalar_metrics']['peak_ground_concentration_mg_m3']:.3f} mg/m³ at {x_peak:.0f} m, H_eff = {plume['scalar_metrics']['effective_stack_height_m']:.0f} m")
+
+        # 11.35 Geoscience, Mining & Rock Mechanics (Hoek-Brown 2002)
+        rock = http_request(port, "POST", "/api/sim/rock_mechanics", body={
+            "intact_ucs_mpa": 130.0,
+            "gsi": 65.0,
+            "confining_stress_mpa": 15.0
+        })
+        s1 = rock["scalar_metrics"]["major_principal_stress_s1_mpa"]
+        scm = rock["scalar_metrics"]["rock_mass_ucs_scm_mpa"]
+        phi = rock["scalar_metrics"]["equivalent_friction_angle_deg"]
+        check(s1 > 120.0, f"Hoek-Brown failure envelope computed (σ1' = {s1:.1f} MPa)")
+        check(scm > 15.0, f"Rock mass unconfined compressive strength evaluated ({scm:.1f} MPa)")
+        print(f"  ✓ 11.35 Rock Mechanics: σ1' = {s1:.1f} MPa, Rock UCS = {scm:.1f} MPa, Friction Angle = {phi:.1f}°, Cohesion = {rock['scalar_metrics']['equivalent_cohesion_mpa']:.2f} MPa")
+
+        # 11.36 Electronics & High-Speed PCB Signal Integrity (IPC-2141)
+        si = http_request(port, "POST", "/api/sim/signal_integrity", body={
+            "trace_width_um": 150.0,
+            "dielectric_height_um": 100.0,
+            "relative_permittivity": 4.2
+        })
+        z0 = si["scalar_metrics"]["characteristic_impedance_z0_ohms"]
+        l_crit = si["scalar_metrics"]["critical_length_l_crit_m"]
+        check(45.0 < z0 < 55.0, f"Controlled impedance matching target 50Ω (Z0 = {z0:.1f} Ω)")
+        check(l_crit > 0.01, f"High-speed critical transmission line length determined ({l_crit*1000:.1f} mm)")
+        print(f"  ✓ 11.36 PCB Signal Integrity: Z0 = {z0:.1f} Ω, Delay = {si['scalar_metrics']['propagation_delay_ps_per_inch']:.1f} ps/in, L_crit = {l_crit*1000:.1f} mm, Skin Depth = {si['scalar_metrics']['copper_skin_depth_um']:.2f} μm")
+
+        # 11.37 Nuclear Physics & Radiological Biological Shielding (ICRP-103)
+        nuke = http_request(port, "POST", "/api/sim/nuclear_shielding", body={
+            "source_activity_curies": 10.0,
+            "distance_to_receptor_m": 3.0
+        })
+        d_shield = nuke["scalar_metrics"]["shielded_dose_rate_usv_hr"]
+        mfp = nuke["scalar_metrics"]["total_mean_free_paths"]
+        check(d_shield < 1.0, f"Biological shield dose attenuation verified ({d_shield:.2f} μSv/hr)")
+        check(nuke["scalar_metrics"]["is_radiologically_safe"] == 1.0, "ICRP-103 radiation protection criteria satisfied")
+        print(f"  ✓ 11.37 Nuclear Shielding: Shielded Dose = {d_shield:.2f} μSv/hr (Unshielded: {nuke['scalar_metrics']['unshielded_dose_rate_usv_hr']:.0f} μSv/hr), {mfp:.1f} mfp, FoS = {nuke['scalar_metrics']['dose_factor_of_safety']:.1f}x (ICRP Safe)")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

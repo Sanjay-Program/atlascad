@@ -142,6 +142,36 @@
   - **Task 3.7.2.1:** Exact dispersion relation solver: $\omega^2 = g k \tanh(kd)$ via Newton-Raphson iteration with Fenton-McKee initial estimate.
   - **Task 3.7.2.2:** Depth regime classification (Deep, Intermediate, Shallow water) and peak surface horizontal orbital velocity.
 
+### Module 3.8: Automotive & Electric Vehicle (EV) Engineering
+- **Sub-Module 3.8.1: Battery Electrochemistry & Thermal Runaway**
+  - **Task 3.8.1.1:** Thevenin / 2-RC Equivalent Circuit Model for Li-ion battery cell and high-voltage traction pack terminal voltage.
+  - **Task 3.8.1.2:** Arrhenius reaction kinetics exothermic breakdown and thermal runaway onset critical temperature margin.
+- **Sub-Module 3.8.2: Vehicle Tractive Road-Load & Driving Range**
+  - **Task 3.8.2.1:** Aerodynamic drag, rolling resistance, and gravitational grade road-load forces.
+  - **Task 3.8.2.2:** Powertrain efficiency, auxiliary power consumption, and WLTP standardized highway cruising range estimation.
+
+### Module 3.9: Environmental Engineering & Atmospheric Dispersion
+- **Sub-Module 3.9.1: Industrial Atmospheric Emission Modeling**
+  - **Task 3.9.1.1:** Pasquill-Gifford Gaussian Plume 3D dispersion model across atmospheric stability classes A through F.
+  - **Task 3.9.1.2:** Ground-level centerline concentration profile, peak ground impact distance ($x_{peak}$), and regulatory safety boundary contour.
+
+### Module 3.10: Geoscience, Mining & Rock Mechanics Engineering
+- **Sub-Module 3.10.1: Jointed Rock Mass Failure & Geomechanics**
+  - **Task 3.10.1.1:** Hoek-Brown (2002) non-linear rock mass failure envelope ($\sigma_1'$ vs $\sigma_3'$), GSI scaling, and equivalent Mohr-Coulomb friction/cohesion.
+  - **Task 3.10.1.2:** Bieniawski Rock Mass Rating (RMR89) geomechanical classification and Serafim-Pereira in-situ deformation modulus ($E_m$).
+  - **Task 3.10.1.3:** USBM scaled-distance blast vibration attenuation and peak particle velocity (PPV) structural damage safety.
+
+### Module 3.11: Electronics, High-Speed PCB & Signal Integrity
+- **Sub-Module 3.11.1: Transmission Line & High-Frequency Electromagnetics**
+  - **Task 3.11.1.1:** IPC-2141 Surface Microstrip and Symmetrical Stripline characteristic impedance ($Z_0$).
+  - **Task 3.11.1.2:** Propagation delay ($t_{pd}$), critical transmission line routing length ($L_{crit}$), and high-frequency copper skin effect + dielectric loss attenuation.
+
+### Module 3.12: Nuclear Physics & Radiation Protection Engineering
+- **Sub-Module 3.12.1: Multi-Layer Biological Shield Attenuation**
+  - **Task 3.12.1.1:** Photon exponential attenuation via Beer-Lambert law with Taylor exposure buildup factors.
+  - **Task 3.12.1.2:** Half-Value Layer (HVL) and Tenth-Value Layer (TVL) thickness derivation for Lead, Concrete, Steel, and Water.
+  - **Task 3.12.1.3:** Multi-layer composite biological shield transmission and occupational dose rate evaluation against ICRP-103 standards.
+
 ---
 
 ## Phase 4: Advanced Subtractive & Multi-Axis CAM
@@ -199,7 +229,8 @@
 ---
 
 ## Verification & Acceptance Criteria
-1. **Zero Unsafe & Zero Panics:** Every crate compiles under `#![forbid(unsafe_code)]` with zero `unwrap()`, `expect()`, or `panic!()`. Verified with `cargo clippy --workspace --all-targets --all-features -- -D warnings` (0 warnings).
-2. **Automated Live Demonstration:** `scripts/live-demo.py` executes end-to-end against live release binary and verifies every single workbench and discipline (**126/126 assertions passed**).
-3. **Analytical Truth:** Every simulation result is validated against closed-form theoretical solutions with error $< 1\%$.
-4. **Full Regression Battery:** `cargo test --workspace` (100% pass), `scripts/full-check.py` (**312/312 assertions passed**), and `./scripts/simulate.sh --http` (**56/56 assertions passed**).
+1. **Zero Unsafe & Zero Panics:** Every crate compiles under `#![forbid(unsafe_code)]` with zero `unwrap()`, `expect()`, or `panic!()`. Verified with `cargo clippy --workspace --all-targets --all-features -- -D warnings` (0 warnings) and `cargo fmt --check` (0 diffs).
+2. **Automated Live Demonstration:** `scripts/live-demo.py` executes end-to-end against live release binary and verifies every single workbench and discipline (**139/139 assertions passed**).
+3. **Full Web Browser CDP Automation:** `scripts/test-airplane-web.py` creates a workplane from scratch, extrudes a solid, executes CAE simulations, runs 5-axis CAM, slices with TPMS Gyroid infill, and verifies 0 console errors (**52/52 browser assertions passed**).
+4. **Analytical Truth:** Every simulation result is validated against closed-form theoretical solutions with error $< 1\%$.
+5. **Full Regression Battery:** `cargo test --workspace` (100% pass across all unit and doc tests), `scripts/full-check.py` (**312/312 assertions passed**), and `./scripts/simulate.sh --http` (**56/56 assertions passed**).

@@ -7195,7 +7195,7 @@ ${gcodeSample}`;
       case "drafting2d":
         if (layoutSheet) {
           layoutSheet.hidden = false;
-          switchAutocadLayoutTab("tabLayout1");
+          switchLayoutTab("layout1");
         }
         app.viewport?.setOverlayLines([]);
         switchRibbonTab("draw");
@@ -7413,6 +7413,24 @@ ${gcodeSample}`;
         } else if (studyType === "shock_response") {
           endpoint = "/api/sim/shock_response";
           body = { peak_acceleration_g: 50.0, pulse_duration_ms: 11.0 };
+        } else if (studyType === "battery_ev") {
+          endpoint = "/api/sim/battery_ev";
+          body = { pack_current_a: 200.0, state_of_charge: 0.8 };
+        } else if (studyType === "vehicle_dynamics") {
+          endpoint = "/api/sim/vehicle_dynamics";
+          body = { velocity_kmh: 110.0, drag_coefficient: 0.208 };
+        } else if (studyType === "environmental") {
+          endpoint = "/api/sim/environmental";
+          body = { emission_rate_g_s: 150.0, stack_height_m: 65.0 };
+        } else if (studyType === "rock_mechanics") {
+          endpoint = "/api/sim/rock_mechanics";
+          body = { intact_ucs_mpa: 130.0, gsi: 65.0, confining_stress_mpa: 15.0 };
+        } else if (studyType === "signal_integrity") {
+          endpoint = "/api/sim/signal_integrity";
+          body = { trace_width_um: 150.0, dielectric_height_um: 100.0, relative_permittivity: 4.2 };
+        } else if (studyType === "nuclear_shielding") {
+          endpoint = "/api/sim/nuclear_shielding";
+          body = { source_activity_curies: 10.0, distance_to_receptor_m: 3.0 };
         }
 
         const res = await api(endpoint, {
@@ -7626,6 +7644,57 @@ ${gcodeSample}`;
               fos.style.color = "#10b981";
             }
             if (elCount) elCount.textContent = `Pv: ${m.pseudo_velocity_m_s?.toFixed(2)} m/s`;
+          } else if (studyType === "battery_ev") {
+            if (peak) peak.textContent = `Pack: ${m.pack_terminal_voltage_v?.toFixed(1)} V`;
+            if (disp) disp.textContent = `Temp: ${m.cell_equilibrium_temp_c?.toFixed(1)} °C`;
+            if (fos) {
+              const safe = m.is_thermally_stable > 0.5;
+              fos.textContent = safe ? `Thermal Margin: +${m.thermal_runaway_margin_c?.toFixed(1)} °C` : "Thermal Runaway Warning!";
+              fos.style.color = safe ? "#10b981" : "#ef4444";
+            }
+            if (elCount) elCount.textContent = `Cap: ${m.pack_capacity_kwh?.toFixed(1)} kWh`;
+          } else if (studyType === "vehicle_dynamics") {
+            if (peak) peak.textContent = `F_trac: ${m.total_tractive_force_n?.toFixed(0)} N`;
+            if (disp) disp.textContent = `P_batt: ${m.battery_power_draw_kw?.toFixed(1)} kW`;
+            if (fos) {
+              fos.textContent = `Range: ${m.estimated_range_km?.toFixed(0)} km`;
+              fos.style.color = "#10b981";
+            }
+            if (elCount) elCount.textContent = `${m.energy_consumption_kwh_per_100km?.toFixed(1)} kWh/100km`;
+          } else if (studyType === "environmental") {
+            if (peak) peak.textContent = `Receptor: ${m.concentration_at_receptor_mg_m3?.toFixed(3)} mg/m³`;
+            if (disp) disp.textContent = `Peak: ${m.peak_ground_concentration_mg_m3?.toFixed(3)} mg/m³`;
+            if (fos) {
+              const safe = m.exceeds_regulatory_threshold < 0.5;
+              fos.textContent = safe ? `Within Limit (Peak at ${m.peak_ground_distance_m?.toFixed(0)} m)` : "Exceeds Air Quality Limit!";
+              fos.style.color = safe ? "#10b981" : "#ef4444";
+            }
+            if (elCount) elCount.textContent = `H_eff = ${m.effective_stack_height_m?.toFixed(0)} m`;
+          } else if (studyType === "rock_mechanics") {
+            if (peak) peak.textContent = `σ1': ${m.major_principal_stress_s1_mpa?.toFixed(1)} MPa`;
+            if (disp) disp.textContent = `UCS_rm: ${m.rock_mass_ucs_scm_mpa?.toFixed(1)} MPa`;
+            if (fos) {
+              fos.textContent = `Friction: ${m.equivalent_friction_angle_deg?.toFixed(1)}°`;
+              fos.style.color = "#10b981";
+            }
+            if (elCount) elCount.textContent = `c' = ${m.equivalent_cohesion_mpa?.toFixed(2)} MPa`;
+          } else if (studyType === "signal_integrity") {
+            if (peak) peak.textContent = `Z0: ${m.characteristic_impedance_z0_ohms?.toFixed(1)} Ω`;
+            if (disp) disp.textContent = `Delay: ${m.propagation_delay_ps_per_inch?.toFixed(1)} ps/in`;
+            if (fos) {
+              fos.textContent = `L_crit: ${(m.critical_length_l_crit_m * 1000)?.toFixed(1)} mm`;
+              fos.style.color = "#10b981";
+            }
+            if (elCount) elCount.textContent = `Loss: ${m.total_attenuation_loss_db?.toFixed(2)} dB`;
+          } else if (studyType === "nuclear_shielding") {
+            if (peak) peak.textContent = `Dose: ${m.shielded_dose_rate_usv_hr?.toFixed(2)} μSv/hr`;
+            if (disp) disp.textContent = `Unshielded: ${m.unshielded_dose_rate_usv_hr?.toFixed(0)} μSv/hr`;
+            if (fos) {
+              const safe = m.is_radiologically_safe > 0.5;
+              fos.textContent = safe ? `ICRP Safe (FoS = ${m.dose_factor_of_safety?.toFixed(1)}x)` : "Radiation Hazard!";
+              fos.style.color = safe ? "#10b981" : "#ef4444";
+            }
+            if (elCount) elCount.textContent = `${m.total_mean_free_paths?.toFixed(1)} mfp (${(m.total_shield_thickness_m * 100)?.toFixed(0)} cm)`;
           }
 
           if (consoleOut) {

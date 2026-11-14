@@ -6,6 +6,7 @@
 pub mod acoustics;
 pub mod aerodynamics;
 pub mod aeroelasticity;
+pub mod battery_ev;
 pub mod biomedical;
 pub mod boundary_conditions;
 pub mod building_physics;
@@ -17,6 +18,7 @@ pub mod digital_twin;
 pub mod elastoplasticity;
 pub mod electromagnetics;
 pub mod engine;
+pub mod environmental;
 pub mod execution;
 pub mod fsi;
 pub mod generative;
@@ -26,12 +28,15 @@ pub mod marine;
 pub mod materials;
 pub mod model;
 pub mod molecular;
+pub mod nuclear_shielding;
 pub mod power_flow;
 pub mod problem;
 pub mod provenance;
 pub mod rainflow;
 pub mod robotics;
+pub mod rock_mechanics;
 pub mod shock_response;
+pub mod signal_integrity;
 pub mod solar;
 pub mod solver_settings;
 pub mod structural;
@@ -45,6 +50,9 @@ pub mod prelude {
         NormalShockProblem, WingAeroProblem, solve_normal_shock, solve_wing_aerodynamics,
     };
     pub use crate::aeroelasticity::{AeroelasticProblem, solve_aeroelastic_viv};
+    pub use crate::battery_ev::{
+        BatteryPackProblem, VehicleDynamicsProblem, solve_battery_pack, solve_vehicle_dynamics,
+    };
     pub use crate::biomedical::{
         HemodynamicsRequest, HemodynamicsResult, OrthopedicBoneRequest, OrthopedicBoneResult,
         solve_hemodynamics, solve_orthopedic_bone,
@@ -63,6 +71,10 @@ pub mod prelude {
     pub use crate::elastoplasticity::{ElastoplasticProblem, solve_elastoplasticity};
     pub use crate::electromagnetics::{MicrostripProblem, solve_microstrip_line};
     pub use crate::engine::SimulationEngineAdapter;
+    pub use crate::environmental::{
+        AtmosphericStabilityClass, PlumeDispersionProblem, compute_dispersion_coefficients,
+        solve_plume_dispersion,
+    };
     pub use crate::execution::{SimulationResult, SimulationStatus};
     pub use crate::fsi::{FsiProblem, solve_fsi_coupled};
     pub use crate::generative::{
@@ -81,6 +93,9 @@ pub mod prelude {
     pub use crate::molecular::{
         Atom, LennardJonesParam, MolecularDynamicsProblem, run_molecular_dynamics,
     };
+    pub use crate::nuclear_shielding::{
+        RadiationShieldingProblem, ShieldLayer, solve_radiation_shielding,
+    };
     pub use crate::power_flow::{
         BusType, ComplexNumber, PowerFlowProblem, TransmissionLine, build_bus_admittance_matrix,
         solve_power_flow, y_bus_frobenius_norm,
@@ -94,7 +109,12 @@ pub mod prelude {
         compute_forward_transforms, compute_geometric_jacobian, compute_manipulability,
         solve_dls_inverse_kinematics, solve_quintic_trajectory, solve_robot_kinematics,
     };
+    pub use crate::rock_mechanics::{
+        BlastVibrationProblem, HoekBrownProblem, RmrClassificationProblem, solve_blast_vibration,
+        solve_hoek_brown, solve_rmr_classification,
+    };
     pub use crate::shock_response::{ShockResponseProblem, solve_shock_response_spectrum};
+    pub use crate::signal_integrity::{PcbTransmissionLineProblem, solve_pcb_signal_integrity};
     pub use crate::solar::{SolarPvProblem, solve_solar_pv};
     pub use crate::solver_settings::SolverSettings;
     pub use crate::structural::{

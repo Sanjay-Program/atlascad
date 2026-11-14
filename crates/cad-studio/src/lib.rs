@@ -3440,6 +3440,143 @@ impl StudioState {
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_battery_ev(
+        &mut self,
+        req: &SimBatteryEvRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::battery_ev::BatteryPackProblem::default();
+        if let Some(i) = req.pack_current_a {
+            prob.pack_current_a = i;
+        }
+        if let Some(soc) = req.state_of_charge {
+            prob.state_of_charge = soc;
+        }
+        if let Some(t) = req.ambient_temp_c {
+            prob.ambient_temp_c = t;
+        }
+        let res = atlas_simulation_core::battery_ev::solve_battery_pack(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_vehicle_dynamics(
+        &mut self,
+        req: &SimVehicleDynamicsRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::battery_ev::VehicleDynamicsProblem::default();
+        if let Some(v) = req.velocity_kmh {
+            prob.velocity_kmh = v;
+        }
+        if let Some(m) = req.total_mass_kg {
+            prob.total_mass_kg = m;
+        }
+        if let Some(cd) = req.drag_coefficient {
+            prob.drag_coefficient = cd;
+        }
+        if let Some(kwh) = req.battery_usable_kwh {
+            prob.battery_usable_kwh = kwh;
+        }
+        let res = atlas_simulation_core::battery_ev::solve_vehicle_dynamics(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_environmental(
+        &mut self,
+        req: &SimEnvironmentalRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::environmental::PlumeDispersionProblem::default();
+        if let Some(q) = req.emission_rate_g_s {
+            prob.emission_rate_g_s = q;
+        }
+        if let Some(h) = req.stack_height_m {
+            prob.stack_height_m = h;
+        }
+        if let Some(u) = req.wind_speed_m_s {
+            prob.wind_speed_m_s = u;
+        }
+        if let Some(x) = req.downwind_distance_m {
+            prob.downwind_distance_m = x;
+        }
+        let res = atlas_simulation_core::environmental::solve_plume_dispersion(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_rock_mechanics(
+        &mut self,
+        req: &SimRockMechanicsRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::rock_mechanics::HoekBrownProblem::default();
+        if let Some(ucs) = req.intact_ucs_mpa {
+            prob.intact_ucs_mpa = ucs;
+        }
+        if let Some(gsi) = req.gsi {
+            prob.gsi = gsi;
+        }
+        if let Some(mi) = req.intact_mi {
+            prob.intact_mi = mi;
+        }
+        if let Some(s3) = req.confining_stress_mpa {
+            prob.confining_stress_mpa = s3;
+        }
+        let res = atlas_simulation_core::rock_mechanics::solve_hoek_brown(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_signal_integrity(
+        &mut self,
+        req: &SimSignalIntegrityRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob =
+            atlas_simulation_core::signal_integrity::PcbTransmissionLineProblem::default();
+        if let Some(w) = req.trace_width_um {
+            prob.trace_width_m = w * 1e-6;
+        }
+        if let Some(h) = req.dielectric_height_um {
+            prob.dielectric_height_m = h * 1e-6;
+        }
+        if let Some(er) = req.relative_permittivity {
+            prob.relative_permittivity = er;
+        }
+        if let Some(l) = req.trace_length_mm {
+            prob.trace_length_m = l * 1e-3;
+        }
+        if let Some(f) = req.signal_frequency_ghz {
+            prob.signal_frequency_hz = f * 1e9;
+        }
+        let res = atlas_simulation_core::signal_integrity::solve_pcb_signal_integrity(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_nuclear_shielding(
+        &mut self,
+        req: &SimNuclearShieldingRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob =
+            atlas_simulation_core::nuclear_shielding::RadiationShieldingProblem::default();
+        if let Some(ci) = req.source_activity_curies {
+            prob.source_activity_bq = ci * 3.7e10;
+        }
+        if let Some(d) = req.distance_to_receptor_m {
+            prob.distance_to_receptor_m = d;
+        }
+        if let (Some(pb_cm), Some(layer)) = (req.lead_shield_thickness_cm, prob.layers.first_mut())
+        {
+            layer.thickness_m = pb_cm / 100.0;
+        }
+        if let (Some(conc_cm), Some(layer)) =
+            (req.concrete_shield_thickness_cm, prob.layers.get_mut(1))
+        {
+            layer.thickness_m = conc_cm / 100.0;
+        }
+        let res = atlas_simulation_core::nuclear_shielding::solve_radiation_shielding(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn convert_units(
         &mut self,
         req: &UnitConvertRequest,
@@ -4870,6 +5007,57 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                 Err(error) => error_response(&error),
             }
         }
+        "/api/sim/battery_ev" => match parse_body_or_default::<SimBatteryEvRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_battery_ev(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/vehicle_dynamics" => {
+            match parse_body_or_default::<SimVehicleDynamicsRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_vehicle_dynamics(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/environmental" => match parse_body_or_default::<SimEnvironmentalRequest>(request)
+        {
+            Ok(body) => match with_state(state, |state| state.sim_environmental(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/rock_mechanics" => {
+            match parse_body_or_default::<SimRockMechanicsRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_rock_mechanics(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/signal_integrity" => {
+            match parse_body_or_default::<SimSignalIntegrityRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_signal_integrity(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/nuclear_shielding" => {
+            match parse_body_or_default::<SimNuclearShieldingRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_nuclear_shielding(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
         "/api/units/convert" => match parse_body::<UnitConvertRequest>(request) {
             Ok(body) => match with_state(state, |state| state.convert_units(&body)) {
                 Ok(payload) => json_response(200, payload),
@@ -6226,4 +6414,82 @@ struct UnitConvertRequest {
     pub category: String,
     pub from_unit: String,
     pub to_unit: String,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimBatteryEvRequest {
+    #[serde(default)]
+    pub pack_current_a: Option<f64>,
+    #[serde(default)]
+    pub state_of_charge: Option<f64>,
+    #[serde(default)]
+    pub ambient_temp_c: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimVehicleDynamicsRequest {
+    #[serde(default)]
+    pub velocity_kmh: Option<f64>,
+    #[serde(default)]
+    pub total_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub drag_coefficient: Option<f64>,
+    #[serde(default)]
+    pub battery_usable_kwh: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimEnvironmentalRequest {
+    #[serde(default)]
+    pub emission_rate_g_s: Option<f64>,
+    #[serde(default)]
+    pub stack_height_m: Option<f64>,
+    #[serde(default)]
+    pub wind_speed_m_s: Option<f64>,
+    #[serde(default)]
+    pub downwind_distance_m: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimRockMechanicsRequest {
+    #[serde(default)]
+    pub intact_ucs_mpa: Option<f64>,
+    #[serde(default)]
+    pub gsi: Option<f64>,
+    #[serde(default)]
+    pub intact_mi: Option<f64>,
+    #[serde(default)]
+    pub confining_stress_mpa: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimSignalIntegrityRequest {
+    #[serde(default)]
+    pub trace_width_um: Option<f64>,
+    #[serde(default)]
+    pub dielectric_height_um: Option<f64>,
+    #[serde(default)]
+    pub relative_permittivity: Option<f64>,
+    #[serde(default)]
+    pub trace_length_mm: Option<f64>,
+    #[serde(default)]
+    pub signal_frequency_ghz: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimNuclearShieldingRequest {
+    #[serde(default)]
+    pub source_activity_curies: Option<f64>,
+    #[serde(default)]
+    pub distance_to_receptor_m: Option<f64>,
+    #[serde(default)]
+    pub lead_shield_thickness_cm: Option<f64>,
+    #[serde(default)]
+    pub concrete_shield_thickness_cm: Option<f64>,
 }
