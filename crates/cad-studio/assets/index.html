@@ -1073,6 +1073,12 @@
                 <option value="geotechnical">Geotechnical Earth Pressure</option>
                 <option value="biomedical">Biomedical Hemodynamics &amp; Biomechanics</option>
                 <option value="marine">Marine Hydrostatics &amp; Ocean Wave Dynamics</option>
+                <option value="buckling">Structural Column Buckling (Euler / Johnson)</option>
+                <option value="fatigue">High-Cycle Fatigue (Goodman / Gerber)</option>
+                <option value="composite">Composite Laminate (CLT Orthotropic Plies)</option>
+                <option value="thermal_stress">Thermal Expansion &amp; Constrained Stress</option>
+                <option value="electromagnetics">High-Speed RF Microstrip (IPC-2141)</option>
+                <option value="building_physics">Building Envelope ISO 6946 (U-Value)</option>
               </select>
             </div>
             <div class="wb-group">
@@ -1484,6 +1490,7 @@ C1 out 0 100n
           </div>
           <div class="wb-header-actions">
             <span class="wb-status-badge" id="additiveStatusBadge">Geometry Loaded</span>
+            <button type="button" class="button secondary small" id="additiveSupportsBtn">🛡 Overhang &amp; Supports</button>
             <button type="button" class="button primary small" id="additiveSliceBtn">⚡ Slice 3D Solid</button>
             <button type="button" class="button ghost small" id="additiveDownloadGcodeBtn">💾 Download G-Code</button>
           </div>
@@ -1570,6 +1577,10 @@ C1 out 0 100n
                 <div class="wb-metric-box">
                   <span class="m-label">Est. Cost (USD)</span>
                   <strong class="m-val" id="additiveCostVal">—</strong>
+                </div>
+                <div class="wb-metric-box">
+                  <span class="m-label">Support Vol</span>
+                  <strong class="m-val" id="additiveSupportVolVal">—</strong>
                 </div>
               </div>
             </div>

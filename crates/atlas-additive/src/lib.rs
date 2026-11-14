@@ -10,6 +10,7 @@ pub mod gcode;
 pub mod infill;
 pub mod settings;
 pub mod slicer;
+pub mod supports;
 
 pub mod prelude {
     pub use crate::estimation::PrintEstimation;
@@ -19,5 +20,9 @@ pub mod prelude {
     pub use crate::slicer::{
         MoveType, SlicedLayer, SlicedModel, compute_adaptive_layer_height,
         compute_adaptive_layer_height_from_normal, slice_solid_bounds,
+    };
+    pub use crate::supports::{
+        SupportAnalysis, SupportPattern, SupportSettings, analyze_overhang_supports,
+        is_overhang_requiring_support,
     };
 }

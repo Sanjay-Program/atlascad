@@ -489,6 +489,74 @@ def run_live_demo() -> None:
         check(w_len > 80.0, f"Airy linear wave dispersion solved (lambda = {w_len:.1f} m)")
         print(f"  ✓ 11.10 Marine Hydrodynamics: GM = {gm:.2f} m, Disp = {marine['hydrostatics']['displacement_tonnes']:.0f} t, Wave λ = {w_len:.1f} m")
 
+        # 11.11 Structural Column Buckling (Euler & Johnson Formulation)
+        buckle = http_request(port, "POST", "/api/sim/buckling", body={
+            "column_length_m": 2.0,
+            "applied_load_n": 1500000.0
+        })
+        p_cr = buckle["scalar_metrics"]["critical_buckling_load_n"]
+        fos_buckle = buckle["scalar_metrics"]["factor_of_safety"]
+        check(p_cr > 2e6, f"Critical buckling load calculated ({p_cr/1000:.1f} kN)")
+        check(fos_buckle > 1.0, f"Buckling Factor of Safety verified ({fos_buckle:.2f})")
+        print(f"  ✓ 11.11 Column Buckling: P_cr = {p_cr/1000:.1f} kN, Slenderness = {buckle['scalar_metrics']['slenderness_ratio']:.1f}, FoS = {fos_buckle:.2f}")
+
+        # 11.12 High-Cycle Fatigue Safety (Goodman & Gerber Criteria)
+        fatigue = http_request(port, "POST", "/api/sim/fatigue", body={
+            "alternating_stress_pa": 80e6,
+            "mean_stress_pa": 50e6
+        })
+        fos_goodman = fatigue["scalar_metrics"]["fos_goodman"]
+        fos_gerber = fatigue["scalar_metrics"]["fos_gerber"]
+        check(fos_goodman > 1.5, f"Goodman fatigue safety factor verified ({fos_goodman:.2f})")
+        check(fos_gerber >= fos_goodman, "Gerber parabolic FoS exceeds conservative linear Goodman")
+        print(f"  ✓ 11.12 High-Cycle Fatigue: Goodman FoS = {fos_goodman:.2f}, Gerber FoS = {fos_gerber:.2f}, Soderberg FoS = {fatigue['scalar_metrics']['fos_soderberg']:.2f}")
+
+        # 11.13 Classical Laminate Theory (CLT Orthotropic Composites)
+        composite = http_request(port, "POST", "/api/sim/composite", body={
+            "ply_angles_deg": [0.0, 90.0, 90.0, 0.0]
+        })
+        ex = composite["scalar_metrics"]["effective_ex_gpa"]
+        ey = composite["scalar_metrics"]["effective_ey_gpa"]
+        check(ex > 50.0 and ey > 50.0, f"Cross-ply laminate moduli verified (Ex={ex:.1f} GPa, Ey={ey:.1f} GPa)")
+        check(abs(ex - ey) < 5.0, "Symmetric cross-ply quasi-isotropic in-plane balance verified")
+        print(f"  ✓ 11.13 Composite CLT: Ex = {ex:.1f} GPa, Ey = {ey:.1f} GPa, νxy = {composite['scalar_metrics']['effective_nu_xy']:.3f}, {composite['scalar_metrics']['ply_count']:.0f} plies")
+
+        # 11.14 Thermal Stress & Timoshenko Bimetallic Strip
+        therm = http_request(port, "POST", "/api/sim/thermal_stress", body={
+            "delta_temp_c": 80.0
+        })
+        sigma_th = therm["scalar_metrics"]["thermal_stress_mpa"]
+        force_kn = therm["scalar_metrics"]["reaction_force_kn"]
+        check(sigma_th < 0.0, f"Constrained thermal stress is compressive ({sigma_th:.1f} MPa)")
+        check(force_kn > 0.0, f"Thermal reaction force magnitude verified ({force_kn:.1f} kN)")
+        print(f"  ✓ 11.14 Thermal Stress: σ_th = {sigma_th:.1f} MPa, Reaction Force = {force_kn:.1f} kN, ΔL_free = {therm['scalar_metrics']['free_expansion_mm']:.3f} mm")
+
+        # 11.15 High-Frequency RF Microstrip Impedance (IPC-2141 / Wheeler)
+        rf = http_request(port, "POST", "/api/sim/electromagnetics", body={
+            "trace_width_mm": 3.0,
+            "substrate_height_mm": 1.6
+        })
+        z0 = rf["scalar_metrics"]["characteristic_impedance_ohms"]
+        check(45.0 < z0 < 55.0, f"Standard 50-Ohm controlled RF impedance verified (Z0 = {z0:.2f} Ω)")
+        check(rf["scalar_metrics"]["skin_depth_um"] < 10.0, f"High-frequency copper skin depth verified ({rf['scalar_metrics']['skin_depth_um']:.2f} μm)")
+        print(f"  ✓ 11.15 RF Electromagnetics: Z0 = {z0:.2f} Ω, ε_eff = {rf['scalar_metrics']['effective_dielectric_constant']:.2f}, Skin Depth = {rf['scalar_metrics']['skin_depth_um']:.2f} μm")
+
+        # 11.16 Building Envelope Energy & Thermal Transmittance (ISO 6946)
+        bldg = http_request(port, "POST", "/api/sim/building_physics", body={
+            "wall_area_m2": 150.0
+        })
+        u_val = bldg["scalar_metrics"]["u_value_w_m2_k"]
+        check(0.10 < u_val < 0.35, f"ISO 6946 building envelope U-value verified (U = {u_val:.3f} W/m²K)")
+        check(bldg["scalar_metrics"]["total_thermal_resistance_r_tot"] > 3.0, f"Building R-value verified ({bldg['scalar_metrics']['total_thermal_resistance_r_tot']:.2f} m²K/W)")
+        print(f"  ✓ 11.16 Building Physics: U-value = {u_val:.3f} W/m²K, R = {bldg['scalar_metrics']['total_thermal_resistance_r_tot']:.2f} m²K/W, Annual Loss = {bldg['scalar_metrics']['annual_heat_loss_kwh']/1000:.1f} MWh")
+
+        # 11.17 Additive Overhang Analysis & Support Estimation
+        supp = http_request(port, "POST", "/api/additive/supports", body={
+            "critical_angle_deg": 45.0
+        })
+        check("requires_support" in supp, "Overhang support analysis returned structured result")
+        print(f"  ✓ 11.17 Additive Supports: Requires Supports = {supp['requires_support']}, Overhang Facets = {supp['critical_facet_count']}, Support Vol = {supp['estimated_support_volume_mm3']:.1f} mm³")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

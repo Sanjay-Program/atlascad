@@ -4094,5 +4094,91 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         .ok_or("wavelength")?;
     assert!(wavelength > 80.0 && wavelength < 110.0);
 
+    // 10. Column Buckling
+    let buck_resp = post(
+        addr,
+        "/api/sim/buckling",
+        r#"{"column_length_m": 3.0, "applied_load_n": 100000.0}"#,
+    )?;
+    assert_eq!(buck_resp.status, 200);
+    let buck = json(&buck_resp)?;
+    let p_cr = buck["scalar_metrics"]["critical_buckling_load_n"]
+        .as_f64()
+        .ok_or("p_cr")?;
+    assert!(p_cr > 1.0e6);
+
+    // 11. Fatigue Goodman / Gerber
+    let fat_resp = post(
+        addr,
+        "/api/sim/fatigue",
+        r#"{"alternating_stress_pa": 120000000.0, "mean_stress_pa": 60000000.0}"#,
+    )?;
+    assert_eq!(fat_resp.status, 200);
+    let fat = json(&fat_resp)?;
+    let fg = fat["scalar_metrics"]["fos_goodman"].as_f64().ok_or("fg")?;
+    assert!(fg > 1.0);
+
+    // 12. Composite CLT Laminate
+    let comp_resp = post(
+        addr,
+        "/api/sim/composite",
+        r#"{"ply_angles_deg": [0.0, 45.0, -45.0, 90.0, 90.0, -45.0, 45.0, 0.0]}"#,
+    )?;
+    assert_eq!(comp_resp.status, 200);
+    let comp = json(&comp_resp)?;
+    let ex = comp["scalar_metrics"]["effective_ex_gpa"]
+        .as_f64()
+        .ok_or("ex")?;
+    assert!(ex > 30.0);
+
+    // 13. Thermal-Structural Stress
+    let th_resp = post(
+        addr,
+        "/api/sim/thermal_stress",
+        r#"{"delta_temp_c": 100.0}"#,
+    )?;
+    assert_eq!(th_resp.status, 200);
+    let th = json(&th_resp)?;
+    let s_th = th["scalar_metrics"]["thermal_stress_mpa"]
+        .as_f64()
+        .ok_or("s_th")?;
+    assert!(s_th < 0.0); // Compressive
+
+    // 14. High-Speed RF Microstrip
+    let em_resp = post(
+        addr,
+        "/api/sim/electromagnetics",
+        r#"{"trace_width_mm": 3.0, "substrate_height_mm": 1.6}"#,
+    )?;
+    assert_eq!(em_resp.status, 200);
+    let em = json(&em_resp)?;
+    let z0 = em["scalar_metrics"]["characteristic_impedance_ohms"]
+        .as_f64()
+        .ok_or("z0")?;
+    assert!(z0 > 45.0 && z0 < 55.0);
+
+    // 15. Building Physics ISO 6946
+    let bp_resp = post(
+        addr,
+        "/api/sim/building_physics",
+        r#"{"wall_area_m2": 150.0}"#,
+    )?;
+    assert_eq!(bp_resp.status, 200);
+    let bp = json(&bp_resp)?;
+    let u_val = bp["scalar_metrics"]["u_value_w_m2_k"]
+        .as_f64()
+        .ok_or("u_val")?;
+    assert!(u_val > 0.10 && u_val < 0.25);
+
+    // 16. Additive Support Analysis
+    let sup_resp = post(
+        addr,
+        "/api/additive/supports",
+        r#"{"critical_angle_deg": 45.0}"#,
+    )?;
+    assert_eq!(sup_resp.status, 200);
+    let sup = json(&sup_resp)?;
+    assert!(sup.get("requires_support").is_some());
+
     Ok(())
 }

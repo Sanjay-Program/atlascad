@@ -6,9 +6,11 @@
 pub mod aerodynamics;
 pub mod biomedical;
 pub mod boundary_conditions;
+pub mod building_physics;
 pub mod cfd;
 pub mod chemical;
 pub mod convergence;
+pub mod electromagnetics;
 pub mod engine;
 pub mod execution;
 pub mod generative;
@@ -22,6 +24,8 @@ pub mod problem;
 pub mod provenance;
 pub mod robotics;
 pub mod solver_settings;
+pub mod structural;
+pub mod thermal_stress;
 pub mod validation;
 
 pub mod prelude {
@@ -33,9 +37,13 @@ pub mod prelude {
         solve_hemodynamics, solve_orthopedic_bone,
     };
     pub use crate::boundary_conditions::BoundaryCondition;
+    pub use crate::building_physics::{
+        BuildingAssemblyProblem, BuildingLayer, solve_building_u_value,
+    };
     pub use crate::cfd::{FluidProperties, PipeFlowProblem, solve_pipe_flow};
     pub use crate::chemical::{ChemicalComponent, FlashProblem, solve_rachford_rice_flash};
     pub use crate::convergence::{ConvergenceMonitor, IterationTelemetry};
+    pub use crate::electromagnetics::{MicrostripProblem, solve_microstrip_line};
     pub use crate::engine::SimulationEngineAdapter;
     pub use crate::execution::{SimulationResult, SimulationStatus};
     pub use crate::generative::{
@@ -64,5 +72,12 @@ pub mod prelude {
         solve_robot_kinematics,
     };
     pub use crate::solver_settings::SolverSettings;
+    pub use crate::structural::{
+        BucklingProblem, ColumnEndCondition, CompositeLaminateProblem, FatigueProblem,
+        OrthotropicLamina, solve_column_buckling, solve_composite_laminate, solve_fatigue_safety,
+    };
+    pub use crate::thermal_stress::{
+        BimetalStripProblem, ThermalStressProblem, solve_bimetal_deflection, solve_thermal_stress,
+    };
     pub use crate::validation::{AnalyticalComparison, ValidationStatus};
 }

@@ -3090,6 +3090,114 @@ impl StudioState {
             "airy_wave": wave,
         }))
     }
+
+    fn sim_buckling(&mut self, req: &SimBucklingRequest) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::structural::BucklingProblem::default();
+        if let Some(l) = req.column_length_m {
+            prob.column_length_m = l;
+        }
+        if let Some(p) = req.applied_load_n {
+            prob.applied_load_n = p;
+        }
+        let res = atlas_simulation_core::structural::solve_column_buckling(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_fatigue(&mut self, req: &SimFatigueRequest) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::structural::FatigueProblem::default();
+        if let Some(sa) = req.alternating_stress_pa {
+            prob.alternating_stress_pa = sa;
+        }
+        if let Some(sm) = req.mean_stress_pa {
+            prob.mean_stress_pa = sm;
+        }
+        let res = atlas_simulation_core::structural::solve_fatigue_safety(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_composite(
+        &mut self,
+        req: &SimCompositeRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::structural::CompositeLaminateProblem::default();
+        if let Some(ref angles) = req.ply_angles_deg {
+            prob.ply_angles_deg.clone_from(angles);
+        }
+        let res = atlas_simulation_core::structural::solve_composite_laminate(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_thermal_stress(
+        &mut self,
+        req: &SimThermalStressRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::thermal_stress::ThermalStressProblem::default();
+        if let Some(dt) = req.delta_temp_c {
+            prob.final_temp_c = prob.initial_temp_c + dt;
+        }
+        let res = atlas_simulation_core::thermal_stress::solve_thermal_stress(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_electromagnetics(
+        &mut self,
+        req: &SimEmRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut prob = atlas_simulation_core::electromagnetics::MicrostripProblem::default();
+        if let Some(w) = req.trace_width_mm {
+            prob.trace_width_mm = w;
+        }
+        if let Some(h) = req.substrate_height_mm {
+            prob.substrate_height_mm = h;
+        }
+        let res = atlas_simulation_core::electromagnetics::solve_microstrip_line(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_building_physics(
+        &mut self,
+        req: &SimBuildingPhysicsRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::building_physics::BuildingAssemblyProblem {
+            wall_area_m2: req.wall_area_m2.unwrap_or(120.0),
+            ..Default::default()
+        };
+        let res = atlas_simulation_core::building_physics::solve_building_u_value(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn additive_analyze_supports(
+        &mut self,
+        req: &AdditiveSupportsRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let settings = atlas_additive::supports::SupportSettings {
+            critical_overhang_angle_deg: req.critical_angle_deg.unwrap_or(45.0),
+            ..Default::default()
+        };
+        let build = self
+            .project
+            .build_with_cache(&mut self.kernel, &mut self.cache)?;
+        let mesh = build.mesh.unwrap_or_default();
+        let mut facets = Vec::new();
+        for tri in &mesh.triangles {
+            if let (Some(&p0), Some(&p1), Some(&p2)) = (
+                mesh.positions.get(tri[0] as usize),
+                mesh.positions.get(tri[1] as usize),
+                mesh.positions.get(tri[2] as usize),
+            ) {
+                facets.push((p0, p1, p2));
+            }
+        }
+        let analysis =
+            atlas_additive::supports::analyze_overhang_supports(&facets, &settings, 1.24);
+        serde_json::to_value(&analysis).map_err(|e| StudioError::Json(e.to_string()))
+    }
 }
 
 fn export_name(name: &str) -> String {
@@ -4264,6 +4372,60 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             },
             Err(error) => error_response(&error),
         },
+        "/api/sim/buckling" => match parse_body_or_default::<SimBucklingRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_buckling(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/fatigue" => match parse_body_or_default::<SimFatigueRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_fatigue(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/composite" => match parse_body_or_default::<SimCompositeRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_composite(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/thermal_stress" => {
+            match parse_body_or_default::<SimThermalStressRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_thermal_stress(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/electromagnetics" => match parse_body_or_default::<SimEmRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_electromagnetics(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/building_physics" => {
+            match parse_body_or_default::<SimBuildingPhysicsRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_building_physics(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/additive/supports" => match parse_body_or_default::<AdditiveSupportsRequest>(request)
+        {
+            Ok(body) => match with_state(state, |state| state.additive_analyze_supports(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
         _ => error_response(&StudioError::NotFound),
     }
 }
@@ -5404,4 +5566,59 @@ struct SimMarineRequest {
     pub heel_angle_deg: Option<f64>,
     #[serde(default)]
     pub wave_period_s: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimBucklingRequest {
+    #[serde(default)]
+    pub column_length_m: Option<f64>,
+    #[serde(default)]
+    pub applied_load_n: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimFatigueRequest {
+    #[serde(default)]
+    pub alternating_stress_pa: Option<f64>,
+    #[serde(default)]
+    pub mean_stress_pa: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimCompositeRequest {
+    #[serde(default)]
+    pub ply_angles_deg: Option<Vec<f64>>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimThermalStressRequest {
+    #[serde(default)]
+    pub delta_temp_c: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimEmRequest {
+    #[serde(default)]
+    pub trace_width_mm: Option<f64>,
+    #[serde(default)]
+    pub substrate_height_mm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimBuildingPhysicsRequest {
+    #[serde(default)]
+    pub wall_area_m2: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AdditiveSupportsRequest {
+    #[serde(default)]
+    pub critical_angle_deg: Option<f64>,
 }

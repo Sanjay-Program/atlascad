@@ -7356,6 +7356,24 @@ ${gcodeSample}`;
         } else if (studyType === "marine") {
           endpoint = "/api/sim/marine";
           body = { hull_length_m: 50.0, hull_beam_m: 10.0, hull_draft_m: 3.0, heel_angle_deg: 5.0 };
+        } else if (studyType === "buckling") {
+          endpoint = "/api/sim/buckling";
+          body = { column_length_m: 2.0, applied_load_n: 1500000.0 };
+        } else if (studyType === "fatigue") {
+          endpoint = "/api/sim/fatigue";
+          body = { alternating_stress_pa: 80e6, mean_stress_pa: 50e6 };
+        } else if (studyType === "composite") {
+          endpoint = "/api/sim/composite";
+          body = { ply_angles_deg: [0.0, 90.0, 90.0, 0.0] };
+        } else if (studyType === "thermal_stress") {
+          endpoint = "/api/sim/thermal_stress";
+          body = { delta_temp_c: 100.0 };
+        } else if (studyType === "electromagnetics") {
+          endpoint = "/api/sim/electromagnetics";
+          body = { trace_width_mm: 3.0, substrate_height_mm: 1.6 };
+        } else if (studyType === "building_physics") {
+          endpoint = "/api/sim/building_physics";
+          body = { wall_area_m2: 120.0 };
         }
 
         const res = await api(endpoint, {
@@ -7421,6 +7439,45 @@ ${gcodeSample}`;
             if (disp) disp.textContent = `Moment: ${m.overturning_moment_kn_m?.toFixed(1)} kNm`;
             if (fos) { fos.textContent = "Ka*Kp = 1.0"; fos.style.color = "#10b981"; }
             if (elCount) elCount.textContent = `Kp: ${m.passive_coefficient_kp?.toFixed(2)}`;
+          } else if (studyType === "buckling") {
+            if (peak) peak.textContent = `Pcr: ${(m.critical_buckling_load_n / 1000)?.toFixed(1)} kN`;
+            if (disp) disp.textContent = `λ = ${m.slenderness_ratio?.toFixed(1)}`;
+            if (fos) {
+              fos.textContent = `FoS: ${m.factor_of_safety?.toFixed(2)}`;
+              fos.style.color = (m.factor_of_safety >= 1.0) ? "#10b981" : "#ef4444";
+            }
+            if (elCount) elCount.textContent = `σ_cr: ${m.critical_stress_mpa?.toFixed(1)} MPa`;
+          } else if (studyType === "fatigue") {
+            if (peak) peak.textContent = `Goodman: ${m.fos_goodman?.toFixed(2)}`;
+            if (disp) disp.textContent = `Gerber: ${m.fos_gerber?.toFixed(2)}`;
+            if (fos) {
+              fos.textContent = (m.fos_goodman >= 1.0) ? "Infinite Life" : "Finite Life";
+              fos.style.color = (m.fos_goodman >= 1.0) ? "#10b981" : "#eab308";
+            }
+            if (elCount) elCount.textContent = `Soderberg: ${m.fos_soderberg?.toFixed(2)}`;
+          } else if (studyType === "composite") {
+            if (peak) peak.textContent = `Ex: ${m.effective_ex_gpa?.toFixed(1)} GPa`;
+            if (disp) disp.textContent = `Ey: ${m.effective_ey_gpa?.toFixed(1)} GPa`;
+            if (fos) { fos.textContent = `νxy = ${m.effective_nu_xy?.toFixed(3)}`; fos.style.color = "#10b981"; }
+            if (elCount) elCount.textContent = `${m.ply_count} Plies (${m.total_thickness_mm?.toFixed(2)} mm)`;
+          } else if (studyType === "thermal_stress") {
+            if (peak) peak.textContent = `σ_th: ${m.thermal_stress_mpa?.toFixed(1)} MPa`;
+            if (disp) disp.textContent = `ΔL: ${m.free_expansion_mm?.toFixed(3)} mm`;
+            if (fos) { fos.textContent = "Compressive"; fos.style.color = "#10b981"; }
+            if (elCount) elCount.textContent = `Force: ${m.reaction_force_kn?.toFixed(1)} kN`;
+          } else if (studyType === "electromagnetics") {
+            if (peak) peak.textContent = `Z0: ${m.characteristic_impedance_ohms?.toFixed(1)} Ω`;
+            if (disp) disp.textContent = `Skin: ${m.skin_depth_um?.toFixed(2)} μm`;
+            if (fos) { fos.textContent = `ε_eff = ${m.effective_dielectric_constant?.toFixed(2)}`; fos.style.color = "#10b981"; }
+            if (elCount) elCount.textContent = `Delay: ${m.propagation_delay_ps_per_mm?.toFixed(1)} ps/mm`;
+          } else if (studyType === "building_physics") {
+            if (peak) peak.textContent = `U: ${m.u_value_w_m2_k?.toFixed(3)} W/m²K`;
+            if (disp) disp.textContent = `R: ${m.total_thermal_resistance_r_tot?.toFixed(2)} m²K/W`;
+            if (fos) {
+              fos.textContent = (m.u_value_w_m2_k <= 0.15) ? "Passive House" : "Code Pass";
+              fos.style.color = (m.u_value_w_m2_k <= 0.15) ? "#10b981" : "#3b82f6";
+            }
+            if (elCount) elCount.textContent = `Loss: ${(m.annual_heat_loss_kwh / 1000)?.toFixed(1)} MWh`;
           }
 
           if (consoleOut) {
@@ -7900,6 +7957,30 @@ ${gcodeSample}`;
         toast(`3D Solid Sliced Successfully: ${est.total_layers || 0} layers generated!`);
       } catch (err) {
         toast(`Slicing failed: ${err.message}`, true);
+      }
+    });
+
+    byId("additiveSupportsBtn")?.addEventListener("click", async () => {
+      toast("Analyzing overhangs and generating sacrificial support structures…");
+      try {
+        const res = await api("/api/additive/supports", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ critical_angle_deg: 45.0 }),
+        });
+        const sv = byId("additiveSupportVolVal");
+        if (sv) {
+          sv.textContent = `${(res.support_volume_mm3 / 1000).toFixed(2)} cm³ (${res.overhang_facets} facets)`;
+        }
+        const badge = byId("additiveStatusBadge");
+        if (badge) {
+          badge.textContent = res.requires_support ? `Supports: ${res.overhang_facets} Overhangs` : "Self-Supporting (0 Overhangs)";
+          badge.style.background = res.requires_support ? "rgba(245, 158, 11, 0.2)" : "rgba(16, 185, 129, 0.2)";
+          badge.style.color = res.requires_support ? "#f59e0b" : "#10b981";
+        }
+        toast(`Support Analysis: ${res.requires_support ? `${res.overhang_facets} overhang facets detected requiring support (${(res.support_volume_mm3/1000).toFixed(2)} cm³)` : "Part is fully self-supporting without supports"}`);
+      } catch (err) {
+        toast(`Support analysis failed: ${err.message}`, true);
       }
     });
 
