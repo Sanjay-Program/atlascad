@@ -2435,17 +2435,26 @@ kbd {
    WORKSPACE MODE SEPARATION (Model Space vs Paper Space Layouts)
    ===================================================================== */
 body[data-workspace-mode="layout1"] #viewCubeContainer,
+body[data-workspace-mode="layout1"] #autocadNavbar,
 body[data-workspace-mode="layout1"] #autocadUcsIcon,
 body[data-workspace-mode="layout1"] #viewportStyleBadge,
 body[data-workspace-mode="layout1"] #axisGizmo,
 body[data-workspace-mode="layout1"] .view-toolbar,
 body[data-workspace-mode="layout1"] #feature-timeline,
 body[data-workspace-mode="layout2"] #viewCubeContainer,
+body[data-workspace-mode="layout2"] #autocadNavbar,
 body[data-workspace-mode="layout2"] #autocadUcsIcon,
 body[data-workspace-mode="layout2"] #viewportStyleBadge,
 body[data-workspace-mode="layout2"] #axisGizmo,
 body[data-workspace-mode="layout2"] .view-toolbar,
-body[data-workspace-mode="layout2"] #feature-timeline {
+body[data-workspace-mode="layout2"] #feature-timeline,
+body[data-workspace-mode^="layout"] #viewCubeContainer,
+body[data-workspace-mode^="layout"] #autocadNavbar,
+body[data-workspace-mode^="layout"] #autocadUcsIcon,
+body[data-workspace-mode^="layout"] #viewportStyleBadge,
+body[data-workspace-mode^="layout"] #axisGizmo,
+body[data-workspace-mode^="layout"] .view-toolbar,
+body[data-workspace-mode^="layout"] #feature-timeline {
   display: none !important;
 }
 
@@ -2591,6 +2600,341 @@ body[data-workspace-mode="layout2"] #feature-timeline {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* =====================================================================
+   AUTOCAD NAVIGATION BAR (NavBar)
+   ===================================================================== */
+.autocad-navbar {
+  position: absolute;
+  top: 180px;
+  right: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(20, 24, 33, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 4px 2px;
+  z-index: 15;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: opacity 0.2s ease;
+}
+
+[data-theme="light"] .autocad-navbar {
+  background: rgba(245, 247, 250, 0.9);
+  border-color: rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.navbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.navbar-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--accent);
+  transform: scale(1.05);
+}
+
+[data-theme="light"] .navbar-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.navbar-btn:active, .navbar-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* =====================================================================
+   AUTOCAD CLEAN SCREEN MODE (Focus / Immersive Canvas)
+   ===================================================================== */
+body.clean-screen .topbar,
+body.clean-screen .autocad-ribbon,
+body.clean-screen .panel-left,
+body.clean-screen .panel-right,
+body.clean-screen .command-line-bar {
+  display: none !important;
+}
+
+body.clean-screen .workspace {
+  grid-template-columns: 1fr !important;
+  height: 100vh !important;
+}
+
+.clean-screen-banner {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(18, 22, 30, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--accent);
+  border-radius: 20px;
+  padding: 6px 16px;
+  z-index: 25;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+  animation: csSlideDown 0.25s ease-out;
+}
+
+@keyframes csSlideDown {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.cs-indicator {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.06em;
+}
+
+.cs-hint {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.cs-exit-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 10.5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cs-exit-btn:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* =====================================================================
+   ON-CANVAS PARAMETRIC FEATURE HUD (Extrude / Cut / Revolve)
+   ===================================================================== */
+.feature-hud, .measure-hud {
+  position: absolute;
+  top: 60px;
+  left: 20px;
+  width: 290px;
+  background: rgba(22, 27, 36, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: hudFadeIn 0.18s ease-out;
+}
+
+[data-theme="light"] .feature-hud,
+[data-theme="light"] .measure-hud {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(0, 0, 0, 0.18);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.15);
+}
+
+@keyframes hudFadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.hud-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--border);
+}
+
+[data-theme="light"] .hud-header {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.hud-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hud-icon {
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.hud-header h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.03em;
+}
+
+.hud-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.hud-close-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.hud-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hud-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hud-field label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.hud-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.hud-val-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(0, 150, 255, 0.12);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.hud-select {
+  width: 100%;
+  padding: 5px 8px;
+  font-size: 11.5px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.hud-segmented-ctrl {
+  display: flex;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.seg-btn {
+  flex: 1;
+  padding: 4px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.seg-btn:hover {
+  color: var(--text);
+}
+
+.seg-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.hud-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hud-slider {
+  flex: 1;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.hud-num-input {
+  width: 55px;
+  padding: 4px 6px;
+  font-size: 11px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  text-align: right;
+}
+
+.hud-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.hud-actions .button {
+  flex: 1;
+}
+
+.hud-guide-text {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* Layout Bar Add Button */
+.layout-add-btn {
+  font-size: 14px;
+  font-weight: 700;
+  padding: 0 10px !important;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.layout-add-btn:hover {
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 

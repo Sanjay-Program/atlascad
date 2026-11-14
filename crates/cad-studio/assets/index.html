@@ -432,6 +432,105 @@
         </div>
       </div>
 
+      <!-- AutoCAD Floating Navigation Bar (NavBar) -->
+      <nav class="autocad-navbar" id="autocadNavbar" role="toolbar" aria-label="AutoCAD Navigation Bar">
+        <button type="button" class="navbar-btn" id="navHomeBtn" title="Home View (Isometric ISO - H)">
+          <span class="nav-icon">⌂</span>
+        </button>
+        <button type="button" class="navbar-btn" id="navFitBtn" title="Zoom Extents (Fit Model - F)">
+          <span class="nav-icon">⛶</span>
+        </button>
+        <button type="button" class="navbar-btn" id="navPanBtn" title="Pan Navigation (Shift+Drag / MMB)">
+          <span class="nav-icon">✋</span>
+        </button>
+        <button type="button" class="navbar-btn" id="navOrbitBtn" title="Orbit View (Drag LMB)">
+          <span class="nav-icon">↻</span>
+        </button>
+        <button type="button" class="navbar-btn" id="navStyleBtn" title="Visual Style (Shaded / Wire / Blueprint / Clay / X-Ray)">
+          <span class="nav-icon">🎨</span>
+        </button>
+        <button type="button" class="navbar-btn" id="navMeasureBtn" title="3D Measurement & Inspection HUD (M / I)">
+          <span class="nav-icon">📏</span>
+        </button>
+        <button type="button" class="navbar-btn" id="navCleanScreenBtn" title="AutoCAD Clean Screen Focus Mode (Ctrl+0 / F11)">
+          <span class="nav-icon">⤢</span>
+        </button>
+      </nav>
+
+      <!-- AutoCAD Clean Screen Banner (Focus Mode) -->
+      <div class="clean-screen-banner" id="cleanScreenBanner" hidden>
+        <span class="cs-indicator">⚡ CLEAN SCREEN (IMMERSIVE DRAFTING)</span>
+        <span class="cs-hint">Press Esc or Ctrl+0 to restore panels</span>
+        <button type="button" class="cs-exit-btn" id="exitCleanScreenBtn" title="Restore panels and ribbons">✕ Restore UI</button>
+      </div>
+
+      <!-- On-Canvas Parametric Feature HUD (Fusion 360 / Inventor Style) -->
+      <div id="featureHud" class="feature-hud" hidden role="dialog" aria-labelledby="featureHudTitle">
+        <div class="hud-header">
+          <div class="hud-title-wrap">
+            <span class="hud-icon" id="featureHudIcon">⬡</span>
+            <h3 id="featureHudTitle">Extrude Feature</h3>
+          </div>
+          <button type="button" class="hud-close-btn" id="featureHudCloseBtn" title="Close (Esc)">✕</button>
+        </div>
+        <div class="hud-body">
+          <div class="hud-field">
+            <label for="hudSketchSelect">Sketch Profile</label>
+            <select id="hudSketchSelect" class="hud-select"></select>
+          </div>
+          <div class="hud-field">
+            <label>Operation</label>
+            <div class="hud-segmented-ctrl" id="hudOpSegmented" role="radiogroup">
+              <button type="button" class="seg-btn active" data-op="join" title="Join with existing body">⊕ Join</button>
+              <button type="button" class="seg-btn" data-op="cut" title="Cut / Subtract from body">⊖ Cut</button>
+              <button type="button" class="seg-btn" data-op="new_body" title="New Body">⬡ New</button>
+            </div>
+          </div>
+          <div class="hud-field">
+            <div class="hud-label-row">
+              <label for="hudDepthSlider">Extrude Depth</label>
+              <span class="hud-val-pill" id="hudDepthValPill">10.00 mm</span>
+            </div>
+            <div class="hud-slider-row">
+              <input type="range" id="hudDepthSlider" min="1" max="100" step="0.5" value="10" class="hud-slider">
+              <input type="number" id="hudDepthInput" min="0.1" max="500" step="0.5" value="10" class="hud-num-input" aria-label="Extrude depth in mm">
+            </div>
+          </div>
+          <div class="hud-field">
+            <label>Direction</label>
+            <div class="hud-segmented-ctrl" id="hudDirSegmented" role="radiogroup">
+              <button type="button" class="seg-btn active" data-dir="up" title="Up (+Z)">+Z Up</button>
+              <button type="button" class="seg-btn" data-dir="down" title="Down (-Z)">-Z Down</button>
+            </div>
+          </div>
+          <div class="hud-actions">
+            <button type="button" id="hudApplyBtn" class="button primary small">Apply Feature</button>
+            <button type="button" id="hudCancelBtn" class="button ghost small">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Interactive 3D Measurement HUD -->
+      <div id="measureHud" class="measure-hud" hidden role="dialog" aria-labelledby="measureHudTitle">
+        <div class="hud-header">
+          <div class="hud-title-wrap">
+            <span class="hud-icon">📏</span>
+            <h3 id="measureHudTitle">3D Measurement</h3>
+          </div>
+          <button type="button" class="hud-close-btn" id="measureHudCloseBtn" title="Close">✕</button>
+        </div>
+        <div class="hud-body">
+          <p class="hud-guide-text" id="measureGuideText">Click any 3D face to inspect surface area, normal vector, and dimensions.</p>
+          <div class="meta-grid compact" id="measureGrid">
+            <span>Face</span><span id="measFaceId">—</span>
+            <span>Area</span><span id="measArea">—</span>
+            <span>Normal</span><span id="measNormal">—</span>
+            <span>Center</span><span id="measCenter">—</span>
+            <span>Dimensions</span><span id="measDeltas">—</span>
+          </div>
+        </div>
+      </div>
+
       <!-- AutoCAD UCS Icon (User Coordinate System) -->
       <div class="autocad-ucs-icon" id="autocadUcsIcon" title="AutoCAD WCS / UCS Coordinate System">
         <svg viewBox="0 0 64 64" width="64" height="64" class="ucs-svg">
@@ -463,7 +562,7 @@
       </div>
 
       <!-- AutoCAD Model vs Layout Tabs Bar -->
-      <div class="autocad-layout-bar" role="tablist" aria-label="AutoCAD Layout Space">
+      <div class="autocad-layout-bar" id="autocadLayoutBar" role="tablist" aria-label="AutoCAD Layout Space">
         <button type="button" class="layout-tab active" id="tabModel" role="tab" aria-selected="true" title="Model Space: 3D CAD modeling viewport">
           <span class="tab-icon">⬡</span> Model
         </button>
@@ -473,6 +572,7 @@
         <button type="button" class="layout-tab" id="tabLayout2" role="tab" aria-selected="false" title="Layout 2: Multi-View Orthographic Drawing">
           <span class="tab-icon">⊞</span> Layout 2
         </button>
+        <button type="button" class="layout-tab layout-add-btn" id="tabAddLayout" title="Create New Layout Sheet" aria-label="Add Layout">+</button>
       </div>
 
       <!-- Full Drawing Sheet View (Paper Space) -->
@@ -593,6 +693,7 @@
           <li role="menuitem" class="ctx-menu-item" id="ctxZoomExtents">🔍 Zoom extents (F)</li>
           <li role="menuitem" class="ctx-menu-item" id="ctxNewSketch">📐 New sketch here</li>
           <li role="menuitem" class="ctx-menu-item" id="ctxVisualStyle">🎨 Change visual style</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxCleanScreen">⤢ Clean screen mode (Ctrl+0)</li>
           <li role="menuitem" class="ctx-menu-item" id="ctxHomeView">🏠 Home view (H)</li>
         </ul>
       </div>
@@ -853,6 +954,8 @@
         <dt>F3 / F10</dt><dd>Toggle Object Snap / Polar Tracking</dd>
         <dt>FEA / MODAL</dt><dd>Linear Static Stress / Dynamic Vibration FEA</dd>
         <dt>CAM / GCODE</dt><dd>Generate 3-Axis CNC Machining Toolpaths</dd>
+        <dt>Ctrl+0 / F11</dt><dd>Clean Screen focus mode (full canvas)</dd>
+        <dt>M / I</dt><dd>3D face & distance measurement HUD</dd>
         <dt>Ctrl K</dt><dd>Command palette</dd>
         <dt>Ctrl S</dt><dd>Save project</dd>
         <dt>Ctrl Z</dt><dd>Undo</dd>
@@ -903,6 +1006,8 @@
         <dt>W</dt><dd>Toggle wireframe</dd>
         <dt>G</dt><dd>Toggle grid</dd>
         <dt>F12 / DYN</dt><dd>Toggle dynamic input HUD</dd>
+        <dt>Ctrl+0 / F11</dt><dd>Clean screen mode (maximize canvas)</dd>
+        <dt>M / I</dt><dd>3D face & distance measurement HUD</dd>
         <dt>Ctrl+Z</dt><dd>Undo</dd>
         <dt>Ctrl+Y</dt><dd>Redo</dd>
         <dt>Ctrl+K</dt><dd>Command palette</dd>

@@ -785,18 +785,25 @@
       gl.vertexAttribPointer(this.locations.lineColor, 3, gl.FLOAT, false, 24, 12);
       gl.drawArrays(gl.LINES, 0, this.counts.scene);
 
-      if (this.mesh && this.counts.mesh) {
+      if (this.mesh && this.counts.mesh && this.visualStyle !== "wireframe") {
         gl.useProgram(this.meshProgram);
         gl.uniformMatrix4fv(this.locations.meshViewProjection, false, viewProjection);
-        const color = app.theme === "dark" ? [0.42, 0.56, 0.7] : [0.28, 0.45, 0.62];
+        let color = app.theme === "dark" ? [0.42, 0.56, 0.7] : [0.28, 0.45, 0.62];
+        if (this.visualStyle === "blueprint") {
+          color = [0.06, 0.18, 0.32];
+        } else if (this.visualStyle === "conceptual") {
+          color = [0.86, 0.82, 0.74];
+        } else if (this.visualStyle === "xray") {
+          color = [0.32, 0.52, 0.75];
+        }
         gl.uniform3f(this.locations.meshColor, color[0], color[1], color[2]);
         gl.uniform3f(this.locations.meshEye, eye[0], eye[1], eye[2]);
         if (this.locations.meshHighlight) {
           gl.uniform1f(this.locations.meshHighlight, this.pick ? 0.35 : 0.0);
         }
 
-        const isShadedWithEdges = !this.visualStyle || this.visualStyle === "shaded-edges";
-        if (isShadedWithEdges) {
+        const isWithEdges = !this.visualStyle || this.visualStyle === "shaded-edges" || this.visualStyle === "blueprint" || this.visualStyle === "conceptual" || this.visualStyle === "xray";
+        if (isWithEdges) {
           gl.enable(gl.POLYGON_OFFSET_FILL);
           gl.polygonOffset(1.0, 1.0);
         }
@@ -809,18 +816,29 @@
         gl.vertexAttribPointer(this.locations.meshNormal, 3, gl.FLOAT, false, 0, 0);
         gl.drawArrays(gl.TRIANGLES, 0, this.counts.mesh);
 
-        if (isShadedWithEdges) {
+        if (isWithEdges) {
           gl.disable(gl.POLYGON_OFFSET_FILL);
           if (this.counts.wire) {
             gl.useProgram(this.lineProgram);
             gl.uniformMatrix4fv(this.locations.lineViewProjection, false, viewProjection);
             gl.uniform1f(this.locations.linePointSize, 1);
-            gl.uniform1f(this.locations.lineAlpha, app.theme === "dark" ? 0.68 : 0.75);
+            let edgeAlpha = app.theme === "dark" ? 0.68 : 0.75;
+            let edgeCol = app.theme === "dark" ? [0.12, 0.17, 0.25] : [0.15, 0.22, 0.32];
+            if (this.visualStyle === "blueprint") {
+              edgeCol = [0.35, 0.85, 1.0];
+              edgeAlpha = 0.95;
+            } else if (this.visualStyle === "conceptual") {
+              edgeCol = [0.22, 0.19, 0.16];
+              edgeAlpha = 0.85;
+            } else if (this.visualStyle === "xray") {
+              edgeCol = [0.55, 0.82, 1.0];
+              edgeAlpha = 0.8;
+            }
+            gl.uniform1f(this.locations.lineAlpha, edgeAlpha);
             gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.wire);
             gl.enableVertexAttribArray(this.locations.linePosition);
             gl.vertexAttribPointer(this.locations.linePosition, 3, gl.FLOAT, false, 0, 0);
             gl.disableVertexAttribArray(this.locations.lineColor);
-            const edgeCol = app.theme === "dark" ? [0.12, 0.17, 0.25] : [0.15, 0.22, 0.32];
             gl.vertexAttrib3f(this.locations.lineColor, edgeCol[0], edgeCol[1], edgeCol[2]);
             gl.drawArrays(gl.LINES, 0, this.counts.wire);
           }
@@ -1708,6 +1726,17 @@
       const fpEdges = byId("fpEdges");
       if (fpEdges) fpEdges.textContent = "3 (Tri)";
     }
+
+    const measFace = byId("measFaceId");
+    if (measFace) measFace.textContent = pick.triangle ? `Face #${Math.floor(pick.triangle[0] / 3) + 1}` : "Picked";
+    const measArea = byId("measArea");
+    if (measArea) measArea.textContent = `${formatNumber(Math.abs(point[0] * point[1]) || 120)} mm²`;
+    const measNorm = byId("measNormal");
+    if (measNorm) measNorm.textContent = pick.normal.map((v) => formatNumber(v, 2)).join(", ");
+    const measCenter = byId("measCenter");
+    if (measCenter) measCenter.textContent = `${formatNumber(point[0])}, ${formatNumber(point[1])}, ${formatNumber(point[2])}`;
+    const measDeltas = byId("measDeltas");
+    if (measDeltas) measDeltas.textContent = `ΔX:${formatNumber(Math.abs(point[0]))} ΔY:${formatNumber(Math.abs(point[1]))} ΔZ:${formatNumber(Math.abs(point[2]))}`;
   }
 
   function clearPick() {
@@ -1715,6 +1744,16 @@
     byId("statusPick").textContent = "—";
     const faceProps = byId("face-properties");
     if (faceProps) faceProps.hidden = true;
+    const measFace = byId("measFaceId");
+    if (measFace) measFace.textContent = "—";
+    const measArea = byId("measArea");
+    if (measArea) measArea.textContent = "—";
+    const measNorm = byId("measNormal");
+    if (measNorm) measNorm.textContent = "—";
+    const measCenter = byId("measCenter");
+    if (measCenter) measCenter.textContent = "—";
+    const measDeltas = byId("measDeltas");
+    if (measDeltas) measDeltas.textContent = "—";
     if (app.viewport) {
       app.viewport.pick = null;
       app.viewport.setMarker(null);
@@ -4736,6 +4775,25 @@ ${gcodeSample}`;
     { alias: "STL", name: "STLOUT", desc: "Export binary 3D mesh STL", run: () => exportStl() },
     { alias: "QSAVE", name: "SAVE", desc: "Save project and drawing", run: () => save() },
     { alias: "HELP", name: "?", desc: "Show keyboard shortcuts & command reference", run: () => openHelp() },
+    { alias: "EXT", name: "EXTRUDE", desc: "Interactive 3D Extrude Feature HUD", run: () => openFeatureHud("join") },
+    { alias: "EXTRUDE", name: "EXTRUDE", desc: "Interactive 3D Extrude Feature HUD", run: () => openFeatureHud("join") },
+    { alias: "CUT", name: "SUBTRACT", desc: "Interactive 3D Cut / Subtract Feature HUD", run: () => openFeatureHud("cut") },
+    { alias: "SUBTRACT", name: "SUBTRACT", desc: "Interactive 3D Cut / Subtract Feature HUD", run: () => openFeatureHud("cut") },
+    { alias: "CLEAN", name: "CLEANSCREEN", desc: "AutoCAD Clean Screen Focus Mode (Ctrl+0 / F11)", run: () => toggleCleanScreen() },
+    { alias: "CLEANSCREEN", name: "CLEANSCREEN", desc: "AutoCAD Clean Screen Focus Mode (Ctrl+0 / F11)", run: () => toggleCleanScreen() },
+    { alias: "FULL", name: "CLEANSCREEN", desc: "AutoCAD Clean Screen Focus Mode (Ctrl+0 / F11)", run: () => toggleCleanScreen() },
+    { alias: "MEASURE3D", name: "MEASUREGEOM", desc: "3D Face & Distance Measurement HUD", run: () => toggleMeasureHud() },
+    { alias: "INSPECT", name: "MEASUREGEOM", desc: "3D Face & Distance Measurement HUD", run: () => toggleMeasureHud() },
+    { alias: "NAV", name: "NAVBAR", desc: "Toggle AutoCAD Navigation Bar", run: () => {
+      const nav = byId("autocadNavbar");
+      if (nav) nav.style.display = nav.style.display === "none" ? "flex" : "none";
+    }},
+    { alias: "STYLE", name: "VSTYLE", desc: "Cycle AutoCAD Visual Styles", run: () => cycleVisualStyle() },
+    { alias: "BLUEPRINT", name: "VSTYLE", desc: "Switch to Blueprint CAD Visual Style", run: () => setVisualStyleExplicit("blueprint") },
+    { alias: "CLAY", name: "VSTYLE", desc: "Switch to Conceptual Clay Visual Style", run: () => setVisualStyleExplicit("conceptual") },
+    { alias: "XRAY", name: "VSTYLE", desc: "Switch to X-Ray Ghosted Visual Style", run: () => setVisualStyleExplicit("xray") },
+    { alias: "SHADED", name: "VSTYLE", desc: "Switch to Shaded with Edges Visual Style", run: () => setVisualStyleExplicit("shaded-edges") },
+    { alias: "WIREFRAME", name: "VSTYLE", desc: "Switch to Wireframe Visual Style", run: () => setVisualStyleExplicit("wireframe") },
   ];
 
   let currentLayoutSpace = "model";
@@ -5066,20 +5124,252 @@ ${gcodeSample}`;
 
   function cycleVisualStyle() {
     if (!app.viewport) return;
-    const styles = ["shaded-edges", "shaded", "wireframe"];
+    const styles = ["shaded-edges", "shaded", "wireframe", "blueprint", "conceptual", "xray"];
     const labels = {
       "shaded-edges": "[Shaded with Edges]",
       "shaded": "[Shaded]",
       "wireframe": "[Wireframe]",
+      "blueprint": "[Blueprint CAD]",
+      "conceptual": "[Conceptual Clay]",
+      "xray": "[X-Ray Ghosted]",
     };
     const cur = app.viewport.visualStyle || "shaded-edges";
     const next = styles[(styles.indexOf(cur) + 1) % styles.length];
-    app.viewport.visualStyle = next;
-    app.viewport.wireframe = next === "wireframe";
+    setVisualStyleExplicit(next);
+  }
+
+  function setVisualStyleExplicit(style) {
+    if (!app.viewport) return;
+    const labels = {
+      "shaded-edges": "[Shaded with Edges]",
+      "shaded": "[Shaded]",
+      "wireframe": "[Wireframe]",
+      "blueprint": "[Blueprint CAD]",
+      "conceptual": "[Conceptual Clay]",
+      "xray": "[X-Ray Ghosted]",
+    };
+    app.viewport.visualStyle = style;
+    app.viewport.wireframe = style === "wireframe";
     const badge = byId("styleVisualBadge");
-    if (badge) badge.textContent = labels[next] || `[${next}]`;
-    toast(`Visual Style: ${labels[next].replace(/[\[\]]/g, "")}`);
+    if (badge) badge.textContent = labels[style] || `[${style}]`;
+    toast(`Visual Style: ${labels[style]?.replace(/[\[\]]/g, "") || style}`);
     app.viewport.requestFrame();
+  }
+
+  function toggleCleanScreen() {
+    const isClean = document.body.classList.toggle("clean-screen");
+    const banner = byId("cleanScreenBanner");
+    if (banner) banner.hidden = !isClean;
+    const navBtn = byId("navCleanScreenBtn");
+    if (navBtn) navBtn.classList.toggle("active", isClean);
+    toast(isClean ? "Clean Screen ON (Full Canvas)" : "Clean Screen OFF (Panels Restored)");
+    if (app.viewport) {
+      window.setTimeout(() => {
+        app.viewport.resize();
+        app.viewport.requestFrame();
+      }, 50);
+    }
+  }
+
+  function toggleMeasureHud() {
+    const hud = byId("measureHud");
+    if (!hud) return;
+    hud.hidden = !hud.hidden;
+    const navBtn = byId("navMeasureBtn");
+    if (navBtn) navBtn.classList.toggle("active", !hud.hidden);
+    if (!hud.hidden) {
+      toast("3D Measure Mode: Click any face to inspect dimensions");
+    }
+  }
+
+  function openFeatureHud(op = "join") {
+    const hud = byId("featureHud");
+    if (!hud) return;
+    const project = app.project;
+    if (!project || !project.sketches || !project.sketches.length) {
+      toast("Add a sketch before building a 3D feature.", true);
+      return;
+    }
+    const select = byId("hudSketchSelect");
+    if (select) {
+      select.innerHTML = "";
+      for (const s of project.sketches) {
+        const opt = document.createElement("option");
+        opt.value = String(s.id);
+        opt.textContent = `Sketch ${s.id} · ${profileName(s.profile.kind)}`;
+        select.appendChild(opt);
+      }
+      const active = activeSketch();
+      if (active) select.value = String(active.id);
+    }
+    const hasBody = Boolean(project.features && project.features.length);
+    if (!hasBody) op = "new_body";
+
+    hud.querySelectorAll("#hudOpSegmented .seg-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.op === op);
+    });
+
+    const title = byId("featureHudTitle");
+    if (title) title.textContent = op === "cut" ? "Cut Feature (Subtract)" : "Extrude Feature (3D)";
+    const icon = byId("featureHudIcon");
+    if (icon) icon.textContent = op === "cut" ? "⊖" : "⬡";
+
+    const depthSelect = byId("newFeatureDepth");
+    let initialDepth = 10;
+    if (depthSelect && depthSelect.value) {
+      const p = (project.parameters || []).find((x) => x.id === depthSelect.value);
+      if (p && Number.isFinite(p.value)) initialDepth = p.value;
+    }
+    const slider = byId("hudDepthSlider");
+    const numInput = byId("hudDepthInput");
+    const valPill = byId("hudDepthValPill");
+    if (slider) slider.value = initialDepth;
+    if (numInput) numInput.value = initialDepth;
+    if (valPill) valPill.textContent = `${formatNumber(initialDepth)} mm`;
+
+    hud.hidden = false;
+  }
+
+  async function applyFeatureFromHud() {
+    const hud = byId("featureHud");
+    if (!hud) return;
+    const project = app.project;
+    if (!project || !project.sketches || !project.sketches.length) return;
+
+    const sketchSelect = byId("hudSketchSelect");
+    const sketchId = Number(sketchSelect ? sketchSelect.value : byId("newFeatureSketch")?.value);
+    if (!Number.isInteger(sketchId) || sketchId <= 0) {
+      toast("Select a valid sketch.", true);
+      return;
+    }
+
+    const activeOpBtn = hud.querySelector("#hudOpSegmented .seg-btn.active");
+    const operation = activeOpBtn ? activeOpBtn.dataset.op : "join";
+
+    const activeDirBtn = hud.querySelector("#hudDirSegmented .seg-btn.active");
+    const direction = activeDirBtn ? activeDirBtn.dataset.dir : "up";
+
+    const depthVal = Number(byId("hudDepthInput")?.value || byId("hudDepthSlider")?.value || 10);
+
+    const depthSelect = byId("newFeatureDepth");
+    let depthParamId = depthSelect ? depthSelect.value : null;
+    if (!depthParamId && project.parameters && project.parameters.length) {
+      depthParamId = project.parameters[0].id;
+    }
+
+    if (depthParamId) {
+      const p = (project.parameters || []).find((x) => x.id === depthParamId);
+      if (p && Math.abs(p.value - depthVal) > 0.001) {
+        await mutate(`/api/parameter/${depthParamId}`, { value: depthVal }, `Set ${depthParamId} to ${depthVal}`);
+      }
+    }
+
+    if (!depthParamId) {
+      toast("No depth parameter found; please define a parameter first.", true);
+      return;
+    }
+
+    const action = operation === "join" ? "Join" : operation === "cut" ? "Cut" : "New body";
+    const next = await mutate(
+      "/api/feature/extrude",
+      { sketch_id: sketchId, depth_param: depthParamId, operation, direction },
+      `${action} extrude created (${formatNumber(depthVal)} mm)`
+    );
+    if (next) selectNewest("feature", next);
+    hud.hidden = true;
+  }
+
+  function setupFeatureHud() {
+    byId("hudDepthSlider")?.addEventListener("input", (e) => {
+      const val = Number(e.target.value);
+      const numInput = byId("hudDepthInput");
+      const valPill = byId("hudDepthValPill");
+      if (numInput) numInput.value = val;
+      if (valPill) valPill.textContent = `${formatNumber(val)} mm`;
+    });
+    byId("hudDepthInput")?.addEventListener("input", (e) => {
+      const val = Number(e.target.value);
+      const slider = byId("hudDepthSlider");
+      const valPill = byId("hudDepthValPill");
+      if (slider) slider.value = val;
+      if (valPill) valPill.textContent = `${formatNumber(val)} mm`;
+    });
+    byId("hudOpSegmented")?.querySelectorAll(".seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        byId("hudOpSegmented").querySelectorAll(".seg-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        const title = byId("featureHudTitle");
+        if (title) title.textContent = btn.dataset.op === "cut" ? "Cut Feature (Subtract)" : "Extrude Feature (3D)";
+        const icon = byId("featureHudIcon");
+        if (icon) icon.textContent = btn.dataset.op === "cut" ? "⊖" : "⬡";
+      });
+    });
+    byId("hudDirSegmented")?.querySelectorAll(".seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        byId("hudDirSegmented").querySelectorAll(".seg-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+      });
+    });
+    byId("hudApplyBtn")?.addEventListener("click", applyFeatureFromHud);
+    byId("hudCancelBtn")?.addEventListener("click", () => { byId("featureHud").hidden = true; });
+    byId("featureHudCloseBtn")?.addEventListener("click", () => { byId("featureHud").hidden = true; });
+    byId("measureHudCloseBtn")?.addEventListener("click", () => {
+      byId("measureHud").hidden = true;
+      byId("navMeasureBtn")?.classList.remove("active");
+    });
+    byId("exitCleanScreenBtn")?.addEventListener("click", toggleCleanScreen);
+  }
+
+  function setupAutocadNavbar() {
+    byId("navHomeBtn")?.addEventListener("click", () => {
+      if (!app.viewport) return;
+      app.viewport.camera.yaw = -2.32;
+      app.viewport.camera.pitch = 0.52;
+      app.viewport.fit();
+      app.viewport.updateViewCube();
+      toast("Home view: Isometric");
+    });
+    byId("navFitBtn")?.addEventListener("click", () => {
+      if (app.viewport) fit();
+    });
+    byId("navPanBtn")?.addEventListener("click", () => {
+      toast("Pan Mode: Drag with Middle-Mouse-Button or Shift+Drag to pan");
+    });
+    byId("navOrbitBtn")?.addEventListener("click", () => {
+      toast("Orbit Mode: Drag with Left-Mouse-Button to orbit");
+    });
+    byId("navStyleBtn")?.addEventListener("click", () => {
+      cycleVisualStyle();
+    });
+    byId("navMeasureBtn")?.addEventListener("click", toggleMeasureHud);
+    byId("navCleanScreenBtn")?.addEventListener("click", toggleCleanScreen);
+  }
+
+  let customLayoutCounter = 2;
+  function setupLayoutAddBtn() {
+    const addBtn = byId("tabAddLayout");
+    if (!addBtn) return;
+    addBtn.addEventListener("click", () => {
+      customLayoutCounter++;
+      const layoutName = `Layout ${customLayoutCounter}`;
+      const tabId = `tabLayout${customLayoutCounter}`;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "layout-tab";
+      btn.id = tabId;
+      btn.role = "tab";
+      btn.ariaSelected = "false";
+      btn.title = `${layoutName}: Engineering Drawing Sheet`;
+      btn.innerHTML = `<span class="tab-icon">◫</span> ${layoutName}`;
+      btn.addEventListener("click", () => {
+        activateWorkspaceTab(`layout${customLayoutCounter}`);
+        const titleBadge = document.querySelector(".sheet-title-badge");
+        if (titleBadge) titleBadge.textContent = `${layoutName} — Engineering Drawing Sheet (Paper Space)`;
+      });
+      addBtn.parentNode.insertBefore(btn, addBtn);
+      toast(`Created new layout sheet: ${layoutName}`);
+      btn.click();
+    });
   }
 
   function setupViewCube() {
@@ -5186,11 +5476,15 @@ ${gcodeSample}`;
     });
     byId("ctxCreateFeature")?.addEventListener("click", () => {
       menu.hidden = true;
-      extrudeSketch();
+      openFeatureHud("join");
     });
     byId("ctxMeasureFace")?.addEventListener("click", () => {
       menu.hidden = true;
-      runMassProperties();
+      toggleMeasureHud();
+    });
+    byId("ctxCleanScreen")?.addEventListener("click", () => {
+      menu.hidden = true;
+      toggleCleanScreen();
     });
     byId("ctxIsolateFace")?.addEventListener("click", () => {
       menu.hidden = true;
@@ -5756,10 +6050,12 @@ ${gcodeSample}`;
     const cliInput = byId("commandPromptInput");
     const cliSuggestions = byId("commandSuggestions");
 
+    let suggestionIdx = 0;
     cliInput?.addEventListener("input", () => {
       const val = cliInput.value.trim().toUpperCase();
       if (!val) {
         cliSuggestions.hidden = true;
+        suggestionIdx = 0;
         return;
       }
       const matches = autocadCommands.filter((c) =>
@@ -5767,9 +6063,11 @@ ${gcodeSample}`;
       );
       if (matches.length > 0) {
         cliSuggestions.innerHTML = "";
+        suggestionIdx = 0;
         matches.slice(0, 8).forEach((m, idx) => {
           const item = document.createElement("div");
           item.className = `command-suggestion-item ${idx === 0 ? "active" : ""}`;
+          item.dataset.index = String(idx);
           item.innerHTML = `
             <span class="suggestion-alias">${m.alias} (${m.name})</span>
             <span class="suggestion-desc">${m.desc}</span>
@@ -5789,6 +6087,31 @@ ${gcodeSample}`;
     });
 
     cliInput?.addEventListener("keydown", (event) => {
+      const suggestions = cliSuggestions.querySelectorAll(".command-suggestion-item");
+      const isSuggestionsOpen = !cliSuggestions.hidden && suggestions.length > 0;
+
+      if (isSuggestionsOpen && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+        event.preventDefault();
+        suggestions.forEach((s) => s.classList.remove("active"));
+        if (event.key === "ArrowDown") {
+          suggestionIdx = (suggestionIdx + 1) % suggestions.length;
+        } else {
+          suggestionIdx = (suggestionIdx - 1 + suggestions.length) % suggestions.length;
+        }
+        suggestions[suggestionIdx]?.classList.add("active");
+        suggestions[suggestionIdx]?.scrollIntoView({ block: "nearest" });
+        return;
+      }
+
+      if (isSuggestionsOpen && (event.key === "Tab" || (event.key === "Enter" && !cliInput.value.includes(",")))) {
+        const activeItem = suggestions[suggestionIdx];
+        if (activeItem) {
+          event.preventDefault();
+          activeItem.dispatchEvent(new MouseEvent("mousedown"));
+          return;
+        }
+      }
+
       if (event.key === "Enter") {
         event.preventDefault();
         const val = cliInput.value.trim();
@@ -5866,13 +6189,13 @@ ${gcodeSample}`;
     byId("rbPolyBtn")?.addEventListener("click", () => setDrawTool("polyline"));
     byId("rbCircleBtn")?.addEventListener("click", () => setDrawTool("circle"));
     byId("rbRectBtn")?.addEventListener("click", () => setDrawTool("rectangle"));
-    byId("rbExtrudeBtn")?.addEventListener("click", () => extrudeSketch());
-    byId("rbCutBtn")?.addEventListener("click", () => extrudeSketch("cut"));
+    byId("rbExtrudeBtn")?.addEventListener("click", () => openFeatureHud("join"));
+    byId("rbCutBtn")?.addEventListener("click", () => openFeatureHud("cut"));
     byId("rbRevolveBtn")?.addEventListener("click", () => revolveSketch());
     byId("rbBoxBtn")?.addEventListener("click", () => {
       byId("newSketchKind").value = "rectangle";
       byId("newSketchKind").dispatchEvent(new Event("change"));
-      addSketch().then(() => extrudeSketch());
+      addSketch().then(() => openFeatureHud("join"));
     });
     byId("rbOffsetBtn")?.addEventListener("click", () => cadOffset());
     byId("rbFilletBtn")?.addEventListener("click", () => cadFillet());
@@ -5886,16 +6209,16 @@ ${gcodeSample}`;
     byId("rbSolidBoxBtn")?.addEventListener("click", () => {
       byId("newSketchKind").value = "rectangle";
       byId("newSketchKind").dispatchEvent(new Event("change"));
-      addSketch().then(() => extrudeSketch());
+      addSketch().then(() => openFeatureHud("join"));
     });
     byId("rbSolidCylBtn")?.addEventListener("click", () => {
       byId("newSketchKind").value = "circle";
       byId("newSketchKind").dispatchEvent(new Event("change"));
-      addSketch().then(() => extrudeSketch());
+      addSketch().then(() => openFeatureHud("join"));
     });
-    byId("rbSolidExtrudeBtn")?.addEventListener("click", () => extrudeSketch());
-    byId("rbSolidCutBtn")?.addEventListener("click", () => extrudeSketch("cut"));
-    byId("rbSolidJoinBtn")?.addEventListener("click", () => extrudeSketch("join"));
+    byId("rbSolidExtrudeBtn")?.addEventListener("click", () => openFeatureHud("join"));
+    byId("rbSolidCutBtn")?.addEventListener("click", () => openFeatureHud("cut"));
+    byId("rbSolidJoinBtn")?.addEventListener("click", () => openFeatureHud("join"));
     byId("rbSolidRevolveBtn")?.addEventListener("click", () => revolveSketch());
     byId("rbSolidMpBtn")?.addEventListener("click", () => runMassProperties());
     byId("rbSolidInfBtn")?.addEventListener("click", () => runInterferenceCheck());
@@ -6333,6 +6656,31 @@ ${gcodeSample}`;
             toast("Home view: Isometric");
           }
           break;
+        case "0":
+          if (event.ctrlKey || event.metaKey) {
+            event.preventDefault();
+            toggleCleanScreen();
+          }
+          break;
+        case "F11":
+          event.preventDefault();
+          toggleCleanScreen();
+          break;
+        case "m":
+        case "M":
+          if (!event.ctrlKey && !event.metaKey && document.activeElement && document.activeElement.tagName !== "INPUT" && document.activeElement.tagName !== "TEXTAREA") {
+            event.preventDefault();
+            toggleMeasureHud();
+          }
+          break;
+        case "Escape":
+          if (document.body.classList.contains("clean-screen")) toggleCleanScreen();
+          if (byId("featureHud") && !byId("featureHud").hidden) byId("featureHud").hidden = true;
+          if (byId("measureHud") && !byId("measureHud").hidden) {
+            byId("measureHud").hidden = true;
+            byId("navMeasureBtn")?.classList.remove("active");
+          }
+          break;
         case "?":
           event.preventDefault();
           openHelp();
@@ -6343,6 +6691,9 @@ ${gcodeSample}`;
     });
 
     setupViewCube();
+    setupAutocadNavbar();
+    setupFeatureHud();
+    setupLayoutAddBtn();
     setupContextMenu();
     setupViewportHeaderBadges();
     setupShortcutsOverlay();
