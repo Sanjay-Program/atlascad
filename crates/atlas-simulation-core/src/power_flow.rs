@@ -15,6 +15,127 @@ pub enum BusType {
     PqLoad,
 }
 
+/// Complex number representation for AC electrical impedance and admittance.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ComplexNumber {
+    pub re: f64,
+    pub im: f64,
+}
+
+impl ComplexNumber {
+    pub const ZERO: Self = Self { re: 0.0, im: 0.0 };
+
+    pub const fn new(re: f64, im: f64) -> Self {
+        Self { re, im }
+    }
+
+    pub fn magnitude(self) -> f64 {
+        (self.re * self.re + self.im * self.im).sqrt()
+    }
+
+    pub fn inv(self) -> Result<Self, String> {
+        let denom = self.re * self.re + self.im * self.im;
+        if denom < 1e-15 {
+            return Err("Division by zero in complex admittance calculation".to_string());
+        }
+        Ok(Self {
+            re: self.re / denom,
+            im: -self.im / denom,
+        })
+    }
+}
+
+impl std::ops::Add for ComplexNumber {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+        Self {
+            re: self.re + other.re,
+            im: self.im + other.im,
+        }
+    }
+}
+
+impl std::ops::AddAssign for ComplexNumber {
+    fn add_assign(&mut self, other: Self) {
+        self.re += other.re;
+        self.im += other.im;
+    }
+}
+
+impl std::ops::Sub for ComplexNumber {
+    type Output = Self;
+    fn sub(self, other: Self) -> Self {
+        Self {
+            re: self.re - other.re,
+            im: self.im - other.im,
+        }
+    }
+}
+
+impl std::ops::Mul for ComplexNumber {
+    type Output = Self;
+    fn mul(self, other: Self) -> Self {
+        Self {
+            re: self.re * other.re - self.im * other.im,
+            im: self.re * other.im + self.im * other.re,
+        }
+    }
+}
+
+/// Constructs the complex Bus Admittance Matrix Y_bus for a grid network.
+pub fn build_bus_admittance_matrix(
+    num_buses: usize,
+    lines: &[TransmissionLine],
+) -> Result<Vec<Vec<ComplexNumber>>, String> {
+    if num_buses == 0 {
+        return Err("Grid requires at least one bus".to_string());
+    }
+
+    let mut y_bus = vec![vec![ComplexNumber::ZERO; num_buses]; num_buses];
+
+    for line in lines {
+        if line.from_bus >= num_buses || line.to_bus >= num_buses {
+            return Err(format!(
+                "Line connects invalid bus indices ({}, {}) for grid with {} buses",
+                line.from_bus, line.to_bus, num_buses
+            ));
+        }
+
+        // Impedance z = r + jx
+        let z = ComplexNumber::new(line.resistance_pu, line.reactance_pu);
+        // Admittance y = 1 / z = (r - jx) / (r^2 + x^2)
+        let y = z.inv()?;
+
+        if line.from_bus != line.to_bus {
+            // Off-diagonal: Y_ij = -y
+            let neg_y = ComplexNumber::new(-y.re, -y.im);
+            y_bus[line.from_bus][line.to_bus] += neg_y;
+            y_bus[line.to_bus][line.from_bus] += neg_y;
+
+            // Diagonal: Y_ii += y
+            y_bus[line.from_bus][line.from_bus] += y;
+            y_bus[line.to_bus][line.to_bus] += y;
+        } else {
+            // Shunt element connected to ground
+            y_bus[line.from_bus][line.from_bus] += y;
+        }
+    }
+
+    Ok(y_bus)
+}
+
+/// Computes the Frobenius norm of the complex Y_bus matrix: sqrt(sum(|Y_ij|^2)).
+pub fn y_bus_frobenius_norm(y_bus: &[Vec<ComplexNumber>]) -> f64 {
+    let mut sum_sq = 0.0;
+    for row in y_bus {
+        for elem in row {
+            let mag = elem.magnitude();
+            sum_sq += mag * mag;
+        }
+    }
+    sum_sq.sqrt()
+}
+
 /// AC transmission line between two buses.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TransmissionLine {
@@ -76,6 +197,17 @@ pub fn solve_power_flow(prob: &PowerFlowProblem) -> Result<SimulationResult, Str
         p_transferred_analytical,
     );
 
+    // Construct Bus Admittance Matrix Y_bus for grid network
+    let num_buses = prob
+        .lines
+        .iter()
+        .map(|l| l.from_bus.max(l.to_bus) + 1)
+        .max()
+        .unwrap_or(2)
+        .max(2);
+    let y_bus = build_bus_admittance_matrix(num_buses, &prob.lines)?;
+    let y_norm = y_bus_frobenius_norm(&y_bus);
+
     let mut metrics = HashMap::new();
     metrics.insert("receiving_bus_voltage_pu".to_string(), v2);
     metrics.insert("voltage_drop_pu".to_string(), delta_v);
@@ -83,6 +215,12 @@ pub fn solve_power_flow(prob: &PowerFlowProblem) -> Result<SimulationResult, Str
     metrics.insert("transmission_loss_mw".to_string(), p_loss_mw);
     metrics.insert("total_generation_mw".to_string(), p_gen_mw);
     metrics.insert("line_current_pu".to_string(), current_i_pu);
+    metrics.insert("num_buses".to_string(), num_buses as f64);
+    metrics.insert("ybus_frobenius_norm".to_string(), y_norm);
+    if let Some(diag) = y_bus.first().and_then(|row| row.first()) {
+        metrics.insert("y00_conductance_g".to_string(), diag.re);
+        metrics.insert("y00_susceptance_b".to_string(), diag.im);
+    }
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, delta_v.abs(), 1, 1e-4);
@@ -101,6 +239,10 @@ pub fn solve_power_flow(prob: &PowerFlowProblem) -> Result<SimulationResult, Str
             "Transmission Losses: {:.3} MW ({:.2}% of load)",
             p_loss_mw,
             (p_loss_mw / prob.p_load_mw.max(1e-4)) * 100.0
+        ),
+        format!(
+            "Bus Admittance Matrix Y_bus ({}x{}): Frobenius Norm = {:.4} p.u.",
+            num_buses, num_buses, y_norm
         ),
     ];
 
@@ -149,6 +291,47 @@ mod tests {
             .unwrap_or(0.0);
         assert!(v2 > 0.90 && v2 < 1.0);
         assert!(losses > 0.0);
+        let y_norm = res
+            .scalar_metrics
+            .get("ybus_frobenius_norm")
+            .copied()
+            .unwrap_or(0.0);
+        assert!(y_norm > 0.0);
+        Ok(())
+    }
+
+    #[test]
+    fn test_bus_admittance_matrix_construction() -> Result<(), String> {
+        let lines = vec![
+            TransmissionLine {
+                from_bus: 0,
+                to_bus: 1,
+                resistance_pu: 0.01,
+                reactance_pu: 0.05,
+            },
+            TransmissionLine {
+                from_bus: 1,
+                to_bus: 2,
+                resistance_pu: 0.02,
+                reactance_pu: 0.08,
+            },
+        ];
+
+        let y_bus = build_bus_admittance_matrix(3, &lines)?;
+        assert_eq!(y_bus.len(), 3);
+        assert_eq!(y_bus[0].len(), 3);
+
+        // Reciprocal symmetry: Y_01 == Y_10
+        assert!((y_bus[0][1].re - y_bus[1][0].re).abs() < 1e-9);
+        assert!((y_bus[0][1].im - y_bus[1][0].im).abs() < 1e-9);
+
+        // Diagonal elements must have positive real conductance
+        assert!(y_bus[0][0].re > 0.0);
+        assert!(y_bus[1][1].re > 0.0);
+        assert!(y_bus[2][2].re > 0.0);
+
+        let norm = y_bus_frobenius_norm(&y_bus);
+        assert!(norm > 0.0);
         Ok(())
     }
 }

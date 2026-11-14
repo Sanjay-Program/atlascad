@@ -13,10 +13,10 @@
 | Phase | Title | Focus Disciplines | Status |
 |---|---|---|---|
 | **Phase 1** | Universal Engineering Foundation | Core data model, units, material database, dependency graph | **Complete / Baseline Verified** |
-| **Phase 2** | Additive Manufacturing & Slicing Platform | FDM/SLA/SLS slicing, infill generators, 3D printer G-code | **Active Implementation** |
-| **Phase 3** | Multiphysics & Multi-Discipline Simulation | CFD, Aerodynamics, Robotics, Chemical, Power Flow, Molecular | **Active Implementation** |
-| **Phase 4** | Advanced Subtractive & Multi-Axis CAM | 3/4/5-axis milling, tool collision detection, feedrate optimization | **In Progress** |
-| **Phase 5** | Generative Engineering & AI Topology Optimization | SIMP method, volume fraction constraints, stress penalties | **Active Implementation** |
+| **Phase 2** | Additive Manufacturing & Slicing Platform | FDM slicing, adaptive layer height, infills, 3D printer G-code | **Complete / Verified** |
+| **Phase 3** | Multiphysics & Multi-Discipline Simulation | CFD, Aerodynamics, Robotics, Chemical, Power Flow, Molecular, Biomedical, Marine | **Complete / Verified** |
+| **Phase 4** | Advanced Subtractive & Multi-Axis CAM | 3/4/5-axis milling, tool collision detection, feedrate optimization | **Complete / Verified** |
+| **Phase 5** | Generative Engineering & AI Topology Optimization | SIMP method, sensitivity filtering, 3D solid mesh reconstruction | **Complete / Verified** |
 | **Phase 6** | Enterprise Governance, Digital Twins & Compliance | Cryptographic audit trail, AS9100/ISO9001 dossiers, HPC queue | **Complete / Baseline Verified** |
 
 ---

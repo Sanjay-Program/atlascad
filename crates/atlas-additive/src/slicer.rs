@@ -39,6 +39,41 @@ pub struct SlicedModel {
     pub gcode: String,
 }
 
+/// Computes the optimal adaptive layer height for a given surface inclination angle.
+///
+/// Under Dolenc & Mäkelä stair-stepping theory, the cusp height `c` for layer thickness `h`
+/// on a surface inclined at angle `theta_rad` with the horizontal build plate is:
+/// `c = h * cos(theta_rad)`.
+///
+/// Enforcing `c <= allowable_cusp_height_mm` yields:
+/// `h_adaptive = allowable_cusp_height_mm / max(cos(theta_rad), 1e-4)`,
+/// clamped to `[min_layer_height_mm, max_layer_height_mm]`.
+pub fn compute_adaptive_layer_height(
+    surface_angle_rad: f64,
+    allowable_cusp_height_mm: f64,
+    min_layer_height_mm: f64,
+    max_layer_height_mm: f64,
+) -> f64 {
+    let theta = surface_angle_rad.clamp(0.0, std::f64::consts::FRAC_PI_2);
+    let cos_theta = theta.cos().max(1e-4);
+    let target_h = allowable_cusp_height_mm / cos_theta;
+    target_h.clamp(min_layer_height_mm, max_layer_height_mm)
+}
+
+/// Computes adaptive layer height directly from a unit surface normal vector `[nx, ny, nz]`.
+pub fn compute_adaptive_layer_height_from_normal(
+    normal: [f64; 3],
+    allowable_cusp_height_mm: f64,
+    min_layer_height_mm: f64,
+    max_layer_height_mm: f64,
+) -> f64 {
+    let n_xy = (normal[0] * normal[0] + normal[1] * normal[1]).sqrt();
+    let norm = (n_xy * n_xy + normal[2] * normal[2]).sqrt().max(1e-6);
+    let cos_theta = (n_xy / norm).max(1e-4);
+    let target_h = allowable_cusp_height_mm / cos_theta;
+    target_h.clamp(min_layer_height_mm, max_layer_height_mm)
+}
+
 /// Slices a 3D bounding geometry according to slicer settings.
 #[allow(clippy::too_many_arguments)]
 pub fn slice_solid_bounds(
@@ -204,5 +239,33 @@ mod tests {
         assert!(sliced.estimation.filament_mass_grams > 0.0);
         assert!(sliced.gcode.contains(";LAYER:0"));
         assert!(sliced.gcode.contains("M104 S0"));
+    }
+
+    #[test]
+    fn test_adaptive_layer_height_formulation() {
+        let cusp = 0.05; // 50 um allowable stair-step cusp
+        let min_h = 0.08;
+        let max_h = 0.32;
+
+        // Vertical wall (theta = 90 deg = pi/2): cos(theta) = 0 -> clamped to max_h
+        let h_vert = compute_adaptive_layer_height(std::f64::consts::FRAC_PI_2, cusp, min_h, max_h);
+        assert!((h_vert - max_h).abs() < 1e-4);
+
+        // Near-horizontal shallow slope (theta = 0 deg): cos(theta) = 1 -> cusp / 1 = 0.05 -> clamped to min_h (0.08)
+        let h_flat = compute_adaptive_layer_height(0.0, cusp, min_h, max_h);
+        assert!((h_flat - min_h).abs() < 1e-4);
+
+        // 45 degree slope: cos(45 deg) = 0.7071 -> 0.05 / 0.7071 = 0.0707 -> clamped to min_h (0.08)
+        let h_45 = compute_adaptive_layer_height(std::f64::consts::FRAC_PI_4, cusp, min_h, max_h);
+        assert!((h_45 - min_h).abs() < 1e-4);
+
+        // 75 degree steep slope: cos(75 deg) = 0.2588 -> 0.05 / 0.2588 = 0.1932 mm
+        let h_75 = compute_adaptive_layer_height(75.0_f64.to_radians(), cusp, min_h, max_h);
+        assert!((h_75 - 0.1932).abs() < 0.01);
+
+        // From normal vector
+        let h_norm =
+            compute_adaptive_layer_height_from_normal([0.2588, 0.0, 0.9659], cusp, min_h, max_h);
+        assert!((h_norm - 0.1932).abs() < 0.01);
     }
 }

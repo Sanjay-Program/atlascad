@@ -4007,6 +4007,10 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         .as_f64()
         .ok_or("reach")?;
     assert!(reach > 0.5);
+    let manip = robot["scalar_metrics"]["manipulability_2d"]
+        .as_f64()
+        .ok_or("manip")?;
+    assert!(manip > 0.0);
 
     // 5. Electrical AC Power Flow
     let pflow_resp = post(
@@ -4020,6 +4024,10 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         .as_f64()
         .ok_or("v2")?;
     assert!(v2 > 0.85 && v2 < 1.05);
+    let y_norm = pflow["scalar_metrics"]["ybus_frobenius_norm"]
+        .as_f64()
+        .ok_or("y_norm")?;
+    assert!(y_norm > 0.0);
 
     // 6. Generative SIMP Topology Optimization
     let gen_resp = post(
@@ -4033,6 +4041,10 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         .as_f64()
         .ok_or("vol")?;
     assert!((vol - 0.35).abs() < 0.05);
+    let triangles = generative_data["mesh"]["triangles"]
+        .as_array()
+        .ok_or("mesh triangles")?;
+    assert!(!triangles.is_empty());
 
     // 7. Geotechnical Retaining Wall
     let geo_resp = post(addr, "/api/sim/geotechnical", r#"{"wall_height_m": 4.5}"#)?;

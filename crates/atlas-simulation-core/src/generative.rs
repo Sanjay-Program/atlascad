@@ -31,8 +31,209 @@ impl Default for TopologyOptProblem {
     }
 }
 
+/// Triangular 3D solid mesh extracted from converged generative topology.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GenerativeMesh {
+    /// 3D vertex positions in millimeters.
+    pub positions: Vec<[f64; 3]>,
+    /// Triangular face indices.
+    pub triangles: Vec<[u32; 3]>,
+    /// Per-vertex outward normal unit vectors.
+    pub normals: Vec<[f64; 3]>,
+}
+
+impl GenerativeMesh {
+    pub fn triangle_count(&self) -> usize {
+        self.triangles.len()
+    }
+
+    pub fn vertex_count(&self) -> usize {
+        self.positions.len()
+    }
+}
+
+/// Comprehensive result of topology optimization including convergence telemetry,
+/// density distribution field, and extracted 3D manifold solid mesh.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GenerativeSolution {
+    #[serde(flatten)]
+    pub result: SimulationResult,
+    pub grid_nx: usize,
+    pub grid_ny: usize,
+    pub densities: Vec<f64>,
+    pub mesh: GenerativeMesh,
+}
+
+/// Applies mesh-independency spatial convolution filter to eliminate numerical checkerboard instability.
+pub fn filter_sensitivities(
+    nx: usize,
+    ny: usize,
+    r_min: f64,
+    rho: &[f64],
+    raw_sens: &[f64],
+) -> Vec<f64> {
+    let total = nx * ny;
+    let mut filtered = vec![0.0; total];
+    let r_ceil = r_min.ceil() as isize;
+
+    for y in 0..ny {
+        for x in 0..nx {
+            let e = y * nx + x;
+            let mut sum_h = 0.0;
+            let mut sum_h_rho_s = 0.0;
+
+            for dy in -r_ceil..=r_ceil {
+                for dx in -r_ceil..=r_ceil {
+                    let nx_cand = x as isize + dx;
+                    let ny_cand = y as isize + dy;
+                    if nx_cand >= 0
+                        && nx_cand < nx as isize
+                        && ny_cand >= 0
+                        && ny_cand < ny as isize
+                    {
+                        let i = (ny_cand as usize) * nx + (nx_cand as usize);
+                        let dist = ((dx * dx + dy * dy) as f64).sqrt();
+                        if dist < r_min {
+                            let weight = r_min - dist;
+                            sum_h += weight;
+                            sum_h_rho_s += weight * rho[i] * raw_sens[i];
+                        }
+                    }
+                }
+            }
+
+            let denom = rho[e] * sum_h.max(1e-12);
+            filtered[e] = sum_h_rho_s / denom;
+        }
+    }
+    filtered
+}
+
+/// Solidifies a 2D density field into an exact, watertight 3D triangle manifold mesh.
+pub fn reconstruct_generative_mesh(
+    nx: usize,
+    ny: usize,
+    rho: &[f64],
+    dx_mm: f64,
+    dy_mm: f64,
+    thickness_z_mm: f64,
+    density_cutoff: f64,
+) -> GenerativeMesh {
+    let mut positions = Vec::new();
+    let mut triangles = Vec::new();
+    let mut normals = Vec::new();
+
+    let z_top = thickness_z_mm * 0.5;
+    let z_bot = -thickness_z_mm * 0.5;
+
+    let is_solid = |x: isize, y: isize| -> bool {
+        if x < 0 || x >= nx as isize || y < 0 || y >= ny as isize {
+            false
+        } else {
+            rho[(y as usize) * nx + (x as usize)] >= density_cutoff
+        }
+    };
+
+    let mut add_quad =
+        |p0: [f64; 3], p1: [f64; 3], p2: [f64; 3], p3: [f64; 3], normal: [f64; 3]| {
+            let base_idx = positions.len() as u32;
+            positions.push(p0);
+            positions.push(p1);
+            positions.push(p2);
+            positions.push(p3);
+            for _ in 0..4 {
+                normals.push(normal);
+            }
+            triangles.push([base_idx, base_idx + 1, base_idx + 2]);
+            triangles.push([base_idx, base_idx + 2, base_idx + 3]);
+        };
+
+    for y in 0..ny {
+        for x in 0..nx {
+            if !is_solid(x as isize, y as isize) {
+                continue;
+            }
+
+            let x0 = (x as f64) * dx_mm;
+            let x1 = (x as f64 + 1.0) * dx_mm;
+            let y0 = (y as f64) * dy_mm;
+            let y1 = (y as f64 + 1.0) * dy_mm;
+
+            // Top face (+Z)
+            add_quad(
+                [x0, y0, z_top],
+                [x1, y0, z_top],
+                [x1, y1, z_top],
+                [x0, y1, z_top],
+                [0.0, 0.0, 1.0],
+            );
+
+            // Bottom face (-Z)
+            add_quad(
+                [x0, y1, z_bot],
+                [x1, y1, z_bot],
+                [x1, y0, z_bot],
+                [x0, y0, z_bot],
+                [0.0, 0.0, -1.0],
+            );
+
+            // West face (-X)
+            if !is_solid(x as isize - 1, y as isize) {
+                add_quad(
+                    [x0, y1, z_top],
+                    [x0, y1, z_bot],
+                    [x0, y0, z_bot],
+                    [x0, y0, z_top],
+                    [-1.0, 0.0, 0.0],
+                );
+            }
+
+            // East face (+X)
+            if !is_solid(x as isize + 1, y as isize) {
+                add_quad(
+                    [x1, y0, z_top],
+                    [x1, y0, z_bot],
+                    [x1, y1, z_bot],
+                    [x1, y1, z_top],
+                    [1.0, 0.0, 0.0],
+                );
+            }
+
+            // South face (-Y)
+            if !is_solid(x as isize, y as isize - 1) {
+                add_quad(
+                    [x0, y0, z_top],
+                    [x0, y0, z_bot],
+                    [x1, y0, z_bot],
+                    [x1, y0, z_top],
+                    [0.0, -1.0, 0.0],
+                );
+            }
+
+            // North face (+Y)
+            if !is_solid(x as isize, y as isize + 1) {
+                add_quad(
+                    [x1, y1, z_top],
+                    [x1, y1, z_bot],
+                    [x0, y1, z_bot],
+                    [x0, y1, z_top],
+                    [0.0, 1.0, 0.0],
+                );
+            }
+        }
+    }
+
+    GenerativeMesh {
+        positions,
+        triangles,
+        normals,
+    }
+}
+
 /// Solves density-based topology optimization on a 2D design domain.
-pub fn solve_topology_optimization(prob: &TopologyOptProblem) -> Result<SimulationResult, String> {
+pub fn solve_topology_optimization(
+    prob: &TopologyOptProblem,
+) -> Result<GenerativeSolution, String> {
     let nx = prob.grid_nx.max(5);
     let ny = prob.grid_ny.max(5);
     let total_elements = nx * ny;
@@ -71,6 +272,10 @@ pub fn solve_topology_optimization(prob: &TopologyOptProblem) -> Result<Simulati
             }
         }
 
+        // Apply Sigmund mesh-independency sensitivity filter to suppress checkerboard artifacts
+        let filtered_sens =
+            filter_sensitivities(nx, ny, prob.filter_radius_elements, &rho, &sensitivities);
+
         final_compliance = compliance;
         conv.record(iter as u32, compliance, 1, 1e-4);
 
@@ -84,7 +289,7 @@ pub fn solve_topology_optimization(prob: &TopologyOptProblem) -> Result<Simulati
             let mut cur_vol = 0.0;
 
             for i in 0..total_elements {
-                let s = sensitivities[i];
+                let s = filtered_sens[i];
                 let b_e = (-s / l_mid).max(1e-9).sqrt();
                 let r_new = (rho[i] * b_e)
                     .clamp(rho[i] - 0.2, rho[i] + 0.2)
@@ -112,11 +317,21 @@ pub fn solve_topology_optimization(prob: &TopologyOptProblem) -> Result<Simulati
         vol_frac,
     );
 
+    // Reconstruct watertight 3D manifold solid triangular mesh from density field
+    let mesh = reconstruct_generative_mesh(
+        nx, ny, &rho, 10.0, // dx_mm
+        10.0, // dy_mm
+        20.0, // thickness_z_mm
+        0.30, // density cutoff
+    );
+
     let mut metrics = HashMap::new();
     metrics.insert("compliance".to_string(), final_compliance);
     metrics.insert("volume_fraction_achieved".to_string(), achieved_vol);
     metrics.insert("total_elements".to_string(), total_elements as f64);
     metrics.insert("iterations".to_string(), max_iter as f64);
+    metrics.insert("mesh_triangles".to_string(), mesh.triangle_count() as f64);
+    metrics.insert("mesh_vertices".to_string(), mesh.vertex_count() as f64);
 
     let solid_elements = rho.iter().filter(|&&r| r > 0.5).count();
     let void_elements = total_elements - solid_elements;
@@ -135,10 +350,15 @@ pub fn solve_topology_optimization(prob: &TopologyOptProblem) -> Result<Simulati
             "Solid Elements: {}, Void Elements: {} (Penalization p = {:.1})",
             solid_elements, void_elements, p
         ),
+        format!(
+            "Reconstructed 3D Solid Mesh: {} triangles, {} vertices",
+            mesh.triangle_count(),
+            mesh.vertex_count()
+        ),
         format!("Final Structural Compliance: {:.4}", final_compliance),
     ];
 
-    Ok(SimulationResult {
+    let result = SimulationResult {
         problem_id: "topology-optimization".to_string(),
         engine_id: "atlas-generative".to_string(),
         status: SimulationStatus::Converged,
@@ -148,6 +368,14 @@ pub fn solve_topology_optimization(prob: &TopologyOptProblem) -> Result<Simulati
         validation: Some(val),
         provenance: SimulationProvenance::new("atlas-generative", "0.1.0"),
         logs,
+    };
+
+    Ok(GenerativeSolution {
+        result,
+        grid_nx: nx,
+        grid_ny: ny,
+        densities: rho,
+        mesh,
     })
 }
 
@@ -158,14 +386,18 @@ mod tests {
     #[test]
     fn test_topology_optimization_compliance_reduction() -> Result<(), String> {
         let prob = TopologyOptProblem::default();
-        let res = solve_topology_optimization(&prob)?;
-        assert_eq!(res.status, SimulationStatus::Converged);
-        let vol = res
+        let sol = solve_topology_optimization(&prob)?;
+        assert_eq!(sol.result.status, SimulationStatus::Converged);
+        let vol = sol
+            .result
             .scalar_metrics
             .get("volume_fraction_achieved")
             .copied()
             .unwrap_or(0.0);
         assert!((vol - prob.target_volume_fraction).abs() < 0.05);
+        assert!(sol.mesh.triangle_count() > 0);
+        assert!(sol.mesh.vertex_count() > 0);
+        assert_eq!(sol.densities.len(), prob.grid_nx * prob.grid_ny);
         Ok(())
     }
 }

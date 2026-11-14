@@ -64,14 +64,22 @@ pub fn mat4_mul(a: &[[f64; 4]; 4], b: &[[f64; 4]; 4]) -> [[f64; 4]; 4] {
 pub struct RobotKinematicsProblem {
     pub robot_name: String,
     pub links: Vec<DhLink>,
+    #[serde(default)]
+    pub target_ee: Option<[f64; 3]>,
 }
 
-/// Solve forward kinematics and manipulability.
-pub fn solve_robot_kinematics(prob: &RobotKinematicsProblem) -> Result<SimulationResult, String> {
-    if prob.links.is_empty() {
-        return Err("Robot requires at least one DH link".to_string());
-    }
+/// Damped Least-Squares (DLS) numerical inverse kinematics result.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct IkResult {
+    pub converged: bool,
+    pub iterations: usize,
+    pub final_error_m: f64,
+    pub joint_angles_rad: Vec<f64>,
+    pub final_position: [f64; 3],
+}
 
+/// Computes the forward kinematics transformation chain, returning cumulative transforms.
+pub fn compute_forward_transforms(links: &[DhLink]) -> (Vec<[[f64; 4]; 4]>, [f64; 3]) {
     let mut t_cumulative = [
         [1.0, 0.0, 0.0, 0.0],
         [0.0, 1.0, 0.0, 0.0],
@@ -79,24 +87,237 @@ pub fn solve_robot_kinematics(prob: &RobotKinematicsProblem) -> Result<Simulatio
         [0.0, 0.0, 0.0, 1.0],
     ];
 
-    let mut link_transforms = Vec::with_capacity(prob.links.len());
+    let mut link_transforms = Vec::with_capacity(links.len());
 
-    for link in &prob.links {
+    for link in links {
         let a_i = link.transform_matrix();
         t_cumulative = mat4_mul(&t_cumulative, &a_i);
         link_transforms.push(t_cumulative);
     }
 
-    let ee_x = t_cumulative[0][3];
-    let ee_y = t_cumulative[1][3];
-    let ee_z = t_cumulative[2][3];
+    let ee_pos = [t_cumulative[0][3], t_cumulative[1][3], t_cumulative[2][3]];
+    (link_transforms, ee_pos)
+}
+
+/// Cross product of two 3D vectors.
+pub fn vec3_cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+}
+
+/// Computes the geometric Jacobian matrix columns: J_v (linear velocity) and J_w (angular velocity).
+pub fn compute_geometric_jacobian(
+    links: &[DhLink],
+    transforms: &[[[f64; 4]; 4]],
+    ee_pos: [f64; 3],
+) -> (Vec<[f64; 3]>, Vec<[f64; 3]>) {
+    let n = links.len();
+    let mut j_v = Vec::with_capacity(n);
+    let mut j_w = Vec::with_capacity(n);
+
+    for i in 0..n {
+        let (z_prev, p_prev) = if i == 0 {
+            ([0.0, 0.0, 1.0], [0.0, 0.0, 0.0])
+        } else {
+            let t_prev = &transforms[i - 1];
+            (
+                [t_prev[0][2], t_prev[1][2], t_prev[2][2]],
+                [t_prev[0][3], t_prev[1][3], t_prev[2][3]],
+            )
+        };
+
+        let diff = [
+            ee_pos[0] - p_prev[0],
+            ee_pos[1] - p_prev[1],
+            ee_pos[2] - p_prev[2],
+        ];
+
+        let linear = vec3_cross(z_prev, diff);
+        j_v.push(linear);
+        j_w.push(z_prev);
+    }
+
+    (j_v, j_w)
+}
+
+/// Computes Yoshikawa manipulability index w = sqrt(det(J_v * J_v^T)).
+pub fn compute_manipulability(j_v: &[[f64; 3]]) -> (f64, f64) {
+    if j_v.is_empty() {
+        return (0.0, 0.0);
+    }
+
+    // 2D planar manipulability (x, y)
+    let mut m00 = 0.0;
+    let mut m01 = 0.0;
+    let mut m11 = 0.0;
+    for col in j_v {
+        m00 += col[0] * col[0];
+        m01 += col[0] * col[1];
+        m11 += col[1] * col[1];
+    }
+    let det_2d = (m00 * m11 - m01 * m01).max(0.0);
+    let w_2d = det_2d.sqrt();
+
+    // 3D manipulability (x, y, z)
+    let mut m = [[0.0; 3]; 3];
+    for col in j_v {
+        for r in 0..3 {
+            for c in 0..3 {
+                m[r][c] += col[r] * col[c];
+            }
+        }
+    }
+    let det_3d = (m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+        - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+        + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]))
+        .max(0.0);
+    let w_3d = det_3d.sqrt();
+
+    (w_3d, w_2d)
+}
+
+/// Solves numerical inverse kinematics using Damped Least-Squares (DLS / Levenberg-Marquardt).
+pub fn solve_dls_inverse_kinematics(
+    links: &[DhLink],
+    target_pos: [f64; 3],
+    max_iterations: usize,
+    lambda: f64,
+) -> IkResult {
+    let mut current_links = links.to_vec();
+    let is_planar = target_pos[2].abs() < 1e-4
+        && links
+            .iter()
+            .all(|l| l.alpha_rad.abs() < 1e-4 && l.d_m.abs() < 1e-4);
+
+    let mut iter_count = 0;
+    let mut final_error = f64::INFINITY;
+    let mut last_ee_pos = [0.0; 3];
+
+    for _ in 0..max_iterations {
+        iter_count += 1;
+        let (transforms, ee_pos) = compute_forward_transforms(&current_links);
+        last_ee_pos = ee_pos;
+
+        let err = [
+            target_pos[0] - ee_pos[0],
+            target_pos[1] - ee_pos[1],
+            target_pos[2] - ee_pos[2],
+        ];
+        let err_norm = (err[0] * err[0] + err[1] * err[1] + err[2] * err[2]).sqrt();
+        final_error = err_norm;
+
+        if err_norm < 1e-4 {
+            break;
+        }
+
+        let (j_v, _) = compute_geometric_jacobian(&current_links, &transforms, ee_pos);
+        let n = current_links.len();
+
+        if is_planar {
+            // 2D DLS: A = J_v * J_v^T + lambda^2 * I_2
+            let mut a00 = lambda * lambda;
+            let mut a01 = 0.0;
+            let mut a11 = lambda * lambda;
+            for col in &j_v {
+                a00 += col[0] * col[0];
+                a01 += col[0] * col[1];
+                a11 += col[1] * col[1];
+            }
+            let det = a00 * a11 - a01 * a01;
+            if det.abs() > 1e-12 {
+                let inv_det = 1.0 / det;
+                let v0 = (a11 * err[0] - a01 * err[1]) * inv_det;
+                let v1 = (-a01 * err[0] + a00 * err[1]) * inv_det;
+                for i in 0..n {
+                    let dq = j_v[i][0] * v0 + j_v[i][1] * v1;
+                    current_links[i].theta_rad += 0.6 * dq;
+                }
+            }
+        } else {
+            // 3D DLS: A = J_v * J_v^T + lambda^2 * I_3
+            let mut a = [[0.0; 3]; 3];
+            for (r, row) in a.iter_mut().enumerate() {
+                row[r] = lambda * lambda;
+            }
+            for col in &j_v {
+                for r in 0..3 {
+                    for c in 0..3 {
+                        a[r][c] += col[r] * col[c];
+                    }
+                }
+            }
+
+            let det = a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1])
+                - a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0])
+                + a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0]);
+
+            if det.abs() > 1e-12 {
+                let inv_det = 1.0 / det;
+                let inv = [
+                    [
+                        (a[1][1] * a[2][2] - a[1][2] * a[2][1]) * inv_det,
+                        (a[0][2] * a[2][1] - a[0][1] * a[2][2]) * inv_det,
+                        (a[0][1] * a[1][2] - a[0][2] * a[1][1]) * inv_det,
+                    ],
+                    [
+                        (a[1][2] * a[2][0] - a[1][0] * a[2][2]) * inv_det,
+                        (a[0][0] * a[2][2] - a[0][2] * a[2][0]) * inv_det,
+                        (a[0][2] * a[1][0] - a[0][0] * a[1][2]) * inv_det,
+                    ],
+                    [
+                        (a[1][0] * a[2][1] - a[1][1] * a[2][0]) * inv_det,
+                        (a[0][1] * a[2][0] - a[0][0] * a[2][1]) * inv_det,
+                        (a[0][0] * a[1][1] - a[0][1] * a[1][0]) * inv_det,
+                    ],
+                ];
+
+                let v = [
+                    inv[0][0] * err[0] + inv[0][1] * err[1] + inv[0][2] * err[2],
+                    inv[1][0] * err[0] + inv[1][1] * err[1] + inv[1][2] * err[2],
+                    inv[2][0] * err[0] + inv[2][1] * err[1] + inv[2][2] * err[2],
+                ];
+
+                for i in 0..n {
+                    let dq = j_v[i][0] * v[0] + j_v[i][1] * v[1] + j_v[i][2] * v[2];
+                    current_links[i].theta_rad += 0.6 * dq;
+                }
+            }
+        }
+    }
+
+    IkResult {
+        converged: final_error < 1e-3,
+        iterations: iter_count,
+        final_error_m: final_error,
+        joint_angles_rad: current_links.iter().map(|l| l.theta_rad).collect(),
+        final_position: last_ee_pos,
+    }
+}
+
+/// Solve forward kinematics, manipulability, and inverse kinematics.
+pub fn solve_robot_kinematics(prob: &RobotKinematicsProblem) -> Result<SimulationResult, String> {
+    if prob.links.is_empty() {
+        return Err("Robot requires at least one DH link".to_string());
+    }
+
+    let (link_transforms, ee_pos) = compute_forward_transforms(&prob.links);
+    let ee_x = ee_pos[0];
+    let ee_y = ee_pos[1];
+    let ee_z = ee_pos[2];
 
     // Total reach from base
     let reach_m = (ee_x * ee_x + ee_y * ee_y + ee_z * ee_z).sqrt();
 
+    // Compute geometric Jacobian and manipulability
+    let (j_v, _) = compute_geometric_jacobian(&prob.links, &link_transforms, ee_pos);
+    let (w_3d, w_2d) = compute_manipulability(&j_v);
+
     // If 2-link planar arm, validate against closed-form trigonometry:
     // x = a1*cos(t1) + a2*cos(t1 + t2)
-    // y = a1*sin(t1) + a2*sin(t1 + t2)
+    // w = a1*a2*|sin(t2)|
     let val = if prob.links.len() >= 2
         && prob.links[0].alpha_rad.abs() < 1e-4
         && prob.links[1].alpha_rad.abs() < 1e-4
@@ -121,18 +342,45 @@ pub fn solve_robot_kinematics(prob: &RobotKinematicsProblem) -> Result<Simulatio
     metrics.insert("end_effector_z_m".to_string(), ee_z);
     metrics.insert("total_reach_m".to_string(), reach_m);
     metrics.insert("dof".to_string(), prob.links.len() as f64);
+    metrics.insert("manipulability_3d".to_string(), w_3d);
+    metrics.insert("manipulability_2d".to_string(), w_2d);
 
-    let mut conv = ConvergenceMonitor::new(1e-6);
-    conv.record(1, reach_m, 1, 1e-4);
-
-    let logs = vec![
+    let mut logs = vec![
         format!("Robot '{}' ({} DOF)", prob.robot_name, prob.links.len()),
         format!(
             "End-Effector Position: [{:.4}, {:.4}, {:.4}] m",
             ee_x, ee_y, ee_z
         ),
         format!("Radial Distance from Base: {:.4} m", reach_m),
+        format!(
+            "Yoshikawa Manipulability Index: w_2d = {:.4}, w_3d = {:.4}",
+            w_2d, w_3d
+        ),
     ];
+
+    // Optional numerical Inverse Kinematics target
+    if let Some(target) = prob.target_ee {
+        let ik = solve_dls_inverse_kinematics(&prob.links, target, 35, 0.05);
+        metrics.insert(
+            "ik_converged".to_string(),
+            if ik.converged { 1.0 } else { 0.0 },
+        );
+        metrics.insert("ik_iterations".to_string(), ik.iterations as f64);
+        metrics.insert("ik_final_error_m".to_string(), ik.final_error_m);
+        if let Some(&q0) = ik.joint_angles_rad.first() {
+            metrics.insert("ik_q0_deg".to_string(), q0.to_degrees());
+        }
+        if let Some(&q1) = ik.joint_angles_rad.get(1) {
+            metrics.insert("ik_q1_deg".to_string(), q1.to_degrees());
+        }
+        logs.push(format!(
+            "Inverse Kinematics: Target [{:.3}, {:.3}, {:.3}] m -> Final Error: {:.4} m ({} iters, Converged: {})",
+            target[0], target[1], target[2], ik.final_error_m, ik.iterations, ik.converged
+        ));
+    }
+
+    let mut conv = ConvergenceMonitor::new(1e-6);
+    conv.record(1, reach_m, 1, 1e-4);
 
     Ok(SimulationResult {
         problem_id: "robot-kinematics".to_string(),
@@ -171,6 +419,7 @@ mod tests {
                     0.0,
                 ), // 45 deg
             ],
+            target_ee: None,
         };
 
         let res = solve_robot_kinematics(&prob)?;
@@ -190,6 +439,43 @@ mod tests {
         if let Some(val) = &res.validation {
             assert!(val.error_percent < 0.01);
         }
+
+        let w_2d = res
+            .scalar_metrics
+            .get("manipulability_2d")
+            .copied()
+            .unwrap_or(0.0);
+        // Analytical w = a1 * a2 * sin(theta2) = 1.0 * 0.8 * sin(45 deg) = 0.565685
+        let analytical_w = 1.0 * 0.8 * std::f64::consts::FRAC_PI_4.sin();
+        assert!((w_2d - analytical_w).abs() < 1e-4);
+        Ok(())
+    }
+
+    #[test]
+    fn test_dls_inverse_kinematics_convergence() -> Result<(), String> {
+        let prob = RobotKinematicsProblem {
+            robot_name: "Planar 2R Arm".to_string(),
+            links: vec![
+                DhLink::new("Link1".to_string(), 0.0, 0.0, 1.0, 0.0),
+                DhLink::new("Link2".to_string(), 0.0, 0.0, 0.8, 0.0),
+            ],
+            target_ee: Some([1.2, 0.6, 0.0]),
+        };
+
+        let res = solve_robot_kinematics(&prob)?;
+        assert_eq!(res.status, SimulationStatus::Converged);
+        let converged = res
+            .scalar_metrics
+            .get("ik_converged")
+            .copied()
+            .unwrap_or(0.0);
+        assert_eq!(converged, 1.0);
+        let error_m = res
+            .scalar_metrics
+            .get("ik_final_error_m")
+            .copied()
+            .unwrap_or(1.0);
+        assert!(error_m < 1e-3);
         Ok(())
     }
 }

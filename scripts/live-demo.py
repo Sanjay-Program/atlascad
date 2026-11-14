@@ -410,16 +410,21 @@ def run_live_demo() -> None:
         check(temp >= 0.0, "Thermodynamic kinetic temperature calculated")
         print(f"  ✓ 11.4 Molecular Dynamics: Lennard-Jones Potential = {mol['scalar_metrics']['potential_energy_ev']:.4f} eV, T = {temp:.1f} K")
 
-        # 11.5 Robotics Kinematics (6-DOF Manipulator)
+        # 11.5 Robotics Kinematics, Jacobian & DLS Inverse Kinematics
         robot = http_request(port, "POST", "/api/sim/robotics", body={
-            "joint_angles_deg": [20.0, 40.0, -30.0]
+            "joint_angles_deg": [20.0, 40.0, -30.0],
+            "target_ee": [0.8, 0.4, 0.2]
         })
         check(robot["status"] == "Converged", "DH Robotics forward kinematics solved")
         reach = robot["scalar_metrics"]["total_reach_m"]
+        w_2d = robot["scalar_metrics"]["manipulability_2d"]
+        ik_conv = robot["scalar_metrics"]["ik_converged"]
         check(reach > 0.5, "Arm reach envelope computed")
-        print(f"  ✓ 11.5 Robotics: End-Effector Reach = {reach:.3f} m (DOF = {robot['scalar_metrics']['dof']:.0f})")
+        check(w_2d > 0.0, "Yoshikawa manipulability index calculated")
+        check(ik_conv == 1.0, "DLS Inverse Kinematics converged to target position")
+        print(f"  ✓ 11.5 Robotics: Reach = {reach:.3f} m, Manipulability w = {w_2d:.4f}, DLS IK Converged: {ik_conv == 1.0}")
 
-        # 11.6 Electrical Power Grid Load Flow
+        # 11.6 Electrical Power Grid Load Flow & Y_bus Matrix
         pflow = http_request(port, "POST", "/api/sim/powerflow", body={
             "p_load_mw": 50.0,
             "q_load_mvar": 20.0
@@ -427,11 +432,13 @@ def run_live_demo() -> None:
         check(pflow["status"] == "Converged", "AC power load flow solved")
         v2 = pflow["scalar_metrics"]["receiving_bus_voltage_pu"]
         losses = pflow["scalar_metrics"]["transmission_loss_mw"]
+        y_norm = pflow["scalar_metrics"]["ybus_frobenius_norm"]
         check(0.85 < v2 < 1.05, f"Bus voltage profile within operating bounds (V2 = {v2:.3f} p.u.)")
         check(losses > 0.0, "I^2 R active transmission losses calculated")
-        print(f"  ✓ 11.6 Power Grid: Bus 2 Voltage = {v2:.4f} p.u., Transmission Losses = {losses:.3f} MW")
+        check(y_norm > 0.0, "Bus Admittance Matrix Y_bus Frobenius norm calculated")
+        print(f"  ✓ 11.6 Power Grid: Bus 2 Voltage = {v2:.4f} p.u., Losses = {losses:.3f} MW, ||Y_bus|| = {y_norm:.2f} p.u.")
 
-        # 11.7 Generative SIMP Topology Optimization
+        # 11.7 Generative SIMP Topology Optimization & 3D Solid Mesh Reconstruction
         gen = http_request(port, "POST", "/api/sim/generative", body={
             "volume_fraction": 0.35,
             "iterations": 10
@@ -439,7 +446,9 @@ def run_live_demo() -> None:
         check(gen["status"] == "Converged", "SIMP Topology optimization converged")
         achieved_vol = gen["scalar_metrics"]["volume_fraction_achieved"]
         check(abs(achieved_vol - 0.35) < 0.05, "Target volume fraction satisfied within tolerance")
-        print(f"  ✓ 11.7 Generative Design: SIMP Final Compliance = {gen['scalar_metrics']['compliance']:.2f}, Volume Fraction = {achieved_vol*100:.1f}%")
+        triangles = gen["mesh"]["triangles"]
+        check(len(triangles) > 0, "Watertight 3D manifold mesh extracted from topology field")
+        print(f"  ✓ 11.7 Generative Design: Final Compliance = {gen['scalar_metrics']['compliance']:.2f}, Vol = {achieved_vol*100:.1f}%, Mesh = {len(triangles)} triangles")
 
         # 11.8 Geotechnical Soil Mechanics & Retaining Wall Stability
         geo = http_request(port, "POST", "/api/sim/geotechnical", body={

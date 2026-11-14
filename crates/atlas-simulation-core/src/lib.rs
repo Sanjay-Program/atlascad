@@ -38,7 +38,10 @@ pub mod prelude {
     pub use crate::convergence::{ConvergenceMonitor, IterationTelemetry};
     pub use crate::engine::SimulationEngineAdapter;
     pub use crate::execution::{SimulationResult, SimulationStatus};
-    pub use crate::generative::{TopologyOptProblem, solve_topology_optimization};
+    pub use crate::generative::{
+        GenerativeMesh, GenerativeSolution, TopologyOptProblem, filter_sensitivities,
+        reconstruct_generative_mesh, solve_topology_optimization,
+    };
     pub use crate::geotechnical::{
         RetainingWallProblem, SoilProperties, solve_retaining_wall_pressures,
     };
@@ -50,9 +53,16 @@ pub mod prelude {
     pub use crate::molecular::{
         Atom, LennardJonesParam, MolecularDynamicsProblem, run_molecular_dynamics,
     };
-    pub use crate::power_flow::{BusType, PowerFlowProblem, TransmissionLine, solve_power_flow};
+    pub use crate::power_flow::{
+        BusType, ComplexNumber, PowerFlowProblem, TransmissionLine, build_bus_admittance_matrix,
+        solve_power_flow, y_bus_frobenius_norm,
+    };
     pub use crate::problem::{AnalysisType, SimulationProblem};
-    pub use crate::robotics::{DhLink, RobotKinematicsProblem, solve_robot_kinematics};
+    pub use crate::robotics::{
+        DhLink, IkResult, RobotKinematicsProblem, compute_forward_transforms,
+        compute_geometric_jacobian, compute_manipulability, solve_dls_inverse_kinematics,
+        solve_robot_kinematics,
+    };
     pub use crate::solver_settings::SolverSettings;
     pub use crate::validation::{AnalyticalComparison, ValidationStatus};
 }

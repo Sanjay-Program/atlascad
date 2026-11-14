@@ -2975,6 +2975,7 @@ impl StudioState {
                     std::f64::consts::FRAC_PI_2,
                 ),
             ],
+            target_ee: req.target_ee,
         };
         let res = atlas_simulation_core::robotics::solve_robot_kinematics(&prob)
             .map_err(StudioError::BadRequest)?;
@@ -5348,6 +5349,8 @@ struct SimMolecularRequest {}
 struct SimRoboticsRequest {
     #[serde(default)]
     pub joint_angles_deg: Option<Vec<f64>>,
+    #[serde(default)]
+    pub target_ee: Option<[f64; 3]>,
 }
 
 #[derive(Debug, Default, Deserialize)]

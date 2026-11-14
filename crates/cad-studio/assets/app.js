@@ -7395,18 +7395,27 @@ ${gcodeSample}`;
           } else if (studyType === "robotics") {
             if (peak) peak.textContent = `Reach: ${m.total_reach_m?.toFixed(3)} m`;
             if (disp) disp.textContent = `EE X: ${m.end_effector_x_m?.toFixed(3)} m`;
-            if (fos) { fos.textContent = "6-DOF OK"; fos.style.color = "#10b981"; }
+            if (fos) {
+              fos.textContent = m.manipulability_2d ? `w = ${m.manipulability_2d.toFixed(3)}` : "6-DOF OK";
+              fos.style.color = "#10b981";
+            }
             if (elCount) elCount.textContent = `EE Z: ${m.end_effector_z_m?.toFixed(3)} m`;
           } else if (studyType === "powerflow") {
             if (peak) peak.textContent = `Loss: ${m.transmission_loss_mw?.toFixed(2)} MW`;
             if (disp) disp.textContent = `V2: ${m.receiving_bus_voltage_pu?.toFixed(3)} pu`;
-            if (fos) { fos.textContent = "Grid OK"; fos.style.color = "#10b981"; }
+            if (fos) {
+              fos.textContent = m.ybus_frobenius_norm ? `||Y|| = ${m.ybus_frobenius_norm.toFixed(1)}` : "Grid OK";
+              fos.style.color = "#10b981";
+            }
             if (elCount) elCount.textContent = `Gen: ${m.total_generation_mw?.toFixed(1)} MW`;
           } else if (studyType === "generative") {
             if (peak) peak.textContent = `Comp: ${m.compliance?.toFixed(2)}`;
             if (disp) disp.textContent = `Vol: ${(m.volume_fraction_achieved * 100)?.toFixed(1)}%`;
             if (fos) { fos.textContent = "SIMP P=3"; fos.style.color = "#10b981"; }
             if (elCount) elCount.textContent = `${m.total_elements} elem`;
+            if (res.mesh) {
+              renderGenerativeMesh(res.mesh);
+            }
           } else if (studyType === "geotechnical") {
             if (peak) peak.textContent = `Thrust: ${m.total_active_thrust_kn_m?.toFixed(1)} kN/m`;
             if (disp) disp.textContent = `Moment: ${m.overturning_moment_kn_m?.toFixed(1)} kNm`;
@@ -7522,6 +7531,28 @@ ${gcodeSample}`;
         toast(`Failed to dispatch: ${err.message}`, true);
       }
     });
+  }
+
+  function renderGenerativeMesh(mesh) {
+    if (!app.viewport || !mesh || !mesh.positions || !mesh.triangles) return;
+    const lines = [];
+    const pos = mesh.positions;
+    const color = [0.1, 0.9, 0.7]; // Emerald/cyan generative lattice
+    for (const tri of mesh.triangles) {
+      const p0 = pos[tri[0]];
+      const p1 = pos[tri[1]];
+      const p2 = pos[tri[2]];
+      if (!p0 || !p1 || !p2) continue;
+      lines.push(
+        p0[0], p0[1], p0[2], color[0], color[1], color[2],
+        p1[0], p1[1], p1[2], color[0], color[1], color[2],
+        p1[0], p1[1], p1[2], color[0], color[1], color[2],
+        p2[0], p2[1], p2[2], color[0], color[1], color[2],
+        p2[0], p2[1], p2[2], color[0], color[1], color[2],
+        p0[0], p0[1], p0[2], color[0], color[1], color[2]
+      );
+    }
+    app.viewport.setOverlayLines(lines);
   }
 
   // --- CAM Workbench Logic ---
