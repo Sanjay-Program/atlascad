@@ -2937,5 +2937,459 @@ body.clean-screen .workspace {
   background: rgba(255, 255, 255, 0.08);
 }
 
+/* =====================================================================
+   SELECTION RECTANGLE (AutoCAD Window vs Crossing Selection)
+   ===================================================================== */
+.selection-box {
+  position: absolute;
+  pointer-events: none;
+  z-index: 50;
+}
+
+.selection-box.window {
+  background: rgba(33, 150, 243, 0.22);
+  border: 1.5px solid #2196f3;
+}
+
+.selection-box.crossing {
+  background: rgba(76, 175, 80, 0.22);
+  border: 1.5px dashed #4caf50;
+}
+
+/* =====================================================================
+   INTELLIGENT OSNAP VISUAL MARKERS & GLYPHS
+   ===================================================================== */
+.drawing-snap-marker {
+  fill: none;
+  stroke: #ff9800;
+  stroke-width: 2px;
+  vector-effect: non-scaling-stroke;
+}
+
+.drawing-snap-marker.endpoint {
+  stroke: #4caf50;
+}
+
+.drawing-snap-marker.midpoint {
+  stroke: #00bcd4;
+}
+
+.drawing-snap-marker.center {
+  stroke: #ffeb3b;
+}
+
+.drawing-snap-marker.quadrant {
+  stroke: #ff9800;
+}
+
+.drawing-snap-marker.intersection {
+  stroke: #f44336;
+}
+
+.drawing-snap-marker.perpendicular {
+  stroke: #2196f3;
+}
+
+.drawing-snap-marker.tangent {
+  stroke: #e91e63;
+}
+
+.drawing-snap-marker.nearest {
+  stroke: #9c27b0;
+}
+
+.drawing-snap-label {
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: 700;
+  fill: #fff;
+  paint-order: stroke fill;
+  stroke: rgba(0, 0, 0, 0.85);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+/* =====================================================================
+   LAYER PROPERTIES MANAGER MODAL
+   ===================================================================== */
+.layer-manager-card {
+  max-width: 820px;
+  width: 90vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.layer-manager-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.layer-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.layer-search-input {
+  padding: 4px 10px;
+  font-size: 11.5px;
+  background: var(--panel-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  width: 180px;
+}
+
+.layer-table-wrap {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 420px;
+  border-bottom: 1px solid var(--border);
+}
+
+.layer-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+}
+
+.layer-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  color: var(--muted);
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border);
+  z-index: 2;
+}
+
+.layer-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.layer-table tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.layer-table tr.current-layer td {
+  background: rgba(0, 150, 255, 0.08);
+  font-weight: 600;
+}
+
+.layer-color-dot {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.layer-toggle-icon {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text);
+  padding: 2px 4px;
+}
+
+.layer-toggle-icon.off {
+  color: var(--muted);
+  opacity: 0.45;
+}
+
+.layer-manager-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: var(--bg);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* =====================================================================
+   COMPONENT & BLOCK LIBRARY
+   ===================================================================== */
+.block-library-card {
+  max-width: 820px;
+  width: 90vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.block-lib-nav {
+  display: flex;
+  gap: 4px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.block-cat-btn {
+  padding: 5px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.block-cat-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.block-lib-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  padding: 16px;
+  overflow-y: auto;
+  max-height: 450px;
+}
+
+.block-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.block-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.block-thumb {
+  width: 100%;
+  height: 90px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.block-name {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.block-meta {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.block-lib-foot {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+/* =====================================================================
+   AI CAD DRAFTING ASSISTANT
+   ===================================================================== */
+.ai-assistant-card {
+  max-width: 680px;
+  width: 85vw;
+}
+
+.ai-head-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-sparkle-icon {
+  font-size: 18px;
+  color: #ab47bc;
+}
+
+.ai-quick-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.ai-pill {
+  background: rgba(171, 71, 188, 0.12);
+  border: 1px solid rgba(171, 71, 188, 0.3);
+  color: var(--text);
+  border-radius: 14px;
+  padding: 3px 10px;
+  font-size: 10.5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ai-pill:hover {
+  background: #ab47bc;
+  color: #fff;
+  border-color: #ab47bc;
+}
+
+.ai-input-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ai-prompt-input {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 12px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  resize: vertical;
+}
+
+.ai-prompt-input:focus {
+  border-color: #ab47bc;
+  outline: none;
+}
+
+.ai-plan-card {
+  margin-top: 12px;
+  background: rgba(171, 71, 188, 0.08);
+  border: 1px solid rgba(171, 71, 188, 0.25);
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.plan-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.plan-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ai-history-section {
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.ai-history-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+}
+
+.ai-history-list {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0 0;
+  max-height: 120px;
+  overflow-y: auto;
+  font-size: 11px;
+}
+
+.ai-history-item {
+  padding: 4px 6px;
+  border-radius: 4px;
+  margin-bottom: 2px;
+  background: rgba(255, 255, 255, 0.02);
+  display: flex;
+  justify-content: space-between;
+}
+
+.history-item-placeholder {
+  color: var(--muted);
+  font-style: italic;
+  padding: 4px 0;
+}
+
+/* =====================================================================
+   CAMERA BOOKMARKS & NAMED VIEWS
+   ===================================================================== */
+.named-views-card {
+  max-width: 440px;
+  width: 80vw;
+}
+
+.nv-add-row {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.nv-name-input {
+  flex: 1;
+  padding: 5px 8px;
+  font-size: 11.5px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.named-views-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 250px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.named-view-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 11.5px;
+}
+
+.named-view-actions {
+  display: flex;
+  gap: 4px;
+}
+
 
 

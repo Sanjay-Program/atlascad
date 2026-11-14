@@ -43,6 +43,7 @@
       <button type="button" class="ribbon-tab" data-tab="annotate" role="tab" aria-selected="false">Annotate</button>
       <button type="button" class="ribbon-tab" data-tab="simulate" role="tab" aria-selected="false">Simulation</button>
       <button type="button" class="ribbon-tab" data-tab="output" role="tab" aria-selected="false">Output</button>
+      <button type="button" class="ribbon-tab" data-tab="automate" role="tab" aria-selected="false">Automate & AI</button>
     </div>
     <div class="ribbon-content">
       <div class="ribbon-panel active" id="ribbonHome">
@@ -114,6 +115,39 @@
             </button>
             <button type="button" class="ribbon-btn" id="rbFeaBtn" title="FEA Simulation (FEA)">
               <span class="rb-icon">⚡</span><span>FEA</span>
+            </button>
+          </div>
+        </div>
+        <div class="ribbon-separator"></div>
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Layers</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn" id="rbLayersBtn" title="Layer Properties Manager (LA / LAYER)">
+              <span class="rb-icon">◫</span><span>Layers</span>
+            </button>
+            <button type="button" class="ribbon-btn" id="rbLayerIsoBtn" title="Isolate Active Layer (LAYISO)">
+              <span class="rb-icon">👁</span><span>Isolate</span>
+            </button>
+          </div>
+        </div>
+        <div class="ribbon-separator"></div>
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Blocks & Views</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn" id="rbBlockLibBtn" title="Component & Block Library (B / INSERT)">
+              <span class="rb-icon">▦</span><span>Library</span>
+            </button>
+            <button type="button" class="ribbon-btn" id="rbNamedViewsBtn" title="Camera Bookmarks & Named Views (VIEW)">
+              <span class="rb-icon">📹</span><span>Views</span>
+            </button>
+          </div>
+        </div>
+        <div class="ribbon-separator"></div>
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">AI</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn primary" id="rbAiDraftBtn" title="AI CAD Drafting Assistant (AI)">
+              <span class="rb-icon">✨</span><span>AI Assist</span>
             </button>
           </div>
         </div>
@@ -218,6 +252,24 @@
             <button type="button" class="ribbon-btn" id="rbOutStlBtn" title="Export Binary 3D STL (STL)"><span class="rb-icon">🧊</span><span>Export STL</span></button>
             <button type="button" class="ribbon-btn" id="rbOutSaveBtn" title="Save Project (QSAVE)"><span class="rb-icon">💾</span><span>Save</span></button>
             <button type="button" class="ribbon-btn" id="rbOutMultiviewBtn" title="4-View Orthographic Drawing"><span class="rb-icon">⊞</span><span>Multi-View</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="ribbon-panel" id="ribbonAutomate">
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">AI Assistance</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn primary" id="rbAutomateAiBtn" title="AI CAD Drafting Assistant (AI)"><span class="rb-icon">✨</span><span>AI Assist</span></button>
+            <button type="button" class="ribbon-btn" id="rbAutomateMacroBtn" title="Run Command Script (SCR)"><span class="rb-icon">📜</span><span>Script</span></button>
+          </div>
+        </div>
+        <div class="ribbon-separator"></div>
+        <div class="ribbon-group">
+          <div class="ribbon-group-title">Parametric & Solver</div>
+          <div class="ribbon-buttons">
+            <button type="button" class="ribbon-btn" id="rbAutomateSolveBtn" title="Solve 2D Constraints (CON / DOF)"><span class="rb-icon">⚙</span><span>Solve DOF</span></button>
+            <button type="button" class="ribbon-btn" id="rbAutomateOverkillBtn" title="Clean Overkill & Duplicates (OV)"><span class="rb-icon">🧹</span><span>Overkill</span></button>
+            <button type="button" class="ribbon-btn" id="rbAutomatePurgeBtn" title="Purge Unused Blocks & Layers (PU)"><span class="rb-icon">🗑</span><span>Purge</span></button>
           </div>
         </div>
       </div>
@@ -446,8 +498,11 @@
         <button type="button" class="navbar-btn" id="navOrbitBtn" title="Orbit View (Drag LMB)">
           <span class="nav-icon">↻</span>
         </button>
-        <button type="button" class="navbar-btn" id="navStyleBtn" title="Visual Style (Shaded / Wire / Blueprint / Clay / X-Ray)">
+        <button type="button" class="navbar-btn" id="navStyleBtn" title="Visual Style (Shaded / Wire / Blueprint / Clay / X-Ray / Realistic / Gooch)">
           <span class="nav-icon">🎨</span>
+        </button>
+        <button type="button" class="navbar-btn" id="navOrthoToggleBtn" title="Toggle Orthographic / Perspective Projection (O)">
+          <span class="nav-icon">⧉</span>
         </button>
         <button type="button" class="navbar-btn" id="navMeasureBtn" title="3D Measurement & Inspection HUD (M / I)">
           <span class="nav-icon">📏</span>
@@ -1026,6 +1081,130 @@
         <dt>CAM / GCODE</dt><dd>Generate 3-Axis CNC Toolpaths</dd>
       </dl>
       <p class="hint">All commands in the palette are connected to the project API. There are no placeholder actions.</p>
+    </div>
+  </div>
+
+  <!-- Layer Properties Manager Modal (LA / LAYER) -->
+  <div id="layerManagerModal" class="palette layer-manager-modal" hidden role="dialog" aria-modal="true" aria-labelledby="layerManagerTitle">
+    <div class="palette-backdrop" id="layerManagerBackdrop"></div>
+    <div class="palette-card layer-manager-card">
+      <div class="section-head">
+        <h2 id="layerManagerTitle">Layer Properties Manager</h2>
+        <button type="button" class="link" id="layerManagerCloseBtn">close</button>
+      </div>
+      <div class="layer-manager-toolbar">
+        <div class="layer-actions">
+          <button type="button" class="button small" id="lmNewLayerBtn" title="Create New Layer (Alt+N)">+ New Layer</button>
+          <button type="button" class="button ghost small" id="lmSetCurrentBtn" title="Set Selected as Current Layer">Set Current</button>
+          <button type="button" class="button ghost small" id="lmPurgeUnusedBtn" title="Purge Unused Layers (PU)">Purge Unused</button>
+        </div>
+        <div class="layer-search-wrap">
+          <input type="text" id="lmSearchInput" class="layer-search-input" placeholder="Search layers…" autocomplete="off">
+        </div>
+      </div>
+      <div class="layer-table-wrap">
+        <table class="layer-table" id="layerTable">
+          <thead>
+            <tr>
+              <th title="Current Layer Status">Status</th>
+              <th>Name</th>
+              <th title="Turn Layer On or Off">On</th>
+              <th title="Freeze or Thaw Layer in all viewports">Freeze</th>
+              <th title="Lock or Unlock Layer">Lock</th>
+              <th>Color</th>
+              <th>Linetype</th>
+              <th>Lineweight</th>
+            </tr>
+          </thead>
+          <tbody id="layerTableBody"></tbody>
+        </table>
+      </div>
+      <div class="layer-manager-foot">
+        <span id="lmSummaryText">0 layers</span>
+        <button type="button" class="button primary small" id="lmApplyBtn">Apply & Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Component & Block Library Modal (INSERT / B) -->
+  <div id="blockLibraryModal" class="palette block-library-modal" hidden role="dialog" aria-modal="true" aria-labelledby="blockLibraryTitle">
+    <div class="palette-backdrop" id="blockLibraryBackdrop"></div>
+    <div class="palette-card block-library-card">
+      <div class="section-head">
+        <h2 id="blockLibraryTitle">AutoCAD Component & Block Library</h2>
+        <button type="button" class="link" id="blockLibraryCloseBtn">close</button>
+      </div>
+      <div class="block-lib-nav" role="tablist">
+        <button type="button" class="block-cat-btn active" data-cat="fasteners">Fasteners (ISO)</button>
+        <button type="button" class="block-cat-btn" data-cat="mechanical">Mechanical & Symbols</button>
+        <button type="button" class="block-cat-btn" data-cat="electrical">Electrical Schematics</button>
+        <button type="button" class="block-cat-btn" data-cat="custom">Document Blocks</button>
+      </div>
+      <div class="block-lib-grid" id="blockLibGrid"></div>
+      <div class="block-lib-foot">
+        <span class="hint">Click any component to insert instance into active drawing sheet at cursor.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI CAD Drafting Assistant Modal (AI / ASSIST) -->
+  <div id="aiAssistantModal" class="palette ai-assistant-modal" hidden role="dialog" aria-modal="true" aria-labelledby="aiAssistantTitle">
+    <div class="palette-backdrop" id="aiAssistantBackdrop"></div>
+    <div class="palette-card ai-assistant-card">
+      <div class="section-head">
+        <div class="ai-head-wrap">
+          <span class="ai-sparkle-icon">✨</span>
+          <h2 id="aiAssistantTitle">AI CAD Drafting & Modeling Assistant</h2>
+        </div>
+        <button type="button" class="link" id="aiAssistantCloseBtn">close</button>
+      </div>
+      <p class="hint">Type natural-language drafting instructions. AI parses your engineering intent into validated, typed CAD transactions.</p>
+      <div class="ai-quick-pills">
+        <button type="button" class="ai-pill" data-prompt="Create a 80x50 mm plate with 4x M6 holes at 10mm corner inset">80×50 mounting plate with holes</button>
+        <button type="button" class="ai-pill" data-prompt="Create a 100x60 rectangle centered at 0,0">100×60 centered rectangle</button>
+        <button type="button" class="ai-pill" data-prompt="Add 12mm center hole">12mm center hole</button>
+        <button type="button" class="ai-pill" data-prompt="Fillet 5mm all corners">Fillet 5mm corners</button>
+        <button type="button" class="ai-pill" data-prompt="Generate 4-view orthographic drawing">4-view orthographic</button>
+      </div>
+      <div class="ai-input-wrap">
+        <textarea id="aiPromptInput" class="ai-prompt-input" rows="2" placeholder="e.g. Draw a 60x40 rectangle at origin and extrude to 15mm..."></textarea>
+        <button type="button" id="aiParseBtn" class="button primary">Plan Operation</button>
+      </div>
+      <div id="aiPlanCard" class="ai-plan-card" hidden>
+        <div class="plan-head"><strong>Verified Operation Plan</strong><span class="badge" id="aiPlanStatusBadge">ready</span></div>
+        <div class="meta-grid compact" id="aiPlanGrid">
+          <span>Operation</span><span id="aiPlanOp">—</span>
+          <span>Entity</span><span id="aiPlanEntity">—</span>
+          <span>Parameters</span><span id="aiPlanParams">—</span>
+          <span>Target Layer</span><span id="aiPlanLayer">—</span>
+        </div>
+        <div class="plan-actions">
+          <button type="button" id="aiExecuteBtn" class="button primary small">Execute CAD Transaction</button>
+          <button type="button" id="aiCancelPlanBtn" class="button ghost small">Dismiss</button>
+        </div>
+      </div>
+      <div class="ai-history-section">
+        <span class="ai-history-title">Transaction Journal</span>
+        <ul id="aiHistoryList" class="ai-history-list">
+          <li class="history-item-placeholder">No AI operations executed in this session yet.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Camera Bookmarks & Named Views Modal (VIEW / V) -->
+  <div id="namedViewsModal" class="palette named-views-modal" hidden role="dialog" aria-modal="true" aria-labelledby="namedViewsTitle">
+    <div class="palette-backdrop" id="namedViewsBackdrop"></div>
+    <div class="palette-card named-views-card">
+      <div class="section-head">
+        <h2 id="namedViewsTitle">Camera Bookmarks & Named Views</h2>
+        <button type="button" class="link" id="namedViewsCloseBtn">close</button>
+      </div>
+      <div class="nv-add-row">
+        <input type="text" id="nvNameInput" class="nv-name-input" placeholder="View name (e.g. Iso Detail, Cavity Cut)…" maxlength="40">
+        <button type="button" id="nvSaveCurrentBtn" class="button small">Save Current View</button>
+      </div>
+      <ul id="namedViewsList" class="named-views-list"></ul>
     </div>
   </div>
 

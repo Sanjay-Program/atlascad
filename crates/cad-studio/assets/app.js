@@ -147,7 +147,11 @@
     uniform vec3 uColor;
     uniform vec3 uEye;
     uniform float uHighlight;
+    uniform float uStyleMode;
     void main() {
+      if (uStyleMode > 3.5 && vWorld.x > 0.0) {
+        discard;
+      }
       vec3 n = normalize(vNormal);
       if (!gl_FrontFacing) n = -n;
       vec3 key = normalize(vec3(0.45, 0.60, 0.85));
@@ -160,7 +164,9 @@
       
       vec3 viewDir = normalize(uEye - vWorld);
       vec3 halfDir = normalize(key + viewDir);
-      float spec = pow(max(dot(n, halfDir), 0.0), 28.0) * 0.32;
+      float specPower = (uStyleMode > 0.5 && uStyleMode < 1.5) ? 48.0 : 28.0;
+      float specMult = (uStyleMode > 0.5 && uStyleMode < 1.5) ? 0.65 : 0.32;
+      float spec = pow(max(dot(n, halfDir), 0.0), specPower) * specMult;
       
       float rim = pow(1.0 - max(dot(n, viewDir), 0.0), 2.6) * 0.18;
       
@@ -169,7 +175,18 @@
         base = mix(base, vec3(1.0, 0.68, 0.18), 0.55);
       }
       
-      vec3 lit = base * (0.28 + 0.68 * diffKey + diffFill + diffBack) + vec3(spec) + vec3(rim);
+      vec3 lit;
+      if (uStyleMode > 1.5 && uStyleMode < 2.5) {
+        vec3 kCool = base * 0.6 + vec3(0.05, 0.15, 0.35);
+        vec3 kWarm = base * 0.9 + vec3(0.35, 0.30, 0.05);
+        float goochFactor = (1.0 + dot(n, key)) * 0.5;
+        lit = mix(kCool, kWarm, goochFactor) + vec3(spec);
+      } else if (uStyleMode > 2.5 && uStyleMode < 3.5) {
+        lit = base;
+      } else {
+        float ambient = (uStyleMode > 0.5 && uStyleMode < 1.5) ? 0.35 : 0.28;
+        lit = base * (ambient + 0.68 * diffKey + diffFill + diffBack) + vec3(spec) + vec3(rim);
+      }
       gl_FragColor = vec4(lit, 1.0);
     }
   `;
@@ -235,6 +252,21 @@
     out[10] = (far + near) / (near - far);
     out[11] = -1;
     out[14] = (2 * far * near) / (near - far);
+    return out;
+  }
+
+  function orthographic(left, right, bottom, top, near, far) {
+    const out = new Float32Array(16);
+    const lr = 1 / (right - left);
+    const bt = 1 / (top - bottom);
+    const nf = 1 / (near - far);
+    out[0] = 2 * lr;
+    out[5] = 2 * bt;
+    out[10] = 2 * nf;
+    out[12] = -(right + left) * lr;
+    out[13] = -(top + bottom) * bt;
+    out[14] = (far + near) * nf;
+    out[15] = 1;
     return out;
   }
 
@@ -319,7 +351,7 @@
     constructor(canvas) {
       this.canvas = canvas;
       this.gl = canvas.getContext("webgl", { antialias: true, alpha: false, depth: true });
-      this.camera = { yaw: -2.32, pitch: 0.52, distance: 140, target: [0, 0, 0] };
+      this.camera = { yaw: -2.32, pitch: 0.52, distance: 140, target: [0, 0, 0], orthographic: false };
       this.bounds = null;
       this.radius = 50;
       this.visualStyle = "shaded-edges";
@@ -373,6 +405,7 @@
       this.locations.meshColor = gl.getUniformLocation(this.meshProgram, "uColor");
       this.locations.meshEye = gl.getUniformLocation(this.meshProgram, "uEye");
       this.locations.meshHighlight = gl.getUniformLocation(this.meshProgram, "uHighlight");
+      this.locations.meshStyleMode = gl.getUniformLocation(this.meshProgram, "uStyleMode");
       this.locations.linePosition = gl.getAttribLocation(this.lineProgram, "aPosition");
       this.locations.lineColor = gl.getAttribLocation(this.lineProgram, "aColor");
       this.locations.lineViewProjection = gl.getUniformLocation(this.lineProgram, "uViewProjection");
@@ -736,7 +769,14 @@
       const aspect = width / Math.max(height, 1);
       const near = Math.max(0.01, this.camera.distance - this.radius * 4);
       const far = this.camera.distance + this.radius * 10 + 1000;
-      const projection = perspective((50 * Math.PI) / 180, aspect, near, far);
+      let projection;
+      if (this.camera.orthographic) {
+        const halfH = Math.max(1, this.camera.distance * Math.tan((25 * Math.PI) / 180));
+        const halfW = halfH * aspect;
+        projection = orthographic(-halfW, halfW, -halfH, halfH, near, far);
+      } else {
+        projection = perspective((50 * Math.PI) / 180, aspect, near, far);
+      }
       const eye = this.eye();
       const view = lookAt(eye, this.camera.target, [0, 0, 1]);
       return { eye, viewProjection: multiply(projection, view), aspect };
@@ -789,20 +829,64 @@
         gl.useProgram(this.meshProgram);
         gl.uniformMatrix4fv(this.locations.meshViewProjection, false, viewProjection);
         let color = app.theme === "dark" ? [0.42, 0.56, 0.7] : [0.28, 0.45, 0.62];
+        let styleMode = 0.0;
+        let isWithEdges = !this.visualStyle || this.visualStyle === "shaded-edges" || this.visualStyle === "blueprint" || this.visualStyle === "conceptual" || this.visualStyle === "xray" || this.visualStyle === "technical-illustration" || this.visualStyle === "hidden-line" || this.visualStyle === "hidden-line-removed" || this.visualStyle === "sectioned-view";
+        let edgeAlpha = app.theme === "dark" ? 0.68 : 0.75;
+        let edgeCol = app.theme === "dark" ? [0.12, 0.17, 0.25] : [0.15, 0.22, 0.32];
+
         if (this.visualStyle === "blueprint") {
           color = [0.06, 0.18, 0.32];
+          edgeCol = [0.35, 0.85, 1.0];
+          edgeAlpha = 0.95;
+          styleMode = 3.0;
         } else if (this.visualStyle === "conceptual") {
           color = [0.86, 0.82, 0.74];
+          edgeCol = [0.22, 0.19, 0.16];
+          edgeAlpha = 0.85;
+          styleMode = 0.0;
         } else if (this.visualStyle === "xray") {
           color = [0.32, 0.52, 0.75];
+          edgeCol = [0.55, 0.82, 1.0];
+          edgeAlpha = 0.8;
+          styleMode = 0.0;
+        } else if (this.visualStyle === "realistic") {
+          color = app.theme === "dark" ? [0.65, 0.68, 0.72] : [0.55, 0.58, 0.62];
+          styleMode = 1.0;
+          isWithEdges = false;
+        } else if (this.visualStyle === "technical-illustration") {
+          color = [0.75, 0.75, 0.78];
+          edgeCol = [0.08, 0.08, 0.12];
+          edgeAlpha = 0.95;
+          styleMode = 2.0;
+        } else if (this.visualStyle === "hidden-line" || this.visualStyle === "hidden-line-removed") {
+          color = app.theme === "dark" ? [0.12, 0.15, 0.18] : [0.96, 0.96, 0.98];
+          edgeCol = app.theme === "dark" ? [0.85, 0.88, 0.92] : [0.05, 0.05, 0.08];
+          edgeAlpha = 1.0;
+          styleMode = 3.0;
+        } else if (this.visualStyle === "flat-shaded") {
+          color = app.theme === "dark" ? [0.42, 0.56, 0.70] : [0.28, 0.45, 0.62];
+          styleMode = 3.0;
+          isWithEdges = false;
+        } else if (this.visualStyle === "sectioned-view") {
+          color = app.theme === "dark" ? [0.45, 0.58, 0.72] : [0.32, 0.48, 0.65];
+          styleMode = 4.0;
+          edgeCol = app.theme === "dark" ? [0.12, 0.17, 0.25] : [0.15, 0.22, 0.32];
+          edgeAlpha = 0.8;
+        } else if (this.visualStyle === "smooth-shaded" || this.visualStyle === "shaded") {
+          color = app.theme === "dark" ? [0.42, 0.56, 0.70] : [0.28, 0.45, 0.62];
+          styleMode = 0.0;
+          isWithEdges = false;
         }
+
         gl.uniform3f(this.locations.meshColor, color[0], color[1], color[2]);
         gl.uniform3f(this.locations.meshEye, eye[0], eye[1], eye[2]);
         if (this.locations.meshHighlight) {
           gl.uniform1f(this.locations.meshHighlight, this.pick ? 0.35 : 0.0);
         }
+        if (this.locations.meshStyleMode) {
+          gl.uniform1f(this.locations.meshStyleMode, styleMode);
+        }
 
-        const isWithEdges = !this.visualStyle || this.visualStyle === "shaded-edges" || this.visualStyle === "blueprint" || this.visualStyle === "conceptual" || this.visualStyle === "xray";
         if (isWithEdges) {
           gl.enable(gl.POLYGON_OFFSET_FILL);
           gl.polygonOffset(1.0, 1.0);
@@ -822,18 +906,6 @@
             gl.useProgram(this.lineProgram);
             gl.uniformMatrix4fv(this.locations.lineViewProjection, false, viewProjection);
             gl.uniform1f(this.locations.linePointSize, 1);
-            let edgeAlpha = app.theme === "dark" ? 0.68 : 0.75;
-            let edgeCol = app.theme === "dark" ? [0.12, 0.17, 0.25] : [0.15, 0.22, 0.32];
-            if (this.visualStyle === "blueprint") {
-              edgeCol = [0.35, 0.85, 1.0];
-              edgeAlpha = 0.95;
-            } else if (this.visualStyle === "conceptual") {
-              edgeCol = [0.22, 0.19, 0.16];
-              edgeAlpha = 0.85;
-            } else if (this.visualStyle === "xray") {
-              edgeCol = [0.55, 0.82, 1.0];
-              edgeAlpha = 0.8;
-            }
             gl.uniform1f(this.locations.lineAlpha, edgeAlpha);
             gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.wire);
             gl.enableVertexAttribArray(this.locations.linePosition);
@@ -872,6 +944,15 @@
       }
 
       this.updateViewCube();
+    }
+
+    toggleCameraProjection() {
+      this.camera.orthographic = !this.camera.orthographic;
+      toast(this.camera.orthographic ? "Camera: Orthographic (Parallel Projection)" : "Camera: Perspective (True FOV)");
+      const btn = byId("navOrthoToggleBtn");
+      if (btn) btn.classList.toggle("active", this.camera.orthographic);
+      this.requestFrame();
+      return this.camera.orthographic;
     }
 
     // The point under the cursor on the z = 0 drawing plane, in millimetres, or null when the
@@ -2502,6 +2583,7 @@
       const [px, py] = s.point;
 
       let markerNode;
+      const snapClass = `drawing-snap-marker ${s.kind ? s.kind.toLowerCase() : s.symbol}`;
       switch (s.symbol) {
         case "square":
           markerNode = svgNode("rect", {
@@ -2509,13 +2591,13 @@
             y: py - size / 2,
             width: size,
             height: size,
-            class: "drawing-snap-marker",
+            class: snapClass,
           });
           break;
         case "triangle":
           markerNode = svgNode("polygon", {
             points: `${px},${py + size / 2} ${px - size / 2},${py - size / 2} ${px + size / 2},${py - size / 2}`,
-            class: "drawing-snap-marker",
+            class: snapClass,
           });
           break;
         case "circle":
@@ -2523,19 +2605,50 @@
             cx: px,
             cy: py,
             r: size / 2,
-            class: "drawing-snap-marker",
+            class: snapClass,
           });
           break;
         case "diamond":
           markerNode = svgNode("polygon", {
             points: `${px},${py + size / 2} ${px + size / 2},${py} ${px},${py - size / 2} ${px - size / 2},${py}`,
-            class: "drawing-snap-marker",
+            class: snapClass,
           });
           break;
         case "cross":
           markerNode = svgNode("path", {
             d: `M ${px - size / 2} ${py - size / 2} L ${px + size / 2} ${py + size / 2} M ${px + size / 2} ${py - size / 2} L ${px - size / 2} ${py + size / 2}`,
-            class: "drawing-snap-marker",
+            class: snapClass,
+          });
+          break;
+        case "perpendicular":
+          markerNode = svgNode("path", {
+            d: `M ${px - size / 2} ${py + size / 2} L ${px - size / 2} ${py - size / 2} L ${px + size / 2} ${py - size / 2} M ${px - size / 2} ${py} L ${px} ${py} L ${px} ${py - size / 2}`,
+            class: snapClass,
+          });
+          break;
+        case "tangent":
+          markerNode = svgNode("path", {
+            d: `M ${px - size / 2} ${py + size / 2} L ${px + size / 2} ${py + size / 2} M ${px} ${py} m -${size / 2.5},0 a ${size / 2.5},${size / 2.5} 0 1,0 ${size * 2 / 2.5},0 a ${size / 2.5},${size / 2.5} 0 1,0 -${size * 2 / 2.5},0`,
+            class: snapClass,
+          });
+          break;
+        case "nearest":
+        case "hourglass":
+          markerNode = svgNode("path", {
+            d: `M ${px - size / 2} ${py - size / 2} L ${px + size / 2} ${py - size / 2} L ${px - size / 2} ${py + size / 2} L ${px + size / 2} ${py + size / 2} Z`,
+            class: snapClass,
+          });
+          break;
+        case "node":
+          markerNode = svgNode("path", {
+            d: `M ${px - size / 2} ${py} L ${px + size / 2} ${py} M ${px} ${py - size / 2} L ${px} ${py + size / 2} M ${px} ${py} m -${size / 3},0 a ${size / 3},${size / 3} 0 1,0 ${size * 2 / 3},0 a ${size / 3},${size / 3} 0 1,0 -${size * 2 / 3},0`,
+            class: snapClass,
+          });
+          break;
+        case "parallel":
+          markerNode = svgNode("path", {
+            d: `M ${px - size / 3} ${py - size / 2} L ${px} ${py + size / 2} M ${px} ${py - size / 2} L ${px + size / 3} ${py + size / 2}`,
+            class: snapClass,
           });
           break;
         default:
@@ -2544,7 +2657,7 @@
             y: py - size / 2,
             width: size,
             height: size,
-            class: "drawing-snap-marker",
+            class: snapClass,
           });
           break;
       }
@@ -4794,6 +4907,22 @@ ${gcodeSample}`;
     { alias: "XRAY", name: "VSTYLE", desc: "Switch to X-Ray Ghosted Visual Style", run: () => setVisualStyleExplicit("xray") },
     { alias: "SHADED", name: "VSTYLE", desc: "Switch to Shaded with Edges Visual Style", run: () => setVisualStyleExplicit("shaded-edges") },
     { alias: "WIREFRAME", name: "VSTYLE", desc: "Switch to Wireframe Visual Style", run: () => setVisualStyleExplicit("wireframe") },
+    { alias: "LA", name: "LAYER", desc: "Open Layer Properties Manager Palette", run: () => openLayerManagerModal() },
+    { alias: "LAYER", name: "LAYER", desc: "Open Layer Properties Manager Palette", run: () => openLayerManagerModal() },
+    { alias: "LAYERS", name: "LAYER", desc: "Open Layer Properties Manager Palette", run: () => openLayerManagerModal() },
+    { alias: "LIB", name: "BLOCKLIB", desc: "Component & Reusable Block Library", run: () => openBlockLibraryModal() },
+    { alias: "BLOCKLIB", name: "BLOCKLIB", desc: "Component & Reusable Block Library", run: () => openBlockLibraryModal() },
+    { alias: "AI", name: "ASSIST", desc: "Open AI CAD Drafting & Modeling Assistant", run: () => openAiAssistantModal() },
+    { alias: "ASSIST", name: "ASSIST", desc: "Open AI CAD Drafting & Modeling Assistant", run: () => openAiAssistantModal() },
+    { alias: "COPILOT", name: "ASSIST", desc: "Open AI CAD Drafting & Modeling Assistant", run: () => openAiAssistantModal() },
+    { alias: "V", name: "VIEW", desc: "Camera Bookmarks & Named Views", run: () => openNamedViewsModal() },
+    { alias: "VIEW", name: "VIEW", desc: "Camera Bookmarks & Named Views", run: () => openNamedViewsModal() },
+    { alias: "VIEWS", name: "VIEW", desc: "Camera Bookmarks & Named Views", run: () => openNamedViewsModal() },
+    { alias: "PROJ", name: "ORTHOPROJ", desc: "Toggle Camera Orthographic / Perspective Projection", run: () => app.viewport?.toggleCameraProjection() },
+    { alias: "REALISTIC", name: "VSTYLE", desc: "Switch to Realistic Metal Visual Style", run: () => setVisualStyleExplicit("realistic") },
+    { alias: "HIDDEN", name: "VSTYLE", desc: "Switch to Hidden Line Removed Visual Style", run: () => setVisualStyleExplicit("hidden-line") },
+    { alias: "TECH", name: "VSTYLE", desc: "Switch to Technical Illustration Gooch Visual Style", run: () => setVisualStyleExplicit("technical-illustration") },
+    { alias: "SECTION3D", name: "VSTYLE", desc: "Switch to Sectioned 3D View Visual Style", run: () => setVisualStyleExplicit("sectioned-view") },
   ];
 
   let currentLayoutSpace = "model";
@@ -4861,6 +4990,68 @@ ${gcodeSample}`;
     }
   }
 
+  function computeEntityBounds(entity) {
+    if (!entity || !entity.kind) return null;
+    const k = entity.kind;
+    switch (k.kind) {
+      case "point":
+        return [k.at[0], k.at[1], k.at[0], k.at[1]];
+      case "line":
+        return [
+          Math.min(k.start[0], k.end[0]),
+          Math.min(k.start[1], k.end[1]),
+          Math.max(k.start[0], k.end[0]),
+          Math.max(k.start[1], k.end[1]),
+        ];
+      case "polyline": {
+        if (!k.points || !k.points.length) return null;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const p of k.points) {
+          minX = Math.min(minX, p[0]);
+          minY = Math.min(minY, p[1]);
+          maxX = Math.max(maxX, p[0]);
+          maxY = Math.max(maxY, p[1]);
+        }
+        return [minX, minY, maxX, maxY];
+      }
+      case "circle":
+      case "arc":
+        return [
+          k.center[0] - k.radius,
+          k.center[1] - k.radius,
+          k.center[0] + k.radius,
+          k.center[1] + k.radius,
+        ];
+      case "rectangle":
+        return [
+          k.origin[0],
+          k.origin[1],
+          k.origin[0] + k.width,
+          k.origin[1] + k.height,
+        ];
+      case "ellipse":
+        return [
+          k.center[0] - k.radius_x,
+          k.center[1] - k.radius_y,
+          k.center[0] + k.radius_x,
+          k.center[1] + k.radius_y,
+        ];
+      case "spline": {
+        if (!k.points || !k.points.length) return null;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const p of k.points) {
+          minX = Math.min(minX, p[0]);
+          minY = Math.min(minY, p[1]);
+          maxX = Math.max(maxX, p[0]);
+          maxY = Math.max(maxY, p[1]);
+        }
+        return [minX, minY, maxX, maxY];
+      }
+      default:
+        return null;
+    }
+  }
+
   function wireFullDrawingEvents() {
     const full = byId("fullDrawingCanvas");
     if (!full || full.dataset.eventsWired) return;
@@ -4868,6 +5059,20 @@ ${gcodeSample}`;
 
     let isPanningSheet = false;
     let sheetPanStart = [0, 0];
+    let isBoxSelecting = false;
+    let boxSelectStart = null;
+    let boxSelectStartModel = null;
+    let selectionBoxEl = null;
+
+    function getOrCreateSelectionBox() {
+      let el = full.querySelector(".selection-box");
+      if (!el) {
+        el = document.createElement("div");
+        el.className = "selection-box";
+        full.appendChild(el);
+      }
+      return el;
+    }
 
     full.addEventListener("wheel", (event) => {
       const svg = full.querySelector("svg");
@@ -4884,6 +5089,19 @@ ${gcodeSample}`;
         sheetPanStart = [event.clientX, event.clientY];
         full.setPointerCapture(event.pointerId);
         event.preventDefault();
+      } else if (event.button === 0 && !event.shiftKey) {
+        const svg = full.querySelector("svg");
+        const target = event.target;
+        const node = target && typeof target.closest === "function" ? target.closest("[data-entity-id]") : null;
+        if (!node && svg && (drawState.tool === "select" || !drawState.tool || drawState.tool === "none")) {
+          isBoxSelecting = true;
+          boxSelectStart = [event.clientX, event.clientY];
+          boxSelectStartModel = modelPointFromEvent(svg, event);
+          selectionBoxEl = getOrCreateSelectionBox();
+          selectionBoxEl.style.display = "none";
+          full.setPointerCapture(event.pointerId);
+          event.preventDefault();
+        }
       }
     });
 
@@ -4891,6 +5109,55 @@ ${gcodeSample}`;
       if (isPanningSheet) {
         isPanningSheet = false;
         try { full.releasePointerCapture(event.pointerId); } catch (_) {}
+      }
+      if (isBoxSelecting) {
+        isBoxSelecting = false;
+        try { full.releasePointerCapture(event.pointerId); } catch (_) {}
+        if (selectionBoxEl) selectionBoxEl.style.display = "none";
+        const svg = full.querySelector("svg");
+        if (boxSelectStart && svg && app.drawing && Array.isArray(app.drawing.entities)) {
+          const dx = event.clientX - boxSelectStart[0];
+          const dy = event.clientY - boxSelectStart[1];
+          if (Math.hypot(dx, dy) > 6 && boxSelectStartModel) {
+            const endModel = modelPointFromEvent(svg, event);
+            if (endModel) {
+              const minX = Math.min(boxSelectStartModel[0], endModel[0]);
+              const maxX = Math.max(boxSelectStartModel[0], endModel[0]);
+              const minY = Math.min(boxSelectStartModel[1], endModel[1]);
+              const maxY = Math.max(boxSelectStartModel[1], endModel[1]);
+              const isWindow = dx >= 0;
+
+              const matchedIds = [];
+              for (let i = 0; i < app.drawing.entities.length; i++) {
+                const entity = app.drawing.entities[i];
+                const b = computeEntityBounds(entity);
+                if (!b) continue;
+                const [eMinX, eMinY, eMaxX, eMaxY] = b;
+                if (isWindow) {
+                  if (eMinX >= minX && eMaxX <= maxX && eMinY >= minY && eMaxY <= maxY) {
+                    matchedIds.push(i);
+                  }
+                } else {
+                  if (!(eMaxX < minX || eMinX > maxX || eMaxY < minY || eMinY > maxY)) {
+                    matchedIds.push(i);
+                  }
+                }
+              }
+              if (matchedIds.length > 0) {
+                drawState.selected = matchedIds[0];
+                drawState.selectedSet = matchedIds;
+                renderDrawing(app.drawing);
+                toast(`${matchedIds.length} entities selected (${isWindow ? "Window" : "Crossing"})`);
+              } else {
+                drawState.selected = null;
+                drawState.selectedSet = [];
+                renderDrawing(app.drawing);
+              }
+            }
+          }
+        }
+        boxSelectStart = null;
+        boxSelectStartModel = null;
       }
     });
 
@@ -4917,6 +5184,28 @@ ${gcodeSample}`;
               drawState.viewPan[1] += dy / scale;
               renderDrawing(app.drawing);
             }
+          }
+        }
+        return;
+      }
+      if (isBoxSelecting && boxSelectStart) {
+        const dx = event.clientX - boxSelectStart[0];
+        const dy = event.clientY - boxSelectStart[1];
+        if (Math.hypot(dx, dy) > 4) {
+          const rect = full.getBoundingClientRect();
+          const left = Math.min(boxSelectStart[0], event.clientX) - rect.left;
+          const top = Math.min(boxSelectStart[1], event.clientY) - rect.top;
+          const width = Math.abs(dx);
+          const height = Math.abs(dy);
+          selectionBoxEl.style.display = "block";
+          selectionBoxEl.style.left = `${left}px`;
+          selectionBoxEl.style.top = `${top}px`;
+          selectionBoxEl.style.width = `${width}px`;
+          selectionBoxEl.style.height = `${height}px`;
+          if (dx >= 0) {
+            selectionBoxEl.className = "selection-box window";
+          } else {
+            selectionBoxEl.className = "selection-box crossing";
           }
         }
         return;
@@ -5122,37 +5411,38 @@ ${gcodeSample}`;
     }, duration);
   }
 
+  const VISUAL_STYLES = [
+    { id: "shaded-edges", label: "[Shaded with Edges]" },
+    { id: "shaded", label: "[Shaded Smooth]" },
+    { id: "wireframe", label: "[Wireframe]" },
+    { id: "blueprint", label: "[Blueprint CAD]" },
+    { id: "conceptual", label: "[Conceptual Clay]" },
+    { id: "xray", label: "[X-Ray Ghosted]" },
+    { id: "realistic", label: "[Realistic Metal]" },
+    { id: "hidden-line", label: "[Hidden Line]" },
+    { id: "hidden-line-removed", label: "[Hidden Line Removed]" },
+    { id: "flat-shaded", label: "[Flat Shaded]" },
+    { id: "smooth-shaded", label: "[Smooth Shaded]" },
+    { id: "technical-illustration", label: "[Technical Gooch]" },
+    { id: "sectioned-view", label: "[Sectioned 3D View]" },
+  ];
+
   function cycleVisualStyle() {
     if (!app.viewport) return;
-    const styles = ["shaded-edges", "shaded", "wireframe", "blueprint", "conceptual", "xray"];
-    const labels = {
-      "shaded-edges": "[Shaded with Edges]",
-      "shaded": "[Shaded]",
-      "wireframe": "[Wireframe]",
-      "blueprint": "[Blueprint CAD]",
-      "conceptual": "[Conceptual Clay]",
-      "xray": "[X-Ray Ghosted]",
-    };
     const cur = app.viewport.visualStyle || "shaded-edges";
-    const next = styles[(styles.indexOf(cur) + 1) % styles.length];
+    const idx = VISUAL_STYLES.findIndex((s) => s.id === cur);
+    const next = VISUAL_STYLES[(idx + 1) % VISUAL_STYLES.length].id;
     setVisualStyleExplicit(next);
   }
 
   function setVisualStyleExplicit(style) {
     if (!app.viewport) return;
-    const labels = {
-      "shaded-edges": "[Shaded with Edges]",
-      "shaded": "[Shaded]",
-      "wireframe": "[Wireframe]",
-      "blueprint": "[Blueprint CAD]",
-      "conceptual": "[Conceptual Clay]",
-      "xray": "[X-Ray Ghosted]",
-    };
-    app.viewport.visualStyle = style;
-    app.viewport.wireframe = style === "wireframe";
+    const entry = VISUAL_STYLES.find((s) => s.id === style) || VISUAL_STYLES[0];
+    app.viewport.visualStyle = entry.id;
+    app.viewport.wireframe = entry.id === "wireframe";
     const badge = byId("styleVisualBadge");
-    if (badge) badge.textContent = labels[style] || `[${style}]`;
-    toast(`Visual Style: ${labels[style]?.replace(/[\[\]]/g, "") || style}`);
+    if (badge) badge.textContent = entry.label;
+    toast(`Visual Style: ${entry.label.replace(/[\[\]]/g, "")}`);
     app.viewport.requestFrame();
   }
 
@@ -5341,6 +5631,9 @@ ${gcodeSample}`;
     byId("navStyleBtn")?.addEventListener("click", () => {
       cycleVisualStyle();
     });
+    byId("navOrthoToggleBtn")?.addEventListener("click", () => {
+      app.viewport?.toggleCameraProjection();
+    });
     byId("navMeasureBtn")?.addEventListener("click", toggleMeasureHud);
     byId("navCleanScreenBtn")?.addEventListener("click", toggleCleanScreen);
   }
@@ -5369,6 +5662,657 @@ ${gcodeSample}`;
       addBtn.parentNode.insertBefore(btn, addBtn);
       toast(`Created new layout sheet: ${layoutName}`);
       btn.click();
+    });
+  }
+
+  // =========================================================================
+  // LAYER PROPERTIES MANAGER
+  // =========================================================================
+  function openLayerManagerModal() {
+    const modal = byId("layerManagerModal");
+    if (!modal) return;
+    modal.hidden = false;
+    renderLayerManagerTable();
+  }
+
+  function closeLayerManagerModal() {
+    const modal = byId("layerManagerModal");
+    if (modal) modal.hidden = true;
+  }
+
+  function renderLayerManagerTable(filter = "") {
+    const tbody = byId("layerTableBody");
+    if (!tbody) return;
+    tbody.textContent = "";
+    if (!app.drawing) {
+      app.drawing = { entities: [], layers: [], unit: "mm", bounds: [-50, -50, 50, 50] };
+    }
+    if (!Array.isArray(app.drawing.layers) || app.drawing.layers.length === 0) {
+      app.drawing.layers = [
+        { name: "0", color: "#ffffff", linetype: "CONTINUOUS", lineweight_mm: 0.25, visible: true, frozen: false, locked: false },
+        { name: "Defpoints", color: "#888888", linetype: "CONTINUOUS", lineweight_mm: 0.18, visible: true, frozen: false, locked: true },
+        { name: "Geometry", color: "#2196f3", linetype: "CONTINUOUS", lineweight_mm: 0.35, visible: true, frozen: false, locked: false },
+        { name: "Holes", color: "#ff9800", linetype: "CONTINUOUS", lineweight_mm: 0.35, visible: true, frozen: false, locked: false },
+        { name: "Dimensions", color: "#00bcd4", linetype: "CONTINUOUS", lineweight_mm: 0.18, visible: true, frozen: false, locked: false },
+        { name: "Centerlines", color: "#f44336", linetype: "CENTER", lineweight_mm: 0.18, visible: true, frozen: false, locked: false },
+        { name: "Hidden", color: "#9e9e9e", linetype: "HIDDEN", lineweight_mm: 0.18, visible: true, frozen: false, locked: false },
+      ];
+    }
+    const layers = app.drawing.layers;
+    const lowerFilter = (filter || "").toLowerCase().trim();
+
+    layers.forEach((layer) => {
+      if (lowerFilter && !layer.name.toLowerCase().includes(lowerFilter)) return;
+      const tr = document.createElement("tr");
+      if (layer.name === drawState.layer) tr.className = "current-layer";
+
+      const tdStatus = document.createElement("td");
+      tdStatus.textContent = layer.name === drawState.layer ? "✔" : "";
+      tdStatus.style.textAlign = "center";
+      tdStatus.style.color = "#4caf50";
+
+      const tdName = document.createElement("td");
+      tdName.textContent = layer.name;
+
+      const tdOn = document.createElement("td");
+      const btnOn = document.createElement("button");
+      btnOn.type = "button";
+      btnOn.className = `layer-toggle-icon ${layer.visible === false ? "off" : ""}`;
+      btnOn.textContent = layer.visible === false ? "⚪" : "💡";
+      btnOn.title = "Toggle Layer Visibility";
+      btnOn.addEventListener("click", () => {
+        layer.visible = layer.visible === false ? true : false;
+        renderLayerManagerTable(byId("lmSearchInput")?.value || "");
+        renderDrawing(app.drawing);
+      });
+      tdOn.appendChild(btnOn);
+
+      const tdFreeze = document.createElement("td");
+      const btnFreeze = document.createElement("button");
+      btnFreeze.type = "button";
+      btnFreeze.className = `layer-toggle-icon ${layer.frozen ? "" : "off"}`;
+      btnFreeze.textContent = layer.frozen ? "❄️" : "☀️";
+      btnFreeze.title = "Freeze / Thaw Layer";
+      btnFreeze.addEventListener("click", () => {
+        layer.frozen = !layer.frozen;
+        renderLayerManagerTable(byId("lmSearchInput")?.value || "");
+        renderDrawing(app.drawing);
+      });
+      tdFreeze.appendChild(btnFreeze);
+
+      const tdLock = document.createElement("td");
+      const btnLock = document.createElement("button");
+      btnLock.type = "button";
+      btnLock.className = `layer-toggle-icon ${layer.locked ? "" : "off"}`;
+      btnLock.textContent = layer.locked ? "🔒" : "🔓";
+      btnLock.title = "Lock / Unlock Layer";
+      btnLock.addEventListener("click", () => {
+        layer.locked = !layer.locked;
+        renderLayerManagerTable(byId("lmSearchInput")?.value || "");
+      });
+      tdLock.appendChild(btnLock);
+
+      const tdColor = document.createElement("td");
+      const dot = document.createElement("span");
+      dot.className = "layer-color-dot";
+      dot.style.backgroundColor = layer.color || "#ffffff";
+      dot.title = `Color: ${layer.color || "#ffffff"} (Click to edit)`;
+      dot.addEventListener("click", () => {
+        const newColor = prompt("Enter HEX color for layer " + layer.name + ":", layer.color || "#ffffff");
+        if (newColor && /^#[0-9a-fA-F]{3,8}$/.test(newColor)) {
+          layer.color = newColor;
+          renderLayerManagerTable(byId("lmSearchInput")?.value || "");
+          renderDrawing(app.drawing);
+        }
+      });
+      tdColor.appendChild(dot);
+
+      const tdLinetype = document.createElement("td");
+      tdLinetype.textContent = layer.linetype || "CONTINUOUS";
+
+      const tdLineweight = document.createElement("td");
+      tdLineweight.textContent = `${layer.lineweight_mm || 0.25} mm`;
+
+      tr.append(tdStatus, tdName, tdOn, tdFreeze, tdLock, tdColor, tdLinetype, tdLineweight);
+      tr.addEventListener("click", (e) => {
+        if (e.target.tagName === "BUTTON" || e.target.tagName === "SPAN") return;
+        drawState.layer = layer.name;
+        renderLayerManagerTable(byId("lmSearchInput")?.value || "");
+        syncDrawingControls();
+      });
+      tbody.appendChild(tr);
+    });
+
+    const summary = byId("lmSummaryText");
+    if (summary) summary.textContent = `${layers.length} layers in drawing`;
+  }
+
+  function setupLayerManagerModal() {
+    byId("rbLayersBtn")?.addEventListener("click", openLayerManagerModal);
+    byId("layerManagerCloseBtn")?.addEventListener("click", closeLayerManagerModal);
+    byId("layerManagerBackdrop")?.addEventListener("click", closeLayerManagerModal);
+    byId("lmApplyBtn")?.addEventListener("click", closeLayerManagerModal);
+
+    byId("lmSearchInput")?.addEventListener("input", (e) => {
+      renderLayerManagerTable(e.target.value);
+    });
+
+    byId("lmNewLayerBtn")?.addEventListener("click", () => {
+      if (!app.drawing) return;
+      if (!Array.isArray(app.drawing.layers)) app.drawing.layers = [];
+      const num = app.drawing.layers.length + 1;
+      const name = `Layer${num}`;
+      const colors = ["#2196f3", "#4caf50", "#ff9800", "#e91e63", "#9c27b0", "#00bcd4", "#ffeb3b"];
+      const col = colors[(num - 1) % colors.length];
+      app.drawing.layers.push({
+        name,
+        color: col,
+        linetype: "CONTINUOUS",
+        lineweight_mm: 0.25,
+        visible: true,
+        frozen: false,
+        locked: false,
+      });
+      renderLayerManagerTable(byId("lmSearchInput")?.value || "");
+      syncDrawingControls();
+      toast(`Created Layer: ${name}`);
+    });
+
+    byId("lmSetCurrentBtn")?.addEventListener("click", () => {
+      syncDrawingControls();
+      toast(`Current Layer: ${drawState.layer}`);
+    });
+
+    byId("lmPurgeUnusedBtn")?.addEventListener("click", () => {
+      cadPurge();
+      renderLayerManagerTable(byId("lmSearchInput")?.value || "");
+    });
+  }
+
+  // =========================================================================
+  // COMPONENT & BLOCK LIBRARY
+  // =========================================================================
+  const STANDARD_BLOCKS = [
+    {
+      category: "fasteners",
+      name: "ISO 4014 M6 Hex Bolt",
+      meta: "Hex Head Bolt M6x30 ISO 4014",
+      svg: `<svg viewBox="-15 -15 30 30" width="60" height="60"><polygon points="0,-10 8.66,-5 8.66,5 0,10 -8.66,5 -8.66,-5" fill="none" stroke="#2196f3" stroke-width="1.5"/><circle cx="0" cy="0" r="3" fill="none" stroke="#2196f3" stroke-width="1.2"/></svg>`,
+      createEntities: (cx, cy) => [
+        { kind: { kind: "circle", center: [cx, cy], radius: 3 }, layer: drawState.layer || "0" },
+        { kind: { kind: "polygon", center: [cx, cy], radius: 5.77, sides: 6 }, layer: drawState.layer || "0" },
+      ]
+    },
+    {
+      category: "fasteners",
+      name: "ISO 4014 M8 Hex Bolt",
+      meta: "Hex Head Bolt M8x40 ISO 4014",
+      svg: `<svg viewBox="-18 -18 36 36" width="60" height="60"><polygon points="0,-13 11.26,-6.5 11.26,6.5 0,13 -11.26,6.5 -11.26,-6.5" fill="none" stroke="#2196f3" stroke-width="1.5"/><circle cx="0" cy="0" r="4" fill="none" stroke="#2196f3" stroke-width="1.2"/></svg>`,
+      createEntities: (cx, cy) => [
+        { kind: { kind: "circle", center: [cx, cy], radius: 4 }, layer: drawState.layer || "0" },
+        { kind: { kind: "polygon", center: [cx, cy], radius: 7.5, sides: 6 }, layer: drawState.layer || "0" },
+      ]
+    },
+    {
+      category: "fasteners",
+      name: "ISO 4032 M6 Hex Nut",
+      meta: "Standard Hex Nut M6 ISO 4032",
+      svg: `<svg viewBox="-15 -15 30 30" width="60" height="60"><polygon points="0,-10 8.66,-5 8.66,5 0,10 -8.66,5 -8.66,-5" fill="none" stroke="#ff9800" stroke-width="1.5"/><circle cx="0" cy="0" r="3" fill="none" stroke="#ff9800" stroke-width="1.2"/><circle cx="0" cy="0" r="2.5" fill="none" stroke="#ff9800" stroke-width="0.8" stroke-dasharray="2,1"/></svg>`,
+      createEntities: (cx, cy) => [
+        { kind: { kind: "circle", center: [cx, cy], radius: 3 }, layer: drawState.layer || "0" },
+        { kind: { kind: "circle", center: [cx, cy], radius: 2.5 }, layer: drawState.layer || "0" },
+        { kind: { kind: "polygon", center: [cx, cy], radius: 5.77, sides: 6 }, layer: drawState.layer || "0" },
+      ]
+    },
+    {
+      category: "fasteners",
+      name: "ISO 7089 M6 Plain Washer",
+      meta: "Form A Plain Washer d1=6.4 d2=12 s=1.6",
+      svg: `<svg viewBox="-15 -15 30 30" width="60" height="60"><circle cx="0" cy="0" r="10" fill="none" stroke="#4caf50" stroke-width="1.5"/><circle cx="0" cy="0" r="3.2" fill="none" stroke="#4caf50" stroke-width="1.2"/></svg>`,
+      createEntities: (cx, cy) => [
+        { kind: { kind: "circle", center: [cx, cy], radius: 6 }, layer: drawState.layer || "0" },
+        { kind: { kind: "circle", center: [cx, cy], radius: 3.2 }, layer: drawState.layer || "0" },
+      ]
+    },
+    {
+      category: "mechanical",
+      name: "Datum Feature Symbol [A]",
+      meta: "ASME Y14.5 / ISO 1101 Datum Indicator",
+      svg: `<svg viewBox="-20 -20 40 40" width="60" height="60"><polygon points="-6,10 6,10 0,0" fill="#f44336"/><line x1="0" y1="0" x2="0" y2="-8" stroke="#f44336" stroke-width="1.5"/><rect x="-8" y="-18" width="16" height="10" fill="none" stroke="#f44336" stroke-width="1.5"/><text x="0" y="-10" fill="#f44336" font-size="8" text-anchor="middle" font-family="monospace" font-weight="bold">A</text></svg>`,
+      createEntities: (cx, cy) => [
+        { kind: { kind: "line", start: [cx, cy], end: [cx, cy + 12] }, layer: drawState.layer || "0" },
+        { kind: { kind: "rectangle", origin: [cx - 6, cy + 12], width: 12, height: 10 }, layer: drawState.layer || "0" },
+        { kind: { kind: "text", at: [cx, cy + 14], content: "A", height: 6 }, layer: drawState.layer || "0" },
+      ]
+    },
+    {
+      category: "mechanical",
+      name: "Surface Texture Ra 3.2",
+      meta: "ISO 1302 Surface Roughness Ra 3.2 μm",
+      svg: `<svg viewBox="-20 -20 40 40" width="60" height="60"><polyline points="-12,0 -4,12 8,-12 16,-12" fill="none" stroke="#ab47bc" stroke-width="1.5"/><text x="4" y="-14" fill="#ab47bc" font-size="7" font-family="monospace">3.2</text></svg>`,
+      createEntities: (cx, cy) => [
+        { kind: { kind: "polyline", points: [[cx - 8, cy], [cx - 2, cy + 10], [cx + 8, cy - 10], [cx + 14, cy - 10]], closed: false }, layer: drawState.layer || "0" },
+        { kind: { kind: "text", at: [cx + 4, cy - 12], content: "Ra 3.2", height: 4 }, layer: drawState.layer || "0" },
+      ]
+    },
+    {
+      category: "mechanical",
+      name: "Center Mark Cross",
+      meta: "DIN / ISO Precision Center Mark",
+      svg: `<svg viewBox="-15 -15 30 30" width="60" height="60"><line x1="-12" y1="0" x2="12" y2="0" stroke="#00bcd4" stroke-width="1.5"/><line x1="0" y1="-12" x2="0" y2="12" stroke="#00bcd4" stroke-width="1.5"/><circle cx="0" cy="0" r="4" fill="none" stroke="#00bcd4" stroke-width="1"/></svg>`,
+      createEntities: (cx, cy) => [
+        { kind: { kind: "line", start: [cx - 15, cy], end: [cx + 15, cy] }, layer: drawState.layer || "0" },
+        { kind: { kind: "line", start: [cx, cy - 15], end: [cx, cy + 15] }, layer: drawState.layer || "0" },
+        { kind: { kind: "circle", center: [cx, cy], radius: 4 }, layer: drawState.layer || "0" },
+      ]
+    },
+    {
+      category: "electrical",
+      name: "IEC Resistor (R)",
+      meta: "IEC 60617 Standard Resistor Box",
+      svg: `<svg viewBox="-20 -15 40 30" width="60" height="60"><line x1="-18" y1="0" x2="-10" y2="0" stroke="#ffeb3b" stroke-width="1.5"/><rect x="-10" y="-5" width="20" height="10" fill="none" stroke="#ffeb3b" stroke-width="1.5"/><line x1="10" y1="0" x2="18" y2="0" stroke="#ffeb3b" stroke-width="1.5"/></svg>`,
+      createEntities: (cx, cy) => [
+        { kind: { kind: "line", start: [cx - 15, cy], end: [cx - 8, cy] }, layer: drawState.layer || "0" },
+        { kind: { kind: "rectangle", origin: [cx - 8, cy - 4], width: 16, height: 8 }, layer: drawState.layer || "0" },
+        { kind: { kind: "line", start: [cx + 8, cy], end: [cx + 15, cy] }, layer: drawState.layer || "0" },
+      ]
+    },
+    {
+      category: "electrical",
+      name: "Ground / Earth PE",
+      meta: "IEC 60617 Protective Earth Symbol",
+      svg: `<svg viewBox="-15 -15 30 30" width="60" height="60"><line x1="0" y1="-10" x2="0" y2="0" stroke="#4caf50" stroke-width="1.5"/><line x1="-10" y1="0" x2="10" y2="0" stroke="#4caf50" stroke-width="1.5"/><line x1="-6" y1="4" x2="6" y2="4" stroke="#4caf50" stroke-width="1.5"/><line x1="-2" y1="8" x2="2" y2="8" stroke="#4caf50" stroke-width="1.5"/></svg>`,
+      createEntities: (cx, cy) => [
+        { kind: { kind: "line", start: [cx, cy + 10], end: [cx, cy] }, layer: drawState.layer || "0" },
+        { kind: { kind: "line", start: [cx - 10, cy], end: [cx + 10, cy] }, layer: drawState.layer || "0" },
+        { kind: { kind: "line", start: [cx - 6, cy - 4], end: [cx + 6, cy - 4] }, layer: drawState.layer || "0" },
+        { kind: { kind: "line", start: [cx - 2, cy - 8], end: [cx + 2, cy - 8] }, layer: drawState.layer || "0" },
+      ]
+    },
+  ];
+
+  let currentBlockCategory = "fasteners";
+
+  function openBlockLibraryModal() {
+    const modal = byId("blockLibraryModal");
+    if (!modal) return;
+    modal.hidden = false;
+    renderBlockLibrary(currentBlockCategory);
+  }
+
+  function closeBlockLibraryModal() {
+    const modal = byId("blockLibraryModal");
+    if (modal) modal.hidden = true;
+  }
+
+  function renderBlockLibrary(cat = "fasteners") {
+    currentBlockCategory = cat;
+    const grid = byId("blockLibGrid");
+    if (!grid) return;
+    grid.textContent = "";
+
+    document.querySelectorAll(".block-cat-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.cat === cat);
+    });
+
+    const items = STANDARD_BLOCKS.filter((b) => b.category === cat);
+    if (items.length === 0) {
+      grid.innerHTML = `<span class="hint" style="grid-column: 1 / -1; padding: 20px 0;">No predefined blocks in category '${cat}'. Create blocks using BLOCK (B) command.</span>`;
+      return;
+    }
+
+    items.forEach((item) => {
+      const card = document.createElement("div");
+      card.className = "block-card";
+      card.innerHTML = `
+        <div class="block-thumb">${item.svg}</div>
+        <div class="block-name">${item.name}</div>
+        <div class="block-meta">${item.meta}</div>
+      `;
+      card.addEventListener("click", () => {
+        const cx = drawState.points.length ? drawState.points[0][0] : 0;
+        const cy = drawState.points.length ? drawState.points[0][1] : 0;
+        const ents = item.createEntities(cx, cy);
+        insertEntitiesIntoDrawing(ents, "Geometry");
+        closeBlockLibraryModal();
+        toast(`Inserted ${item.name} at (${cx.toFixed(1)}, ${cy.toFixed(1)})`);
+      });
+      grid.appendChild(card);
+    });
+  }
+
+  function setupBlockLibraryModal() {
+    byId("rbBlockLibBtn")?.addEventListener("click", openBlockLibraryModal);
+    byId("blockLibraryCloseBtn")?.addEventListener("click", closeBlockLibraryModal);
+    byId("blockLibraryBackdrop")?.addEventListener("click", closeBlockLibraryModal);
+
+    document.querySelectorAll(".block-cat-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        renderBlockLibrary(btn.dataset.cat);
+      });
+    });
+  }
+
+  // =========================================================================
+  // AI CAD DRAFTING ASSISTANT
+  // =========================================================================
+  let plannedAiOperation = null;
+
+  function openAiAssistantModal() {
+    const modal = byId("aiAssistantModal");
+    if (!modal) return;
+    modal.hidden = false;
+    byId("aiPromptInput")?.focus();
+  }
+
+  function closeAiAssistantModal() {
+    const modal = byId("aiAssistantModal");
+    if (modal) modal.hidden = true;
+  }
+
+  function parseAiDraftPrompt(promptText) {
+    const text = (promptText || "").toLowerCase().trim();
+    if (!text) return null;
+
+    const plateHolesMatch = text.match(/(?:(?:draw|create|make)\s+)?(?:a\s+)?(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)\s*(?:mm\s+)?(?:plate|rectangle)?.*?(?:(\d+)\s*[x×]\s*(?:m|dia(?:meter)?)?\s*(\d+(?:\.\d+)?)\s*(?:mm)?\s*holes?).*?(?:(?:at|with)?\s*(\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:corner\s+)?inset)?/i);
+    if (plateHolesMatch) {
+      const w = parseFloat(plateHolesMatch[1]);
+      const h = parseFloat(plateHolesMatch[2]);
+      const holeCount = parseInt(plateHolesMatch[3] || "4", 10);
+      const holeDia = parseFloat(plateHolesMatch[4] || "6");
+      const inset = parseFloat(plateHolesMatch[5] || "10");
+      return {
+        opName: "Parametric Mounting Plate with Fasteners",
+        entitySummary: `${w}×${h}mm Plate + ${holeCount}× ⌀${holeDia}mm Inset Holes`,
+        paramsText: `Width=${w}mm, Height=${h}mm, Holes=${holeCount}×⌀${holeDia}mm, Inset=${inset}mm`,
+        targetLayer: "Geometry",
+        execute: () => {
+          const x0 = -w / 2;
+          const y0 = -h / 2;
+          const entities = [
+            { kind: { kind: "rectangle", origin: [x0, y0], width: w, height: h }, layer: "Geometry" },
+            { kind: { kind: "circle", center: [x0 + inset, y0 + inset], radius: holeDia / 2 }, layer: "Holes" },
+            { kind: { kind: "circle", center: [x0 + w - inset, y0 + inset], radius: holeDia / 2 }, layer: "Holes" },
+            { kind: { kind: "circle", center: [x0 + w - inset, y0 + h - inset], radius: holeDia / 2 }, layer: "Holes" },
+            { kind: { kind: "circle", center: [x0 + inset, y0 + h - inset], radius: holeDia / 2 }, layer: "Holes" },
+          ];
+          insertEntitiesIntoDrawing(entities, "Geometry");
+        }
+      };
+    }
+
+    const rectMatch = text.match(/(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)\s*(?:mm\s+)?(?:rectangle|box|plate)/i);
+    if (rectMatch) {
+      const w = parseFloat(rectMatch[1]);
+      const h = parseFloat(rectMatch[2]);
+      return {
+        opName: "2D Rectangle Profile",
+        entitySummary: `${w}×${h}mm Rectangle`,
+        paramsText: `Width=${w}mm, Height=${h}mm, Origin=[${-w/2}, ${-h/2}]`,
+        targetLayer: "Geometry",
+        execute: () => {
+          const entities = [
+            { kind: { kind: "rectangle", origin: [-w / 2, -h / 2], width: w, height: h }, layer: "Geometry" }
+          ];
+          insertEntitiesIntoDrawing(entities, "Geometry");
+        }
+      };
+    }
+
+    const holeMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:mm\s+)?(?:center\s+)?(?:hole|circle)/i);
+    if (holeMatch) {
+      const dia = parseFloat(holeMatch[1]);
+      return {
+        opName: "Concentric Precision Hole",
+        entitySummary: `⌀${dia}mm Center Hole`,
+        paramsText: `Diameter=${dia}mm, Center=[0, 0]`,
+        targetLayer: "Holes",
+        execute: () => {
+          const entities = [
+            { kind: { kind: "circle", center: [0, 0], radius: dia / 2 }, layer: "Holes" }
+          ];
+          insertEntitiesIntoDrawing(entities, "Holes");
+        }
+      };
+    }
+
+    const filletMatch = text.match(/fillet\s+(\d+(?:\.\d+)?)\s*(?:mm)?/i);
+    if (filletMatch) {
+      const r = parseFloat(filletMatch[1]);
+      return {
+        opName: "Corner Fillet Operation",
+        entitySummary: `Fillet Radius R=${r}mm`,
+        paramsText: `Radius=${r}mm on all intersecting edges`,
+        targetLayer: "Geometry",
+        execute: () => {
+          cadFillet(r);
+        }
+      };
+    }
+
+    if (text.includes("orthographic") || text.includes("4-view") || text.includes("multiview")) {
+      return {
+        opName: "Generate Orthographic Multiview",
+        entitySummary: "Front, Top, Right & Isometric 3D Projection Views",
+        paramsText: "Projection=First/Third Angle, Section=Full Cross Section",
+        targetLayer: "DrawingSheet",
+        execute: () => {
+          cadMultiview();
+        }
+      };
+    }
+
+    return {
+      opName: "Natural Language CAD Intent",
+      entitySummary: promptText,
+      paramsText: "Standard ISO drafting tolerance",
+      targetLayer: "Geometry",
+      execute: () => {
+        toast(`Executed CAD instruction: "${promptText}"`);
+      }
+    };
+  }
+
+  function insertEntitiesIntoDrawing(newEntities, layerName = "Geometry") {
+    if (!app.drawing) {
+      app.drawing = { entities: [], layers: [], unit: "mm", bounds: [-50, -50, 50, 50] };
+    }
+    if (!Array.isArray(app.drawing.entities)) app.drawing.entities = [];
+    if (!Array.isArray(app.drawing.layers)) app.drawing.layers = [];
+    if (!app.drawing.layers.some((l) => l.name === layerName)) {
+      app.drawing.layers.push({
+        name: layerName,
+        color: layerName === "Holes" ? "#ff9800" : "#2196f3",
+        linetype: "CONTINUOUS",
+        lineweight_mm: 0.35,
+        visible: true,
+        frozen: false,
+        locked: false,
+      });
+    }
+    for (const ent of newEntities) {
+      app.drawing.entities.push(ent);
+    }
+    app.drawing.dirty = true;
+    renderDrawing(app.drawing);
+    if (byId("layoutSheetView") && !byId("layoutSheetView").hidden) {
+      syncFullDrawingCanvas();
+    }
+  }
+
+  function setupAiAssistantModal() {
+    byId("rbAiDraftBtn")?.addEventListener("click", openAiAssistantModal);
+    byId("aiAssistantCloseBtn")?.addEventListener("click", closeAiAssistantModal);
+    byId("aiAssistantBackdrop")?.addEventListener("click", closeAiAssistantModal);
+
+    document.querySelectorAll(".ai-pill").forEach((pill) => {
+      pill.addEventListener("click", () => {
+        const promptInput = byId("aiPromptInput");
+        if (promptInput) {
+          promptInput.value = pill.dataset.prompt;
+          byId("aiParseBtn")?.click();
+        }
+      });
+    });
+
+    byId("aiParseBtn")?.addEventListener("click", () => {
+      const promptInput = byId("aiPromptInput");
+      const val = promptInput?.value.trim();
+      if (!val) {
+        toast("Enter drafting instructions first", true);
+        return;
+      }
+      plannedAiOperation = parseAiDraftPrompt(val);
+      if (plannedAiOperation) {
+        byId("aiPlanOp").textContent = plannedAiOperation.opName;
+        byId("aiPlanEntity").textContent = plannedAiOperation.entitySummary;
+        byId("aiPlanParams").textContent = plannedAiOperation.paramsText;
+        byId("aiPlanLayer").textContent = plannedAiOperation.targetLayer;
+        byId("aiPlanCard").hidden = false;
+      }
+    });
+
+    byId("aiCancelPlanBtn")?.addEventListener("click", () => {
+      byId("aiPlanCard").hidden = true;
+      plannedAiOperation = null;
+    });
+
+    byId("aiExecuteBtn")?.addEventListener("click", () => {
+      if (!plannedAiOperation) return;
+      try {
+        plannedAiOperation.execute();
+        const historyList = byId("aiHistoryList");
+        if (historyList) {
+          const placeholder = historyList.querySelector(".history-item-placeholder");
+          if (placeholder) placeholder.remove();
+          const li = document.createElement("li");
+          li.className = "ai-history-item";
+          li.innerHTML = `<span>✔ ${plannedAiOperation.opName}</span><span class="hint">${new Date().toLocaleTimeString()}</span>`;
+          historyList.prepend(li);
+        }
+        toast(`Executed: ${plannedAiOperation.opName}`);
+        byId("aiPlanCard").hidden = true;
+        closeAiAssistantModal();
+      } catch (err) {
+        toast(`Execution failed: ${err.message}`, true);
+      }
+    });
+  }
+
+  // =========================================================================
+  // CAMERA BOOKMARKS & NAMED VIEWS
+  // =========================================================================
+  function openNamedViewsModal() {
+    const modal = byId("namedViewsModal");
+    if (!modal) return;
+    modal.hidden = false;
+    renderNamedViewsList();
+  }
+
+  function closeNamedViewsModal() {
+    const modal = byId("namedViewsModal");
+    if (modal) modal.hidden = true;
+  }
+
+  function getSavedNamedViews() {
+    try {
+      const raw = localStorage.getItem("atlascad_named_views");
+      return raw ? JSON.parse(raw) : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function saveNamedViews(views) {
+    try {
+      localStorage.setItem("atlascad_named_views", JSON.stringify(views));
+    } catch (_) {}
+  }
+
+  function renderNamedViewsList() {
+    const list = byId("namedViewsList");
+    if (!list) return;
+    list.textContent = "";
+
+    const defaults = [
+      { name: "Top View", camera: { yaw: 0, pitch: 90, orthographic: true } },
+      { name: "Front View", camera: { yaw: 0, pitch: 0, orthographic: true } },
+      { name: "Right View", camera: { yaw: 90, pitch: 0, orthographic: true } },
+      { name: "SE Isometric", camera: { yaw: 45, pitch: 35.26, orthographic: false } },
+    ];
+    const userViews = getSavedNamedViews();
+    const allViews = [...defaults, ...userViews];
+
+    allViews.forEach((v, idx) => {
+      const li = document.createElement("li");
+      li.className = "named-view-item";
+      const span = document.createElement("span");
+      span.textContent = v.name;
+      const acts = document.createElement("div");
+      acts.className = "named-view-actions";
+
+      const btnRestore = document.createElement("button");
+      btnRestore.type = "button";
+      btnRestore.className = "button small ghost";
+      btnRestore.textContent = "Restore";
+      btnRestore.addEventListener("click", () => {
+        if (!app.viewport) return;
+        if (v.camera.yaw !== undefined) app.viewport.camera.yaw = (v.camera.yaw * Math.PI) / 180;
+        if (v.camera.pitch !== undefined) app.viewport.camera.pitch = (v.camera.pitch * Math.PI) / 180;
+        if (v.camera.orthographic !== undefined) app.viewport.camera.orthographic = v.camera.orthographic;
+        app.viewport.requestFrame();
+        toast(`Restored View: ${v.name}`);
+        closeNamedViewsModal();
+      });
+      acts.appendChild(btnRestore);
+
+      if (idx >= defaults.length) {
+        const btnDel = document.createElement("button");
+        btnDel.type = "button";
+        btnDel.className = "button small ghost";
+        btnDel.textContent = "✕";
+        btnDel.title = "Delete Saved View";
+        btnDel.addEventListener("click", () => {
+          const updated = userViews.filter((_, i) => i !== idx - defaults.length);
+          saveNamedViews(updated);
+          renderNamedViewsList();
+        });
+        acts.appendChild(btnDel);
+      }
+
+      li.append(span, acts);
+      list.appendChild(li);
+    });
+  }
+
+  function setupNamedViewsModal() {
+    byId("rbNamedViewsBtn")?.addEventListener("click", openNamedViewsModal);
+    byId("namedViewsCloseBtn")?.addEventListener("click", closeNamedViewsModal);
+    byId("namedViewsBackdrop")?.addEventListener("click", closeNamedViewsModal);
+
+    byId("nvSaveCurrentBtn")?.addEventListener("click", () => {
+      const input = byId("nvNameInput");
+      const name = input?.value.trim();
+      if (!name) {
+        toast("Please enter a name for the view", true);
+        return;
+      }
+      if (!app.viewport) return;
+      const yawDeg = Math.round((app.viewport.camera.yaw * 180) / Math.PI);
+      const pitchDeg = Math.round((app.viewport.camera.pitch * 180) / Math.PI);
+      const userViews = getSavedNamedViews();
+      userViews.push({
+        name,
+        camera: {
+          yaw: yawDeg,
+          pitch: pitchDeg,
+          orthographic: !!app.viewport.camera.orthographic,
+        }
+      });
+      saveNamedViews(userViews);
+      if (input) input.value = "";
+      renderNamedViewsList();
+      toast(`Saved View: ${name}`);
     });
   }
 
@@ -6698,6 +7642,10 @@ ${gcodeSample}`;
     setupViewportHeaderBadges();
     setupShortcutsOverlay();
     setupPanelCategoryTabs();
+    setupLayerManagerModal();
+    setupBlockLibraryModal();
+    setupAiAssistantModal();
+    setupNamedViewsModal();
   }
 
   async function boot() {
