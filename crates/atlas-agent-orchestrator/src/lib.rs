@@ -143,8 +143,8 @@ mod tests {
         let templates = WorkflowRegistry::list_templates();
         assert_eq!(
             templates.len(),
-            15,
-            "Must offer 15 standard engineering, creative, and real-time workflow templates"
+            16,
+            "Must offer 16 standard engineering, creative, real-time, and hypersonic workflow templates"
         );
 
         let graph = WorkflowRegistry::instantiate_template("cad_to_fea")?;

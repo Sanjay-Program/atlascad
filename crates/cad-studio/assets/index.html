@@ -1959,24 +1959,41 @@ Ready for Catmull-Clark subdivision or brush displacement.</pre>
               <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px;">
                 <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; text-align: center;">
                   <div style="font-size: 10px; color: #a1a1aa; text-transform: uppercase;">Mach Number</div>
-                  <div id="rtMachVal" style="font-size: 20px; font-weight: 700; color: #f43f5e;">11.20 M</div>
-                  <div style="font-size: 10px; color: #71717a;">12,000 km/h</div>
+                  <div id="rtMachVal" style="font-size: 20px; font-weight: 700; color: #f43f5e;">11.00 M</div>
+                  <div style="font-size: 10px; color: #71717a;">12,000 km/h (3,333 m/s)</div>
                 </div>
                 <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; text-align: center;">
-                  <div style="font-size: 10px; color: #a1a1aa; text-transform: uppercase;">Altitude</div>
+                  <div style="font-size: 10px; color: #a1a1aa; text-transform: uppercase;">Altitude &amp; Dyn Press</div>
                   <div id="rtAltVal" style="font-size: 20px; font-weight: 700; color: #38bdf8;">32,000 m</div>
-                  <div style="font-size: 10px; color: #71717a;">Stratosphere (105,000 ft)</div>
+                  <div style="font-size: 10px; color: #71717a;">q = 73.5 kPa (Corridor OK)</div>
                 </div>
                 <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; text-align: center;">
-                  <div style="font-size: 10px; color: #a1a1aa; text-transform: uppercase;">Scramjet Thrust</div>
-                  <div id="rtThrustVal" style="font-size: 20px; font-weight: 700; color: #10b981;">485.0 kN</div>
-                  <div style="font-size: 10px; color: #71717a;">Equivalence Ratio: 1.05</div>
+                  <div style="font-size: 10px; color: #a1a1aa; text-transform: uppercase;">Scramjet Thrust &amp; Isp</div>
+                  <div id="rtThrustVal" style="font-size: 20px; font-weight: 700; color: #10b981;">131.4 kN</div>
+                  <div style="font-size: 10px; color: #71717a;">Isp = 2,717 s (T/D = 1.69x)</div>
                 </div>
                 <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; text-align: center;">
-                  <div style="font-size: 10px; color: #a1a1aa; text-transform: uppercase;">Stagnation Temp</div>
-                  <div id="rtTempVal" style="font-size: 20px; font-weight: 700; color: #fbbf24;">3,120 K</div>
-                  <div style="font-size: 10px; color: #71717a;">UHTC Active Cooling OK</div>
+                  <div style="font-size: 10px; color: #a1a1aa; text-transform: uppercase;">Stagnation &amp; UHTC Wall</div>
+                  <div id="rtTempVal" style="font-size: 20px; font-weight: 700; color: #fbbf24;">2,272 °C</div>
+                  <div style="font-size: 10px; color: #71717a;">T0 = 5,150 K (Margin +228°C)</div>
                 </div>
+                <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; text-align: center;">
+                  <div style="font-size: 10px; color: #a1a1aa; text-transform: uppercase;">Plasma Sheath Cutoff</div>
+                  <div id="rtPlasmaVal" style="font-size: 20px; font-weight: 700; color: #c084fc;">14.9 GHz</div>
+                  <div style="font-size: 10px; color: #ef4444;">X-Band Blackout (MHD: 0.8T)</div>
+                </div>
+                <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; text-align: center;">
+                  <div style="font-size: 10px; color: #a1a1aa; text-transform: uppercase;">270V DC Bus &amp; Q-INS</div>
+                  <div id="rtAvionicsVal" style="font-size: 20px; font-weight: 700; color: #34d399;">261.5 V</div>
+                  <div style="font-size: 10px; color: #71717a;">Load 104 kW | Drift 1.42 m</div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
+                <button type="button" class="button small ghost" id="rtSolvePlasmaBtn">Plasma Sheath</button>
+                <button type="button" class="button small ghost" id="rtSolveCoolingBtn">Supercrit Cooling</button>
+                <button type="button" class="button small ghost" id="rtSolveMhdBtn">MHD Bypass</button>
+                <button type="button" class="button small ghost" id="rtSolveSlushBtn">Slush H2 Fuel</button>
+                <button type="button" class="button small ghost" id="rtInspectBomBtn">21-Item BOM</button>
               </div>
             </div>
 

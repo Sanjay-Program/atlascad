@@ -4487,6 +4487,36 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(bom_json["component_count"].as_u64(), Some(21));
     assert!(bom_json["dry_weight_kg"].as_f64().ok_or("dry")? > 15_000.0);
 
+    let mhd_resp = post(
+        addr,
+        "/api/sim/hypersonic/mhd",
+        r#"{"flow_velocity_m_s": 3333.3, "b_field_tesla": 0.80, "channel_volume_m3": 0.25}"#,
+    )?;
+    assert_eq!(mhd_resp.status, 200);
+    let mhd_json = json(&mhd_resp)?;
+    assert!(mhd_json["extracted_power_mw"].as_f64().ok_or("mhd_p")? > 5.0);
+    assert_eq!(mhd_json["avionics_bus_power_kw"].as_f64(), Some(104.2));
+
+    let slush_resp = post(
+        addr,
+        "/api/sim/hypersonic/slush",
+        r#"{"fuel_mass_kg": 16300.0, "solid_fraction": 0.50}"#,
+    )?;
+    assert_eq!(slush_resp.status, 200);
+    let slush_json = json(&slush_resp)?;
+    assert!(slush_json["volume_savings_m3"].as_f64().ok_or("vol")? > 20.0);
+    assert!(slush_json["latent_heat_capacity_mj"].as_f64().ok_or("latent")? > 400.0);
+
+    let creep_resp = post(
+        addr,
+        "/api/sim/hypersonic/creep",
+        r#"{"operating_temp_k": 2545.0, "applied_stress_mpa": 45.0, "flight_duration_hours": 1.6}"#,
+    )?;
+    assert_eq!(creep_resp.status, 200);
+    let creep_json = json(&creep_resp)?;
+    assert!(creep_json["rupture_life_hours"].as_f64().ok_or("tr")? > 1000.0);
+    assert!(creep_json["mission_accumulated_strain_pct"].as_f64().ok_or("strain")? < 0.1);
+
     // 32. DaVinci Resolve Timeline & VFX Bundle Exporter
     let davinci_resp = get(addr, "/api/export/davinci")?;
     assert_eq!(davinci_resp.status, 200);

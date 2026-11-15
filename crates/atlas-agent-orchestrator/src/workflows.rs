@@ -160,6 +160,27 @@ impl WorkflowRegistry {
                 ],
                 task_count: 6,
             },
+            WorkflowTemplateInfo {
+                id: "hypersonic_full_vehicle_master".into(),
+                name: "12,000 km/h Hypersonic Aircraft Master Autonomous Workflow".into(),
+                description: "Closed-loop autonomous generative engineering for Mach 11 waverider: synthesizes B-Rep geometry, solves plasma aerothermodynamics, supercritical cryo-cooling, scramjet propulsion, 270V avionics, 5-axis CNC toolpaths, and AS9100 compliance.".into(),
+                category: "Hypersonic & Aerospace".into(),
+                required_agents: vec![
+                    "chief_engineer".into(),
+                    "requirements_spec".into(),
+                    "cad_design".into(),
+                    "cfd_specialist".into(),
+                    "structural_sim".into(),
+                    "thermal_engineer".into(),
+                    "chemical_engineer".into(),
+                    "electrical_engineer".into(),
+                    "manufacturing_engineer".into(),
+                    "digital_twin".into(),
+                    "media_production".into(),
+                    "certification_officer".into(),
+                ],
+                task_count: 11,
+            },
         ]
     }
 
@@ -629,6 +650,108 @@ impl WorkflowRegistry {
                     .with_dependency("t5_sound"),
                 )?;
             }
+            "hypersonic_full_vehicle_master" => {
+                graph.add_task(EngineeringTask::new(
+                    "t1_mission_req",
+                    "Synthesize Mach 11 Flight Envelope & Mission Requirements",
+                    "requirements_spec",
+                    "project.inspect",
+                ))?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t2_waverider_cad",
+                        "Synthesize 38m Waverider B-Rep Parametric CAD Geometry",
+                        "cad_design",
+                        "cad.solid.extrude",
+                    )
+                    .with_dependency("t1_mission_req"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t3_aero_plasma",
+                        "Solve Nonequilibrium Aerothermodynamics & Plasma Sheath",
+                        "cfd_specialist",
+                        "sim.hypersonic.plasma",
+                    )
+                    .with_dependency("t2_waverider_cad"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t4_scramjet_cycle",
+                        "Solve Multistage Oblique Shock Scramjet Propulsion",
+                        "chemical_engineer",
+                        "sim.hypersonic.scramjet",
+                    )
+                    .with_dependency("t2_waverider_cad"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t5_regen_cooling",
+                        "Solve Supercritical LH2 Active Regenerative Cooling",
+                        "thermal_engineer",
+                        "sim.hypersonic.thermal",
+                    )
+                    .with_dependency("t3_aero_plasma")
+                    .with_dependency("t4_scramjet_cycle"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t6_uhtc_structural",
+                        "Verify UHTC / Gamma-TiAl Thermomechanical Stress & Creep",
+                        "structural_sim",
+                        "sim.hypersonic.creep",
+                    )
+                    .with_dependency("t3_aero_plasma")
+                    .with_dependency("t5_regen_cooling"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t7_avionics_qins",
+                        "Size 270V DC Bus & Cold-Atom Quantum Navigation",
+                        "electrical_engineer",
+                        "sim.hypersonic.solve",
+                    )
+                    .with_dependency("t1_mission_req"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t8_mfg_toolpaths",
+                        "Generate 5-Axis CNC & SLM Toolpaths for Combustor Injectors",
+                        "manufacturing_engineer",
+                        "cam.toolpaths.generate",
+                    )
+                    .with_dependency("t6_uhtc_structural"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t9_digital_twin",
+                        "Bind 6-DOF Telemetry to Unity Engine Digital Twin",
+                        "digital_twin",
+                        "export.unity.engine",
+                    )
+                    .with_dependency("t3_aero_plasma")
+                    .with_dependency("t7_avionics_qins"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t10_media_master",
+                        "Assemble DaVinci Resolve Master Presentation Reel",
+                        "media_production",
+                        "export.davinci.resolve",
+                    )
+                    .with_dependency("t9_digital_twin"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t11_as9100_cert",
+                        "Emit Cryptographic AS9100 / FAA Certification Dossier",
+                        "certification_officer",
+                        "eco.submit",
+                    )
+                    .with_dependency("t6_uhtc_structural")
+                    .with_dependency("t8_mfg_toolpaths"),
+                )?;
+            }
             _ => {
                 return Err(OrchestratorError::Internal(format!(
                     "Unknown template ID: '{template_id}'"
@@ -661,6 +784,13 @@ mod tests {
         assert!(twin_graph.is_ok());
         if let Ok(g) = twin_graph {
             assert_eq!(g.tasks.len(), 5);
+        }
+
+        let hyper_graph = WorkflowRegistry::instantiate_template("hypersonic_full_vehicle_master");
+        assert!(hyper_graph.is_ok());
+        if let Ok(g) = hyper_graph {
+            assert_eq!(g.tasks.len(), 11);
+            assert!(g.validate_no_cycles().is_ok());
         }
     }
 }

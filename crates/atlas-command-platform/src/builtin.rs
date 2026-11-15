@@ -645,5 +645,35 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         .with_permission(CommandPermission::ReadOnly),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.hypersonic.mhd_bypass",
+            "Magnetohydrodynamic (MHD) Energy Bypass Generator",
+            "Solves boundary layer ionization electrical extraction, Faraday generator power, and downstream SERN nozzle thrust augmentation.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.hypersonic.slush_h2",
+            "Slush Hydrogen (13.8 K Triple Point) Fuel & Cryogenics",
+            "Evaluates density boost, 15% tank volume reduction, latent heat cooling margin, and zero-boiloff hold time.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.hypersonic.creep",
+            "High-Temperature Viscoplastic Creep & Larson-Miller Rupture",
+            "Evaluates steady-state Norton-Bailey creep strain rate and predicts 1000-hour mission life for UHTC ceramics.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun),
+    )?;
+
     Ok(())
 }

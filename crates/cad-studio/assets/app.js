@@ -9307,6 +9307,105 @@ ${gcodeSample}`;
       }
     });
 
+    // Hypersonic Subsystems Cockpit Event Listeners
+    byId("rtSolvePlasmaBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/hypersonic/plasma", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ flight_mach: 11.0, altitude_m: 32000.0 }),
+        });
+        const out = byId("realtimeConsoleOutput");
+        if (out) {
+          out.textContent = `[Nonequilibrium Plasma] Cutoff f_p = ${res.plasma_cutoff_freq_ghz.toFixed(1)} GHz | n_e = ${res.electron_density_m3.toExponential(2)} m⁻³\n` +
+            `Attenuation: L-Band = ${res.attenuation_l_band_db.toFixed(1)} dB | X-Band = ${res.attenuation_x_band_db.toFixed(1)} dB | Ka-Band = ${res.attenuation_ka_band_db.toFixed(1)} dB\n` +
+            `Blackout: ${res.is_rf_blackout ? "ACTIVE (Communications Cut Off)" : "Clear"}\n` +
+            `MHD Whistler Magnetic Window: ${res.mhd_window_b_field_tesla.toFixed(2)} Tesla field required to open RF portal.`;
+        }
+        toast(`Plasma Sheath: Cutoff ${res.plasma_cutoff_freq_ghz.toFixed(1)} GHz (Blackout: ${res.is_rf_blackout})`);
+      } catch (err) {
+        toast(`Plasma error: ${err.message}`, true);
+      }
+    });
+
+    byId("rtSolveCoolingBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/hypersonic/thermal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ heat_flux_mw_m2: 1.45, coolant_flow_kg_s: 4.93 }),
+        });
+        const out = byId("realtimeConsoleOutput");
+        if (out) {
+          out.textContent = `[Active Cryogenic Cooling] Supercritical H2 HTC = ${res.coolant_htc_w_m2_k.toFixed(0)} W/m²K\n` +
+            `Nusselt: ${res.coolant_nusselt_number.toFixed(1)} | Reynolds: ${res.coolant_reynolds_number.toFixed(0)}\n` +
+            `Substrate Wall: ${res.inner_substrate_temperature_c.toFixed(1)} °C (GRCop-84 Margin = +${res.substrate_thermal_margin_c.toFixed(1)} °C)\n` +
+            `Total Heat Absorbed: ${res.total_heat_removed_mw.toFixed(2)} MW | Exit Temp: ${res.coolant_exit_temperature_k.toFixed(1)} K`;
+        }
+        toast(`Regenerative Cooling: HTC ${res.coolant_htc_w_m2_k.toFixed(0)} W/m²K (Substrate ${res.inner_substrate_temperature_c.toFixed(1)} °C)`);
+      } catch (err) {
+        toast(`Cooling error: ${err.message}`, true);
+      }
+    });
+
+    byId("rtSolveMhdBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/hypersonic/mhd", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ flow_velocity_m_s: 3333.3, b_field_tesla: 0.80 }),
+        });
+        const out = byId("realtimeConsoleOutput");
+        if (out) {
+          out.textContent = `[MHD Energy Bypass] Extracted Power = ${res.extracted_power_mw.toFixed(2)} MW (Plasma σ = ${res.plasma_conductivity_s_m.toFixed(1)} S/m)\n` +
+            `Avionics 270V DC Supply: ${res.avionics_bus_power_kw.toFixed(1)} kW (Self-Powered Airframe)\n` +
+            `Downstream SERN Nozzle Thrust Boost: +${res.downstream_thrust_boost_kn.toFixed(1)} kN\n` +
+            `Thermodynamic Cycle Efficiency Gain: +${res.cycle_efficiency_gain_pct.toFixed(1)}%`;
+        }
+        toast(`MHD Generator: Extracted ${res.extracted_power_mw.toFixed(1)} MW, +${res.downstream_thrust_boost_kn.toFixed(1)} kN thrust`);
+      } catch (err) {
+        toast(`MHD error: ${err.message}`, true);
+      }
+    });
+
+    byId("rtSolveSlushBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/hypersonic/slush", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fuel_mass_kg: 16300.0, solid_fraction: 0.50 }),
+        });
+        const out = byId("realtimeConsoleOutput");
+        if (out) {
+          out.textContent = `[Slush Hydrogen SLH2] Triple Point 13.8 K | Density: ${res.slush_density_kg_m3.toFixed(1)} kg/m³ (+${res.density_enhancement_pct.toFixed(1)}%)\n` +
+            `Tank Volume: ${res.slush_volume_m3.toFixed(1)} m³ (Saved ${res.volume_savings_m3.toFixed(1)} m³ fuselage volume)\n` +
+            `Latent Heat Capacity: ${res.latent_heat_capacity_mj.toFixed(1)} MJ subcooling enthalpy\n` +
+            `Zero-Boiloff Ground Hold Time: ${res.zero_boiloff_hold_time_hours.toFixed(1)} hours before venting`;
+        }
+        toast(`Slush H2: Saved ${res.volume_savings_m3.toFixed(1)} m³ volume, ${res.zero_boiloff_hold_time_hours.toFixed(1)}h zero boil-off`);
+      } catch (err) {
+        toast(`Slush error: ${err.message}`, true);
+      }
+    });
+
+    byId("rtInspectBomBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/hypersonic/bom");
+        const out = byId("realtimeConsoleOutput");
+        if (out) {
+          const topParts = res.components.slice(0, 5).map(c => `• ${c.part_id}: ${c.name} (${c.mass_kg} kg, ${c.material})`).join("\n");
+          out.textContent = `[Verified Aircraft BOM] ${res.component_count} Components Cataloged\n` +
+            `Dry Weight: ${res.dry_weight_kg.toFixed(0)} kg | MTOW: ${res.mtow_kg.toFixed(0)} kg | Fuel: ${res.fuel_mass_kg} kg LH2\n` +
+            `Global CG Station: X = ${res.global_cg_m[0].toFixed(2)} m, Z = ${res.global_cg_m[2].toFixed(2)} m\n` +
+            `Subsystems (${res.subsystem_names.length}): ${res.subsystem_names.slice(0, 4).join(", ")}...\n` +
+            topParts;
+        }
+        toast(`BOM: 21 components, Dry Mass ${res.dry_weight_kg.toFixed(0)} kg, MTOW ${res.mtow_kg.toFixed(0)} kg`);
+      } catch (err) {
+        toast(`BOM error: ${err.message}`, true);
+      }
+    });
+
     // Atlas Media: Timeline & Render
     byId("mediaNewTimelineBtn")?.addEventListener("click", async () => {
       try {

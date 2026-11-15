@@ -116,3 +116,76 @@ pub fn evaluate_cryogenic_system(
         slosh_damping_ratio,
     }
 }
+
+/// Evaluation of triple-point Slush Hydrogen (SLH2) fuel properties.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SlushHydrogenResult {
+    /// Fuel mass in kg
+    pub fuel_mass_kg: f64,
+    /// Solid particle mass fraction (e.g. 0.50 = 50% solid)
+    pub solid_mass_fraction: f64,
+    /// Triple-point storage temperature in Kelvin (13.80 K)
+    pub storage_temperature_k: f64,
+    /// Slush hydrogen density in kg/m^3 (vs 70.85 for normal liquid)
+    pub slush_density_kg_m3: f64,
+    /// Normal liquid hydrogen volume required in m^3
+    pub normal_liquid_volume_m3: f64,
+    /// Slush hydrogen volume required in m^3
+    pub slush_volume_m3: f64,
+    /// Net volume savings achieved in m^3
+    pub volume_savings_m3: f64,
+    /// Volumetric density enhancement percentage
+    pub density_enhancement_pct: f64,
+    /// Additional latent heat of fusion heat absorption capacity in MJ
+    pub latent_heat_capacity_mj: f64,
+    /// Hold time before any vapor boil-off commences in hours
+    pub zero_boiloff_hold_time_hours: f64,
+}
+
+/// Evaluates benefits of loading cryogenic Slush Hydrogen (SLH2) at the 13.8 K triple point.
+#[must_use]
+pub fn evaluate_slush_hydrogen(
+    fuel_mass_kg: f64,
+    solid_fraction: f64,
+    tank_heat_leak_w: f64,
+) -> SlushHydrogenResult {
+    let phi = solid_fraction.clamp(0.0, 0.65);
+    let rho_liquid_tp = 77.0; // kg/m^3 at triple point 13.8 K
+    let rho_solid_tp = 86.6;  // kg/m^3 solid hydrogen at 13.8 K
+
+    // Slush mixture density: 1 / rho_slush = (1 - phi)/rho_l + phi/rho_s
+    let inv_rho = ((1.0 - phi) / rho_liquid_tp) + (phi / rho_solid_tp);
+    let slush_density = 1.0 / inv_rho;
+
+    let normal_liquid_density = 70.85; // Normal boiling point 20.3 K
+    let normal_vol = fuel_mass_kg / normal_liquid_density;
+    let slush_vol = fuel_mass_kg / slush_density;
+    let vol_savings = normal_vol - slush_vol;
+    let density_boost = ((slush_density - normal_liquid_density) / normal_liquid_density) * 100.0;
+
+    // Latent heat of fusion = 58.2 kJ/kg for solid hydrogen portion
+    let latent_heat_j = fuel_mass_kg * phi * 58_200.0;
+    let latent_heat_mj = latent_heat_j / 1.0e6;
+
+    // Sensible heat from 13.8 K to 20.3 K (Delta T = 6.5 K, cp ~ 10 kJ/kg*K)
+    let sensible_heat_j = fuel_mass_kg * 6.5 * 10_000.0;
+    let total_subcooling_j = latent_heat_j + sensible_heat_j;
+
+    // Hold time before reaching 20.3 K boiling point under heat leak
+    let q_leak = tank_heat_leak_w.max(10.0);
+    let hold_time_s = total_subcooling_j / q_leak;
+    let hold_time_hours = hold_time_s / 3600.0;
+
+    SlushHydrogenResult {
+        fuel_mass_kg,
+        solid_mass_fraction: phi,
+        storage_temperature_k: 13.80,
+        slush_density_kg_m3: slush_density,
+        normal_liquid_volume_m3: normal_vol,
+        slush_volume_m3: slush_vol,
+        volume_savings_m3: vol_savings,
+        density_enhancement_pct: density_boost,
+        latent_heat_capacity_mj: latent_heat_mj,
+        zero_boiloff_hold_time_hours: hold_time_hours,
+    }
+}

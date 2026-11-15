@@ -3838,6 +3838,44 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_hypersonic_mhd(
+        &mut self,
+        req: &HypersonicMhdRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let u = req.flow_velocity_m_s.unwrap_or(3333.3);
+        let b = req.b_field_tesla.unwrap_or(0.80);
+        let vol = req.channel_volume_m3.unwrap_or(0.25);
+        let res = atlas_simulation_core::hypersonic::plasma::evaluate_mhd_energy_bypass(
+            u, b, vol, 2.77e18, 1.8e9,
+        );
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_hypersonic_slush(
+        &mut self,
+        req: &HypersonicSlushRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let fuel_mass = req.fuel_mass_kg.unwrap_or(16300.0);
+        let solid_frac = req.solid_fraction.unwrap_or(0.50);
+        let res = atlas_simulation_core::hypersonic::cryo::evaluate_slush_hydrogen(
+            fuel_mass, solid_frac, 158.4,
+        );
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_hypersonic_creep(
+        &mut self,
+        req: &HypersonicCreepRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let t_k = req.operating_temp_k.unwrap_or(2545.0);
+        let stress = req.applied_stress_mpa.unwrap_or(45.0);
+        let dur = req.flight_duration_hours.unwrap_or(1.6);
+        let res = atlas_simulation_core::hypersonic::thermal::evaluate_high_temp_creep(
+            t_k, stress, dur,
+        );
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_chemical(&mut self, req: &SimChemicalRequest) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::chemical::FlashProblem {
             temperature_k: req.temperature_k.unwrap_or(315.0),
@@ -4908,6 +4946,23 @@ namespace AtlasCAD.Unity
                 self.sim_hypersonic_cryo(&HypersonicCryoRequest { fuel_mass_kg: fuel })?
             }
             "sim.hypersonic.bom" => self.sim_hypersonic_bom()?,
+            "sim.hypersonic.mhd_bypass" => {
+                let u = req.arguments.get("flow_velocity_m_s").and_then(|v| v.as_f64());
+                let b = req.arguments.get("b_field_tesla").and_then(|v| v.as_f64());
+                let vol = req.arguments.get("channel_volume_m3").and_then(|v| v.as_f64());
+                self.sim_hypersonic_mhd(&HypersonicMhdRequest { flow_velocity_m_s: u, b_field_tesla: b, channel_volume_m3: vol })?
+            }
+            "sim.hypersonic.slush_h2" => {
+                let fuel = req.arguments.get("fuel_mass_kg").and_then(|v| v.as_f64());
+                let solid = req.arguments.get("solid_fraction").and_then(|v| v.as_f64());
+                self.sim_hypersonic_slush(&HypersonicSlushRequest { fuel_mass_kg: fuel, solid_fraction: solid })?
+            }
+            "sim.hypersonic.creep" => {
+                let t_k = req.arguments.get("operating_temp_k").and_then(|v| v.as_f64());
+                let s = req.arguments.get("applied_stress_mpa").and_then(|v| v.as_f64());
+                let dur = req.arguments.get("flight_duration_hours").and_then(|v| v.as_f64());
+                self.sim_hypersonic_creep(&HypersonicCreepRequest { operating_temp_k: t_k, applied_stress_mpa: s, flight_duration_hours: dur })?
+            }
             "sim.multiphysics_suite.solve" => self.sim_multiphysics_suite()?,
             "cam.toolpaths.generate" => serde_json::json!({
                 "status": "Generated",
@@ -6614,6 +6669,27 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             Ok(payload) => json_response(200, payload),
             Err(error) => error_response(&error),
         },
+        "/api/sim/hypersonic/mhd" => match parse_body_or_default::<HypersonicMhdRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_hypersonic_mhd(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/hypersonic/slush" => match parse_body_or_default::<HypersonicSlushRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_hypersonic_slush(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/hypersonic/creep" => match parse_body_or_default::<HypersonicCreepRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_hypersonic_creep(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
         "/api/sim/chemical" => match parse_body_or_default::<SimChemicalRequest>(request) {
             Ok(body) => match with_state(state, |state| state.sim_chemical(&body)) {
                 Ok(payload) => json_response(200, payload),
@@ -8209,6 +8285,37 @@ struct HypersonicScramjetRequest {
 struct HypersonicCryoRequest {
     #[serde(default)]
     pub fuel_mass_kg: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HypersonicMhdRequest {
+    #[serde(default)]
+    pub flow_velocity_m_s: Option<f64>,
+    #[serde(default)]
+    pub b_field_tesla: Option<f64>,
+    #[serde(default)]
+    pub channel_volume_m3: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HypersonicSlushRequest {
+    #[serde(default)]
+    pub fuel_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub solid_fraction: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HypersonicCreepRequest {
+    #[serde(default)]
+    pub operating_temp_k: Option<f64>,
+    #[serde(default)]
+    pub applied_stress_mpa: Option<f64>,
+    #[serde(default)]
+    pub flight_duration_hours: Option<f64>,
 }
 
 #[derive(Debug, Default, Deserialize)]

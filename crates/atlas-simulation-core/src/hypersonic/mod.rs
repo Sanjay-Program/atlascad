@@ -498,4 +498,25 @@ mod tests {
         assert!((bom.mtow_kg - 48_000.0).abs() < 2_000.0);
         assert!(bom.global_cg_m[0] > 15.0 && bom.global_cg_m[0] < 20.0);
     }
+
+    #[test]
+    fn test_advanced_hypersonic_subsystems() {
+        // 1. MHD Energy Bypass Generator
+        let mhd = plasma::evaluate_mhd_energy_bypass(3333.3, 0.80, 0.25, 2.77e18, 1.8e9);
+        assert!(mhd.extracted_power_mw > 5.0, "MHD should extract > 5 MW from plasma");
+        assert_eq!(mhd.avionics_bus_power_kw, 104.2);
+        assert!(mhd.downstream_thrust_boost_kn > 1.0);
+
+        // 2. Slush Hydrogen Triple-Point Fuel
+        let slush = cryo::evaluate_slush_hydrogen(16300.0, 0.50, 158.4);
+        assert!(slush.volume_savings_m3 > 20.0, "Slush H2 must save > 20 m³ tank volume");
+        assert!(slush.latent_heat_capacity_mj > 400.0);
+        assert!(slush.zero_boiloff_hold_time_hours > 10.0);
+
+        // 3. High-Temperature UHTC Viscoplastic Creep & Larson-Miller Life
+        let creep = thermal::evaluate_high_temp_creep(2545.0, 45.0, 1.6);
+        assert!(creep.rupture_life_hours > 1000.0, "UHTC creep rupture life must exceed 1000 hrs");
+        assert!(creep.mission_accumulated_strain_pct < 0.1, "Creep strain per flight must be < 0.1%");
+        assert!(creep.creep_life_safety_factor >= 1.0);
+    }
 }

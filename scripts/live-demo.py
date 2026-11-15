@@ -922,7 +922,7 @@ def run_live_demo() -> None:
 
         # 12.9 Reusable Engineering Workflow Templates
         wfs = http_request(port, "GET", "/api/agents/workflows")
-        check(wfs.get("count") == 15, f"All 15 pre-built workflow templates registered ({wfs.get('count')})")
+        check(wfs.get("count") == 16, f"All 16 pre-built workflow templates registered ({wfs.get('count')})")
         wf_ids = [w["id"] for w in wfs["workflows"]]
         check("concept_to_cad" in wf_ids, "Workflow concept_to_cad present")
         check("cad_to_fea" in wf_ids, "Workflow cad_to_fea present")
@@ -932,11 +932,12 @@ def run_live_demo() -> None:
         check("cad_to_product_commercial" in wf_ids, "Workflow cad_to_product_commercial present")
         check("cad_to_interactive_twin" in wf_ids, "Workflow cad_to_interactive_twin present")
         check("engineering_to_vfx_master" in wf_ids, "Workflow engineering_to_vfx_master present")
+        check("hypersonic_full_vehicle_master" in wf_ids, "Workflow hypersonic_full_vehicle_master present")
 
         wf_run = http_request(port, "POST", "/api/agents/workflows/run", body={"workflow_id": "cad_to_fea"})
         check(wf_run.get("workflow_id") == "cad_to_fea", "Workflow instantiated and executed")
         check(wf_run.get("status") == "Loaded", "Workflow loaded into task graph")
-        print(f"  ✓ 12.9 Workflow Templates: Verified 12 engineering workflows, executed cad_to_fea")
+        print(f"  ✓ 12.9 Workflow Templates: Verified 16 multi-disciplinary workflows, executed cad_to_fea")
 
         # 12.10 Closed-Loop Iterative Engineering Optimization
         opt_loop = http_request(port, "POST", "/api/agents/optimize_loop", body={
@@ -1143,6 +1144,49 @@ def run_live_demo() -> None:
         check(mtow >= 45000.0, f"MTOW >= 45,000 kg (was {mtow:.0f} kg)")
         print(f"  ✓ 13.11 Real-World Aircraft BOM: 21 Components, Dry Mass = {dry_wt:.0f} kg, MTOW = {mtow:.0f} kg, CG Station X = {cg[0]:.2f} m")
 
+        # 13.12 Magnetohydrodynamic (MHD) Energy Bypass Generator API
+        mhd_res = http_request(port, "POST", "/api/sim/hypersonic/mhd", body={
+            "flow_velocity_m_s": 3333.3,
+            "b_field_tesla": 0.80,
+            "channel_volume_m3": 0.25
+        })
+        mhd_p = mhd_res.get("extracted_power_mw", 0.0)
+        mhd_avionics = mhd_res.get("avionics_bus_power_kw", 0.0)
+        mhd_boost = mhd_res.get("downstream_thrust_boost_kn", 0.0)
+        check(mhd_p >= 5.0, f"MHD boundary layer power extraction >= 5.0 MW (was {mhd_p:.2f} MW)")
+        check(mhd_avionics == 104.2, f"MHD self-powers 270V DC avionics bus (104.2 kW)")
+        check(mhd_boost > 1.0, f"MHD nozzle acceleration produces thrust boost (was +{mhd_boost:.1f} kN)")
+        print(f"  ✓ 13.12 MHD Energy Bypass: Extracted {mhd_p:.2f} MW, Powers Avionics ({mhd_avionics:.1f} kW), SERN Nozzle Boost +{mhd_boost:.1f} kN")
+
+        # 13.13 Cryogenic Slush Hydrogen (SLH2 at 13.8 K) API
+        slush_res = http_request(port, "POST", "/api/sim/hypersonic/slush", body={
+            "fuel_mass_kg": 16300.0,
+            "solid_fraction": 0.50
+        })
+        v_saved = slush_res.get("volume_savings_m3", 0.0)
+        rho_slush = slush_res.get("slush_density_kg_m3", 0.0)
+        q_latent = slush_res.get("latent_heat_capacity_mj", 0.0)
+        hold_time = slush_res.get("zero_boiloff_hold_time_hours", 0.0)
+        check(v_saved >= 20.0, f"Slush H2 saves >= 20 m³ tank volume (was {v_saved:.1f} m³)")
+        check(rho_slush > 75.0, f"Slush H2 density > 75 kg/m³ (was {rho_slush:.1f} kg/m³)")
+        check(q_latent >= 400.0, f"Solid latent heat capacity >= 400 MJ (was {q_latent:.1f} MJ)")
+        check(hold_time >= 10.0, f"Zero-boiloff ground hold time >= 10 hours (was {hold_time:.1f} h)")
+        print(f"  ✓ 13.13 Slush Hydrogen (13.8 K): Saved {v_saved:.1f} m³ Volume, Density {rho_slush:.1f} kg/m³, Zero-Boiloff Hold {hold_time:.1f} hours")
+
+        # 13.14 High-Temperature UHTC Creep-Fatigue Interaction API
+        creep_res = http_request(port, "POST", "/api/sim/hypersonic/creep", body={
+            "operating_temp_k": 2545.0,
+            "applied_stress_mpa": 45.0,
+            "flight_duration_hours": 1.6
+        })
+        rup_hrs = creep_res.get("rupture_life_hours", 0.0)
+        strain_pct = creep_res.get("mission_accumulated_strain_pct", 0.0)
+        creep_fos = creep_res.get("creep_life_safety_factor", 0.0)
+        check(rup_hrs >= 1000.0, f"UHTC Larson-Miller rupture life >= 1,000 hours (was {rup_hrs:.0f} h)")
+        check(strain_pct < 0.1, f"Mission accumulated creep strain < 0.1% (was {strain_pct:.4f}%)")
+        check(creep_fos >= 1.0, f"Creep life safety factor >= 1.0 (was {creep_fos:.2f})")
+        print(f"  ✓ 13.14 UHTC Creep-Fatigue Life: Larson-Miller Rupture = {rup_hrs:.0f} hrs, Mission Strain = {strain_pct:.4f}%, FoS = {creep_fos:.2f}x")
+
         # =====================================================================
         # DEMO 14: DAVINCI RESOLVE TIMELINE, UNITY 3D ENGINE & DEPLOYMENT PLATFORM
         # =====================================================================
@@ -1321,14 +1365,15 @@ def run_live_demo() -> None:
         check(mcp_grade.get("result", {}).get("isError") == False, "atlas_media_color_grade MCP tool executed")
         print(f"  ✓ 15.6 Autonomous Creative MCP Tools: Subdivide, Sculpt, RealTime Spawn, and Color Grade verified over JSON-RPC 2.0")
 
-        # 15.7 Verify 44 Agents and 15 Multi-Disciplinary Workflow Templates
+        # 15.7 Verify 44 Agents and 16 Multi-Disciplinary Workflow Templates
         wf_templates = http_request(port, "GET", "/api/agents/workflows")
-        check(wf_templates.get("count") == 15, "Orchestrator offers all 15 workflow templates (including 3 creative workflows)")
+        check(wf_templates.get("count") == 16, "Orchestrator offers all 16 workflow templates (including hypersonic master workflow)")
         template_ids = [t["id"] for t in wf_templates.get("workflows", [])]
         check("cad_to_product_commercial" in template_ids, "'cad_to_product_commercial' template registered")
         check("cad_to_interactive_twin" in template_ids, "'cad_to_interactive_twin' template registered")
         check("engineering_to_vfx_master" in template_ids, "'engineering_to_vfx_master' template registered")
-        print(f"  ✓ 15.7 Multi-Agent Orchestrator: All 44 Specialists (28 Engineering + 16 Creative) & 15 Workflow Templates Verified")
+        check("hypersonic_full_vehicle_master" in template_ids, "'hypersonic_full_vehicle_master' template registered")
+        print(f"  ✓ 15.7 Multi-Agent Orchestrator: All 44 Specialists (28 Engineering + 16 Creative) & 16 Workflow Templates Verified")
 
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")

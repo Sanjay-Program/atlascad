@@ -321,6 +321,39 @@ impl McpServer {
                 description: "Query complete 15-subsystem real-world component Bill of Materials, masses, CG coordinates, and thermal ratings".into(),
                 input_schema: serde_json::json!({ "type": "object" }),
             },
+            McpToolDefinition {
+                name: "atlas_hypersonic_mhd".into(),
+                description: "Simulate Magnetohydrodynamic (MHD) energy bypass, boundary layer power extraction, and nozzle thrust boost".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "flow_velocity_m_s": { "type": "number", "default": 3333.3 },
+                        "b_field_tesla": { "type": "number", "default": 0.80 }
+                    }
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_hypersonic_slush".into(),
+                description: "Simulate Slush Hydrogen (13.8 K) 50% solid fraction fuel density, volume savings, and zero-boiloff hold time".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "fuel_mass_kg": { "type": "number", "default": 16300.0 },
+                        "solid_fraction": { "type": "number", "default": 0.50 }
+                    }
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_hypersonic_creep".into(),
+                description: "Simulate UHTC viscoplastic creep strain rate and predict Larson-Miller 1000-hour mission life".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "operating_temp_k": { "type": "number", "default": 2545.0 },
+                        "applied_stress_mpa": { "type": "number", "default": 45.0 }
+                    }
+                }),
+            },
         ]
     }
 

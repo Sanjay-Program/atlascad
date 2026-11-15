@@ -120,3 +120,69 @@ pub fn evaluate_plasma_sheath(
         mhd_window_b_field_tesla: mhd_b_field,
     }
 }
+
+/// Results of the Magnetohydrodynamic (MHD) energy bypass generator.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MhdEnergyBypassResult {
+    /// Plasma electrical conductivity in Siemens/meter (S/m)
+    pub plasma_conductivity_s_m: f64,
+    /// Electron Hall parameter beta_H
+    pub hall_parameter: f64,
+    /// Total electrical power extracted from boundary layer in MW
+    pub extracted_power_mw: f64,
+    /// Lorentz aerodynamic braking force exerted on flow in kN
+    pub lorentz_braking_force_kn: f64,
+    /// Electrical power supplied directly to 270V DC avionics bus in kW
+    pub avionics_bus_power_kw: f64,
+    /// Net thrust gain from downstream exhaust MHD accelerator in kN
+    pub downstream_thrust_boost_kn: f64,
+    /// Overall thermodynamic efficiency improvement of scramjet cycle percentage
+    pub cycle_efficiency_gain_pct: f64,
+}
+
+/// Evaluates Magnetohydrodynamic (MHD) energy bypass generator in hypersonic inlet.
+#[must_use]
+pub fn evaluate_mhd_energy_bypass(
+    flow_velocity_m_s: f64,
+    b_field_tesla: f64,
+    channel_volume_m3: f64,
+    electron_density_m3: f64,
+    collision_frequency_hz: f64,
+) -> MhdEnergyBypassResult {
+    let elem_charge = 1.602_176_634e-19_f64;
+    let electron_mass = 9.109_383_701_5e-31_f64;
+
+    // Electrical conductivity: sigma = n_e * e^2 / (m_e * nu_en)
+    let nu = collision_frequency_hz.max(1.0e6);
+    let conductivity = (electron_density_m3 * elem_charge.powi(2)) / (electron_mass * nu);
+    let sigma = conductivity.clamp(5.0, 150.0);
+
+    // Hall parameter: beta = e * B / (m_e * nu)
+    let hall_parameter = (elem_charge * b_field_tesla) / (electron_mass * nu);
+
+    // Faraday generator load factor K = 0.75 for maximum power transfer
+    let load_factor = 0.75;
+    let power_density_w_m3 = sigma * flow_velocity_m_s.powi(2) * b_field_tesla.powi(2) * load_factor * (1.0 - load_factor);
+    let extracted_power_w = power_density_w_m3 * channel_volume_m3.clamp(0.05, 2.0);
+    let extracted_power_mw = extracted_power_w / 1.0e6;
+
+    // Lorentz force: F_L = sigma * u * B^2 * (1 - K) * Volume
+    let lorentz_n = sigma * flow_velocity_m_s * b_field_tesla.powi(2) * (1.0 - load_factor) * channel_volume_m3;
+    let lorentz_kn = lorentz_n / 1000.0;
+
+    let avionics_kw = 104.2; // Direct baseline avionics load
+    let net_accel_power_mw = (extracted_power_mw - (avionics_kw / 1000.0)).max(0.0);
+    // Downstream SERN nozzle acceleration: F_accel ~ (2 * eta * P / v_exhaust)
+    let downstream_boost_kn = ((net_accel_power_mw * 1.0e6 * 0.85) / 4200.0) / 1000.0;
+    let cycle_gain = (downstream_boost_kn / 130.0) * 100.0;
+
+    MhdEnergyBypassResult {
+        plasma_conductivity_s_m: sigma,
+        hall_parameter,
+        extracted_power_mw,
+        lorentz_braking_force_kn: lorentz_kn,
+        avionics_bus_power_kw: avionics_kw,
+        downstream_thrust_boost_kn: downstream_boost_kn,
+        cycle_efficiency_gain_pct: cycle_gain,
+    }
+}

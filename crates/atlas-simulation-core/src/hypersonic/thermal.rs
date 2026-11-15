@@ -122,3 +122,68 @@ pub fn evaluate_active_cooling(
         substrate_thermal_margin_c: substrate_margin_c,
     }
 }
+
+/// Results of high-temperature creep and thermomechanical life analysis.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CreepFatigueResult {
+    /// Material name
+    pub material_name: String,
+    /// Operating temperature in Kelvin
+    pub operating_temperature_k: f64,
+    /// Applied von Mises stress in MPa
+    pub applied_stress_mpa: f64,
+    /// Steady-state Norton-Bailey creep strain rate in 1/second
+    pub creep_strain_rate_per_sec: f64,
+    /// Larson-Miller Parameter (LMP)
+    pub larson_miller_parameter: f64,
+    /// Estimated creep rupture life in hours
+    pub rupture_life_hours: f64,
+    /// Accumulated creep strain during single mission percentage
+    pub mission_accumulated_strain_pct: f64,
+    /// Safety factor on creep rupture life
+    pub creep_life_safety_factor: f64,
+}
+
+/// Evaluates high-temperature viscoplastic creep strain rate and Larson-Miller rupture life.
+#[must_use]
+pub fn evaluate_high_temp_creep(
+    operating_temp_k: f64,
+    applied_stress_mpa: f64,
+    flight_duration_hours: f64,
+) -> CreepFatigueResult {
+    let t_k = operating_temp_k.max(300.0);
+    let sigma = applied_stress_mpa.max(1.0);
+    let r_gas = 8.314; // J/(mol*K)
+
+    // UHTC ZrB2-SiC viscoplastic parameters
+    let q_activation = 420_000.0; // 420 kJ/mol
+    let stress_exp = 1.6;
+    let pre_exp_a = 1.2e-4;
+
+    // Norton-Bailey creep: eps_dot = A * sigma^n * exp(-Q / RT)
+    let arrhenius = (-q_activation / (r_gas * t_k)).exp();
+    let creep_rate = pre_exp_a * sigma.powf(stress_exp) * arrhenius;
+
+    // Larson-Miller Parameter for ultra-high temperature ceramics: LMP ~ 62.5 at 45 MPa
+    let lmp = 68.0 - (0.12 * sigma);
+    let log10_tr = ((1000.0 * lmp) / t_k) - 20.0;
+    let rupture_hours = 10.0_f64.powf(log10_tr.clamp(1.0, 6.0));
+
+    // Accumulated mission creep strain
+    let flight_sec = flight_duration_hours * 3600.0;
+    let mission_strain_pct = (creep_rate * flight_sec) * 100.0;
+
+    let target_life_hours = 1000.0;
+    let safety_factor = rupture_hours / target_life_hours;
+
+    CreepFatigueResult {
+        material_name: "UHTC ZrB2-20vol%SiC".into(),
+        operating_temperature_k: t_k,
+        applied_stress_mpa: sigma,
+        creep_strain_rate_per_sec: creep_rate,
+        larson_miller_parameter: lmp,
+        rupture_life_hours: rupture_hours,
+        mission_accumulated_strain_pct: mission_strain_pct,
+        creep_life_safety_factor: safety_factor,
+    }
+}
