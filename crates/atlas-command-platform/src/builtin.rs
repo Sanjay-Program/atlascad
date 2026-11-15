@@ -430,5 +430,53 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         .with_permission(CommandPermission::ReadOnly),
     )?;
 
+    // --- 9. Post-Production & Digital Twin Engines ---
+    registry.register(
+        CommandSchema::new(
+            "export.davinci.resolve",
+            "Export DaVinci Resolve Timeline & VFX Bundle",
+            "Generates FCPXML multi-track timeline, CMX 3600 EDL, 3D aerothermal LUT (.cube), and Pixar OpenUSD (.usda) scene.",
+            CommandCategory::Reporting,
+        )
+        .with_permission(CommandPermission::FileExport)
+        .with_argument(CommandArgument {
+            name: "timebase_fps".into(),
+            arg_type: ArgumentType::Number,
+            description: "Timeline frame rate (e.g. 24.0, 25.0, 29.97, 30.0, 60.0)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(25.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(240.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "export.unity.engine",
+            "Export Unity 3D Engine & Digital Twin Package",
+            "Generates Unity Package (com.atlascad.unity), glTF 2.0 PBR scene model, and 6-DOF telemetry flight controllers.",
+            CommandCategory::Reporting,
+        )
+        .with_permission(CommandPermission::FileExport)
+        .with_argument(CommandArgument {
+            name: "include_hud".into(),
+            arg_type: ArgumentType::Boolean,
+            description: "Include real-time flight telemetry glass-cockpit HUD controller".into(),
+            required: false,
+            default_value: Some(serde_json::json!(true)),
+            validation_rules: vec![],
+        }),
+    )?;
+
+    // --- 10. System & Deployment Lifecycle ---
+    registry.register(
+        CommandSchema::new(
+            "system.deploy.status",
+            "Query System Deployment & Runtime Status",
+            "Inspects production container orchestrator, host telemetry, engine availability, and active session states.",
+            CommandCategory::System,
+        )
+        .with_permission(CommandPermission::ReadOnly),
+    )?;
+
     Ok(())
 }

@@ -124,6 +124,11 @@ fn post(addr: SocketAddr, path: &str, body: &str) -> Result<Response, Box<dyn st
     )
 }
 
+fn get(addr: SocketAddr, path: &str) -> Result<Response, Box<dyn std::error::Error>> {
+    let origin = origin(addr);
+    request(addr, "GET", path, &[("Origin", &origin)], &[])
+}
+
 fn fixture(
     tag: &str,
     size: [f64; 3],
@@ -4405,6 +4410,136 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let press_json = json(&press_resp)?;
     let psi = press_json["converted_value"].as_f64().ok_or("psi")?;
     assert!((psi - 145.038).abs() < 1e-1);
+
+    // 31. Hypersonic Multi-Physics Aircraft Simulation (Mach 11 / 12,000 km/h)
+    let hyp_resp = post(
+        addr,
+        "/api/sim/hypersonic",
+        r#"{"target_speed_km_h": 12000.0, "cruise_altitude_m": 32000.0, "angle_of_attack_deg": 2.5}"#,
+    )?;
+    assert_eq!(hyp_resp.status, 200);
+    let hyp_json = json(&hyp_resp)?;
+    let mach = hyp_json["scalar_metrics"]["flight_mach"]
+        .as_f64()
+        .ok_or("mach")?;
+    assert!(mach > 10.5 && mach < 11.5);
+    let l_over_d = hyp_json["scalar_metrics"]["lift_to_drag_ratio"]
+        .as_f64()
+        .ok_or("l_over_d")?;
+    assert!(l_over_d > 4.5 && l_over_d < 6.0);
+    let stag_t = hyp_json["scalar_metrics"]["stagnation_recovery_temp_k"]
+        .as_f64()
+        .ok_or("stag_t")?;
+    assert!(stag_t > 4000.0);
+    let thrust_kn = hyp_json["scalar_metrics"]["scramjet_net_thrust_kn"]
+        .as_f64()
+        .ok_or("thrust_kn")?;
+    assert!(thrust_kn > 100.0);
+    let fos = hyp_json["scalar_metrics"]["structural_fos"]
+        .as_f64()
+        .ok_or("fos")?;
+    assert!(fos > 1.5);
+
+    // 32. DaVinci Resolve Timeline & VFX Bundle Exporter
+    let davinci_resp = get(addr, "/api/export/davinci")?;
+    assert_eq!(davinci_resp.status, 200);
+    let davinci_json = json(&davinci_resp)?;
+    assert_eq!(davinci_json["status"], "Success");
+    assert_eq!(davinci_json["tracks_count"], 4);
+    assert_eq!(davinci_json["markers_count"], 5);
+    let fcpxml = davinci_json["fcpxml"].as_str().ok_or("fcpxml")?;
+    assert!(fcpxml.contains("<xmeml version=\"5\">"));
+    assert!(fcpxml.contains("sequence-atlas-hypersonic"));
+    let edl = davinci_json["edl"].as_str().ok_or("edl")?;
+    assert!(edl.contains("TITLE: ATLAS_HYPERSONIC_TIMELINE"));
+    let lut = davinci_json["thermal_cube_lut"].as_str().ok_or("lut")?;
+    assert!(lut.contains("LUT_3D_SIZE 17"));
+    assert!(lut.contains("AtlasCAD_Aerothermal_Ironbow_3D"));
+    let usda = davinci_json["open_usd_usda"].as_str().ok_or("usda")?;
+    assert!(usda.contains("#usda 1.0"));
+    assert!(usda.contains("WaveriderFuselage"));
+
+    // DaVinci specific format query parameter
+    let fcpxml_resp = get(addr, "/api/export/davinci?format=fcpxml")?;
+    assert_eq!(fcpxml_resp.status, 200);
+    assert_eq!(
+        fcpxml_resp.headers.get("content-type").map(|s| s.as_str()),
+        Some("application/xml")
+    );
+
+    // 33. Unity 3D Engine & Digital Twin Bridge
+    let unity_resp = get(addr, "/api/export/unity")?;
+    assert_eq!(unity_resp.status, 200);
+    let unity_json = json(&unity_resp)?;
+    assert_eq!(unity_json["status"], "Success");
+    assert_eq!(unity_json["package_name"], "com.atlascad.unity");
+    let manifest = unity_json["package_manifest"].as_str().ok_or("manifest")?;
+    assert!(manifest.contains("com.atlascad.unity"));
+    let client_cs = unity_json["scripts"]["AtlasCadClient.cs"]
+        .as_str()
+        .ok_or("client_cs")?;
+    assert!(client_cs.contains("class AtlasCadClient"));
+    assert!(client_cs.contains("HypersonicTelemetry"));
+    let sim_cs = unity_json["scripts"]["HypersonicFlightSimulator.cs"]
+        .as_str()
+        .ok_or("sim_cs")?;
+    assert!(sim_cs.contains("class HypersonicFlightSimulator"));
+    let hud_cs = unity_json["scripts"]["AtlasCadHUD.cs"]
+        .as_str()
+        .ok_or("hud_cs")?;
+    assert!(hud_cs.contains("class AtlasCadHUD"));
+    let gltf = unity_json["gltf_json"].as_str().ok_or("gltf")?;
+    assert!(gltf.contains("\"asset\""));
+
+    let gltf_resp = get(addr, "/api/export/gltf")?;
+    assert_eq!(gltf_resp.status, 200);
+    assert_eq!(
+        gltf_resp.headers.get("content-type").map(|s| s.as_str()),
+        Some("model/gltf+json")
+    );
+
+    // 34. System Deployment Status & Health Monitoring
+    let deploy_resp = get(addr, "/api/deploy/status")?;
+    assert_eq!(deploy_resp.status, 200);
+    let deploy_json = json(&deploy_resp)?;
+    assert_eq!(deploy_json["status"], "healthy");
+    assert_eq!(
+        deploy_json["deployment_mode"],
+        "containerized_and_standalone"
+    );
+    let total_engines = deploy_json["simulation_engines"]["total_engines"]
+        .as_u64()
+        .ok_or("total_engines")?;
+    assert_eq!(total_engines, 27);
+    assert_eq!(
+        deploy_json["compliance"]["quality_management"],
+        "AS9100 Rev D & ISO 9001:2015"
+    );
+
+    // 35. Execute Commands via Command Platform
+    let cmd_davinci = post(
+        addr,
+        "/api/commands/execute",
+        r#"{"command_id": "export.davinci.resolve", "arguments": {"timebase_fps": 30.0}}"#,
+    )?;
+    assert_eq!(cmd_davinci.status, 200);
+    assert_eq!(json(&cmd_davinci)?["status"], "Success");
+
+    let cmd_unity = post(
+        addr,
+        "/api/commands/execute",
+        r#"{"command_id": "export.unity.engine", "arguments": {"include_hud": true}}"#,
+    )?;
+    assert_eq!(cmd_unity.status, 200);
+    assert_eq!(json(&cmd_unity)?["status"], "Success");
+
+    let cmd_deploy = post(
+        addr,
+        "/api/commands/execute",
+        r#"{"command_id": "system.deploy.status", "arguments": {}}"#,
+    )?;
+    assert_eq!(cmd_deploy.status, 200);
+    assert_eq!(json(&cmd_deploy)?["status"], "Success");
 
     Ok(())
 }

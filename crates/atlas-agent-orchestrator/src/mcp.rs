@@ -185,6 +185,31 @@ impl McpServer {
                     }
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_export_davinci".into(),
+                description: "Export FCPXML timeline, CMX 3600 EDL, 3D aerothermal LUT, and Pixar OpenUSD scene for DaVinci Resolve Studio".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "timebase_fps": { "type": "number", "default": 25.0 }
+                    }
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_export_unity".into(),
+                description: "Export Unity Engine Package (com.atlascad.unity), glTF 2.0 PBR asset, and 6-DOF telemetry flight controllers".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "include_hud": { "type": "boolean", "default": true }
+                    }
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_deploy_status".into(),
+                description: "Query system deployment status, container orchestrator state, memory usage, and multi-physics engine health".into(),
+                input_schema: serde_json::json!({ "type": "object" }),
+            },
         ]
     }
 

@@ -3188,6 +3188,100 @@
     }
   }
 
+  async function exportDavinci(format) {
+    try {
+      const headers = new Headers();
+      if (shareToken) headers.set("x-atlas-token", shareToken);
+      const url = format ? `/api/export/davinci?format=${encodeURIComponent(format)}` : "/api/export/davinci";
+      const response = await fetch(url, { headers });
+      if (!response.ok) {
+        throw new Error(`DaVinci export failed with status ${response.status}`);
+      }
+      if (format === "fcpxml" || format === "xml") {
+        const blob = await response.blob();
+        downloadBlob(blob, "hypersonic-timeline.fcpxml");
+        toast("DaVinci Resolve FCPXML Timeline downloaded.");
+      } else if (format === "edl") {
+        const blob = await response.blob();
+        downloadBlob(blob, "hypersonic-timeline.edl");
+        toast("CMX 3600 EDL downloaded.");
+      } else if (format === "cube" || format === "lut") {
+        const blob = await response.blob();
+        downloadBlob(blob, "hypersonic-aerothermal.cube");
+        toast("3D Aerothermal .cube LUT downloaded.");
+      } else if (format === "usda" || format === "usd") {
+        const blob = await response.blob();
+        downloadBlob(blob, "hypersonic-fusion.usda");
+        toast("Pixar OpenUSD Scene (.usda) downloaded.");
+      } else {
+        const data = await response.json();
+        const blob = new Blob([data.fcpxml], { type: "application/xml" });
+        downloadBlob(blob, "hypersonic-timeline.fcpxml");
+        log(`Exported DaVinci Resolve Bundle: 4 tracks, ${data.markers_count} markers`);
+        toast("DaVinci Resolve Master Timeline (.fcpxml) downloaded.");
+      }
+    } catch (err) {
+      toast(err.message, true);
+      log(`DaVinci Resolve export error: ${err.message}`, "error");
+    }
+  }
+
+  async function exportUnity(file) {
+    try {
+      const headers = new Headers();
+      if (shareToken) headers.set("x-atlas-token", shareToken);
+      const url = file ? `/api/export/unity?file=${encodeURIComponent(file)}` : "/api/export/unity";
+      const response = await fetch(url, { headers });
+      if (!response.ok) {
+        throw new Error(`Unity export failed with status ${response.status}`);
+      }
+      if (file) {
+        const blob = await response.blob();
+        downloadBlob(blob, file);
+        toast(`Downloaded Unity file: ${file}`);
+      } else {
+        const data = await response.json();
+        const blob = new Blob([data.package_manifest], { type: "application/json" });
+        downloadBlob(blob, "package.json");
+        log(`Exported Unity Engine Package: ${data.package_name} v${data.version}`);
+        toast("Unity Package manifest (com.atlascad.unity) downloaded.");
+      }
+    } catch (err) {
+      toast(err.message, true);
+      log(`Unity export error: ${err.message}`, "error");
+    }
+  }
+
+  async function exportGltf() {
+    try {
+      const headers = new Headers();
+      if (shareToken) headers.set("x-atlas-token", shareToken);
+      const response = await fetch("/api/export/gltf", { headers });
+      if (!response.ok) throw new Error(`glTF export failed: ${response.status}`);
+      const blob = await response.blob();
+      downloadBlob(blob, "hypersonic-aircraft.gltf");
+      log("Exported glTF 2.0 PBR scene model");
+      toast("glTF 2.0 3D model downloaded.");
+    } catch (err) {
+      toast(err.message, true);
+      log(`glTF export error: ${err.message}`, "error");
+    }
+  }
+
+  async function showDeployStatus() {
+    try {
+      const headers = new Headers();
+      if (shareToken) headers.set("x-atlas-token", shareToken);
+      const response = await fetch("/api/deploy/status", { headers });
+      if (!response.ok) throw new Error(`Status check failed: ${response.status}`);
+      const data = await response.json();
+      log(`Deployment Status: ${data.status.toUpperCase()} | Engines: ${data.simulation_engines.total_engines} | Compliance: ${data.compliance.quality_management}`);
+      toast(`Deployment Status: ${data.status.toUpperCase()} (${data.simulation_engines.total_engines} Multiphysics Engines Online, AS9100/ISO 9001 Compliant)`);
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+
   async function setProfile(kind) {
     const sketch = activeSketch();
     if (!sketch) {
@@ -4917,6 +5011,11 @@ ${gcodeSample}`;
     { alias: "DXF", name: "DXFOUT", desc: "Export plan drawing as AutoCAD R12 DXF", run: () => exportDxf() },
     { alias: "PDF", name: "PLOT", desc: "Plot drawing as ISO/ANSI vector sheet", run: () => plotPdf() },
     { alias: "STL", name: "STLOUT", desc: "Export binary 3D mesh STL", run: () => exportStl() },
+    { alias: "DAVINCI", name: "EXPORT.DAVINCI", desc: "Export DaVinci Resolve Timeline, EDL, 3D LUT & Fusion OpenUSD", run: () => exportDavinci() },
+    { alias: "UNITY", name: "EXPORT.UNITY", desc: "Export Unity 3D Engine Package & glTF 2.0 digital twin", run: () => exportUnity() },
+    { alias: "GLTF", name: "EXPORT.GLTF", desc: "Export Khronos glTF 2.0 PBR scene model", run: () => exportGltf() },
+    { alias: "DEPLOY", name: "SYSTEM.DEPLOY", desc: "Query deployment health and active engines", run: () => showDeployStatus() },
+    { alias: "HEALTH", name: "SYSTEM.DEPLOY", desc: "Query deployment health and active engines", run: () => showDeployStatus() },
     { alias: "QSAVE", name: "SAVE", desc: "Save project and drawing", run: () => save() },
     { alias: "HELP", name: "?", desc: "Show keyboard shortcuts & command reference", run: () => openHelp() },
     { alias: "EXT", name: "EXTRUDE", desc: "Interactive 3D Extrude Feature HUD", run: () => openFeatureHud("join") },
@@ -9638,6 +9737,12 @@ ${gcodeSample}`;
     byId("recoveryDiscard").addEventListener("click", discardRecovery);
     byId("exportBtn").addEventListener("click", exportStl);
     byId("exportDxfBtn")?.addEventListener("click", exportDxf);
+    byId("exportDavinciBtn")?.addEventListener("click", () => exportDavinci());
+    byId("exportUnityBtn")?.addEventListener("click", () => exportUnity());
+    byId("rbOutDavinciBtn")?.addEventListener("click", () => exportDavinci());
+    byId("rbOutUnityBtn")?.addEventListener("click", () => exportUnity());
+    byId("rbOutGltfBtn")?.addEventListener("click", () => exportGltf());
+    byId("statusDeployIndicator")?.addEventListener("click", () => showDeployStatus());
     byId("downloadDxfBtn").addEventListener("click", exportDxf);
     byId("timelineStepUndo")?.addEventListener("click", undo);
     byId("timelineStepRedo")?.addEventListener("click", redo);
