@@ -14,3 +14,4 @@ thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 atlas-command-platform = { path = "../atlas-command-platform" }
+atlas-simulation-core = { path = "../atlas-simulation-core" }

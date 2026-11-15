@@ -4675,5 +4675,50 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(render_json["status"], "rendered");
     assert_eq!(render_json["export_format"], "ProRes 422 HQ / OpenTimelineIO");
 
+    // 41. Hypersonic Panel Flutter Aeroelastic Stability API
+    let flutter_resp = post(
+        addr,
+        "/api/sim/hypersonic/flutter",
+        r#"{"dynamic_pressure_kpa": 73.5, "flight_mach": 11.0, "wall_temp_c": 2272.0}"#,
+    )?;
+    assert_eq!(flutter_resp.status, 200);
+    let flutter_json = json(&flutter_resp)?;
+    assert_eq!(flutter_json["is_flutter_safe"], true);
+    assert!(flutter_json["flutter_factor_of_safety"].as_f64().unwrap_or(0.0) >= 1.50);
+
+    // 42. Hypersonic 6-DOF Bank-to-Turn Maneuver API
+    let btt_resp = post(
+        addr,
+        "/api/sim/hypersonic/6dof",
+        r#"{"flight_speed_m_s": 3333.3, "altitude_m": 32000.0, "target_heading_change_deg": 30.0, "bank_angle_deg": 55.0}"#,
+    )?;
+    assert_eq!(btt_resp.status, 200);
+    let btt_json = json(&btt_resp)?;
+    assert_eq!(btt_json["is_maneuver_safe"], true);
+    assert!(btt_json["turn_radius_km"].as_f64().unwrap_or(0.0) > 100.0);
+
+    // 43. REBCO 20K Superconducting Magnet API
+    let magnet_resp = post(
+        addr,
+        "/api/sim/hypersonic/magnet",
+        r#"{"target_b_field_tesla": 1.25, "channel_gap_m": 0.35, "coil_temperature_k": 20.0}"#,
+    )?;
+    assert_eq!(magnet_resp.status, 200);
+    let magnet_json = json(&magnet_resp)?;
+    assert_eq!(magnet_json["is_hts_stable"], true);
+    assert!(magnet_json["critical_current_margin"].as_f64().unwrap_or(0.0) >= 1.30);
+
+    // 44. Closed-Loop Autonomous Master Workflow Run API
+    let run_all_resp = post(
+        addr,
+        "/api/agents/workflows/run_all",
+        r#"{"workflow_id": "hypersonic_full_vehicle_master", "auto_approve": true}"#,
+    )?;
+    assert_eq!(run_all_resp.status, 200);
+    let run_all_json = json(&run_all_resp)?;
+    assert_eq!(run_all_json["status"], "Completed");
+    assert_eq!(run_all_json["summary"]["completed_tasks"], 11);
+    assert_eq!(run_all_json["summary"]["execution_status"], "Completed");
+
     Ok(())
 }

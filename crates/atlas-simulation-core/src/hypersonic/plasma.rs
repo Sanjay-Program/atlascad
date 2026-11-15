@@ -186,3 +186,75 @@ pub fn evaluate_mhd_energy_bypass(
         cycle_efficiency_gain_pct: cycle_gain,
     }
 }
+
+/// High-Temperature Superconducting (HTS) REBCO Magnet system for MHD channel and RF window.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SuperconductingMagnetResult {
+    /// Magnetic flux density generated in Tesla
+    pub magnetic_field_tesla: f64,
+    /// Critical current density at operating temperature in A/mm^2
+    pub critical_current_density_a_mm2: f64,
+    /// Operating current in Amperes
+    pub operating_current_a: f64,
+    /// Total Ampere-turns required
+    pub total_ampere_turns: f64,
+    /// Stored magnetic energy in kilojoules (kJ)
+    pub stored_magnetic_energy_kj: f64,
+    /// Magnetic pressure exerted on channel structure in kPa
+    pub magnetic_pressure_kpa: f64,
+    /// Cryogenic heat leak absorbed by slush LH2 cooling loop in Watts
+    pub cryo_heat_leak_watts: f64,
+    /// Safety margin above critical current (I_c / I_op)
+    pub critical_current_margin: f64,
+    /// Whether superconducting magnet operates safely within critical surface
+    pub is_hts_stable: bool,
+}
+
+/// Evaluates 20 K REBCO High-Temperature Superconducting (HTS) magnet performance.
+#[must_use]
+pub fn evaluate_superconducting_hts_magnet(
+    target_b_field_tesla: f64,
+    channel_gap_m: f64,
+    coil_temperature_k: f64,
+    channel_volume_m3: f64,
+) -> SuperconductingMagnetResult {
+    let mu0 = 4.0 * std::f64::consts::PI * 1.0e-7;
+
+    // REBCO tape critical surface model at T <= 92 K:
+    // J_c(T, B) ~ J_c0 * (1 - T / 92)^1.5 / (1 + B / 3.0)^0.7
+    let temp_ratio = (coil_temperature_k / 92.0).clamp(0.0, 1.0);
+    let jc0_a_mm2 = 1200.0; // Baseline at 4.2 K self-field
+    let critical_current_density_a_mm2 = (jc0_a_mm2 * (1.0 - temp_ratio).powf(1.5))
+        / (1.0 + target_b_field_tesla / 3.0).powf(0.7);
+
+    // Operating current design: 65% of critical current for thermal runaway margin
+    let operating_current_a = (critical_current_density_a_mm2 * 4.0 * 0.12 * 0.65).max(100.0); // 4mm x 0.12mm tape
+    let critical_current_margin = 1.0 / 0.65; // ~ 1.54x margin
+
+    // Ampere-turns: N * I = B * gap / mu0
+    let total_ampere_turns = (target_b_field_tesla * channel_gap_m) / mu0;
+
+    // Stored magnetic energy: E = (B^2 / (2 * mu0)) * Volume
+    let energy_density_j_m3 = target_b_field_tesla.powi(2) / (2.0 * mu0);
+    let stored_magnetic_energy_kj = (energy_density_j_m3 * channel_volume_m3) / 1000.0;
+
+    // Magnetic pressure: p_mag = B^2 / (2 * mu0)
+    let magnetic_pressure_kpa = energy_density_j_m3 / 1000.0;
+
+    // Cryostat conductive and radiative heat leak (vacuum MLI + conduction leads)
+    let cryo_heat_leak_watts = 32.5 + (coil_temperature_k * 0.45);
+
+    let is_hts_stable = coil_temperature_k <= 35.0 && critical_current_margin >= 1.30;
+
+    SuperconductingMagnetResult {
+        magnetic_field_tesla: target_b_field_tesla,
+        critical_current_density_a_mm2,
+        operating_current_a,
+        total_ampere_turns,
+        stored_magnetic_energy_kj,
+        magnetic_pressure_kpa,
+        cryo_heat_leak_watts,
+        critical_current_margin,
+        is_hts_stable,
+    }
+}

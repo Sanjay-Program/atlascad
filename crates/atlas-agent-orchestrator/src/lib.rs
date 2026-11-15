@@ -186,4 +186,40 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_hypersonic_master_workflow_closed_loop_execution() -> Result<(), OrchestratorError> {
+        let mut orch = EngineeringOrchestrator::new("Hypersonic_Mach11_Flagship");
+        let graph = WorkflowRegistry::instantiate_template("hypersonic_full_vehicle_master")?;
+        assert_eq!(graph.len(), 11);
+
+        orch.load_task_graph(graph)?;
+        let summary = orch.execute_all(true)?;
+
+        assert_eq!(summary.total_tasks, 11);
+        assert_eq!(summary.completed_tasks, 11);
+        assert_eq!(summary.failed_tasks, 0);
+        assert_eq!(summary.execution_status, "Completed");
+
+        // Verify task output artifacts
+        let plasma_task = orch
+            .active_graph
+            .get_task("t3_aero_plasma")
+            .ok_or_else(|| OrchestratorError::TaskNotFound("t3_aero_plasma missing".into()))?;
+        assert!(plasma_task.result.is_some());
+
+        let scramjet_task = orch
+            .active_graph
+            .get_task("t4_scramjet_cycle")
+            .ok_or_else(|| OrchestratorError::TaskNotFound("t4_scramjet_cycle missing".into()))?;
+        assert!(scramjet_task.result.is_some());
+
+        let cert_task = orch
+            .active_graph
+            .get_task("t11_as9100_cert")
+            .ok_or_else(|| OrchestratorError::TaskNotFound("t11_as9100_cert missing".into()))?;
+        assert!(cert_task.result.is_some());
+
+        Ok(())
+    }
 }

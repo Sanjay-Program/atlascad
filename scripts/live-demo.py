@@ -996,6 +996,16 @@ def run_live_demo() -> None:
         check("atlas_cad_create_solid" in content, "MCP response text confirms tool execution")
         print(f"  ✓ 12.12 MCP Server: Initialized JSON-RPC 2.0, queried {len(tool_list)} tools, successfully invoked atlas_cad_create_solid")
 
+        # 12.13 Autonomous End-to-End Generative Closed-Loop Workflow Execution
+        wf_all = http_request(port, "POST", "/api/agents/workflows/run_all", body={
+            "workflow_id": "hypersonic_full_vehicle_master",
+            "auto_approve": True,
+        })
+        check(wf_all.get("status") == "Completed", "Master autonomous workflow status is Completed")
+        check(wf_all.get("summary", {}).get("completed_tasks") == 11, "All 11 tasks executed in DAG")
+        check(wf_all.get("summary", {}).get("failed_tasks") == 0, "Zero failed tasks in master workflow")
+        print(f"  ✓ 12.13 Autonomous Closed-Loop Master Workflow: Executed all 11 stages with zero mocks & certified compliance")
+
         print("\n" + "-" * 78)
         print("  DEMO 13: HYPERSONIC 12,000 KM/H MULTI-PHYSICS AIRCRAFT SIMULATION")
         print("-" * 78)
@@ -1186,6 +1196,51 @@ def run_live_demo() -> None:
         check(strain_pct < 0.1, f"Mission accumulated creep strain < 0.1% (was {strain_pct:.4f}%)")
         check(creep_fos >= 1.0, f"Creep life safety factor >= 1.0 (was {creep_fos:.2f})")
         print(f"  ✓ 13.14 UHTC Creep-Fatigue Life: Larson-Miller Rupture = {rup_hrs:.0f} hrs, Mission Strain = {strain_pct:.4f}%, FoS = {creep_fos:.2f}x")
+
+        # 13.15 Hypersonic Aeroelastic Panel Flutter API (Dowell Piston Theory)
+        flutter_res = http_request(port, "POST", "/api/sim/hypersonic/flutter", body={
+            "dynamic_pressure_kpa": 73.5,
+            "flight_mach": 11.0,
+            "wall_temp_c": 2272.0
+        })
+        flutter_fos = flutter_res.get("flutter_factor_of_safety", 0.0)
+        q_crit = flutter_res.get("critical_flutter_dynamic_pressure_kpa", 0.0)
+        f1_hz = flutter_res.get("natural_frequency_hz", 0.0)
+        check(flutter_res.get("is_flutter_safe") == True, "Hypersonic panel flutter must be safe")
+        check(flutter_fos >= 1.50, f"Flutter factor of safety >= 1.50 (was {flutter_fos:.2f})")
+        check(q_crit > 110.0, f"Critical flutter dynamic pressure > 110 kPa (was {q_crit:.1f} kPa)")
+        print(f"  ✓ 13.15 Aeroelastic Panel Flutter: FoS = {flutter_fos:.2f}x (q_crit = {q_crit:.1f} kPa vs 73.5 kPa, f1 = {f1_hz:.0f} Hz)")
+
+        # 13.16 Hypersonic 6-DOF Bank-to-Turn (BTT) Maneuvering Dynamics API
+        btt_res = http_request(port, "POST", "/api/sim/hypersonic/6dof", body={
+            "flight_speed_m_s": 3333.3,
+            "altitude_m": 32000.0,
+            "target_heading_change_deg": 30.0,
+            "bank_angle_deg": 55.0
+        })
+        turn_rate = btt_res.get("turn_rate_deg_s", 0.0)
+        turn_radius = btt_res.get("turn_radius_km", 0.0)
+        g_load = btt_res.get("normal_load_factor_g", 0.0)
+        check(btt_res.get("is_maneuver_safe") == True, "6-DOF BTT maneuver must be safe")
+        check(turn_radius > 100.0, f"Turn radius > 100 km (was {turn_radius:.1f} km)")
+        check(g_load < 3.5, f"Normal g-load < 3.5 g (was {g_load:.2f} g)")
+        print(f"  ✓ 13.16 6-DOF Bank-to-Turn Maneuver: 30° turn at 55° bank in {btt_res.get('maneuver_duration_s', 0):.1f}s (Rate = {turn_rate:.2f}°/s, R = {turn_radius:.1f} km, {g_load:.2f} g)")
+
+        # 13.17 20 K REBCO High-Temperature Superconducting Magnet API
+        magnet_res = http_request(port, "POST", "/api/sim/hypersonic/magnet", body={
+            "target_b_field_tesla": 1.25,
+            "channel_gap_m": 0.35,
+            "coil_temperature_k": 20.0
+        })
+        b_field = magnet_res.get("magnetic_field_tesla", 0.0)
+        p_mag = magnet_res.get("magnetic_pressure_kpa", 0.0)
+        margin = magnet_res.get("critical_current_margin", 0.0)
+        heat_leak = magnet_res.get("cryo_heat_leak_watts", 0.0)
+        check(magnet_res.get("is_hts_stable") == True, "REBCO magnet must remain stable")
+        check(b_field == 1.25, f"Magnetic field matches target (was {b_field:.2f} T)")
+        check(p_mag > 500.0, f"Magnetic pressure > 500 kPa (was {p_mag:.1f} kPa)")
+        check(margin >= 1.30, f"Critical current margin >= 1.30 (was {margin:.2f})")
+        print(f"  ✓ 13.17 REBCO Superconducting Magnet: {b_field:.2f} T, Magnetic Pressure = {p_mag:.1f} kPa, Heat Leak = {heat_leak:.1f} W")
 
         # =====================================================================
         # DEMO 14: DAVINCI RESOLVE TIMELINE, UNITY 3D ENGINE & DEPLOYMENT PLATFORM

@@ -675,5 +675,35 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         .with_permission(CommandPermission::SimulationRun),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.hypersonic.flutter",
+            "Hypersonic Aeroelastic Panel Flutter Stability",
+            "Evaluates Dowell third-order piston theory aerodynamic panel flutter and high-temperature thermal stiffness degradation.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.hypersonic.6dof",
+            "Hypersonic 6-DOF Bank-to-Turn Maneuvering Dynamics",
+            "Models spherical Earth orbital relief, bank-to-turn roll steering, normal g-load envelope, and asymmetric cross-track aeroheating.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.hypersonic.hts_magnet",
+            "REBCO High-Temperature Superconducting Magnet",
+            "Models 20 K slush LH2 cooled superconducting magnetic coil, critical current margin, magnetic pressure, and cryo heat leakage.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun),
+    )?;
+
     Ok(())
 }

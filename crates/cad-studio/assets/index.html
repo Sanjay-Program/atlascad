@@ -1987,6 +1987,16 @@ Ready for Catmull-Clark subdivision or brush displacement.</pre>
                   <div id="rtAvionicsVal" style="font-size: 20px; font-weight: 700; color: #34d399;">261.5 V</div>
                   <div style="font-size: 10px; color: #71717a;">Load 104 kW | Drift 1.42 m</div>
                 </div>
+                <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; text-align: center;">
+                  <div style="font-size: 10px; color: #a1a1aa; text-transform: uppercase;">Aeroelastic Flutter FoS</div>
+                  <div id="rtFlutterVal" style="font-size: 20px; font-weight: 700; color: #38bdf8;">1.62 FoS</div>
+                  <div style="font-size: 10px; color: #10b981;">q_crit 119 kPa (AS9100 Pass)</div>
+                </div>
+                <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; text-align: center;">
+                  <div style="font-size: 10px; color: #a1a1aa; text-transform: uppercase;">6-DOF BTT Turn Rate</div>
+                  <div id="rt6DofVal" style="font-size: 20px; font-weight: 700; color: #fb923c;">1.45 °/s</div>
+                  <div style="font-size: 10px; color: #71717a;">R = 131 km | Load 1.82 g</div>
+                </div>
               </div>
               <div style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
                 <button type="button" class="button small ghost" id="rtSolvePlasmaBtn">Plasma Sheath</button>
@@ -1994,6 +2004,10 @@ Ready for Catmull-Clark subdivision or brush displacement.</pre>
                 <button type="button" class="button small ghost" id="rtSolveMhdBtn">MHD Bypass</button>
                 <button type="button" class="button small ghost" id="rtSolveSlushBtn">Slush H2 Fuel</button>
                 <button type="button" class="button small ghost" id="rtInspectBomBtn">21-Item BOM</button>
+                <button type="button" class="button small ghost" id="rtSolveFlutterBtn">Aeroelastic Flutter</button>
+                <button type="button" class="button small ghost" id="rtSolve6DofBtn">6-DOF BTT Turn</button>
+                <button type="button" class="button small ghost" id="rtSolveMagnetBtn">20K REBCO Magnet</button>
+                <button type="button" class="button small primary" id="rtRunMasterWorkflowBtn" style="background: linear-gradient(135deg, #f43f5e, #a855f7); color: white; border: none; font-weight: 600;">Autonomous Master Workflow</button>
               </div>
             </div>
 

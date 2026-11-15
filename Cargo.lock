@@ -38,6 +38,7 @@ name = "atlas-agent-orchestrator"
 version = "0.1.0"
 dependencies = [
  "atlas-command-platform",
+ "atlas-simulation-core",
  "serde",
  "serde_json",
  "thiserror 2.0.21",

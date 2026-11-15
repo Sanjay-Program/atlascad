@@ -3876,6 +3876,46 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_hypersonic_flutter(
+        &mut self,
+        req: &HypersonicFlutterRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let q = req.dynamic_pressure_kpa.unwrap_or(73.5);
+        let m = req.flight_mach.unwrap_or(11.0);
+        let t_c = req.wall_temp_c.unwrap_or(2272.0);
+        let res = atlas_simulation_core::hypersonic::trajectory::evaluate_hypersonic_flutter(
+            q, m, 0.80, 0.0035, t_c, 480.0, 0.15, 6080.0, 0.0132, 3333.3,
+        );
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_hypersonic_6dof(
+        &mut self,
+        req: &Hypersonic6DofRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let v = req.flight_speed_m_s.unwrap_or(3333.3);
+        let alt = req.altitude_m.unwrap_or(32000.0);
+        let heading = req.target_heading_change_deg.unwrap_or(30.0);
+        let bank = req.bank_angle_deg.unwrap_or(55.0);
+        let res = atlas_simulation_core::hypersonic::trajectory::evaluate_6dof_btt_maneuver(
+            v, alt, 48000.0, heading, bank, 770_000.0,
+        );
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_hypersonic_magnet(
+        &mut self,
+        req: &HypersonicMagnetRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let b = req.target_b_field_tesla.unwrap_or(1.25);
+        let gap = req.channel_gap_m.unwrap_or(0.35);
+        let t_coil = req.coil_temperature_k.unwrap_or(20.0);
+        let res = atlas_simulation_core::hypersonic::plasma::evaluate_superconducting_hts_magnet(
+            b, gap, t_coil, 0.25,
+        );
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_chemical(&mut self, req: &SimChemicalRequest) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::chemical::FlashProblem {
             temperature_k: req.temperature_k.unwrap_or(315.0),
@@ -5099,6 +5139,30 @@ namespace AtlasCAD.Unity
             "workflow_id": req.workflow_id,
             "total_tasks": self.orchestrator.active_graph.len(),
             "summary": self.orchestrator.summary(),
+        }))
+    }
+
+    fn run_workflow_all(&mut self, req: &RunWorkflowRequest) -> Result<serde_json::Value, StudioError> {
+        let graph =
+            atlas_agent_orchestrator::WorkflowRegistry::instantiate_template(&req.workflow_id)
+                .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+
+        self.orchestrator
+            .load_task_graph(graph)
+            .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+
+        let auto = req.auto_approve.unwrap_or(true);
+        let summary = self
+            .orchestrator
+            .execute_all(auto)
+            .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+
+        Ok(serde_json::json!({
+            "status": "Completed",
+            "workflow_id": req.workflow_id,
+            "summary": summary,
+            "tasks": self.orchestrator.active_graph.tasks,
+            "execution_log": self.orchestrator.execution_log,
         }))
     }
 
@@ -6690,6 +6754,34 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             },
             Err(error) => error_response(&error),
         },
+        "/api/sim/hypersonic/flutter" => match parse_body_or_default::<HypersonicFlutterRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_hypersonic_flutter(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/hypersonic/6dof" => match parse_body_or_default::<Hypersonic6DofRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_hypersonic_6dof(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/hypersonic/magnet" => match parse_body_or_default::<HypersonicMagnetRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_hypersonic_magnet(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/orchestrator/workflows/run" => match parse_body_or_default::<RunWorkflowRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.run_workflow_all(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
         "/api/sim/chemical" => match parse_body_or_default::<SimChemicalRequest>(request) {
             Ok(body) => match with_state(state, |state| state.sim_chemical(&body)) {
                 Ok(payload) => json_response(200, payload),
@@ -7008,6 +7100,13 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             },
             Err(error) => error_response(&error),
         },
+        "/api/agents/workflows/run_all" => match parse_body::<RunWorkflowRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.run_workflow_all(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
         "/api/agents/approvals/respond" => match parse_body::<RespondApprovalRequest>(request) {
             Ok(body) => match with_state(state, |state| state.respond_approval(&body)) {
                 Ok(payload) => json_response(200, payload),
@@ -7158,7 +7257,23 @@ struct OrchestrateRequirementRequest {
 
 #[derive(Debug, Deserialize)]
 struct RunWorkflowRequest {
+    #[serde(default = "default_workflow_id")]
     workflow_id: String,
+    #[serde(default)]
+    pub auto_approve: Option<bool>,
+}
+
+fn default_workflow_id() -> String {
+    "hypersonic_full_vehicle_master".to_string()
+}
+
+impl Default for RunWorkflowRequest {
+    fn default() -> Self {
+        Self {
+            workflow_id: default_workflow_id(),
+            auto_approve: Some(true),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -8316,6 +8431,41 @@ struct HypersonicCreepRequest {
     pub applied_stress_mpa: Option<f64>,
     #[serde(default)]
     pub flight_duration_hours: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HypersonicFlutterRequest {
+    #[serde(default)]
+    pub dynamic_pressure_kpa: Option<f64>,
+    #[serde(default)]
+    pub flight_mach: Option<f64>,
+    #[serde(default)]
+    pub wall_temp_c: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Hypersonic6DofRequest {
+    #[serde(default)]
+    pub flight_speed_m_s: Option<f64>,
+    #[serde(default)]
+    pub altitude_m: Option<f64>,
+    #[serde(default)]
+    pub target_heading_change_deg: Option<f64>,
+    #[serde(default)]
+    pub bank_angle_deg: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HypersonicMagnetRequest {
+    #[serde(default)]
+    pub target_b_field_tesla: Option<f64>,
+    #[serde(default)]
+    pub channel_gap_m: Option<f64>,
+    #[serde(default)]
+    pub coil_temperature_k: Option<f64>,
 }
 
 #[derive(Debug, Default, Deserialize)]

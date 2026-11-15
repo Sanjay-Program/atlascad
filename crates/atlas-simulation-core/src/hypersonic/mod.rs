@@ -268,7 +268,7 @@ pub fn solve_hypersonic_airplane(
         scram_res.fuel_mass_flow_kg_s,
     );
 
-    // 10. 6-DOF Hypersonic Trajectory Corridor (using trajectory submodule)
+    // 10. 6-DOF Hypersonic Trajectory Corridor & Maneuvering Dynamics
     let traj_res = trajectory::evaluate_trajectory_corridor(
         prob.target_speed_km_h,
         prob.cruise_altitude_m,
@@ -278,6 +278,30 @@ pub fn solve_hypersonic_airplane(
         scramjet_isp,
         atmos.density_kg_m3,
         atmos.speed_of_sound_m_s,
+    );
+
+    // 11. Aeroelastic Panel Flutter (Dowell Piston Theory with UHTC Thermal Softening)
+    let flutter_res = trajectory::evaluate_hypersonic_flutter(
+        dynamic_press_kpa,
+        mach,
+        0.80,   // 80 cm skin panel length
+        0.0035, // 3.5 mm UHTC skin thickness
+        t_wall_c,
+        480.0,  // 480 GPa ZrB2-SiC baseline
+        0.15,
+        6080.0,
+        atmos.density_kg_m3,
+        speed_m_s,
+    );
+
+    // 12. 6-DOF Bank-to-Turn (BTT) Hypersonic Maneuver (30 deg heading turn at 55 deg bank)
+    let btt_res = trajectory::evaluate_6dof_btt_maneuver(
+        speed_m_s,
+        prob.cruise_altitude_m,
+        prob.takeoff_weight_kg,
+        30.0,
+        55.0,
+        lift_force_kn * 1000.0,
     );
 
     let global_range_km = traj_res.total_range_km;
@@ -333,6 +357,15 @@ pub fn solve_hypersonic_airplane(
     metrics.insert("blackout_pos_drift_m".to_string(), av_res.blackout_position_drift_m);
     metrics.insert("fbl_optical_margin_db".to_string(), av_res.optical_link_margin_db);
 
+    // Aeroelastic Flutter & 6-DOF Maneuvering Metrics
+    metrics.insert("flutter_factor_of_safety".to_string(), flutter_res.flutter_factor_of_safety);
+    metrics.insert("flutter_critical_q_kpa".to_string(), flutter_res.critical_flutter_dynamic_pressure_kpa);
+    metrics.insert("flutter_natural_freq_hz".to_string(), flutter_res.natural_frequency_hz);
+    metrics.insert("btt_turn_rate_deg_s".to_string(), btt_res.turn_rate_deg_s);
+    metrics.insert("btt_turn_radius_km".to_string(), btt_res.turn_radius_km);
+    metrics.insert("btt_normal_load_g".to_string(), btt_res.normal_load_factor_g);
+    metrics.insert("btt_maneuver_duration_s".to_string(), btt_res.maneuver_duration_s);
+
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, mach, 1, 1e-4);
     conv.record(2, scramjet_isp, 2, 1e-5);
@@ -385,6 +418,14 @@ pub fn solve_hypersonic_airplane(
         format!(
             "Global Mission Trajectory: Breguet Range = {:.0} km ({:.1} hours endurance) with {:.0} kg LH2",
             global_range_km, flight_time_hours, prob.fuel_mass_kg
+        ),
+        format!(
+            "Aeroelastic Stability: Panel Flutter FoS = {:.2} (q_crit = {:.1} kPa vs q_op = {:.1} kPa, f1 = {:.0} Hz, AS9100 Pass)",
+            flutter_res.flutter_factor_of_safety, flutter_res.critical_flutter_dynamic_pressure_kpa, dynamic_press_kpa, flutter_res.natural_frequency_hz
+        ),
+        format!(
+            "6-DOF Bank-to-Turn Maneuver: 30° heading turn at 55° bank in {:.1} s (Rate = {:.2}°/s, Radius = {:.1} km, Load = {:.2} g, Residual Sideslip = {:.3}°)",
+            btt_res.maneuver_duration_s, btt_res.turn_rate_deg_s, btt_res.turn_radius_km, btt_res.normal_load_factor_g, btt_res.residual_sideslip_deg
         ),
     ];
 
@@ -518,5 +559,23 @@ mod tests {
         assert!(creep.rupture_life_hours > 1000.0, "UHTC creep rupture life must exceed 1000 hrs");
         assert!(creep.mission_accumulated_strain_pct < 0.1, "Creep strain per flight must be < 0.1%");
         assert!(creep.creep_life_safety_factor >= 1.0);
+
+        // 4. Aeroelastic Panel Flutter (Dowell Piston Theory)
+        let flutter = trajectory::evaluate_hypersonic_flutter(73.5, 11.0, 0.80, 0.0035, 2272.0, 480.0, 0.15, 6080.0, 0.0132, 3333.3);
+        assert!(flutter.is_flutter_safe, "Hypersonic panel flutter must be safe");
+        assert!(flutter.flutter_factor_of_safety >= 1.50, "Flutter factor of safety must exceed 1.50");
+        assert!(flutter.critical_flutter_dynamic_pressure_kpa > 110.0);
+
+        // 5. 6-DOF Bank-to-Turn Hypersonic Maneuvering
+        let btt = trajectory::evaluate_6dof_btt_maneuver(3333.3, 32000.0, 48000.0, 30.0, 55.0, 770_000.0);
+        assert!(btt.is_maneuver_safe, "6-DOF BTT maneuver must be safe");
+        assert!(btt.turn_radius_km > 100.0, "Turn radius at Mach 11 should be large");
+        assert!(btt.normal_load_factor_g < 3.5, "Normal load factor should remain within pilot/airframe envelope");
+
+        // 6. 20 K REBCO Superconducting Magnet
+        let magnet = plasma::evaluate_superconducting_hts_magnet(1.25, 0.35, 20.0, 0.25);
+        assert!(magnet.is_hts_stable, "REBCO magnet must remain superconductive");
+        assert!(magnet.critical_current_margin >= 1.30);
+        assert!(magnet.magnetic_pressure_kpa > 500.0);
     }
 }

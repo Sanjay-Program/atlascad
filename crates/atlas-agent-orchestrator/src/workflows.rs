@@ -171,13 +171,13 @@ impl WorkflowRegistry {
                     "cad_design".into(),
                     "cfd_specialist".into(),
                     "structural_sim".into(),
-                    "thermal_engineer".into(),
-                    "chemical_engineer".into(),
+                    "aerospace_engineer".into(),
+                    "chemical_process".into(),
                     "electrical_engineer".into(),
-                    "manufacturing_engineer".into(),
+                    "cnc_machinist".into(),
                     "digital_twin".into(),
                     "media_production".into(),
-                    "certification_officer".into(),
+                    "quality_assurance".into(),
                 ],
                 task_count: 11,
             },
@@ -679,7 +679,7 @@ impl WorkflowRegistry {
                     EngineeringTask::new(
                         "t4_scramjet_cycle",
                         "Solve Multistage Oblique Shock Scramjet Propulsion",
-                        "chemical_engineer",
+                        "chemical_process",
                         "sim.hypersonic.scramjet",
                     )
                     .with_dependency("t2_waverider_cad"),
@@ -688,7 +688,7 @@ impl WorkflowRegistry {
                     EngineeringTask::new(
                         "t5_regen_cooling",
                         "Solve Supercritical LH2 Active Regenerative Cooling",
-                        "thermal_engineer",
+                        "aerospace_engineer",
                         "sim.hypersonic.thermal",
                     )
                     .with_dependency("t3_aero_plasma")
@@ -717,7 +717,7 @@ impl WorkflowRegistry {
                     EngineeringTask::new(
                         "t8_mfg_toolpaths",
                         "Generate 5-Axis CNC & SLM Toolpaths for Combustor Injectors",
-                        "manufacturing_engineer",
+                        "cnc_machinist",
                         "cam.toolpaths.generate",
                     )
                     .with_dependency("t6_uhtc_structural"),
@@ -745,7 +745,7 @@ impl WorkflowRegistry {
                     EngineeringTask::new(
                         "t11_as9100_cert",
                         "Emit Cryptographic AS9100 / FAA Certification Dossier",
-                        "certification_officer",
+                        "quality_assurance",
                         "eco.submit",
                     )
                     .with_dependency("t6_uhtc_structural")

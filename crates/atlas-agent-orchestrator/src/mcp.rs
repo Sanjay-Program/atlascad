@@ -354,6 +354,40 @@ impl McpServer {
                     }
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_hypersonic_flutter".into(),
+                description: "Simulate hypersonic aeroelastic panel flutter (Dowell third-order piston theory) and safety factor".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "dynamic_pressure_kpa": { "type": "number", "default": 73.5 },
+                        "mach": { "type": "number", "default": 11.0 },
+                        "wall_temp_c": { "type": "number", "default": 2272.0 }
+                    }
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_hypersonic_6dof".into(),
+                description: "Simulate 6-DOF Bank-to-Turn hypersonic maneuvering dynamics, turn radius, and g-load envelope".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "target_heading_change_deg": { "type": "number", "default": 30.0 },
+                        "bank_angle_deg": { "type": "number", "default": 55.0 }
+                    }
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_hypersonic_magnet".into(),
+                description: "Simulate 20 K REBCO High-Temperature Superconducting (HTS) magnet for MHD channel & RF window".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "target_b_field_tesla": { "type": "number", "default": 1.25 },
+                        "channel_gap_m": { "type": "number", "default": 0.35 }
+                    }
+                }),
+            },
         ]
     }
 

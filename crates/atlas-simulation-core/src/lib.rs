@@ -96,15 +96,20 @@ pub mod prelude {
             evaluate_slush_hydrogen,
         },
         plasma::{
-            MhdEnergyBypassResult, PlasmaSheathResult, evaluate_mhd_energy_bypass,
-            evaluate_plasma_sheath,
+            MhdEnergyBypassResult, PlasmaSheathResult, SuperconductingMagnetResult,
+            evaluate_mhd_energy_bypass, evaluate_plasma_sheath,
+            evaluate_superconducting_hts_magnet,
         },
         scramjet::{ScramjetEngineResult, evaluate_scramjet_cycle},
         thermal::{
             ActiveCoolingResult, CreepFatigueResult, evaluate_active_cooling,
             evaluate_high_temp_creep,
         },
-        trajectory::{HypersonicTrajectoryResult, evaluate_trajectory_corridor},
+        trajectory::{
+            Hypersonic6DofManeuverResult, HypersonicFlutterResult, HypersonicTrajectoryResult,
+            evaluate_6dof_btt_maneuver, evaluate_hypersonic_flutter,
+            evaluate_trajectory_corridor,
+        },
     };
     pub use crate::marine::{
         AiryWaveRequest, AiryWaveResult, MarineHydrostaticsRequest, MarineHydrostaticsResult,
