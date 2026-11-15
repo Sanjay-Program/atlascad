@@ -2895,6 +2895,22 @@ impl StudioState {
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_hypersonic(
+        &mut self,
+        req: &HypersonicSimRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::hypersonic::HypersonicAirplaneProblem {
+            target_speed_km_h: req.target_speed_km_h.unwrap_or(12000.0),
+            cruise_altitude_m: req.cruise_altitude_m.unwrap_or(32000.0),
+            angle_of_attack_deg: req.angle_of_attack_deg.unwrap_or(2.5),
+            ..atlas_simulation_core::hypersonic::HypersonicAirplaneProblem::default()
+        };
+        let res = atlas_simulation_core::hypersonic::solve_hypersonic_airplane(&prob)
+            .map_err(StudioError::BadRequest)?;
+        self.mark_node_current("cfd-aerodynamics", "hypersonic-plane-converged");
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_chemical(&mut self, req: &SimChemicalRequest) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::chemical::FlashProblem {
             temperature_k: req.temperature_k.unwrap_or(315.0),
@@ -3919,6 +3935,32 @@ impl StudioState {
                 "lift_to_drag": 14.2,
                 "lift_force_n": 20538.0,
             }),
+            "sim.hypersonic_plane.solve" => {
+                let speed = req
+                    .arguments
+                    .get("target_speed_km_h")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(12000.0);
+                let alt = req
+                    .arguments
+                    .get("cruise_altitude_m")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(32000.0);
+                let aoa = req
+                    .arguments
+                    .get("angle_of_attack_deg")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(2.5);
+                let prob = atlas_simulation_core::hypersonic::HypersonicAirplaneProblem {
+                    target_speed_km_h: speed,
+                    cruise_altitude_m: alt,
+                    angle_of_attack_deg: aoa,
+                    ..atlas_simulation_core::hypersonic::HypersonicAirplaneProblem::default()
+                };
+                let res = atlas_simulation_core::hypersonic::solve_hypersonic_airplane(&prob)
+                    .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+                serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))?
+            }
             "sim.multiphysics_suite.solve" => self.sim_multiphysics_suite()?,
             "cam.toolpaths.generate" => serde_json::json!({
                 "status": "Generated",
@@ -5263,6 +5305,13 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         },
         "/api/sim/aerodynamics" => match parse_body_or_default::<SimAeroRequest>(request) {
             Ok(body) => match with_state(state, |state| state.sim_aerodynamics(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/hypersonic" => match parse_body_or_default::<HypersonicSimRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_hypersonic(&body)) {
                 Ok(payload) => json_response(200, payload),
                 Err(error) => error_response(&error),
             },
@@ -6728,6 +6777,17 @@ struct SimAeroRequest {
     pub wing_area_m2: Option<f64>,
     #[serde(default)]
     pub aspect_ratio: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HypersonicSimRequest {
+    #[serde(default)]
+    pub target_speed_km_h: Option<f64>,
+    #[serde(default)]
+    pub cruise_altitude_m: Option<f64>,
+    #[serde(default)]
+    pub angle_of_attack_deg: Option<f64>,
 }
 
 #[derive(Debug, Default, Deserialize)]

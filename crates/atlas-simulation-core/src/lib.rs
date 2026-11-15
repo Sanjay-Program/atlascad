@@ -24,6 +24,7 @@ pub mod fsi;
 pub mod generative;
 pub mod geotechnical;
 pub mod heat_exchanger;
+pub mod hypersonic;
 pub mod marine;
 pub mod materials;
 pub mod model;
@@ -85,6 +86,10 @@ pub mod prelude {
         RetainingWallProblem, SoilProperties, solve_retaining_wall_pressures,
     };
     pub use crate::heat_exchanger::{FlowArrangement, HeatExchangerProblem, solve_heat_exchanger};
+    pub use crate::hypersonic::{
+        AtmosphericState, HypersonicAirplaneProblem, HypersonicSimulationSummary,
+        compute_standard_atmosphere, solve_hypersonic_airplane,
+    };
     pub use crate::marine::{
         AiryWaveRequest, AiryWaveResult, MarineHydrostaticsRequest, MarineHydrostaticsResult,
         solve_airy_wave, solve_hydrostatics,

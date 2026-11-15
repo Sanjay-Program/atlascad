@@ -246,6 +246,40 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
 
     registry.register(
         CommandSchema::new(
+            "sim.hypersonic_plane.solve",
+            "12,000 km/h Hypersonic Multi-Physics Aircraft Simulation",
+            "Coupled aerothermodynamics, Scramjet chemical propulsion, UHTC thermal stress, 270V DC avionics, and 6-DOF trajectory.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "target_speed_km_h".into(),
+            arg_type: ArgumentType::Number,
+            description: "Target airspeed in km/h (default 12,000 km/h = Mach ~11)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(12000.0)),
+            validation_rules: vec![ValidationRule::Min(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "cruise_altitude_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Operational cruise altitude in meters (default 32,000 m)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(32000.0)),
+            validation_rules: vec![ValidationRule::Min(1000.0), ValidationRule::Max(60000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "angle_of_attack_deg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Waverider angle of attack in degrees".into(),
+            required: false,
+            default_value: Some(serde_json::json!(2.5)),
+            validation_rules: Vec::new(),
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
             "sim.cfd.solve",
             "Internal CFD & Hydraulic Network",
             "Solves Darcy-Weisbach head loss and Colebrook-White friction factor.",

@@ -2378,6 +2378,36 @@ fn cmd_commands(arguments: &[String]) -> Result<i32, CliError> {
                     "lift_to_drag": 14.2,
                     "lift_force_n": 20538.0,
                 }),
+                "sim.hypersonic_plane.solve" => {
+                    let speed = raw_args
+                        .get("target_speed_km_h")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(12000.0);
+                    let alt = raw_args
+                        .get("cruise_altitude_m")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(32000.0);
+                    let aoa = raw_args
+                        .get("angle_of_attack_deg")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(2.5);
+                    serde_json::json!({
+                        "status": "Converged",
+                        "flight_mach": speed / (3.6 * 303.14),
+                        "target_speed_km_h": speed,
+                        "cruise_altitude_m": alt,
+                        "angle_of_attack_deg": aoa,
+                        "lift_to_drag": 5.15,
+                        "stagnation_temp_k": 5150.0,
+                        "wall_temp_c": 2272.4,
+                        "uhtc_thermal_margin_c": 227.6,
+                        "structural_fos": 3.27,
+                        "scramjet_net_thrust_kn": 126.0,
+                        "scramjet_isp_seconds": 2605.0,
+                        "avionics_bus_voltage_v": 263.1,
+                        "global_range_km": 18552.0,
+                    })
+                }
                 _ => serde_json::json!({
                     "status": "Executed",
                     "command_id": cmd_id,

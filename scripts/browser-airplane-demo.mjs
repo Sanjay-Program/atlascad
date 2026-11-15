@@ -311,7 +311,28 @@ try {
   check(whSurge.includes('Surge:'), `Water hammer pressure surge computed (${whSurge})`);
   console.log(`    ✓ Piping Water Hammer Solved with user parameters: ${whSurge}`);
 
-  // 3h. Master 27-Domain Multiphysics Suite Execution
+  // 3h. Hypersonic 12,000 km/h Multi-Physics Aircraft Simulation (Mach 11 Scramjet)
+  logStep('Executing 12,000 km/h Hypersonic Multi-Physics Aircraft solver...');
+  await setInputValue('#caeStudyTypeSelect', 'hypersonic');
+  await sleep(150);
+  const hyperTitle = await evaluate('document.getElementById("caeStudyParamsTitle").textContent');
+  check(hyperTitle.includes('Hypersonic'), `Dynamic hypersonic parameter title updated (${hyperTitle})`);
+  await setInputValue('#caeParam1Input', '12000.0'); // Flight Speed km/h
+  await setInputValue('#caeParam2Input', '32000.0'); // Cruise Altitude m
+  await setInputValue('#caeParam3Input', '2.5');     // Angle of Attack deg
+  await clickSelector('#caeRunSolveBtn', 'Solve Hypersonic Aircraft');
+  await sleep(350);
+  const hyperMach = await evaluate('document.getElementById("caePeakStressVal").textContent');
+  const hyperTwall = await evaluate('document.getElementById("caeMaxDispVal").textContent');
+  const hyperFos = await evaluate('document.getElementById("caeFosVal").textContent');
+  const hyperRange = await evaluate('document.getElementById("caeElementsVal").textContent');
+  check(hyperMach.includes('Mach 11'), `Hypersonic Mach 11 verified (${hyperMach})`);
+  check(hyperTwall.includes('T_wall:'), `Equilibrium wall temperature evaluated (${hyperTwall})`);
+  check(hyperFos.includes('FoS:'), `Thermal & structural margin verified (${hyperFos})`);
+  check(hyperRange.includes('Range:'), `Global hypersonic range evaluated (${hyperRange})`);
+  console.log(`    ✓ Hypersonic 12,000 km/h Aircraft Solved: ${hyperMach}, ${hyperTwall}, ${hyperFos}, ${hyperRange}`);
+
+  // 3i. Master 27-Domain Multiphysics Suite Execution
   logStep('Executing 27-Domain Enterprise Multiphysics Suite (#caeRunAllSuiteBtn)...');
   await clickSelector('#caeRunAllSuiteBtn', 'Run 27-Domain Suite');
   await sleep(500);

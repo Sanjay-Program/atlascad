@@ -173,6 +173,18 @@ impl McpServer {
                 description: "Query status of active multi-agent engineering workflows and tasks".into(),
                 input_schema: serde_json::json!({ "type": "object" }),
             },
+            McpToolDefinition {
+                name: "atlas_hypersonic_solve".into(),
+                description: "Simulate 12,000 km/h (Mach 11) aircraft across aerothermodynamics, Scramjet propulsion, UHTC thermal stress, and 270V avionics".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "target_speed_km_h": { "type": "number", "default": 12000.0 },
+                        "cruise_altitude_m": { "type": "number", "default": 32000.0 },
+                        "angle_of_attack_deg": { "type": "number", "default": 2.5 }
+                    }
+                }),
+            },
         ]
     }
 

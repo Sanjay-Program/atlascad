@@ -7532,6 +7532,12 @@ ${gcodeSample}`;
       p2: { label: "Receptor Distance (m):", val: 3.0, step: 0.5 },
       p3: { label: "Shield Thickness (cm):", val: 20.0, step: 2 },
     },
+    "hypersonic": {
+      title: "12,000 km/h Hypersonic Multi-Physics Parameters",
+      p1: { label: "Flight Speed (km/h):", val: 12000.0, step: 500 },
+      p2: { label: "Cruise Altitude (m):", val: 32000.0, step: 1000 },
+      p3: { label: "Angle of Attack (°):", val: 2.5, step: 0.5 },
+    },
   };
 
   function setupCaeWorkbenchControllers() {
@@ -7809,6 +7815,13 @@ ${gcodeSample}`;
             distance_to_receptor_m: !isNaN(p2) ? p2 : 3.0,
             lead_shield_thickness_cm: !isNaN(p3) ? p3 : 20.0
           };
+        } else if (studyType === "hypersonic") {
+          endpoint = "/api/sim/hypersonic";
+          body = {
+            target_speed_km_h: !isNaN(p1) ? p1 : 12000.0,
+            cruise_altitude_m: !isNaN(p2) ? p2 : 32000.0,
+            angle_of_attack_deg: !isNaN(p3) ? p3 : 2.5
+          };
         }
 
         const res = await api(endpoint, {
@@ -8073,6 +8086,15 @@ ${gcodeSample}`;
               fos.style.color = safe ? "#10b981" : "#ef4444";
             }
             if (elCount) elCount.textContent = `${m.total_mean_free_paths?.toFixed(1)} mfp (${(m.total_shield_thickness_m * 100)?.toFixed(0)} cm)`;
+          } else if (studyType === "hypersonic") {
+            if (peak) peak.textContent = `Mach ${m.flight_mach?.toFixed(1)} (${m.scramjet_net_thrust_kn?.toFixed(0)} kN)`;
+            if (disp) disp.textContent = `T_wall: ${m.wall_equilibrium_temp_c?.toFixed(0)} °C`;
+            if (fos) {
+              const safe = m.thermal_safety_margin_c > 0.0 && m.structural_fos >= 1.5;
+              fos.textContent = safe ? `FoS: ${m.structural_fos?.toFixed(2)} (+${m.thermal_safety_margin_c?.toFixed(0)}°C)` : "Margin Limit";
+              fos.style.color = safe ? "#10b981" : "#ef4444";
+            }
+            if (elCount) elCount.textContent = `Range: ${m.global_range_km?.toFixed(0)} km (${m.flight_time_hours?.toFixed(1)} h)`;
           }
 
           if (consoleOut) {

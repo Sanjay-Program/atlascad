@@ -983,6 +983,89 @@ def run_live_demo() -> None:
         check("atlas_cad_create_solid" in content, "MCP response text confirms tool execution")
         print(f"  ✓ 12.12 MCP Server: Initialized JSON-RPC 2.0, queried {len(tool_list)} tools, successfully invoked atlas_cad_create_solid")
 
+        print("\n" + "-" * 78)
+        print("  DEMO 13: HYPERSONIC 12,000 KM/H MULTI-PHYSICS AIRCRAFT SIMULATION")
+        print("-" * 78)
+
+        # 13.1 Direct HTTP Endpoint Solve (/api/sim/hypersonic)
+        hyper = http_request(port, "POST", "/api/sim/hypersonic", body={
+            "target_speed_km_h": 12000.0,
+            "cruise_altitude_m": 32000.0,
+            "angle_of_attack_deg": 2.5
+        })
+        m = hyper.get("scalar_metrics", {})
+        mach = m.get("flight_mach", 0.0)
+        v_ms = m.get("airspeed_m_s", 0.0)
+        ld = m.get("lift_to_drag_ratio", 0.0)
+        q_stag = m.get("stagnation_heat_flux_mw_m2", 0.0)
+        t_wall = m.get("wall_equilibrium_temp_c", 0.0)
+        t_margin = m.get("thermal_safety_margin_c", 0.0)
+        struct_fos = m.get("structural_fos", 0.0)
+        thrust_kn = m.get("scramjet_net_thrust_kn", 0.0)
+        isp = m.get("scramjet_specific_impulse_s", 0.0)
+        td_ratio = m.get("thrust_to_drag_ratio", 0.0)
+        v_bus = m.get("avionics_bus_voltage_v", 0.0)
+        z0 = m.get("ipc2141_impedance_ohms", 0.0)
+        range_km = m.get("global_range_km", 0.0)
+        flight_hrs = m.get("flight_time_hours", 0.0)
+
+        check(mach >= 10.5, f"Flight Mach >= 10.5 (was {mach:.2f})")
+        check(v_ms >= 3300.0, f"Airspeed >= 3,300 m/s (was {v_ms:.1f} m/s)")
+        check(ld >= 4.5, f"Waverider Lift-to-Drag L/D >= 4.5 (was {ld:.2f})")
+        check(q_stag >= 1.5, f"Detra-Kemp-Riddell Stagnation Heat Flux >= 1.5 MW/m² (was {q_stag:.2f})")
+        check(t_wall >= 2000.0, f"Stefan-Boltzmann Wall Equilibrium Temp >= 2,000 °C (was {t_wall:.1f})")
+        check(t_margin > 0.0, f"UHTC ZrB2-SiC Thermal Safety Margin > 0 °C (was {t_margin:.1f})")
+        check(struct_fos >= 1.50, f"Aerospace Structural Factor of Safety >= 1.50 (was {struct_fos:.2f})")
+        check(thrust_kn >= 100.0, f"Scramjet Net Thrust >= 100 kN (was {thrust_kn:.1f})")
+        check(isp >= 2000.0, f"Liquid Hydrogen Scramjet Isp >= 2000 s (was {isp:.0f})")
+        check(td_ratio >= 1.2, f"Thrust-to-Drag Ratio >= 1.2x (was {td_ratio:.2f})")
+        check(v_bus >= 250.0, f"Avionics 270V DC Bus Voltage >= 250 V (was {v_bus:.1f})")
+        check(90.0 <= z0 <= 110.0, f"IPC-2141 Controlled Impedance ~100 Ω (was {z0:.1f})")
+        check(range_km >= 15000.0, f"Breguet Global Hypersonic Range >= 15,000 km (was {range_km:.0f})")
+        check(flight_hrs <= 2.5, f"Flight Time for Global Range <= 2.5 hours (was {flight_hrs:.2f})")
+
+        print(f"  ✓ 13.1 Hypersonic Aerothermodynamics: Mach {mach:.2f} ({v_ms:.1f} m/s) at 32 km, L/D = {ld:.2f}, q_stag = {q_stag:.2f} MW/m², T_wall = {t_wall:.0f} °C (UHTC Margin +{t_margin:.1f} °C)")
+        print(f"  ✓ 13.2 Scramjet & Materials: LH2 Net Thrust = {thrust_kn:.1f} kN, Isp = {isp:.0f} s (T/D = {td_ratio:.2f}x), Structural FoS = {struct_fos:.2f} (AS9100 Pass)")
+        print(f"  ✓ 13.3 Avionics & Inside Circuits: 270V DC Bus = {v_bus:.1f} V, IPC-2141 Z0 = {z0:.1f} Ω differential")
+        print(f"  ✓ 13.4 Global Mission Trajectory: Breguet Range = {range_km:.0f} km ({flight_hrs:.1f} hours, London-Sydney / NYC-Tokyo nonstop)")
+
+        # 13.5 Command Platform Execution (sim.hypersonic_plane.solve)
+        cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+            "command_id": "sim.hypersonic_plane.solve",
+            "arguments": {
+                "target_speed_km_h": 12000.0,
+                "cruise_altitude_m": 32000.0,
+                "angle_of_attack_deg": 2.5
+            },
+            "caller_identity": "aerospace_agent"
+        })
+        check(cmd_exec.get("status") == "Success", "sim.hypersonic_plane.solve executed successfully via command platform")
+        out_cmd = cmd_exec.get("output", {})
+        check(out_cmd.get("status") == "Converged", "Command output indicates Converged simulation")
+        m_cmd = out_cmd.get("scalar_metrics", {})
+        check(m_cmd.get("flight_mach", 0.0) >= 10.5, "Command output contains flight_mach >= 10.5")
+        check(m_cmd.get("scramjet_net_thrust_kn", 0.0) >= 100.0, "Command output contains scramjet_net_thrust_kn")
+        print(f"  ✓ 13.5 Command Platform: sim.hypersonic_plane.solve executed (Mach {m_cmd.get('flight_mach', 0):.2f}, Thrust {m_cmd.get('scramjet_net_thrust_kn', 0):.1f} kN)")
+
+        # 13.6 Model Context Protocol (MCP) Tool Calling (atlas_hypersonic_solve)
+        mcp_hyper = http_request(port, "POST", "/api/mcp", body={
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "tools/call",
+            "params": {
+                "name": "atlas_hypersonic_solve",
+                "arguments": {
+                    "target_speed_km_h": 12000.0,
+                    "cruise_altitude_m": 32000.0,
+                    "angle_of_attack_deg": 2.5
+                }
+            }
+        })
+        check(mcp_hyper.get("result", {}).get("isError") == False, "atlas_hypersonic_solve executed via MCP without error")
+        content_hyper = mcp_hyper.get("result", {}).get("content", [{}])[0].get("text", "")
+        check("atlas_hypersonic_solve" in content_hyper, "MCP response text confirms hypersonic tool execution")
+        print(f"  ✓ 13.6 MCP Autonomous AI Tool: atlas_hypersonic_solve invoked via JSON-RPC 2.0 with verifiable results")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")
