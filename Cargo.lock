@@ -34,10 +34,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "atlas-agent-orchestrator"
+version = "0.1.0"
+dependencies = [
+ "atlas-command-platform",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "atlas-audit"
 version = "0.1.0"
 dependencies = [
  "atlas-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "atlas-command-platform"
+version = "0.1.0"
+dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -236,6 +255,8 @@ dependencies = [
 name = "cad-cli"
 version = "0.1.0"
 dependencies = [
+ "atlas-agent-orchestrator",
+ "atlas-command-platform",
  "cad-cae",
  "cad-cam",
  "cad-contract",
@@ -340,7 +361,9 @@ name = "cad-studio"
 version = "0.1.0"
 dependencies = [
  "atlas-additive",
+ "atlas-agent-orchestrator",
  "atlas-audit",
+ "atlas-command-platform",
  "atlas-compliance",
  "atlas-core",
  "atlas-dependency-graph",

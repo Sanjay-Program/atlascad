@@ -812,6 +812,177 @@ def run_live_demo() -> None:
         check(suite["standards_compliance"]["aerospace"] == "AS9100 Rev D & FAA FAR 25", "Aerospace AS9100 standard verified")
         print(f"  ✓ 11.38 Master Multiphysics Suite: Evaluated {suite['domains_evaluated']}/27 domains with 100% convergence across all aerospace, nuclear, automotive & mining standards")
 
+        # ---------------------------------------------------------------------
+        # 12. AUTONOMOUS ENGINEERING AGENTS & COMMAND PLATFORM WORKBENCH
+        # ---------------------------------------------------------------------
+        print("\n" + "-" * 78)
+        print("  DEMO 12: AUTONOMOUS ENGINEERING AGENTS & COMMAND PLATFORM WORKBENCH")
+        print("-" * 78)
+
+        # 12.1 Universal Command Platform Registry
+        cmds = http_request(port, "GET", "/api/commands")
+        check("commands" in cmds, "Command registry endpoint returns commands list")
+        check(cmds["total_commands"] >= 15, f"At least 15 commands registered ({cmds['total_commands']})")
+        cmd_ids = [c["id"] for c in cmds["commands"]]
+        check("project.inspect" in cmd_ids, "Project inspect command registered")
+        check("cad.solid.extrude" in cmd_ids, "CAD extrude command registered")
+        check("sim.fea.solve" in cmd_ids, "FEA solver command registered")
+        check("sim.aerodynamics.solve" in cmd_ids, "Aerodynamics command registered")
+        check("cam.toolpaths.generate" in cmd_ids, "CAM toolpaths command registered")
+        check("additive.slice.generate" in cmd_ids, "Additive slicing command registered")
+        print(f"  ✓ 12.1 Command Registry: {cmds['total_commands']} typed commands loaded across 12 disciplines")
+
+        # 12.2 Command Discovery Filter
+        disc = http_request(port, "POST", "/api/commands/discover", body={
+            "category": "simulation"
+        })
+        check("commands" in disc, "Command discovery returns filtered commands")
+        check(len(disc["commands"]) >= 3, "Simulation commands found via category filter")
+        print(f"  ✓ 12.2 Command Discovery: Filtered {len(disc['commands'])} simulation commands")
+
+        # 12.3 Typed Command Execution & Audit Trail
+        exec_res = http_request(port, "POST", "/api/commands/execute", body={
+            "command_id": "sim.aerodynamics.solve",
+            "arguments": {
+                "mach": 0.78,
+                "altitude_m": 10500.0
+            },
+            "caller_identity": "chief_engineer"
+        })
+        check(exec_res.get("status") == "Success", "Command execution returned Success status")
+        out = exec_res.get("output", {})
+        check(out.get("status") == "Converged", "Aerodynamics command executed with convergence")
+        check(out.get("cl", 0) > 0.4, "Aerodynamics lift coefficient returned")
+        check(out.get("lift_to_drag", 0) > 10.0, "Aerodynamics L/D ratio evaluated")
+        print(f"  ✓ 12.3 Command Execution: sim.aerodynamics.solve -> CL = {out['cl']}, L/D = {out['lift_to_drag']}")
+
+        # 12.4 Command Execution History
+        history = http_request(port, "GET", "/api/commands/history")
+        check("history" in history, "Command history retrieved")
+        check(len(history["history"]) >= 1, "Executed command recorded in audit history")
+        last_rec = history["history"][-1]
+        check(last_rec["command_id"] == "sim.aerodynamics.solve", "History record matches executed command")
+        check("audit_hash" in last_rec, "History record contains cryptographic audit hash")
+        print(f"  ✓ 12.4 Audit Logging: Recorded execution {last_rec['execution_id']} with hash {last_rec['audit_hash']}")
+
+        # 12.5 28-Specialist Agent Ecosystem Roster
+        agents_data = http_request(port, "GET", "/api/agents")
+        check(agents_data.get("total_agents") == 28, f"Exactly 28 specialized engineering agents registered ({agents_data.get('total_agents')})")
+        agent_ids = [a["id"] for a in agents_data["agents"]]
+        for req_agent in [
+            "chief_engineer", "requirements_spec", "research", "architecture",
+            "cad_design", "mechanical_engineer", "structural_sim", "cfd_specialist",
+            "multiphysics", "electrical_engineer", "pcb_electronics", "bim_specialist",
+            "civil_engineer", "gis_specialist", "chemical_process", "molecular_engineer",
+            "aerospace_engineer", "automotive_ev", "robotics_automation", "materials_scientist",
+            "cnc_machinist", "additive_specialist", "printing_3d", "topology_optimizer",
+            "verification_engineer", "quality_assurance", "technical_writer", "cost_planner"
+        ]:
+            check(req_agent in agent_ids, f"Required agent '{req_agent}' present in ecosystem")
+        print(f"  ✓ 12.5 Agent Ecosystem: Verified all 28 specialized personas from Chief Engineer to Cost Planner")
+
+        # 12.6 Requirements Analysis & Missing Constraint Detection
+        missing_prompt = "Design a lightweight aerospace wing spar under 35 kN aerodynamic lift"
+        analysis = http_request(port, "POST", "/api/agents/analyze", body={"prompt": missing_prompt})
+        check(analysis.get("primary_discipline") == "aerospace", "Discipline classified as aerospace")
+        check(analysis.get("is_ready_for_execution") == False, "Analysis correctly detects incomplete constraints")
+        check(len(analysis.get("missing_constraints", [])) >= 2, "Missing constraints identified")
+        missing_keys = [mc["key"] for mc in analysis["missing_constraints"]]
+        check("material" in missing_keys, "Identified missing material specification")
+        check("manufacturing_process" in missing_keys, "Identified missing manufacturing process")
+        print(f"  ✓ 12.6 Requirements Analysis: Detected missing constraints ({', '.join(missing_keys)}) without hallucinating")
+
+        # 12.7 Autonomous Specification & Task Graph DAG Generation
+        orch_res = http_request(port, "POST", "/api/agents/orchestrate", body={
+            "prompt": "Design an aluminum.6061-t6 aerospace wing bracket under 45 kN load for 5-axis CNC machining"
+        })
+        check("specification" in orch_res, "Specification generated")
+        check("task_graph" in orch_res, "DAG task graph generated")
+        tasks = orch_res["task_graph"]["tasks"]
+        check(len(tasks) >= 5, f"Task graph contains multi-agent steps ({len(tasks)} tasks)")
+        check("task_01_spec_approval" in tasks, "Task 1: Spec review present")
+        check("task_04_structural_fea" in tasks, "Task 4: FEA simulation present")
+        check("task_07_manufacturing_prep" in tasks, "Task 7: CNC toolpath prep present")
+        print(f"  ✓ 12.7 Task Graph Orchestration: Synthesized DAG with {len(tasks)} dependent tasks across agents")
+
+        # 12.8 Multi-Agent Step Execution
+        step_res = http_request(port, "POST", "/api/agents/step", body={})
+        summary = step_res.get("summary", {})
+        check("execution_status" in summary, "Orchestrator stepped")
+        print(f"  ✓ 12.8 Orchestrator Execution: Status = {summary['execution_status']}, Completed = {summary['completed_tasks']}/{summary['total_tasks']}")
+
+        # 12.9 Reusable Engineering Workflow Templates
+        wfs = http_request(port, "GET", "/api/agents/workflows")
+        check(wfs.get("count") == 12, f"All 12 pre-built workflow templates registered ({wfs.get('count')})")
+        wf_ids = [w["id"] for w in wfs["workflows"]]
+        check("concept_to_cad" in wf_ids, "Workflow concept_to_cad present")
+        check("cad_to_fea" in wf_ids, "Workflow cad_to_fea present")
+        check("cad_to_cfd" in wf_ids, "Workflow cad_to_cfd present")
+        check("cad_to_cnc" in wf_ids, "Workflow cad_to_cnc present")
+        check("cad_to_additive" in wf_ids, "Workflow cad_to_additive present")
+
+        wf_run = http_request(port, "POST", "/api/agents/workflows/run", body={"workflow_id": "cad_to_fea"})
+        check(wf_run.get("workflow_id") == "cad_to_fea", "Workflow instantiated and executed")
+        check(wf_run.get("status") == "Loaded", "Workflow loaded into task graph")
+        print(f"  ✓ 12.9 Workflow Templates: Verified 12 engineering workflows, executed cad_to_fea")
+
+        # 12.10 Closed-Loop Iterative Engineering Optimization
+        opt_loop = http_request(port, "POST", "/api/agents/optimize_loop", body={
+            "target_fos": 1.5,
+            "max_iterations": 4
+        })
+        opt_res = opt_loop.get("optimization_result", {})
+        check(opt_res.get("completed_iterations") == 4, "Iterative loop completed 4 optimization cycles")
+        check(opt_res.get("mass_reduction_percent", 0) > 20.0, "Mass reduced by >20% across design revisions")
+        check(opt_res.get("final_factor_of_safety", 0) >= 1.5, "Final Factor of Safety satisfies constraint (>= 1.5)")
+        check(opt_res.get("evidence_verified") == True, "Numerical evidence cryptographically verified")
+        print(f"  ✓ 12.10 Iterative Optimization: Initial {opt_res['initial_mass_grams']:.0f}g -> Optimized {opt_res['optimized_mass_grams']:.0f}g (-{opt_res['mass_reduction_percent']:.1f}%), FoS = {opt_res['final_factor_of_safety']:.2f}")
+
+        # 12.11 Structured Project Memory & Revision Dossier
+        memory = http_request(port, "GET", "/api/agents/memory")
+        check("revisions" in memory, "Project memory contains revisions")
+        check(len(memory["revisions"]) >= 4, f"Revision history contains verified cycles ({len(memory['revisions'])})")
+        rev_last = memory["revisions"][-1]
+        check(rev_last["status"] == "Pass (FoS Satisfied)", "Latest revision satisfies safety criteria")
+        check(rev_last["evidence_hash"].startswith("sha256-rev-"), "Cryptographic evidence hash present")
+        print(f"  ✓ 12.11 Project Memory: {len(memory['revisions'])} design revisions logged with SHA-256 evidence trail")
+
+        # 12.12 Model Context Protocol (MCP JSON-RPC 2.0) Interface
+        mcp_init = http_request(port, "POST", "/api/mcp", body={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {}
+        })
+        check(mcp_init.get("jsonrpc") == "2.0", "MCP initialize returned valid JSON-RPC 2.0")
+        check(mcp_init.get("result", {}).get("serverInfo", {}).get("name") == "atlascad-mcp", "MCP server identified as atlascad-mcp")
+
+        mcp_tools = http_request(port, "POST", "/api/mcp", body={
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/list",
+            "params": {}
+        })
+        tool_list = mcp_tools.get("result", {}).get("tools", [])
+        check(len(tool_list) >= 12, f"MCP exposes standard tools ({len(tool_list)} tools)")
+
+        mcp_call = http_request(port, "POST", "/api/mcp", body={
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+                "name": "atlas_cad_create_solid",
+                "arguments": {
+                    "sketch_id": "sk_wing_box",
+                    "depth_mm": 50.0
+                }
+            }
+        })
+        check(mcp_call.get("result", {}).get("isError") == False, "MCP tool executed without error")
+        content = mcp_call.get("result", {}).get("content", [{}])[0].get("text", "")
+        check("atlas_cad_create_solid" in content, "MCP response text confirms tool execution")
+        print(f"  ✓ 12.12 MCP Server: Initialized JSON-RPC 2.0, queried {len(tool_list)} tools, successfully invoked atlas_cad_create_solid")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

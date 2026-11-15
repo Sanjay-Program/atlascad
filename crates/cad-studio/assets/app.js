@@ -7171,6 +7171,8 @@ ${gcodeSample}`;
       byId("camWorkbenchView"),
       byId("bimWorkbenchView"),
       byId("ecadWorkbenchView"),
+      byId("additiveWorkbenchView"),
+      byId("agentWorkbenchView"),
     ];
     wbViews.forEach(v => { if (v) v.hidden = true; });
 
@@ -7267,6 +7269,14 @@ ${gcodeSample}`;
         openEnterpriseModal("audit");
         break;
 
+      case "agent":
+        if (layoutSheet) layoutSheet.hidden = true;
+        const agV = byId("agentWorkbenchView");
+        if (agV) agV.hidden = false;
+        loadAgentRoster();
+        toast("Activated: Autonomous Engineering Agent Console");
+        break;
+
       default:
         break;
     }
@@ -7289,6 +7299,7 @@ ${gcodeSample}`;
     setupBimWorkbenchControllers();
     setupEcadWorkbenchControllers();
     setupAdditiveWorkbenchControllers();
+    setupAgentWorkbenchControllers();
   }
 
   // --- CAE Workbench Logic ---
@@ -8671,6 +8682,355 @@ ${gcodeSample}`;
       }).catch(() => {
         toast("Failed to copy to clipboard", true);
       });
+    });
+  }
+
+  // --- Autonomous Engineering Agent Console Logic ---
+  let activePendingApprovalId = null;
+
+  async function loadAgentRoster() {
+    try {
+      const res = await api("/api/agents");
+      const grid = byId("agentRosterGrid");
+      if (!grid || !res.agents) return;
+      grid.innerHTML = "";
+      res.agents.forEach(agent => {
+        const card = document.createElement("div");
+        card.className = "wb-fixture-row";
+        card.style.flexDirection = "column";
+        card.style.alignItems = "flex-start";
+        card.style.padding = "6px 8px";
+        card.style.background = "rgba(255,255,255,0.03)";
+        card.style.borderRadius = "4px";
+        card.style.border = "1px solid rgba(255,255,255,0.06)";
+
+        const header = document.createElement("div");
+        header.style.display = "flex";
+        header.style.justifyContent = "space-between";
+        header.style.width = "100%";
+        header.style.alignItems = "center";
+
+        const nameSpan = document.createElement("strong");
+        nameSpan.style.color = "#f4f4f5";
+        nameSpan.textContent = agent.name;
+
+        const badge = document.createElement("span");
+        badge.className = "wb-status-badge";
+        badge.style.fontSize = "9px";
+        badge.style.padding = "1px 5px";
+        badge.textContent = agent.status.toUpperCase();
+        badge.style.background = agent.status === "idle" ? "rgba(16, 185, 129, 0.15)" : "rgba(59, 130, 246, 0.2)";
+        badge.style.color = agent.status === "idle" ? "#10b981" : "#3b82f6";
+
+        header.appendChild(nameSpan);
+        header.appendChild(badge);
+
+        const roleDiv = document.createElement("div");
+        roleDiv.style.color = "#a1a1aa";
+        roleDiv.style.fontSize = "10px";
+        roleDiv.style.marginTop = "2px";
+        roleDiv.textContent = agent.role;
+
+        const stdDiv = document.createElement("div");
+        stdDiv.style.color = "#71717a";
+        stdDiv.style.fontSize = "9px";
+        stdDiv.style.marginTop = "2px";
+        stdDiv.textContent = (agent.standards || []).slice(0, 2).join(" · ");
+
+        card.appendChild(header);
+        card.appendChild(roleDiv);
+        card.appendChild(stdDiv);
+        grid.appendChild(card);
+      });
+    } catch (err) {
+      console.warn("Failed to load agent roster", err);
+    }
+  }
+
+  function renderTaskGraph(tasks) {
+    const container = byId("agentTaskGraphList");
+    if (!container) return;
+    if (!tasks || Object.keys(tasks).length === 0) {
+      container.innerHTML = '<div style="color: #71717a; font-style: italic;">No active task graph loaded.</div>';
+      return;
+    }
+    container.innerHTML = "";
+    Object.values(tasks).forEach(task => {
+      const row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.justifyContent = "space-between";
+      row.style.alignItems = "center";
+      row.style.padding = "4px 8px";
+      row.style.background = "rgba(255,255,255,0.03)";
+      row.style.borderRadius = "4px";
+      row.style.border = "1px solid rgba(255,255,255,0.06)";
+
+      const info = document.createElement("div");
+      info.innerHTML = `<strong>${task.name}</strong> <span style="color:#a1a1aa; font-size:10px;">[${task.assigned_agent}]</span>`;
+
+      const statusBadge = document.createElement("span");
+      statusBadge.className = "wb-status-badge";
+      statusBadge.style.fontSize = "10px";
+      statusBadge.textContent = task.status;
+      if (task.status === "completed") {
+        statusBadge.style.background = "rgba(16, 185, 129, 0.2)";
+        statusBadge.style.color = "#10b981";
+      } else if (task.status === "waiting_approval") {
+        statusBadge.style.background = "rgba(245, 158, 11, 0.2)";
+        statusBadge.style.color = "#f59e0b";
+      } else if (task.status === "running") {
+        statusBadge.style.background = "rgba(59, 130, 246, 0.2)";
+        statusBadge.style.color = "#3b82f6";
+      }
+      row.appendChild(info);
+      row.appendChild(statusBadge);
+      container.appendChild(row);
+    });
+  }
+
+  function setupAgentWorkbenchControllers() {
+    // 1. Requirement Analysis
+    byId("agentAnalyzeReqBtn")?.addEventListener("click", async () => {
+      const prompt = byId("agentRequirementInput")?.value || "";
+      if (!prompt.trim()) {
+        toast("Please describe your engineering requirement", true);
+        return;
+      }
+      toast("Analyzing requirement & checking constraints…");
+      try {
+        const res = await api("/api/agents/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt }),
+        });
+
+        const missingGroup = byId("agentMissingConstraintsGroup");
+        const missingBox = byId("agentMissingConstraintsBox");
+        const consoleOut = byId("agentConsoleOutput");
+
+        if (consoleOut) {
+          consoleOut.textContent += `\n[Requirements Spec Agent] Analyzed: '${prompt}'\n[Discipline] Detected: ${res.primary_discipline.toUpperCase()}\n[Constraints Check] ${res.is_ready_for_execution ? "All constraints satisfied" : "Missing constraints detected!"}`;
+        }
+
+        if (res.missing_constraints && res.missing_constraints.length > 0) {
+          if (missingGroup) missingGroup.style.display = "block";
+          if (missingBox) {
+            missingBox.innerHTML = "";
+            res.missing_constraints.forEach(mc => {
+              const row = document.createElement("div");
+              row.className = "wb-fixture-row";
+              row.style.flexDirection = "column";
+              row.style.alignItems = "flex-start";
+              row.style.gap = "4px";
+              row.innerHTML = `<span style="color:#f59e0b; font-weight:600;">${mc.title}:</span>
+                <span style="color:#a1a1aa;">${mc.prompt_question}</span>
+                <input type="text" class="wb-input compact agent-clarification-input" data-key="${mc.key}" value="${mc.suggested_default || ''}" style="width:100%;">`;
+              missingBox.appendChild(row);
+            });
+          }
+          toast("Please clarify the missing engineering constraints");
+        } else {
+          if (missingGroup) missingGroup.style.display = "none";
+          toast("Requirements verified! Ready to synthesize DAG plan.");
+        }
+      } catch (err) {
+        toast(`Analysis failed: ${err.message}`, true);
+      }
+    });
+
+    // 2. Synthesize DAG Plan
+    byId("agentSynthesizePlanBtn")?.addEventListener("click", async () => {
+      const prompt = byId("agentRequirementInput")?.value || "";
+      if (!prompt.trim()) {
+        toast("Please describe your engineering requirement", true);
+        return;
+      }
+      const clarifications = {};
+      document.querySelectorAll(".agent-clarification-input").forEach(inp => {
+        const key = inp.getAttribute("data-key");
+        if (key && inp.value) clarifications[key] = inp.value;
+      });
+
+      toast("Synthesizing multi-agent engineering task graph…");
+      try {
+        const res = await api("/api/agents/orchestrate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt, clarifications }),
+        });
+
+        renderTaskGraph(res.task_graph?.tasks);
+        const statusBadge = byId("agentStatusBadge");
+        if (statusBadge) {
+          statusBadge.textContent = "DAG Plan Ready";
+          statusBadge.style.color = "#3b82f6";
+        }
+        const consoleOut = byId("agentConsoleOutput");
+        if (consoleOut) {
+          consoleOut.textContent += `\n[Chief Engineer] Synthesized ${Object.keys(res.task_graph?.tasks || {}).length}-task engineering DAG.\n[Target Spec] ${res.specification?.functional_objective} (${res.specification?.material_choice}, ${res.specification?.manufacturing_process})`;
+        }
+        toast("Engineering task graph synthesized!");
+      } catch (err) {
+        toast(`Orchestration failed: ${err.message}`, true);
+      }
+    });
+
+    // 3. Step / Run Orchestration
+    const stepOrchestrator = async () => {
+      try {
+        const res = await api("/api/agents/step", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        });
+
+        renderTaskGraph(res.active_tasks);
+        const consoleOut = byId("agentConsoleOutput");
+        if (consoleOut && res.execution_log) {
+          consoleOut.textContent = res.execution_log.slice(-12).join("\n");
+        }
+
+        // Check for pending approval
+        const gateCard = byId("agentApprovalGateCard");
+        if (res.pending_approvals && Object.keys(res.pending_approvals).length > 0) {
+          const appr = Object.values(res.pending_approvals)[0];
+          activePendingApprovalId = appr.approval_id;
+          if (gateCard) {
+            gateCard.style.display = "block";
+            byId("agentApprovalIntentText").textContent = appr.intent;
+            byId("agentApprovalRiskBadge").textContent = appr.risk_level.toUpperCase();
+          }
+          toast("Execution paused: Human approval gate required!");
+        } else {
+          if (gateCard) gateCard.style.display = "none";
+          activePendingApprovalId = null;
+        }
+
+        const statusBadge = byId("agentStatusBadge");
+        if (statusBadge) {
+          statusBadge.textContent = res.summary.execution_status;
+          if (res.summary.execution_status === "Completed") {
+            statusBadge.style.color = "#10b981";
+            toast("All DAG engineering tasks completed successfully!");
+          }
+        }
+      } catch (err) {
+        toast(`Execution step error: ${err.message}`, true);
+      }
+    };
+
+    byId("agentStepBtn")?.addEventListener("click", stepOrchestrator);
+    byId("agentRunOrchestrationBtn")?.addEventListener("click", async () => {
+      toast("Executing multi-agent engineering workflow…");
+      for (let i = 0; i < 8; i++) {
+        await stepOrchestrator();
+        if (activePendingApprovalId) break;
+      }
+    });
+
+    // 4. Human Approval / Rejection
+    byId("agentApproveBtn")?.addEventListener("click", async () => {
+      if (!activePendingApprovalId) return;
+      toast("Approving action…");
+      try {
+        await api("/api/agents/approvals/respond", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            approval_id: activePendingApprovalId,
+            approve: true,
+            approver: "chief_engineer",
+          }),
+        });
+        toast("Human approval recorded!");
+        await stepOrchestrator();
+      } catch (err) {
+        toast(`Approval error: ${err.message}`, true);
+      }
+    });
+
+    byId("agentRejectBtn")?.addEventListener("click", async () => {
+      if (!activePendingApprovalId) return;
+      toast("Rejecting action…");
+      try {
+        await api("/api/agents/approvals/respond", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            approval_id: activePendingApprovalId,
+            approve: false,
+            approver: "chief_engineer",
+            reason: "Rejected by human operator",
+          }),
+        });
+        toast("Action rejected by engineer");
+        await stepOrchestrator();
+      } catch (err) {
+        toast(`Rejection error: ${err.message}`, true);
+      }
+    });
+
+    // 5. Pre-Built Workflow Loading
+    byId("agentLoadWorkflowBtn")?.addEventListener("click", async () => {
+      const wfId = byId("agentWorkflowSelect")?.value || "concept_to_cad";
+      toast(`Loading engineering workflow: ${wfId}…`);
+      try {
+        const res = await api("/api/agents/workflows/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workflow_id: wfId }),
+        });
+        toast(`Workflow ${wfId} loaded (${res.total_tasks} tasks)`);
+        await stepOrchestrator();
+      } catch (err) {
+        toast(`Failed to load workflow: ${err.message}`, true);
+      }
+    });
+
+    // 6. Closed-Loop Iterative Optimization
+    byId("agentRunOptimizeBtn")?.addEventListener("click", async () => {
+      const fos = parseFloat(byId("agentTargetFosInput")?.value || "1.50");
+      const iters = parseInt(byId("agentMaxIterInput")?.value || "5", 10);
+      toast("Executing closed-loop iterative design optimization…");
+      try {
+        const res = await api("/api/agents/optimize_loop", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target_fos: fos, max_iterations: iters }),
+        });
+
+        const tableBody = byId("agentRevisionTable")?.querySelector("tbody");
+        if (tableBody && res.revisions) {
+          tableBody.innerHTML = "";
+          res.revisions.forEach(rev => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td>Rev ${rev.revision_index}</td>
+              <td>${rev.mass_grams.toFixed(1)} g</td>
+              <td>${rev.peak_stress_mpa.toFixed(1)} MPa</td>
+              <td style="color:#10b981; font-weight:600;">${rev.factor_of_safety.toFixed(2)}</td>
+              <td>${rev.compliance_score.toFixed(1)}</td>
+              <td><span class="wb-status-badge" style="background:rgba(16,185,129,0.2);color:#10b981;font-size:9px;">${rev.status}</span></td>
+              <td style="font-family:monospace; color:#a1a1aa;">${rev.evidence_hash}</td>
+            `;
+            tableBody.appendChild(tr);
+          });
+        }
+
+        const opt = res.optimization_result;
+        const consoleOut = byId("agentConsoleOutput");
+        if (consoleOut && opt) {
+          consoleOut.textContent += `\n[Topology Optimizer] ${opt.completed_iterations} iterations converged.\n[Mass Reduction] ${opt.initial_mass_grams.toFixed(0)}g -> ${opt.optimized_mass_grams.toFixed(0)}g (-${opt.mass_reduction_percent.toFixed(1)}%)\n[Verification] Peak Stress: ${opt.final_peak_stress_mpa.toFixed(1)} MPa · FoS: ${opt.final_factor_of_safety.toFixed(2)} (${opt.convergence_status})`;
+        }
+        toast(`Iterative optimization complete (-${opt?.mass_reduction_percent.toFixed(1)}% mass)`);
+      } catch (err) {
+        toast(`Optimization error: ${err.message}`, true);
+      }
+    });
+
+    byId("agentClearLogBtn")?.addEventListener("click", () => {
+      const consoleOut = byId("agentConsoleOutput");
+      if (consoleOut) consoleOut.textContent = "[Agent Log Cleared]";
     });
   }
 

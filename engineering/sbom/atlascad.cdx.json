@@ -95,6 +95,29 @@
           }
         }
       ],
+      "name": "atlas-agent-orchestrator",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/atlas-agent-orchestrator@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
       "name": "atlas-audit",
       "properties": [
         {
@@ -107,6 +130,29 @@
         }
       ],
       "purl": "pkg:cargo/atlas-audit@0.1.0",
+      "type": "application",
+      "version": "0.1.0"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-AtlasCAD-Personal-NonCommercial"
+          }
+        }
+      ],
+      "name": "atlas-command-platform",
+      "properties": [
+        {
+          "name": "atlas:licence_verdict",
+          "value": "allowed"
+        },
+        {
+          "name": "atlas:licence_reason",
+          "value": "workspace member under its own licence: LicenseRef-AtlasCAD-Personal-NonCommercial"
+        }
+      ],
+      "purl": "pkg:cargo/atlas-command-platform@0.1.0",
       "type": "application",
       "version": "0.1.0"
     },

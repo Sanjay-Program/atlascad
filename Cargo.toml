@@ -28,6 +28,8 @@ members = [
     "crates/atlas-job-queue",
     "crates/atlas-organization",
     "crates/atlas-additive",
+    "crates/atlas-command-platform",
+    "crates/atlas-agent-orchestrator",
 ]
 # The reference and kernel checkouts are independent repositories with their own histories and
 # manifests. Without this, this workspace root would claim any nested package whose manifest has no
@@ -67,6 +69,8 @@ atlas-compliance = { path = "crates/atlas-compliance" }
 atlas-job-queue = { path = "crates/atlas-job-queue" }
 atlas-organization = { path = "crates/atlas-organization" }
 atlas-additive = { path = "crates/atlas-additive" }
+atlas-command-platform = { path = "crates/atlas-command-platform" }
+atlas-agent-orchestrator = { path = "crates/atlas-agent-orchestrator" }
 
 # Same pinned versions the SolidCraft kernel uses, so measurements describe the
 # kernel this platform actually ships rather than a different release.

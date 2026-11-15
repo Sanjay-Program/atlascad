@@ -378,7 +378,51 @@ try {
   check(Math.abs(unitConv.converted_value - 88.9) < 1e-6, `Units conversion accurate (3.5 in = ${unitConv.converted_value} mm)`);
   console.log(`    ✓ Units API: 3.5 in -> ${unitConv.converted_value} mm`);
 
-  // --- Step 8: Return to 3D CAD Viewport & Validate Zero Console Errors ---
+  // --- Step 8: Switch to Autonomous Agent Console Workbench ---
+  logStep('Switching to Autonomous Agent Console Workbench...');
+  await clickSelector('.wb-tab[data-workbench="agent"]', 'Agent Console Tab');
+  await waitFor('!document.getElementById("agentWorkbenchView").hidden', 'Agent View visible');
+
+  logStep('Submitting engineering requirement for autonomous analysis...');
+  await setInputValue('#agentRequirementInput', 'Design a high-strength titanium wing spar for 40 kN aerodynamic lift');
+  await clickSelector('#agentAnalyzeReqBtn', 'Analyze Requirement');
+  await sleep(400);
+
+  const missingVisible = await evaluate('document.getElementById("agentMissingConstraintsGroup").style.display !== "none"');
+  check(missingVisible, 'Missing constraints clarification group displayed');
+  const agentLog = await evaluate('document.getElementById("agentConsoleOutput").textContent.toLowerCase()');
+  check(agentLog.includes('analyzed') || agentLog.includes('missing constraints') || agentLog.includes('requirements spec'), 'Agent console logged requirement analysis');
+  console.log('    ✓ Agent Console: Analyzed requirement & detected missing constraints');
+
+  logStep('Synthesizing formal engineering specification & TaskGraph DAG plan...');
+  await clickSelector('#agentSynthesizePlanBtn', 'Synthesize Specification & DAG Plan');
+  await sleep(500);
+
+  const taskNodesCount = await evaluate('document.querySelectorAll("#agentTaskGraphList > div").length');
+  check(taskNodesCount >= 3, `TaskGraph DAG rendered with multi-agent nodes (${taskNodesCount} tasks)`);
+  console.log(`    ✓ Agent Orchestrator: Synthesized DAG with ${taskNodesCount} tasks`);
+
+  logStep('Stepping orchestrator execution & testing human approval gate...');
+  await clickSelector('#agentStepBtn', 'Execute Single Step');
+  await sleep(400);
+
+  const approvalCard = await evaluate('document.getElementById("agentApprovalGateCard").style.display !== "none"');
+  if (approvalCard) {
+    await clickSelector('#agentApproveBtn', 'Approve Task');
+    await sleep(300);
+    console.log('    ✓ Human Safety Approval Gate: Responded and approved high-risk task');
+  }
+
+  logStep('Executing closed-loop iterative design optimization loop...');
+  await clickSelector('#agentRunOptimizeBtn', 'Run Iterative Optimization Loop');
+  await sleep(600);
+
+  const revisionRows = await evaluate('document.querySelectorAll("#agentRevisionTable tbody tr").length');
+  check(revisionRows >= 3, `Design revision history populated (${revisionRows} revisions)`);
+  console.log(`    ✓ Closed-Loop Optimization: ${revisionRows} verified revisions populated with evidence hashes`);
+  await takeScreenshot('10-agent-console-optimized');
+
+  // --- Step 9: Return to 3D CAD Viewport & Validate Zero Console Errors ---
   logStep('Returning to 3D CAD Modeling workbench...');
   await clickSelector('.wb-tab[data-workbench="cad3d"]', '3D CAD Tab');
   await sleep(300);

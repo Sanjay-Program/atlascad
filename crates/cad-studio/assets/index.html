@@ -501,6 +501,9 @@
       <button type="button" class="wb-tab" data-workbench="enterprise" role="tab" aria-selected="false" title="Enterprise SaaS Hub (Audit Trail, Cert Reports, HPC Queue, Org & ECO)">
         <span class="wb-icon">🛡️</span><span class="wb-text">Enterprise Hub</span>
       </button>
+      <button type="button" class="wb-tab" data-workbench="agent" role="tab" aria-selected="false" title="Autonomous Engineering Agent Console (28 Specialists, DAG Orchestration, MCP)">
+        <span class="wb-icon">🤖</span><span class="wb-text">Agent Console</span>
+      </button>
     </div>
   </nav>
 
@@ -1637,6 +1640,147 @@ C1 out 0 100n
               </div>
               <pre class="wb-gcode-viewer" id="additiveGcodeViewer" style="height: 240px;">Click "Slice 3D Solid" to generate high-precision multi-layer G-code toolpaths.</pre>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent Console Workbench View -->
+      <div id="agentWorkbenchView" class="workbench-view agent-workbench-view" hidden role="region" aria-label="Autonomous Engineering Agent Console">
+        <div class="wb-header">
+          <div class="wb-title-wrap">
+            <span class="wb-title-icon">🤖</span>
+            <div>
+              <h3>Autonomous Engineering Agent Console</h3>
+              <span class="wb-subtitle">28-Specialist Agent Ecosystem · Natural Language Requirements · DAG Task Scheduling · Human Safety Gate · MCP Server</span>
+            </div>
+          </div>
+          <div class="wb-header-actions">
+            <span class="wb-status-badge" id="agentStatusBadge">28 Specialists Online</span>
+            <button type="button" class="button primary small" id="agentRunOrchestrationBtn">▶ Execute Task Graph</button>
+            <button type="button" class="button secondary small" id="agentStepBtn">⏯ Single Step</button>
+            <button type="button" class="button ghost small" id="agentClearLogBtn">Clear Log</button>
+          </div>
+        </div>
+        <div class="wb-body-split">
+          <div class="wb-control-pane">
+            <div class="wb-group">
+              <label for="agentRequirementInput">Natural Language Engineering Requirement</label>
+              <textarea id="agentRequirementInput" class="wb-input" rows="3" style="width: 100%; font-size: 12px; resize: vertical;" placeholder="e.g. Design a titanium wing bracket for 45 kN load with 35% weight reduction for 5-axis CNC machining"></textarea>
+              <div style="display: flex; gap: 6px; margin-top: 6px;">
+                <button type="button" class="button secondary small" id="agentAnalyzeReqBtn" style="flex: 1;">🔍 Analyze Requirements</button>
+                <button type="button" class="button primary small" id="agentSynthesizePlanBtn" style="flex: 1;">⚡ Synthesize DAG Plan</button>
+              </div>
+            </div>
+
+            <div class="wb-group" id="agentMissingConstraintsGroup" style="display: none;">
+              <label style="color: #f59e0b;">⚠️ Missing Critical Engineering Constraints</label>
+              <div class="wb-fixtures-box" id="agentMissingConstraintsBox" style="font-size: 11px;">
+                <!-- Dynamically populated missing constraint questions & inputs -->
+              </div>
+            </div>
+
+            <div class="wb-group">
+              <label for="agentWorkflowSelect">Pre-Built Multi-Disciplinary Engineering Workflows</label>
+              <select id="agentWorkflowSelect" class="wb-select">
+                <option value="concept_to_cad" selected>Concept to 3D Parametric CAD</option>
+                <option value="cad_to_fea">CAD to Finite Element Stress Analysis (FEA)</option>
+                <option value="cad_to_cfd">CAD to Internal Fluid Dynamics (CFD)</option>
+                <option value="cad_to_optimization">CAD to SIMP Topology Optimization</option>
+                <option value="cad_to_additive">CAD to Additive Slicing &amp; Gyroid Printing</option>
+                <option value="cad_to_cnc">CAD to 5-Axis Simultaneous CNC Machining</option>
+                <option value="bim_to_energy">BIM Architecture to ISO 6946 Energy Model</option>
+                <option value="circuit_to_spice">Circuit Schematic to SPICE AC Frequency</option>
+                <option value="pcb_to_si">High-Speed PCB to Controlled Impedance (IPC-2141)</option>
+                <option value="robot_to_kinematics">Robotic Manipulator to 6-DOF Trajectory</option>
+                <option value="ev_to_battery_thermal">EV Powertrain to Battery Thermal Runaway</option>
+                <option value="req_to_tech_docs">Requirements to Certified AS9100 Tech Docs</option>
+              </select>
+              <button type="button" class="button secondary small" id="agentLoadWorkflowBtn" style="width: 100%; margin-top: 6px;">Load Workflow Template</button>
+            </div>
+
+            <div class="wb-group">
+              <label>Closed-Loop Iterative Design Optimization</label>
+              <div class="wb-fixtures-box">
+                <div class="wb-fixture-row">
+                  <span>Target Factor of Safety:</span>
+                  <input type="number" id="agentTargetFosInput" value="1.50" step="0.05" class="wb-input compact">
+                </div>
+                <div class="wb-fixture-row">
+                  <span>Iteration Budget:</span>
+                  <input type="number" id="agentMaxIterInput" value="5" step="1" class="wb-input compact">
+                </div>
+              </div>
+              <button type="button" class="button primary small" id="agentRunOptimizeBtn" style="width: 100%; margin-top: 6px;">🔄 Run Iterative Optimization Loop</button>
+            </div>
+
+            <div class="wb-group">
+              <label>MCP Server Status</label>
+              <div style="font-size: 11px; color: #a1a1aa; line-height: 1.4;">
+                <div>Protocol: <strong style="color: #10b981;">JSON-RPC 2.0 (2024-11-05)</strong></div>
+                <div>Tools Exposed: <strong>18 Enterprise Tools</strong></div>
+                <div>Endpoint: <code>/api/mcp</code></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="wb-display-pane">
+            <!-- Human Safety Approval Gate -->
+            <div id="agentApprovalGateCard" class="wb-cam-metrics-card" style="border: 1px solid #f59e0b; background: rgba(245, 158, 11, 0.08); display: none;">
+              <div class="wb-card-title" style="color: #f59e0b; display: flex; justify-content: space-between;">
+                <span>⚠️ HUMAN ENGINEERING APPROVAL GATE REQUIRED</span>
+                <span class="wb-status-badge" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;" id="agentApprovalRiskBadge">High Risk</span>
+              </div>
+              <div style="font-size: 12px; margin: 8px 0;" id="agentApprovalIntentText">Intent: Execute sensitive operation</div>
+              <div style="display: flex; gap: 8px;">
+                <button type="button" class="button primary small" id="agentApproveBtn" style="background: #10b981;">✓ Approve &amp; Execute</button>
+                <button type="button" class="button ghost small" id="agentRejectBtn" style="color: #ef4444;">✕ Reject Action</button>
+              </div>
+            </div>
+
+            <!-- Task Graph Visualizer -->
+            <div class="wb-cam-metrics-card" style="margin-top: 10px;">
+              <div class="wb-card-title">Active Directed Acyclic Task Graph (DAG)</div>
+              <div id="agentTaskGraphList" style="display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto; font-size: 12px; margin-top: 6px;">
+                <div style="color: #71717a; font-style: italic;">No active task graph loaded. Enter requirements or select a workflow template.</div>
+              </div>
+            </div>
+
+            <!-- Revisions & Numerical Evidence Table -->
+            <div class="wb-cam-metrics-card" style="margin-top: 10px;">
+              <div class="wb-card-title">Iterative Design Revisions &amp; Verified Evidence</div>
+              <div style="max-height: 130px; overflow-y: auto;">
+                <table style="width: 100%; font-size: 11px; text-align: left; border-collapse: collapse;" id="agentRevisionTable">
+                  <thead>
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #a1a1aa;">
+                      <th>Rev</th><th>Mass</th><th>Peak Stress</th><th>FoS</th><th>Compliance</th><th>Status</th><th>Evidence Hash</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td colspan="7" style="color: #71717a; text-align: center; padding: 6px;">Run iterative optimization to generate design revisions.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Streaming Log Console -->
+            <div class="wb-gcode-container" style="margin-top: 10px;">
+              <div class="wb-gcode-header">
+                <span>Autonomous Multi-Agent Activity &amp; Communication Stream</span>
+                <span id="agentActiveSpecialistLabel" style="color: #10b981; font-size: 11px;">Chief Engineer Ready</span>
+              </div>
+              <pre class="wb-gcode-viewer" id="agentConsoleOutput" style="height: 180px; font-size: 11px; line-height: 1.4;">[Agent Ecosystem] Initialized 28 specialized engineering agents.
+[Orchestrator] Ready for natural language requirements or template workflows.</pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- 28-Specialist Agent Directory Tray -->
+        <div style="padding: 10px 16px; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.2);">
+          <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; margin-bottom: 8px;">
+            Active Engineering Specialist Directory (28 Autonomous Personas)
+          </div>
+          <div id="agentRosterGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; max-height: 140px; overflow-y: auto;">
+            <!-- Dynamically populated cards for all 28 agents -->
           </div>
         </div>
       </div>
