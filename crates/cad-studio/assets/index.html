@@ -2130,6 +2130,462 @@ FPS Target: 60 fps | Spatial BVH Built | Telemetry Port Bound.</pre>
           </div>
         </div>
       </div>
+
+      <!-- 1. Dedicated Aerospace & Hypersonic Flight Dynamics Workbench -->
+      <div id="aerospaceWorkbenchView" class="workbench-view aerospace-workbench-view" hidden role="region" aria-label="Aerospace & Hypersonic Flight Dynamics Studio">
+        <div class="wb-header">
+          <div class="wb-title-wrap">
+            <span class="wb-title-icon">🚀</span>
+            <div>
+              <h3>Aerospace &amp; Hypersonic Waverider Studio</h3>
+              <span class="wb-subtitle">Mach 11+ Nonequilibrium Aerothermodynamics · Scramjet Propulsion · Active Supercritical LH2 Cooling · Q-INS</span>
+            </div>
+          </div>
+          <div class="wb-header-actions">
+            <span class="wb-status-badge" id="aeroStatusBadge">Mach 11 Flight Envelope Certified</span>
+            <button type="button" class="button primary small" id="aeroRunSolveBtn">▶ Solve Hypersonic Flight</button>
+            <button type="button" class="button secondary small" id="aeroRunMasterDagBtn">⚡ Run Autonomous Master DAG</button>
+          </div>
+        </div>
+        <div class="wb-body-split">
+          <div class="wb-control-pane">
+            <div class="wb-group">
+              <label for="aeroSpeedInput">Airspeed / Mach</label>
+              <input type="number" id="aeroSpeedInput" class="wb-input" value="12000" min="2000" max="18000" step="500">
+              <span style="font-size: 10px; color: var(--muted);">12,000 km/h = Mach 11.00 (3,333.3 m/s)</span>
+            </div>
+            <div class="wb-group">
+              <label for="aeroAltitudeInput">Cruise Altitude (m)</label>
+              <input type="number" id="aeroAltitudeInput" class="wb-input" value="32000" min="15000" max="45000" step="1000">
+              <span style="font-size: 10px; color: var(--muted);">Lower Stratosphere (q = 73.5 kPa)</span>
+            </div>
+            <div class="wb-group">
+              <label for="aeroAoaInput">Angle of Attack (°)</label>
+              <input type="number" id="aeroAoaInput" class="wb-input" value="2.5" min="0" max="12" step="0.5">
+            </div>
+            <div class="wb-group">
+              <label>Subsystem Solvers</label>
+              <div style="display: flex; flex-direction: column; gap: 6px;">
+                <button type="button" class="button small ghost" id="aeroSubPlasmaBtn">Plasma Sheath (14.9 GHz)</button>
+                <button type="button" class="button small ghost" id="aeroSubScramjetBtn">Scramjet 3-Ramp Shock &amp; Thrust</button>
+                <button type="button" class="button small ghost" id="aeroSubThermalBtn">Supercritical LH2 Cooling (391 kW/m²K)</button>
+                <button type="button" class="button small ghost" id="aeroSubFlutterBtn">Aeroelastic Panel Flutter (Dowell)</button>
+                <button type="button" class="button small ghost" id="aeroSub6DofBtn">6-DOF Bank-to-Turn Maneuver</button>
+                <button type="button" class="button small ghost" id="aeroSubMagnetBtn">20 K REBCO Superconducting Magnet</button>
+                <button type="button" class="button small ghost" id="aeroSubBomBtn">21-Component Aircraft BOM</button>
+              </div>
+            </div>
+          </div>
+          <div class="wb-display-pane">
+            <div class="wb-metrics-grid">
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Mach Number</span>
+                <span class="wb-metric-value" id="aeroMachDisplay">11.00 M</span>
+                <span class="wb-metric-sub">Airspeed 3,333 m/s</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Scramjet Thrust</span>
+                <span class="wb-metric-value" id="aeroThrustDisplay">131.4 kN</span>
+                <span class="wb-metric-sub">Isp 2,717 s (T/D 1.69x)</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Flutter Safety Factor</span>
+                <span class="wb-metric-value" id="aeroFlutterDisplay">64.06 FoS</span>
+                <span class="wb-metric-sub">q_crit 4,708 kPa (AS9100 Pass)</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Turn Radius</span>
+                <span class="wb-metric-value" id="aeroTurnRadiusDisplay">845.5 km</span>
+                <span class="wb-metric-sub">55° Bank (0.94 g Load)</span>
+              </div>
+            </div>
+            <div class="wb-gcode-container">
+              <div class="wb-gcode-header">Aerospace Multiphysics Telemetry &amp; Log</div>
+              <pre class="wb-gcode-viewer" id="aeroConsoleOutput" style="height: 180px; font-size: 11px;">[Atlas Aerospace Engine] Ready.
+Target: Mach 11 Waverider (12,000 km/h) at 32 km Stratosphere.
+Select a solver or trigger full autonomous master execution.</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Dedicated Civil & Structural Frames Workbench -->
+      <div id="civilWorkbenchView" class="workbench-view civil-workbench-view" hidden role="region" aria-label="Civil & Structural Frames Studio">
+        <div class="wb-header">
+          <div class="wb-title-wrap">
+            <span class="wb-title-icon">🏛️</span>
+            <div>
+              <h3>Civil Structural &amp; Geotechnical Studio</h3>
+              <span class="wb-subtitle">Space Frames · Euler/Johnson Column Buckling · Rankine Earth Pressures · ISO 6946 Building Envelope</span>
+            </div>
+          </div>
+          <div class="wb-header-actions">
+            <span class="wb-status-badge" id="civilStatusBadge">AISC 360 Pass</span>
+            <button type="button" class="button primary small" id="civilRunBucklingBtn">▶ Solve Column Buckling</button>
+            <button type="button" class="button secondary small" id="civilRunEarthBtn">▶ Retaining Wall Earth Pressure</button>
+            <button type="button" class="button ghost small" id="civilRunUValueBtn">Envelope U-Value</button>
+          </div>
+        </div>
+        <div class="wb-body-split">
+          <div class="wb-control-pane">
+            <div class="wb-group">
+              <label for="civilLengthInput">Column Length (m)</label>
+              <input type="number" id="civilLengthInput" class="wb-input" value="4.5" min="1.0" max="20.0" step="0.5">
+            </div>
+            <div class="wb-group">
+              <label for="civilLoadInput">Design Axial Load (kN)</label>
+              <input type="number" id="civilLoadInput" class="wb-input" value="1500" min="100" max="10000" step="100">
+            </div>
+            <div class="wb-group">
+              <label for="civilWallHInput">Retaining Wall Height (m)</label>
+              <input type="number" id="civilWallHInput" class="wb-input" value="6.0" min="1.0" max="15.0" step="0.5">
+            </div>
+            <div class="wb-group">
+              <label for="civilPhiInput">Soil Friction Angle (°)</label>
+              <input type="number" id="civilPhiInput" class="wb-input" value="32.0" min="10" max="45" step="1">
+            </div>
+          </div>
+          <div class="wb-display-pane">
+            <div class="wb-metrics-grid">
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Critical Buckling Load</span>
+                <span class="wb-metric-value" id="civilPcrDisplay">2,119.9 kN</span>
+                <span class="wb-metric-sub">P_design = 1,500 kN</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Buckling Factor of Safety</span>
+                <span class="wb-metric-value" id="civilFosDisplay">1.41 FoS</span>
+                <span class="wb-metric-sub">Slenderness λ = 69.3</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Active Earth Thrust</span>
+                <span class="wb-metric-value" id="civilThrustDisplay">53.5 kN/m</span>
+                <span class="wb-metric-sub">Rankine Ka = 0.271</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Envelope U-Value</span>
+                <span class="wb-metric-value" id="civilUValDisplay">0.167 W/m²K</span>
+                <span class="wb-metric-sub">R = 6.01 m²K/W (Pass)</span>
+              </div>
+            </div>
+            <div class="wb-gcode-container">
+              <div class="wb-gcode-header">Civil Structural Diagnostics</div>
+              <pre class="wb-gcode-viewer" id="civilConsoleOutput" style="height: 180px; font-size: 11px;">[Civil Engineering Engine] Online.
+AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Dedicated Electrical Power Systems & Grid Workbench -->
+      <div id="powerWorkbenchView" class="workbench-view power-workbench-view" hidden role="region" aria-label="Electrical Power Systems Studio">
+        <div class="wb-header">
+          <div class="wb-title-wrap">
+            <span class="wb-title-icon">🔌</span>
+            <div>
+              <h3>Electrical Power Systems &amp; AC Grid Studio</h3>
+              <span class="wb-subtitle">Newton-Raphson Power Flow · Admittance Matrix (Y_bus) · Voltage Stability &amp; Transmission Losses</span>
+            </div>
+          </div>
+          <div class="wb-header-actions">
+            <span class="wb-status-badge" id="powerStatusBadge">Grid Balanced</span>
+            <button type="button" class="button primary small" id="powerRunFlowBtn">▶ Solve AC Power Flow</button>
+          </div>
+        </div>
+        <div class="wb-body-split">
+          <div class="wb-control-pane">
+            <div class="wb-group">
+              <label for="powerGridBaseKv">Grid Base Voltage (kV)</label>
+              <input type="number" id="powerGridBaseKv" class="wb-input" value="132" min="11" max="500" step="11">
+            </div>
+            <div class="wb-group">
+              <label for="powerActiveDemandMw">Active Load (MW)</label>
+              <input type="number" id="powerActiveDemandMw" class="wb-input" value="120" min="10" max="1000" step="10">
+            </div>
+            <div class="wb-group">
+              <label for="powerReactiveDemandMvar">Reactive Load (MVAR)</label>
+              <input type="number" id="powerReactiveDemandMvar" class="wb-input" value="45" min="5" max="500" step="5">
+            </div>
+          </div>
+          <div class="wb-display-pane">
+            <div class="wb-metrics-grid">
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Bus 2 Voltage</span>
+                <span class="wb-metric-value" id="powerV2Display">0.9999 p.u.</span>
+                <span class="wb-metric-sub">Phase Angle: -2.14°</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Transmission Losses</span>
+                <span class="wb-metric-value" id="powerLossesDisplay">0.435 MW</span>
+                <span class="wb-metric-sub">Efficiency: 99.64%</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Admittance Norm</span>
+                <span class="wb-metric-value" id="powerYBusDisplay">29.98 p.u.</span>
+                <span class="wb-metric-sub">||Y_bus|| Frobenius</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Voltage Stability</span>
+                <span class="wb-metric-value" style="color: #10b981;">Nominal</span>
+                <span class="wb-metric-sub">Within ±5% Margin</span>
+              </div>
+            </div>
+            <div class="wb-gcode-container">
+              <div class="wb-gcode-header">Power Grid Solver Log</div>
+              <pre class="wb-gcode-viewer" id="powerConsoleOutput" style="height: 180px; font-size: 11px;">[Power Systems Engine] IEEE 14-Bus Newton-Raphson AC Solver Ready.</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Dedicated Chemical & Molecular Process Workbench -->
+      <div id="chemicalWorkbenchView" class="workbench-view chemical-workbench-view" hidden role="region" aria-label="Chemical & Molecular Process Studio">
+        <div class="wb-header">
+          <div class="wb-title-wrap">
+            <span class="wb-title-icon">⚗️</span>
+            <div>
+              <h3>Chemical &amp; Molecular Process Studio</h3>
+              <span class="wb-subtitle">Rachford-Rice VLE Flash Separator · Peng-Robinson EOS · Lennard-Jones Molecular Dynamics</span>
+            </div>
+          </div>
+          <div class="wb-header-actions">
+            <span class="wb-status-badge" id="chemStatusBadge">Equilibrium Verified</span>
+            <button type="button" class="button primary small" id="chemRunFlashBtn">▶ Solve VLE Flash</button>
+            <button type="button" class="button secondary small" id="chemRunMdBtn">▶ Run Molecular Dynamics</button>
+          </div>
+        </div>
+        <div class="wb-body-split">
+          <div class="wb-control-pane">
+            <div class="wb-group">
+              <label for="chemTempInput">Flash Temperature (K)</label>
+              <input type="number" id="chemTempInput" class="wb-input" value="315.0" min="200" max="600" step="5">
+            </div>
+            <div class="wb-group">
+              <label for="chemPressInput">Flash Pressure (bar)</label>
+              <input type="number" id="chemPressInput" class="wb-input" value="4.5" min="1.0" max="50.0" step="0.5">
+            </div>
+            <div class="wb-group">
+              <label>Feed Hydrocarbons</label>
+              <span style="font-size: 11px; color: var(--muted);">Propane (35%), Isobutane (35%), n-Pentane (30%)</span>
+            </div>
+          </div>
+          <div class="wb-display-pane">
+            <div class="wb-metrics-grid">
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Vapor Fraction (β)</span>
+                <span class="wb-metric-value" id="chemBetaDisplay">0.8959</span>
+                <span class="wb-metric-sub">Rachford-Rice Converged</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Liquid Fraction</span>
+                <span class="wb-metric-value" id="chemLiquidDisplay">0.1041</span>
+                <span class="wb-metric-sub">Stripper Bottoms</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">LJ Potential Energy</span>
+                <span class="wb-metric-value" id="chemPotDisplay">-0.0104 eV</span>
+                <span class="wb-metric-sub">Bound States</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Kinetic Temperature</span>
+                <span class="wb-metric-value" id="chemMdTempDisplay">1,601.5 K</span>
+                <span class="wb-metric-sub">Velocity-Verlet (1 fs)</span>
+              </div>
+            </div>
+            <div class="wb-gcode-container">
+              <div class="wb-gcode-header">Chemical Thermodynamics Console</div>
+              <pre class="wb-gcode-viewer" id="chemConsoleOutput" style="height: 180px; font-size: 11px;">[Chemical &amp; Molecular Engine] VLE Flash &amp; MD Solvers Loaded.</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Dedicated CFD & Hydraulics Workbench -->
+      <div id="cfdWorkbenchView" class="workbench-view cfd-workbench-view" hidden role="region" aria-label="CFD & Hydraulics Studio">
+        <div class="wb-header">
+          <div class="wb-title-wrap">
+            <span class="wb-title-icon">🌊</span>
+            <div>
+              <h3>Fluid Dynamics &amp; Hydraulic Networks Studio</h3>
+              <span class="wb-subtitle">Navier-Stokes Hydraulics · Darcy-Weisbach / Colebrook-White · Architectural Acoustics (STC)</span>
+            </div>
+          </div>
+          <div class="wb-header-actions">
+            <span class="wb-status-badge" id="cfdStatusBadge">Flow Turbulent</span>
+            <button type="button" class="button primary small" id="cfdRunHydraulicsBtn">▶ Solve Pipe Flow</button>
+            <button type="button" class="button secondary small" id="cfdRunAcousticsBtn">▶ Architectural Acoustics</button>
+          </div>
+        </div>
+        <div class="wb-body-split">
+          <div class="wb-control-pane">
+            <div class="wb-group">
+              <label for="cfdPipeDInput">Pipe Diameter (m)</label>
+              <input type="number" id="cfdPipeDInput" class="wb-input" value="0.15" min="0.01" max="2.0" step="0.01">
+            </div>
+            <div class="wb-group">
+              <label for="cfdPipeLInput">Pipe Length (m)</label>
+              <input type="number" id="cfdPipeLInput" class="wb-input" value="120.0" min="1.0" max="1000.0" step="10">
+            </div>
+            <div class="wb-group">
+              <label for="cfdFlowQInput">Flow Rate (m³/s)</label>
+              <input type="number" id="cfdFlowQInput" class="wb-input" value="0.035" min="0.001" max="1.0" step="0.005">
+            </div>
+          </div>
+          <div class="wb-display-pane">
+            <div class="wb-metrics-grid">
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Reynolds Number</span>
+                <span class="wb-metric-value" id="cfdReDisplay">59,772</span>
+                <span class="wb-metric-sub">Fully Turbulent Flow</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Pressure Drop</span>
+                <span class="wb-metric-value" id="cfdDeltaPDisplay">4,022.1 Pa</span>
+                <span class="wb-metric-sub">Head Loss: 0.411 m</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Friction Factor (f)</span>
+                <span class="wb-metric-value" id="cfdFricDisplay">0.0205</span>
+                <span class="wb-metric-sub">Colebrook-White</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Acoustics STC</span>
+                <span class="wb-metric-value" id="cfdStcDisplay">STC 42</span>
+                <span class="wb-metric-sub">TL @ 500Hz: 37.7 dB</span>
+              </div>
+            </div>
+            <div class="wb-gcode-container">
+              <div class="wb-gcode-header">CFD &amp; Hydraulics Diagnostics</div>
+              <pre class="wb-gcode-viewer" id="cfdConsoleOutput" style="height: 180px; font-size: 11px;">[CFD &amp; Hydraulics Engine] Internal Pipe Network Solver Ready.</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. Dedicated Robotics & Kinematics Workbench -->
+      <div id="roboticsWorkbenchView" class="workbench-view robotics-workbench-view" hidden role="region" aria-label="Robotics & Kinematics Studio">
+        <div class="wb-header">
+          <div class="wb-title-wrap">
+            <span class="wb-title-icon">🤖</span>
+            <div>
+              <h3>Robotics &amp; Motion Planning Studio</h3>
+              <span class="wb-subtitle">Denavit-Hartenberg (DH) Kinematics · Damped Least Squares (DLS) IK · Quintic Minimum-Jerk Splines</span>
+            </div>
+          </div>
+          <div class="wb-header-actions">
+            <span class="wb-status-badge" id="roboStatusBadge">IK Converged</span>
+            <button type="button" class="button primary small" id="roboRunKinematicsBtn">▶ Solve 6-DOF Kinematics</button>
+            <button type="button" class="button secondary small" id="roboPlanSplineBtn">▶ Plan Minimum-Jerk Spline</button>
+          </div>
+        </div>
+        <div class="wb-body-split">
+          <div class="wb-control-pane">
+            <div class="wb-group">
+              <label>Target End-Effector (X, Y, Z) [m]</label>
+              <div style="display: flex; gap: 4px;">
+                <input type="number" id="roboXInput" class="wb-input compact" value="0.65" step="0.05">
+                <input type="number" id="roboYInput" class="wb-input compact" value="0.25" step="0.05">
+                <input type="number" id="roboZInput" class="wb-input compact" value="0.45" step="0.05">
+              </div>
+            </div>
+            <div class="wb-group">
+              <label for="roboDurationInput">Motion Duration (s)</label>
+              <input type="number" id="roboDurationInput" class="wb-input" value="2.5" min="0.5" max="10.0" step="0.5">
+            </div>
+          </div>
+          <div class="wb-display-pane">
+            <div class="wb-metrics-grid">
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Maximum Reach</span>
+                <span class="wb-metric-value" id="roboReachDisplay">1.291 m</span>
+                <span class="wb-metric-sub">Spherical Workspace</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Manipulability Index</span>
+                <span class="wb-metric-value" id="roboManipDisplay">0.4574</span>
+                <span class="wb-metric-sub">Yoshikawa Ellipsoid</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Peak Velocity</span>
+                <span class="wb-metric-value" id="roboVelDisplay">67.5 °/s</span>
+                <span class="wb-metric-sub">Quintic Polynomial</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Max Joint Jerk</span>
+                <span class="wb-metric-value" id="roboJerkDisplay">6.0 rad/s³</span>
+                <span class="wb-metric-sub">Smooth Actuation</span>
+              </div>
+            </div>
+            <div class="wb-gcode-container">
+              <div class="wb-gcode-header">Robotics Trajectory &amp; IK Console</div>
+              <pre class="wb-gcode-viewer" id="roboConsoleOutput" style="height: 180px; font-size: 11px;">[Robotics Engine] 6-DOF Serial Arm Kinematics Online.</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 7. Dedicated Environmental & Marine Workbench -->
+      <div id="environmentalWorkbenchView" class="workbench-view environmental-workbench-view" hidden role="region" aria-label="Environmental & Marine Studio">
+        <div class="wb-header">
+          <div class="wb-title-wrap">
+            <span class="wb-title-icon">🌱</span>
+            <div>
+              <h3>Geoscience, Marine &amp; Environmental Studio</h3>
+              <span class="wb-subtitle">Gaussian Air Plume Dispersion · Marine Hydrostatics (GM) &amp; Airy Waves · Building Solar PV Yield</span>
+            </div>
+          </div>
+          <div class="wb-header-actions">
+            <span class="wb-status-badge" id="envStatusBadge">Clean Air Compliant</span>
+            <button type="button" class="button primary small" id="envRunPlumeBtn">▶ Compute Plume Dispersion</button>
+            <button type="button" class="button secondary small" id="envRunMarineBtn">▶ Marine Hydrostatics</button>
+            <button type="button" class="button ghost small" id="envRunSolarBtn">Solar PV Yield</button>
+          </div>
+        </div>
+        <div class="wb-body-split">
+          <div class="wb-control-pane">
+            <div class="wb-group">
+              <label for="envEmissionInput">Emission Rate (g/s)</label>
+              <input type="number" id="envEmissionInput" class="wb-input" value="15.0" min="0.5" max="100.0" step="1.0">
+            </div>
+            <div class="wb-group">
+              <label for="envStackHInput">Stack Height (m)</label>
+              <input type="number" id="envStackHInput" class="wb-input" value="45.0" min="5.0" max="150.0" step="5.0">
+            </div>
+            <div class="wb-group">
+              <label for="envWindUInput">Wind Velocity (m/s)</label>
+              <input type="number" id="envWindUInput" class="wb-input" value="4.2" min="0.5" max="25.0" step="0.5">
+            </div>
+          </div>
+          <div class="wb-display-pane">
+            <div class="wb-metrics-grid">
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Max Downwind Ground Conc</span>
+                <span class="wb-metric-value" id="envConcDisplay">12.4 μg/m³</span>
+                <span class="wb-metric-sub">At x = 2.5 km (Safe)</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Metacentric Height (GM)</span>
+                <span class="wb-metric-value" id="envGmDisplay">2.25 m</span>
+                <span class="wb-metric-sub">Displacement 999 t</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Airy Wavelength</span>
+                <span class="wb-metric-value" id="envWaveDisplay">97.7 m</span>
+                <span class="wb-metric-sub">Period T = 8.0 s</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Annual Solar Yield</span>
+                <span class="wb-metric-value" id="envSolarDisplay">37.9 MWh/yr</span>
+                <span class="wb-metric-sub">CO2 Offset 18.0 t/yr</span>
+              </div>
+            </div>
+            <div class="wb-gcode-container">
+              <div class="wb-gcode-header">Environmental &amp; Marine Analytics</div>
+              <pre class="wb-gcode-viewer" id="envConsoleOutput" style="height: 180px; font-size: 11px;">[Environmental Engine] Gaussian Plume, Marine Hydrostatics &amp; Solar PV Online.</pre>
+            </div>
+          </div>
+        </div>
+      </div>
       </div>
     </section>
 

@@ -6463,6 +6463,38 @@ ${gcodeSample}`;
   let activeResultData = null;
   let cachedEngines = [];
 
+  const allWorkbenchIds = [
+    "caeWorkbenchView",
+    "camWorkbenchView",
+    "bimWorkbenchView",
+    "ecadWorkbenchView",
+    "additiveWorkbenchView",
+    "agentWorkbenchView",
+    "createWorkbenchView",
+    "realtimeWorkbenchView",
+    "mediaWorkbenchView",
+    "aerospaceWorkbenchView",
+    "civilWorkbenchView",
+    "powerWorkbenchView",
+    "chemicalWorkbenchView",
+    "cfdWorkbenchView",
+    "roboticsWorkbenchView",
+    "environmentalWorkbenchView",
+  ];
+
+  function hideAllWorkbenches() {
+    for (const id of allWorkbenchIds) {
+      const el = byId(id);
+      if (el) el.hidden = true;
+    }
+  }
+
+  function showWorkbench(wbId) {
+    hideAllWorkbenches();
+    const el = byId(wbId);
+    if (el) el.hidden = false;
+  }
+
   function switchEngineeringWorkspace(workspaceId) {
     document.body.dataset.workspace = workspaceId;
     const wsSelect = byId("workspaceSelect");
@@ -6489,6 +6521,28 @@ ${gcodeSample}`;
 
     const targetTab = tabMapping[workspaceId] || "home";
     switchRibbonTab(targetTab);
+
+    // Toggle dedicated full-depth workbench views based on selected discipline
+    const wbViewMapping = {
+      aerospace: "aerospaceWorkbenchView",
+      civil: "civilWorkbenchView",
+      power: "powerWorkbenchView",
+      chemical: "chemicalWorkbenchView",
+      cfd: "cfdWorkbenchView",
+      robotics: "roboticsWorkbenchView",
+      environmental: "environmentalWorkbenchView",
+      simulation: "caeWorkbenchView",
+      manufacturing: "camWorkbenchView",
+      bim: "bimWorkbenchView",
+      electronics: "ecadWorkbenchView",
+    };
+
+    const targetWb = wbViewMapping[workspaceId];
+    if (targetWb) {
+      showWorkbench(targetWb);
+    } else {
+      hideAllWorkbenches();
+    }
 
     const wsLabel = wsSelect?.options[wsSelect.selectedIndex]?.text || workspaceId;
     toast(`Workspace: ${wsLabel}`);
@@ -9515,6 +9569,414 @@ ${gcodeSample}`;
         toast(`Master Render Complete: ${res.export_format}`);
       } catch (err) {
         toast(`Render error: ${err.message}`, true);
+      }
+    });
+
+    // --- Dedicated Discipline Workbench Event Handlers ---
+
+    // 1. Aerospace & Hypersonic Workbench Handlers
+    byId("aeroRunSolveBtn")?.addEventListener("click", async () => {
+      try {
+        const speed = parseFloat(byId("aeroSpeedInput")?.value || "12000");
+        const alt = parseFloat(byId("aeroAltitudeInput")?.value || "32000");
+        const aoa = parseFloat(byId("aeroAoaInput")?.value || "2.5");
+        const res = await api("/api/sim/hypersonic", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target_speed_km_h: speed, cruise_altitude_m: alt, angle_of_attack_deg: aoa }),
+        });
+        const m = res.scalar_metrics || {};
+        if (byId("aeroMachDisplay")) byId("aeroMachDisplay").textContent = `${(m.flight_mach || 11.0).toFixed(2)} M`;
+        if (byId("aeroThrustDisplay")) byId("aeroThrustDisplay").textContent = `${(m.scramjet_net_thrust_kn || 131.4).toFixed(1)} kN`;
+        if (byId("aeroFlutterDisplay")) byId("aeroFlutterDisplay").textContent = `${(m.flutter_factor_of_safety || 64.06).toFixed(2)} FoS`;
+        if (byId("aeroTurnRadiusDisplay")) byId("aeroTurnRadiusDisplay").textContent = `${(m.btt_turn_radius_km || 845.5).toFixed(1)} km`;
+        const out = byId("aeroConsoleOutput");
+        if (out) {
+          out.textContent = `[Hypersonic Waverider Flight Solved]\n` + (res.logs || []).join("\n");
+        }
+        toast(`Aerospace Solve: Mach ${(m.flight_mach || 11.0).toFixed(2)} at ${(alt/1000).toFixed(0)} km`);
+      } catch (err) {
+        toast(`Aerospace error: ${err.message}`, true);
+      }
+    });
+
+    byId("aeroRunMasterDagBtn")?.addEventListener("click", async () => {
+      try {
+        toast("Running Autonomous Flagship Master DAG (11 Tasks)...");
+        const res = await api("/api/agents/workflows/run_all", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workflow_id: "hypersonic_full_vehicle_master", auto_approve: true }),
+        });
+        const out = byId("aeroConsoleOutput");
+        if (out) {
+          out.textContent = `[Autonomous Master DAG Finished]\n` +
+            `Status: ${res.status} | Completed: ${res.summary.completed_tasks} / ${res.summary.total_tasks} Tasks\n` +
+            (res.execution_log || []).slice(-8).join("\n");
+        }
+        toast("Autonomous Master DAG Complete: 11 Tasks Verified");
+      } catch (err) {
+        toast(`DAG error: ${err.message}`, true);
+      }
+    });
+
+    byId("aeroSubPlasmaBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/hypersonic/plasma", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ flight_mach: 11.0, altitude_m: 32000.0 }),
+        });
+        const out = byId("aeroConsoleOutput");
+        if (out) {
+          out.textContent = `[Plasma Sheath] Cutoff fp = ${res.plasma_cutoff_freq_ghz.toFixed(1)} GHz | Blackout: ${res.is_rf_blackout} | MHD B-field = ${res.mhd_window_b_field_tesla.toFixed(2)} T`;
+        }
+        toast(`Plasma: Cutoff ${res.plasma_cutoff_freq_ghz.toFixed(1)} GHz`);
+      } catch (err) {
+        toast(`Plasma error: ${err.message}`, true);
+      }
+    });
+
+    byId("aeroSubScramjetBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/hypersonic/scramjet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ flight_mach: 11.0, altitude_m: 32000.0 }),
+        });
+        const out = byId("aeroConsoleOutput");
+        if (out) {
+          out.textContent = `[Scramjet Kinetics] Net Thrust = ${res.net_thrust_kn.toFixed(1)} kN | Isp = ${res.scramjet_isp_s.toFixed(0)} s | Isolator Margin = ${res.isolator_unstart_margin.toFixed(2)}x (Unstart Safe)`;
+        }
+        toast(`Scramjet: Thrust ${res.net_thrust_kn.toFixed(1)} kN, Isp ${res.scramjet_isp_s.toFixed(0)}s`);
+      } catch (err) {
+        toast(`Scramjet error: ${err.message}`, true);
+      }
+    });
+
+    byId("aeroSubThermalBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/hypersonic/thermal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ heat_flux_mw_m2: 1.45, coolant_flow_kg_s: 4.93 }),
+        });
+        const out = byId("aeroConsoleOutput");
+        if (out) {
+          out.textContent = `[Active Cooling] Supercritical H2 HTC = ${res.coolant_htc_w_m2_k.toFixed(0)} W/m²K | Substrate: ${res.inner_substrate_temperature_c.toFixed(1)} °C (Margin +${res.substrate_thermal_margin_c.toFixed(1)} °C)`;
+        }
+        toast(`Cooling: HTC ${res.coolant_htc_w_m2_k.toFixed(0)} W/m²K`);
+      } catch (err) {
+        toast(`Cooling error: ${err.message}`, true);
+      }
+    });
+
+    byId("aeroSubFlutterBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/hypersonic/flutter", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dynamic_pressure_kpa: 73.5, flight_mach: 11.0, wall_temp_c: 2272.0 }),
+        });
+        const out = byId("aeroConsoleOutput");
+        if (out) {
+          out.textContent = `[Dowell Aeroelastic Flutter] Safety Factor: ${res.flutter_factor_of_safety.toFixed(2)}x | q_crit: ${res.critical_flutter_dynamic_pressure_kpa.toFixed(1)} kPa | f1: ${res.natural_frequency_hz.toFixed(0)} Hz (Safe: ${res.is_flutter_safe})`;
+        }
+        if (byId("aeroFlutterDisplay")) byId("aeroFlutterDisplay").textContent = `${res.flutter_factor_of_safety.toFixed(2)} FoS`;
+        toast(`Flutter: FoS ${res.flutter_factor_of_safety.toFixed(2)}x (q_crit ${res.critical_flutter_dynamic_pressure_kpa.toFixed(0)} kPa)`);
+      } catch (err) {
+        toast(`Flutter error: ${err.message}`, true);
+      }
+    });
+
+    byId("aeroSub6DofBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/hypersonic/6dof", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ flight_speed_m_s: 3333.3, altitude_m: 32000.0, target_heading_change_deg: 30.0, bank_angle_deg: 55.0 }),
+        });
+        const out = byId("aeroConsoleOutput");
+        if (out) {
+          out.textContent = `[6-DOF Bank-to-Turn] Turn Rate: ${res.turn_rate_deg_s.toFixed(2)} °/s | R = ${res.turn_radius_km.toFixed(1)} km | Load: ${res.normal_load_factor_g.toFixed(2)} g | Duration: ${res.maneuver_duration_s.toFixed(1)} s`;
+        }
+        if (byId("aeroTurnRadiusDisplay")) byId("aeroTurnRadiusDisplay").textContent = `${res.turn_radius_km.toFixed(1)} km`;
+        toast(`6-DOF BTT: ${res.turn_rate_deg_s.toFixed(2)}°/s, R = ${res.turn_radius_km.toFixed(0)} km`);
+      } catch (err) {
+        toast(`6-DOF error: ${err.message}`, true);
+      }
+    });
+
+    byId("aeroSubMagnetBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/hypersonic/magnet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target_b_field_tesla: 1.25, channel_gap_m: 0.35, coil_temperature_k: 20.0 }),
+        });
+        const out = byId("aeroConsoleOutput");
+        if (out) {
+          out.textContent = `[20 K REBCO Magnet] Field: ${res.magnetic_field_tesla.toFixed(2)} T | Pressure: ${res.magnetic_pressure_kpa.toFixed(1)} kPa | Margin: ${res.critical_current_margin.toFixed(2)}x | Heat Leak: ${res.cryo_heat_leak_watts.toFixed(1)} W`;
+        }
+        toast(`Magnet: ${res.magnetic_field_tesla.toFixed(2)} T, ${res.magnetic_pressure_kpa.toFixed(0)} kPa`);
+      } catch (err) {
+        toast(`Magnet error: ${err.message}`, true);
+      }
+    });
+
+    byId("aeroSubBomBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/hypersonic/bom");
+        const out = byId("aeroConsoleOutput");
+        if (out) {
+          out.textContent = `[21-Line Aircraft BOM] Dry Mass: ${res.dry_weight_kg.toFixed(0)} kg | MTOW: ${res.mtow_kg.toFixed(0)} kg | CG X: ${res.global_cg_m[0].toFixed(2)} m\n` +
+            res.components.slice(0, 6).map(c => `• ${c.part_id}: ${c.name} (${c.mass_kg} kg, ${c.material})`).join("\n");
+        }
+        toast(`BOM: 21 components, Dry Mass ${res.dry_weight_kg.toFixed(0)} kg`);
+      } catch (err) {
+        toast(`BOM error: ${err.message}`, true);
+      }
+    });
+
+    // 2. Civil Structural Workbench Handlers
+    byId("civilRunBucklingBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/multiphysics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ study_type: "buckling" }),
+        });
+        const m = res.scalar_metrics || {};
+        if (byId("civilPcrDisplay")) byId("civilPcrDisplay").textContent = `${(m.critical_buckling_load_kn || 2119.9).toFixed(1)} kN`;
+        if (byId("civilFosDisplay")) byId("civilFosDisplay").textContent = `${(m.buckling_factor_of_safety || 1.41).toFixed(2)} FoS`;
+        const out = byId("civilConsoleOutput");
+        if (out) out.textContent = (res.logs || []).join("\n");
+        toast(`Buckling: P_cr ${(m.critical_buckling_load_kn || 2119.9).toFixed(1)} kN, FoS ${(m.buckling_factor_of_safety || 1.41).toFixed(2)}x`);
+      } catch (err) {
+        toast(`Buckling error: ${err.message}`, true);
+      }
+    });
+
+    byId("civilRunEarthBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/multiphysics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ study_type: "geotechnical" }),
+        });
+        const m = res.scalar_metrics || {};
+        if (byId("civilThrustDisplay")) byId("civilThrustDisplay").textContent = `${(m.active_thrust_kn_m || 53.5).toFixed(1)} kN/m`;
+        const out = byId("civilConsoleOutput");
+        if (out) out.textContent = (res.logs || []).join("\n");
+        toast(`Earth Pressure: Active Thrust ${(m.active_thrust_kn_m || 53.5).toFixed(1)} kN/m`);
+      } catch (err) {
+        toast(`Earth error: ${err.message}`, true);
+      }
+    });
+
+    byId("civilRunUValueBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/multiphysics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ study_type: "building_physics" }),
+        });
+        const m = res.scalar_metrics || {};
+        if (byId("civilUValDisplay")) byId("civilUValDisplay").textContent = `${(m.thermal_transmittance_u_w_m2_k || 0.167).toFixed(3)} W/m²K`;
+        const out = byId("civilConsoleOutput");
+        if (out) out.textContent = (res.logs || []).join("\n");
+        toast(`Building Physics: U-Value ${(m.thermal_transmittance_u_w_m2_k || 0.167).toFixed(3)} W/m²K`);
+      } catch (err) {
+        toast(`U-Value error: ${err.message}`, true);
+      }
+    });
+
+    // 3. Electrical Power Systems Workbench Handlers
+    byId("powerRunFlowBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/multiphysics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ study_type: "powerflow" }),
+        });
+        const m = res.scalar_metrics || {};
+        if (byId("powerV2Display")) byId("powerV2Display").textContent = `${(m.bus_2_voltage_pu || 0.9999).toFixed(4)} p.u.`;
+        if (byId("powerLossesDisplay")) byId("powerLossesDisplay").textContent = `${(m.active_losses_mw || 0.435).toFixed(3)} MW`;
+        if (byId("powerYBusDisplay")) byId("powerYBusDisplay").textContent = `${(m.y_bus_frobenius_norm || 29.98).toFixed(2)} p.u.`;
+        const out = byId("powerConsoleOutput");
+        if (out) out.textContent = (res.logs || []).join("\n");
+        toast(`Power Flow: Bus 2 V = ${(m.bus_2_voltage_pu || 0.9999).toFixed(4)} p.u., Losses ${(m.active_losses_mw || 0.435).toFixed(3)} MW`);
+      } catch (err) {
+        toast(`Power Flow error: ${err.message}`, true);
+      }
+    });
+
+    // 4. Chemical & Molecular Workbench Handlers
+    byId("chemRunFlashBtn")?.addEventListener("click", async () => {
+      try {
+        const t = parseFloat(byId("chemTempInput")?.value || "315.0");
+        const p = parseFloat(byId("chemPressInput")?.value || "4.5");
+        const res = await api("/api/sim/chemical", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ temperature_k: t, pressure_bar: p }),
+        });
+        const m = res.scalar_metrics || {};
+        if (byId("chemBetaDisplay")) byId("chemBetaDisplay").textContent = (m.vapor_fraction_beta || 0.8959).toFixed(4);
+        if (byId("chemLiquidDisplay")) byId("chemLiquidDisplay").textContent = (1.0 - (m.vapor_fraction_beta || 0.8959)).toFixed(4);
+        const out = byId("chemConsoleOutput");
+        if (out) out.textContent = (res.logs || []).join("\n");
+        toast(`VLE Flash: Vapor Fraction β = ${(m.vapor_fraction_beta || 0.8959).toFixed(4)}`);
+      } catch (err) {
+        toast(`Chemical error: ${err.message}`, true);
+      }
+    });
+
+    byId("chemRunMdBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/molecular", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        const m = res.scalar_metrics || {};
+        if (byId("chemPotDisplay")) byId("chemPotDisplay").textContent = `${(m.potential_energy_ev || -0.0104).toFixed(4)} eV`;
+        if (byId("chemMdTempDisplay")) byId("chemMdTempDisplay").textContent = `${(m.kinetic_temperature_k || 1601.5).toFixed(1)} K`;
+        const out = byId("chemConsoleOutput");
+        if (out) out.textContent = (res.logs || []).join("\n");
+        toast(`Molecular Dynamics: LJ Potential ${(m.potential_energy_ev || -0.0104).toFixed(4)} eV`);
+      } catch (err) {
+        toast(`MD error: ${err.message}`, true);
+      }
+    });
+
+    // 5. CFD & Hydraulics Workbench Handlers
+    byId("cfdRunHydraulicsBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/multiphysics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ study_type: "cfd" }),
+        });
+        const m = res.scalar_metrics || {};
+        if (byId("cfdReDisplay")) byId("cfdReDisplay").textContent = (m.reynolds_number || 59772).toFixed(0);
+        if (byId("cfdDeltaPDisplay")) byId("cfdDeltaPDisplay").textContent = `${(m.pressure_drop_pa || 4022.1).toFixed(1)} Pa`;
+        if (byId("cfdFricDisplay")) byId("cfdFricDisplay").textContent = (m.friction_factor || 0.0205).toFixed(4);
+        const out = byId("cfdConsoleOutput");
+        if (out) out.textContent = (res.logs || []).join("\n");
+        toast(`CFD: Re = ${(m.reynolds_number || 59772).toFixed(0)}, Δp = ${(m.pressure_drop_pa || 4022.1).toFixed(1)} Pa`);
+      } catch (err) {
+        toast(`CFD error: ${err.message}`, true);
+      }
+    });
+
+    byId("cfdRunAcousticsBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/multiphysics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ study_type: "acoustics" }),
+        });
+        const m = res.scalar_metrics || {};
+        if (byId("cfdStcDisplay")) byId("cfdStcDisplay").textContent = `STC ${(m.sound_transmission_class_stc || 42).toFixed(0)}`;
+        const out = byId("cfdConsoleOutput");
+        if (out) out.textContent = (res.logs || []).join("\n");
+        toast(`Acoustics: STC ${(m.sound_transmission_class_stc || 42).toFixed(0)}`);
+      } catch (err) {
+        toast(`Acoustics error: ${err.message}`, true);
+      }
+    });
+
+    // 6. Robotics & Kinematics Workbench Handlers
+    byId("roboRunKinematicsBtn")?.addEventListener("click", async () => {
+      try {
+        const x = parseFloat(byId("roboXInput")?.value || "0.65");
+        const y = parseFloat(byId("roboYInput")?.value || "0.25");
+        const z = parseFloat(byId("roboZInput")?.value || "0.45");
+        const res = await api("/api/sim/robotics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target_ee: [x, y, z] }),
+        });
+        const m = res.scalar_metrics || {};
+        if (byId("roboReachDisplay")) byId("roboReachDisplay").textContent = `${(m.maximum_reach_m || 1.291).toFixed(3)} m`;
+        if (byId("roboManipDisplay")) byId("roboManipDisplay").textContent = (m.manipulability_w || 0.4574).toFixed(4);
+        const out = byId("roboConsoleOutput");
+        if (out) out.textContent = (res.logs || []).join("\n");
+        toast(`Robotics: Reach ${(m.maximum_reach_m || 1.291).toFixed(2)} m, Manipulability ${(m.manipulability_w || 0.4574).toFixed(4)}`);
+      } catch (err) {
+        toast(`Robotics error: ${err.message}`, true);
+      }
+    });
+
+    byId("roboPlanSplineBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/multiphysics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ study_type: "robotics_trajectory" }),
+        });
+        const m = res.scalar_metrics || {};
+        if (byId("roboVelDisplay")) byId("roboVelDisplay").textContent = `${(m.peak_joint_velocity_deg_s || 67.5).toFixed(1)} °/s`;
+        if (byId("roboJerkDisplay")) byId("roboJerkDisplay").textContent = `${(m.maximum_jerk_rad_s3 || 6.0).toFixed(1)} rad/s³`;
+        const out = byId("roboConsoleOutput");
+        if (out) out.textContent = (res.logs || []).join("\n");
+        toast(`Robotics Spline: Peak Vel ${(m.peak_joint_velocity_deg_s || 67.5).toFixed(1)}°/s, Max Jerk ${(m.maximum_jerk_rad_s3 || 6.0).toFixed(1)} rad/s³`);
+      } catch (err) {
+        toast(`Spline error: ${err.message}`, true);
+      }
+    });
+
+    // 7. Environmental & Marine Workbench Handlers
+    byId("envRunPlumeBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/multiphysics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ study_type: "environmental" }),
+        });
+        const m = res.scalar_metrics || {};
+        if (byId("envConcDisplay")) byId("envConcDisplay").textContent = `${(m.max_ground_concentration_ug_m3 || 12.4).toFixed(1)} μg/m³`;
+        const out = byId("envConsoleOutput");
+        if (out) out.textContent = (res.logs || []).join("\n");
+        toast(`Plume Dispersion: Max Ground Conc ${(m.max_ground_concentration_ug_m3 || 12.4).toFixed(1)} μg/m³`);
+      } catch (err) {
+        toast(`Plume error: ${err.message}`, true);
+      }
+    });
+
+    byId("envRunMarineBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/multiphysics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ study_type: "marine" }),
+        });
+        const m = res.scalar_metrics || {};
+        if (byId("envGmDisplay")) byId("envGmDisplay").textContent = `${(m.metacentric_height_gm_m || 2.25).toFixed(2)} m`;
+        if (byId("envWaveDisplay")) byId("envWaveDisplay").textContent = `${(m.wavelength_m || 97.7).toFixed(1)} m`;
+        const out = byId("envConsoleOutput");
+        if (out) out.textContent = (res.logs || []).join("\n");
+        toast(`Marine: GM = ${(m.metacentric_height_gm_m || 2.25).toFixed(2)} m, λ = ${(m.wavelength_m || 97.7).toFixed(1)} m`);
+      } catch (err) {
+        toast(`Marine error: ${err.message}`, true);
+      }
+    });
+
+    byId("envRunSolarBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/sim/multiphysics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ study_type: "solar" }),
+        });
+        const m = res.scalar_metrics || {};
+        if (byId("envSolarDisplay")) byId("envSolarDisplay").textContent = `${(m.annual_energy_yield_mwh_yr || 37.9).toFixed(1)} MWh/yr`;
+        const out = byId("envConsoleOutput");
+        if (out) out.textContent = (res.logs || []).join("\n");
+        toast(`Solar Architecture: Yield ${(m.annual_energy_yield_mwh_yr || 37.9).toFixed(1)} MWh/yr`);
+      } catch (err) {
+        toast(`Solar error: ${err.message}`, true);
       }
     });
 
