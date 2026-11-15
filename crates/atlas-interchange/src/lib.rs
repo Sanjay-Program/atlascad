@@ -21,6 +21,8 @@ pub enum ExportFormat {
     WavefrontObj,
     MaterialX,
     OpenTimelineIo,
+    StepIso10303,
+    ThreeMfXml,
 }
 
 /// Universal OpenUSD (.usda) ASCII exporter
@@ -215,6 +217,112 @@ impl GltfExporter {
     }
 }
 
+/// Standard ISO 10303-21 STEP Part 21 physical file exporter (AP203/AP214)
+pub struct StepExporter;
+
+impl StepExporter {
+    pub fn mesh_to_step(mesh: &PolyMesh, model_name: &str) -> String {
+        let mut out = String::new();
+        out.push_str("ISO-10303-21;\nHEADER;\n");
+        out.push_str("FILE_DESCRIPTION(('AtlasCAD ISO 10303-21 STEP Model','AP214'),'2;1');\n");
+        out.push_str(&format!(
+            "FILE_NAME('{model_name}.stp','2026-11-15T00:00:00',('AtlasCAD'),('AtlasCAD Aerospace'),'AtlasCAD B-Rep STEP Kernel v0.1.0','AtlasCAD','');\n"
+        ));
+        out.push_str("FILE_SCHEMA(('CONFIG_CONTROL_DESIGN'));\nENDSEC;\nDATA;\n");
+        out.push_str("#1=APPLICATION_CONTEXT('configuration controlled 3d designs of mechanical parts and assemblies');\n");
+        out.push_str("#2=APPLICATION_PROTOCOL_DEFINITION('international standard','config_control_design',1994,#1);\n");
+
+        let mut entity_id = 10;
+        let mut vertex_ids = Vec::with_capacity(mesh.positions.len());
+
+        for p in &mesh.positions {
+            let cp_id = entity_id;
+            entity_id += 1;
+            out.push_str(&format!("#{cp_id}=CARTESIAN_POINT('',({:.6},{:.6},{:.6}));\n", p[0], p[1], p[2]));
+
+            let vp_id = entity_id;
+            entity_id += 1;
+            out.push_str(&format!("#{vp_id}=VERTEX_POINT('',#{cp_id});\n"));
+            vertex_ids.push(vp_id);
+        }
+
+        let mut face_ids = Vec::new();
+        for face in &mesh.faces {
+            if face.len() < 3 {
+                continue;
+            }
+            let mut edge_point_refs = Vec::new();
+            for &v_idx in face {
+                if let Some(&vp_id) = vertex_ids.get(v_idx as usize) {
+                    edge_point_refs.push(format!("#{vp_id}"));
+                }
+            }
+            let loop_id = entity_id;
+            entity_id += 1;
+            out.push_str(&format!("#{loop_id}=POLY_LOOP('',({}));\n", edge_point_refs.join(",")));
+
+            let bound_id = entity_id;
+            entity_id += 1;
+            out.push_str(&format!("#{bound_id}=FACE_OUTER_BOUND('',#{loop_id},.T.);\n"));
+
+            let face_id = entity_id;
+            entity_id += 1;
+            out.push_str(&format!("#{face_id}=ADVANCED_FACE('',(#{bound_id}));\n"));
+            face_ids.push(face_id);
+        }
+
+        let shell_id = entity_id;
+        entity_id += 1;
+        let faces_str = face_ids.iter().map(|id| format!("#{id}")).collect::<Vec<_>>().join(",");
+        out.push_str(&format!("#{shell_id}=CLOSED_SHELL('',({faces_str}));\n"));
+
+        let brep_id = entity_id;
+        out.push_str(&format!("#{brep_id}=MANIFOLD_SOLID_BREP('{model_name}',#{shell_id});\n"));
+
+        out.push_str("ENDSEC;\nEND-ISO-10303-21;\n");
+        out
+    }
+}
+
+/// ASTM/ISO 52915 3D Manufacturing Format (3MF) XML exporter
+pub struct ThreeMfExporter;
+
+impl ThreeMfExporter {
+    pub fn mesh_to_3mf_xml(mesh: &PolyMesh, model_name: &str) -> String {
+        let mut out = String::new();
+        out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        out.push_str("<model unit=\"millimeter\" xml:lang=\"en-US\" xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\">\n");
+        out.push_str(&format!("  <metadata name=\"Title\">{model_name}</metadata>\n"));
+        out.push_str("  <metadata name=\"Application\">AtlasCAD Manufacturing Studio</metadata>\n");
+        out.push_str("  <resources>\n");
+        out.push_str("    <object id=\"1\" type=\"model\">\n");
+        out.push_str("      <mesh>\n");
+        out.push_str("        <vertices>\n");
+        for p in &mesh.positions {
+            out.push_str(&format!("          <vertex x=\"{:.4}\" y=\"{:.4}\" z=\"{:.4}\" />\n", p[0], p[1], p[2]));
+        }
+        out.push_str("        </vertices>\n");
+        out.push_str("        <triangles>\n");
+        for face in &mesh.faces {
+            if face.len() >= 3 {
+                out.push_str(&format!("          <triangle v1=\"{}\" v2=\"{}\" v3=\"{}\" />\n", face[0], face[1], face[2]));
+                if face.len() == 4 {
+                    out.push_str(&format!("          <triangle v1=\"{}\" v2=\"{}\" v3=\"{}\" />\n", face[0], face[2], face[3]));
+                }
+            }
+        }
+        out.push_str("        </triangles>\n");
+        out.push_str("      </mesh>\n");
+        out.push_str("    </object>\n");
+        out.push_str("  </resources>\n");
+        out.push_str("  <build>\n");
+        out.push_str("    <item objectid=\"1\" />\n");
+        out.push_str("  </build>\n");
+        out.push_str("</model>\n");
+        out
+    }
+}
+
 const BASE64_ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 fn to_base64(data: &[u8]) -> String {
@@ -283,5 +391,27 @@ mod tests {
             assert!(g.contains("\"POSITION\""));
             assert!(g.contains("data:application/octet-stream;base64"));
         }
+    }
+
+    #[test]
+    fn test_step_and_threemf_export() {
+        let mut mesh = PolyMesh::new("BoxSolid");
+        let _ = mesh.add_vertex([0.0, 0.0, 0.0]);
+        let _ = mesh.add_vertex([10.0, 0.0, 0.0]);
+        let _ = mesh.add_vertex([10.0, 10.0, 0.0]);
+        let _ = mesh.add_vertex([0.0, 10.0, 0.0]);
+        let _ = mesh.add_face(vec![0, 1, 2, 3]);
+
+        let step = StepExporter::mesh_to_step(&mesh, "BoxSolid");
+        assert!(step.contains("ISO-10303-21;"));
+        assert!(step.contains("CONFIG_CONTROL_DESIGN"));
+        assert!(step.contains("MANIFOLD_SOLID_BREP"));
+        assert!(step.contains("CARTESIAN_POINT"));
+
+        let threemf = ThreeMfExporter::mesh_to_3mf_xml(&mesh, "BoxSolid");
+        assert!(threemf.contains("<model unit=\"millimeter\""));
+        assert!(threemf.contains("<object id=\"1\""));
+        assert!(threemf.contains("<vertex x=\"10.0000\""));
+        assert!(threemf.contains("<triangle v1=\"0\""));
     }
 }

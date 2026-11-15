@@ -2308,6 +2308,70 @@ impl StudioState {
         Ok((bytes, export_name(&self.project.name)))
     }
 
+    fn step(&mut self) -> Result<(Vec<u8>, String), StudioError> {
+        if self.project.features().is_empty() {
+            return Err(StudioError::BadRequest(
+                "this project has no solid to export".into(),
+            ));
+        }
+        let build = self
+            .project
+            .build_with_cache(&mut self.kernel, &mut self.cache)?;
+        if let Some(failure) = build.failed {
+            return Err(StudioError::BadRequest(format!(
+                "feature {} cannot be rebuilt, so the export would not match the model: {}",
+                failure.id, failure.message
+            )));
+        }
+        let mesh = build
+            .mesh
+            .ok_or_else(|| StudioError::BadRequest("this project has no solid to export".into()))?;
+
+        let mut poly = atlas_creative_core::mesh::PolyMesh::new(&self.project.name);
+        for p in &mesh.positions {
+            let _ = poly.add_vertex(*p);
+        }
+        for tri in &mesh.triangles {
+            let _ = poly.add_face(vec![tri[0], tri[1], tri[2]]);
+        }
+
+        let step_text = atlas_interchange::StepExporter::mesh_to_step(&poly, &self.project.name);
+        let filename = format!("{}.stp", export_stem(&self.project.name));
+        Ok((step_text.into_bytes(), filename))
+    }
+
+    fn threemf(&mut self) -> Result<(Vec<u8>, String), StudioError> {
+        if self.project.features().is_empty() {
+            return Err(StudioError::BadRequest(
+                "this project has no solid to export".into(),
+            ));
+        }
+        let build = self
+            .project
+            .build_with_cache(&mut self.kernel, &mut self.cache)?;
+        if let Some(failure) = build.failed {
+            return Err(StudioError::BadRequest(format!(
+                "feature {} cannot be rebuilt, so the export would not match the model: {}",
+                failure.id, failure.message
+            )));
+        }
+        let mesh = build
+            .mesh
+            .ok_or_else(|| StudioError::BadRequest("this project has no solid to export".into()))?;
+
+        let mut poly = atlas_creative_core::mesh::PolyMesh::new(&self.project.name);
+        for p in &mesh.positions {
+            let _ = poly.add_vertex(*p);
+        }
+        for tri in &mesh.triangles {
+            let _ = poly.add_face(vec![tri[0], tri[1], tri[2]]);
+        }
+
+        let threemf_text = atlas_interchange::ThreeMfExporter::mesh_to_3mf_xml(&poly, &self.project.name);
+        let filename = format!("{}.3mf", export_stem(&self.project.name));
+        Ok((threemf_text.into_bytes(), filename))
+    }
+
     fn export_davinci_resolve(
         &self,
         timebase_fps: Option<f64>,
@@ -5781,6 +5845,22 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
         },
         ("GET", "/api/export/stl") => match with_state(state, |state| state.stl()) {
             Ok((bytes, filename)) => http::Response::new(200, "OK", "model/stl", bytes)
+                .with_header(
+                    "Content-Disposition",
+                    format!("attachment; filename=\"{filename}\""),
+                ),
+            Err(error) => error_response(&error),
+        },
+        ("GET", "/api/export/step") => match with_state(state, |state| state.step()) {
+            Ok((bytes, filename)) => http::Response::new(200, "OK", "application/step", bytes)
+                .with_header(
+                    "Content-Disposition",
+                    format!("attachment; filename=\"{filename}\""),
+                ),
+            Err(error) => error_response(&error),
+        },
+        ("GET", "/api/export/3mf") => match with_state(state, |state| state.threemf()) {
+            Ok((bytes, filename)) => http::Response::new(200, "OK", "model/3mf", bytes)
                 .with_header(
                     "Content-Disposition",
                     format!("attachment; filename=\"{filename}\""),

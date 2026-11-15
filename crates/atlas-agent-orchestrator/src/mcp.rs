@@ -206,6 +206,16 @@ impl McpServer {
                 }),
             },
             McpToolDefinition {
+                name: "atlas_export_step".into(),
+                description: "Export active 3D model as standardized ISO 10303-21 STEP Part 21 (AP203/AP214) exchange file".into(),
+                input_schema: serde_json::json!({ "type": "object" }),
+            },
+            McpToolDefinition {
+                name: "atlas_export_threemf".into(),
+                description: "Export active 3D model as ASTM/ISO 52915 3MF additive manufacturing XML package".into(),
+                input_schema: serde_json::json!({ "type": "object" }),
+            },
+            McpToolDefinition {
                 name: "atlas_deploy_status".into(),
                 description: "Query system deployment status, container orchestrator state, memory usage, and multi-physics engine health".into(),
                 input_schema: serde_json::json!({ "type": "object" }),

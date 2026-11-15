@@ -1971,6 +1971,64 @@
     }
   }
 
+  async function exportStep() {
+    const project = app.project;
+    if (!project) return;
+    if (project.failure) {
+      toast(`Feature ${project.failure.feature} cannot rebuild, so the export would not match the model.`, true);
+      return;
+    }
+    try {
+      const headers = new Headers();
+      if (shareToken) headers.set("x-atlas-token", shareToken);
+      const response = await fetch("/api/export/step", { headers });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new ApiError(
+          payload && payload.error ? payload.error.message : `Export failed with status ${response.status}.`,
+          "export_failure",
+          response.status
+        );
+      }
+      const blob = await response.blob();
+      downloadBlob(blob, `${project.name.replace(/[^A-Za-z0-9_-]+/g, "_") || "part"}.stp`);
+      log("Exported ISO 10303-21 STEP CAD part");
+      toast("STEP download started.");
+    } catch (error) {
+      toast(error.message, true);
+      log(`Export failed: ${error.message}`, "error");
+    }
+  }
+
+  async function export3mf() {
+    const project = app.project;
+    if (!project) return;
+    if (project.failure) {
+      toast(`Feature ${project.failure.feature} cannot rebuild, so the export would not match the model.`, true);
+      return;
+    }
+    try {
+      const headers = new Headers();
+      if (shareToken) headers.set("x-atlas-token", shareToken);
+      const response = await fetch("/api/export/3mf", { headers });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new ApiError(
+          payload && payload.error ? payload.error.message : `Export failed with status ${response.status}.`,
+          "export_failure",
+          response.status
+        );
+      }
+      const blob = await response.blob();
+      downloadBlob(blob, `${project.name.replace(/[^A-Za-z0-9_-]+/g, "_") || "part"}.3mf`);
+      log("Exported ASTM/ISO 52915 3MF Additive model");
+      toast("3MF download started.");
+    } catch (error) {
+      toast(error.message, true);
+      log(`Export failed: ${error.message}`, "error");
+    }
+  }
+
   function downloadBlob(blob, filename) {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -10639,6 +10697,8 @@ ${gcodeSample}`;
     byId("recoveryDiscard").addEventListener("click", discardRecovery);
     byId("exportBtn").addEventListener("click", exportStl);
     byId("exportDxfBtn")?.addEventListener("click", exportDxf);
+    byId("exportStepBtn")?.addEventListener("click", exportStep);
+    byId("export3mfBtn")?.addEventListener("click", export3mf);
     byId("exportDavinciBtn")?.addEventListener("click", () => exportDavinci());
     byId("exportUnityBtn")?.addEventListener("click", () => exportUnity());
     byId("rbOutDavinciBtn")?.addEventListener("click", () => exportDavinci());

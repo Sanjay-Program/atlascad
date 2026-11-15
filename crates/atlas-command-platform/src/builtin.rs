@@ -467,6 +467,26 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "export.step.cad",
+            "Export ISO 10303-21 STEP CAD Model",
+            "Generates standardized ISO 10303-21 Part 21 (AP203/AP214) exchange file for solid B-Rep geometry.",
+            CommandCategory::Reporting,
+        )
+        .with_permission(CommandPermission::FileExport),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "export.threemf.additive",
+            "Export ASTM/ISO 52915 3MF Additive Model",
+            "Generates standardized 3D Manufacturing Format (3MF) XML model with mesh vertices and triangles.",
+            CommandCategory::Additive,
+        )
+        .with_permission(CommandPermission::FileExport),
+    )?;
+
     // --- 10. System & Deployment Lifecycle ---
     registry.register(
         CommandSchema::new(

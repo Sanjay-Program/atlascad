@@ -4745,13 +4745,13 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(agents_json["total_agents"], 44);
     assert_eq!(agents_json["target_ecosystem_size"], 44);
 
-    // 47. Universal Command Platform Registry (46 Built-in Commands)
+    // 47. Universal Command Platform Registry (48 Built-in Commands)
     let cmd_schemas_resp = get(addr, "/api/commands")?;
     assert_eq!(cmd_schemas_resp.status, 200);
     let cmd_schemas_json = json(&cmd_schemas_resp)?;
-    assert!(cmd_schemas_json["total_commands"].as_u64().unwrap_or(0) >= 46);
+    assert!(cmd_schemas_json["total_commands"].as_u64().unwrap_or(0) >= 48);
 
-    // 48. Enterprise Model Context Protocol (41 Tools via JSON-RPC 2.0)
+    // 48. Enterprise Model Context Protocol (43 Tools via JSON-RPC 2.0)
     let mcp_tools_resp = post(
         addr,
         "/api/mcp",
@@ -4760,7 +4760,62 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(mcp_tools_resp.status, 200);
     let mcp_tools_json = json(&mcp_tools_resp)?;
     let tools_list = mcp_tools_json["result"]["tools"].as_array().map(|v| v.len()).unwrap_or(0);
-    assert!(tools_list >= 41);
+    assert!(tools_list >= 43);
+
+    // 49. Standardized ISO 10303-21 STEP Part 21 CAD Exporter API
+    let step_resp = get(addr, "/api/export/step")?;
+    assert_eq!(step_resp.status, 200);
+    assert_eq!(
+        step_resp.headers.get("content-type").map(String::as_str),
+        Some("application/step")
+    );
+    let step_str = std::str::from_utf8(&step_resp.body).unwrap_or("");
+    assert!(step_str.contains("ISO-10303-21;"));
+    assert!(step_str.contains("CONFIG_CONTROL_DESIGN"));
+    assert!(step_str.contains("MANIFOLD_SOLID_BREP"));
+    assert!(step_str.contains("CARTESIAN_POINT"));
+
+    // 50. ASTM/ISO 52915 3D Manufacturing Format (3MF) Additive Exporter API
+    let threemf_resp = get(addr, "/api/export/3mf")?;
+    assert_eq!(threemf_resp.status, 200);
+    assert_eq!(
+        threemf_resp.headers.get("content-type").map(String::as_str),
+        Some("model/3mf")
+    );
+    let threemf_str = std::str::from_utf8(&threemf_resp.body).unwrap_or("");
+    assert!(threemf_str.contains("<model unit=\"millimeter\""));
+    assert!(threemf_str.contains("<object id=\"1\""));
+    assert!(threemf_str.contains("<triangle"));
+
+    // 51. Universal Commands: Execute export.step.cad & export.threemf.additive
+    let cmd_step = post(
+        addr,
+        "/api/commands/execute",
+        r#"{"command_id": "export.step.cad", "arguments": {}}"#,
+    )?;
+    assert_eq!(cmd_step.status, 200);
+
+    let cmd_3mf = post(
+        addr,
+        "/api/commands/execute",
+        r#"{"command_id": "export.threemf.additive", "arguments": {}}"#,
+    )?;
+    assert_eq!(cmd_3mf.status, 200);
+
+    // 52. Enterprise MCP Tools: atlas_export_step & atlas_export_threemf
+    let mcp_step = post(
+        addr,
+        "/api/mcp",
+        r#"{"jsonrpc": "2.0", "id": 101, "method": "tools/call", "params": {"name": "atlas_export_step", "arguments": {}}}"#,
+    )?;
+    assert_eq!(mcp_step.status, 200);
+
+    let mcp_3mf = post(
+        addr,
+        "/api/mcp",
+        r#"{"jsonrpc": "2.0", "id": 102, "method": "tools/call", "params": {"name": "atlas_export_threemf", "arguments": {}}}"#,
+    )?;
+    assert_eq!(mcp_3mf.status, 200);
 
     Ok(())
 }

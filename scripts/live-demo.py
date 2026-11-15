@@ -165,6 +165,16 @@ def run_live_demo() -> None:
         check(pdf_bytes.startswith(b"%PDF-"), "Valid PDF drawing sheet plotted")
         print(f"  ✓ Plot PDF sheet generated ({len(pdf_bytes)} bytes)")
 
+        step_resp = http_request(port, "GET", "/api/export/step")
+        step_bytes = step_resp.get("_raw", b"")
+        check(b"ISO-10303-21;" in step_bytes and b"CONFIG_CONTROL_DESIGN" in step_bytes, "Valid ISO 10303-21 STEP AP214 CAD part generated")
+        print(f"  ✓ Export STEP generated ({len(step_bytes)} bytes)")
+
+        threemf_resp = http_request(port, "GET", "/api/export/3mf")
+        threemf_bytes = threemf_resp.get("_raw", b"")
+        check(b"<model unit=\"millimeter\"" in threemf_bytes and b"<triangle" in threemf_bytes, "Valid ASTM/ISO 52915 3MF Additive model generated")
+        print(f"  ✓ Export 3MF generated ({len(threemf_bytes)} bytes)")
+
         # ---------------------------------------------------------------------
         # DEMO 3: CAE Multiphysics Simulation Studio
         # ---------------------------------------------------------------------
@@ -994,7 +1004,23 @@ def run_live_demo() -> None:
         check(mcp_call.get("result", {}).get("isError") == False, "MCP tool executed without error")
         content = mcp_call.get("result", {}).get("content", [{}])[0].get("text", "")
         check("atlas_cad_create_solid" in content, "MCP response text confirms tool execution")
-        print(f"  ✓ 12.12 MCP Server: Initialized JSON-RPC 2.0, queried {len(tool_list)} tools, successfully invoked atlas_cad_create_solid")
+
+        mcp_step = http_request(port, "POST", "/api/mcp", body={
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "tools/call",
+            "params": {"name": "atlas_export_step", "arguments": {}}
+        })
+        check(mcp_step.get("result", {}).get("isError") == False, "MCP atlas_export_step executed without error")
+
+        mcp_3mf = http_request(port, "POST", "/api/mcp", body={
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "tools/call",
+            "params": {"name": "atlas_export_threemf", "arguments": {}}
+        })
+        check(mcp_3mf.get("result", {}).get("isError") == False, "MCP atlas_export_threemf executed without error")
+        print(f"  ✓ 12.12 MCP Server: Initialized JSON-RPC 2.0, queried {len(tool_list)} tools, successfully invoked atlas_cad_create_solid, atlas_export_step, and atlas_export_threemf")
 
         # 12.13 Autonomous End-to-End Generative Closed-Loop Workflow Execution
         wf_all = http_request(port, "POST", "/api/agents/workflows/run_all", body={
