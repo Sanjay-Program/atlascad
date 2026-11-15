@@ -1629,6 +1629,120 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 16.7 Enterprise MCP Tool Calling: 5 New Engineering Tools verified via JSON-RPC 2.0")
 
+        # -------------------------------------------------------------------------
+        # 17. ADVANCED CATALOG WORKBENCHES: SPRINGS, GEARS, KIENZLE CAM, IEC 60909 & CIE DAYLIGHTING
+        # -------------------------------------------------------------------------
+        print("\n[17/17] ADVANCED CATALOG WORKBENCHES (SPRINGS, GEARS, KIENZLE CAM, IEC 60909, CIE DAYLIGHTING)")
+
+        # 17.1 Mechanical Helical Springs (DIN EN 13906-1 / DIN 2089-1)
+        spring_res = http_request(port, "POST", "/api/cad/hardware/spring", body={
+            "wire_diameter_d_mm": 4.0,
+            "mean_coil_diameter_d_mm": 32.0,
+            "free_length_l0_mm": 85.0,
+            "active_coils_na": 7.0,
+            "operating_force_f2_n": 650.0,
+            "material": "MusicWireA228",
+            "end_type": "ClosedAndGround"
+        })
+        check(abs(spring_res.get("spring_rate_k_n_mm", 0.0) - 11.08) < 0.2, "Helical spring rate k = 11.08 N/mm")
+        check(abs(spring_res.get("wahl_factor_kw", 0.0) - 1.184) < 0.05, "Wahl factor kw = 1.184")
+        check(spring_res.get("is_buckling_safe") is True, "Spring is free-standing buckling safe")
+        check(180.0 < spring_res.get("fundamental_frequency_hz", 0.0) < 250.0, "Surge frequency ~206 Hz")
+        print(f"  ✓ 17.1 Helical Spring Mechanics: k = {spring_res['spring_rate_k_n_mm']:.2f} N/mm, kw = {spring_res['wahl_factor_kw']:.3f}, f0 = {spring_res['fundamental_frequency_hz']:.1f} Hz, Buckling Safe = {spring_res['is_buckling_safe']}")
+
+        # 17.2 Involute Spur & Helical Gears (ISO 6336 / AGMA 2001-D04)
+        gear_res = http_request(port, "POST", "/api/cad/hardware/gear_pair", body={
+            "gear_type": "Helical",
+            "normal_module_mn": 3.5,
+            "pinion_teeth_z1": 19,
+            "gear_teeth_z2": 57,
+            "face_width_b_mm": 40.0,
+            "helix_angle_beta_deg": 20.0,
+            "pinion_speed_rpm": 3000.0,
+            "transmitted_power_kw": 35.0
+        })
+        check(gear_res.get("transverse_contact_ratio", 0.0) > 1.20, "Contact ratio >= 1.20 adequate")
+        check(gear_res.get("bending_safety_factor", 0.0) > 1.0, "Tooth bending safety factor > 1.0")
+        check(gear_res.get("tangential_force_ft_n", 0.0) > 500.0, "Tangential force Ft calculated")
+        print(f"  ✓ 17.2 Involute Gear Transmission: Ratio u = {gear_res['gear_ratio_u']:.1f}, Contact Ratio = {gear_res['transverse_contact_ratio']:.3f}, Ft = {gear_res['tangential_force_ft_n']:.1f} N, Bending SF = {gear_res['bending_safety_factor']:.2f}")
+
+        # 17.3 Kienzle Cutting Force & CNC Spindle Physics (DIN 6584)
+        kienzle_res = http_request(port, "POST", "/api/cam/physics/cutting_force", body={
+            "operation": "FaceMilling",
+            "workpiece": "AlloySteel4140",
+            "cutting_speed_vc_m_per_min": 180.0,
+            "feed_f_mm": 0.15,
+            "depth_of_cut_ap_mm": 3.0,
+            "radial_width_ae_mm": 40.0,
+            "tool_diameter_dc_mm": 50.0,
+            "number_of_teeth_z": 4
+        })
+        check(kienzle_res.get("tangential_cutting_force_fc_n", 0.0) > 1000.0, "Cutting force Fc > 1000 N")
+        check(kienzle_res.get("required_spindle_power_pm_kw", 0.0) > 3.0, "Spindle motor power > 3 kW")
+        check(kienzle_res.get("material_removal_rate_cm3_min", 0.0) > 50.0, "MRR > 50 cm³/min")
+        print(f"  ✓ 17.3 Kienzle CNC Cutting Physics: Fc = {kienzle_res['tangential_cutting_force_fc_n']:.1f} N, Pm = {kienzle_res['required_spindle_power_pm_kw']:.2f} kW, MRR = {kienzle_res['material_removal_rate_cm3_min']:.1f} cm³/min")
+
+        # 17.4 Industrial Electrical Short-Circuit & Voltage Drop (IEC 60909)
+        sc_res = http_request(port, "POST", "/api/sim/electrical/short_circuit", body={
+            "nominal_voltage_un_v": 400.0,
+            "transformer_rated_power_sn_kva": 1000.0,
+            "transformer_impedance_voltage_uk_percent": 6.0,
+            "feeder_length_l_m": 65.0,
+            "conductor_cross_section_q_mm2": 150.0,
+            "conductor_material": "Copper",
+            "operating_current_ib_a": 220.0
+        })
+        check(10.0 < sc_res.get("initial_symmetrical_short_circuit_current_ka", 0.0) < 20.0, "Ik'' short circuit current within range")
+        check(sc_res.get("peak_short_circuit_current_ka", 0.0) > 18.0, "Peak dynamic current ip calculated")
+        check(sc_res.get("is_voltage_drop_compliant") is True, "Feeder voltage drop compliant with IEC 60364-5-52")
+        print(f"  ✓ 17.4 IEC 60909 Power Systems: Ik'' = {sc_res['initial_symmetrical_short_circuit_current_ka']:.2f} kA, ip = {sc_res['peak_short_circuit_current_ka']:.2f} kA, Cable Δu = {sc_res['voltage_drop_percent']:.2f}% (Compliant)")
+
+        # 17.5 Architectural Daylighting & CIE Sky Luminescence (EN 17037)
+        day_res = http_request(port, "POST", "/api/sim/building/daylight_factor", body={
+            "room_length_m": 6.0,
+            "room_width_m": 5.0,
+            "room_height_m": 3.0,
+            "window_width_m": 3.2,
+            "window_height_m": 2.0,
+            "desk_distance_from_window_m": 2.5
+        })
+        check(day_res.get("point_daylight_factor_percent", 0.0) > 1.0, "Point DF calculated")
+        check(day_res.get("average_daylight_factor_percent", 0.0) > 1.5, "Room average ADF calculated")
+        check(day_res.get("is_compliant") is True, "EN 17037 / BREEAM Daylight Compliance Met")
+        print(f"  ✓ 17.5 Architectural Daylighting: Point DF = {day_res['point_daylight_factor_percent']:.2f}%, ADF = {day_res['average_daylight_factor_percent']:.2f}%, EN 17037 Compliant = {day_res['is_compliant']}")
+
+        # 17.6 Universal Commands Execution Verification (5 Advanced Domains)
+        for cmd_id, cmd_args in [
+            ("cad.hardware.spring", {"wire_diameter_d_mm": 4.0, "mean_coil_diameter_d_mm": 32.0, "free_length_l0_mm": 85.0, "active_coils_na": 7.0}),
+            ("cad.hardware.gear_pair", {"normal_module_mn": 3.5, "pinion_teeth_z1": 19, "gear_teeth_z2": 57, "face_width_b_mm": 40.0}),
+            ("cam.physics.cutting_force", {"cutting_speed_vc_m_per_min": 180.0, "feed_f_mm": 0.15, "depth_of_cut_ap_mm": 3.0}),
+            ("sim.electrical.short_circuit", {"nominal_voltage_un_v": 400.0, "transformer_rated_power_sn_kva": 1000.0, "feeder_length_l_m": 65.0, "conductor_cross_section_q_mm2": 150.0}),
+            ("sim.building.daylight_factor", {"room_length_m": 6.0, "room_width_m": 5.0, "room_height_m": 3.0, "window_width_m": 3.2, "window_height_m": 2.0}),
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": cmd_args
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 17.6 Universal Commands: All 5 Advanced Engineering Commands verified via typed schema engine")
+
+        # 17.7 Enterprise MCP Tool Calling (5 Advanced Domains)
+        for mcp_tool_name, mcp_args in [
+            ("atlas_cad_hardware_spring", {"wire_diameter_d_mm": 4.0}),
+            ("atlas_cad_hardware_gear_pair", {"normal_module_mn": 3.5}),
+            ("atlas_cam_cutting_force", {"feed_f_mm": 0.15}),
+            ("atlas_electrical_short_circuit", {"nominal_voltage_un_v": 400.0}),
+            ("atlas_building_daylight_factor", {"room_length_m": 6.0}),
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 300,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": mcp_args}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 17.7 Enterprise MCP Tool Calling: 5 New Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

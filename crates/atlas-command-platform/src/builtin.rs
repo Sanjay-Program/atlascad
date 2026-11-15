@@ -1193,5 +1193,356 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    // --- 18. Mechanical Helical Springs (DIN EN 13906-1) ---
+    registry.register(
+        CommandSchema::new(
+            "cad.hardware.spring",
+            "DIN EN 13906-1 Helical Compression Spring Design & Verification",
+            "Calculates spring rate k, Wahl stress factor kw, solid height Ls, solid stress tau_n, surge natural frequency f0, and free-standing buckling limit.",
+            CommandCategory::Geometry,
+        )
+        .with_permission(CommandPermission::GeometryCreate)
+        .with_argument(CommandArgument {
+            name: "wire_diameter_d_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Spring wire diameter d in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(4.0)),
+            validation_rules: vec![ValidationRule::Min(0.1)],
+        })
+        .with_argument(CommandArgument {
+            name: "mean_coil_diameter_d_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Mean coil diameter D in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(32.0)),
+            validation_rules: vec![ValidationRule::Min(0.5)],
+        })
+        .with_argument(CommandArgument {
+            name: "free_length_l0_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Uncompressed free length L0 in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(85.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "active_coils_na".into(),
+            arg_type: ArgumentType::Number,
+            description: "Number of active coils na".into(),
+            required: true,
+            default_value: Some(serde_json::json!(7.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "operating_force_f2_n".into(),
+            arg_type: ArgumentType::Number,
+            description: "Maximum operating working load F2 in Newtons".into(),
+            required: true,
+            default_value: Some(serde_json::json!(650.0)),
+            validation_rules: vec![ValidationRule::Min(0.1)],
+        })
+        .with_argument(CommandArgument {
+            name: "material".into(),
+            arg_type: ArgumentType::String,
+            description: "Spring steel material alloy (e.g. MusicWire, OilTempered, Stainless302, InconelX750, ChromeSilicon)".into(),
+            required: false,
+            default_value: Some(serde_json::json!("MusicWire")),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "end_type".into(),
+            arg_type: ArgumentType::String,
+            description: "Spring end coil configuration (SquaredAndGround, Closed, Open)".into(),
+            required: false,
+            default_value: Some(serde_json::json!("SquaredAndGround")),
+            validation_rules: vec![],
+        }),
+    )?;
+
+    // --- 19. Involute Spur & Helical Gears (ISO 6336 / AGMA 2001-D04) ---
+    registry.register(
+        CommandSchema::new(
+            "cad.hardware.gear_pair",
+            "ISO 6336 / AGMA 2001-D04 Involute Gear Pair Design & Rating",
+            "Synthesizes transverse module, standard pitch/root/tip diameters, contact ratio, pitch line velocity, Lewis bending stress, and AGMA contact pitting safety factor.",
+            CommandCategory::Geometry,
+        )
+        .with_permission(CommandPermission::GeometryCreate)
+        .with_argument(CommandArgument {
+            name: "gear_type".into(),
+            arg_type: ArgumentType::String,
+            description: "Gear kinematic arrangement (Spur or Helical)".into(),
+            required: false,
+            default_value: Some(serde_json::json!("Helical")),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "normal_module_mn".into(),
+            arg_type: ArgumentType::Number,
+            description: "Normal module mn in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(3.5)),
+            validation_rules: vec![ValidationRule::Min(0.2)],
+        })
+        .with_argument(CommandArgument {
+            name: "pinion_teeth_z1".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Number of teeth on driving pinion z1".into(),
+            required: true,
+            default_value: Some(serde_json::json!(19)),
+            validation_rules: vec![ValidationRule::Min(8.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "gear_teeth_z2".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Number of teeth on driven gear wheel z2".into(),
+            required: true,
+            default_value: Some(serde_json::json!(57)),
+            validation_rules: vec![ValidationRule::Min(8.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "face_width_b_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Active tooth face width b in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(40.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "helix_angle_beta_deg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Helix angle beta in degrees (0.0 for spur)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(20.0)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(45.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "pinion_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Pinion rotational speed in RPM".into(),
+            required: true,
+            default_value: Some(serde_json::json!(3000.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "transmitted_power_kw".into(),
+            arg_type: ArgumentType::Number,
+            description: "Transmitted mechanical power in kW".into(),
+            required: true,
+            default_value: Some(serde_json::json!(35.0)),
+            validation_rules: vec![ValidationRule::Min(0.01)],
+        }),
+    )?;
+
+    // --- 20. Advanced CNC Machining Physics (DIN 6584 / Kienzle Force Model) ---
+    registry.register(
+        CommandSchema::new(
+            "cam.physics.cutting_force",
+            "DIN 6584 Kienzle Cutting Force & CNC Spindle Physics",
+            "Computes specific cutting force kc, cutting force Fc, cutting power Pc, required motor power Pm, material removal rate MRR, and theoretical surface finish Ra.",
+            CommandCategory::Cnc,
+        )
+        .with_permission(CommandPermission::ManufacturingPrep)
+        .with_argument(CommandArgument {
+            name: "operation".into(),
+            arg_type: ArgumentType::String,
+            description: "Machining kinematic operation (Turning, EndMilling, FaceMilling, Drilling)".into(),
+            required: false,
+            default_value: Some(serde_json::json!("FaceMilling")),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "workpiece".into(),
+            arg_type: ArgumentType::String,
+            description: "Workpiece material grade (LowCarbonSteel, AlloySteel4140, AusteniticStainless304, Aluminum6061T6, TitaniumTi6Al4V, CastIronGG25)".into(),
+            required: false,
+            default_value: Some(serde_json::json!("AlloySteel4140")),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "cutting_speed_vc_m_per_min".into(),
+            arg_type: ArgumentType::Number,
+            description: "Cutting linear speed Vc in m/min".into(),
+            required: true,
+            default_value: Some(serde_json::json!(180.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "feed_f_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Feed per tooth or feed per revolution f in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(0.15)),
+            validation_rules: vec![ValidationRule::Min(0.001)],
+        })
+        .with_argument(CommandArgument {
+            name: "depth_of_cut_ap_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Axial depth of cut ap in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(3.0)),
+            validation_rules: vec![ValidationRule::Min(0.01)],
+        })
+        .with_argument(CommandArgument {
+            name: "radial_width_ae_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Radial engagement width ae in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(40.0)),
+            validation_rules: vec![ValidationRule::Min(0.01)],
+        })
+        .with_argument(CommandArgument {
+            name: "tool_diameter_dc_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Cutting cutter diameter Dc in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(50.0)),
+            validation_rules: vec![ValidationRule::Min(0.5)],
+        })
+        .with_argument(CommandArgument {
+            name: "number_of_teeth_z".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Number of cutter insert flutes z".into(),
+            required: false,
+            default_value: Some(serde_json::json!(4)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        }),
+    )?;
+
+    // --- 21. Industrial Electrical Short-Circuit & Voltage Drop (IEC 60909) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.electrical.short_circuit",
+            "IEC 60909 3-Phase Symmetrical Short-Circuit & Voltage Drop",
+            "Computes transformer and network impedances, initial symmetrical short-circuit current Ik'', peak dynamic current ip, breaking MVA, and cable run voltage drop.",
+            CommandCategory::Electrical,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "nominal_voltage_un_v".into(),
+            arg_type: ArgumentType::Number,
+            description: "Secondary nominal line-to-line AC voltage in Volts (e.g. 400V)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(400.0)),
+            validation_rules: vec![ValidationRule::Min(50.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "transformer_rated_power_sn_kva".into(),
+            arg_type: ArgumentType::Number,
+            description: "Distribution transformer rated apparent capacity in kVA (e.g. 1000 kVA)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1000.0)),
+            validation_rules: vec![ValidationRule::Min(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "transformer_impedance_voltage_uk_percent".into(),
+            arg_type: ArgumentType::Number,
+            description: "Transformer percent short-circuit impedance voltage uk% (e.g. 6.0%)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(6.0)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(20.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "feeder_length_l_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Feeder cable run route length in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(65.0)),
+            validation_rules: vec![ValidationRule::Min(0.5)],
+        })
+        .with_argument(CommandArgument {
+            name: "conductor_cross_section_q_mm2".into(),
+            arg_type: ArgumentType::Number,
+            description: "Phase conductor cross-sectional area in mm2 (e.g. 150 mm2)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(150.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "conductor_material".into(),
+            arg_type: ArgumentType::String,
+            description: "Conductor metallurgy (Copper or Aluminum)".into(),
+            required: false,
+            default_value: Some(serde_json::json!("Copper")),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "operating_current_ib_a".into(),
+            arg_type: ArgumentType::Number,
+            description: "Normal operating design load current Ib in Amperes".into(),
+            required: false,
+            default_value: Some(serde_json::json!(220.0)),
+            validation_rules: vec![ValidationRule::Min(0.1)],
+        }),
+    )?;
+
+    // --- 22. Architectural Daylighting & CIE Sky Luminescence (EN 17037) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.building.daylight_factor",
+            "CIE Sky Luminescence & EN 17037 Daylight Factor Analysis",
+            "Calculates CIE standard overcast sky daylight factors (Sky Component SC, ERC, IRC), working desk daylight factor DF%, and room average daylight factor ADF%.",
+            CommandCategory::Bim,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "sky_type".into(),
+            arg_type: ArgumentType::String,
+            description: "CIE standard sky condition (CieOvercast, CieUniform, CiePartlyCloudy, CieClear)".into(),
+            required: false,
+            default_value: Some(serde_json::json!("CieOvercast")),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "room_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Room interior depth/length in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(6.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "room_width_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Room interior width along fenestration facade in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(5.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "room_height_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Room finished floor-to-ceiling clear height in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(3.0)),
+            validation_rules: vec![ValidationRule::Min(1.5)],
+        })
+        .with_argument(CommandArgument {
+            name: "window_width_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Total architectural window glazed width in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(3.2)),
+            validation_rules: vec![ValidationRule::Min(0.2)],
+        })
+        .with_argument(CommandArgument {
+            name: "window_height_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Architectural window glazed height in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(2.0)),
+            validation_rules: vec![ValidationRule::Min(0.2)],
+        })
+        .with_argument(CommandArgument {
+            name: "desk_distance_from_window_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Primary occupant desk distance from window plane in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(2.5)),
+            validation_rules: vec![ValidationRule::Min(0.1)],
+        }),
+    )?;
+
     Ok(())
 }

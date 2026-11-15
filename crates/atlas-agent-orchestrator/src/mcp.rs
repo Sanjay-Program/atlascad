@@ -590,6 +590,93 @@ impl McpServer {
                     "required": ["sound_power_lwa", "distance_m"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_cad_hardware_spring".into(),
+                description: "Calculate DIN EN 13906-1 helical compression spring rate, Wahl stress factor, solid length, and surge natural frequency".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "wire_diameter_d_mm": { "type": "number", "default": 4.0 },
+                        "mean_coil_diameter_d_mm": { "type": "number", "default": 32.0 },
+                        "free_length_l0_mm": { "type": "number", "default": 85.0 },
+                        "active_coils_na": { "type": "number", "default": 7.0 },
+                        "operating_force_f2_n": { "type": "number", "default": 650.0 },
+                        "material": { "type": "string", "default": "MusicWire" },
+                        "end_type": { "type": "string", "default": "SquaredAndGround" }
+                    },
+                    "required": ["wire_diameter_d_mm", "mean_coil_diameter_d_mm", "free_length_l0_mm", "active_coils_na"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_cad_hardware_gear_pair".into(),
+                description: "Design and rate ISO 6336 / AGMA 2001-D04 spur and helical involute gear pair with contact ratio, bending stress, and pitting safety factor".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "gear_type": { "type": "string", "enum": ["Spur", "Helical"], "default": "Helical" },
+                        "normal_module_mn": { "type": "number", "default": 3.5 },
+                        "pinion_teeth_z1": { "type": "integer", "default": 19 },
+                        "gear_teeth_z2": { "type": "integer", "default": 57 },
+                        "face_width_b_mm": { "type": "number", "default": 40.0 },
+                        "helix_angle_beta_deg": { "type": "number", "default": 20.0 },
+                        "pinion_speed_rpm": { "type": "number", "default": 3000.0 },
+                        "transmitted_power_kw": { "type": "number", "default": 35.0 }
+                    },
+                    "required": ["normal_module_mn", "pinion_teeth_z1", "gear_teeth_z2", "face_width_b_mm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_cam_cutting_force".into(),
+                description: "Calculate DIN 6584 Kienzle specific cutting force, cutting force Fc, spindle power Pm, MRR, and theoretical surface finish Ra".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "operation": { "type": "string", "enum": ["Turning", "EndMilling", "FaceMilling", "Drilling"], "default": "FaceMilling" },
+                        "workpiece": { "type": "string", "default": "AlloySteel4140" },
+                        "cutting_speed_vc_m_per_min": { "type": "number", "default": 180.0 },
+                        "feed_f_mm": { "type": "number", "default": 0.15 },
+                        "depth_of_cut_ap_mm": { "type": "number", "default": 3.0 },
+                        "radial_width_ae_mm": { "type": "number", "default": 40.0 },
+                        "tool_diameter_dc_mm": { "type": "number", "default": 50.0 },
+                        "number_of_teeth_z": { "type": "integer", "default": 4 }
+                    },
+                    "required": ["cutting_speed_vc_m_per_min", "feed_f_mm", "depth_of_cut_ap_mm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_electrical_short_circuit".into(),
+                description: "IEC 60909 symmetrical 3-phase short-circuit current Ik'', peak dynamic current ip, breaking MVA, and cable run voltage drop".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "nominal_voltage_un_v": { "type": "number", "default": 400.0 },
+                        "transformer_rated_power_sn_kva": { "type": "number", "default": 1000.0 },
+                        "transformer_impedance_voltage_uk_percent": { "type": "number", "default": 6.0 },
+                        "feeder_length_l_m": { "type": "number", "default": 65.0 },
+                        "conductor_cross_section_q_mm2": { "type": "number", "default": 150.0 },
+                        "conductor_material": { "type": "string", "enum": ["Copper", "Aluminum"], "default": "Copper" },
+                        "operating_current_ib_a": { "type": "number", "default": 220.0 }
+                    },
+                    "required": ["nominal_voltage_un_v", "transformer_rated_power_sn_kva", "feeder_length_l_m", "conductor_cross_section_q_mm2"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_building_daylight_factor".into(),
+                description: "CIE overcast sky daylight factor (Sky Component SC, ERC, IRC), working desk DF%, and room average ADF% (EN 17037)".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "sky_type": { "type": "string", "default": "CieOvercast" },
+                        "room_length_m": { "type": "number", "default": 6.0 },
+                        "room_width_m": { "type": "number", "default": 5.0 },
+                        "room_height_m": { "type": "number", "default": 3.0 },
+                        "window_width_m": { "type": "number", "default": 3.2 },
+                        "window_height_m": { "type": "number", "default": 2.0 },
+                        "desk_distance_from_window_m": { "type": "number", "default": 2.5 }
+                    },
+                    "required": ["room_length_m", "room_width_m", "room_height_m", "window_width_m", "window_height_m"]
+                }),
+            },
         ]
     }
 

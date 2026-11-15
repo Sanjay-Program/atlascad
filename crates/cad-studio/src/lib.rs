@@ -4264,6 +4264,211 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn cad_hardware_spring(
+        &mut self,
+        req: &CadHardwareSpringRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mat = match req.material.as_deref().unwrap_or("MusicWireA228") {
+            "OilTempered" | "oil_tempered" | "OilTempered51CrV4" => {
+                atlas_simulation_core::springs::SpringMaterial::OilTempered51CrV4
+            }
+            "Stainless302" | "stainless_302" | "stainless" => {
+                atlas_simulation_core::springs::SpringMaterial::Stainless302
+            }
+            "PhosphorBronze" | "phosphor_bronze" | "PhosphorBronzeC510" => {
+                atlas_simulation_core::springs::SpringMaterial::PhosphorBronzeC510
+            }
+            _ => atlas_simulation_core::springs::SpringMaterial::MusicWireA228,
+        };
+
+        let end = match req.end_type.as_deref().unwrap_or("ClosedAndGround") {
+            "ClosedUnground" | "closed_unground" => {
+                atlas_simulation_core::springs::SpringEndType::ClosedUnground
+            }
+            "OpenPlain" | "open_plain" | "open" => {
+                atlas_simulation_core::springs::SpringEndType::OpenPlain
+            }
+            _ => atlas_simulation_core::springs::SpringEndType::ClosedAndGround,
+        };
+
+        let prob = atlas_simulation_core::springs::HelicalSpringProblem {
+            spring_name: "Helical Compression Spring".to_string(),
+            material: mat,
+            end_type: end,
+            wire_diameter_d_mm: req.wire_diameter_d_mm.unwrap_or(4.0),
+            mean_diameter_d_mm: req.mean_coil_diameter_d_mm.unwrap_or(32.0),
+            active_coils_na: req.active_coils_na.unwrap_or(7.0),
+            free_length_l0_mm: req.free_length_l0_mm.unwrap_or(85.0),
+            working_load_f1_n: Some(req.operating_force_f2_n.unwrap_or(650.0) * 0.5),
+            peak_load_f2_n: req.operating_force_f2_n.or(Some(650.0)),
+        };
+
+        let res = atlas_simulation_core::springs::solve_helical_compression_spring(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn cad_hardware_gear_pair(
+        &mut self,
+        req: &CadHardwareGearPairRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let gtype = match req.gear_type.as_deref().unwrap_or("Helical") {
+            "Spur" | "spur" => atlas_simulation_core::gears::GearType::Spur,
+            _ => atlas_simulation_core::gears::GearType::Helical,
+        };
+
+        let prob = atlas_simulation_core::gears::InvoluteGearPairProblem {
+            gear_set_name: "Involute Gear Transmission Pair".to_string(),
+            gear_type: gtype,
+            tooth_profile: atlas_simulation_core::gears::GearToothProfile::FullDepth20Deg,
+            normal_module_mn_mm: req.normal_module_mn.unwrap_or(3.5),
+            pinion_teeth_z1: req.pinion_teeth_z1.unwrap_or(19),
+            gear_teeth_z2: req.gear_teeth_z2.unwrap_or(57),
+            helix_angle_deg: req.helix_angle_beta_deg.unwrap_or(20.0),
+            face_width_b_mm: req.face_width_b_mm.unwrap_or(40.0),
+            transmitted_power_kw: req.transmitted_power_kw.unwrap_or(35.0),
+            pinion_speed_rpm: req.pinion_speed_rpm.unwrap_or(3000.0),
+            allowable_bending_stress_mpa: req.pinion_yield_strength_mpa,
+            allowable_contact_stress_mpa: req.gear_yield_strength_mpa,
+        };
+
+        let res = atlas_simulation_core::gears::solve_involute_gear_pair(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn cam_cutting_force(
+        &mut self,
+        req: &CamCuttingForceRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let op = match req.operation.as_deref().unwrap_or("FaceMilling") {
+            "Turning" | "turning" | "OdTurning" => {
+                atlas_simulation_core::machining_physics::MachiningOperation::OdTurning
+            }
+            "ShoulderSideMilling" | "shoulder" => {
+                atlas_simulation_core::machining_physics::MachiningOperation::ShoulderSideMilling
+            }
+            "SlotMilling" | "slot" => {
+                atlas_simulation_core::machining_physics::MachiningOperation::SlotMilling
+            }
+            _ => atlas_simulation_core::machining_physics::MachiningOperation::FaceMilling,
+        };
+
+        let mat = match req.workpiece.as_deref().unwrap_or("AlloySteel4140") {
+            "LowCarbonSteel" | "low_carbon_steel" | "CarbonSteel1045" => {
+                atlas_simulation_core::machining_physics::WorkpieceMachinability::CarbonSteel1045
+            }
+            "AusteniticStainless304" | "stainless_304" | "Stainless316L" => {
+                atlas_simulation_core::machining_physics::WorkpieceMachinability::Stainless316L
+            }
+            "Aluminum6061T6" | "aluminum_6061" | "aluminum" => {
+                atlas_simulation_core::machining_physics::WorkpieceMachinability::Aluminum6061T6
+            }
+            "TitaniumTi6Al4V" | "titanium_ti6al4v" | "titanium" => {
+                atlas_simulation_core::machining_physics::WorkpieceMachinability::TitaniumTi6Al4V
+            }
+            "Inconel718" | "inconel" => {
+                atlas_simulation_core::machining_physics::WorkpieceMachinability::Inconel718
+            }
+            "CastIronGG25" | "cast_iron" => {
+                atlas_simulation_core::machining_physics::WorkpieceMachinability::CastIronGG25
+            }
+            _ => atlas_simulation_core::machining_physics::WorkpieceMachinability::AlloySteel4140,
+        };
+
+        let prob = atlas_simulation_core::machining_physics::KienzleMachiningProblem {
+            operation_name: "CNC Machining Pass".to_string(),
+            operation_type: op,
+            workpiece_material: mat,
+            tool_diameter_mm: req.tool_diameter_dc_mm.unwrap_or(50.0),
+            number_of_teeth: req.number_of_teeth_z.unwrap_or(4),
+            axial_depth_ap_mm: req.depth_of_cut_ap_mm.unwrap_or(3.0),
+            radial_width_ae_mm: req.radial_width_ae_mm.unwrap_or(40.0),
+            feed_per_tooth_fz_mm: req.feed_f_mm.unwrap_or(0.15),
+            cutting_speed_vc_m_min: req.cutting_speed_vc_m_per_min.unwrap_or(180.0),
+            tool_nose_radius_mm: req.corner_radius_re_mm,
+            rake_angle_deg: req.rake_angle_gamma_deg,
+            spindle_efficiency: Some(0.85),
+        };
+
+        let res = atlas_simulation_core::machining_physics::solve_kienzle_machining(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_electrical_short_circuit(
+        &mut self,
+        req: &SimShortCircuitRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let conductor = match req.conductor_material.as_deref().unwrap_or("Copper") {
+            "Aluminum" | "aluminum" => {
+                atlas_simulation_core::short_circuit::ConductorMaterial::Aluminum
+            }
+            _ => atlas_simulation_core::short_circuit::ConductorMaterial::Copper,
+        };
+
+        let prob = atlas_simulation_core::short_circuit::ShortCircuitProblem {
+            feeder_name: "Low-Voltage Distribution Feeder".to_string(),
+            nominal_voltage_un_v: req.nominal_voltage_un_v.unwrap_or(400.0),
+            upstream_fault_capacity_mva: req.upstream_short_circuit_mva.unwrap_or(250.0),
+            transformer_rating_kva: req.transformer_rated_power_sn_kva.unwrap_or(1000.0),
+            transformer_impedance_percent: req.transformer_impedance_voltage_uk_percent.unwrap_or(6.0),
+            transformer_copper_loss_kw: req.transformer_copper_losses_pk_kw.unwrap_or(10.5),
+            cable_length_m: req.feeder_length_l_m.unwrap_or(65.0),
+            conductor_area_mm2: req.conductor_cross_section_q_mm2.unwrap_or(150.0),
+            conductor_material: conductor,
+            cable_operating_temp_c: Some(70.0),
+            design_load_current_a: req.operating_current_ib_a.or(Some(220.0)),
+            load_power_factor: Some(0.85),
+            max_voltage_drop_percent: Some(3.0),
+        };
+
+        let res = atlas_simulation_core::short_circuit::solve_iec60909_short_circuit(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_building_daylight_factor(
+        &mut self,
+        req: &SimDaylightingRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let sky = match req.sky_type.as_deref().unwrap_or("StandardOvercast") {
+            "UniformDiffuse" | "uniform" => {
+                atlas_simulation_core::daylighting::CieSkyType::UniformDiffuse
+            }
+            _ => atlas_simulation_core::daylighting::CieSkyType::StandardOvercast,
+        };
+
+        let finishes = atlas_simulation_core::daylighting::RoomSurfaceFinishes {
+            wall_reflectance: req.walls_reflectance.unwrap_or(0.50),
+            ceiling_reflectance: req.ceiling_reflectance.unwrap_or(0.75),
+            floor_reflectance: req.floor_reflectance.unwrap_or(0.20),
+        };
+
+        let w_width = req.window_width_m.unwrap_or(3.2);
+        let w_height = req.window_height_m.unwrap_or(2.0);
+        let glazing_area = w_width * w_height;
+
+        let prob = atlas_simulation_core::daylighting::DaylightingProblem {
+            room_name: "Commercial Office Space".to_string(),
+            sky_type: sky,
+            room_depth_m: req.room_length_m.unwrap_or(6.0),
+            room_width_m: req.room_width_m.unwrap_or(5.0),
+            room_height_m: req.room_height_m.unwrap_or(3.0),
+            window_glazing_area_m2: glazing_area,
+            visual_transmittance: req.glazing_transmittance.unwrap_or(0.70),
+            glazing_correction_factor: req.glazing_maintenance_factor.or(Some(0.85)),
+            obstruction_angle_deg: req.external_obstruction_angle_deg.or(Some(15.0)),
+            workplane_distance_from_window_m: req.desk_distance_from_window_m.or(Some(2.5)),
+            target_daylight_factor_percent: Some(2.0),
+            surface_finishes: finishes,
+        };
+
+        let res = atlas_simulation_core::daylighting::solve_cie_daylight_factor(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -5608,6 +5813,115 @@ namespace AtlasCAD.Unity
                     ambient_temp_c: None,
                     relative_humidity_pct: None,
                     regulatory_limit_dba: limit,
+                })?
+            }
+            "cad.hardware.spring" => {
+                let d = req.arguments.get("wire_diameter_d_mm").and_then(|v| v.as_f64());
+                let mean_d = req.arguments.get("mean_coil_diameter_d_mm").and_then(|v| v.as_f64());
+                let l0 = req.arguments.get("free_length_l0_mm").and_then(|v| v.as_f64());
+                let na = req.arguments.get("active_coils_na").and_then(|v| v.as_f64());
+                let f2 = req.arguments.get("operating_force_f2_n").and_then(|v| v.as_f64());
+                let mat = req.arguments.get("material").and_then(|v| v.as_str()).map(String::from);
+                let end = req.arguments.get("end_type").and_then(|v| v.as_str()).map(String::from);
+                self.cad_hardware_spring(&CadHardwareSpringRequest {
+                    wire_diameter_d_mm: d,
+                    mean_coil_diameter_d_mm: mean_d,
+                    free_length_l0_mm: l0,
+                    active_coils_na: na,
+                    operating_force_f2_n: f2,
+                    material: mat,
+                    end_type: end,
+                })?
+            }
+            "cad.hardware.gear_pair" => {
+                let gtype = req.arguments.get("gear_type").and_then(|v| v.as_str()).map(String::from);
+                let mn = req.arguments.get("normal_module_mn").and_then(|v| v.as_f64());
+                let z1 = req.arguments.get("pinion_teeth_z1").and_then(|v| v.as_u64()).map(|v| v as u32);
+                let z2 = req.arguments.get("gear_teeth_z2").and_then(|v| v.as_u64()).map(|v| v as u32);
+                let b = req.arguments.get("face_width_b_mm").and_then(|v| v.as_f64());
+                let beta = req.arguments.get("helix_angle_beta_deg").and_then(|v| v.as_f64());
+                let rpm = req.arguments.get("pinion_speed_rpm").and_then(|v| v.as_f64());
+                let power = req.arguments.get("transmitted_power_kw").and_then(|v| v.as_f64());
+                self.cad_hardware_gear_pair(&CadHardwareGearPairRequest {
+                    gear_type: gtype,
+                    normal_module_mn: mn,
+                    pinion_teeth_z1: z1,
+                    gear_teeth_z2: z2,
+                    face_width_b_mm: b,
+                    helix_angle_beta_deg: beta,
+                    pinion_speed_rpm: rpm,
+                    transmitted_power_kw: power,
+                    pinion_yield_strength_mpa: None,
+                    gear_yield_strength_mpa: None,
+                })?
+            }
+            "cam.physics.cutting_force" => {
+                let op = req.arguments.get("operation").and_then(|v| v.as_str()).map(String::from);
+                let mat = req.arguments.get("workpiece").and_then(|v| v.as_str()).map(String::from);
+                let vc = req.arguments.get("cutting_speed_vc_m_per_min").and_then(|v| v.as_f64());
+                let f = req.arguments.get("feed_f_mm").and_then(|v| v.as_f64());
+                let ap = req.arguments.get("depth_of_cut_ap_mm").and_then(|v| v.as_f64());
+                let ae = req.arguments.get("radial_width_ae_mm").and_then(|v| v.as_f64());
+                let dc = req.arguments.get("tool_diameter_dc_mm").and_then(|v| v.as_f64());
+                let z = req.arguments.get("number_of_teeth_z").and_then(|v| v.as_u64()).map(|v| v as u32);
+                self.cam_cutting_force(&CamCuttingForceRequest {
+                    operation: op,
+                    workpiece: mat,
+                    cutting_speed_vc_m_per_min: vc,
+                    feed_f_mm: f,
+                    depth_of_cut_ap_mm: ap,
+                    radial_width_ae_mm: ae,
+                    tool_diameter_dc_mm: dc,
+                    number_of_teeth_z: z,
+                    rake_angle_gamma_deg: None,
+                    corner_radius_re_mm: None,
+                })?
+            }
+            "sim.electrical.short_circuit" => {
+                let un = req.arguments.get("nominal_voltage_un_v").and_then(|v| v.as_f64());
+                let sn = req.arguments.get("transformer_rated_power_sn_kva").and_then(|v| v.as_f64());
+                let uk = req.arguments.get("transformer_impedance_voltage_uk_percent").and_then(|v| v.as_f64());
+                let l = req.arguments.get("feeder_length_l_m").and_then(|v| v.as_f64());
+                let q = req.arguments.get("conductor_cross_section_q_mm2").and_then(|v| v.as_f64());
+                let mat = req.arguments.get("conductor_material").and_then(|v| v.as_str()).map(String::from);
+                let ib = req.arguments.get("operating_current_ib_a").and_then(|v| v.as_f64());
+                self.sim_electrical_short_circuit(&SimShortCircuitRequest {
+                    nominal_voltage_un_v: un,
+                    transformer_rated_power_sn_kva: sn,
+                    transformer_impedance_voltage_uk_percent: uk,
+                    transformer_copper_losses_pk_kw: None,
+                    feeder_length_l_m: l,
+                    conductor_cross_section_q_mm2: q,
+                    conductor_material: mat,
+                    upstream_short_circuit_mva: None,
+                    operating_current_ib_a: ib,
+                })?
+            }
+            "sim.building.daylight_factor" => {
+                let sky = req.arguments.get("sky_type").and_then(|v| v.as_str()).map(String::from);
+                let l = req.arguments.get("room_length_m").and_then(|v| v.as_f64());
+                let w = req.arguments.get("room_width_m").and_then(|v| v.as_f64());
+                let h = req.arguments.get("room_height_m").and_then(|v| v.as_f64());
+                let ww = req.arguments.get("window_width_m").and_then(|v| v.as_f64());
+                let wh = req.arguments.get("window_height_m").and_then(|v| v.as_f64());
+                let desk = req.arguments.get("desk_distance_from_window_m").and_then(|v| v.as_f64());
+                self.sim_building_daylight_factor(&SimDaylightingRequest {
+                    sky_type: sky,
+                    room_length_m: l,
+                    room_width_m: w,
+                    room_height_m: h,
+                    window_width_m: ww,
+                    window_height_m: wh,
+                    window_sill_height_m: None,
+                    glazing_transmittance: None,
+                    glazing_maintenance_factor: None,
+                    external_obstruction_angle_deg: None,
+                    desk_distance_from_window_m: desk,
+                    desk_height_m: None,
+                    ceiling_reflectance: None,
+                    walls_reflectance: None,
+                    floor_reflectance: None,
+                    ground_reflectance: None,
                 })?
             }
             "system.deploy.status" => self.deploy_status()?,
@@ -7306,6 +7620,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/cad/hardware/fasteners" => {
             match with_state(state, |state| state.cad_hardware_fasteners()) {
                 Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/cad/hardware/spring" => {
+            match parse_body_or_default::<CadHardwareSpringRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.cad_hardware_spring(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/cad/hardware/gear_pair" => {
+            match parse_body_or_default::<CadHardwareGearPairRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.cad_hardware_gear_pair(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/cam/physics/cutting_force" => {
+            match parse_body_or_default::<CamCuttingForceRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.cam_cutting_force(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/electrical/short_circuit" => {
+            match parse_body_or_default::<SimShortCircuitRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_electrical_short_circuit(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/building/daylight_factor" => {
+            match parse_body_or_default::<SimDaylightingRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_building_daylight_factor(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
                 Err(error) => error_response(&error),
             }
         }
@@ -9640,4 +9999,136 @@ struct SimOutdoorNoiseRequest {
     pub relative_humidity_pct: Option<f64>,
     #[serde(default)]
     pub regulatory_limit_dba: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CadHardwareSpringRequest {
+    #[serde(default)]
+    pub wire_diameter_d_mm: Option<f64>,
+    #[serde(default)]
+    pub mean_coil_diameter_d_mm: Option<f64>,
+    #[serde(default)]
+    pub free_length_l0_mm: Option<f64>,
+    #[serde(default)]
+    pub active_coils_na: Option<f64>,
+    #[serde(default)]
+    pub operating_force_f2_n: Option<f64>,
+    #[serde(default)]
+    pub material: Option<String>,
+    #[serde(default)]
+    pub end_type: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CadHardwareGearPairRequest {
+    #[serde(default)]
+    pub gear_type: Option<String>,
+    #[serde(default)]
+    pub normal_module_mn: Option<f64>,
+    #[serde(default)]
+    pub pinion_teeth_z1: Option<u32>,
+    #[serde(default)]
+    pub gear_teeth_z2: Option<u32>,
+    #[serde(default)]
+    pub face_width_b_mm: Option<f64>,
+    #[serde(default)]
+    pub helix_angle_beta_deg: Option<f64>,
+    #[serde(default)]
+    pub pinion_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub transmitted_power_kw: Option<f64>,
+    #[serde(default)]
+    pub pinion_yield_strength_mpa: Option<f64>,
+    #[serde(default)]
+    pub gear_yield_strength_mpa: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CamCuttingForceRequest {
+    #[serde(default)]
+    pub operation: Option<String>,
+    #[serde(default)]
+    pub workpiece: Option<String>,
+    #[serde(default)]
+    pub cutting_speed_vc_m_per_min: Option<f64>,
+    #[serde(default)]
+    pub feed_f_mm: Option<f64>,
+    #[serde(default)]
+    pub depth_of_cut_ap_mm: Option<f64>,
+    #[serde(default)]
+    pub radial_width_ae_mm: Option<f64>,
+    #[serde(default)]
+    pub tool_diameter_dc_mm: Option<f64>,
+    #[serde(default)]
+    pub number_of_teeth_z: Option<u32>,
+    #[serde(default)]
+    pub rake_angle_gamma_deg: Option<f64>,
+    #[serde(default)]
+    pub corner_radius_re_mm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimShortCircuitRequest {
+    #[serde(default)]
+    pub nominal_voltage_un_v: Option<f64>,
+    #[serde(default)]
+    pub transformer_rated_power_sn_kva: Option<f64>,
+    #[serde(default)]
+    pub transformer_impedance_voltage_uk_percent: Option<f64>,
+    #[serde(default)]
+    pub transformer_copper_losses_pk_kw: Option<f64>,
+    #[serde(default)]
+    pub feeder_length_l_m: Option<f64>,
+    #[serde(default)]
+    pub conductor_cross_section_q_mm2: Option<f64>,
+    #[serde(default)]
+    pub conductor_material: Option<String>,
+    #[serde(default)]
+    pub upstream_short_circuit_mva: Option<f64>,
+    #[serde(default)]
+    pub operating_current_ib_a: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimDaylightingRequest {
+    #[serde(default)]
+    pub sky_type: Option<String>,
+    #[serde(default)]
+    pub room_length_m: Option<f64>,
+    #[serde(default)]
+    pub room_width_m: Option<f64>,
+    #[serde(default)]
+    pub room_height_m: Option<f64>,
+    #[serde(default)]
+    pub window_width_m: Option<f64>,
+    #[serde(default)]
+    pub window_height_m: Option<f64>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub window_sill_height_m: Option<f64>,
+    #[serde(default)]
+    pub glazing_transmittance: Option<f64>,
+    #[serde(default)]
+    pub glazing_maintenance_factor: Option<f64>,
+    #[serde(default)]
+    pub external_obstruction_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub desk_distance_from_window_m: Option<f64>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub desk_height_m: Option<f64>,
+    #[serde(default)]
+    pub ceiling_reflectance: Option<f64>,
+    #[serde(default)]
+    pub walls_reflectance: Option<f64>,
+    #[serde(default)]
+    pub floor_reflectance: Option<f64>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub ground_reflectance: Option<f64>,
 }

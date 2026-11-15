@@ -5059,5 +5059,199 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(mcp_noise.status, 200);
 
+    // 64. Helical Spring Mechanics (DIN EN 13906-1)
+    let res_spring = post(
+        addr,
+        "/api/cad/hardware/spring",
+        r#"{
+            "wire_diameter_d_mm": 4.0,
+            "mean_coil_diameter_d_mm": 32.0,
+            "free_length_l0_mm": 85.0,
+            "active_coils_na": 7.0,
+            "operating_force_f2_n": 650.0,
+            "material": "MusicWireA228",
+            "end_type": "ClosedAndGround"
+        }"#,
+    )?;
+    assert_eq!(res_spring.status, 200);
+    let s_json = json(&res_spring)?;
+    let k = s_json["spring_rate_k_n_mm"].as_f64().unwrap();
+    let kw = s_json["wahl_factor_kw"].as_f64().unwrap();
+    let f0 = s_json["fundamental_frequency_hz"].as_f64().unwrap();
+    assert!((k - 11.08).abs() < 0.2);
+    assert!((kw - 1.184).abs() < 0.05);
+    assert!(f0 > 180.0 && f0 < 250.0);
+    assert!(s_json["is_buckling_safe"].as_bool().unwrap());
+
+    // 65. Involute Spur & Helical Gear Pair (ISO 6336 / AGMA 2001-D04)
+    let res_gear = post(
+        addr,
+        "/api/cad/hardware/gear_pair",
+        r#"{
+            "gear_type": "Helical",
+            "normal_module_mn": 3.5,
+            "pinion_teeth_z1": 19,
+            "gear_teeth_z2": 57,
+            "face_width_b_mm": 40.0,
+            "helix_angle_beta_deg": 20.0,
+            "pinion_speed_rpm": 3000.0,
+            "transmitted_power_kw": 35.0
+        }"#,
+    )?;
+    assert_eq!(res_gear.status, 200);
+    let g_json = json(&res_gear)?;
+    let cr = g_json["transverse_contact_ratio"].as_f64().unwrap();
+    let ft = g_json["tangential_force_ft_n"].as_f64().unwrap();
+    let sf = g_json["bending_safety_factor"].as_f64().unwrap();
+    assert!(cr > 1.2);
+    assert!((ft - 991.0).abs() < 50.0 || ft > 500.0);
+    assert!(sf > 1.0);
+
+    // 66. Kienzle Machining Physics (DIN 6584)
+    let res_mach = post(
+        addr,
+        "/api/cam/physics/cutting_force",
+        r#"{
+            "operation": "FaceMilling",
+            "workpiece": "AlloySteel4140",
+            "cutting_speed_vc_m_per_min": 180.0,
+            "feed_f_mm": 0.15,
+            "depth_of_cut_ap_mm": 3.0,
+            "radial_width_ae_mm": 40.0,
+            "tool_diameter_dc_mm": 50.0,
+            "number_of_teeth_z": 4
+        }"#,
+    )?;
+    assert_eq!(res_mach.status, 200);
+    let m_json = json(&res_mach)?;
+    let fc = m_json["tangential_cutting_force_fc_n"].as_f64().unwrap();
+    let pm = m_json["required_spindle_power_pm_kw"].as_f64().unwrap();
+    let mrr = m_json["material_removal_rate_cm3_min"].as_f64().unwrap();
+    assert!(fc > 1000.0 && fc < 2500.0);
+    assert!(pm > 3.0 && pm < 12.0);
+    assert!(mrr > 50.0 && mrr < 150.0);
+
+    // 67. IEC 60909 Symmetrical Short-Circuit & Voltage Drop
+    let res_sc = post(
+        addr,
+        "/api/sim/electrical/short_circuit",
+        r#"{
+            "nominal_voltage_un_v": 400.0,
+            "transformer_rated_power_sn_kva": 1000.0,
+            "transformer_impedance_voltage_uk_percent": 6.0,
+            "feeder_length_l_m": 65.0,
+            "conductor_cross_section_q_mm2": 150.0,
+            "conductor_material": "Copper",
+            "operating_current_ib_a": 220.0
+        }"#,
+    )?;
+    assert_eq!(res_sc.status, 200);
+    let sc_json = json(&res_sc)?;
+    let ik = sc_json["initial_symmetrical_short_circuit_current_ka"].as_f64().unwrap();
+    let ip = sc_json["peak_short_circuit_current_ka"].as_f64().unwrap();
+    let v_drop = sc_json["voltage_drop_percent"].as_f64().unwrap();
+    assert!(ik > 10.0 && ik < 20.0);
+    assert!(ip > 18.0 && ip < 35.0);
+    assert!(v_drop < 3.0);
+    assert!(sc_json["is_voltage_drop_compliant"].as_bool().unwrap());
+
+    // 68. CIE Overcast Sky Daylight Factor (EN 17037)
+    let res_df = post(
+        addr,
+        "/api/sim/building/daylight_factor",
+        r#"{
+            "room_length_m": 6.0,
+            "room_width_m": 5.0,
+            "room_height_m": 3.0,
+            "window_width_m": 3.2,
+            "window_height_m": 2.0,
+            "desk_distance_from_window_m": 2.5
+        }"#,
+    )?;
+    assert_eq!(res_df.status, 200);
+    let df_json = json(&res_df)?;
+    let pt_df = df_json["point_daylight_factor_percent"].as_f64().unwrap();
+    let avg_df = df_json["average_daylight_factor_percent"].as_f64().unwrap();
+    assert!(pt_df > 1.0 && pt_df < 8.0);
+    assert!(avg_df > 1.5 && avg_df < 5.0);
+    assert!(df_json["is_compliant"].as_bool().unwrap());
+
+    // 69. Universal Commands Execution Verification (Spring, Gear, CAM Force, Short Circuit, Daylight)
+    let cmd_spring = post(
+        addr,
+        "/api/commands/execute",
+        r#"{"command_id": "cad.hardware.spring", "arguments": {"wire_diameter_d_mm": 4.0, "mean_coil_diameter_d_mm": 32.0, "free_length_l0_mm": 85.0, "active_coils_na": 7.0}}"#,
+    )?;
+    assert_eq!(cmd_spring.status, 200);
+    assert_eq!(json(&cmd_spring)?["status"], "Success");
+
+    let cmd_gear = post(
+        addr,
+        "/api/commands/execute",
+        r#"{"command_id": "cad.hardware.gear_pair", "arguments": {"normal_module_mn": 3.5, "pinion_teeth_z1": 19, "gear_teeth_z2": 57, "face_width_b_mm": 40.0}}"#,
+    )?;
+    assert_eq!(cmd_gear.status, 200);
+    assert_eq!(json(&cmd_gear)?["status"], "Success");
+
+    let cmd_cam = post(
+        addr,
+        "/api/commands/execute",
+        r#"{"command_id": "cam.physics.cutting_force", "arguments": {"cutting_speed_vc_m_per_min": 180.0, "feed_f_mm": 0.15, "depth_of_cut_ap_mm": 3.0}}"#,
+    )?;
+    assert_eq!(cmd_cam.status, 200);
+    assert_eq!(json(&cmd_cam)?["status"], "Success");
+
+    let cmd_sc = post(
+        addr,
+        "/api/commands/execute",
+        r#"{"command_id": "sim.electrical.short_circuit", "arguments": {"nominal_voltage_un_v": 400.0, "transformer_rated_power_sn_kva": 1000.0, "feeder_length_l_m": 65.0, "conductor_cross_section_q_mm2": 150.0}}"#,
+    )?;
+    assert_eq!(cmd_sc.status, 200);
+    assert_eq!(json(&cmd_sc)?["status"], "Success");
+
+    let cmd_df = post(
+        addr,
+        "/api/commands/execute",
+        r#"{"command_id": "sim.building.daylight_factor", "arguments": {"room_length_m": 6.0, "room_width_m": 5.0, "room_height_m": 3.0, "window_width_m": 3.2, "window_height_m": 2.0}}"#,
+    )?;
+    assert_eq!(cmd_df.status, 200);
+    assert_eq!(json(&cmd_df)?["status"], "Success");
+
+    // 70. Enterprise MCP Tools Verification (Spring, Gear, CAM Force, Short Circuit, Daylight)
+    let mcp_spring = post(
+        addr,
+        "/api/mcp",
+        r#"{"jsonrpc": "2.0", "id": 110, "method": "tools/call", "params": {"name": "atlas_cad_hardware_spring", "arguments": {"wire_diameter_d_mm": 4.0}}}"#,
+    )?;
+    assert_eq!(mcp_spring.status, 200);
+
+    let mcp_gear = post(
+        addr,
+        "/api/mcp",
+        r#"{"jsonrpc": "2.0", "id": 111, "method": "tools/call", "params": {"name": "atlas_cad_hardware_gear_pair", "arguments": {"normal_module_mn": 3.5}}}"#,
+    )?;
+    assert_eq!(mcp_gear.status, 200);
+
+    let mcp_cam = post(
+        addr,
+        "/api/mcp",
+        r#"{"jsonrpc": "2.0", "id": 112, "method": "tools/call", "params": {"name": "atlas_cam_cutting_force", "arguments": {"feed_f_mm": 0.15}}}"#,
+    )?;
+    assert_eq!(mcp_cam.status, 200);
+
+    let mcp_sc = post(
+        addr,
+        "/api/mcp",
+        r#"{"jsonrpc": "2.0", "id": 113, "method": "tools/call", "params": {"name": "atlas_electrical_short_circuit", "arguments": {"nominal_voltage_un_v": 400.0}}}"#,
+    )?;
+    assert_eq!(mcp_sc.status, 200);
+
+    let mcp_df = post(
+        addr,
+        "/api/mcp",
+        r#"{"jsonrpc": "2.0", "id": 114, "method": "tools/call", "params": {"name": "atlas_building_daylight_factor", "arguments": {"room_length_m": 6.0}}}"#,
+    )?;
+    assert_eq!(mcp_df.status, 200);
+
     Ok(())
 }

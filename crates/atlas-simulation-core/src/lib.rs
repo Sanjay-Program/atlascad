@@ -14,6 +14,7 @@ pub mod cavitation;
 pub mod cfd;
 pub mod chemical;
 pub mod convergence;
+pub mod daylighting;
 pub mod digital_twin;
 pub mod elastoplasticity;
 pub mod electromagnetics;
@@ -22,10 +23,12 @@ pub mod environmental;
 pub mod execution;
 pub mod fasteners;
 pub mod fsi;
+pub mod gears;
 pub mod generative;
 pub mod geotechnical;
 pub mod heat_exchanger;
 pub mod hypersonic;
+pub mod machining_physics;
 pub mod marine;
 pub mod materials;
 pub mod model;
@@ -39,8 +42,10 @@ pub mod robotics;
 pub mod rock_mechanics;
 pub mod sheet_metal;
 pub mod shock_response;
+pub mod short_circuit;
 pub mod signal_integrity;
 pub mod solar;
+pub mod springs;
 pub mod solver_settings;
 pub mod structural;
 pub mod thermal_stress;
@@ -77,6 +82,10 @@ pub mod prelude {
         solve_reaction_kinetics, solve_reaction_kinetics_sim,
     };
     pub use crate::convergence::{ConvergenceMonitor, IterationTelemetry};
+    pub use crate::daylighting::{
+        CieSkyType, DaylightingProblem, DaylightingResult, RoomSurfaceFinishes,
+        solve_cie_daylight_factor, solve_daylighting_sim,
+    };
     pub use crate::digital_twin::{
         DigitalTwinProblem, StrainRosetteTelemetry, StressCycleBlock, solve_digital_twin,
     };
@@ -93,6 +102,10 @@ pub mod prelude {
         get_standard_metric_threads, solve_bolted_joint, solve_bolted_joint_sim,
     };
     pub use crate::fsi::{FsiProblem, solve_fsi_coupled};
+    pub use crate::gears::{
+        GearToothProfile, GearType, InvoluteGearPairProblem, InvoluteGearPairResult,
+        solve_gear_pair_sim, solve_involute_gear_pair,
+    };
     pub use crate::generative::{
         GenerativeMesh, GenerativeSolution, TopologyOptProblem, filter_sensitivities,
         reconstruct_generative_mesh, solve_topology_optimization,
@@ -125,6 +138,10 @@ pub mod prelude {
             evaluate_6dof_btt_maneuver, evaluate_hypersonic_flutter,
             evaluate_trajectory_corridor,
         },
+    };
+    pub use crate::machining_physics::{
+        KienzleMachiningProblem, KienzleMachiningResult, MachiningOperation, WorkpieceMachinability,
+        solve_kienzle_machining, solve_machining_physics_sim,
     };
     pub use crate::marine::{
         AiryWaveRequest, AiryWaveResult, MarineHydrostaticsRequest, MarineHydrostaticsResult,
@@ -159,9 +176,17 @@ pub mod prelude {
         solve_sheet_metal_sim, solve_sheet_metal_unfold,
     };
     pub use crate::shock_response::{ShockResponseProblem, solve_shock_response_spectrum};
+    pub use crate::short_circuit::{
+        ConductorMaterial, ShortCircuitProblem, ShortCircuitResult, solve_iec60909_short_circuit,
+        solve_short_circuit_sim,
+    };
     pub use crate::signal_integrity::{PcbTransmissionLineProblem, solve_pcb_signal_integrity};
     pub use crate::solar::{SolarPvProblem, solve_solar_pv};
     pub use crate::solver_settings::SolverSettings;
+    pub use crate::springs::{
+        HelicalSpringProblem, HelicalSpringResult, SpringEndType, SpringMaterial,
+        solve_helical_compression_spring, solve_helical_spring_sim,
+    };
     pub use crate::structural::{
         BucklingProblem, ColumnEndCondition, CompositeFailureProblem, CompositeLaminateProblem,
         FatigueProblem, LaminaStrengthLimits, OrthotropicLamina, solve_column_buckling,

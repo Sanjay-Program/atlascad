@@ -991,6 +991,83 @@ def simulation_section(studio: Studio) -> None:
     noise_data = noise.json()
     check(abs(noise_data.get("divergence_attenuation_db", 0.0) - 52.58) < 0.2, "divergence matches ISO 9613-2")
     check(noise_data.get("is_compliant") is True, "receiver is compliant")
+
+    # 10. Helical Spring Mechanics (DIN EN 13906-1)
+    spring = studio.post("/api/cad/hardware/spring", {
+        "wire_diameter_d_mm": 4.0,
+        "mean_coil_diameter_d_mm": 32.0,
+        "free_length_l0_mm": 85.0,
+        "active_coils_na": 7.0,
+        "operating_force_f2_n": 650.0,
+        "material": "MusicWireA228",
+        "end_type": "ClosedAndGround"
+    })
+    check(spring.status == 200, f"spring returns 200 (got {spring.status})")
+    sp_data = spring.json()
+    check(abs(sp_data.get("spring_rate_k_n_mm", 0.0) - 11.08) < 0.2, "spring rate k matches DIN EN 13906-1")
+    check(abs(sp_data.get("wahl_factor_kw", 0.0) - 1.184) < 0.05, "Wahl factor matches")
+    check(sp_data.get("is_buckling_safe") is True, "spring is free-standing buckling safe")
+
+    # 11. Involute Gear Pair Mechanics (ISO 6336 / AGMA 2001-D04)
+    gear = studio.post("/api/cad/hardware/gear_pair", {
+        "gear_type": "Helical",
+        "normal_module_mn": 3.5,
+        "pinion_teeth_z1": 19,
+        "gear_teeth_z2": 57,
+        "face_width_b_mm": 40.0,
+        "helix_angle_beta_deg": 20.0,
+        "pinion_speed_rpm": 3000.0,
+        "transmitted_power_kw": 35.0
+    })
+    check(gear.status == 200, f"gear pair returns 200 (got {gear.status})")
+    g_data = gear.json()
+    check(g_data.get("transverse_contact_ratio", 0.0) > 1.2, "contact ratio >= 1.20 adequate")
+    check(g_data.get("bending_safety_factor", 0.0) > 1.0, "AGMA bending safety factor adequate")
+
+    # 12. Kienzle Machining Physics (DIN 6584)
+    milling = studio.post("/api/cam/physics/cutting_force", {
+        "operation": "FaceMilling",
+        "workpiece": "AlloySteel4140",
+        "cutting_speed_vc_m_per_min": 180.0,
+        "feed_f_mm": 0.15,
+        "depth_of_cut_ap_mm": 3.0,
+        "radial_width_ae_mm": 40.0,
+        "tool_diameter_dc_mm": 50.0,
+        "number_of_teeth_z": 4
+    })
+    check(milling.status == 200, f"kienzle milling returns 200 (got {milling.status})")
+    m_data = milling.json()
+    check(m_data.get("tangential_cutting_force_fc_n", 0.0) > 1000.0, "tangential cutting force calculated")
+    check(m_data.get("material_removal_rate_cm3_min", 0.0) > 50.0, "MRR calculated")
+
+    # 13. Industrial Electrical Short-Circuit & Cable Sizing (IEC 60909)
+    sc = studio.post("/api/sim/electrical/short_circuit", {
+        "nominal_voltage_un_v": 400.0,
+        "transformer_rated_power_sn_kva": 1000.0,
+        "transformer_impedance_voltage_uk_percent": 6.0,
+        "feeder_length_l_m": 65.0,
+        "conductor_cross_section_q_mm2": 150.0,
+        "conductor_material": "Copper",
+        "operating_current_ib_a": 220.0
+    })
+    check(sc.status == 200, f"IEC 60909 short circuit returns 200 (got {sc.status})")
+    sc_data = sc.json()
+    check(10.0 < sc_data.get("initial_symmetrical_short_circuit_current_ka", 0.0) < 20.0, "Ik'' short circuit current within range")
+    check(sc_data.get("is_voltage_drop_compliant") is True, "cable feeder voltage drop <= 3.0%")
+
+    # 14. Architectural Daylighting & CIE Sky Luminescence (EN 17037)
+    daylighting = studio.post("/api/sim/building/daylight_factor", {
+        "room_length_m": 6.0,
+        "room_width_m": 5.0,
+        "room_height_m": 3.0,
+        "window_width_m": 3.2,
+        "window_height_m": 2.0,
+        "desk_distance_from_window_m": 2.5
+    })
+    check(daylighting.status == 200, f"daylighting returns 200 (got {daylighting.status})")
+    df_data = daylighting.json()
+    check(df_data.get("point_daylight_factor_percent", 0.0) > 1.0, "point daylight factor calculated")
+    check(df_data.get("is_compliant") is True, "EN 17037 office daylighting target satisfied")
     report("simulation")
 
 
