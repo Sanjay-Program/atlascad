@@ -8,6 +8,7 @@ pub mod aerodynamics;
 pub mod aeroelasticity;
 pub mod automotive_braking;
 pub mod battery_ev;
+pub mod belt_transmission;
 pub mod biomedical;
 pub mod boundary_conditions;
 pub mod building_physics;
@@ -35,8 +36,10 @@ pub mod geotechnical_bearing;
 pub mod heat_exchanger;
 pub mod heat_exchanger_rating;
 pub mod hvac_ducts;
+pub mod hydraulic_actuator;
 pub mod hydrology;
 pub mod hypersonic;
+pub mod induction_motor;
 pub mod machining_physics;
 pub mod marine;
 pub mod marine_propeller;
@@ -61,7 +64,9 @@ pub mod sheet_metal;
 pub mod shock_response;
 pub mod short_circuit;
 pub mod signal_integrity;
+pub mod slope_stability;
 pub mod solar;
+pub mod solar_thermal;
 pub mod springs;
 pub mod solver_settings;
 pub mod structural;
@@ -87,6 +92,10 @@ pub mod prelude {
     };
     pub use crate::battery_ev::{
         BatteryPackProblem, VehicleDynamicsProblem, solve_battery_pack, solve_vehicle_dynamics,
+    };
+    pub use crate::belt_transmission::{
+        BeltProfile, BeltTransmissionProblem, BeltTransmissionResult,
+        solve_belt_transmission, solve_belt_transmission_sim,
     };
     pub use crate::biomedical::{
         HemodynamicsRequest, HemodynamicsResult, OrthopedicBoneRequest, OrthopedicBoneResult,
@@ -166,6 +175,10 @@ pub mod prelude {
         DuctGeometry, DuctMaterial, HvacDuctProblem, HvacDuctResult,
         solve_hvac_ducts, solve_hvac_ducts_sim,
     };
+    pub use crate::hydraulic_actuator::{
+        HydraulicActuatorProblem, HydraulicActuatorResult, MountingCondition,
+        solve_hydraulic_actuator, solve_hydraulic_actuator_sim,
+    };
     pub use crate::hydrology::{
         HydrologyProblem, HydrologyResult, LandUseCategory, PipeMaterial,
         solve_hydrology_sim, solve_rational_runoff_and_pipe,
@@ -194,6 +207,10 @@ pub mod prelude {
             evaluate_6dof_btt_maneuver, evaluate_hypersonic_flutter,
             evaluate_trajectory_corridor,
         },
+    };
+    pub use crate::induction_motor::{
+        InductionMotorProblem, InductionMotorResult,
+        solve_induction_motor, solve_induction_motor_sim,
     };
     pub use crate::machining_physics::{
         KienzleMachiningProblem, KienzleMachiningResult, MachiningOperation, WorkpieceMachinability,
@@ -269,7 +286,15 @@ pub mod prelude {
         solve_short_circuit_sim,
     };
     pub use crate::signal_integrity::{PcbTransmissionLineProblem, solve_pcb_signal_integrity};
+    pub use crate::slope_stability::{
+        SlopeStabilityProblem, SlopeStabilityResult,
+        solve_slope_stability, solve_slope_stability_sim,
+    };
     pub use crate::solar::{SolarPvProblem, solve_solar_pv};
+    pub use crate::solar_thermal::{
+        CollectorType, SolarThermalProblem, SolarThermalResult,
+        solve_solar_thermal, solve_solar_thermal_sim,
+    };
     pub use crate::solver_settings::SolverSettings;
     pub use crate::springs::{
         HelicalSpringProblem, HelicalSpringResult, SpringEndType, SpringMaterial,

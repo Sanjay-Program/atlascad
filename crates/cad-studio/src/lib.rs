@@ -5027,6 +5027,124 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_hydraulic_cylinder(
+        &mut self,
+        req: &SimHydraulicCylinderRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::hydraulic_actuator::HydraulicActuatorProblem {
+            problem_id: "hydraulic_cylinder_sim".to_string(),
+            bore_diameter_mm: req.bore_diameter_mm.unwrap_or(100.0),
+            rod_diameter_mm: req.rod_diameter_mm.unwrap_or(56.0),
+            stroke_length_mm: req.stroke_length_mm.unwrap_or(600.0),
+            working_pressure_bar: req.working_pressure_bar.unwrap_or(210.0),
+            barrel_wall_thickness_mm: req.barrel_wall_thickness_mm.unwrap_or(12.0),
+            barrel_yield_strength_mpa: req.barrel_yield_strength_mpa.unwrap_or(355.0),
+            rod_yield_strength_mpa: req.rod_yield_strength_mpa.unwrap_or(460.0),
+            rod_youngs_modulus_gpa: req.rod_youngs_modulus_gpa.unwrap_or(210.0),
+            mounting_end_condition: atlas_simulation_core::hydraulic_actuator::MountingCondition::PinnedPinned,
+            load_mass_kg: req.load_mass_kg.unwrap_or(2500.0),
+            stroke_velocity_m_s: req.stroke_velocity_m_s.unwrap_or(0.45),
+            cushion_length_mm: req.cushion_length_mm.unwrap_or(25.0),
+            cushion_spear_diameter_mm: req.cushion_spear_diameter_mm.unwrap_or(32.0),
+            mechanical_efficiency: req.mechanical_efficiency.unwrap_or(0.95),
+        };
+        let res = atlas_simulation_core::hydraulic_actuator::solve_hydraulic_actuator(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_mechanical_belt_drive(
+        &mut self,
+        req: &SimBeltDriveRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::belt_transmission::BeltTransmissionProblem {
+            problem_id: "belt_drive_sim".to_string(),
+            power_kw: req.power_kw.unwrap_or(15.0),
+            driver_speed_rpm: req.driver_speed_rpm.unwrap_or(1450.0),
+            driver_diameter_mm: req.driver_diameter_mm.unwrap_or(160.0),
+            driven_diameter_mm: req.driven_diameter_mm.unwrap_or(315.0),
+            center_distance_mm: req.center_distance_mm.unwrap_or(600.0),
+            belt_profile: atlas_simulation_core::belt_transmission::BeltProfile::Spa,
+            service_factor: req.service_factor.unwrap_or(1.30),
+            friction_coefficient: req.friction_coefficient.unwrap_or(0.35),
+            belt_linear_mass_kg_m: req.belt_linear_mass_kg_m.unwrap_or(0.125),
+            max_allowable_tension_per_belt_n: req.max_allowable_tension_per_belt_n.unwrap_or(1100.0),
+        };
+        let res = atlas_simulation_core::belt_transmission::solve_belt_transmission(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_geotechnical_slope_stability(
+        &mut self,
+        req: &SimSlopeStabilityRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::slope_stability::SlopeStabilityProblem {
+            problem_id: "slope_stability_sim".to_string(),
+            slope_height_m: req.slope_height_m.unwrap_or(10.0),
+            slope_angle_deg: req.slope_angle_deg.unwrap_or(32.0),
+            soil_unit_weight_kn_m3: req.soil_unit_weight_kn_m3.unwrap_or(19.0),
+            effective_cohesion_kpa: req.effective_cohesion_kpa.unwrap_or(12.0),
+            effective_friction_angle_deg: req.effective_friction_angle_deg.unwrap_or(27.0),
+            pore_pressure_ratio_ru: req.pore_pressure_ratio_ru.unwrap_or(0.15),
+            seismic_coefficient_kh: req.seismic_coefficient_kh.unwrap_or(0.05),
+            circle_center_x_m: req.circle_center_x_m.unwrap_or(5.5),
+            circle_center_y_m: req.circle_center_y_m.unwrap_or(16.0),
+            slip_circle_radius_m: req.slip_circle_radius_m.unwrap_or(17.5),
+            number_of_slices: req.number_of_slices.unwrap_or(25),
+            convergence_tolerance: 1.0e-5,
+        };
+        let res = atlas_simulation_core::slope_stability::solve_slope_stability(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_electrical_induction_motor(
+        &mut self,
+        req: &SimInductionMotorRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::induction_motor::InductionMotorProblem {
+            problem_id: "induction_motor_sim".to_string(),
+            rated_power_kw: req.rated_power_kw.unwrap_or(15.0),
+            rated_voltage_ll_v: req.rated_voltage_ll_v.unwrap_or(400.0),
+            frequency_hz: req.frequency_hz.unwrap_or(50.0),
+            pole_count: req.pole_count.unwrap_or(4),
+            stator_resistance_r1_ohm: req.stator_resistance_r1_ohm.unwrap_or(0.35),
+            stator_leakage_reactance_x1_ohm: req.stator_leakage_reactance_x1_ohm.unwrap_or(0.85),
+            rotor_resistance_r2_prime_ohm: req.rotor_resistance_r2_prime_ohm.unwrap_or(0.32),
+            rotor_leakage_reactance_x2_prime_ohm: req.rotor_leakage_reactance_x2_prime_ohm.unwrap_or(0.95),
+            magnetizing_reactance_xm_ohm: req.magnetizing_reactance_xm_ohm.unwrap_or(38.0),
+            rotational_loss_w: req.rotational_loss_w.unwrap_or(450.0),
+            operating_slip: req.operating_slip,
+        };
+        let res = atlas_simulation_core::induction_motor::solve_induction_motor(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_thermal_solar_collector(
+        &mut self,
+        req: &SimSolarCollectorRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::solar_thermal::SolarThermalProblem {
+            problem_id: "solar_collector_sim".to_string(),
+            collector_type: atlas_simulation_core::solar_thermal::CollectorType::FlatPlateGlazed,
+            gross_area_m2: req.gross_area_m2.unwrap_or(2.50),
+            aperture_area_m2: req.aperture_area_m2.unwrap_or(2.30),
+            solar_irradiance_w_m2: req.solar_irradiance_w_m2.unwrap_or(850.0),
+            ambient_temperature_c: req.ambient_temp_c.unwrap_or(20.0),
+            fluid_inlet_temp_c: req.fluid_inlet_temp_c.unwrap_or(45.0),
+            fluid_flow_rate_kg_s: req.fluid_flow_rate_kg_s.unwrap_or(0.045),
+            fluid_specific_heat_j_kg_k: req.fluid_specific_heat_j_kg_k.unwrap_or(4182.0),
+            optical_efficiency_eta0: req.optical_efficiency_eta0,
+            linear_heat_loss_a1: req.linear_heat_loss_a1,
+            quadratic_heat_loss_a2: req.quadratic_heat_loss_a2,
+        };
+        let res = atlas_simulation_core::solar_thermal::solve_solar_thermal(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -6778,6 +6896,79 @@ namespace AtlasCAD.Unity
                     core_mass_flow_kg_s: m_core,
                     compressor_pressure_ratio: opr,
                     turbine_inlet_temp_k: tit,
+                    ..Default::default()
+                })?
+            }
+            "sim.hydraulic.cylinder" => {
+                let bore = req.arguments.get("bore_diameter_mm").and_then(|v| v.as_f64());
+                let rod = req.arguments.get("rod_diameter_mm").and_then(|v| v.as_f64());
+                let stroke = req.arguments.get("stroke_length_mm").and_then(|v| v.as_f64());
+                let press = req.arguments.get("working_pressure_bar").and_then(|v| v.as_f64());
+                let wall = req.arguments.get("barrel_wall_thickness_mm").and_then(|v| v.as_f64());
+                self.sim_hydraulic_cylinder(&SimHydraulicCylinderRequest {
+                    bore_diameter_mm: bore,
+                    rod_diameter_mm: rod,
+                    stroke_length_mm: stroke,
+                    working_pressure_bar: press,
+                    barrel_wall_thickness_mm: wall,
+                    ..Default::default()
+                })?
+            }
+            "sim.mechanical.belt_drive" => {
+                let p = req.arguments.get("power_kw").and_then(|v| v.as_f64());
+                let n1 = req.arguments.get("driver_speed_rpm").and_then(|v| v.as_f64());
+                let d1 = req.arguments.get("driver_diameter_mm").and_then(|v| v.as_f64());
+                let d2 = req.arguments.get("driven_diameter_mm").and_then(|v| v.as_f64());
+                let c = req.arguments.get("center_distance_mm").and_then(|v| v.as_f64());
+                self.sim_mechanical_belt_drive(&SimBeltDriveRequest {
+                    power_kw: p,
+                    driver_speed_rpm: n1,
+                    driver_diameter_mm: d1,
+                    driven_diameter_mm: d2,
+                    center_distance_mm: c,
+                    ..Default::default()
+                })?
+            }
+            "sim.geotechnical.slope_stability" => {
+                let h = req.arguments.get("slope_height_m").and_then(|v| v.as_f64());
+                let beta = req.arguments.get("slope_angle_deg").and_then(|v| v.as_f64());
+                let gamma = req.arguments.get("soil_unit_weight_kn_m3").and_then(|v| v.as_f64());
+                let c = req.arguments.get("effective_cohesion_kpa").and_then(|v| v.as_f64());
+                let phi = req.arguments.get("effective_friction_angle_deg").and_then(|v| v.as_f64());
+                self.sim_geotechnical_slope_stability(&SimSlopeStabilityRequest {
+                    slope_height_m: h,
+                    slope_angle_deg: beta,
+                    soil_unit_weight_kn_m3: gamma,
+                    effective_cohesion_kpa: c,
+                    effective_friction_angle_deg: phi,
+                    ..Default::default()
+                })?
+            }
+            "sim.electrical.induction_motor" => {
+                let p = req.arguments.get("rated_power_kw").and_then(|v| v.as_f64());
+                let v = req.arguments.get("rated_voltage_ll_v").and_then(|v| v.as_f64());
+                let f = req.arguments.get("frequency_hz").and_then(|v| v.as_f64());
+                let poles = req.arguments.get("pole_count").and_then(|v| v.as_u64()).map(|n| n as usize);
+                self.sim_electrical_induction_motor(&SimInductionMotorRequest {
+                    rated_power_kw: p,
+                    rated_voltage_ll_v: v,
+                    frequency_hz: f,
+                    pole_count: poles,
+                    ..Default::default()
+                })?
+            }
+            "sim.thermal.solar_collector" => {
+                let a = req.arguments.get("aperture_area_m2").and_then(|v| v.as_f64());
+                let g = req.arguments.get("solar_irradiance_w_m2").and_then(|v| v.as_f64());
+                let t_amb = req.arguments.get("ambient_temp_c").and_then(|v| v.as_f64());
+                let t_in = req.arguments.get("fluid_inlet_temp_c").and_then(|v| v.as_f64());
+                let m_dot = req.arguments.get("fluid_flow_rate_kg_s").and_then(|v| v.as_f64());
+                self.sim_thermal_solar_collector(&SimSolarCollectorRequest {
+                    aperture_area_m2: a,
+                    solar_irradiance_w_m2: g,
+                    ambient_temp_c: t_amb,
+                    fluid_inlet_temp_c: t_in,
+                    fluid_flow_rate_kg_s: m_dot,
                     ..Default::default()
                 })?
             }
@@ -8699,6 +8890,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/aerospace/gas_turbine" => {
             match parse_body_or_default::<SimGasTurbineRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_aerospace_gas_turbine(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/hydraulic/cylinder" => {
+            match parse_body_or_default::<SimHydraulicCylinderRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_hydraulic_cylinder(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/mechanical/belt_drive" => {
+            match parse_body_or_default::<SimBeltDriveRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_mechanical_belt_drive(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/geotechnical/slope_stability" => {
+            match parse_body_or_default::<SimSlopeStabilityRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_geotechnical_slope_stability(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/electrical/induction_motor" => {
+            match parse_body_or_default::<SimInductionMotorRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_electrical_induction_motor(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/thermal/solar_collector" => {
+            match parse_body_or_default::<SimSolarCollectorRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_thermal_solar_collector(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -11592,4 +11828,137 @@ struct SimGasTurbineRequest {
     pub turbine_isentropic_efficiency: Option<f64>,
     #[serde(default)]
     pub combustor_efficiency: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimHydraulicCylinderRequest {
+    #[serde(default)]
+    pub bore_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub rod_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub stroke_length_mm: Option<f64>,
+    #[serde(default)]
+    pub working_pressure_bar: Option<f64>,
+    #[serde(default)]
+    pub barrel_wall_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub barrel_yield_strength_mpa: Option<f64>,
+    #[serde(default)]
+    pub rod_yield_strength_mpa: Option<f64>,
+    #[serde(default)]
+    pub rod_youngs_modulus_gpa: Option<f64>,
+    #[serde(default)]
+    pub load_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub stroke_velocity_m_s: Option<f64>,
+    #[serde(default)]
+    pub cushion_length_mm: Option<f64>,
+    #[serde(default)]
+    pub cushion_spear_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub mechanical_efficiency: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimBeltDriveRequest {
+    #[serde(default)]
+    pub power_kw: Option<f64>,
+    #[serde(default)]
+    pub driver_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub driver_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub driven_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub center_distance_mm: Option<f64>,
+    #[serde(default)]
+    pub service_factor: Option<f64>,
+    #[serde(default)]
+    pub friction_coefficient: Option<f64>,
+    #[serde(default)]
+    pub belt_linear_mass_kg_m: Option<f64>,
+    #[serde(default)]
+    pub max_allowable_tension_per_belt_n: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimSlopeStabilityRequest {
+    #[serde(default)]
+    pub slope_height_m: Option<f64>,
+    #[serde(default)]
+    pub slope_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub soil_unit_weight_kn_m3: Option<f64>,
+    #[serde(default)]
+    pub effective_cohesion_kpa: Option<f64>,
+    #[serde(default)]
+    pub effective_friction_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub pore_pressure_ratio_ru: Option<f64>,
+    #[serde(default)]
+    pub seismic_coefficient_kh: Option<f64>,
+    #[serde(default)]
+    pub circle_center_x_m: Option<f64>,
+    #[serde(default)]
+    pub circle_center_y_m: Option<f64>,
+    #[serde(default)]
+    pub slip_circle_radius_m: Option<f64>,
+    #[serde(default)]
+    pub number_of_slices: Option<usize>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimInductionMotorRequest {
+    #[serde(default)]
+    pub rated_power_kw: Option<f64>,
+    #[serde(default)]
+    pub rated_voltage_ll_v: Option<f64>,
+    #[serde(default)]
+    pub frequency_hz: Option<f64>,
+    #[serde(default)]
+    pub pole_count: Option<usize>,
+    #[serde(default)]
+    pub stator_resistance_r1_ohm: Option<f64>,
+    #[serde(default)]
+    pub stator_leakage_reactance_x1_ohm: Option<f64>,
+    #[serde(default)]
+    pub rotor_resistance_r2_prime_ohm: Option<f64>,
+    #[serde(default)]
+    pub rotor_leakage_reactance_x2_prime_ohm: Option<f64>,
+    #[serde(default)]
+    pub magnetizing_reactance_xm_ohm: Option<f64>,
+    #[serde(default)]
+    pub rotational_loss_w: Option<f64>,
+    #[serde(default)]
+    pub operating_slip: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimSolarCollectorRequest {
+    #[serde(default)]
+    pub gross_area_m2: Option<f64>,
+    #[serde(default)]
+    pub aperture_area_m2: Option<f64>,
+    #[serde(default)]
+    pub solar_irradiance_w_m2: Option<f64>,
+    #[serde(default)]
+    pub ambient_temp_c: Option<f64>,
+    #[serde(default)]
+    pub fluid_inlet_temp_c: Option<f64>,
+    #[serde(default)]
+    pub fluid_flow_rate_kg_s: Option<f64>,
+    #[serde(default)]
+    pub fluid_specific_heat_j_kg_k: Option<f64>,
+    #[serde(default)]
+    pub optical_efficiency_eta0: Option<f64>,
+    #[serde(default)]
+    pub linear_heat_loss_a1: Option<f64>,
+    #[serde(default)]
+    pub quadratic_heat_loss_a2: Option<f64>,
 }

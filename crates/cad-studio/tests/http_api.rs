@@ -5764,5 +5764,132 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 99. Hydraulic Actuator Mechanics, Barrel Stresses & Buckling (ISO 6020-2)
+    let res_actuator = post(
+        addr,
+        "/api/sim/hydraulic/cylinder",
+        r#"{
+            "bore_diameter_mm": 100.0,
+            "rod_diameter_mm": 56.0,
+            "stroke_length_mm": 600.0,
+            "working_pressure_bar": 210.0,
+            "barrel_wall_thickness_mm": 12.0
+        }"#,
+    )?;
+    assert_eq!(res_actuator.status, 200);
+    let act_json = json(&res_actuator)?;
+    assert!(act_json["push_force_kn"].as_f64().unwrap() > 140.0);
+    assert!(act_json["pull_force_kn"].as_f64().unwrap() > 95.0);
+    assert!(act_json["barrel_safety_factor"].as_f64().unwrap() > 1.8);
+    assert!(act_json["rod_buckling_safety_factor"].as_f64().unwrap() > 2.0);
+    assert!(act_json["is_safe"].as_bool().unwrap());
+
+    // 100. Belt & Pulley Power Transmission (ISO 5296 / RMA IP-20)
+    let res_belt = post(
+        addr,
+        "/api/sim/mechanical/belt_drive",
+        r#"{
+            "power_kw": 15.0,
+            "driver_speed_rpm": 1450.0,
+            "driver_diameter_mm": 160.0,
+            "driven_diameter_mm": 315.0,
+            "center_distance_mm": 600.0
+        }"#,
+    )?;
+    assert_eq!(res_belt.status, 200);
+    let belt_json = json(&res_belt)?;
+    assert!(belt_json["belt_velocity_m_s"].as_f64().unwrap() > 10.0);
+    assert!(belt_json["belts_required"].as_u64().unwrap() >= 2);
+    assert!(belt_json["shaft_reaction_force_n"].as_f64().unwrap() > 1000.0);
+    assert!(belt_json["is_safe"].as_bool().unwrap());
+
+    // 101. Soil Slope Stability Analysis (Bishop's Method of Slices / Eurocode 7)
+    let res_slope = post(
+        addr,
+        "/api/sim/geotechnical/slope_stability",
+        r#"{
+            "slope_height_m": 10.0,
+            "slope_angle_deg": 32.0,
+            "soil_unit_weight_kn_m3": 19.0,
+            "effective_cohesion_kpa": 12.0,
+            "effective_friction_angle_deg": 27.0
+        }"#,
+    )?;
+    assert_eq!(res_slope.status, 200);
+    let slope_json = json(&res_slope)?;
+    assert!(slope_json["factor_of_safety_bishop"].as_f64().unwrap() > 1.1);
+    assert!(slope_json["converged"].as_bool().unwrap());
+    assert!(slope_json["active_slices_count"].as_u64().unwrap() > 10);
+
+    // 102. Three-Phase Induction Motor Electromechanics & Torque-Speed (IEEE 112 / NEMA MG-1)
+    let res_motor = post(
+        addr,
+        "/api/sim/electrical/induction_motor",
+        r#"{
+            "rated_power_kw": 15.0,
+            "rated_voltage_ll_v": 400.0,
+            "frequency_hz": 50.0,
+            "pole_count": 4
+        }"#,
+    )?;
+    assert_eq!(res_motor.status, 200);
+    let motor_json = json(&res_motor)?;
+    assert_eq!(motor_json["synchronous_speed_rpm"].as_f64().unwrap(), 1500.0);
+    assert!(motor_json["operating_speed_rpm"].as_f64().unwrap() > 1420.0);
+    assert!(motor_json["efficiency_pct"].as_f64().unwrap() > 85.0);
+    assert!(motor_json["torque_ratio_breakdown_rated"].as_f64().unwrap() > 1.75);
+    assert!(motor_json["is_safe"].as_bool().unwrap());
+
+    // 103. Solar Thermal Collector & Heat Pipe Efficiency (ISO 9806 / EN 12975)
+    let res_solar = post(
+        addr,
+        "/api/sim/thermal/solar_collector",
+        r#"{
+            "aperture_area_m2": 2.30,
+            "solar_irradiance_w_m2": 850.0,
+            "ambient_temp_c": 20.0,
+            "fluid_inlet_temp_c": 45.0
+        }"#,
+    )?;
+    assert_eq!(res_solar.status, 200);
+    let solar_json = json(&res_solar)?;
+    assert!(solar_json["collector_efficiency_pct"].as_f64().unwrap() > 50.0);
+    assert!(solar_json["useful_thermal_power_w"].as_f64().unwrap() > 900.0);
+    assert!(solar_json["stagnation_temperature_c"].as_f64().unwrap() > 130.0);
+    assert!(solar_json["is_safe"].as_bool().unwrap());
+
+    // 104. Universal Commands Execution Verification (Batch 7 Domains)
+    for cmd_id in [
+        "sim.hydraulic.cylinder",
+        "sim.mechanical.belt_drive",
+        "sim.geotechnical.slope_stability",
+        "sim.electrical.induction_motor",
+        "sim.thermal.solar_collector",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 105. Enterprise MCP Tool Calling (Batch 7 Domains)
+    for tool_name in [
+        "atlas_sim_hydraulic_cylinder",
+        "atlas_sim_mechanical_belt_drive",
+        "atlas_sim_geotechnical_slope_stability",
+        "atlas_sim_electrical_induction_motor",
+        "atlas_sim_thermal_solar_collector",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 160, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

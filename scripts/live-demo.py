@@ -2153,6 +2153,113 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 21.7 Enterprise MCP Tool Calling: 5 Batch-6 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # ---------------------------------------------------------------------
+        # DEMO 22: BATCH 7 MULTI-DISCIPLINARY ENGINEERING (HYDRAULICS, BELTS,
+        #          SLOPE STABILITY, INDUCTION MOTORS, SOLAR THERMAL)
+        # ---------------------------------------------------------------------
+        print("\n[22/22] Testing Batch 7 Multi-Disciplinary Engineering Engines...")
+
+        # 22.1 Hydraulic Actuator Mechanics & Barrel Stresses (ISO 6020-2 / NFPA T3.6.7 R2)
+        cyl_res = http_request(port, "POST", "/api/sim/hydraulic/cylinder", body={
+            "bore_diameter_mm": 100.0,
+            "rod_diameter_mm": 56.0,
+            "stroke_length_mm": 600.0,
+            "working_pressure_bar": 210.0,
+            "barrel_wall_thickness_mm": 12.0
+        })
+        check(cyl_res.get("push_force_kn", 0.0) > 140.0, "Hydraulic actuator push force > 140 kN")
+        check(cyl_res.get("pull_force_kn", 0.0) > 95.0, "Hydraulic actuator pull force > 95 kN")
+        check(cyl_res.get("barrel_safety_factor", 0.0) > 1.8, "Actuator barrel Lamé yield FS > 1.8")
+        check(cyl_res.get("rod_buckling_safety_factor", 0.0) > 2.0, "Actuator rod Euler buckling FS > 2.0")
+        check(cyl_res.get("is_safe", False) is True, "Hydraulic actuator safety criteria satisfied")
+        print(f"  ✓ 22.1 Hydraulic Actuator (ISO 6020-2): Push = {cyl_res['push_force_kn']:.1f} kN, Pull = {cyl_res['pull_force_kn']:.1f} kN, Barrel Lamé FS = {cyl_res['barrel_safety_factor']:.2f}, Rod Buckling FS = {cyl_res['rod_buckling_safety_factor']:.2f} ({cyl_res['rod_buckling_mode']}), Peak Cushion P = {cyl_res['peak_cushion_pressure_bar']:.1f} bar")
+
+        # 22.2 Belt & Pulley Power Transmission (ISO 5296 / RMA IP-20)
+        belt_res = http_request(port, "POST", "/api/sim/mechanical/belt_drive", body={
+            "power_kw": 15.0,
+            "driver_speed_rpm": 1450.0,
+            "driver_diameter_mm": 160.0,
+            "driven_diameter_mm": 315.0,
+            "center_distance_mm": 600.0
+        })
+        check(belt_res.get("belt_velocity_m_s", 0.0) > 10.0, "Belt linear velocity > 10 m/s")
+        check(belt_res.get("belts_required", 0) >= 2, "Belts required >= 2")
+        check(belt_res.get("estimated_life_hours", 0.0) > 5000.0, "Belt fatigue life > 5000 hours")
+        check(belt_res.get("is_safe", False) is True, "Belt drive within ratings")
+        print(f"  ✓ 22.2 Belt Power Transmission (ISO 5296): v = {belt_res['belt_velocity_m_s']:.1f} m/s, Speed Ratio = {belt_res['speed_ratio']:.2f}, Wrap = {belt_res['small_pulley_wrap_deg']:.1f}°, Belts = {belt_res['belts_required']}, T1 = {belt_res['tight_side_tension_per_belt_n']:.1f} N, Shaft Load = {belt_res['shaft_reaction_force_n']:.1f} N, Fatigue Life = {belt_res['estimated_life_hours']:.0f} hrs")
+
+        # 22.3 Soil Slope Stability Analysis (Bishop's Method of Slices / Eurocode 7)
+        slope_res = http_request(port, "POST", "/api/sim/geotechnical/slope_stability", body={
+            "slope_height_m": 10.0,
+            "slope_angle_deg": 32.0,
+            "soil_unit_weight_kn_m3": 19.0,
+            "effective_cohesion_kpa": 12.0,
+            "effective_friction_angle_deg": 27.0
+        })
+        check(slope_res.get("factor_of_safety_bishop", 0.0) > 1.1, "Bishop factor of safety > 1.1")
+        check(slope_res.get("converged", False) is True, "Bishop FoS iteration converged")
+        check(slope_res.get("active_slices_count", 0) > 10, "Active slice count > 10")
+        print(f"  ✓ 22.3 Slope Stability (Bishop / EC7): Bishop FoS = {slope_res['factor_of_safety_bishop']:.3f} (Fellenius = {slope_res['factor_of_safety_fellenius']:.3f}), Converged in {slope_res['iteration_count']} iters, Slices = {slope_res['active_slices_count']}, Sliding Weight = {slope_res['total_sliding_weight_kn']:.1f} kN/m")
+
+        # 22.4 Three-Phase Induction Motor Electromechanics (IEEE 112 / NEMA MG-1)
+        motor_res = http_request(port, "POST", "/api/sim/electrical/induction_motor", body={
+            "rated_power_kw": 15.0,
+            "rated_voltage_ll_v": 400.0,
+            "frequency_hz": 50.0,
+            "pole_count": 4
+        })
+        check(motor_res.get("synchronous_speed_rpm", 0.0) == 1500.0, "Synchronous speed == 1500 RPM")
+        check(motor_res.get("operating_speed_rpm", 0.0) > 1420.0, "Operating rotor speed > 1420 RPM")
+        check(motor_res.get("efficiency_pct", 0.0) > 85.0, "Induction motor efficiency > 85%")
+        check(motor_res.get("torque_ratio_breakdown_rated", 0.0) > 1.75, "Breakdown torque ratio > 1.75")
+        check(motor_res.get("is_safe", False) is True, "Induction motor compliant with NEMA standards")
+        print(f"  ✓ 22.4 Induction Motor (IEEE 112 / NEMA): ns = {motor_res['synchronous_speed_rpm']:.0f} RPM, nop = {motor_res['operating_speed_rpm']:.0f} RPM (Slip = {motor_res['operating_slip']*100:.2f}%), Tmax/Trated = {motor_res['torque_ratio_breakdown_rated']:.2f}, Efficiency = {motor_res['efficiency_pct']:.1f}%, PF = {motor_res['power_factor']:.2f}, Class = {motor_res['nema_design_class']}")
+
+        # 22.5 Solar Thermal Collector & Heat Pipe Efficiency (ISO 9806 / EN 12975)
+        sol_res = http_request(port, "POST", "/api/sim/thermal/solar_collector", body={
+            "aperture_area_m2": 2.30,
+            "solar_irradiance_w_m2": 850.0,
+            "ambient_temp_c": 20.0,
+            "fluid_inlet_temp_c": 45.0
+        })
+        check(sol_res.get("collector_efficiency_pct", 0.0) > 50.0, "Solar collector efficiency > 50%")
+        check(sol_res.get("useful_thermal_power_w", 0.0) > 900.0, "Useful solar power gain > 900 W")
+        check(sol_res.get("stagnation_temperature_c", 0.0) > 130.0, "Collector stagnation temp > 130 °C")
+        check(sol_res.get("is_safe", False) is True, "Solar thermal collector safe operational state")
+        print(f"  ✓ 22.5 Solar Thermal (ISO 9806): Aperture = {sol_res['solar_input_power_w']/850.0:.2f} m², G = 850 W/m², Useful Heat Qu = {sol_res['useful_thermal_power_w']:.1f} W, Tout = {sol_res['fluid_outlet_temp_c']:.1f} °C (+{sol_res['temperature_gain_c']:.1f} °C), η = {sol_res['collector_efficiency_pct']:.1f}%, T_stag = {sol_res['stagnation_temperature_c']:.1f} °C")
+
+        # 22.6 Universal Commands Execution Verification (Batch 7 Domains)
+        for cmd_id in [
+            "sim.hydraulic.cylinder",
+            "sim.mechanical.belt_drive",
+            "sim.geotechnical.slope_stability",
+            "sim.electrical.induction_motor",
+            "sim.thermal.solar_collector",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 22.6 Universal Commands: All 5 Batch-7 Engineering Commands verified via typed schema engine")
+
+        # 22.7 Enterprise MCP Tool Calling (Batch 7 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_hydraulic_cylinder",
+            "atlas_sim_mechanical_belt_drive",
+            "atlas_sim_geotechnical_slope_stability",
+            "atlas_sim_electrical_induction_motor",
+            "atlas_sim_thermal_solar_collector",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 800,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 22.7 Enterprise MCP Tool Calling: 5 Batch-7 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

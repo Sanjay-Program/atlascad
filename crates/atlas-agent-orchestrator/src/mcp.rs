@@ -962,6 +962,79 @@ impl McpServer {
                     "required": ["flight_mach", "altitude_m", "core_mass_flow_kg_s", "compressor_pressure_ratio", "turbine_inlet_temp_k"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_hydraulic_cylinder".into(),
+                description: "ISO 6020-2 / NFPA hydraulic actuator mechanics, thick-walled barrel Lamé stresses, Euler/Rankine-Gordon rod buckling, and cushion deceleration".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "bore_diameter_mm": { "type": "number", "default": 100.0 },
+                        "rod_diameter_mm": { "type": "number", "default": 56.0 },
+                        "stroke_length_mm": { "type": "number", "default": 600.0 },
+                        "working_pressure_bar": { "type": "number", "default": 210.0 },
+                        "barrel_wall_thickness_mm": { "type": "number", "default": 12.0 }
+                    },
+                    "required": ["bore_diameter_mm", "rod_diameter_mm", "stroke_length_mm", "working_pressure_bar"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_mechanical_belt_drive".into(),
+                description: "ISO 5296 / RMA IP-20 belt & pulley power transmission, Euler-Eytelwein tensioning, centrifugal tension, parallel belt count, and fatigue life".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "power_kw": { "type": "number", "default": 15.0 },
+                        "driver_speed_rpm": { "type": "number", "default": 1450.0 },
+                        "driver_diameter_mm": { "type": "number", "default": 160.0 },
+                        "driven_diameter_mm": { "type": "number", "default": 315.0 },
+                        "center_distance_mm": { "type": "number", "default": 600.0 }
+                    },
+                    "required": ["power_kw", "driver_speed_rpm", "driver_diameter_mm", "driven_diameter_mm", "center_distance_mm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_geotechnical_slope_stability".into(),
+                description: "Eurocode 7 / USACE soil slope stability analysis via Bishop's Simplified Method of Slices with pore water ratio (ru) and seismic inertia (kh)".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "slope_height_m": { "type": "number", "default": 10.0 },
+                        "slope_angle_deg": { "type": "number", "default": 32.0 },
+                        "soil_unit_weight_kn_m3": { "type": "number", "default": 19.0 },
+                        "effective_cohesion_kpa": { "type": "number", "default": 12.0 },
+                        "effective_friction_angle_deg": { "type": "number", "default": 27.0 }
+                    },
+                    "required": ["slope_height_m", "slope_angle_deg"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_electrical_induction_motor".into(),
+                description: "IEEE 112 / NEMA MG-1 three-phase induction motor electromechanics, per-phase equivalent circuit, breakdown torque, starting transients, and efficiency".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "rated_power_kw": { "type": "number", "default": 15.0 },
+                        "rated_voltage_ll_v": { "type": "number", "default": 400.0 },
+                        "frequency_hz": { "type": "number", "default": 50.0 },
+                        "pole_count": { "type": "integer", "default": 4 }
+                    },
+                    "required": ["rated_power_kw", "rated_voltage_ll_v", "frequency_hz", "pole_count"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_thermal_solar_collector".into(),
+                description: "ISO 9806 / EN 12975 solar thermal flat-plate and evacuated-tube collector efficiency rating, fluid temperature gain, and stagnation temperatures".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "aperture_area_m2": { "type": "number", "default": 2.30 },
+                        "solar_irradiance_w_m2": { "type": "number", "default": 850.0 },
+                        "ambient_temp_c": { "type": "number", "default": 20.0 },
+                        "fluid_inlet_temp_c": { "type": "number", "default": 45.0 }
+                    },
+                    "required": ["aperture_area_m2", "solar_irradiance_w_m2", "ambient_temp_c", "fluid_inlet_temp_c"]
+                }),
+            },
         ]
     }
 

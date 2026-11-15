@@ -2460,5 +2460,252 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    // --- 43. Hydraulic Cylinder & Actuator Mechanics (ISO 6020-2 / NFPA T3.6.7 R2) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.hydraulic.cylinder",
+            "Hydraulic Actuator Sizing, Barrel Lamé Stresses & Rod Buckling (ISO 6020-2)",
+            "Calculates hydraulic cylinder push/pull forces, thick-walled barrel hoop and von Mises stresses, Euler/Rankine-Gordon rod column buckling, and cushion deceleration peak pressures.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "bore_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Cylinder bore inner diameter in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(100.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rod_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Piston rod diameter in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(56.0)),
+            validation_rules: vec![ValidationRule::Min(8.0), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "stroke_length_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Actuator stroke length in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(600.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(10000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "working_pressure_bar".into(),
+            arg_type: ArgumentType::Number,
+            description: "Hydraulic system working pressure in bar".into(),
+            required: true,
+            default_value: Some(serde_json::json!(210.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(700.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "barrel_wall_thickness_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Cylinder barrel wall thickness in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(12.0)),
+            validation_rules: vec![ValidationRule::Min(2.0)],
+        }),
+    )?;
+
+    // --- 44. Belt & Pulley Power Transmission (ISO 5296 / RMA IP-20) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.mechanical.belt_drive",
+            "Belt & Pulley Transmission Kinematics, Tensioning & Fatigue Life (ISO 5296)",
+            "Calculates belt linear speed, pulley wrap angles, Euler-Eytelwein friction drive tensioning, centrifugal tension, parallel belt count, shaft loads, and fatigue hours.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "power_kw".into(),
+            arg_type: ArgumentType::Number,
+            description: "Transmitted mechanical power in kW".into(),
+            required: true,
+            default_value: Some(serde_json::json!(15.0)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "driver_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Driving pulley speed in RPM".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1450.0)),
+            validation_rules: vec![ValidationRule::Min(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "driver_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Driving pulley pitch diameter in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(160.0)),
+            validation_rules: vec![ValidationRule::Min(20.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "driven_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Driven pulley pitch diameter in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(315.0)),
+            validation_rules: vec![ValidationRule::Min(20.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "center_distance_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Shaft center distance in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(600.0)),
+            validation_rules: vec![ValidationRule::Min(50.0)],
+        }),
+    )?;
+
+    // --- 45. Soil Slope Stability Analysis (Bishop's Method of Slices / Eurocode 7) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.geotechnical.slope_stability",
+            "Soil Slope Stability Analysis via Bishop's Method of Slices (Eurocode 7 / USACE)",
+            "Calculates circular slip surface limit equilibrium, slice discretization, Bishop and Fellenius Factors of Safety (FoS), pore water pressure ratio (ru), and pseudo-static seismic inertia (kh).",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "slope_height_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Vertical slope height in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(10.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(200.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "slope_angle_deg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Slope angle from horizontal in degrees".into(),
+            required: true,
+            default_value: Some(serde_json::json!(32.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(85.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "soil_unit_weight_kn_m3".into(),
+            arg_type: ArgumentType::Number,
+            description: "Soil unit weight in kN/m3".into(),
+            required: false,
+            default_value: Some(serde_json::json!(19.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(30.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "effective_cohesion_kpa".into(),
+            arg_type: ArgumentType::Number,
+            description: "Effective soil cohesion c' in kPa".into(),
+            required: false,
+            default_value: Some(serde_json::json!(12.0)),
+            validation_rules: vec![ValidationRule::Min(0.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "effective_friction_angle_deg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Effective soil friction angle phi' in degrees".into(),
+            required: false,
+            default_value: Some(serde_json::json!(27.0)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(55.0)],
+        }),
+    )?;
+
+    // --- 46. Three-Phase Induction Motor Electromechanics & Torque-Speed (IEEE 112 / NEMA MG-1) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.electrical.induction_motor",
+            "Three-Phase Induction Motor Electromechanics & Torque-Speed (IEEE 112 / NEMA MG-1)",
+            "Solves per-phase equivalent circuit, Thevenin transformation, breakdown torque, starting current and torque, power factor, and electromechanical efficiency.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "rated_power_kw".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rated shaft output power in kW".into(),
+            required: true,
+            default_value: Some(serde_json::json!(15.0)),
+            validation_rules: vec![ValidationRule::Min(0.25), ValidationRule::Max(5000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rated_voltage_ll_v".into(),
+            arg_type: ArgumentType::Number,
+            description: "Line-to-line RMS voltage in Volts (e.g. 400V)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(400.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(15000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "frequency_hz".into(),
+            arg_type: ArgumentType::Number,
+            description: "Supply grid frequency in Hz (50 or 60)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(50.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(400.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "pole_count".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Magnetic pole count (2, 4, 6, 8)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(4)),
+            validation_rules: vec![ValidationRule::Min(2.0), ValidationRule::Max(16.0)],
+        }),
+    )?;
+
+    // --- 47. Solar Thermal Collector & Heat Pipe Efficiency (ISO 9806 / EN 12975) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.thermal.solar_collector",
+            "Solar Thermal Collector & Heat Pipe Efficiency Rating (ISO 9806 / EN 12975)",
+            "Evaluates flat-plate and evacuated-tube solar collector efficiency curves, fluid temperature gain, useful thermal power gain, and stagnation temperatures.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "aperture_area_m2".into(),
+            arg_type: ArgumentType::Number,
+            description: "Net optical aperture area in m2".into(),
+            required: true,
+            default_value: Some(serde_json::json!(2.30)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "solar_irradiance_w_m2".into(),
+            arg_type: ArgumentType::Number,
+            description: "Incident plane-of-array solar irradiance in W/m2".into(),
+            required: true,
+            default_value: Some(serde_json::json!(850.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(1500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "ambient_temp_c".into(),
+            arg_type: ArgumentType::Number,
+            description: "Ambient air temperature in degrees Celsius".into(),
+            required: true,
+            default_value: Some(serde_json::json!(20.0)),
+            validation_rules: vec![ValidationRule::Min(-40.0), ValidationRule::Max(60.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "fluid_inlet_temp_c".into(),
+            arg_type: ArgumentType::Number,
+            description: "Fluid inlet temperature in degrees Celsius".into(),
+            required: true,
+            default_value: Some(serde_json::json!(45.0)),
+            validation_rules: vec![ValidationRule::Min(-20.0), ValidationRule::Max(150.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "fluid_flow_rate_kg_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Fluid mass flowrate in kg/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.045)),
+            validation_rules: vec![ValidationRule::Min(0.001)],
+        }),
+    )?;
+
     Ok(())
 }

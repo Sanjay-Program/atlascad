@@ -1318,6 +1318,73 @@ def simulation_section(studio: Studio) -> None:
     gt_data = gt.json()
     check(gt_data.get("net_thrust_kn", 0.0) > 18.0, "gas turbine net thrust > 18 kN")
     check(gt_data.get("thermal_efficiency", 0.0) > 0.35, "Brayton thermal efficiency > 35%")
+
+    # 35. Hydraulic Actuator Mechanics & Barrel Stresses (ISO 6020-2)
+    cyl = studio.post("/api/sim/hydraulic/cylinder", {
+        "bore_diameter_mm": 100.0,
+        "rod_diameter_mm": 56.0,
+        "stroke_length_mm": 600.0,
+        "working_pressure_bar": 210.0,
+        "barrel_wall_thickness_mm": 12.0
+    })
+    check(cyl.status == 200, f"hydraulic cylinder returns 200 (got {cyl.status})")
+    cyl_data = cyl.json()
+    check(cyl_data.get("push_force_kn", 0.0) > 140.0, "cylinder push force > 140 kN")
+    check(cyl_data.get("barrel_safety_factor", 0.0) > 1.8, "cylinder barrel FS > 1.8")
+    check(cyl_data.get("is_safe", False) is True, "hydraulic actuator meets safety norms")
+
+    # 36. Belt & Pulley Power Transmission (ISO 5296 / RMA IP-20)
+    belt = studio.post("/api/sim/mechanical/belt_drive", {
+        "power_kw": 15.0,
+        "driver_speed_rpm": 1450.0,
+        "driver_diameter_mm": 160.0,
+        "driven_diameter_mm": 315.0,
+        "center_distance_mm": 600.0
+    })
+    check(belt.status == 200, f"belt drive returns 200 (got {belt.status})")
+    belt_data = belt.json()
+    check(belt_data.get("belt_velocity_m_s", 0.0) > 10.0, "belt velocity > 10 m/s")
+    check(belt_data.get("belts_required", 0) >= 2, "belts required >= 2")
+    check(belt_data.get("is_safe", False) is True, "belt drive ratings within limits")
+
+    # 37. Soil Slope Stability Analysis (Bishop's Method of Slices / Eurocode 7)
+    slope = studio.post("/api/sim/geotechnical/slope_stability", {
+        "slope_height_m": 10.0,
+        "slope_angle_deg": 32.0,
+        "soil_unit_weight_kn_m3": 19.0,
+        "effective_cohesion_kpa": 12.0,
+        "effective_friction_angle_deg": 27.0
+    })
+    check(slope.status == 200, f"slope stability returns 200 (got {slope.status})")
+    slope_data = slope.json()
+    check(slope_data.get("factor_of_safety_bishop", 0.0) > 1.1, "Bishop FoS > 1.1")
+    check(slope_data.get("converged", False) is True, "Bishop FoS iteration converged")
+
+    # 38. Three-Phase Induction Motor Electromechanics (IEEE 112 / NEMA MG-1)
+    motor = studio.post("/api/sim/electrical/induction_motor", {
+        "rated_power_kw": 15.0,
+        "rated_voltage_ll_v": 400.0,
+        "frequency_hz": 50.0,
+        "pole_count": 4
+    })
+    check(motor.status == 200, f"induction motor returns 200 (got {motor.status})")
+    motor_data = motor.json()
+    check(motor_data.get("operating_speed_rpm", 0.0) > 1420.0, "motor operating speed > 1420 RPM")
+    check(motor_data.get("efficiency_pct", 0.0) > 85.0, "motor efficiency > 85%")
+    check(motor_data.get("torque_ratio_breakdown_rated", 0.0) > 1.75, "breakdown torque ratio > 1.75")
+
+    # 39. Solar Thermal Collector & Heat Pipe Efficiency (ISO 9806 / EN 12975)
+    solar = studio.post("/api/sim/thermal/solar_collector", {
+        "aperture_area_m2": 2.30,
+        "solar_irradiance_w_m2": 850.0,
+        "ambient_temp_c": 20.0,
+        "fluid_inlet_temp_c": 45.0
+    })
+    check(solar.status == 200, f"solar collector returns 200 (got {solar.status})")
+    sol_data = solar.json()
+    check(sol_data.get("collector_efficiency_pct", 0.0) > 50.0, "collector efficiency > 50%")
+    check(sol_data.get("useful_thermal_power_w", 0.0) > 900.0, "useful solar heat > 900 W")
+    check(sol_data.get("stagnation_temperature_c", 0.0) > 130.0, "stagnation temperature > 130 C")
     report("simulation")
 
 
