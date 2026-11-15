@@ -4720,5 +4720,47 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(run_all_json["summary"]["completed_tasks"], 11);
     assert_eq!(run_all_json["summary"]["execution_status"], "Completed");
 
+    // 45. Multi-Disciplinary Workbenches HTML & Navigation Verification
+    let index_resp = get(addr, "/")?;
+    assert_eq!(index_resp.status, 200);
+    let html = std::str::from_utf8(&index_resp.body).unwrap_or("");
+    assert!(html.contains("id=\"aerospaceWorkbenchView\""));
+    assert!(html.contains("id=\"civilWorkbenchView\""));
+    assert!(html.contains("id=\"powerWorkbenchView\""));
+    assert!(html.contains("id=\"chemicalWorkbenchView\""));
+    assert!(html.contains("id=\"cfdWorkbenchView\""));
+    assert!(html.contains("id=\"roboticsWorkbenchView\""));
+    assert!(html.contains("id=\"environmentalWorkbenchView\""));
+    assert!(html.contains("id=\"agentRunAllBtn\""));
+    assert!(html.contains("value=\"create\""));
+    assert!(html.contains("value=\"realtime\""));
+    assert!(html.contains("value=\"media\""));
+    assert!(html.contains("value=\"agents\""));
+    assert!(html.contains("value=\"enterprise\""));
+
+    // 46. 44 Specialized Engineering & Creative Agents Ecosystem API
+    let agents_resp = get(addr, "/api/agents")?;
+    assert_eq!(agents_resp.status, 200);
+    let agents_json = json(&agents_resp)?;
+    assert_eq!(agents_json["total_agents"], 44);
+    assert_eq!(agents_json["target_ecosystem_size"], 44);
+
+    // 47. Universal Command Platform Registry (46 Built-in Commands)
+    let cmd_schemas_resp = get(addr, "/api/commands")?;
+    assert_eq!(cmd_schemas_resp.status, 200);
+    let cmd_schemas_json = json(&cmd_schemas_resp)?;
+    assert!(cmd_schemas_json["total_commands"].as_u64().unwrap_or(0) >= 46);
+
+    // 48. Enterprise Model Context Protocol (41 Tools via JSON-RPC 2.0)
+    let mcp_tools_resp = post(
+        addr,
+        "/api/mcp",
+        r#"{"jsonrpc": "2.0", "id": 100, "method": "tools/list", "params": {}}"#,
+    )?;
+    assert_eq!(mcp_tools_resp.status, 200);
+    let mcp_tools_json = json(&mcp_tools_resp)?;
+    let tools_list = mcp_tools_json["result"]["tools"].as_array().map(|v| v.len()).unwrap_or(0);
+    assert!(tools_list >= 41);
+
     Ok(())
 }

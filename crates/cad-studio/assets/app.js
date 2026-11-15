@@ -6517,6 +6517,11 @@ ${gcodeSample}`;
       robotics: "robotics",
       aerospace: "aero",
       environmental: "environmental",
+      create: "output",
+      realtime: "output",
+      media: "output",
+      agents: "automate",
+      enterprise: "home",
     };
 
     const targetTab = tabMapping[workspaceId] || "home";
@@ -6535,6 +6540,10 @@ ${gcodeSample}`;
       manufacturing: "camWorkbenchView",
       bim: "bimWorkbenchView",
       electronics: "ecadWorkbenchView",
+      create: "createWorkbenchView",
+      realtime: "realtimeWorkbenchView",
+      media: "mediaWorkbenchView",
+      agents: "agentWorkbenchView",
     };
 
     const targetWb = wbViewMapping[workspaceId];
@@ -6542,6 +6551,10 @@ ${gcodeSample}`;
       showWorkbench(targetWb);
     } else {
       hideAllWorkbenches();
+    }
+
+    if (workspaceId === "enterprise") {
+      openEnterpriseModal("audit");
     }
 
     const wsLabel = wsSelect?.options[wsSelect.selectedIndex]?.text || workspaceId;
@@ -9120,6 +9133,64 @@ ${gcodeSample}`;
     };
 
     byId("agentStepBtn")?.addEventListener("click", stepOrchestrator);
+    byId("agentRunAllBtn")?.addEventListener("click", async () => {
+      const wfSelect = byId("agentWorkflowSelect");
+      const wfId = wfSelect?.value || "hypersonic_full_vehicle_master";
+      toast(`Running full generative DAG: ${wfId}…`);
+      const pWrap = byId("agentProgressWrap");
+      const pBar = byId("agentProgressBar");
+      const pPercent = byId("agentProgressPercent");
+      if (pWrap) pWrap.style.display = "block";
+      if (pBar) pBar.style.width = "25%";
+      if (pPercent) pPercent.textContent = "Executing...";
+
+      try {
+        const res = await api("/api/agents/workflows/run_all", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workflow_id: wfId, auto_approve: true }),
+        });
+
+        if (pBar) pBar.style.width = "100%";
+        if (pPercent) pPercent.textContent = "100% (Completed)";
+
+        const statusBadge = byId("agentStatusBadge");
+        if (statusBadge) {
+          statusBadge.textContent = `${res.summary.completed_tasks} / ${res.summary.total_tasks} Tasks Verified`;
+          statusBadge.style.color = "#10b981";
+        }
+
+        const consoleOut = byId("agentConsoleOutput");
+        if (consoleOut) {
+          consoleOut.textContent = `[Autonomous Generative Runner] Executed ${wfId} to completion.\n` +
+            `Total Tasks: ${res.summary.total_tasks} | Completed: ${res.summary.completed_tasks} | Status: ${res.status}\n\n` +
+            (res.execution_log || []).join("\n");
+        }
+
+        const taskList = byId("agentTaskGraphList");
+        if (taskList && res.execution_log) {
+          taskList.innerHTML = "";
+          res.execution_log.forEach((logLine, idx) => {
+            const row = document.createElement("div");
+            row.style.display = "flex";
+            row.style.justifyContent = "space-between";
+            row.style.alignItems = "center";
+            row.style.padding = "4px 8px";
+            row.style.background = "rgba(16, 185, 129, 0.08)";
+            row.style.borderRadius = "3px";
+            row.style.borderLeft = "3px solid #10b981";
+            row.innerHTML = `<span>Task ${idx + 1}: ${logLine.slice(0, 45)}...</span><span class="wb-status-badge" style="background:rgba(16,185,129,0.2);color:#10b981;font-size:9px;">Completed</span>`;
+            taskList.appendChild(row);
+          });
+        }
+
+        toast(`Autonomous Workflow Completed: ${res.summary.completed_tasks} Tasks`);
+      } catch (err) {
+        if (pPercent) pPercent.textContent = "Failed";
+        toast(`Autonomous execution failed: ${err.message}`, true);
+      }
+    });
+
     byId("agentRunOrchestrationBtn")?.addEventListener("click", async () => {
       toast("Executing multi-agent engineering workflow…");
       for (let i = 0; i < 8; i++) {

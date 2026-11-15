@@ -43,6 +43,15 @@
           <option value="aerospace">Aerospace & Flight Dynamics</option>
           <option value="environmental">Geoscience & Water Hydraulics</option>
         </optgroup>
+        <optgroup label="Creative, Interactive & Media">
+          <option value="create">Atlas Create (3D SubD, Sculpt &amp; PBR)</option>
+          <option value="realtime">Atlas RealTime (Interactive &amp; Unity Engine)</option>
+          <option value="media">Atlas Media (Video NLE &amp; DaVinci Resolve)</option>
+        </optgroup>
+        <optgroup label="Intelligence & Governance">
+          <option value="agents">AI Agents (44 Specialists &amp; Orchestrator)</option>
+          <option value="enterprise">Enterprise PLM (Audit, ECO &amp; HPC Queue)</option>
+        </optgroup>
       </select>
     </div>
     <nav class="top-actions" aria-label="Document actions">
@@ -1676,11 +1685,12 @@ C1 out 0 100n
             <span class="wb-title-icon">🤖</span>
             <div>
               <h3>Autonomous Engineering Agent Console</h3>
-              <span class="wb-subtitle">28-Specialist Agent Ecosystem · Natural Language Requirements · DAG Task Scheduling · Human Safety Gate · MCP Server</span>
+              <span class="wb-subtitle">44-Specialist Agent Ecosystem · Autonomous Generative Execution · DAG Task Scheduling · Human Safety Gate · MCP Server</span>
             </div>
           </div>
           <div class="wb-header-actions">
-            <span class="wb-status-badge" id="agentStatusBadge">28 Specialists Online</span>
+            <span class="wb-status-badge" id="agentStatusBadge">44 Specialists Online</span>
+            <button type="button" class="button primary small" id="agentRunAllBtn" style="background: #059669;" title="Execute entire multi-agent DAG to completion with live solver verification">⚡ Run All Tasks</button>
             <button type="button" class="button primary small" id="agentRunOrchestrationBtn">▶ Execute Task Graph</button>
             <button type="button" class="button secondary small" id="agentStepBtn">⏯ Single Step</button>
             <button type="button" class="button ghost small" id="agentClearLogBtn">Clear Log</button>
@@ -1707,7 +1717,8 @@ C1 out 0 100n
             <div class="wb-group">
               <label for="agentWorkflowSelect">Pre-Built Multi-Disciplinary Engineering Workflows</label>
               <select id="agentWorkflowSelect" class="wb-select">
-                <option value="concept_to_cad" selected>Concept to 3D Parametric CAD</option>
+                <option value="hypersonic_full_vehicle_master" selected>Hypersonic Flight Vehicle Master (11 Multi-Agent Tasks)</option>
+                <option value="concept_to_cad">Concept to 3D Parametric CAD</option>
                 <option value="cad_to_fea">CAD to Finite Element Stress Analysis (FEA)</option>
                 <option value="cad_to_cfd">CAD to Internal Fluid Dynamics (CFD)</option>
                 <option value="cad_to_optimization">CAD to SIMP Topology Optimization</option>
@@ -1719,6 +1730,9 @@ C1 out 0 100n
                 <option value="robot_to_kinematics">Robotic Manipulator to 6-DOF Trajectory</option>
                 <option value="ev_to_battery_thermal">EV Powertrain to Battery Thermal Runaway</option>
                 <option value="req_to_tech_docs">Requirements to Certified AS9100 Tech Docs</option>
+                <option value="subdiv_to_render">SubD Character Mesh to PBR Studio Render</option>
+                <option value="twin_to_interactive">Digital Twin to Unity Engine Physics</option>
+                <option value="edit_to_color_master">Multi-Track Edit to DaVinci 3D LUT Color Grade</option>
               </select>
               <button type="button" class="button secondary small" id="agentLoadWorkflowBtn" style="width: 100%; margin-top: 6px;">Load Workflow Template</button>
             </div>
@@ -1742,7 +1756,7 @@ C1 out 0 100n
               <label>MCP Server Status</label>
               <div style="font-size: 11px; color: #a1a1aa; line-height: 1.4;">
                 <div>Protocol: <strong style="color: #10b981;">JSON-RPC 2.0 (2024-11-05)</strong></div>
-                <div>Tools Exposed: <strong>18 Enterprise Tools</strong></div>
+                <div>Tools Exposed: <strong>41 Enterprise Tools</strong></div>
                 <div>Endpoint: <code>/api/mcp</code></div>
               </div>
             </div>
@@ -1762,9 +1776,17 @@ C1 out 0 100n
               </div>
             </div>
 
-            <!-- Task Graph Visualizer -->
+            <!-- Task Graph Visualizer & Progress Bar -->
             <div class="wb-cam-metrics-card" style="margin-top: 10px;">
-              <div class="wb-card-title">Active Directed Acyclic Task Graph (DAG)</div>
+              <div class="wb-card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>Active Directed Acyclic Task Graph (DAG)</span>
+                <span id="agentProgressPercent" style="color: #10b981; font-size: 11px; font-weight: 600;"></span>
+              </div>
+              <div id="agentProgressWrap" style="margin: 6px 0; display: none;">
+                <div style="background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden;">
+                  <div id="agentProgressBar" style="background: #10b981; height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+                </div>
+              </div>
               <div id="agentTaskGraphList" style="display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto; font-size: 12px; margin-top: 6px;">
                 <div style="color: #71717a; font-style: italic;">No active task graph loaded. Enter requirements or select a workflow template.</div>
               </div>

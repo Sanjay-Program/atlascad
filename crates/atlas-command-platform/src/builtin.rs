@@ -705,5 +705,102 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         .with_permission(CommandPermission::SimulationRun),
     )?;
 
+    // --- 10. Multi-Disciplinary Engineering & Science Commands ---
+    registry.register(
+        CommandSchema::new(
+            "sim.civil.frame_buckling",
+            "Euler & Johnson Column Buckling Analysis",
+            "Evaluates critical buckling load, effective slenderness ratio, and AISC 360 safety factor for structural frames.",
+            CommandCategory::Bim,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Unsupported column length in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(4.5)),
+            validation_rules: vec![ValidationRule::Min(0.1)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.civil.retaining_wall",
+            "Rankine & Coulomb Lateral Earth Pressure",
+            "Computes active and passive earth thrust, overturning stability, and sliding resistance for retaining structures.",
+            CommandCategory::Bim,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "wall_height_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Retaining wall height in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(4.0)),
+            validation_rules: vec![ValidationRule::Min(0.5)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.power.ac_flow",
+            "Newton-Raphson AC Power Flow Solver",
+            "Solves bus admittance matrix, voltage magnitudes/angles, and active/reactive transmission line losses.",
+            CommandCategory::Electrical,
+        )
+        .with_permission(CommandPermission::SimulationRun),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.chemical.vle_flash",
+            "Rachford-Rice Multi-Component VLE Flash",
+            "Evaluates isothermal vapor-liquid equilibrium split, phase compositions, and Peng-Robinson fugacities.",
+            CommandCategory::Chemical,
+        )
+        .with_permission(CommandPermission::SimulationRun),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.robotics.kinematics",
+            "6-DOF Manipulator Forward & Inverse Kinematics",
+            "Evaluates Denavit-Hartenberg homogeneous transforms, Damped Least Squares inverse kinematics, and Yoshikawa manipulability.",
+            CommandCategory::Robotics,
+        )
+        .with_permission(CommandPermission::SimulationRun),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.env.plume_dispersion",
+            "Pasquill-Gifford Gaussian Atmospheric Plume",
+            "Calculates downwind and crosswind pollutant concentrations and peak ground-level impact distance.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.marine.hydrostatics",
+            "Marine Vessel Hydrostatics & Wave Dispersion",
+            "Solves vessel displacement, metacentric height (GM), righting arm GZ, and linear Airy surface gravity wave kinematics.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.acoustics.stc",
+            "Acoustic Sound Transmission Class & Attenuation",
+            "Evaluates transmission loss across ISO 1/3 octave bands, mass law limits, and ASTM E413 STC rating.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun),
+    )?;
+
     Ok(())
 }

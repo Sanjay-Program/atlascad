@@ -5067,7 +5067,7 @@ namespace AtlasCAD.Unity
         let list = self.orchestrator.registry.list();
         serde_json::json!({
             "total_agents": list.len(),
-            "target_ecosystem_size": 28,
+            "target_ecosystem_size": 44,
             "agents": list
         })
     }

@@ -388,6 +388,93 @@ impl McpServer {
                     }
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_civil_buckling".into(),
+                description: "Simulate Euler-Johnson column buckling, critical axial loads, and AISC 360 slenderness safety factor".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "length_m": { "type": "number", "default": 4.5 },
+                        "axial_load_n": { "type": "number", "default": 1500000.0 }
+                    }
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_civil_earth_pressure".into(),
+                description: "Calculate Rankine and Coulomb lateral earth pressures, wall active thrust, and overturning safety".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "wall_height_m": { "type": "number", "default": 4.0 },
+                        "soil_friction_angle_deg": { "type": "number", "default": 32.0 }
+                    }
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_power_flow".into(),
+                description: "Simulate AC transmission power grid flow using Newton-Raphson iteration on bus admittance matrix".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "base_mva": { "type": "number", "default": 100.0 }
+                    }
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_chemical_vle".into(),
+                description: "Calculate multi-component vapor-liquid equilibrium (VLE) flash split using Rachford-Rice equation".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "temperature_c": { "type": "number", "default": 25.0 },
+                        "pressure_kpa": { "type": "number", "default": 101.325 }
+                    }
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_robotics_kinematics".into(),
+                description: "Simulate 6-DOF manipulator forward kinematics, DLS inverse kinematics, and Yoshikawa manipulability".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "target_x_m": { "type": "number", "default": 0.8 },
+                        "target_y_m": { "type": "number", "default": 0.4 },
+                        "target_z_m": { "type": "number", "default": 0.5 }
+                    }
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_env_plume".into(),
+                description: "Simulate Gaussian air pollutant dispersion plume under Pasquill-Gifford atmospheric stability classes".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "emission_rate_g_s": { "type": "number", "default": 50.0 },
+                        "wind_speed_m_s": { "type": "number", "default": 4.5 }
+                    }
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_marine_hydrostatics".into(),
+                description: "Simulate marine vessel displacement, metacentric height GM, righting arm, and Airy surface wave kinematics".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "displacement_tonnes": { "type": "number", "default": 1000.0 },
+                        "draft_m": { "type": "number", "default": 4.2 }
+                    }
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_acoustics_stc".into(),
+                description: "Calculate acoustic transmission loss across 1/3 octave bands and ASTM E413 Sound Transmission Class".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "surface_density_kg_m2": { "type": "number", "default": 24.0 }
+                    }
+                }),
+            },
         ]
     }
 
