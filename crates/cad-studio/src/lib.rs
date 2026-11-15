@@ -4469,6 +4469,170 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn cad_hardware_shaft_key(
+        &mut self,
+        req: &CadHardwareShaftKeyRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let smat = match req.shaft_material.as_deref().unwrap_or("AlloySteel42CrMo4") {
+            "CarbonSteelC45" | "c45" => atlas_simulation_core::shafts_keys::ShaftMaterial::CarbonSteelC45,
+            "NickelChromeSteel4340" | "4340" => atlas_simulation_core::shafts_keys::ShaftMaterial::NickelChromeSteel4340,
+            "Stainless316" | "stainless" => atlas_simulation_core::shafts_keys::ShaftMaterial::Stainless316,
+            _ => atlas_simulation_core::shafts_keys::ShaftMaterial::AlloySteel42CrMo4,
+        };
+
+        let hmat = match req.hub_material.as_deref().unwrap_or("StructuralSteelS275") {
+            "CastIronGG25" | "cast_iron" => atlas_simulation_core::shafts_keys::HubMaterial::CastIronGG25,
+            "AlloySteel42CrMo4" | "alloy_steel" => atlas_simulation_core::shafts_keys::HubMaterial::AlloySteel42CrMo4,
+            _ => atlas_simulation_core::shafts_keys::HubMaterial::StructuralSteelS275,
+        };
+
+        let prob = atlas_simulation_core::shafts_keys::ShaftKeyProblem {
+            shaft_name: req.shaft_name.clone().unwrap_or_else(|| "Transmission Shaft".to_string()),
+            shaft_material: smat,
+            hub_material: hmat,
+            transmitted_power_kw: req.transmitted_power_kw.unwrap_or(45.0),
+            rotational_speed_rpm: req.rotational_speed_rpm.unwrap_or(1450.0),
+            bending_moment_nm: req.bending_moment_nm.unwrap_or(350.0),
+            shaft_length_m: req.shaft_length_m.unwrap_or(0.60),
+            safety_factor: req.safety_factor.or(Some(2.0)),
+            shock_factor_kb: Some(1.5),
+            shock_factor_kt: Some(1.2),
+            selected_shaft_diameter_mm: req.selected_shaft_diameter_mm.or(Some(45.0)),
+            key_length_mm: req.key_length_mm.or(Some(60.0)),
+        };
+
+        let res = atlas_simulation_core::shafts_keys::solve_shaft_and_key(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_pressure_vessel_asme(
+        &mut self,
+        req: &SimPressureVesselRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mat = match req.material.as_deref().unwrap_or("Sa516Gr70") {
+            "Sa240Type304" | "stainless_304" => atlas_simulation_core::pressure_vessel::VesselMaterial::Sa240Type304,
+            "Sa387Gr11" | "chrome_moly" => atlas_simulation_core::pressure_vessel::VesselMaterial::Sa387Gr11,
+            "Sb168Inconel600" | "inconel_600" => atlas_simulation_core::pressure_vessel::VesselMaterial::Sb168Inconel600,
+            _ => atlas_simulation_core::pressure_vessel::VesselMaterial::Sa516Gr70,
+        };
+
+        let head = match req.head_type.as_deref().unwrap_or("Ellipsoidal2to1") {
+            "TorisphericalAsme" | "torispherical" => atlas_simulation_core::pressure_vessel::HeadType::TorisphericalAsme,
+            "Hemispherical" | "hemispherical" => atlas_simulation_core::pressure_vessel::HeadType::Hemispherical,
+            _ => atlas_simulation_core::pressure_vessel::HeadType::Ellipsoidal2to1,
+        };
+
+        let je = match req.joint_efficiency.as_deref().unwrap_or("SpotRadiography") {
+            "FullRadiography" | "full" => atlas_simulation_core::pressure_vessel::JointEfficiencyType::FullRadiography,
+            "NoneVisualOnly" | "visual" => atlas_simulation_core::pressure_vessel::JointEfficiencyType::NoneVisualOnly,
+            _ => atlas_simulation_core::pressure_vessel::JointEfficiencyType::SpotRadiography,
+        };
+
+        let prob = atlas_simulation_core::pressure_vessel::PressureVesselProblem {
+            vessel_name: req.vessel_name.clone().unwrap_or_else(|| "Chemical Pressure Vessel".to_string()),
+            material: mat,
+            head_type: head,
+            joint_efficiency: je,
+            design_pressure_bar: req.design_pressure_bar.unwrap_or(20.0),
+            design_temperature_c: req.design_temperature_c.unwrap_or(180.0),
+            inside_diameter_d_mm: req.inside_diameter_d_mm.unwrap_or(1200.0),
+            tangent_length_l_mm: req.tangent_length_l_mm.unwrap_or(3000.0),
+            corrosion_allowance_mm: req.corrosion_allowance_mm.unwrap_or(2.5),
+            nominal_shell_thickness_mm: req.nominal_shell_thickness_mm.or(Some(16.0)),
+            nominal_head_thickness_mm: req.nominal_head_thickness_mm.or(Some(16.0)),
+        };
+
+        let res = atlas_simulation_core::pressure_vessel::solve_asme_pressure_vessel(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_thermal_psychrometrics(
+        &mut self,
+        req: &SimPsychrometricsRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::psychrometrics::PsychrometricProblem {
+            stream_name: req.stream_name.clone().unwrap_or_else(|| "Moist Air Stream".to_string()),
+            dry_bulb_temp_c: req.dry_bulb_temp_c.unwrap_or(24.0),
+            relative_humidity: req.relative_humidity.unwrap_or(0.50),
+            atmospheric_pressure_pa: req.atmospheric_pressure_pa.or(Some(101325.0)),
+        };
+
+        let res = atlas_simulation_core::psychrometrics::solve_psychrometric_state(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_civil_hydrology(
+        &mut self,
+        req: &SimHydrologyRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let land = match req.land_use.as_deref().unwrap_or("CommercialDowntown") {
+            "PavedRoadsRoofs" | "paved" => atlas_simulation_core::hydrology::LandUseCategory::PavedRoadsRoofs,
+            "IndustrialHeavy" | "industrial" => atlas_simulation_core::hydrology::LandUseCategory::IndustrialHeavy,
+            "ResidentialSuburban" | "residential" => atlas_simulation_core::hydrology::LandUseCategory::ResidentialSuburban,
+            "ParksLawnsMeadows" | "parks" => atlas_simulation_core::hydrology::LandUseCategory::ParksLawnsMeadows,
+            _ => atlas_simulation_core::hydrology::LandUseCategory::CommercialDowntown,
+        };
+
+        let pipe = match req.pipe_material.as_deref().unwrap_or("PrecastConcrete") {
+            "SmoothHdpPvc" | "pvc" => atlas_simulation_core::hydrology::PipeMaterial::SmoothHdpPvc,
+            "CorrugatedMetal" | "metal" => atlas_simulation_core::hydrology::PipeMaterial::CorrugatedMetal,
+            _ => atlas_simulation_core::hydrology::PipeMaterial::PrecastConcrete,
+        };
+
+        let prob = atlas_simulation_core::hydrology::HydrologyProblem {
+            basin_name: req.basin_name.clone().unwrap_or_else(|| "Catchment Basin".to_string()),
+            land_use: land,
+            pipe_material: pipe,
+            catchment_area_ha: req.catchment_area_ha.unwrap_or(8.5),
+            flow_path_length_m: req.flow_path_length_m.unwrap_or(450.0),
+            terrain_slope: req.terrain_slope.unwrap_or(0.020),
+            pipe_slope: req.pipe_slope.unwrap_or(0.008),
+            idf_a: Some(1250.0),
+            idf_b: Some(15.0),
+            idf_c: Some(0.85),
+            selected_pipe_diameter_mm: req.selected_pipe_diameter_mm.or(Some(600.0)),
+        };
+
+        let res = atlas_simulation_core::hydrology::solve_rational_runoff_and_pipe(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_structural_fracture(
+        &mut self,
+        req: &SimFractureRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mat = match req.material.as_deref().unwrap_or("Aluminum7075T6") {
+            "TitaniumTi6Al4V" | "titanium" => atlas_simulation_core::fracture::FractureMaterial::TitaniumTi6Al4V,
+            "AlloySteel4340" | "alloy_steel" => atlas_simulation_core::fracture::FractureMaterial::AlloySteel4340,
+            "CarbonSteelSa516" | "carbon_steel" => atlas_simulation_core::fracture::FractureMaterial::CarbonSteelSa516,
+            _ => atlas_simulation_core::fracture::FractureMaterial::Aluminum7075T6,
+        };
+
+        let crack = match req.crack_type.as_deref().unwrap_or("EdgeCrackInTension") {
+            "CenterCrackInTension" | "center" => atlas_simulation_core::fracture::CrackConfiguration::CenterCrackInTension,
+            "EmbeddedCircularCrack" | "circular" => atlas_simulation_core::fracture::CrackConfiguration::EmbeddedCircularCrack,
+            _ => atlas_simulation_core::fracture::CrackConfiguration::EdgeCrackInTension,
+        };
+
+        let prob = atlas_simulation_core::fracture::FractureProblem {
+            component_name: req.component_name.clone().unwrap_or_else(|| "Structural Member".to_string()),
+            material: mat,
+            crack_type: crack,
+            max_stress_mpa: req.max_stress_mpa.unwrap_or(180.0),
+            min_stress_mpa: req.min_stress_mpa.or(Some(18.0)),
+            initial_crack_depth_a0_mm: req.initial_crack_depth_a0_mm.unwrap_or(1.5),
+            plate_width_w_mm: req.plate_width_w_mm.unwrap_or(80.0),
+        };
+
+        let res = atlas_simulation_core::fracture::solve_lefm_and_paris_growth(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -5922,6 +6086,84 @@ namespace AtlasCAD.Unity
                     walls_reflectance: None,
                     floor_reflectance: None,
                     ground_reflectance: None,
+                })?
+            }
+            "cad.hardware.shaft_key" => {
+                let p = req.arguments.get("transmitted_power_kw").and_then(|v| v.as_f64());
+                let n = req.arguments.get("rotational_speed_rpm").and_then(|v| v.as_f64());
+                let mb = req.arguments.get("bending_moment_nm").and_then(|v| v.as_f64());
+                let d = req.arguments.get("selected_shaft_diameter_mm").and_then(|v| v.as_f64());
+                self.cad_hardware_shaft_key(&CadHardwareShaftKeyRequest {
+                    shaft_name: None,
+                    shaft_material: None,
+                    hub_material: None,
+                    transmitted_power_kw: p,
+                    rotational_speed_rpm: n,
+                    bending_moment_nm: mb,
+                    shaft_length_m: None,
+                    safety_factor: None,
+                    selected_shaft_diameter_mm: d,
+                    key_length_mm: None,
+                })?
+            }
+            "sim.pressure_vessel.asme" => {
+                let p = req.arguments.get("design_pressure_bar").and_then(|v| v.as_f64());
+                let d = req.arguments.get("inside_diameter_d_mm").and_then(|v| v.as_f64());
+                let l = req.arguments.get("tangent_length_l_mm").and_then(|v| v.as_f64());
+                let ca = req.arguments.get("corrosion_allowance_mm").and_then(|v| v.as_f64());
+                self.sim_pressure_vessel_asme(&SimPressureVesselRequest {
+                    vessel_name: None,
+                    material: None,
+                    head_type: None,
+                    joint_efficiency: None,
+                    design_pressure_bar: p,
+                    design_temperature_c: None,
+                    inside_diameter_d_mm: d,
+                    tangent_length_l_mm: l,
+                    corrosion_allowance_mm: ca,
+                    nominal_shell_thickness_mm: None,
+                    nominal_head_thickness_mm: None,
+                })?
+            }
+            "sim.thermal.psychrometrics" => {
+                let t = req.arguments.get("dry_bulb_temp_c").and_then(|v| v.as_f64());
+                let rh = req.arguments.get("relative_humidity").and_then(|v| v.as_f64());
+                self.sim_thermal_psychrometrics(&SimPsychrometricsRequest {
+                    stream_name: None,
+                    dry_bulb_temp_c: t,
+                    relative_humidity: rh,
+                    atmospheric_pressure_pa: None,
+                })?
+            }
+            "sim.civil.hydrology" => {
+                let a = req.arguments.get("catchment_area_ha").and_then(|v| v.as_f64());
+                let l = req.arguments.get("flow_path_length_m").and_then(|v| v.as_f64());
+                let s_terr = req.arguments.get("terrain_slope").and_then(|v| v.as_f64());
+                let s_pipe = req.arguments.get("pipe_slope").and_then(|v| v.as_f64());
+                self.sim_civil_hydrology(&SimHydrologyRequest {
+                    basin_name: None,
+                    land_use: None,
+                    pipe_material: None,
+                    catchment_area_ha: a,
+                    flow_path_length_m: l,
+                    terrain_slope: s_terr,
+                    pipe_slope: s_pipe,
+                    selected_pipe_diameter_mm: None,
+                })?
+            }
+            "sim.structural.fracture" => {
+                let s_max = req.arguments.get("max_stress_mpa").and_then(|v| v.as_f64());
+                let s_min = req.arguments.get("min_stress_mpa").and_then(|v| v.as_f64());
+                let a0 = req.arguments.get("initial_crack_depth_a0_mm").and_then(|v| v.as_f64());
+                let w = req.arguments.get("plate_width_w_mm").and_then(|v| v.as_f64());
+                self.sim_structural_fracture(&SimFractureRequest {
+                    component_name: None,
+                    material: None,
+                    crack_type: None,
+                    max_stress_mpa: s_max,
+                    min_stress_mpa: s_min,
+                    initial_crack_depth_a0_mm: a0,
+                    plate_width_w_mm: w,
                 })?
             }
             "system.deploy.status" => self.deploy_status()?,
@@ -7662,6 +7904,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/building/daylight_factor" => {
             match parse_body_or_default::<SimDaylightingRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_building_daylight_factor(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/cad/hardware/shaft_key" => {
+            match parse_body_or_default::<CadHardwareShaftKeyRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.cad_hardware_shaft_key(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/pressure_vessel/asme" => {
+            match parse_body_or_default::<SimPressureVesselRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_pressure_vessel_asme(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/thermal/psychrometrics" => {
+            match parse_body_or_default::<SimPsychrometricsRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_thermal_psychrometrics(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/civil/hydrology" => {
+            match parse_body_or_default::<SimHydrologyRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_civil_hydrology(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/structural/fracture" => {
+            match parse_body_or_default::<SimFractureRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_structural_fracture(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -10131,4 +10418,109 @@ struct SimDaylightingRequest {
     #[serde(default)]
     #[allow(dead_code)]
     pub ground_reflectance: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CadHardwareShaftKeyRequest {
+    #[serde(default)]
+    pub shaft_name: Option<String>,
+    #[serde(default)]
+    pub shaft_material: Option<String>,
+    #[serde(default)]
+    pub hub_material: Option<String>,
+    #[serde(default)]
+    pub transmitted_power_kw: Option<f64>,
+    #[serde(default)]
+    pub rotational_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub bending_moment_nm: Option<f64>,
+    #[serde(default)]
+    pub shaft_length_m: Option<f64>,
+    #[serde(default)]
+    pub safety_factor: Option<f64>,
+    #[serde(default)]
+    pub selected_shaft_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub key_length_mm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimPressureVesselRequest {
+    #[serde(default)]
+    pub vessel_name: Option<String>,
+    #[serde(default)]
+    pub material: Option<String>,
+    #[serde(default)]
+    pub head_type: Option<String>,
+    #[serde(default)]
+    pub joint_efficiency: Option<String>,
+    #[serde(default)]
+    pub design_pressure_bar: Option<f64>,
+    #[serde(default)]
+    pub design_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub inside_diameter_d_mm: Option<f64>,
+    #[serde(default)]
+    pub tangent_length_l_mm: Option<f64>,
+    #[serde(default)]
+    pub corrosion_allowance_mm: Option<f64>,
+    #[serde(default)]
+    pub nominal_shell_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub nominal_head_thickness_mm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimPsychrometricsRequest {
+    #[serde(default)]
+    pub stream_name: Option<String>,
+    #[serde(default)]
+    pub dry_bulb_temp_c: Option<f64>,
+    #[serde(default)]
+    pub relative_humidity: Option<f64>,
+    #[serde(default)]
+    pub atmospheric_pressure_pa: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimHydrologyRequest {
+    #[serde(default)]
+    pub basin_name: Option<String>,
+    #[serde(default)]
+    pub land_use: Option<String>,
+    #[serde(default)]
+    pub pipe_material: Option<String>,
+    #[serde(default)]
+    pub catchment_area_ha: Option<f64>,
+    #[serde(default)]
+    pub flow_path_length_m: Option<f64>,
+    #[serde(default)]
+    pub terrain_slope: Option<f64>,
+    #[serde(default)]
+    pub pipe_slope: Option<f64>,
+    #[serde(default)]
+    pub selected_pipe_diameter_mm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimFractureRequest {
+    #[serde(default)]
+    pub component_name: Option<String>,
+    #[serde(default)]
+    pub material: Option<String>,
+    #[serde(default)]
+    pub crack_type: Option<String>,
+    #[serde(default)]
+    pub max_stress_mpa: Option<f64>,
+    #[serde(default)]
+    pub min_stress_mpa: Option<f64>,
+    #[serde(default)]
+    pub initial_crack_depth_a0_mm: Option<f64>,
+    #[serde(default)]
+    pub plate_width_w_mm: Option<f64>,
 }

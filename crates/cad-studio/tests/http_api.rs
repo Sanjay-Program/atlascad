@@ -5253,5 +5253,124 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(mcp_df.status, 200);
 
+    // 71. Transmission Shaft Sizing & DIN 6885-1 Keyway
+    let res_shaft = post(
+        addr,
+        "/api/cad/hardware/shaft_key",
+        r#"{
+            "transmitted_power_kw": 45.0,
+            "rotational_speed_rpm": 1450.0,
+            "bending_moment_nm": 350.0,
+            "selected_shaft_diameter_mm": 45.0
+        }"#,
+    )?;
+    assert_eq!(res_shaft.status, 200);
+    let sh_json = json(&res_shaft)?;
+    assert!((sh_json["torque_nm"].as_f64().unwrap() - 296.34).abs() < 1.0);
+    assert!(sh_json["min_required_diameter_mm"].as_f64().unwrap() > 25.0);
+    assert_eq!(sh_json["key_dimensions"]["key_width_b_mm"].as_f64().unwrap(), 14.0);
+    assert!(sh_json["is_design_adequate"].as_bool().unwrap());
+
+    // 72. ASME BPVC Section VIII Div 1 Pressure Vessel
+    let res_pv = post(
+        addr,
+        "/api/sim/pressure_vessel/asme",
+        r#"{
+            "design_pressure_bar": 20.0,
+            "inside_diameter_d_mm": 1200.0,
+            "tangent_length_l_mm": 3000.0,
+            "corrosion_allowance_mm": 2.5
+        }"#,
+    )?;
+    assert_eq!(res_pv.status, 200);
+    let pv_json = json(&res_pv)?;
+    assert!((pv_json["min_required_shell_thickness_mm"].as_f64().unwrap() - 13.07).abs() < 0.2);
+    assert!(pv_json["vessel_mawp_bar"].as_f64().unwrap() > 20.0);
+    assert!(pv_json["hydrostatic_test_pressure_bar"].as_f64().unwrap() > 30.0);
+    assert!(pv_json["is_asme_compliant"].as_bool().unwrap());
+
+    // 73. ASHRAE Psychrometrics & Moist Air Thermodynamics
+    let res_psy = post(
+        addr,
+        "/api/sim/thermal/psychrometrics",
+        r#"{
+            "dry_bulb_temp_c": 24.0,
+            "relative_humidity": 0.50
+        }"#,
+    )?;
+    assert_eq!(res_psy.status, 200);
+    let psy_json = json(&res_psy)?;
+    assert!((psy_json["humidity_ratio_g_kg"].as_f64().unwrap() - 9.3).abs() < 0.2);
+    assert!((psy_json["dew_point_temp_c"].as_f64().unwrap() - 12.9).abs() < 0.5);
+    assert!((psy_json["specific_enthalpy_kj_kg"].as_f64().unwrap() - 47.8).abs() < 0.5);
+
+    // 74. Civil Stormwater Hydrology & Manning Hydraulics
+    let res_hydro = post(
+        addr,
+        "/api/sim/civil/hydrology",
+        r#"{
+            "catchment_area_ha": 8.5,
+            "flow_path_length_m": 450.0,
+            "terrain_slope": 0.020,
+            "pipe_slope": 0.008
+        }"#,
+    )?;
+    assert_eq!(res_hydro.status, 200);
+    let hydro_json = json(&res_hydro)?;
+    assert!(hydro_json["peak_discharge_m3_s"].as_f64().unwrap() > 0.8);
+    assert!(hydro_json["min_required_pipe_diameter_mm"].as_f64().unwrap() > 700.0);
+    assert!(hydro_json["is_self_cleansing"].as_bool().unwrap());
+
+    // 75. LEFM Stress Intensity & Paris Fatigue Crack Growth
+    let res_frac = post(
+        addr,
+        "/api/sim/structural/fracture",
+        r#"{
+            "max_stress_mpa": 180.0,
+            "min_stress_mpa": 18.0,
+            "initial_crack_depth_a0_mm": 1.5,
+            "plate_width_w_mm": 80.0
+        }"#,
+    )?;
+    assert_eq!(res_frac.status, 200);
+    let frac_json = json(&res_frac)?;
+    assert!((frac_json["initial_stress_intensity_k1_mpa_m05"].as_f64().unwrap() - 13.9).abs() < 1.0);
+    assert!(frac_json["critical_crack_length_ac_mm"].as_f64().unwrap() > 5.0);
+    assert!(frac_json["fatigue_cycles_to_failure_nf"].as_f64().unwrap() > 1500.0);
+    assert!(frac_json["is_safe_against_fast_fracture"].as_bool().unwrap());
+
+    // 76. Universal Commands Execution Verification (5 Advanced Domains)
+    for cmd_id in [
+        "cad.hardware.shaft_key",
+        "sim.pressure_vessel.asme",
+        "sim.thermal.psychrometrics",
+        "sim.civil.hydrology",
+        "sim.structural.fracture",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 77. Enterprise MCP Tool Calling (5 Advanced Domains)
+    for tool_name in [
+        "atlas_cad_hardware_shaft_key",
+        "atlas_sim_pressure_vessel",
+        "atlas_sim_psychrometrics",
+        "atlas_sim_civil_hydrology",
+        "atlas_sim_fracture_lefm",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 120, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

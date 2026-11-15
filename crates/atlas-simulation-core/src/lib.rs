@@ -22,11 +22,13 @@ pub mod engine;
 pub mod environmental;
 pub mod execution;
 pub mod fasteners;
+pub mod fracture;
 pub mod fsi;
 pub mod gears;
 pub mod generative;
 pub mod geotechnical;
 pub mod heat_exchanger;
+pub mod hydrology;
 pub mod hypersonic;
 pub mod machining_physics;
 pub mod marine;
@@ -35,11 +37,14 @@ pub mod model;
 pub mod molecular;
 pub mod nuclear_shielding;
 pub mod power_flow;
+pub mod pressure_vessel;
 pub mod problem;
 pub mod provenance;
+pub mod psychrometrics;
 pub mod rainflow;
 pub mod robotics;
 pub mod rock_mechanics;
+pub mod shafts_keys;
 pub mod sheet_metal;
 pub mod shock_response;
 pub mod short_circuit;
@@ -101,6 +106,10 @@ pub mod prelude {
         BoltPropertyClass, BoltedJointProblem, BoltedJointResult, MetricThreadSpec,
         get_standard_metric_threads, solve_bolted_joint, solve_bolted_joint_sim,
     };
+    pub use crate::fracture::{
+        CrackConfiguration, FractureMaterial, FractureProblem, FractureResult,
+        solve_fracture_sim, solve_lefm_and_paris_growth,
+    };
     pub use crate::fsi::{FsiProblem, solve_fsi_coupled};
     pub use crate::gears::{
         GearToothProfile, GearType, InvoluteGearPairProblem, InvoluteGearPairResult,
@@ -114,6 +123,10 @@ pub mod prelude {
         RetainingWallProblem, SoilProperties, solve_retaining_wall_pressures,
     };
     pub use crate::heat_exchanger::{FlowArrangement, HeatExchangerProblem, solve_heat_exchanger};
+    pub use crate::hydrology::{
+        HydrologyProblem, HydrologyResult, LandUseCategory, PipeMaterial,
+        solve_hydrology_sim, solve_rational_runoff_and_pipe,
+    };
     pub use crate::hypersonic::{
         AtmosphericState, HypersonicAirplaneProblem, HypersonicSimulationSummary,
         compute_standard_atmosphere, solve_hypersonic_airplane,
@@ -158,7 +171,16 @@ pub mod prelude {
         BusType, ComplexNumber, PowerFlowProblem, TransmissionLine, build_bus_admittance_matrix,
         solve_power_flow, y_bus_frobenius_norm,
     };
+    pub use crate::pressure_vessel::{
+        HeadType, JointEfficiencyType, PressureVesselProblem, PressureVesselResult,
+        VesselMaterial, solve_asme_pressure_vessel, solve_pressure_vessel_sim,
+    };
     pub use crate::problem::{AnalysisType, SimulationProblem};
+    pub use crate::provenance::SimulationProvenance;
+    pub use crate::psychrometrics::{
+        PsychrometricProblem, PsychrometricResult, saturation_vapor_pressure_pa,
+        solve_psychrometric_state, solve_psychrometrics_sim,
+    };
     pub use crate::rainflow::{
         RainflowCycle, RainflowProblem, count_rainflow_cycles, solve_rainflow_fatigue,
     };
@@ -170,6 +192,10 @@ pub mod prelude {
     pub use crate::rock_mechanics::{
         BlastVibrationProblem, HoekBrownProblem, RmrClassificationProblem, solve_blast_vibration,
         solve_hoek_brown, solve_rmr_classification,
+    };
+    pub use crate::shafts_keys::{
+        Din6885KeyDimensions, HubMaterial, ShaftKeyProblem, ShaftKeyResult, ShaftMaterial,
+        lookup_din6885_key, solve_shaft_and_key, solve_shaft_keys_sim,
     };
     pub use crate::sheet_metal::{
         SheetMetalBend, SheetMetalMaterial, SheetMetalPartProblem, SheetMetalUnfoldResult,

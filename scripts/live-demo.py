@@ -1743,6 +1743,103 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 17.7 Enterprise MCP Tool Calling: 5 New Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # -------------------------------------------------------------------------
+        # 18. PROCESS, CIVIL, THERMAL & STRUCTURAL PHYSICS (SHAFTS, ASME VESSELS, PSYCHROMETRICS, HYDROLOGY, LEFM)
+        # -------------------------------------------------------------------------
+        print("\n[18/18] PROCESS, CIVIL, THERMAL & STRUCTURAL WORKBENCHES (SHAFTS, ASME, PSYCHRO, HYDRO, LEFM)")
+
+        # 18.1 Transmission Shaft Sizing & DIN 6885-1 Keyway
+        shaft_res = http_request(port, "POST", "/api/cad/hardware/shaft_key", body={
+            "transmitted_power_kw": 45.0,
+            "rotational_speed_rpm": 1450.0,
+            "bending_moment_nm": 350.0,
+            "selected_shaft_diameter_mm": 45.0
+        })
+        check(abs(shaft_res.get("torque_nm", 0.0) - 296.34) < 1.0, "Shaft torque T = 296.3 N·m")
+        check(shaft_res.get("key_dimensions", {}).get("key_width_b_mm") == 14.0, "DIN 6885-1 key size = 14x9 mm")
+        check(shaft_res.get("is_design_adequate") is True, "Shaft and key stresses satisfy safety criteria")
+        print(f"  ✓ 18.1 Transmission Shaft & Key: T = {shaft_res['torque_nm']:.1f} N·m, Min D = {shaft_res['min_required_diameter_mm']:.1f} mm, DIN 6885 Key {shaft_res['key_dimensions']['key_width_b_mm']:.0f}x{shaft_res['key_dimensions']['key_height_h_mm']:.0f} mm (Adequate = {shaft_res['is_design_adequate']})")
+
+        # 18.2 ASME BPVC Section VIII Div 1 Pressure Vessel
+        pv_res = http_request(port, "POST", "/api/sim/pressure_vessel/asme", body={
+            "design_pressure_bar": 20.0,
+            "inside_diameter_d_mm": 1200.0,
+            "tangent_length_l_mm": 3000.0,
+            "corrosion_allowance_mm": 2.5
+        })
+        check(abs(pv_res.get("min_required_shell_thickness_mm", 0.0) - 13.07) < 0.2, "Shell thickness t = 13.07 mm")
+        check(pv_res.get("vessel_mawp_bar", 0.0) > 20.0, "Vessel MAWP > 20 bar")
+        check(pv_res.get("hydrostatic_test_pressure_bar", 0.0) > 30.0, "Hydrotest pressure > 30 bar")
+        check(pv_res.get("is_asme_compliant") is True, "ASME BPVC Section VIII Div 1 compliance certified")
+        print(f"  ✓ 18.2 ASME Pressure Vessel: Shell t = {pv_res['min_required_shell_thickness_mm']:.2f} mm, 2:1 Head t = {pv_res['min_required_head_thickness_mm']:.2f} mm, MAWP = {pv_res['vessel_mawp_bar']:.1f} bar, Hydrotest = {pv_res['hydrostatic_test_pressure_bar']:.1f} bar")
+
+        # 18.3 ASHRAE Psychrometrics & Moist Air Thermodynamics
+        psy_res = http_request(port, "POST", "/api/sim/thermal/psychrometrics", body={
+            "dry_bulb_temp_c": 24.0,
+            "relative_humidity": 0.50
+        })
+        check(abs(psy_res.get("humidity_ratio_g_kg", 0.0) - 9.3) < 0.2, "Humidity ratio W = 9.3 g/kg")
+        check(abs(psy_res.get("dew_point_temp_c", 0.0) - 12.9) < 0.5, "Dew point Tdp = 12.9 °C")
+        check(abs(psy_res.get("specific_enthalpy_kj_kg", 0.0) - 47.8) < 0.5, "Enthalpy h = 47.8 kJ/kg")
+        print(f"  ✓ 18.3 ASHRAE Psychrometrics: W = {psy_res['humidity_ratio_g_kg']:.2f} g/kg, Tdp = {psy_res['dew_point_temp_c']:.1f} °C, Twb = {psy_res['wet_bulb_temp_c']:.1f} °C, h = {psy_res['specific_enthalpy_kj_kg']:.1f} kJ/kg")
+
+        # 18.4 Civil Stormwater Runoff & Manning Culvert
+        hydro_res = http_request(port, "POST", "/api/sim/civil/hydrology", body={
+            "catchment_area_ha": 8.5,
+            "flow_path_length_m": 450.0,
+            "terrain_slope": 0.020,
+            "pipe_slope": 0.008
+        })
+        check(hydro_res.get("peak_discharge_m3_s", 0.0) > 0.8, "Peak discharge calculated")
+        check(hydro_res.get("min_required_pipe_diameter_mm", 0.0) > 700.0, "Pipe diameter sized via Manning")
+        check(hydro_res.get("is_self_cleansing") is True, "Self-cleansing flow velocity maintained")
+        print(f"  ✓ 18.4 Civil Stormwater Hydrology: Q_peak = {hydro_res['peak_discharge_m3_s']:.3f} m³/s ({hydro_res['peak_discharge_liters_s']:.0f} L/s), Pipe Min D = {hydro_res['min_required_pipe_diameter_mm']:.0f} mm (V = {hydro_res['flow_velocity_m_s']:.2f} m/s)")
+
+        # 18.5 LEFM Stress Intensity & Paris Fatigue Crack Growth
+        frac_res = http_request(port, "POST", "/api/sim/structural/fracture", body={
+            "max_stress_mpa": 180.0,
+            "min_stress_mpa": 18.0,
+            "initial_crack_depth_a0_mm": 1.5,
+            "plate_width_w_mm": 80.0
+        })
+        check(abs(frac_res.get("initial_stress_intensity_k1_mpa_m05", 0.0) - 13.9) < 1.0, "K_I ~ 13.9 MPa*m^0.5")
+        check(frac_res.get("critical_crack_length_ac_mm", 0.0) > 5.0, "Critical flaw a_c > 5.0 mm")
+        check(frac_res.get("fatigue_cycles_to_failure_nf", 0.0) > 1500.0, "Fatigue cycles to failure calculated")
+        check(frac_res.get("is_safe_against_fast_fracture") is True, "Initial flaw safe against fast fracture")
+        print(f"  ✓ 18.5 LEFM & Paris Crack Growth: Initial K_I = {frac_res['initial_stress_intensity_k1_mpa_m05']:.2f} MPa·m^0.5, a_c = {frac_res['critical_crack_length_ac_mm']:.2f} mm, N_f = {frac_res['fatigue_cycles_to_failure_nf']:.0f} cycles (Inspection: {frac_res['recommended_inspection_interval_cycles']:.0f} cycles)")
+
+        # 18.6 Universal Commands Execution Verification (5 Advanced Domains)
+        for cmd_id in [
+            "cad.hardware.shaft_key",
+            "sim.pressure_vessel.asme",
+            "sim.thermal.psychrometrics",
+            "sim.civil.hydrology",
+            "sim.structural.fracture",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 18.6 Universal Commands: All 5 New Engineering Commands verified via typed schema engine")
+
+        # 18.7 Enterprise MCP Tool Calling (5 Advanced Domains)
+        for mcp_tool_name in [
+            "atlas_cad_hardware_shaft_key",
+            "atlas_sim_pressure_vessel",
+            "atlas_sim_psychrometrics",
+            "atlas_sim_civil_hydrology",
+            "atlas_sim_fracture_lefm",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 400,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 18.7 Enterprise MCP Tool Calling: 5 New Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

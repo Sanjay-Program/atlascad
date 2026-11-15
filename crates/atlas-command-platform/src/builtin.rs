@@ -1544,5 +1544,204 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    // --- 23. Transmission Shaft Sizing & DIN 6885-1 Parallel Key ---
+    registry.register(
+        CommandSchema::new(
+            "cad.hardware.shaft_key",
+            "DIN 6885-1 & ASME B106.1M Transmission Shaft & Key Sizing",
+            "Calculates shaft diameter under combined torsion and bending, torsional angular deflection, and DIN 6885-1 parallel key shear stress and hub contact pressure.",
+            CommandCategory::Geometry,
+        )
+        .with_permission(CommandPermission::GeometryCreate)
+        .with_argument(CommandArgument {
+            name: "transmitted_power_kw".into(),
+            arg_type: ArgumentType::Number,
+            description: "Transmitted mechanical power in kW".into(),
+            required: true,
+            default_value: Some(serde_json::json!(45.0)),
+            validation_rules: vec![ValidationRule::Min(0.1)],
+        })
+        .with_argument(CommandArgument {
+            name: "rotational_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Shaft rotational speed in RPM".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1450.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "bending_moment_nm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Peak resultant bending moment in N·m".into(),
+            required: false,
+            default_value: Some(serde_json::json!(350.0)),
+            validation_rules: vec![ValidationRule::Min(0.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "selected_shaft_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Nominal selected shaft diameter in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(45.0)),
+            validation_rules: vec![ValidationRule::Min(5.0)],
+        }),
+    )?;
+
+    // --- 24. ASME BPVC Section VIII Div. 1 Pressure Vessel ---
+    registry.register(
+        CommandSchema::new(
+            "sim.pressure_vessel.asme",
+            "ASME BPVC Section VIII Division 1 Pressure Vessel & Formed Heads",
+            "Calculates minimum wall thickness for cylindrical shells and 2:1 ellipsoidal / torispherical heads, vessel MAWP, and hydrostatic proof test pressure.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "design_pressure_bar".into(),
+            arg_type: ArgumentType::Number,
+            description: "Internal design gauge pressure in bar (e.g. 20.0 bar)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(20.0)),
+            validation_rules: vec![ValidationRule::Min(0.1)],
+        })
+        .with_argument(CommandArgument {
+            name: "inside_diameter_d_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Inside diameter of vessel in mm (e.g. 1200 mm)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1200.0)),
+            validation_rules: vec![ValidationRule::Min(50.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "tangent_length_l_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Cylindrical shell tangent-to-tangent length in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(3000.0)),
+            validation_rules: vec![ValidationRule::Min(50.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "corrosion_allowance_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Specified corrosion allowance in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(2.5)),
+            validation_rules: vec![ValidationRule::Min(0.0)],
+        }),
+    )?;
+
+    // --- 25. ASHRAE Psychrometrics & Moist Air Thermodynamics ---
+    registry.register(
+        CommandSchema::new(
+            "sim.thermal.psychrometrics",
+            "ASHRAE Psychrometric State & Moist Air Thermodynamics",
+            "Calculates saturation and vapor pressures, humidity ratio W, specific enthalpy h, dew point Tdp, wet bulb Twb, specific volume, and density.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "dry_bulb_temp_c".into(),
+            arg_type: ArgumentType::Number,
+            description: "Dry-bulb ambient temperature in °C".into(),
+            required: true,
+            default_value: Some(serde_json::json!(24.0)),
+            validation_rules: vec![ValidationRule::Min(-50.0), ValidationRule::Max(85.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "relative_humidity".into(),
+            arg_type: ArgumentType::Number,
+            description: "Relative humidity (0.0 to 1.0 or 0.0 to 100.0%)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(0.50)),
+            validation_rules: vec![ValidationRule::Min(0.01), ValidationRule::Max(100.0)],
+        }),
+    )?;
+
+    // --- 26. Stormwater Runoff Hydrology & Manning Pipe Sizing ---
+    registry.register(
+        CommandSchema::new(
+            "sim.civil.hydrology",
+            "Rational Stormwater Runoff & Manning Culvert Pipe Sizing",
+            "Calculates watershed Kirpich time of concentration, IDF rainfall intensity, peak runoff Q_peak, and Manning minimum required storm sewer diameter.",
+            CommandCategory::Bim,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "catchment_area_ha".into(),
+            arg_type: ArgumentType::Number,
+            description: "Catchment drainage area in hectares (1 ha = 10,000 m2)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(8.5)),
+            validation_rules: vec![ValidationRule::Min(0.01)],
+        })
+        .with_argument(CommandArgument {
+            name: "flow_path_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Longest overland/channel drainage path length in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(450.0)),
+            validation_rules: vec![ValidationRule::Min(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "terrain_slope".into(),
+            arg_type: ArgumentType::Number,
+            description: "Average terrain slope in m/m (e.g. 0.02 for 2%)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(0.020)),
+            validation_rules: vec![ValidationRule::Min(0.0001)],
+        })
+        .with_argument(CommandArgument {
+            name: "pipe_slope".into(),
+            arg_type: ArgumentType::Number,
+            description: "Storm sewer pipe longitudinal gradient in m/m (e.g. 0.008 for 0.8%)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(0.008)),
+            validation_rules: vec![ValidationRule::Min(0.0001)],
+        }),
+    )?;
+
+    // --- 27. Linear Elastic Fracture Mechanics & Paris Crack Growth ---
+    registry.register(
+        CommandSchema::new(
+            "sim.structural.fracture",
+            "LEFM Stress Intensity K_I & Paris Fatigue Crack Growth",
+            "Calculates Mode I stress intensity factor K_I, fracture toughness margin K_IC, critical fast-fracture flaw size a_c, and Paris fatigue cycle life N_f.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "max_stress_mpa".into(),
+            arg_type: ArgumentType::Number,
+            description: "Maximum cyclic tensile stress in MPa".into(),
+            required: true,
+            default_value: Some(serde_json::json!(180.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "min_stress_mpa".into(),
+            arg_type: ArgumentType::Number,
+            description: "Minimum cyclic tensile stress in MPa".into(),
+            required: false,
+            default_value: Some(serde_json::json!(18.0)),
+            validation_rules: vec![ValidationRule::Min(0.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "initial_crack_depth_a0_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Initial detected flaw depth a_0 in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1.5)),
+            validation_rules: vec![ValidationRule::Min(0.05)],
+        })
+        .with_argument(CommandArgument {
+            name: "plate_width_w_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Structural section width W in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(80.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        }),
+    )?;
+
     Ok(())
 }

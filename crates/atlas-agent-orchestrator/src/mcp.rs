@@ -677,6 +677,74 @@ impl McpServer {
                     "required": ["room_length_m", "room_width_m", "room_height_m", "window_width_m", "window_height_m"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_cad_hardware_shaft_key".into(),
+                description: "Calculate transmission shaft diameter under bending and torsion, torsional deflection, and DIN 6885-1 parallel key stresses".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "transmitted_power_kw": { "type": "number", "default": 45.0 },
+                        "rotational_speed_rpm": { "type": "number", "default": 1450.0 },
+                        "bending_moment_nm": { "type": "number", "default": 350.0 },
+                        "selected_shaft_diameter_mm": { "type": "number", "default": 45.0 }
+                    },
+                    "required": ["transmitted_power_kw", "rotational_speed_rpm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_pressure_vessel".into(),
+                description: "Calculate ASME BPVC Section VIII Division 1 shell and head required thicknesses, MAWP, and hydrotest pressure".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "design_pressure_bar": { "type": "number", "default": 20.0 },
+                        "inside_diameter_d_mm": { "type": "number", "default": 1200.0 },
+                        "tangent_length_l_mm": { "type": "number", "default": 3000.0 },
+                        "corrosion_allowance_mm": { "type": "number", "default": 2.5 }
+                    },
+                    "required": ["design_pressure_bar", "inside_diameter_d_mm", "tangent_length_l_mm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_psychrometrics".into(),
+                description: "Calculate ASHRAE moist air psychrometric properties: vapor pressure, humidity ratio, enthalpy, dew point, wet bulb, and density".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "dry_bulb_temp_c": { "type": "number", "default": 24.0 },
+                        "relative_humidity": { "type": "number", "default": 0.50 }
+                    },
+                    "required": ["dry_bulb_temp_c", "relative_humidity"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_civil_hydrology".into(),
+                description: "Calculate watershed Kirpich time of concentration, IDF rainfall intensity, peak runoff Q, and Manning culvert pipe diameter".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "catchment_area_ha": { "type": "number", "default": 8.5 },
+                        "flow_path_length_m": { "type": "number", "default": 450.0 },
+                        "terrain_slope": { "type": "number", "default": 0.020 },
+                        "pipe_slope": { "type": "number", "default": 0.008 }
+                    },
+                    "required": ["catchment_area_ha", "flow_path_length_m", "terrain_slope", "pipe_slope"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_fracture_lefm".into(),
+                description: "Calculate Mode I stress intensity factor K_I, fracture toughness margin K_IC, critical flaw size a_c, and Paris fatigue cycle life".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "max_stress_mpa": { "type": "number", "default": 180.0 },
+                        "min_stress_mpa": { "type": "number", "default": 18.0 },
+                        "initial_crack_depth_a0_mm": { "type": "number", "default": 1.5 },
+                        "plate_width_w_mm": { "type": "number", "default": 80.0 }
+                    },
+                    "required": ["max_stress_mpa", "initial_crack_depth_a0_mm", "plate_width_w_mm"]
+                }),
+            },
         ]
     }
 

@@ -1068,6 +1068,66 @@ def simulation_section(studio: Studio) -> None:
     df_data = daylighting.json()
     check(df_data.get("point_daylight_factor_percent", 0.0) > 1.0, "point daylight factor calculated")
     check(df_data.get("is_compliant") is True, "EN 17037 office daylighting target satisfied")
+
+    # 15. Transmission Shaft & DIN 6885-1 Keyway
+    shaft = studio.post("/api/cad/hardware/shaft_key", {
+        "transmitted_power_kw": 45.0,
+        "rotational_speed_rpm": 1450.0,
+        "bending_moment_nm": 350.0,
+        "selected_shaft_diameter_mm": 45.0
+    })
+    check(shaft.status == 200, f"shaft/key returns 200 (got {shaft.status})")
+    sh_data = shaft.json()
+    check(abs(sh_data.get("torque_nm", 0.0) - 296.34) < 1.0, "torque matches 296.3 N·m")
+    check(sh_data.get("key_dimensions", {}).get("key_width_b_mm") == 14.0, "DIN 6885 key width = 14mm")
+    check(sh_data.get("is_design_adequate") is True, "shaft and key design adequate")
+
+    # 16. ASME BPVC Section VIII Div. 1 Pressure Vessel
+    pv = studio.post("/api/sim/pressure_vessel/asme", {
+        "design_pressure_bar": 20.0,
+        "inside_diameter_d_mm": 1200.0,
+        "tangent_length_l_mm": 3000.0,
+        "corrosion_allowance_mm": 2.5
+    })
+    check(pv.status == 200, f"pressure vessel returns 200 (got {pv.status})")
+    pv_data = pv.json()
+    check(abs(pv_data.get("min_required_shell_thickness_mm", 0.0) - 13.07) < 0.2, "ASME shell thickness = 13.07 mm")
+    check(pv_data.get("vessel_mawp_bar", 0.0) > 20.0, "MAWP exceeds design pressure")
+    check(pv_data.get("is_asme_compliant") is True, "vessel is ASME compliant")
+
+    # 17. ASHRAE Psychrometrics & Moist Air
+    psy = studio.post("/api/sim/thermal/psychrometrics", {
+        "dry_bulb_temp_c": 24.0,
+        "relative_humidity": 0.50
+    })
+    check(psy.status == 200, f"psychrometrics returns 200 (got {psy.status})")
+    psy_data = psy.json()
+    check(abs(psy_data.get("humidity_ratio_g_kg", 0.0) - 9.3) < 0.2, "humidity ratio ~ 9.3 g/kg")
+    check(abs(psy_data.get("dew_point_temp_c", 0.0) - 12.9) < 0.5, "dew point ~ 12.9 °C")
+
+    # 18. Civil Stormwater Runoff & Manning Pipe
+    hydro = studio.post("/api/sim/civil/hydrology", {
+        "catchment_area_ha": 8.5,
+        "flow_path_length_m": 450.0,
+        "terrain_slope": 0.020,
+        "pipe_slope": 0.008
+    })
+    check(hydro.status == 200, f"hydrology returns 200 (got {hydro.status})")
+    hy_data = hydro.json()
+    check(hy_data.get("peak_discharge_m3_s", 0.0) > 0.8, "peak discharge calculated")
+    check(hy_data.get("is_self_cleansing") is True, "culvert pipe velocity is self-cleansing")
+
+    # 19. LEFM Fracture Mechanics & Paris Crack Growth
+    frac = studio.post("/api/sim/structural/fracture", {
+        "max_stress_mpa": 180.0,
+        "min_stress_mpa": 18.0,
+        "initial_crack_depth_a0_mm": 1.5,
+        "plate_width_w_mm": 80.0
+    })
+    check(frac.status == 200, f"fracture returns 200 (got {frac.status})")
+    fr_data = frac.json()
+    check(abs(fr_data.get("initial_stress_intensity_k1_mpa_m05", 0.0) - 13.9) < 1.0, "K_I ~ 13.9 MPa*m^0.5")
+    check(fr_data.get("is_safe_against_fast_fracture") is True, "safe against brittle fast fracture")
     report("simulation")
 
 
