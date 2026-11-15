@@ -478,5 +478,114 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         .with_permission(CommandPermission::ReadOnly),
     )?;
 
+    // --- 11. Atlas Create, RealTime & Media Creative Ecosystem ---
+    registry.register(
+        CommandSchema::new(
+            "create.subdiv.apply",
+            "Apply Catmull-Clark Subdivision Surface",
+            "Performs iterative Catmull-Clark subdivision smoothing on a polygon mesh.",
+            CommandCategory::Mesh,
+        )
+        .with_permission(CommandPermission::GeometryCreate)
+        .with_argument(CommandArgument {
+            name: "mesh_id".into(),
+            arg_type: ArgumentType::String,
+            description: "Target polygon mesh identifier".into(),
+            required: true,
+            default_value: None,
+            validation_rules: vec![ValidationRule::NonEmpty],
+        })
+        .with_argument(CommandArgument {
+            name: "levels".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Subdivision recursion depth (1-4)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(4.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "create.sculpt.stroke",
+            "Execute Digital Sculpting Brush Stroke",
+            "Deforms mesh vertices using sculpting brush physics (Draw, Clay, Smooth, Flatten, Inflate).",
+            CommandCategory::Geometry,
+        )
+        .with_permission(CommandPermission::GeometryCreate)
+        .with_argument(CommandArgument {
+            name: "brush_type".into(),
+            arg_type: ArgumentType::String,
+            description: "Sculpting brush algorithm (draw, clay, smooth, flatten, inflate)".into(),
+            required: true,
+            default_value: None,
+            validation_rules: vec![ValidationRule::NonEmpty],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "create.material.assign",
+            "Assign PBR MaterialX Shader",
+            "Binds a physically-based material with metallic, roughness, and subsurface properties.",
+            CommandCategory::Materials,
+        )
+        .with_permission(CommandPermission::ProjectEdit)
+        .with_argument(CommandArgument {
+            name: "material_name".into(),
+            arg_type: ArgumentType::String,
+            description: "Name of PBR material definition".into(),
+            required: true,
+            default_value: None,
+            validation_rules: vec![ValidationRule::NonEmpty],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "realtime.scene.build",
+            "Build Real-Time ECS Scene Graph",
+            "Assembles 3D hierarchy, generates BVH spatial indices, and binds telemetry sensors.",
+            CommandCategory::Assemblies,
+        )
+        .with_permission(CommandPermission::ProjectEdit)
+        .with_argument(CommandArgument {
+            name: "scene_name".into(),
+            arg_type: ArgumentType::String,
+            description: "Name of the real-time scene".into(),
+            required: true,
+            default_value: None,
+            validation_rules: vec![ValidationRule::NonEmpty],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "media.timeline.create",
+            "Create NLE Multi-Track Timeline",
+            "Instantiates video and audio timeline tracks with SMPTE timecode support.",
+            CommandCategory::Reporting,
+        )
+        .with_permission(CommandPermission::ProjectEdit)
+        .with_argument(CommandArgument {
+            name: "title".into(),
+            arg_type: ArgumentType::String,
+            description: "Title of timeline project".into(),
+            required: true,
+            default_value: None,
+            validation_rules: vec![ValidationRule::NonEmpty],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "media.render.export",
+            "Export Timeline Package via OpenTimelineIO",
+            "Renders timeline EDL/OTIO and exports master media deliverables.",
+            CommandCategory::Reporting,
+        )
+        .with_permission(CommandPermission::FileExport),
+    )?;
+
     Ok(())
 }

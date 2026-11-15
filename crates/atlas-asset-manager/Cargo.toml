@@ -1,0 +1,18 @@
+[package]
+name = "atlas-asset-manager"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+rust-version.workspace = true
+description = "Atlas Asset Manager: Content-Addressable Storage, LOD tracking, and CAD dependency invalidation"
+
+[dependencies]
+atlas-creative-core.workspace = true
+atlas-material-system.workspace = true
+atlas-scene-graph.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

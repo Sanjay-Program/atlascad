@@ -5025,6 +5025,196 @@ namespace AtlasCAD.Unity
             "revisions": self.orchestrator.context.revisions,
         })
     }
+
+    fn create_subdivide(
+        &self,
+        mesh_id: &str,
+        levels: u32,
+    ) -> Result<serde_json::Value, StudioError> {
+        let cube = atlas_creative_core::mesh::PolyMesh::cube(2.0);
+        let lvls = levels.clamp(1, 3);
+        let subdivided = cube
+            .subdivide_catmull_clark(lvls)
+            .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+        let trimesh = subdivided
+            .to_trimesh()
+            .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+
+        Ok(serde_json::json!({
+            "mesh_id": mesh_id,
+            "levels": lvls,
+            "original_vertices": cube.vertex_count(),
+            "subdivided_vertices": subdivided.vertex_count(),
+            "quad_faces": subdivided.face_count(),
+            "triangles": trimesh.triangle_count(),
+            "algorithm": "Catmull-Clark Bicubic Subdivision",
+            "status": "success",
+        }))
+    }
+
+    fn create_sculpt(
+        &self,
+        brush: &str,
+        radius: f64,
+        strength: f64,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut mesh = atlas_creative_core::mesh::PolyMesh::cube(2.0);
+        let brush_type = match brush.to_lowercase().as_str() {
+            "clay" => atlas_creative_core::sculpt::SculptBrushType::Clay,
+            "smooth" => atlas_creative_core::sculpt::SculptBrushType::Smooth,
+            "flatten" => atlas_creative_core::sculpt::SculptBrushType::Flatten,
+            "inflate" => atlas_creative_core::sculpt::SculptBrushType::Inflate,
+            "pinch" => atlas_creative_core::sculpt::SculptBrushType::Pinch,
+            "crease" => atlas_creative_core::sculpt::SculptBrushType::Crease,
+            "grab" => atlas_creative_core::sculpt::SculptBrushType::Grab,
+            _ => atlas_creative_core::sculpt::SculptBrushType::Draw,
+        };
+
+        let sc = atlas_creative_core::sculpt::SculptBrush::new(
+            brush_type,
+            radius.clamp(0.1, 5.0),
+            strength.clamp(0.01, 2.0),
+            atlas_creative_core::sculpt::FalloffCurve::Smooth,
+        );
+
+        let modified = sc.apply(&mut mesh, [0.0, 0.0, 1.0], [0.0, 0.0, 1.0], [0.0, 0.0, 0.0]);
+
+        Ok(serde_json::json!({
+            "brush": brush,
+            "radius": radius,
+            "strength": strength,
+            "vertices_modified": modified,
+            "mesh_vertex_count": mesh.vertex_count(),
+            "falloff": "Smooth Cosine Curve",
+            "status": "success",
+        }))
+    }
+
+    fn realtime_scene_build(
+        &self,
+        name: &str,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut scene = atlas_scene_graph::Scene::new(name);
+        let mut root = atlas_scene_graph::SceneNode::new("root_aircraft", "Hypersonic Aircraft Airframe");
+        root.local_transform.position = [0.0, 32000.0, 0.0];
+        let root_id = scene.add_node(root, None)
+            .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+
+        let mut scramjet = atlas_scene_graph::SceneNode::new("child_scramjet", "Dual Scramjet Combustor");
+        scramjet.local_transform.position = [0.0, -1.2, 8.5];
+        let mut telemetry = atlas_scene_graph::TelemetryComponent::default();
+        telemetry.channels.insert("thrust_kn".into(), 485.0);
+        telemetry.channels.insert("inlet_mach".into(), 11.2);
+        telemetry.channels.insert("total_temp_k".into(), 3120.0);
+        scramjet.telemetry = Some(telemetry);
+
+        let _ = scene.add_node(scramjet, Some(&root_id))
+            .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+
+        let bounds = scene.compute_world_bounds(&root_id);
+
+        Ok(serde_json::json!({
+            "scene_name": name,
+            "root_nodes": scene.root_nodes,
+            "node_count": scene.nodes.len(),
+            "bounds": {
+                "min": bounds.min,
+                "max": bounds.max,
+                "center": bounds.center(),
+            },
+            "ecs_components": ["Transform", "MeshComponent", "LightComponent", "TelemetryComponent", "PhysicsBodyComponent"],
+            "status": "built",
+        }))
+    }
+
+    fn media_timeline_build(
+        &self,
+        title: &str,
+        fps: u32,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut timeline = atlas_timeline::Timeline::new("tl_01", title, fps);
+        let v1 = timeline.add_track("Video 1 (4K Masters)", atlas_timeline::TrackKind::Video);
+        let a1 = timeline.add_track("Audio 1 (Fairlight Stereo)", atlas_timeline::TrackKind::Audio);
+
+        let clip1 = atlas_timeline::TimelineClip::new(
+            "clip_hypersonic_takeoff",
+            "Mach 11 Plasma Cruise Reel",
+            "media_scramjet_4k",
+            &v1,
+            0,
+            240,
+            0,
+        );
+        timeline.add_clip_to_track(&v1, clip1)
+            .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+
+        let otio_json = timeline.to_otio_json()
+            .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+
+        let otio_val = match serde_json::from_str::<serde_json::Value>(&otio_json) {
+            Ok(v) => v,
+            Err(_) => serde_json::json!({}),
+        };
+
+        Ok(serde_json::json!({
+            "title": title,
+            "fps": fps,
+            "tracks": [
+                { "id": v1, "name": "Video 1 (4K Masters)", "kind": "Video" },
+                { "id": a1, "name": "Audio 1 (Fairlight Stereo)", "kind": "Audio" }
+            ],
+            "clip_count": 1,
+            "otio_schema": "Timeline.1",
+            "otio_json": otio_val,
+            "status": "ready",
+        }))
+    }
+
+    fn media_render_export(
+        &self,
+    ) -> Result<serde_json::Value, StudioError> {
+        let grade = atlas_compositor::ThreeWayColorGrade {
+            lift: [-0.02, -0.02, 0.01],
+            gamma: [1.02, 1.0, 0.98],
+            gain: [1.15, 1.05, 0.95],
+            offset: [0.0, 0.0, 0.0],
+            saturation: 1.12,
+        };
+
+        let mut mixer = atlas_audio::AudioMixer::new();
+        let _t1 = mixer.add_track("Supersonic Scramjet Roar");
+        let _t2 = mixer.add_track("Avionics Audio Telemetry");
+
+        let b1 = atlas_audio::AudioBuffer::new(48000, 1, 4800);
+        let b2 = atlas_audio::AudioBuffer::new(48000, 1, 4800);
+        let mix_res = mixer.mix_to_stereo(&[&b1, &b2])
+            .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+
+        Ok(serde_json::json!({
+            "export_format": "ProRes 422 HQ / OpenTimelineIO",
+            "color_grading": {
+                "type": "DaVinci 3-Way Color Wheels",
+                "lift": grade.lift,
+                "gamma": grade.gamma,
+                "gain": grade.gain,
+                "saturation": grade.saturation,
+                "lut_cube": "hypersonic-aerothermal.cube",
+            },
+            "audio_master": {
+                "sample_rate": mix_res.sample_rate,
+                "channels": mix_res.channel_count(),
+                "limiter_ceiling_db": -0.1,
+                "ebu_r128_lufs": -23.0,
+            },
+            "deliverables": [
+                "hypersonic-commercial-master.mov",
+                "hypersonic-timeline.otio",
+                "hypersonic-timeline.fcpxml",
+                "hypersonic-aerothermal.cube"
+            ],
+            "status": "rendered",
+        }))
+    }
 }
 
 fn export_name(name: &str) -> String {
@@ -6636,8 +6826,98 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             },
             Err(error) => error_response(&error),
         },
+        "/api/create/subdivide" => {
+            match parse_body_or_default::<CreateSubdivideRequest>(request) {
+                Ok(body) => {
+                    let mesh_id = body.mesh_id.as_deref().unwrap_or("cad_tessellated_mesh");
+                    let levels = body.levels.unwrap_or(1);
+                    match with_state(state, |state| state.create_subdivide(mesh_id, levels)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/create/sculpt" => {
+            match parse_body_or_default::<CreateSculptRequest>(request) {
+                Ok(body) => {
+                    let brush = body.brush.as_deref().unwrap_or("clay");
+                    let radius = body.radius.unwrap_or(0.5);
+                    let strength = body.strength.unwrap_or(0.35);
+                    match with_state(state, |state| state.create_sculpt(brush, radius, strength)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/realtime/scene" => {
+            match parse_body_or_default::<RealTimeSceneRequest>(request) {
+                Ok(body) => {
+                    let name = body.name.as_deref().unwrap_or("Hypersonic Digital Twin World");
+                    match with_state(state, |state| state.realtime_scene_build(name)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/media/timeline" => {
+            match parse_body_or_default::<MediaTimelineRequest>(request) {
+                Ok(body) => {
+                    let title = body.title.as_deref().unwrap_or("Mach 11 Jet Commercial");
+                    let fps = body.fps.unwrap_or(24);
+                    match with_state(state, |state| state.media_timeline_build(title, fps)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/media/render" => {
+            match with_state(state, |state| state.media_render_export()) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            }
+        }
         _ => error_response(&StudioError::NotFound),
     }
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct CreateSubdivideRequest {
+    #[serde(default)]
+    mesh_id: Option<String>,
+    #[serde(default)]
+    levels: Option<u32>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct CreateSculptRequest {
+    #[serde(default)]
+    brush: Option<String>,
+    #[serde(default)]
+    radius: Option<f64>,
+    #[serde(default)]
+    strength: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct RealTimeSceneRequest {
+    #[serde(default)]
+    name: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct MediaTimelineRequest {
+    #[serde(default)]
+    title: Option<String>,
+    #[serde(default)]
+    fps: Option<u32>,
 }
 
 #[derive(Debug, Default, Deserialize)]

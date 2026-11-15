@@ -1,0 +1,16 @@
+[package]
+name = "atlas-creative-core"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+rust-version.workspace = true
+description = "Atlas Create: polygon/subdiv modeling, sculpting brushes, UV unwrapping and procedural geometry nodes"
+
+[dependencies]
+cad-contract.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,18 @@
+[package]
+name = "atlas-render-core"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+rust-version.workspace = true
+description = "Atlas Render Core: software ray and path tracer, camera models, and BSDF shader evaluation"
+
+[dependencies]
+atlas-creative-core.workspace = true
+atlas-material-system.workspace = true
+atlas-scene-graph.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

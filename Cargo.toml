@@ -30,6 +30,17 @@ members = [
     "crates/atlas-additive",
     "crates/atlas-command-platform",
     "crates/atlas-agent-orchestrator",
+    "crates/atlas-creative-core",
+    "crates/atlas-scene-graph",
+    "crates/atlas-asset-manager",
+    "crates/atlas-material-system",
+    "crates/atlas-animation-core",
+    "crates/atlas-render-core",
+    "crates/atlas-media-core",
+    "crates/atlas-timeline",
+    "crates/atlas-compositor",
+    "crates/atlas-audio",
+    "crates/atlas-interchange",
 ]
 # The reference and kernel checkouts are independent repositories with their own histories and
 # manifests. Without this, this workspace root would claim any nested package whose manifest has no
@@ -71,6 +82,17 @@ atlas-organization = { path = "crates/atlas-organization" }
 atlas-additive = { path = "crates/atlas-additive" }
 atlas-command-platform = { path = "crates/atlas-command-platform" }
 atlas-agent-orchestrator = { path = "crates/atlas-agent-orchestrator" }
+atlas-creative-core = { path = "crates/atlas-creative-core" }
+atlas-scene-graph = { path = "crates/atlas-scene-graph" }
+atlas-asset-manager = { path = "crates/atlas-asset-manager" }
+atlas-material-system = { path = "crates/atlas-material-system" }
+atlas-animation-core = { path = "crates/atlas-animation-core" }
+atlas-render-core = { path = "crates/atlas-render-core" }
+atlas-media-core = { path = "crates/atlas-media-core" }
+atlas-timeline = { path = "crates/atlas-timeline" }
+atlas-compositor = { path = "crates/atlas-compositor" }
+atlas-audio = { path = "crates/atlas-audio" }
+atlas-interchange = { path = "crates/atlas-interchange" }
 
 # Same pinned versions the SolidCraft kernel uses, so measurements describe the
 # kernel this platform actually ships rather than a different release.

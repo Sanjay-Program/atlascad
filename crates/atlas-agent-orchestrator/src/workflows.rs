@@ -116,6 +116,50 @@ impl WorkflowRegistry {
                 required_agents: vec!["technical_writer".into(), "quality_assurance".into(), "cost_planner".into()],
                 task_count: 4,
             },
+            WorkflowTemplateInfo {
+                id: "cad_to_product_commercial".into(),
+                name: "CAD to Cinematic Product Commercial".into(),
+                description: "Tessellates CAD solid into subdivision mesh, configures MaterialX PBR shaders, arranges 3-point studio lighting, path-traces 4K frames, and assembles multi-track video with color grading.".into(),
+                category: "Creative & Media".into(),
+                required_agents: vec![
+                    "creative_3d_modeling".into(),
+                    "creative_material".into(),
+                    "creative_lighting".into(),
+                    "creative_rendering".into(),
+                    "media_video_editing".into(),
+                    "media_color_grading".into(),
+                    "media_audio".into(),
+                ],
+                task_count: 7,
+            },
+            WorkflowTemplateInfo {
+                id: "cad_to_interactive_twin".into(),
+                name: "CAD to Interactive Digital Twin Runtime".into(),
+                description: "Generates multi-resolution LODs, builds real-time scene graph with BVH collision, binds physical IoT telemetry streams, and sets up interactive 3D HUD telemetry instruments.".into(),
+                category: "Digital Twin & RealTime".into(),
+                required_agents: vec![
+                    "realtime_scene".into(),
+                    "realtime_game_dev".into(),
+                    "digital_twin".into(),
+                    "creative_qa".into(),
+                ],
+                task_count: 5,
+            },
+            WorkflowTemplateInfo {
+                id: "engineering_to_vfx_master".into(),
+                name: "Aerodynamic Simulation to VFX Master Cut".into(),
+                description: "Takes Mach 10 hypersonic shock wave and aerothermal temperature data, renders plasma plume volume VFX, mixes Fairlight supersonic audio, and exports master ProRes reel.".into(),
+                category: "Creative & Media".into(),
+                required_agents: vec![
+                    "cfd_specialist".into(),
+                    "creative_vfx".into(),
+                    "creative_rendering".into(),
+                    "media_video_editing".into(),
+                    "media_audio".into(),
+                    "media_production".into(),
+                ],
+                task_count: 6,
+            },
         ]
     }
 
@@ -426,6 +470,165 @@ impl WorkflowRegistry {
                     .with_dependency("t1_dxf"),
                 )?;
             }
+            "cad_to_product_commercial" => {
+                graph.add_task(EngineeringTask::new(
+                    "t1_subdiv",
+                    "Catmull-Clark Mesh Subdivision",
+                    "creative_3d_modeling",
+                    "create.subdiv.apply",
+                ))?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t2_material",
+                        "Assign PBR MaterialX Shaders",
+                        "creative_material",
+                        "create.material.assign",
+                    )
+                    .with_dependency("t1_subdiv"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t3_lighting",
+                        "Rig Cinematic Studio Lights",
+                        "creative_lighting",
+                        "realtime.light.configure",
+                    )
+                    .with_dependency("t2_material"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t4_render",
+                        "Path Trace 4K Keyframe Frames",
+                        "creative_rendering",
+                        "create.render.frame",
+                    )
+                    .with_dependency("t3_lighting"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t5_edit",
+                        "Assemble Multi-Track NLE Timeline",
+                        "media_video_editing",
+                        "media.timeline.create",
+                    )
+                    .with_dependency("t4_render"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t6_grade",
+                        "Apply 3-Way Lift/Gamma/Gain Grade",
+                        "media_color_grading",
+                        "media.color.grade",
+                    )
+                    .with_dependency("t5_edit"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t7_audio",
+                        "Fairlight Multi-Channel Mix & Master",
+                        "media_audio",
+                        "media.audio.mix",
+                    )
+                    .with_dependency("t6_grade"),
+                )?;
+            }
+            "cad_to_interactive_twin" => {
+                graph.add_task(EngineeringTask::new(
+                    "t1_scene",
+                    "Build ECS Real-Time Scene Graph",
+                    "realtime_scene",
+                    "realtime.scene.build",
+                ))?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t2_bvh",
+                        "Construct Spatial BVH Hierarchy",
+                        "realtime_scene",
+                        "realtime.bvh.query",
+                    )
+                    .with_dependency("t1_scene"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t3_physics",
+                        "Configure Rigid Body Kinematics",
+                        "realtime_game_dev",
+                        "realtime.physics.step",
+                    )
+                    .with_dependency("t2_bvh"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t4_telemetry",
+                        "Ingest Live IoT Sensor Channels",
+                        "digital_twin",
+                        "twin.telemetry.ingest",
+                    )
+                    .with_dependency("t3_physics"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t5_qa",
+                        "Verify Real-Time Draw Call Budget",
+                        "creative_qa",
+                        "realtime.budget.verify",
+                    )
+                    .with_dependency("t4_telemetry"),
+                )?;
+            }
+            "engineering_to_vfx_master" => {
+                graph.add_task(EngineeringTask::new(
+                    "t1_cfd",
+                    "Extract Aerodynamic Pressure & Shock Front",
+                    "cfd_specialist",
+                    "sim.cfd.solve",
+                ))?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t2_vfx",
+                        "Simulate Hypersonic Plasma Plume VFX",
+                        "creative_vfx",
+                        "create.vfx.simulate",
+                    )
+                    .with_dependency("t1_cfd"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t3_render",
+                        "Ray Trace Aerothermal Visuals",
+                        "creative_rendering",
+                        "create.render.frame",
+                    )
+                    .with_dependency("t2_vfx"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t4_timeline",
+                        "Cut Sequence on NLE Timeline",
+                        "media_video_editing",
+                        "media.timeline.create",
+                    )
+                    .with_dependency("t3_render"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t5_sound",
+                        "Design Supersonic Jet Engine Audio",
+                        "media_audio",
+                        "media.audio.mix",
+                    )
+                    .with_dependency("t4_timeline"),
+                )?;
+                graph.add_task(
+                    EngineeringTask::new(
+                        "t6_master",
+                        "Export ProRes 422 Master Package",
+                        "media_production",
+                        "media.master.export",
+                    )
+                    .with_dependency("t5_sound"),
+                )?;
+            }
             _ => {
                 return Err(OrchestratorError::Internal(format!(
                     "Unknown template ID: '{template_id}'"
@@ -434,5 +637,30 @@ impl WorkflowRegistry {
         }
 
         Ok(graph)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_creative_workflow_templates() {
+        let templates = WorkflowRegistry::list_templates();
+        assert!(templates.iter().any(|t| t.id == "cad_to_product_commercial"));
+        assert!(templates.iter().any(|t| t.id == "cad_to_interactive_twin"));
+        assert!(templates.iter().any(|t| t.id == "engineering_to_vfx_master"));
+
+        let comm_graph = WorkflowRegistry::instantiate_template("cad_to_product_commercial");
+        assert!(comm_graph.is_ok());
+        if let Ok(g) = comm_graph {
+            assert_eq!(g.tasks.len(), 7);
+        }
+
+        let twin_graph = WorkflowRegistry::instantiate_template("cad_to_interactive_twin");
+        assert!(twin_graph.is_ok());
+        if let Ok(g) = twin_graph {
+            assert_eq!(g.tasks.len(), 5);
+        }
     }
 }

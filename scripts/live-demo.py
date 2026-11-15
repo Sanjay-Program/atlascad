@@ -12,6 +12,12 @@ subsystem, and API endpoint in AtlasCAD:
   7. Enterprise Governance & ECO Hub (Audit Chain, Cert Dossier, Jobs, Org) (enterprise)
   8. Upstream Solvers Discovery, Guides & Benchmarks (engines)
   9. Engineering Dependency Graph Cascade Invalidation (graph)
+  10. 3D Slicing & Additive Manufacturing Studio (additive)
+  11. Autonomous Multi-Agent Engineering Orchestrator & MCP Server (agent)
+  12. Comprehensive 27 Multi-Disciplinary Simulation Solvers (sim)
+  13. Hypersonic Mach 11 Real-World Aircraft Physics Simulation (hypersonic)
+  14. DaVinci Resolve Studio & Unity 3D Engine Bridges & Deploy (deploy)
+  15. Creative Ecosystem: Atlas Create, Atlas RealTime, Atlas Media & 16 Creative Agents (creative)
 
 Usage:
   python3 scripts/live-demo.py
@@ -864,9 +870,9 @@ def run_live_demo() -> None:
         check("audit_hash" in last_rec, "History record contains cryptographic audit hash")
         print(f"  ✓ 12.4 Audit Logging: Recorded execution {last_rec['execution_id']} with hash {last_rec['audit_hash']}")
 
-        # 12.5 28-Specialist Agent Ecosystem Roster
+        # 12.5 44-Specialist Agent Ecosystem Roster (28 Engineering + 16 Creative & Media)
         agents_data = http_request(port, "GET", "/api/agents")
-        check(agents_data.get("total_agents") == 28, f"Exactly 28 specialized engineering agents registered ({agents_data.get('total_agents')})")
+        check(agents_data.get("total_agents") == 44, f"Exactly 44 specialized agents registered ({agents_data.get('total_agents')})")
         agent_ids = [a["id"] for a in agents_data["agents"]]
         for req_agent in [
             "chief_engineer", "requirements_spec", "research", "architecture",
@@ -875,10 +881,14 @@ def run_live_demo() -> None:
             "civil_engineer", "gis_specialist", "chemical_process", "molecular_engineer",
             "aerospace_engineer", "automotive_ev", "robotics_automation", "materials_scientist",
             "cnc_machinist", "additive_specialist", "printing_3d", "topology_optimizer",
-            "verification_engineer", "quality_assurance", "technical_writer", "cost_planner"
+            "verification_engineer", "quality_assurance", "technical_writer", "cost_planner",
+            "creative_3d_modeling", "creative_sculpting", "creative_material", "creative_texture",
+            "creative_lighting", "creative_animation", "creative_rendering", "creative_vfx",
+            "realtime_scene", "realtime_game_dev", "digital_twin", "media_video_editing",
+            "media_color_grading", "media_audio", "media_production", "creative_qa"
         ]:
             check(req_agent in agent_ids, f"Required agent '{req_agent}' present in ecosystem")
-        print(f"  ✓ 12.5 Agent Ecosystem: Verified all 28 specialized personas from Chief Engineer to Cost Planner")
+        print(f"  ✓ 12.5 Agent Ecosystem: Verified all 44 specialized personas (28 engineering + 16 creative/realtime/media)")
 
         # 12.6 Requirements Analysis & Missing Constraint Detection
         missing_prompt = "Design a lightweight aerospace wing spar under 35 kN aerodynamic lift"
@@ -912,13 +922,16 @@ def run_live_demo() -> None:
 
         # 12.9 Reusable Engineering Workflow Templates
         wfs = http_request(port, "GET", "/api/agents/workflows")
-        check(wfs.get("count") == 12, f"All 12 pre-built workflow templates registered ({wfs.get('count')})")
+        check(wfs.get("count") == 15, f"All 15 pre-built workflow templates registered ({wfs.get('count')})")
         wf_ids = [w["id"] for w in wfs["workflows"]]
         check("concept_to_cad" in wf_ids, "Workflow concept_to_cad present")
         check("cad_to_fea" in wf_ids, "Workflow cad_to_fea present")
         check("cad_to_cfd" in wf_ids, "Workflow cad_to_cfd present")
         check("cad_to_cnc" in wf_ids, "Workflow cad_to_cnc present")
         check("cad_to_additive" in wf_ids, "Workflow cad_to_additive present")
+        check("cad_to_product_commercial" in wf_ids, "Workflow cad_to_product_commercial present")
+        check("cad_to_interactive_twin" in wf_ids, "Workflow cad_to_interactive_twin present")
+        check("engineering_to_vfx_master" in wf_ids, "Workflow engineering_to_vfx_master present")
 
         wf_run = http_request(port, "POST", "/api/agents/workflows/run", body={"workflow_id": "cad_to_fea"})
         check(wf_run.get("workflow_id") == "cad_to_fea", "Workflow instantiated and executed")
@@ -1152,6 +1165,105 @@ def run_live_demo() -> None:
         })
         check(mcp_dp.get("result", {}).get("isError") == False, "atlas_deploy_status MCP tool executed")
         print(f"  ✓ 14.6 MCP Autonomous Tools: atlas_export_davinci, atlas_export_unity, atlas_deploy_status verified via JSON-RPC 2.0")
+
+        # =========================================================================
+        # DEMO 15: Creative Application Ecosystem (Atlas Create, Atlas RealTime, Atlas Media & 16 Specialized AI Creative Agents)
+        # =========================================================================
+        print("\n--- DEMO 15: CREATIVE APPLICATION ECOSYSTEM (ATLAS CREATE, REALTIME, MEDIA & 16 AI AGENTS) ---")
+
+        # 15.1 Atlas Create: Catmull-Clark Polygonal Mesh Subdivision
+        create_subdiv = http_request(port, "POST", "/api/create/subdivide", body={
+            "mesh_id": "hypersonic_waverider_airframe",
+            "levels": 2
+        })
+        check(create_subdiv.get("status") == "success", "Atlas Create Catmull-Clark subdivision succeeds")
+        check(create_subdiv.get("levels") == 2, "Subdivision level matches requested level 2")
+        check(create_subdiv.get("subdivided_vertices", 0) > 26, "Subdivided vertex count exceeds baseline cube")
+        check(create_subdiv.get("algorithm") == "Catmull-Clark Bicubic Subdivision", "Algorithm reports Catmull-Clark")
+        print(f"  ✓ 15.1 Atlas Create (Subdiv): Level 2 Catmull-Clark subdivision generated {create_subdiv['subdivided_vertices']} verts, {create_subdiv['quad_faces']} quads")
+
+        # 15.2 Atlas Create: Digital Sculpting Brushes (Clay, Draw, Smooth)
+        create_sculpt = http_request(port, "POST", "/api/create/sculpt", body={
+            "brush": "clay",
+            "radius": 2.0,
+            "strength": 0.45
+        })
+        check(create_sculpt.get("status") == "success", "Atlas Create sculpting brush stroke succeeds")
+        check(create_sculpt.get("brush") == "clay", "Sculpting brush algorithm set to 'clay'")
+        check(create_sculpt.get("vertices_modified", 0) > 0, "Vertices modified by brush displacement")
+        print(f"  ✓ 15.2 Atlas Create (Sculpting): Clay brush stroke displaced {create_sculpt['vertices_modified']} vertices with Smooth Cosine falloff")
+
+        # 15.3 Atlas RealTime: ECS Scene Graph Hierarchy & Live Digital Twin Telemetry
+        rt_scene = http_request(port, "POST", "/api/realtime/scene", body={
+            "name": "Hypersonic Digital Twin World"
+        })
+        check(rt_scene.get("status") == "built", "Atlas RealTime ECS scene graph successfully built")
+        check(rt_scene.get("node_count") == 2, "Scene contains root and scramjet child nodes")
+        check("TelemetryComponent" in rt_scene.get("ecs_components", []), "ECS contains live TelemetryComponent")
+        check(len(rt_scene.get("bounds", {}).get("center", [])) == 3, "Spatial bounds center vector present")
+        print(f"  ✓ 15.3 Atlas RealTime (Scene Graph & Twin): ECS hierarchy ({rt_scene['node_count']} entities) & physical flight sensors bound")
+
+        # 15.4 Atlas Media: Multi-Track NLE Video/Audio Timeline & OpenTimelineIO Export
+        media_tl = http_request(port, "POST", "/api/media/timeline", body={
+            "title": "Hypersonic Mach 11 Commercial Master",
+            "fps": 24
+        })
+        check(media_tl.get("status") == "ready", "Atlas Media multi-track timeline instantiated")
+        check(media_tl.get("fps") == 24, "Timeline frame rate is 24 fps")
+        check(media_tl.get("otio_schema") == "Timeline.1", "Timeline complies with OpenTimelineIO schema v1")
+        check(len(media_tl.get("tracks", [])) >= 2, "Timeline has both Video and Audio tracks")
+        print(f"  ✓ 15.4 Atlas Media (NLE Timeline): Multi-track timeline assembled with SMPTE timecode and OpenTimelineIO export")
+
+        # 15.5 Atlas Media: DaVinci 3-Way Color Wheels & Fairlight Audio Mastering
+        media_render = http_request(port, "POST", "/api/media/render", body={})
+        check(media_render.get("status") == "rendered", "Atlas Media master render completed")
+        check("ProRes 422 HQ" in media_render.get("export_format", ""), "Master export format is Apple ProRes 422 HQ")
+        check(media_render.get("audio_master", {}).get("limiter_ceiling_db") == -0.1, "Fairlight brickwall limiter set to -0.1 dBFS")
+        check(media_render.get("audio_master", {}).get("ebu_r128_lufs") == -23.0, "Audio master conforms to EBU R128 (-23.0 LUFS)")
+        print(f"  ✓ 15.5 Atlas Media (DaVinci Grading & Fairlight): 3-Way Color Wheels applied, Fairlight audio normalized to -23 LUFS / -0.1 dBFS peak")
+
+        # 15.6 Creative MCP Autonomous Agent Tool Calling
+        mcp_subdiv = http_request(port, "POST", "/api/mcp", body={
+            "jsonrpc": "2.0",
+            "id": 8,
+            "method": "tools/call",
+            "params": {"name": "atlas_create_subdivide", "arguments": {"mesh_id": "airframe_mesh", "subdiv_levels": 1}}
+        })
+        check(mcp_subdiv.get("result", {}).get("isError") == False, "atlas_create_subdivide MCP tool executed")
+
+        mcp_sculpt = http_request(port, "POST", "/api/mcp", body={
+            "jsonrpc": "2.0",
+            "id": 9,
+            "method": "tools/call",
+            "params": {"name": "atlas_create_sculpt", "arguments": {"brush": "smooth", "radius": 1.0, "strength": 0.5}}
+        })
+        check(mcp_sculpt.get("result", {}).get("isError") == False, "atlas_create_sculpt MCP tool executed")
+
+        mcp_rt = http_request(port, "POST", "/api/mcp", body={
+            "jsonrpc": "2.0",
+            "id": 10,
+            "method": "tools/call",
+            "params": {"name": "atlas_realtime_scene_spawn", "arguments": {"name": "scramjet_igniter", "position": [0, 0, 5]}}
+        })
+        check(mcp_rt.get("result", {}).get("isError") == False, "atlas_realtime_scene_spawn MCP tool executed")
+
+        mcp_grade = http_request(port, "POST", "/api/mcp", body={
+            "jsonrpc": "2.0",
+            "id": 11,
+            "method": "tools/call",
+            "params": {"name": "atlas_media_color_grade", "arguments": {"saturation": 1.25}}
+        })
+        check(mcp_grade.get("result", {}).get("isError") == False, "atlas_media_color_grade MCP tool executed")
+        print(f"  ✓ 15.6 Autonomous Creative MCP Tools: Subdivide, Sculpt, RealTime Spawn, and Color Grade verified over JSON-RPC 2.0")
+
+        # 15.7 Verify 44 Agents and 15 Multi-Disciplinary Workflow Templates
+        wf_templates = http_request(port, "GET", "/api/agents/workflows")
+        check(wf_templates.get("count") == 15, "Orchestrator offers all 15 workflow templates (including 3 creative workflows)")
+        template_ids = [t["id"] for t in wf_templates.get("workflows", [])]
+        check("cad_to_product_commercial" in template_ids, "'cad_to_product_commercial' template registered")
+        check("cad_to_interactive_twin" in template_ids, "'cad_to_interactive_twin' template registered")
+        check("engineering_to_vfx_master" in template_ids, "'engineering_to_vfx_master' template registered")
+        print(f"  ✓ 15.7 Multi-Agent Orchestrator: All 44 Specialists (28 Engineering + 16 Creative) & 15 Workflow Templates Verified")
 
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")

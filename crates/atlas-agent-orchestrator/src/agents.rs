@@ -1,4 +1,4 @@
-//! Registry and specifications for all 28 specialized engineering agents.
+//! Registry and specifications for all 44 specialized engineering, creative, real-time, and media agents.
 
 use atlas_command_platform::schema::CommandPermission;
 use serde::{Deserialize, Serialize};
@@ -126,7 +126,7 @@ impl AgentRegistry {
     }
 }
 
-/// Populates the full ecosystem of 28 specialized engineering agents.
+/// Populates the full ecosystem of 44 specialized engineering, creative, real-time, and media agents.
 #[must_use]
 pub fn create_default_agent_ecosystem() -> AgentRegistry {
     let mut reg = AgentRegistry::new();
@@ -548,6 +548,282 @@ pub fn create_default_agent_ecosystem() -> AgentRegistry {
         .with_knowledge("Cost Modeling & DFM")
         .with_knowledge("Machining Cycle Time Economics")
         .with_standard("Boothroyd Dewhurst DFM Standards")
+    );
+
+    // 29. 3D Modeling Agent (Atlas Create)
+    reg.register(
+        AgentManifest::new(
+            "creative_3d_modeling",
+            "3D Modeling Agent",
+            "Subdivision Surface & Polygon Modeling Specialist",
+            "Tessellates CAD B-Reps into clean quad-dominant polygon topologies, performs Catmull-Clark subdivision, and runs procedural geometry node graphs.",
+        )
+        .with_permission(CommandPermission::GeometryCreate)
+        .with_permission(CommandPermission::ProjectEdit)
+        .with_tool("create.subdiv.apply")
+        .with_tool("create.geomnode.execute")
+        .with_knowledge("Catmull-Clark Subdivision")
+        .with_knowledge("Quad Topology Flow")
+        .with_knowledge("Procedural Geometry Nodes")
+        .with_standard("OpenUSD Geometry Specification")
+        .with_standard("Pixar SubD Standards")
+    );
+
+    // 30. Sculpting Agent (Atlas Create)
+    reg.register(
+        AgentManifest::new(
+            "creative_sculpting",
+            "Digital Sculpting Agent",
+            "Organic Surface & High-Resolution Brush Sculptor",
+            "Applies 9 brush types (Draw, Clay, Smooth, Flatten, Inflate, Pinch, Crease, Grab, Elastic) with 4 falloff curves for high-frequency micro-displacement.",
+        )
+        .with_permission(CommandPermission::GeometryCreate)
+        .with_tool("create.sculpt.stroke")
+        .with_knowledge("Digital Sculpting Brushes")
+        .with_knowledge("Dynamic Topology")
+        .with_knowledge("Surface Displacement")
+        .with_standard("Blender Sculpt API Standards")
+    );
+
+    // 31. Material Agent (Atlas Create)
+    reg.register(
+        AgentManifest::new(
+            "creative_material",
+            "Material & Shader Agent",
+            "PBR MaterialX & Shader Node Graph Architect",
+            "Authors physically-based materials conforming to OpenPBR and MaterialX 1.38, evaluating dielectric/conductor Fresnel, microfacet rough specular, subsurface scattering, and clearcoat.",
+        )
+        .with_permission(CommandPermission::ProjectEdit)
+        .with_tool("create.material.assign")
+        .with_tool("create.material.export_mtlx")
+        .with_knowledge("MaterialX 1.38 Specification")
+        .with_knowledge("OpenPBR Surface Standard")
+        .with_knowledge("Microfacet GGX / Smith Masking")
+        .with_standard("ASWF MaterialX v1.38")
+        .with_standard("Academy Software Foundation")
+    );
+
+    // 32. Texture Agent (Atlas Create)
+    reg.register(
+        AgentManifest::new(
+            "creative_texture",
+            "Texture & UV Unwrapping Agent",
+            "UV Chart Layout & Texture Synthesis Specialist",
+            "Computes planar, box triplanar, cylindrical, and spherical UV projections, minimizing seam distortion and packing charts with uniform texel density.",
+        )
+        .with_permission(CommandPermission::ProjectEdit)
+        .with_tool("create.uv.unwrap")
+        .with_knowledge("UV Parameterization")
+        .with_knowledge("Triplanar Texture Projection")
+        .with_knowledge("Texel Density Optimization")
+        .with_standard("UDIM UV Mapping Standards")
+    );
+
+    // 33. Lighting Agent (Atlas Create & RealTime)
+    reg.register(
+        AgentManifest::new(
+            "creative_lighting",
+            "Cinematic Lighting Agent",
+            "Physically-Based Lighting & Radiometry Designer",
+            "Configures photometric studio lights (Sun, Point, Spot, Area) calibrated in lumens and lux, sets up three-point lighting rigs, and calculates shadow attenuation.",
+        )
+        .with_permission(CommandPermission::ProjectEdit)
+        .with_tool("realtime.light.configure")
+        .with_knowledge("Photometric Radiometry")
+        .with_knowledge("Three-Point Studio Lighting")
+        .with_knowledge("IES Light Profiles")
+        .with_standard("CIE Photometric Measurement Standards")
+    );
+
+    // 34. Animation Agent (Atlas Create & RealTime)
+    reg.register(
+        AgentManifest::new(
+            "creative_animation",
+            "Rigging & Skeletal Animation Agent",
+            "Character/Mechanism Rigging & IK Specialist",
+            "Constructs hierarchical bone armatures, computes forward kinematics, solves 2-bone analytical inverse kinematics, evaluates Hermite/Bezier curves, and calculates Linear Blend Skinning (LBS).",
+        )
+        .with_permission(CommandPermission::ProjectEdit)
+        .with_tool("create.rig.build")
+        .with_tool("create.animation.evaluate")
+        .with_knowledge("Forward & Inverse Kinematics")
+        .with_knowledge("Linear Blend Skinning (LBS)")
+        .with_knowledge("Hermite / Bezier Curve Mathematics")
+        .with_standard("glTF 2.0 Skinning & Animation Specification")
+    );
+
+    // 35. Rendering Agent (Atlas Create)
+    reg.register(
+        AgentManifest::new(
+            "creative_rendering",
+            "Path Tracing & Render Agent",
+            "Software Ray Tracing & Photorealism Engine",
+            "Traces primary and shadow rays against geometric primitives, computes BSDF surface illumination, calculates ambient occlusion, and renders tone-mapped image buffers.",
+        )
+        .with_permission(CommandPermission::FileExport)
+        .with_tool("create.render.frame")
+        .with_knowledge("Monte Carlo Path Tracing")
+        .with_knowledge("Ray-Surface Intersections")
+        .with_knowledge("Cook-Torrance BSDF Evaluation")
+        .with_standard("OpenEXR Image Specifications")
+        .with_standard("ACES Color Encoding")
+    );
+
+    // 36. VFX Agent (Atlas Create & RealTime)
+    reg.register(
+        AgentManifest::new(
+            "creative_vfx",
+            "Visual Effects & Simulation Agent",
+            "Aerodynamic & Particle VFX Specialist",
+            "Simulates hypersonic shock waves, scramjet exhaust plasma plumes, atmospheric thermal ionization, and particle field dynamics.",
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_tool("create.vfx.simulate")
+        .with_knowledge("Shock Boundary Layer Visualization")
+        .with_knowledge("Plasma Glow Radiative Emission")
+        .with_knowledge("Eulerian Grid Advection")
+        .with_standard("OpenVDB Volume Grid Specification")
+    );
+
+    // 37. Real-Time Scene Agent (Atlas RealTime)
+    reg.register(
+        AgentManifest::new(
+            "realtime_scene",
+            "Real-Time Scene Graph Agent",
+            "Scene Hierarchy & Spatial Partitioning Architect",
+            "Maintains ECS scene entities, aggregates hierarchical transform matrices, computes AABB bounds, constructs BVH trees, and coordinates LOD levels.",
+        )
+        .with_permission(CommandPermission::ProjectEdit)
+        .with_tool("realtime.scene.build")
+        .with_tool("realtime.bvh.query")
+        .with_knowledge("ECS Architecture")
+        .with_knowledge("Bounding Volume Hierarchies (BVH)")
+        .with_knowledge("Frustum & Occlusion Culling")
+        .with_standard("OpenUSD Scene Composition Standards")
+    );
+
+    // 38. Game Development Agent (Atlas RealTime)
+    reg.register(
+        AgentManifest::new(
+            "realtime_game_dev",
+            "Game Development & Interaction Agent",
+            "Interactive Mechanics & Physics State Specialist",
+            "Implements rigid body physics dynamics, collision detection, user input interaction graphs, and flight simulation mechanics.",
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_tool("realtime.physics.step")
+        .with_knowledge("Rigid Body Dynamics")
+        .with_knowledge("Collision Response Math")
+        .with_knowledge("Interactive State Machines")
+        .with_standard("Unity C# Runtime Standards")
+        .with_standard("OpenXR Specifications")
+    );
+
+    // 39. Digital Twin Agent (Atlas RealTime)
+    reg.register(
+        AgentManifest::new(
+            "digital_twin",
+            "Digital Twin Runtime Agent",
+            "Telemetry Streaming & Physical Sensor Binding Specialist",
+            "Streams live telemetry from physical aircraft/machinery into 3D scene nodes, binds telemetry channels to HUD instruments, and monitors operational envelope thresholds.",
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_tool("twin.telemetry.ingest")
+        .with_tool("twin.health.evaluate")
+        .with_knowledge("Digital Twin Sensor Telemetry")
+        .with_knowledge("Industrial IoT Protocols")
+        .with_knowledge("Structural Health Monitoring (SHM)")
+        .with_standard("ISO 23247 (Digital Twin Framework for Manufacturing)")
+    );
+
+    // 40. Video Editing Agent (Atlas Media)
+    reg.register(
+        AgentManifest::new(
+            "media_video_editing",
+            "Nonlinear Video Editing Agent",
+            "NLE Multi-Track Timeline & Cutting Specialist",
+            "Assembles multi-track video timelines, executes ripple trims, roll edits, slip edits, split cuts, transitions, and generates SMPTE timecode synchronized sequences.",
+        )
+        .with_permission(CommandPermission::ProjectEdit)
+        .with_tool("media.timeline.create")
+        .with_tool("media.clip.split")
+        .with_knowledge("Nonlinear Editing (NLE) Workflow")
+        .with_knowledge("SMPTE 12M Timecode Math")
+        .with_knowledge("Continuity Editing")
+        .with_standard("OpenTimelineIO Specification v1.0")
+        .with_standard("SMPTE 12M Timecode Standard")
+    );
+
+    // 41. Color Grading Agent (Atlas Media)
+    reg.register(
+        AgentManifest::new(
+            "media_color_grading",
+            "Color Grading & Telecine Agent",
+            "DaVinci Resolve 3-Way Color & 3D LUT Colorist",
+            "Performs primary color correction with Lift, Gamma, Gain, and Offset wheels, adjusts saturation, enforces ASC-CDL compliance, and samples 3D LUT .cube color maps.",
+        )
+        .with_permission(CommandPermission::ProjectEdit)
+        .with_tool("media.color.grade")
+        .with_tool("media.lut.apply")
+        .with_knowledge("3-Way Primary Color Wheels")
+        .with_knowledge("Rec.709 / ACEScc Color Spaces")
+        .with_knowledge("Trilinear 3D LUT Interpolation")
+        .with_standard("ASC-CDL (American Society of Cinematographers Color Decision List)")
+        .with_standard("ACES 1.3")
+    );
+
+    // 42. Audio Agent (Atlas Media)
+    reg.register(
+        AgentManifest::new(
+            "media_audio",
+            "Fairlight Audio Engineering Agent",
+            "Multi-Track Sound Design & Audio Mixer",
+            "Mixes multi-track audio to stereo master, applies 3-band biquad parametric EQ, tunes dynamic compression thresholds, and prevents clipping with lookahead brickwall peak limiting.",
+        )
+        .with_permission(CommandPermission::ProjectEdit)
+        .with_tool("media.audio.mix")
+        .with_tool("media.audio.process_eq")
+        .with_knowledge("Biquad Audio Filter Synthesis")
+        .with_knowledge("Dynamic Range Compression")
+        .with_knowledge("Loudness Metering & True Peak Limiting")
+        .with_standard("ITU-R BS.1770-4 (Audio Loudness Measurement)")
+        .with_standard("EBU R128")
+    );
+
+    // 43. Media Production Agent (Atlas Media)
+    reg.register(
+        AgentManifest::new(
+            "media_production",
+            "Media Production & Transcoding Agent",
+            "Post-Production Deliverables & Mastering Producer",
+            "Manages media pools, generates proxy files, transcodes master reels to Apple ProRes 422, Avid DNxHR, and AV1, and exports OpenTimelineIO packages.",
+        )
+        .with_permission(CommandPermission::FileExport)
+        .with_tool("media.master.export")
+        .with_tool("media.pool.organize")
+        .with_knowledge("Digital Cinema Mastering")
+        .with_knowledge("Broadcast Deliverable Compliance")
+        .with_knowledge("Video Codec Pipelines")
+        .with_standard("Apple ProRes Technical Whitepaper")
+        .with_standard("SMPTE 2067 (Interoperable Master Format)")
+    );
+
+    // 44. Creative QA & Asset Optimization Agent
+    reg.register(
+        AgentManifest::new(
+            "creative_qa",
+            "Creative QA & Optimization Agent",
+            "Mesh Topology, Draw Call & Performance Auditor",
+            "Audits polygon meshes for manifold non-degeneracy, identifies T-junctions and zero-area polygons, verifies texture budget allocations, and enforces real-time frame budgets.",
+        )
+        .with_permission(CommandPermission::ReadOnly)
+        .with_tool("create.mesh.audit")
+        .with_tool("realtime.budget.verify")
+        .with_knowledge("Mesh Manifoldness & Topology Health")
+        .with_knowledge("Real-Time Draw Call Budgets")
+        .with_knowledge("Asset LOD Hierarchy Verification")
+        .with_standard("Khronos glTF Asset Optimization Guidelines")
+        .with_standard("Real-Time 3D Rendering Performance Standards")
     );
 
     reg

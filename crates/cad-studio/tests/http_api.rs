@@ -4541,5 +4541,62 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(cmd_deploy.status, 200);
     assert_eq!(json(&cmd_deploy)?["status"], "Success");
 
+    // 36. Atlas Create: Catmull-Clark Subdivision API
+    let subdiv_resp = post(
+        addr,
+        "/api/create/subdivide",
+        r#"{"mesh_id": "fuselage_skin", "levels": 2}"#,
+    )?;
+    assert_eq!(subdiv_resp.status, 200);
+    let subdiv_json = json(&subdiv_resp)?;
+    assert_eq!(subdiv_json["status"], "success");
+    assert_eq!(subdiv_json["levels"], 2);
+    assert!(subdiv_json["subdivided_vertices"].as_u64().unwrap_or(0) > 26);
+
+    // 37. Atlas Create: Digital Sculpting Brush API
+    let sculpt_resp = post(
+        addr,
+        "/api/create/sculpt",
+        r#"{"brush": "clay", "radius": 2.0, "strength": 0.45}"#,
+    )?;
+    assert_eq!(sculpt_resp.status, 200);
+    let sculpt_json = json(&sculpt_resp)?;
+    assert_eq!(sculpt_json["status"], "success");
+    assert_eq!(sculpt_json["brush"], "clay");
+    assert!(sculpt_json["vertices_modified"].as_u64().unwrap_or(0) > 0);
+
+    // 38. Atlas RealTime: ECS Scene Graph Hierarchy & Telemetry API
+    let scene_resp = post(
+        addr,
+        "/api/realtime/scene",
+        r#"{"name": "Hypersonic Flight Simulation"}"#,
+    )?;
+    assert_eq!(scene_resp.status, 200);
+    let scene_json = json(&scene_resp)?;
+    assert_eq!(scene_json["status"], "built");
+    assert_eq!(scene_json["node_count"], 2);
+
+    // 39. Atlas Media: Multi-Track Timeline & OTIO API
+    let timeline_resp = post(
+        addr,
+        "/api/media/timeline",
+        r#"{"title": "Hypersonic Mach 11 Commercial", "fps": 24}"#,
+    )?;
+    assert_eq!(timeline_resp.status, 200);
+    let timeline_json = json(&timeline_resp)?;
+    assert_eq!(timeline_json["status"], "ready");
+    assert_eq!(timeline_json["otio_schema"], "Timeline.1");
+
+    // 40. Atlas Media: Render Master & Color Grade API
+    let render_resp = post(
+        addr,
+        "/api/media/render",
+        r#"{}"#,
+    )?;
+    assert_eq!(render_resp.status, 200);
+    let render_json = json(&render_resp)?;
+    assert_eq!(render_json["status"], "rendered");
+    assert_eq!(render_json["export_format"], "ProRes 422 HQ / OpenTimelineIO");
+
     Ok(())
 }

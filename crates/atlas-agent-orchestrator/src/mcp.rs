@@ -210,6 +210,69 @@ impl McpServer {
                 description: "Query system deployment status, container orchestrator state, memory usage, and multi-physics engine health".into(),
                 input_schema: serde_json::json!({ "type": "object" }),
             },
+            McpToolDefinition {
+                name: "atlas_create_subdivide".into(),
+                description: "Atlas Create: Perform Catmull-Clark iterative subdivision surface smoothing on polygon mesh".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "mesh_id": { "type": "string" },
+                        "subdiv_levels": { "type": "integer", "default": 1 }
+                    },
+                    "required": ["mesh_id"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_create_sculpt".into(),
+                description: "Atlas Create: Apply 3D sculpting brush stroke (Draw, Clay, Smooth, Flatten, Inflate) to mesh".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "brush": { "type": "string", "enum": ["draw", "clay", "smooth", "flatten", "inflate", "grab"] },
+                        "radius": { "type": "number", "default": 0.5 },
+                        "strength": { "type": "number", "default": 0.5 }
+                    },
+                    "required": ["brush"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_realtime_scene_spawn".into(),
+                description: "Atlas RealTime: Spawn entity in ECS scene graph with transform, physics, and telemetry bindings".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "name": { "type": "string" },
+                        "mesh_id": { "type": "string" },
+                        "position": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }
+                    },
+                    "required": ["name"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_media_timeline_create".into(),
+                description: "Atlas Media: Create multi-track NLE video/audio timeline with SMPTE timecode and export OTIO".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "title": { "type": "string" },
+                        "fps": { "type": "integer", "default": 24 }
+                    },
+                    "required": ["title"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_media_color_grade".into(),
+                description: "Atlas Media: Apply 3-way color wheels (Lift, Gamma, Gain, Offset) and 3D LUT .cube".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "lift": { "type": "array", "items": { "type": "number" } },
+                        "gamma": { "type": "array", "items": { "type": "number" } },
+                        "gain": { "type": "array", "items": { "type": "number" } },
+                        "saturation": { "type": "number", "default": 1.0 }
+                    }
+                }),
+            },
         ]
     }
 

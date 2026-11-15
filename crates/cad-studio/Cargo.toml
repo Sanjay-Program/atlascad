@@ -29,6 +29,17 @@ atlas-organization.workspace = true
 atlas-additive.workspace = true
 atlas-command-platform.workspace = true
 atlas-agent-orchestrator.workspace = true
+atlas-creative-core.workspace = true
+atlas-scene-graph.workspace = true
+atlas-asset-manager.workspace = true
+atlas-material-system.workspace = true
+atlas-animation-core.workspace = true
+atlas-render-core.workspace = true
+atlas-media-core.workspace = true
+atlas-timeline.workspace = true
+atlas-compositor.workspace = true
+atlas-audio.workspace = true
+atlas-interchange.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 

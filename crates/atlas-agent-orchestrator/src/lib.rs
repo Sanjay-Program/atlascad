@@ -1,6 +1,6 @@
 //! AtlasCAD Multi-Agent Engineering Orchestrator
 //!
-//! Provides a 28-specialist agent ecosystem, DAG task graph scheduling,
+//! Provides a 44-specialist agent ecosystem (28 engineering + 16 creative, real-time, and media specialists), DAG task graph scheduling,
 //! requirement-to-engineering execution, closed-loop iterative design optimization,
 //! human safety approval gates, structured agent memory, and standard MCP JSON-RPC 2.0 endpoints.
 
@@ -39,15 +39,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_agent_ecosystem_has_28_specialists() {
+    fn test_agent_ecosystem_has_44_specialists() {
         let registry = create_default_agent_ecosystem();
         assert_eq!(
             registry.len(),
-            28,
-            "Exactly 28 specialized engineering agents must be registered"
+            44,
+            "Exactly 44 specialized engineering, creative, real-time, and media agents must be registered"
         );
 
-        // Verify key agents exist
+        // Verify engineering agents exist
         assert!(registry.get("chief_engineer").is_some());
         assert!(registry.get("cad_design").is_some());
         assert!(registry.get("structural_sim").is_some());
@@ -57,6 +57,24 @@ mod tests {
         assert!(registry.get("additive_specialist").is_some());
         assert!(registry.get("verification_engineer").is_some());
         assert!(registry.get("quality_assurance").is_some());
+
+        // Verify creative, real-time, and media agents exist
+        assert!(registry.get("creative_3d_modeling").is_some());
+        assert!(registry.get("creative_sculpting").is_some());
+        assert!(registry.get("creative_material").is_some());
+        assert!(registry.get("creative_texture").is_some());
+        assert!(registry.get("creative_lighting").is_some());
+        assert!(registry.get("creative_animation").is_some());
+        assert!(registry.get("creative_rendering").is_some());
+        assert!(registry.get("creative_vfx").is_some());
+        assert!(registry.get("realtime_scene").is_some());
+        assert!(registry.get("realtime_game_dev").is_some());
+        assert!(registry.get("digital_twin").is_some());
+        assert!(registry.get("media_video_editing").is_some());
+        assert!(registry.get("media_color_grading").is_some());
+        assert!(registry.get("media_audio").is_some());
+        assert!(registry.get("media_production").is_some());
+        assert!(registry.get("creative_qa").is_some());
     }
 
     #[test]
@@ -125,8 +143,8 @@ mod tests {
         let templates = WorkflowRegistry::list_templates();
         assert_eq!(
             templates.len(),
-            12,
-            "Must offer 12 standard engineering workflow templates"
+            15,
+            "Must offer 15 standard engineering, creative, and real-time workflow templates"
         );
 
         let graph = WorkflowRegistry::instantiate_template("cad_to_fea")?;

@@ -1,0 +1,16 @@
+[package]
+name = "atlas-scene-graph"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+rust-version.workspace = true
+description = "Atlas RealTime / Create Scene Graph, ECS entity-component architecture, hierarchy, and BVH spatial indexing"
+
+[dependencies]
+atlas-animation-core.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,19 @@
+[package]
+name = "atlas-interchange"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+rust-version.workspace = true
+description = "Atlas Interchange: OpenUSD, glTF 2.0, MaterialX, OpenTimelineIO, and Wavefront OBJ universal translators"
+
+[dependencies]
+atlas-creative-core.workspace = true
+atlas-material-system.workspace = true
+atlas-scene-graph.workspace = true
+atlas-timeline.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

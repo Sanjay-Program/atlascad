@@ -1,0 +1,15 @@
+[package]
+name = "atlas-audio"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+rust-version.workspace = true
+description = "Atlas Audio: Fairlight-class multi-track audio mixing, parametric EQ, dynamic compression and brickwall limiting"
+
+[dependencies]
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

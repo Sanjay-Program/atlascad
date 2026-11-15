@@ -512,8 +512,17 @@
       <button type="button" class="wb-tab" data-workbench="enterprise" role="tab" aria-selected="false" title="Enterprise SaaS Hub (Audit Trail, Cert Reports, HPC Queue, Org & ECO)">
         <span class="wb-icon">🛡️</span><span class="wb-text">Enterprise Hub</span>
       </button>
-      <button type="button" class="wb-tab" data-workbench="agent" role="tab" aria-selected="false" title="Autonomous Engineering Agent Console (28 Specialists, DAG Orchestration, MCP)">
+      <button type="button" class="wb-tab" data-workbench="agent" role="tab" aria-selected="false" title="Autonomous Engineering Agent Console (44 Specialists, DAG Orchestration, MCP)">
         <span class="wb-icon">🤖</span><span class="wb-text">Agent Console</span>
+      </button>
+      <button type="button" class="wb-tab" data-workbench="atlas_create" role="tab" aria-selected="false" title="Atlas Create: Blender-Class 3D Modeling, Sculpting, UV Unwrapping & MaterialX Shaders">
+        <span class="wb-icon">🎨</span><span class="wb-text">Atlas Create</span>
+      </button>
+      <button type="button" class="wb-tab" data-workbench="atlas_realtime" role="tab" aria-selected="false" title="Atlas RealTime: Unity-Class Interactive 3D, ECS Scene Graph, Physics & Digital Twin">
+        <span class="wb-icon">🎮</span><span class="wb-text">Atlas RealTime</span>
+      </button>
+      <button type="button" class="wb-tab" data-workbench="atlas_media" role="tab" aria-selected="false" title="Atlas Media: DaVinci Resolve-Class Multi-Track NLE, 3-Way Color Wheels & Fairlight Audio">
+        <span class="wb-icon">🎬</span><span class="wb-text">Atlas Media</span>
       </button>
     </div>
   </nav>
@@ -1793,12 +1802,303 @@ C1 out 0 100n
         <!-- 28-Specialist Agent Directory Tray -->
         <div style="padding: 10px 16px; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.2);">
           <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; margin-bottom: 8px;">
-            Active Engineering Specialist Directory (28 Autonomous Personas)
+            Active Engineering Specialist Directory (44 Autonomous Personas: 28 Engineering + 16 Creative &amp; Media)
           </div>
           <div id="agentRosterGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; max-height: 140px; overflow-y: auto;">
-            <!-- Dynamically populated cards for all 28 agents -->
+            <!-- Dynamically populated cards for all 44 agents -->
           </div>
         </div>
+      </div>
+
+      <!-- Dedicated Atlas Create (Blender-Class 3D Modeling & Sculpting Studio) -->
+      <div id="createWorkbenchView" class="workbench-view create-workbench-view" hidden role="region" aria-label="Atlas Create 3D Studio">
+        <div class="wb-header">
+          <div class="wb-title-area">
+            <span class="wb-title-badge" style="background: #f59e0b;">Atlas Create</span>
+            <span class="wb-subtitle">Blender-Class Polygonal &amp; Subdiv Modeling, Digital Sculpting &amp; MaterialX PBR</span>
+          </div>
+          <div class="wb-actions">
+            <button type="button" class="button small ghost" id="createResetBtn">Reset View</button>
+            <button type="button" class="button small primary" id="createSubdivApplyBtn">Apply Catmull-Clark Subdiv</button>
+          </div>
+        </div>
+        <div class="wb-body" style="display: flex; gap: 16px; padding: 16px; height: calc(100% - 60px); overflow-y: auto;">
+          <!-- Left Column: Modeling, Subdiv & Sculpting Tools -->
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 12px;">
+            <div class="wb-cam-metrics-card">
+              <div class="wb-card-title">Catmull-Clark Subdivision Surface</div>
+              <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px;">
+                <label for="createSubdivSlider" style="font-size: 12px; color: #a1a1aa;">Subdiv Level (1-4):</label>
+                <input type="range" id="createSubdivSlider" min="1" max="4" value="1" style="flex: 1;">
+                <span id="createSubdivVal" style="font-weight: 600; color: #f59e0b;">1</span>
+              </div>
+              <div style="font-size: 11px; color: #71717a; margin-top: 4px;">
+                Recursively subdivides quad/n-gon faces into limit-continuous bicubic surfaces.
+              </div>
+            </div>
+
+            <div class="wb-cam-metrics-card">
+              <div class="wb-card-title">Digital Sculpting Brushes (9 Algorithms)</div>
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px;">
+                <button type="button" class="button small primary sculpt-brush-btn active" data-brush="draw">Draw</button>
+                <button type="button" class="button small ghost sculpt-brush-btn" data-brush="clay">Clay</button>
+                <button type="button" class="button small ghost sculpt-brush-btn" data-brush="smooth">Smooth</button>
+                <button type="button" class="button small ghost sculpt-brush-btn" data-brush="flatten">Flatten</button>
+                <button type="button" class="button small ghost sculpt-brush-btn" data-brush="inflate">Inflate</button>
+                <button type="button" class="button small ghost sculpt-brush-btn" data-brush="pinch">Pinch</button>
+                <button type="button" class="button small ghost sculpt-brush-btn" data-brush="crease">Crease</button>
+                <button type="button" class="button small ghost sculpt-brush-btn" data-brush="grab">Grab</button>
+                <button type="button" class="button small ghost sculpt-brush-btn" data-brush="elastic">Elastic</button>
+              </div>
+              <div style="display: flex; gap: 12px; margin-top: 10px;">
+                <div style="flex: 1;">
+                  <label style="font-size: 11px; color: #a1a1aa;">Radius (m): <span id="sculptRadiusVal">0.5</span></label>
+                  <input type="range" id="sculptRadiusSlider" min="0.1" max="3.0" step="0.1" value="0.5" style="width: 100%;">
+                </div>
+                <div style="flex: 1;">
+                  <label style="font-size: 11px; color: #a1a1aa;">Strength: <span id="sculptStrengthVal">0.35</span></label>
+                  <input type="range" id="sculptStrengthSlider" min="0.05" max="1.0" step="0.05" value="0.35" style="width: 100%;">
+                </div>
+              </div>
+              <button type="button" class="button small primary" id="createSculptApplyBtn" style="margin-top: 8px; width: 100%;">Execute Sculpt Stroke</button>
+            </div>
+
+            <div class="wb-cam-metrics-card">
+              <div class="wb-card-title">UV Parameterization &amp; Unwrapping</div>
+              <div style="display: flex; gap: 8px; margin-top: 8px;">
+                <button type="button" class="button small ghost" id="uvBoxBtn">Box Triplanar</button>
+                <button type="button" class="button small ghost" id="uvPlanarBtn">Planar Z</button>
+                <button type="button" class="button small ghost" id="uvCylindricalBtn">Cylindrical</button>
+                <button type="button" class="button small ghost" id="uvSphericalBtn">Spherical</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: MaterialX & Shading -->
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 12px;">
+            <div class="wb-cam-metrics-card">
+              <div class="wb-card-title">PBR MaterialX 1.38 &amp; OpenPBR Shader</div>
+              <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+                <div>
+                  <label style="font-size: 11px; color: #a1a1aa;">Base Color</label>
+                  <input type="color" id="pbrBaseColorPicker" value="#2a3b4c" style="width: 100%; height: 32px; border: none; cursor: pointer;">
+                </div>
+                <div>
+                  <label style="font-size: 11px; color: #a1a1aa;">Metallic (0.0 - 1.0): <span id="pbrMetallicVal">0.85</span></label>
+                  <input type="range" id="pbrMetallicSlider" min="0" max="1" step="0.05" value="0.85" style="width: 100%;">
+                </div>
+                <div>
+                  <label style="font-size: 11px; color: #a1a1aa;">Roughness (0.0 - 1.0): <span id="pbrRoughnessVal">0.25</span></label>
+                  <input type="range" id="pbrRoughnessSlider" min="0" max="1" step="0.05" value="0.25" style="width: 100%;">
+                </div>
+                <div>
+                  <label style="font-size: 11px; color: #a1a1aa;">Clearcoat: <span id="pbrClearcoatVal">0.40</span></label>
+                  <input type="range" id="pbrClearcoatSlider" min="0" max="1" step="0.05" value="0.40" style="width: 100%;">
+                </div>
+                <button type="button" class="button small primary" id="pbrExportMtlxBtn" style="margin-top: 6px;">Export MaterialX (.mtlx)</button>
+              </div>
+            </div>
+
+            <div class="wb-gcode-container">
+              <div class="wb-gcode-header">Atlas Create Console Output</div>
+              <pre class="wb-gcode-viewer" id="createConsoleOutput" style="height: 140px; font-size: 11px;">[Atlas Create] Loaded polygonal subdiv &amp; sculpting environment.
+Ready for Catmull-Clark subdivision or brush displacement.</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dedicated Atlas RealTime (Unity-Class Interactive 3D & Digital Twin) -->
+      <div id="realtimeWorkbenchView" class="workbench-view realtime-workbench-view" hidden role="region" aria-label="Atlas RealTime Studio">
+        <div class="wb-header">
+          <div class="wb-title-area">
+            <span class="wb-title-badge" style="background: #10b981;">Atlas RealTime</span>
+            <span class="wb-subtitle">Unity-Class Interactive Scene Graph, ECS Architecture, Physics &amp; Live Digital Twin Runtime</span>
+          </div>
+          <div class="wb-actions">
+            <button type="button" class="button small ghost" id="rtPhysicsToggleBtn">Enable Physics</button>
+            <button type="button" class="button small primary" id="rtBuildSceneBtn">Build ECS Scene</button>
+          </div>
+        </div>
+        <div class="wb-body" style="display: flex; gap: 16px; padding: 16px; height: calc(100% - 60px); overflow-y: auto;">
+          <!-- Left: Scene Graph Tree & ECS Inspector -->
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 12px;">
+            <div class="wb-cam-metrics-card">
+              <div class="wb-card-title">Scene Graph Hierarchy (ECS Nodes)</div>
+              <div id="rtSceneTree" style="max-height: 180px; overflow-y: auto; font-size: 12px; margin-top: 8px; font-family: monospace;">
+                <div style="color: #10b981;">▼ SceneRoot: Hypersonic Digital Twin World</div>
+                <div style="padding-left: 16px; color: #60a5fa;">├─ Node: root_aircraft [Transform, Mesh, Physics]</div>
+                <div style="padding-left: 32px; color: #f59e0b;">├─ Node: child_scramjet [Transform, Telemetry]</div>
+                <div style="padding-left: 32px; color: #a78bfa;">└─ Node: child_avionics [Transform, Telemetry]</div>
+              </div>
+            </div>
+
+            <div class="wb-cam-metrics-card">
+              <div class="wb-card-title">ECS Component Inspector</div>
+              <div style="display: flex; flex-direction: column; gap: 6px; font-size: 11px; margin-top: 6px;">
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="color: #a1a1aa;">Entity ID:</span><span style="font-family: monospace; color: #f43f5e;">root_aircraft</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="color: #a1a1aa;">Position (X, Y, Z):</span><span style="font-family: monospace;">[0.0, 32000.0, 0.0] m</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="color: #a1a1aa;">Physics Body:</span><span style="color: #10b981;">Dynamic (Mass: 25,000 kg)</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="color: #a1a1aa;">BVH Collision Bounds:</span><span>[-16.5, -2.1, -28.0] to [16.5, 3.8, 28.0]</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Live Telemetry Gauges & Unity Bridge -->
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 12px;">
+            <div class="wb-cam-metrics-card">
+              <div class="wb-card-title">Live Hypersonic Flight Telemetry (Digital Twin)</div>
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px;">
+                <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; text-align: center;">
+                  <div style="font-size: 10px; color: #a1a1aa; text-transform: uppercase;">Mach Number</div>
+                  <div id="rtMachVal" style="font-size: 20px; font-weight: 700; color: #f43f5e;">11.20 M</div>
+                  <div style="font-size: 10px; color: #71717a;">12,000 km/h</div>
+                </div>
+                <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; text-align: center;">
+                  <div style="font-size: 10px; color: #a1a1aa; text-transform: uppercase;">Altitude</div>
+                  <div id="rtAltVal" style="font-size: 20px; font-weight: 700; color: #38bdf8;">32,000 m</div>
+                  <div style="font-size: 10px; color: #71717a;">Stratosphere (105,000 ft)</div>
+                </div>
+                <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; text-align: center;">
+                  <div style="font-size: 10px; color: #a1a1aa; text-transform: uppercase;">Scramjet Thrust</div>
+                  <div id="rtThrustVal" style="font-size: 20px; font-weight: 700; color: #10b981;">485.0 kN</div>
+                  <div style="font-size: 10px; color: #71717a;">Equivalence Ratio: 1.05</div>
+                </div>
+                <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; text-align: center;">
+                  <div style="font-size: 10px; color: #a1a1aa; text-transform: uppercase;">Stagnation Temp</div>
+                  <div id="rtTempVal" style="font-size: 20px; font-weight: 700; color: #fbbf24;">3,120 K</div>
+                  <div style="font-size: 10px; color: #71717a;">UHTC Active Cooling OK</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="wb-gcode-container">
+              <div class="wb-gcode-header">Atlas RealTime Diagnostics</div>
+              <pre class="wb-gcode-viewer" id="realtimeConsoleOutput" style="height: 140px; font-size: 11px;">[Atlas RealTime] ECS Runtime Active.
+FPS Target: 60 fps | Spatial BVH Built | Telemetry Port Bound.</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dedicated Atlas Media (DaVinci Resolve-Class Video & Color Grading) -->
+      <div id="mediaWorkbenchView" class="workbench-view media-workbench-view" hidden role="region" aria-label="Atlas Media Post-Production Studio">
+        <div class="wb-header">
+          <div class="wb-title-area">
+            <span class="wb-title-badge" style="background: #a855f7;">Atlas Media</span>
+            <span class="wb-subtitle">DaVinci Resolve-Class Multi-Track NLE, 3-Way Color Wheels &amp; Fairlight Audio Mixing</span>
+          </div>
+          <div class="wb-actions">
+            <button type="button" class="button small ghost" id="mediaNewTimelineBtn">New Timeline</button>
+            <button type="button" class="button small primary" id="mediaRenderExportBtn">Render Master ProRes &amp; OTIO</button>
+          </div>
+        </div>
+        <div class="wb-body" style="display: flex; flex-direction: column; gap: 12px; padding: 16px; height: calc(100% - 60px); overflow-y: auto;">
+          <!-- Top: Multi-Track NLE Timeline Visualizer -->
+          <div class="wb-cam-metrics-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <div class="wb-card-title">Multi-Track NLE Timeline: Hypersonic Commercial Reel</div>
+              <div style="font-family: monospace; font-size: 13px; font-weight: 700; color: #38bdf8;" id="mediaTimecodeDisplay">01:00:04:12</div>
+            </div>
+            <!-- Timeline Canvas simulation -->
+            <div style="background: #18181b; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 10px; font-family: monospace; font-size: 11px;">
+              <!-- Video Track 1 -->
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                <span style="width: 80px; color: #a1a1aa; font-weight: 600;">V1 (4K)</span>
+                <div style="flex: 1; height: 28px; background: #27272a; border-radius: 3px; display: flex; position: relative; overflow: hidden;">
+                  <div style="width: 40%; background: #0284c7; border-right: 2px solid #38bdf8; padding: 6px; font-size: 10px; color: #fff;">Clip 1: Mach 11 Ignition (4K ProRes)</div>
+                  <div style="width: 60%; background: #0369a1; padding: 6px; font-size: 10px; color: #fff;">Clip 2: Plasma Plume Thermal Cam</div>
+                </div>
+              </div>
+              <!-- Audio Track 1 -->
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="width: 80px; color: #a1a1aa; font-weight: 600;">A1 (Stereo)</span>
+                <div style="flex: 1; height: 24px; background: #27272a; border-radius: 3px; display: flex; position: relative; overflow: hidden;">
+                  <div style="width: 100%; background: #059669; padding: 4px; font-size: 10px; color: #fff;">Stereo Fairlight Mix: Scramjet Sound Design &amp; Cockpit Telemetry</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom: DaVinci 3-Way Color Wheels & Fairlight Audio Mixer -->
+          <div style="display: flex; gap: 16px;">
+            <!-- DaVinci 3-Way Color Wheels -->
+            <div class="wb-cam-metrics-card" style="flex: 1;">
+              <div class="wb-card-title">DaVinci Resolve 3-Way Primary Color Wheels</div>
+              <div style="display: flex; justify-content: space-around; margin-top: 10px; text-align: center;">
+                <div>
+                  <div style="width: 70px; height: 70px; border-radius: 50%; border: 2px solid #3b82f6; margin: 0 auto; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, rgba(59,130,246,0.3) 0%, rgba(0,0,0,0.8) 100%);">
+                    <span style="font-size: 10px; color: #93c5fd;">Lift</span>
+                  </div>
+                  <div style="font-size: 10px; color: #a1a1aa; margin-top: 4px;">Shadows</div>
+                </div>
+                <div>
+                  <div style="width: 70px; height: 70px; border-radius: 50%; border: 2px solid #10b981; margin: 0 auto; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, rgba(16,185,129,0.3) 0%, rgba(0,0,0,0.8) 100%);">
+                    <span style="font-size: 10px; color: #6ee7b7;">Gamma</span>
+                  </div>
+                  <div style="font-size: 10px; color: #a1a1aa; margin-top: 4px;">Midtones</div>
+                </div>
+                <div>
+                  <div style="width: 70px; height: 70px; border-radius: 50%; border: 2px solid #f59e0b; margin: 0 auto; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, rgba(245,158,11,0.3) 0%, rgba(0,0,0,0.8) 100%);">
+                    <span style="font-size: 10px; color: #fde68a;">Gain</span>
+                  </div>
+                  <div style="font-size: 10px; color: #a1a1aa; margin-top: 4px;">Highlights</div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 12px; margin-top: 10px;">
+                <div style="flex: 1;">
+                  <label style="font-size: 11px; color: #a1a1aa;">Saturation: <span id="mediaSatVal">1.12</span></label>
+                  <input type="range" id="mediaSatSlider" min="0" max="2" step="0.05" value="1.12" style="width: 100%;">
+                </div>
+                <div style="flex: 1;">
+                  <label style="font-size: 11px; color: #a1a1aa;">3D LUT: <span style="color: #a855f7;">aerothermal.cube</span></label>
+                  <select style="width: 100%; font-size: 11px; background: #27272a; color: #fff; border: 1px solid rgba(255,255,255,0.1); border-radius: 3px; padding: 4px;">
+                    <option selected>hypersonic-aerothermal.cube (33x33x33)</option>
+                    <option>film_rec709_kodak2383.cube</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fairlight Audio Mixer -->
+            <div class="wb-cam-metrics-card" style="flex: 1;">
+              <div class="wb-card-title">Fairlight Audio Mixer &amp; Brickwall Peak Limiter</div>
+              <div style="display: flex; justify-content: space-around; margin-top: 10px; align-items: flex-end; height: 100px;">
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                  <div style="width: 12px; height: 70px; background: #27272a; border-radius: 2px; position: relative;">
+                    <div style="width: 100%; height: 50px; background: #10b981; position: absolute; bottom: 0; border-radius: 2px;"></div>
+                  </div>
+                  <span style="font-size: 9px; color: #a1a1aa;">CH 1 (SFX)</span>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                  <div style="width: 12px; height: 70px; background: #27272a; border-radius: 2px; position: relative;">
+                    <div style="width: 100%; height: 42px; background: #10b981; position: absolute; bottom: 0; border-radius: 2px;"></div>
+                  </div>
+                  <span style="font-size: 9px; color: #a1a1aa;">CH 2 (Score)</span>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                  <div style="width: 16px; height: 70px; background: #27272a; border-radius: 2px; position: relative;">
+                    <div style="width: 100%; height: 58px; background: #f59e0b; position: absolute; bottom: 0; border-radius: 2px;"></div>
+                  </div>
+                  <span style="font-size: 9px; color: #f59e0b; font-weight: 600;">Master (L/R)</span>
+                </div>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 11px; color: #a1a1aa; margin-top: 10px;">
+                <span>Integrated LUFS: <strong style="color: #fff;">-23.0 LUFS</strong></span>
+                <span>True Peak: <strong style="color: #10b981;">-0.1 dBFS</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       </div>
     </section>
 

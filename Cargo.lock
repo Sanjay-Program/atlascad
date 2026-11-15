@@ -44,6 +44,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "atlas-animation-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "atlas-asset-manager"
+version = "0.1.0"
+dependencies = [
+ "atlas-creative-core",
+ "atlas-material-system",
+ "atlas-scene-graph",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "atlas-audio"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "atlas-audit"
 version = "0.1.0"
 dependencies = [
@@ -74,9 +104,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "atlas-compositor"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "atlas-core"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "atlas-creative-core"
+version = "0.1.0"
+dependencies = [
+ "cad-contract",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -114,10 +163,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "atlas-interchange"
+version = "0.1.0"
+dependencies = [
+ "atlas-creative-core",
+ "atlas-material-system",
+ "atlas-scene-graph",
+ "atlas-timeline",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "atlas-job-queue"
 version = "0.1.0"
 dependencies = [
  "atlas-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "atlas-material-system"
+version = "0.1.0"
+dependencies = [
+ "cad-contract",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "atlas-media-core"
+version = "0.1.0"
+dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -145,10 +226,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "atlas-render-core"
+version = "0.1.0"
+dependencies = [
+ "atlas-creative-core",
+ "atlas-material-system",
+ "atlas-scene-graph",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "atlas-scene-graph"
+version = "0.1.0"
+dependencies = [
+ "atlas-animation-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "atlas-simulation-core"
 version = "0.1.0"
 dependencies = [
  "atlas-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "atlas-timeline"
+version = "0.1.0"
+dependencies = [
+ "atlas-media-core",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -362,15 +475,26 @@ version = "0.1.0"
 dependencies = [
  "atlas-additive",
  "atlas-agent-orchestrator",
+ "atlas-animation-core",
+ "atlas-asset-manager",
+ "atlas-audio",
  "atlas-audit",
  "atlas-command-platform",
  "atlas-compliance",
+ "atlas-compositor",
  "atlas-core",
+ "atlas-creative-core",
  "atlas-dependency-graph",
  "atlas-engine-manager",
+ "atlas-interchange",
  "atlas-job-queue",
+ "atlas-material-system",
+ "atlas-media-core",
  "atlas-organization",
+ "atlas-render-core",
+ "atlas-scene-graph",
  "atlas-simulation-core",
+ "atlas-timeline",
  "cad-cae",
  "cad-cam",
  "cad-constraints",
