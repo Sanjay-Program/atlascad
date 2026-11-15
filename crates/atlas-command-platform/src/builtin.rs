@@ -2229,5 +2229,236 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    // --- 38. Marine Propeller Hydrodynamics (Wageningen B-Series / ITTC) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.marine.propeller",
+            "Marine Propeller Open-Water Hydrodynamics & Keller Cavitation (ITTC)",
+            "Calculates Wageningen B-series advance coefficient J, KT, KQ, open-water efficiency eta_0, thrust, delivered power, and Keller cavitation margin.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "diameter_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Propeller outer diameter in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(6.80)),
+            validation_rules: vec![ValidationRule::Min(0.5)],
+        })
+        .with_argument(CommandArgument {
+            name: "pitch_ratio_p_d".into(),
+            arg_type: ArgumentType::Number,
+            description: "Propeller pitch-to-diameter ratio P/D".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1.05)),
+            validation_rules: vec![ValidationRule::Min(0.4), ValidationRule::Max(2.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rotational_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Propeller rotational speed in RPM".into(),
+            required: true,
+            default_value: Some(serde_json::json!(108.0)),
+            validation_rules: vec![ValidationRule::Min(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "advance_speed_knots".into(),
+            arg_type: ArgumentType::Number,
+            description: "Ship advance speed through water in knots".into(),
+            required: true,
+            default_value: Some(serde_json::json!(17.5)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        }),
+    )?;
+
+    // --- 39. Automotive Braking & Disc Rotor Thermal Dynamics (ECE R13H / SAE J292) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.automotive.braking",
+            "Automotive Braking Dynamics & Disc Rotor Thermal Dissipation (ECE R13H)",
+            "Calculates dynamic longitudinal axle load transfer, brake torque distribution, stopping distance, kinetic energy dissipation, and rotor adiabatic temperature rise.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "vehicle_mass_kg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Total vehicle mass in kg".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1850.0)),
+            validation_rules: vec![ValidationRule::Min(200.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "wheelbase_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Wheelbase in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(2.85)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "initial_speed_kph".into(),
+            arg_type: ArgumentType::Number,
+            description: "Initial vehicle speed in km/h".into(),
+            required: true,
+            default_value: Some(serde_json::json!(100.0)),
+            validation_rules: vec![ValidationRule::Min(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "road_friction_coeff".into(),
+            arg_type: ArgumentType::Number,
+            description: "Tire-road peak friction coefficient mu".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.92)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(1.5)],
+        }),
+    )?;
+
+    // --- 40. Reinforced Concrete Flexure & Crack Width (Eurocode 2 EN 1992-1-1) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.civil.reinforced_concrete",
+            "Reinforced Concrete Beam Flexural ULS Capacity & SLS Crack Width (EC2)",
+            "Calculates ultimate moment resistance M_Rd, neutral axis depth, ductility ratio xi, steel service stress, and characteristic crack width w_k.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "breadth_b_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Beam breadth b in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(300.0)),
+            validation_rules: vec![ValidationRule::Min(50.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "depth_h_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Beam overall depth h in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(600.0)),
+            validation_rules: vec![ValidationRule::Min(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "applied_moment_ed_kn_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Applied design bending moment M_Ed in kNm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(240.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rebar_count".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Number of main tensile rebars".into(),
+            required: true,
+            default_value: Some(serde_json::json!(4)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rebar_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Tensile rebar diameter in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(20.0)),
+            validation_rules: vec![ValidationRule::Min(6.0)],
+        }),
+    )?;
+
+    // --- 41. HVAC Airflow, Duct Pressure Loss & Fan Power (ASHRAE / SMACNA) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.hvac.duct_airflow",
+            "HVAC Airflow Duct Hydraulics, Pressure Drop & Fan Power (ASHRAE)",
+            "Calculates Huebscher equivalent hydraulic diameter, Colebrook-White friction factors, dynamic fitting losses, total external static pressure (ESP), and fan brake power.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "airflow_m3_h".into(),
+            arg_type: ArgumentType::Number,
+            description: "Volumetric airflow rate in m³/h".into(),
+            required: true,
+            default_value: Some(serde_json::json!(5400.0)),
+            validation_rules: vec![ValidationRule::Min(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "duct_width_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rectangular duct width in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(600.0)),
+            validation_rules: vec![ValidationRule::Min(50.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "duct_height_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rectangular duct height in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(350.0)),
+            validation_rules: vec![ValidationRule::Min(50.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "duct_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Straight duct total run length in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(45.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        }),
+    )?;
+
+    // --- 42. Aero Gas Turbine Open Brayton Cycle & Thrust (NASA SP-290 / ISO 2314) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.aerospace.gas_turbine",
+            "Aero Gas Turbine Open Brayton Cycle & Propulsion Performance (NASA SP-290)",
+            "Calculates aircraft gas turbine thermodynamic state stations (0-2-3-4-5-9), fuel-air ratio, nozzle jet velocity, net thrust, TSFC, and thermal / propulsive efficiencies.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "flight_mach".into(),
+            arg_type: ArgumentType::Number,
+            description: "Flight Mach number (e.g. 0.82 cruise)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(0.82)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(4.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "altitude_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Flight altitude in meters (e.g. 10668m / 35,000 ft)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(10668.0)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(30000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "core_mass_flow_kg_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Core air mass flowrate in kg/s".into(),
+            required: true,
+            default_value: Some(serde_json::json!(45.0)),
+            validation_rules: vec![ValidationRule::Min(0.5)],
+        })
+        .with_argument(CommandArgument {
+            name: "compressor_pressure_ratio".into(),
+            arg_type: ArgumentType::Number,
+            description: "Compressor overall pressure ratio OPR (Pt3/Pt2)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(24.0)),
+            validation_rules: vec![ValidationRule::Min(1.5), ValidationRule::Max(70.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "turbine_inlet_temp_k".into(),
+            arg_type: ArgumentType::Number,
+            description: "Turbine Inlet Temperature TIT in Kelvin".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1650.0)),
+            validation_rules: vec![ValidationRule::Min(600.0), ValidationRule::Max(2400.0)],
+        }),
+    )?;
+
     Ok(())
 }

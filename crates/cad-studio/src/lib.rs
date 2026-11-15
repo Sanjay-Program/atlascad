@@ -4912,6 +4912,121 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_marine_propeller(
+        &mut self,
+        req: &SimMarinePropellerRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::marine_propeller::MarinePropellerProblem {
+            problem_id: "marine_propeller_simulation".to_string(),
+            series: atlas_simulation_core::marine_propeller::PropellerSeries::WageningenB4,
+            diameter_m: req.diameter_m.unwrap_or(6.80),
+            pitch_ratio_p_d: req.pitch_ratio_p_d.unwrap_or(1.05),
+            expanded_area_ratio: req.expanded_area_ratio.unwrap_or(0.68),
+            rotational_speed_rpm: req.rotational_speed_rpm.unwrap_or(108.0),
+            advance_speed_knots: req.advance_speed_knots.unwrap_or(17.5),
+            immersion_depth_m: req.immersion_depth_m.unwrap_or(6.50),
+            water_density_kg_m3: req.water_density_kg_m3.unwrap_or(1025.0),
+            keller_constant_k: req.keller_constant_k.unwrap_or(0.20),
+        };
+        let res = atlas_simulation_core::marine_propeller::solve_marine_propeller(&prob);
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_automotive_braking(
+        &mut self,
+        req: &SimAutomotiveBrakingRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::automotive_braking::AutomotiveBrakingProblem {
+            problem_id: "automotive_braking_simulation".to_string(),
+            vehicle_mass_kg: req.vehicle_mass_kg.unwrap_or(1850.0),
+            wheelbase_m: req.wheelbase_m.unwrap_or(2.85),
+            cg_height_m: req.cg_height_m.unwrap_or(0.52),
+            static_front_weight_bias: req.static_front_weight_bias.unwrap_or(0.53),
+            tire_rolling_radius_m: req.tire_rolling_radius_m.unwrap_or(0.33),
+            road_friction_coeff: req.road_friction_coeff.unwrap_or(0.92),
+            initial_speed_kph: req.initial_speed_kph.unwrap_or(100.0),
+            driver_reaction_time_s: req.driver_reaction_time_s.unwrap_or(0.45),
+            rotor_material: atlas_simulation_core::automotive_braking::RotorMaterial::GrayCastIron,
+            front_rotor_mass_kg: req.front_rotor_mass_kg.unwrap_or(11.8),
+            front_rotor_diameter_m: 0.355,
+            ambient_temp_c: req.ambient_temp_c.unwrap_or(25.0),
+        };
+        let res = atlas_simulation_core::automotive_braking::solve_automotive_braking(&prob);
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_civil_reinforced_concrete(
+        &mut self,
+        req: &SimReinforcedConcreteRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::reinforced_concrete::ReinforcedConcreteProblem {
+            problem_id: "rc_beam_simulation".to_string(),
+            concrete_grade: atlas_simulation_core::reinforced_concrete::ConcreteGrade::C30_37,
+            rebar_yield_strength_fyk_mpa: 500.0,
+            breadth_b_mm: req.breadth_b_mm.unwrap_or(300.0),
+            depth_h_mm: req.depth_h_mm.unwrap_or(600.0),
+            concrete_cover_c_mm: req.concrete_cover_c_mm.unwrap_or(35.0),
+            rebar_diameter_mm: req.rebar_diameter_mm.unwrap_or(20.0),
+            rebar_count: req.rebar_count.unwrap_or(4),
+            applied_moment_ed_kn_m: req.applied_moment_ed_kn_m.unwrap_or(240.0),
+            quasi_permanent_moment_ratio: req.quasi_permanent_moment_ratio.unwrap_or(0.65),
+            max_allowable_crack_width_mm: req.max_allowable_crack_width_mm.unwrap_or(0.30),
+        };
+        let res = atlas_simulation_core::reinforced_concrete::solve_reinforced_concrete(&prob);
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_hvac_duct_airflow(
+        &mut self,
+        req: &SimHvacDuctsRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let geom = if let Some(diam) = req.duct_diameter_mm {
+            atlas_simulation_core::hvac_ducts::DuctGeometry::Circular { diameter_mm: diam }
+        } else {
+            atlas_simulation_core::hvac_ducts::DuctGeometry::Rectangular {
+                width_mm: req.duct_width_mm.unwrap_or(600.0),
+                height_mm: req.duct_height_mm.unwrap_or(350.0),
+            }
+        };
+        let prob = atlas_simulation_core::hvac_ducts::HvacDuctProblem {
+            problem_id: "hvac_duct_simulation".to_string(),
+            geometry: geom,
+            material: atlas_simulation_core::hvac_ducts::DuctMaterial::GalvanizedSteel,
+            airflow_m3_h: req.airflow_m3_h.unwrap_or(5400.0),
+            duct_length_m: req.duct_length_m.unwrap_or(45.0),
+            fitting_loss_coeff_sum: req.fitting_loss_coeff_sum.unwrap_or(3.8),
+            terminal_equipment_pa: req.terminal_equipment_pa.unwrap_or(140.0),
+            fan_efficiency: req.fan_efficiency.unwrap_or(0.73),
+            motor_efficiency: req.motor_efficiency.unwrap_or(0.91),
+            air_temperature_c: 20.0,
+        };
+        let res = atlas_simulation_core::hvac_ducts::solve_hvac_ducts(&prob);
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_aerospace_gas_turbine(
+        &mut self,
+        req: &SimGasTurbineRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::gas_turbine::GasTurbineProblem {
+            problem_id: "gas_turbine_simulation".to_string(),
+            flight_mach: req.flight_mach.unwrap_or(0.82),
+            altitude_m: req.altitude_m.unwrap_or(10668.0),
+            core_mass_flow_kg_s: req.core_mass_flow_kg_s.unwrap_or(45.0),
+            compressor_pressure_ratio: req.compressor_pressure_ratio.unwrap_or(24.0),
+            turbine_inlet_temp_k: req.turbine_inlet_temp_k.unwrap_or(1650.0),
+            fuel: atlas_simulation_core::gas_turbine::AviationFuel::JetA1,
+            compressor_isentropic_efficiency: req.compressor_isentropic_efficiency.unwrap_or(0.88),
+            turbine_isentropic_efficiency: req.turbine_isentropic_efficiency.unwrap_or(0.91),
+            combustor_efficiency: req.combustor_efficiency.unwrap_or(0.99),
+            combustor_pressure_loss_pct: 3.5,
+            nozzle_velocity_coefficient: 0.98,
+            mechanical_efficiency: 0.99,
+        };
+        let res = atlas_simulation_core::gas_turbine::solve_gas_turbine(&prob);
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -6594,6 +6709,75 @@ namespace AtlasCAD.Unity
                     fire_duration_min: t_fire,
                     ambient_moment_ed_kn_m: med,
                     fire_load_ratio_eta_fi: eta,
+                    ..Default::default()
+                })?
+            }
+            "sim.marine.propeller" => {
+                let d = req.arguments.get("diameter_m").and_then(|v| v.as_f64());
+                let pd = req.arguments.get("pitch_ratio_p_d").and_then(|v| v.as_f64());
+                let n = req.arguments.get("rotational_speed_rpm").and_then(|v| v.as_f64());
+                let va = req.arguments.get("advance_speed_knots").and_then(|v| v.as_f64());
+                self.sim_marine_propeller(&SimMarinePropellerRequest {
+                    diameter_m: d,
+                    pitch_ratio_p_d: pd,
+                    rotational_speed_rpm: n,
+                    advance_speed_knots: va,
+                    ..Default::default()
+                })?
+            }
+            "sim.automotive.braking" => {
+                let m = req.arguments.get("vehicle_mass_kg").and_then(|v| v.as_f64());
+                let l = req.arguments.get("wheelbase_m").and_then(|v| v.as_f64());
+                let v = req.arguments.get("initial_speed_kph").and_then(|v| v.as_f64());
+                let mu = req.arguments.get("road_friction_coeff").and_then(|v| v.as_f64());
+                self.sim_automotive_braking(&SimAutomotiveBrakingRequest {
+                    vehicle_mass_kg: m,
+                    wheelbase_m: l,
+                    initial_speed_kph: v,
+                    road_friction_coeff: mu,
+                    ..Default::default()
+                })?
+            }
+            "sim.civil.reinforced_concrete" => {
+                let b = req.arguments.get("breadth_b_mm").and_then(|v| v.as_f64());
+                let h = req.arguments.get("depth_h_mm").and_then(|v| v.as_f64());
+                let med = req.arguments.get("applied_moment_ed_kn_m").and_then(|v| v.as_f64());
+                let n_bars = req.arguments.get("rebar_count").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let phi = req.arguments.get("rebar_diameter_mm").and_then(|v| v.as_f64());
+                self.sim_civil_reinforced_concrete(&SimReinforcedConcreteRequest {
+                    breadth_b_mm: b,
+                    depth_h_mm: h,
+                    applied_moment_ed_kn_m: med,
+                    rebar_count: n_bars,
+                    rebar_diameter_mm: phi,
+                    ..Default::default()
+                })?
+            }
+            "sim.hvac.duct_airflow" => {
+                let q = req.arguments.get("airflow_m3_h").and_then(|v| v.as_f64());
+                let w = req.arguments.get("duct_width_mm").and_then(|v| v.as_f64());
+                let h = req.arguments.get("duct_height_mm").and_then(|v| v.as_f64());
+                let l = req.arguments.get("duct_length_m").and_then(|v| v.as_f64());
+                self.sim_hvac_duct_airflow(&SimHvacDuctsRequest {
+                    airflow_m3_h: q,
+                    duct_width_mm: w,
+                    duct_height_mm: h,
+                    duct_length_m: l,
+                    ..Default::default()
+                })?
+            }
+            "sim.aerospace.gas_turbine" => {
+                let m0 = req.arguments.get("flight_mach").and_then(|v| v.as_f64());
+                let alt = req.arguments.get("altitude_m").and_then(|v| v.as_f64());
+                let m_core = req.arguments.get("core_mass_flow_kg_s").and_then(|v| v.as_f64());
+                let opr = req.arguments.get("compressor_pressure_ratio").and_then(|v| v.as_f64());
+                let tit = req.arguments.get("turbine_inlet_temp_k").and_then(|v| v.as_f64());
+                self.sim_aerospace_gas_turbine(&SimGasTurbineRequest {
+                    flight_mach: m0,
+                    altitude_m: alt,
+                    core_mass_flow_kg_s: m_core,
+                    compressor_pressure_ratio: opr,
+                    turbine_inlet_temp_k: tit,
                     ..Default::default()
                 })?
             }
@@ -8470,6 +8654,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/structural/timber_fire" => {
             match parse_body_or_default::<SimTimberFireRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_timber_fire(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/marine/propeller" => {
+            match parse_body_or_default::<SimMarinePropellerRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_marine_propeller(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/automotive/braking" => {
+            match parse_body_or_default::<SimAutomotiveBrakingRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_automotive_braking(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/civil/reinforced_concrete" => {
+            match parse_body_or_default::<SimReinforcedConcreteRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_civil_reinforced_concrete(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/hvac/duct_airflow" => {
+            match parse_body_or_default::<SimHvacDuctsRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_hvac_duct_airflow(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/aerospace/gas_turbine" => {
+            match parse_body_or_default::<SimGasTurbineRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_aerospace_gas_turbine(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -11252,4 +11481,115 @@ struct SimTimberFireRequest {
     pub ambient_moment_ed_kn_m: Option<f64>,
     #[serde(default)]
     pub fire_load_ratio_eta_fi: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimMarinePropellerRequest {
+    #[serde(default)]
+    pub diameter_m: Option<f64>,
+    #[serde(default)]
+    pub pitch_ratio_p_d: Option<f64>,
+    #[serde(default)]
+    pub expanded_area_ratio: Option<f64>,
+    #[serde(default)]
+    pub rotational_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub advance_speed_knots: Option<f64>,
+    #[serde(default)]
+    pub immersion_depth_m: Option<f64>,
+    #[serde(default)]
+    pub water_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub keller_constant_k: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimAutomotiveBrakingRequest {
+    #[serde(default)]
+    pub vehicle_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub wheelbase_m: Option<f64>,
+    #[serde(default)]
+    pub cg_height_m: Option<f64>,
+    #[serde(default)]
+    pub static_front_weight_bias: Option<f64>,
+    #[serde(default)]
+    pub tire_rolling_radius_m: Option<f64>,
+    #[serde(default)]
+    pub road_friction_coeff: Option<f64>,
+    #[serde(default)]
+    pub initial_speed_kph: Option<f64>,
+    #[serde(default)]
+    pub driver_reaction_time_s: Option<f64>,
+    #[serde(default)]
+    pub front_rotor_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub ambient_temp_c: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimReinforcedConcreteRequest {
+    #[serde(default)]
+    pub breadth_b_mm: Option<f64>,
+    #[serde(default)]
+    pub depth_h_mm: Option<f64>,
+    #[serde(default)]
+    pub concrete_cover_c_mm: Option<f64>,
+    #[serde(default)]
+    pub rebar_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub rebar_count: Option<usize>,
+    #[serde(default)]
+    pub applied_moment_ed_kn_m: Option<f64>,
+    #[serde(default)]
+    pub quasi_permanent_moment_ratio: Option<f64>,
+    #[serde(default)]
+    pub max_allowable_crack_width_mm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimHvacDuctsRequest {
+    #[serde(default)]
+    pub airflow_m3_h: Option<f64>,
+    #[serde(default)]
+    pub duct_width_mm: Option<f64>,
+    #[serde(default)]
+    pub duct_height_mm: Option<f64>,
+    #[serde(default)]
+    pub duct_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub duct_length_m: Option<f64>,
+    #[serde(default)]
+    pub fitting_loss_coeff_sum: Option<f64>,
+    #[serde(default)]
+    pub terminal_equipment_pa: Option<f64>,
+    #[serde(default)]
+    pub fan_efficiency: Option<f64>,
+    #[serde(default)]
+    pub motor_efficiency: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimGasTurbineRequest {
+    #[serde(default)]
+    pub flight_mach: Option<f64>,
+    #[serde(default)]
+    pub altitude_m: Option<f64>,
+    #[serde(default)]
+    pub core_mass_flow_kg_s: Option<f64>,
+    #[serde(default)]
+    pub compressor_pressure_ratio: Option<f64>,
+    #[serde(default)]
+    pub turbine_inlet_temp_k: Option<f64>,
+    #[serde(default)]
+    pub compressor_isentropic_efficiency: Option<f64>,
+    #[serde(default)]
+    pub turbine_isentropic_efficiency: Option<f64>,
+    #[serde(default)]
+    pub combustor_efficiency: Option<f64>,
 }

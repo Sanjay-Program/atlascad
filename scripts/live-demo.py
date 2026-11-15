@@ -2048,6 +2048,111 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 20.7 Enterprise MCP Tool Calling: 5 Batch-5 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # -------------------------------------------------------------
+        # DEMO 21: Marine Propellers, Automotive Braking, Reinforced Concrete, HVAC & Gas Turbines
+        # -------------------------------------------------------------
+        print("\n" + "=" * 78)
+        print("  DEMO 21: MARINE PROPELLERS, BRAKING, RC CONCRETE, HVAC & GAS TURBINES")
+        print("=" * 78)
+
+        # 21.1 Marine Propeller Open-Water Hydrodynamics (Wageningen B-Series / ITTC)
+        prop_res = http_request(port, "POST", "/api/sim/marine/propeller", body={
+            "diameter_m": 6.80,
+            "pitch_ratio_p_d": 1.05,
+            "rotational_speed_rpm": 108.0,
+            "advance_speed_knots": 17.5
+        })
+        check(prop_res.get("open_water_efficiency", 0.0) > 0.58, "Marine propeller open-water efficiency > 58%")
+        check(prop_res.get("thrust_kn", 0.0) > 700.0, "Marine propeller thrust > 700 kN")
+        check(prop_res.get("delivered_power_kw", 0.0) > 10000.0, "Marine propeller shaft power evaluated")
+        check(prop_res.get("keller_margin", -1.0) > -0.05, "Keller cavitation margin verified")
+        print(f"  ✓ 21.1 Marine Propeller (Wageningen B-Series): J = {prop_res['advance_coefficient_j']:.3f}, Thrust = {prop_res['thrust_kn']:.1f} kN, Delivered Power = {prop_res['delivered_power_kw']:.1f} kW, η_0 = {prop_res['open_water_efficiency']*100:.1f}%, Tip Speed = {prop_res['blade_tip_speed_m_s']:.1f} m/s (Keller Margin: +{prop_res['keller_margin']:.3f})")
+
+        # 21.2 Automotive Braking Dynamics & Rotor Thermal (ECE R13H / SAE J292)
+        brake_res = http_request(port, "POST", "/api/sim/automotive/braking", body={
+            "vehicle_mass_kg": 1850.0,
+            "wheelbase_m": 2.85,
+            "initial_speed_kph": 100.0,
+            "road_friction_coeff": 0.92
+        })
+        check(brake_res.get("deceleration_g", 0.0) > 0.85, "Deceleration > 0.85g")
+        check(brake_res.get("stopping_distance_m", 99.0) < 65.0, "Stopping distance < 65m")
+        check(brake_res.get("rotor_temp_rise_c", 0.0) > 30.0, "Rotor temperature rise evaluated")
+        check(brake_res.get("thermal_fade_safe") is True, "Rotor thermal fade safe")
+        print(f"  ✓ 21.2 Automotive Braking (ECE R13H): a = {brake_res['deceleration_g']:.2f}g, Stop Dist = {brake_res['stopping_distance_m']:.1f} m (Active {brake_res['braking_distance_only_m']:.1f} m), Front Load = {brake_res['front_braking_fraction_pct']:.1f}%, Wheel Torque = {brake_res['front_wheel_brake_torque_nm']:.0f} N·m, Disc ΔT = +{brake_res['rotor_temp_rise_c']:.1f} °C")
+
+        # 21.3 Reinforced Concrete Flexure & Crack Width (Eurocode 2 EN 1992-1-1)
+        rc_res = http_request(port, "POST", "/api/sim/civil/reinforced_concrete", body={
+            "breadth_b_mm": 300.0,
+            "depth_h_mm": 600.0,
+            "applied_moment_ed_kn_m": 240.0,
+            "rebar_count": 4,
+            "rebar_diameter_mm": 20.0
+        })
+        check(rc_res.get("design_moment_resistance_mrd_kn_m", 0.0) > 250.0, "RC beam flexural resistance > 250 kNm")
+        check(rc_res.get("flexural_utilization_ratio", 9.0) < 1.0, "Flexural utilization ratio < 1.0")
+        check(rc_res.get("characteristic_crack_width_wk_mm", 1.0) <= 0.30, "Characteristic crack width <= 0.30 mm")
+        check(rc_res.get("crack_width_compliant") is True, "Crack width complies with EC2 limit")
+        print(f"  ✓ 21.3 Reinforced Concrete Beam (EC2): M_Rd = {rc_res['design_moment_resistance_mrd_kn_m']:.1f} kNm (UR = {rc_res['flexural_utilization_ratio']:.2f}), Neutral Axis ξ = {rc_res['neutral_axis_ratio_xi']:.3f}, Steel σ_s = {rc_res['steel_service_stress_sigma_s_mpa']:.1f} MPa, Crack Width w_k = {rc_res['characteristic_crack_width_wk_mm']:.3f} mm (≤ 0.30 mm)")
+
+        # 21.4 HVAC Airflow, Duct Pressure Loss & Fan Power (ASHRAE / SMACNA)
+        duct_res = http_request(port, "POST", "/api/sim/hvac/duct_airflow", body={
+            "airflow_m3_h": 5400.0,
+            "duct_width_mm": 600.0,
+            "duct_height_mm": 350.0,
+            "duct_length_m": 45.0
+        })
+        check(duct_res.get("air_velocity_m_s", 0.0) > 5.0, "Air velocity > 5.0 m/s")
+        check(duct_res.get("total_fan_pressure_pa", 0.0) > 200.0, "Total fan ESP > 200 Pa")
+        check(duct_res.get("fan_brake_power_kw", 0.0) > 0.40, "Fan brake power evaluated")
+        check(duct_res.get("velocity_within_comfort_limits") is True, "Airflow velocity within SMACNA limits")
+        print(f"  ✓ 21.4 HVAC Duct Hydraulics (ASHRAE): Q = {duct_res['airflow_m3_s']:.2f} m³/s, Velocity = {duct_res['air_velocity_m_s']:.2f} m/s, Huebscher D_e = {duct_res['equivalent_diameter_m']:.3f} m, Total ESP = {duct_res['total_fan_pressure_pa']:.1f} Pa, Fan Power = {duct_res['fan_brake_power_kw']:.2f} kW, Noise = {duct_res['estimated_sound_power_lwa']:.1f} dBA")
+
+        # 21.5 Aero Gas Turbine Open Brayton Cycle & Thrust (NASA SP-290 / ISO 2314)
+        gt_res = http_request(port, "POST", "/api/sim/aerospace/gas_turbine", body={
+            "flight_mach": 0.82,
+            "altitude_m": 10668.0,
+            "core_mass_flow_kg_s": 45.0,
+            "compressor_pressure_ratio": 24.0,
+            "turbine_inlet_temp_k": 1650.0
+        })
+        check(gt_res.get("net_thrust_kn", 0.0) > 18.0, "Gas turbine net thrust > 18 kN")
+        check(gt_res.get("thermal_efficiency", 0.0) > 0.35, "Brayton thermal efficiency > 35%")
+        check(gt_res.get("nozzle_jet_velocity_m_s", 0.0) > 700.0, "Nozzle jet velocity > 700 m/s")
+        print(f"  ✓ 21.5 Aero Gas Turbine (NASA SP-290): Cruise Mach 0.82 @ 35k ft, Net Thrust = {gt_res['net_thrust_kn']:.1f} kN, Jet v_9 = {gt_res['nozzle_jet_velocity_m_s']:.1f} m/s, TSFC = {gt_res['tsfc_kg_kn_h']:.2f} kg/(kN·h), η_th = {gt_res['thermal_efficiency']*100:.1f}%, η_p = {gt_res['propulsive_efficiency']*100:.1f}%")
+
+        # 21.6 Universal Commands Execution Verification (Batch 6 Domains)
+        for cmd_id in [
+            "sim.marine.propeller",
+            "sim.automotive.braking",
+            "sim.civil.reinforced_concrete",
+            "sim.hvac.duct_airflow",
+            "sim.aerospace.gas_turbine",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 21.6 Universal Commands: All 5 Batch-6 Engineering Commands verified via typed schema engine")
+
+        # 21.7 Enterprise MCP Tool Calling (Batch 6 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_marine_propeller",
+            "atlas_sim_automotive_braking",
+            "atlas_sim_civil_reinforced_concrete",
+            "atlas_sim_hvac_duct_airflow",
+            "atlas_sim_aerospace_gas_turbine",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 700,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 21.7 Enterprise MCP Tool Calling: 5 Batch-6 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

@@ -6,6 +6,7 @@
 pub mod acoustics;
 pub mod aerodynamics;
 pub mod aeroelasticity;
+pub mod automotive_braking;
 pub mod battery_ev;
 pub mod biomedical;
 pub mod boundary_conditions;
@@ -26,16 +27,19 @@ pub mod fasteners;
 pub mod fracture;
 pub mod fsi;
 pub mod gas_compression;
+pub mod gas_turbine;
 pub mod gears;
 pub mod generative;
 pub mod geotechnical;
 pub mod geotechnical_bearing;
 pub mod heat_exchanger;
 pub mod heat_exchanger_rating;
+pub mod hvac_ducts;
 pub mod hydrology;
 pub mod hypersonic;
 pub mod machining_physics;
 pub mod marine;
+pub mod marine_propeller;
 pub mod materials;
 pub mod model;
 pub mod molecular;
@@ -48,6 +52,7 @@ pub mod provenance;
 pub mod psychrometrics;
 pub mod pumps;
 pub mod rainflow;
+pub mod reinforced_concrete;
 pub mod robotics;
 pub mod rock_mechanics;
 pub mod rotor_dynamics;
@@ -76,6 +81,10 @@ pub mod prelude {
         NormalShockProblem, WingAeroProblem, solve_normal_shock, solve_wing_aerodynamics,
     };
     pub use crate::aeroelasticity::{AeroelasticProblem, solve_aeroelastic_viv};
+    pub use crate::automotive_braking::{
+        AutomotiveBrakingProblem, AutomotiveBrakingResult, RotorMaterial,
+        solve_automotive_braking, solve_automotive_braking_sim,
+    };
     pub use crate::battery_ev::{
         BatteryPackProblem, VehicleDynamicsProblem, solve_battery_pack, solve_vehicle_dynamics,
     };
@@ -129,6 +138,10 @@ pub mod prelude {
         CompressionStageData, GasCompressionProblem, GasCompressionResult, ProcessGas,
         solve_gas_compression, solve_gas_compression_sim,
     };
+    pub use crate::gas_turbine::{
+        AviationFuel, GasTurbineProblem, GasTurbineResult,
+        solve_gas_turbine, solve_gas_turbine_sim, standard_atmosphere,
+    };
     pub use crate::gears::{
         GearToothProfile, GearType, InvoluteGearPairProblem, InvoluteGearPairResult,
         solve_gear_pair_sim, solve_involute_gear_pair,
@@ -148,6 +161,10 @@ pub mod prelude {
     pub use crate::heat_exchanger_rating::{
         HeatExchangerRatingProblem, HeatExchangerRatingResult, TubeLayoutPattern,
         solve_heat_exchanger_rating, solve_heat_exchanger_rating_sim,
+    };
+    pub use crate::hvac_ducts::{
+        DuctGeometry, DuctMaterial, HvacDuctProblem, HvacDuctResult,
+        solve_hvac_ducts, solve_hvac_ducts_sim,
     };
     pub use crate::hydrology::{
         HydrologyProblem, HydrologyResult, LandUseCategory, PipeMaterial,
@@ -186,6 +203,10 @@ pub mod prelude {
         AiryWaveRequest, AiryWaveResult, MarineHydrostaticsRequest, MarineHydrostaticsResult,
         solve_airy_wave, solve_hydrostatics,
     };
+    pub use crate::marine_propeller::{
+        MarinePropellerProblem, MarinePropellerResult, PropellerSeries,
+        evaluate_wageningen_b, solve_marine_propeller, solve_marine_propeller_sim,
+    };
     pub use crate::materials::SimulationMaterial;
     pub use crate::molecular::{
         Atom, LennardJonesParam, MolecularDynamicsProblem, run_molecular_dynamics,
@@ -216,6 +237,10 @@ pub mod prelude {
     };
     pub use crate::rainflow::{
         RainflowCycle, RainflowProblem, count_rainflow_cycles, solve_rainflow_fatigue,
+    };
+    pub use crate::reinforced_concrete::{
+        ConcreteGrade, ReinforcedConcreteProblem, ReinforcedConcreteResult,
+        solve_reinforced_concrete, solve_reinforced_concrete_sim,
     };
     pub use crate::robotics::{
         DhLink, IkResult, QuinticTrajectoryProblem, RobotKinematicsProblem,

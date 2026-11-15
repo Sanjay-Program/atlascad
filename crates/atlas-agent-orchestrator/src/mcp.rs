@@ -890,6 +890,78 @@ impl McpServer {
                     "required": ["initial_breadth_mm", "initial_depth_mm", "fire_duration_min", "ambient_moment_ed_kn_m"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_marine_propeller".into(),
+                description: "Wageningen B-series marine propeller open-water hydrodynamics (KT, KQ, eta_0), thrust, torque, power, and Keller cavitation criteria".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "diameter_m": { "type": "number", "default": 6.80 },
+                        "pitch_ratio_p_d": { "type": "number", "default": 1.05 },
+                        "rotational_speed_rpm": { "type": "number", "default": 108.0 },
+                        "advance_speed_knots": { "type": "number", "default": 17.5 }
+                    },
+                    "required": ["diameter_m", "pitch_ratio_p_d", "rotational_speed_rpm", "advance_speed_knots"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_automotive_braking".into(),
+                description: "ECE R13H automotive braking dynamics, dynamic axle load transfer, stopping distance, and disc rotor thermal dissipation".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "vehicle_mass_kg": { "type": "number", "default": 1850.0 },
+                        "wheelbase_m": { "type": "number", "default": 2.85 },
+                        "initial_speed_kph": { "type": "number", "default": 100.0 },
+                        "road_friction_coeff": { "type": "number", "default": 0.92 }
+                    },
+                    "required": ["vehicle_mass_kg", "wheelbase_m", "initial_speed_kph"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_civil_reinforced_concrete".into(),
+                description: "Eurocode 2 EN 1992-1-1 reinforced concrete beam flexural moment capacity M_Rd, neutral axis depth, and SLS crack width w_k".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "breadth_b_mm": { "type": "number", "default": 300.0 },
+                        "depth_h_mm": { "type": "number", "default": 600.0 },
+                        "applied_moment_ed_kn_m": { "type": "number", "default": 240.0 },
+                        "rebar_count": { "type": "integer", "default": 4 },
+                        "rebar_diameter_mm": { "type": "number", "default": 20.0 }
+                    },
+                    "required": ["breadth_b_mm", "depth_h_mm", "applied_moment_ed_kn_m", "rebar_count"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_hvac_duct_airflow".into(),
+                description: "ASHRAE / SMACNA HVAC airflow duct hydraulics, Huebscher equivalent hydraulic diameter, friction loss, ESP, and fan brake horsepower".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "airflow_m3_h": { "type": "number", "default": 5400.0 },
+                        "duct_width_mm": { "type": "number", "default": 600.0 },
+                        "duct_height_mm": { "type": "number", "default": 350.0 },
+                        "duct_length_m": { "type": "number", "default": 45.0 }
+                    },
+                    "required": ["airflow_m3_h", "duct_width_mm", "duct_height_mm", "duct_length_m"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_aerospace_gas_turbine".into(),
+                description: "NASA SP-290 aero gas turbine open Brayton cycle, compressor/turbine states, fuel-air ratio, net thrust, TSFC, and thermal efficiency".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "flight_mach": { "type": "number", "default": 0.82 },
+                        "altitude_m": { "type": "number", "default": 10668.0 },
+                        "core_mass_flow_kg_s": { "type": "number", "default": 45.0 },
+                        "compressor_pressure_ratio": { "type": "number", "default": 24.0 },
+                        "turbine_inlet_temp_k": { "type": "number", "default": 1650.0 }
+                    },
+                    "required": ["flight_mach", "altitude_m", "core_mass_flow_kg_s", "compressor_pressure_ratio", "turbine_inlet_temp_k"]
+                }),
+            },
         ]
     }
 

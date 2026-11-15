@@ -5638,5 +5638,131 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 92. Marine Propeller Open-Water Hydrodynamics & Cavitation (Wageningen B-Series / ITTC)
+    let res_prop = post(
+        addr,
+        "/api/sim/marine/propeller",
+        r#"{
+            "diameter_m": 6.80,
+            "pitch_ratio_p_d": 1.05,
+            "rotational_speed_rpm": 108.0,
+            "advance_speed_knots": 17.5
+        }"#,
+    )?;
+    assert_eq!(res_prop.status, 200);
+    let prop_json = json(&res_prop)?;
+    assert!(prop_json["open_water_efficiency"].as_f64().unwrap() > 0.58);
+    assert!(prop_json["thrust_kn"].as_f64().unwrap() > 700.0);
+    assert!(prop_json["delivered_power_kw"].as_f64().unwrap() > 10000.0);
+    assert!(prop_json["keller_margin"].as_f64().unwrap() > -0.05);
+
+    // 93. Automotive Braking Dynamics & Rotor Thermal Dissipation (ECE R13H / SAE J292)
+    let res_brake = post(
+        addr,
+        "/api/sim/automotive/braking",
+        r#"{
+            "vehicle_mass_kg": 1850.0,
+            "wheelbase_m": 2.85,
+            "initial_speed_kph": 100.0,
+            "road_friction_coeff": 0.92
+        }"#,
+    )?;
+    assert_eq!(res_brake.status, 200);
+    let brake_json = json(&res_brake)?;
+    assert!(brake_json["deceleration_g"].as_f64().unwrap() > 0.85);
+    assert!(brake_json["stopping_distance_m"].as_f64().unwrap() < 65.0);
+    assert!(brake_json["front_wheel_brake_torque_nm"].as_f64().unwrap() > 1500.0);
+    assert!(brake_json["rotor_temp_rise_c"].as_f64().unwrap() > 30.0);
+    assert!(brake_json["thermal_fade_safe"].as_bool().unwrap());
+
+    // 94. Reinforced Concrete Flexure & Crack Width (Eurocode 2 EN 1992-1-1)
+    let res_rc = post(
+        addr,
+        "/api/sim/civil/reinforced_concrete",
+        r#"{
+            "breadth_b_mm": 300.0,
+            "depth_h_mm": 600.0,
+            "applied_moment_ed_kn_m": 240.0,
+            "rebar_count": 4,
+            "rebar_diameter_mm": 20.0
+        }"#,
+    )?;
+    assert_eq!(res_rc.status, 200);
+    let rc_json = json(&res_rc)?;
+    assert!(rc_json["design_moment_resistance_mrd_kn_m"].as_f64().unwrap() > 250.0);
+    assert!(rc_json["flexural_utilization_ratio"].as_f64().unwrap() < 1.0);
+    assert!(rc_json["characteristic_crack_width_wk_mm"].as_f64().unwrap() <= 0.30);
+    assert!(rc_json["uls_flexure_adequate"].as_bool().unwrap());
+    assert!(rc_json["crack_width_compliant"].as_bool().unwrap());
+
+    // 95. HVAC Airflow, Duct Pressure Loss & Fan Power (ASHRAE / SMACNA)
+    let res_duct = post(
+        addr,
+        "/api/sim/hvac/duct_airflow",
+        r#"{
+            "airflow_m3_h": 5400.0,
+            "duct_width_mm": 600.0,
+            "duct_height_mm": 350.0,
+            "duct_length_m": 45.0
+        }"#,
+    )?;
+    assert_eq!(res_duct.status, 200);
+    let duct_json = json(&res_duct)?;
+    assert!(duct_json["air_velocity_m_s"].as_f64().unwrap() > 5.0);
+    assert!(duct_json["total_fan_pressure_pa"].as_f64().unwrap() > 200.0);
+    assert!(duct_json["fan_brake_power_kw"].as_f64().unwrap() > 0.40);
+    assert!(duct_json["velocity_within_comfort_limits"].as_bool().unwrap());
+
+    // 96. Aero Gas Turbine Open Brayton Cycle & Thrust (NASA SP-290 / ISO 2314)
+    let res_gt = post(
+        addr,
+        "/api/sim/aerospace/gas_turbine",
+        r#"{
+            "flight_mach": 0.82,
+            "altitude_m": 10668.0,
+            "core_mass_flow_kg_s": 45.0,
+            "compressor_pressure_ratio": 24.0,
+            "turbine_inlet_temp_k": 1650.0
+        }"#,
+    )?;
+    assert_eq!(res_gt.status, 200);
+    let gt_json = json(&res_gt)?;
+    assert!(gt_json["net_thrust_kn"].as_f64().unwrap() > 18.0);
+    assert!(gt_json["nozzle_jet_velocity_m_s"].as_f64().unwrap() > 700.0);
+    assert!(gt_json["thermal_efficiency"].as_f64().unwrap() > 0.35);
+
+    // 97. Universal Commands Execution Verification (Batch 6 Domains)
+    for cmd_id in [
+        "sim.marine.propeller",
+        "sim.automotive.braking",
+        "sim.civil.reinforced_concrete",
+        "sim.hvac.duct_airflow",
+        "sim.aerospace.gas_turbine",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 98. Enterprise MCP Tool Calling (Batch 6 Domains)
+    for tool_name in [
+        "atlas_sim_marine_propeller",
+        "atlas_sim_automotive_braking",
+        "atlas_sim_civil_reinforced_concrete",
+        "atlas_sim_hvac_duct_airflow",
+        "atlas_sim_aerospace_gas_turbine",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 150, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

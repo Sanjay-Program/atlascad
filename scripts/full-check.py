@@ -1256,6 +1256,68 @@ def simulation_section(studio: Studio) -> None:
     tmb_data = timber.json()
     check(tmb_data.get("fire_resistance_verified") is True, "timber R60 fire resistance verified")
     check(tmb_data.get("critical_fire_endurance_min", 0.0) >= 60.0, "critical fire endurance >= 60 min")
+
+    # 30. Marine Propeller Hydrodynamics (Wageningen B-Series / ITTC)
+    prop = studio.post("/api/sim/marine/propeller", {
+        "diameter_m": 6.80,
+        "pitch_ratio_p_d": 1.05,
+        "rotational_speed_rpm": 108.0,
+        "advance_speed_knots": 17.5
+    })
+    check(prop.status == 200, f"marine propeller returns 200 (got {prop.status})")
+    prp_data = prop.json()
+    check(prp_data.get("open_water_efficiency", 0.0) > 0.58, "propeller open water efficiency > 58%")
+    check(prp_data.get("thrust_kn", 0.0) > 700.0, "propeller thrust > 700 kN")
+
+    # 31. Automotive Braking Dynamics & Rotor Thermal (ECE R13H / SAE J292)
+    brake = studio.post("/api/sim/automotive/braking", {
+        "vehicle_mass_kg": 1850.0,
+        "wheelbase_m": 2.85,
+        "initial_speed_kph": 100.0,
+        "road_friction_coeff": 0.92
+    })
+    check(brake.status == 200, f"automotive braking returns 200 (got {brake.status})")
+    brk_data = brake.json()
+    check(brk_data.get("deceleration_g", 0.0) > 0.85, "emergency deceleration > 0.85g")
+    check(brk_data.get("stopping_distance_m", 99.0) < 65.0, "stopping distance < 65m")
+
+    # 32. Reinforced Concrete Flexure & Crack Width (Eurocode 2 EN 1992-1-1)
+    rc = studio.post("/api/sim/civil/reinforced_concrete", {
+        "breadth_b_mm": 300.0,
+        "depth_h_mm": 600.0,
+        "applied_moment_ed_kn_m": 240.0,
+        "rebar_count": 4,
+        "rebar_diameter_mm": 20.0
+    })
+    check(rc.status == 200, f"reinforced concrete returns 200 (got {rc.status})")
+    rc_data = rc.json()
+    check(rc_data.get("design_moment_resistance_mrd_kn_m", 0.0) > 250.0, "RC beam flexural resistance > 250 kNm")
+    check(rc_data.get("characteristic_crack_width_wk_mm", 1.0) <= 0.30, "crack width <= 0.30 mm")
+
+    # 33. HVAC Airflow, Duct Pressure Loss & Fan Power (ASHRAE / SMACNA)
+    duct = studio.post("/api/sim/hvac/duct_airflow", {
+        "airflow_m3_h": 5400.0,
+        "duct_width_mm": 600.0,
+        "duct_height_mm": 350.0,
+        "duct_length_m": 45.0
+    })
+    check(duct.status == 200, f"hvac duct returns 200 (got {duct.status})")
+    dct_data = duct.json()
+    check(dct_data.get("air_velocity_m_s", 0.0) > 5.0, "air velocity > 5.0 m/s")
+    check(dct_data.get("total_fan_pressure_pa", 0.0) > 200.0, "total fan ESP > 200 Pa")
+
+    # 34. Aero Gas Turbine Open Brayton Cycle & Thrust (NASA SP-290 / ISO 2314)
+    gt = studio.post("/api/sim/aerospace/gas_turbine", {
+        "flight_mach": 0.82,
+        "altitude_m": 10668.0,
+        "core_mass_flow_kg_s": 45.0,
+        "compressor_pressure_ratio": 24.0,
+        "turbine_inlet_temp_k": 1650.0
+    })
+    check(gt.status == 200, f"gas turbine returns 200 (got {gt.status})")
+    gt_data = gt.json()
+    check(gt_data.get("net_thrust_kn", 0.0) > 18.0, "gas turbine net thrust > 18 kN")
+    check(gt_data.get("thermal_efficiency", 0.0) > 0.35, "Brayton thermal efficiency > 35%")
     report("simulation")
 
 
