@@ -1078,6 +1078,71 @@ def run_live_demo() -> None:
         check("atlas_hypersonic_solve" in content_hyper, "MCP response text confirms hypersonic tool execution")
         print(f"  ✓ 13.6 MCP Autonomous AI Tool: atlas_hypersonic_solve invoked via JSON-RPC 2.0 with verifiable results")
 
+        # 13.7 Nonequilibrium Plasma Sheath & RF Blackout API
+        plasma_res = http_request(port, "POST", "/api/sim/hypersonic/plasma", body={
+            "flight_mach": 11.0,
+            "altitude_m": 32000.0
+        })
+        fp = plasma_res.get("plasma_cutoff_freq_ghz", 0.0)
+        ne = plasma_res.get("electron_density_m3", 0.0)
+        is_bo = plasma_res.get("is_rf_blackout", False)
+        mhd_b = plasma_res.get("mhd_window_b_field_tesla", 0.0)
+        check(fp >= 10.0, f"Plasma cutoff frequency >= 10 GHz (was {fp:.1f} GHz)")
+        check(ne >= 1.0e17, f"Electron density >= 1e17 m⁻³ (was {ne:.2e})")
+        check(is_bo == True, "Plasma sheath induces RF blackout across L/X bands")
+        check(mhd_b <= 2.5, f"MHD magnetic window field achievable (was {mhd_b:.2f} T)")
+        print(f"  ✓ 13.7 Plasma Sheath & RF Blackout: Cutoff f_p = {fp:.1f} GHz, n_e = {ne:.2e} m⁻³, Blackout: True, MHD B-field = {mhd_b:.2f} T")
+
+        # 13.8 Active Regenerative Cryogenic Cooling API
+        thermal_res = http_request(port, "POST", "/api/sim/hypersonic/thermal", body={
+            "heat_flux_mw_m2": 1.45,
+            "coolant_flow_kg_s": 4.93
+        })
+        htc = thermal_res.get("coolant_htc_w_m2_k", 0.0)
+        t_sub = thermal_res.get("inner_substrate_temperature_c", 0.0)
+        sub_margin = thermal_res.get("substrate_thermal_margin_c", 0.0)
+        heat_mw = thermal_res.get("total_heat_removed_mw", 0.0)
+        check(htc >= 10000.0, f"Supercritical H2 coolant HTC >= 10,000 W/m²K (was {htc:.0f})")
+        check(sub_margin > 0.0, f"Substrate maintains positive thermal safety margin (was {sub_margin:.1f} °C)")
+        check(heat_mw > 0.0, f"Total heat removed by regenerative cooling > 0 MW (was {heat_mw:.2f} MW)")
+        print(f"  ✓ 13.8 Active Regenerative Cooling: Supercritical H2 HTC = {htc:.0f} W/m²K, Substrate = {t_sub:.1f} °C (Margin +{sub_margin:.1f} °C)")
+
+        # 13.9 Multistage Scramjet & Isolator Unstart Margin API
+        scram_res = http_request(port, "POST", "/api/sim/hypersonic/scramjet", body={
+            "flight_mach": 11.0,
+            "equivalence_ratio": 1.05
+        })
+        iso_margin = scram_res.get("isolator_unstart_margin", 0.0)
+        comb_eff = scram_res.get("combustion_efficiency_pct", 0.0)
+        res_time = scram_res.get("combustor_residence_time_ms", 0.0)
+        check(iso_margin >= 1.20, f"Waltrup-Billig isolator unstart margin >= 1.20x (was {iso_margin:.2f}x)")
+        check(comb_eff >= 80.0, f"Supersonic combustion efficiency >= 80% (was {comb_eff:.1f}%)")
+        check(res_time > 0.1, f"Combustor residence time > 0.1 ms (was {res_time:.3f} ms)")
+        print(f"  ✓ 13.9 Scramjet & Isolator Unstart: Isolator Margin = {iso_margin:.2f}x (Unstart Safe), Combustion Eff = {comb_eff:.1f}%, Residence = {res_time:.3f} ms")
+
+        # 13.10 Cryogenic Fuel Feed & Turbopump Hydraulics API
+        cryo_res = http_request(port, "POST", "/api/sim/hypersonic/cryo", body={
+            "fuel_mass_kg": 16300.0
+        })
+        cav_margin = cryo_res.get("cavitation_safety_margin", 0.0)
+        boil_rate = cryo_res.get("boil_off_rate_pct_day", 0.0)
+        pump_head = cryo_res.get("turbopump_head_rise_m", 0.0)
+        check(cav_margin >= 1.50, f"Turbopump inducer cavitation safety margin >= 1.50x (was {cav_margin:.2f}x)")
+        check(boil_rate < 1.0, f"60-layer MLI cryogenic boil-off < 1.0%/day (was {boil_rate:.3f}%/day)")
+        check(pump_head >= 5000.0, f"Expander-cycle turbopump head rise >= 5,000 m (was {pump_head:.0f} m)")
+        print(f"  ✓ 13.10 Cryogenic Feed & Turbopumps: Cavitation Margin = {cav_margin:.2f}x, 60-layer MLI Boil-off = {boil_rate:.3f}%/day, Head = {pump_head:.0f} m")
+
+        # 13.11 Detailed 15-Subsystem Verified Real-World Aircraft BOM API
+        bom_res = http_request(port, "GET", "/api/sim/hypersonic/bom")
+        comp_count = bom_res.get("component_count", 0)
+        dry_wt = bom_res.get("dry_weight_kg", 0.0)
+        mtow = bom_res.get("mtow_kg", 0.0)
+        cg = bom_res.get("global_cg_m", [0, 0, 0])
+        check(comp_count == 21, f"BOM contains 21 verified components (was {comp_count})")
+        check(dry_wt >= 15000.0, f"Dry weight >= 15,000 kg (was {dry_wt:.0f} kg)")
+        check(mtow >= 45000.0, f"MTOW >= 45,000 kg (was {mtow:.0f} kg)")
+        print(f"  ✓ 13.11 Real-World Aircraft BOM: 21 Components, Dry Mass = {dry_wt:.0f} kg, MTOW = {mtow:.0f} kg, CG Station X = {cg[0]:.2f} m")
+
         # =====================================================================
         # DEMO 14: DAVINCI RESOLVE TIMELINE, UNITY 3D ENGINE & DEPLOYMENT PLATFORM
         # =====================================================================

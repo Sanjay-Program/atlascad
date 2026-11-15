@@ -587,5 +587,63 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         .with_permission(CommandPermission::FileExport),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.hypersonic.plasma",
+            "Nonequilibrium Plasma Sheath & RF Blackout",
+            "Computes electron number density, plasma cutoff frequency, wave attenuation across L/X/Ka bands, and MHD magnetic window.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "flight_mach".into(),
+            arg_type: ArgumentType::Number,
+            description: "Flight Mach number (e.g. 11.0)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(11.0)),
+            validation_rules: vec![ValidationRule::Min(5.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.hypersonic.thermal",
+            "Active Regenerative Cooling Thermal Network",
+            "Solves supercritical LH2 microchannel convective heat transfer, Dittus-Boelter HTC, and substrate wall thermal safety margin.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.hypersonic.scramjet",
+            "Scramjet Multistage Inlet, Isolator & Combustor",
+            "Solves 3-ramp oblique shock wave compression, isolator unstart margin (Waltrup-Billig), and supersonic Rayleigh combustion.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.hypersonic.cryo",
+            "Cryogenic Fuel Feed & Turbopump Hydraulics",
+            "Evaluates 60-layer MLI boil-off rates, expander-cycle turbopump head rise, and inducer cavitation safety margins.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.hypersonic.bom",
+            "Detailed 15-System Real-World Aircraft BOM",
+            "Outputs the complete hierarchical engineering BOM with 48 line items, materials, masses, and CG coordinates.",
+            CommandCategory::Reporting,
+        )
+        .with_permission(CommandPermission::ReadOnly),
+    )?;
+
     Ok(())
 }

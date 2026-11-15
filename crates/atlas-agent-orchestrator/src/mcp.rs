@@ -273,6 +273,54 @@ impl McpServer {
                     }
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_hypersonic_plasma".into(),
+                description: "Simulate nonequilibrium plasma sheath, electron density, RF blackout across L/X/Ka bands, and MHD magnetic window".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "flight_mach": { "type": "number", "default": 11.0 },
+                        "altitude_m": { "type": "number", "default": 32000.0 }
+                    }
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_hypersonic_thermal".into(),
+                description: "Simulate active regenerative cooling microchannels, supercritical H2 heat transfer, and wall temperature gradients".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "heat_flux_mw_m2": { "type": "number", "default": 1.45 },
+                        "coolant_flow_kg_s": { "type": "number", "default": 4.93 }
+                    }
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_hypersonic_scramjet".into(),
+                description: "Simulate 3-ramp oblique shock wave compression, isolator unstart margin (Waltrup-Billig), and supersonic Rayleigh combustion".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "flight_mach": { "type": "number", "default": 11.0 },
+                        "equivalence_ratio": { "type": "number", "default": 1.05 }
+                    }
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_hypersonic_cryo".into(),
+                description: "Simulate cryogenic LH2 storage tanks, 60-layer MLI boil-off rates, and turbopump inducer cavitation safety margins".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "fuel_mass_kg": { "type": "number", "default": 16300.0 }
+                    }
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_hypersonic_bom".into(),
+                description: "Query complete 15-subsystem real-world component Bill of Materials, masses, CG coordinates, and thermal ratings".into(),
+                input_schema: serde_json::json!({ "type": "object" }),
+            },
         ]
     }
 

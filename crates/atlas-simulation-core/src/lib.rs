@@ -89,6 +89,13 @@ pub mod prelude {
     pub use crate::hypersonic::{
         AtmosphericState, HypersonicAirplaneProblem, HypersonicSimulationSummary,
         compute_standard_atmosphere, solve_hypersonic_airplane,
+        avionics::{HypersonicAvionicsResult, evaluate_avionics_system},
+        bom::{HypersonicBomSummary, HypersonicComponent, build_hypersonic_bom},
+        cryo::{CryogenicFeedResult, evaluate_cryogenic_system},
+        plasma::{PlasmaSheathResult, evaluate_plasma_sheath},
+        scramjet::{ScramjetEngineResult, evaluate_scramjet_cycle},
+        thermal::{ActiveCoolingResult, evaluate_active_cooling},
+        trajectory::{HypersonicTrajectoryResult, evaluate_trajectory_corridor},
     };
     pub use crate::marine::{
         AiryWaveRequest, AiryWaveResult, MarineHydrostaticsRequest, MarineHydrostaticsResult,

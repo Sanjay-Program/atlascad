@@ -3767,6 +3767,77 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_hypersonic_plasma(
+        &mut self,
+        req: &HypersonicPlasmaRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mach = req.flight_mach.unwrap_or(11.0);
+        let alt = req.altitude_m.unwrap_or(32000.0);
+        let atmos = atlas_simulation_core::hypersonic::compute_standard_atmosphere(alt);
+        let res = atlas_simulation_core::hypersonic::plasma::evaluate_plasma_sheath(
+            mach,
+            alt,
+            atmos.temperature_k,
+            atmos.density_kg_m3,
+            0.05,
+        );
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_hypersonic_thermal(
+        &mut self,
+        req: &HypersonicThermalRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let q = req.heat_flux_mw_m2.unwrap_or(1.45);
+        let m_dot = req.coolant_flow_kg_s.unwrap_or(4.93);
+        let res = atlas_simulation_core::hypersonic::thermal::evaluate_active_cooling(
+            q,
+            18.5,
+            m_dot,
+            35.0,
+            4.5,
+        );
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_hypersonic_scramjet(
+        &mut self,
+        req: &HypersonicScramjetRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mach = req.flight_mach.unwrap_or(11.0);
+        let phi = req.equivalence_ratio.unwrap_or(1.05);
+        let atmos = atlas_simulation_core::hypersonic::compute_standard_atmosphere(32000.0);
+        let speed_m_s = mach * atmos.speed_of_sound_m_s;
+        let res = atlas_simulation_core::hypersonic::scramjet::evaluate_scramjet_cycle(
+            mach,
+            speed_m_s,
+            atmos.temperature_k,
+            atmos.pressure_pa,
+            atmos.density_kg_m3,
+            3.65,
+            phi,
+        );
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_hypersonic_cryo(
+        &mut self,
+        req: &HypersonicCryoRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let fuel_mass = req.fuel_mass_kg.unwrap_or(16300.0);
+        let res = atlas_simulation_core::hypersonic::cryo::evaluate_cryogenic_system(
+            fuel_mass,
+            240.0,
+            4.93,
+        );
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_hypersonic_bom(&self) -> Result<serde_json::Value, StudioError> {
+        let res = atlas_simulation_core::hypersonic::bom::build_hypersonic_bom();
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_chemical(&mut self, req: &SimChemicalRequest) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::chemical::FlashProblem {
             temperature_k: req.temperature_k.unwrap_or(315.0),
@@ -4817,6 +4888,26 @@ namespace AtlasCAD.Unity
                     .map_err(|e| StudioError::BadRequest(e.to_string()))?;
                 serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))?
             }
+            "sim.hypersonic.plasma" => {
+                let mach = req.arguments.get("flight_mach").and_then(|v| v.as_f64());
+                let alt = req.arguments.get("altitude_m").and_then(|v| v.as_f64());
+                self.sim_hypersonic_plasma(&HypersonicPlasmaRequest { flight_mach: mach, altitude_m: alt })?
+            }
+            "sim.hypersonic.thermal" => {
+                let q = req.arguments.get("heat_flux_mw_m2").and_then(|v| v.as_f64());
+                let m_dot = req.arguments.get("coolant_flow_kg_s").and_then(|v| v.as_f64());
+                self.sim_hypersonic_thermal(&HypersonicThermalRequest { heat_flux_mw_m2: q, coolant_flow_kg_s: m_dot })?
+            }
+            "sim.hypersonic.scramjet" => {
+                let mach = req.arguments.get("flight_mach").and_then(|v| v.as_f64());
+                let phi = req.arguments.get("equivalence_ratio").and_then(|v| v.as_f64());
+                self.sim_hypersonic_scramjet(&HypersonicScramjetRequest { flight_mach: mach, equivalence_ratio: phi })?
+            }
+            "sim.hypersonic.cryo" => {
+                let fuel = req.arguments.get("fuel_mass_kg").and_then(|v| v.as_f64());
+                self.sim_hypersonic_cryo(&HypersonicCryoRequest { fuel_mass_kg: fuel })?
+            }
+            "sim.hypersonic.bom" => self.sim_hypersonic_bom()?,
             "sim.multiphysics_suite.solve" => self.sim_multiphysics_suite()?,
             "cam.toolpaths.generate" => serde_json::json!({
                 "status": "Generated",
@@ -5837,6 +5928,12 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
                 Err(error) => error_response(&error),
             }
         }
+        ("GET", "/api/sim/hypersonic/bom") => {
+            match with_state(state, |state| state.sim_hypersonic_bom()) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            }
+        }
         ("POST", path) if path.starts_with("/api/") => {
             match require_same_origin(request, port, shared).and_then(|()| require_json(request)) {
                 Ok(()) => post_route(state, request),
@@ -6483,6 +6580,38 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                 Ok(payload) => json_response(200, payload),
                 Err(error) => error_response(&error),
             },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/hypersonic/plasma" => match parse_body_or_default::<HypersonicPlasmaRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_hypersonic_plasma(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/hypersonic/thermal" => match parse_body_or_default::<HypersonicThermalRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_hypersonic_thermal(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/hypersonic/scramjet" => match parse_body_or_default::<HypersonicScramjetRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_hypersonic_scramjet(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/hypersonic/cryo" => match parse_body_or_default::<HypersonicCryoRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_hypersonic_cryo(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/hypersonic/bom" => match with_state(state, |state| state.sim_hypersonic_bom()) {
+            Ok(payload) => json_response(200, payload),
             Err(error) => error_response(&error),
         },
         "/api/sim/chemical" => match parse_body_or_default::<SimChemicalRequest>(request) {
@@ -8046,6 +8175,40 @@ struct HypersonicSimRequest {
     pub cruise_altitude_m: Option<f64>,
     #[serde(default)]
     pub angle_of_attack_deg: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HypersonicPlasmaRequest {
+    #[serde(default)]
+    pub flight_mach: Option<f64>,
+    #[serde(default)]
+    pub altitude_m: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HypersonicThermalRequest {
+    #[serde(default)]
+    pub heat_flux_mw_m2: Option<f64>,
+    #[serde(default)]
+    pub coolant_flow_kg_s: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HypersonicScramjetRequest {
+    #[serde(default)]
+    pub flight_mach: Option<f64>,
+    #[serde(default)]
+    pub equivalence_ratio: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HypersonicCryoRequest {
+    #[serde(default)]
+    pub fuel_mass_kg: Option<f64>,
 }
 
 #[derive(Debug, Default, Deserialize)]

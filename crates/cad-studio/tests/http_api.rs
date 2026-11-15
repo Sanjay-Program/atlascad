@@ -4440,6 +4440,53 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         .ok_or("fos")?;
     assert!(fos > 1.5);
 
+    // 31b. Hypersonic Subsystems: Plasma, Active Thermal, Scramjet, Cryo, and BOM
+    let plasma_resp = post(
+        addr,
+        "/api/sim/hypersonic/plasma",
+        r#"{"flight_mach": 11.0, "altitude_m": 32000.0}"#,
+    )?;
+    assert_eq!(plasma_resp.status, 200);
+    let plasma_json = json(&plasma_resp)?;
+    assert!(plasma_json["plasma_cutoff_freq_ghz"].as_f64().ok_or("fp")? > 10.0);
+    assert_eq!(plasma_json["is_rf_blackout"].as_bool(), Some(true));
+
+    let thermal_resp = post(
+        addr,
+        "/api/sim/hypersonic/thermal",
+        r#"{"heat_flux_mw_m2": 1.45, "coolant_flow_kg_s": 4.93}"#,
+    )?;
+    assert_eq!(thermal_resp.status, 200);
+    let thermal_json = json(&thermal_resp)?;
+    assert!(thermal_json["coolant_htc_w_m2_k"].as_f64().ok_or("htc")? > 10_000.0);
+    assert!(thermal_json["substrate_thermal_margin_c"].as_f64().ok_or("margin")? > 0.0);
+
+    let scram_resp = post(
+        addr,
+        "/api/sim/hypersonic/scramjet",
+        r#"{"flight_mach": 11.0, "equivalence_ratio": 1.05}"#,
+    )?;
+    assert_eq!(scram_resp.status, 200);
+    let scram_json = json(&scram_resp)?;
+    assert!(scram_json["isolator_unstart_margin"].as_f64().ok_or("margin")? > 1.20);
+    assert!(scram_json["combustion_efficiency_pct"].as_f64().ok_or("eff")? > 80.0);
+
+    let cryo_resp = post(
+        addr,
+        "/api/sim/hypersonic/cryo",
+        r#"{"fuel_mass_kg": 16300.0}"#,
+    )?;
+    assert_eq!(cryo_resp.status, 200);
+    let cryo_json = json(&cryo_resp)?;
+    assert!(cryo_json["cavitation_safety_margin"].as_f64().ok_or("cav")? > 1.50);
+    assert!(cryo_json["boil_off_rate_pct_day"].as_f64().ok_or("boil")? < 1.0);
+
+    let bom_resp = get(addr, "/api/sim/hypersonic/bom")?;
+    assert_eq!(bom_resp.status, 200);
+    let bom_json = json(&bom_resp)?;
+    assert_eq!(bom_json["component_count"].as_u64(), Some(21));
+    assert!(bom_json["dry_weight_kg"].as_f64().ok_or("dry")? > 15_000.0);
+
     // 32. DaVinci Resolve Timeline & VFX Bundle Exporter
     let davinci_resp = get(addr, "/api/export/davinci")?;
     assert_eq!(davinci_resp.status, 200);
