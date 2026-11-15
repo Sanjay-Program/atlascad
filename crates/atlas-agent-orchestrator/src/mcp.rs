@@ -1259,6 +1259,83 @@ impl McpServer {
                     "required": ["length_bp_m", "beam_m", "draft_m", "vertical_center_of_gravity_kg_m"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_manufacturing_injection_molding".into(),
+                description: "ISO 294 / SPE plastic injection molding cavity filling pressure, Ballman-Shusman 1D transient cooling time, cycle time, and machine clamp tonnage".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "resin": { "type": "string", "default": "ABS" },
+                        "nominal_wall_thickness_mm": { "type": "number", "default": 2.5 },
+                        "projected_area_cm2": { "type": "number", "default": 180.0 },
+                        "cavity_volume_cm3": { "type": "number", "default": 112.5 },
+                        "max_flow_length_mm": { "type": "number", "default": 175.0 },
+                        "injection_time_s": { "type": "number", "default": 1.5 },
+                        "cavity_count": { "type": "integer", "default": 2 }
+                    },
+                    "required": ["nominal_wall_thickness_mm", "projected_area_cm2", "cavity_volume_cm3"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_civil_seismic_analysis".into(),
+                description: "ASCE 7-22 / Eurocode 8 structural seismic equivalent lateral force procedure, design response spectrum, fundamental period, base shear Vb, story forces, and roof drift".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "building_height_m": { "type": "number", "default": 36.0 },
+                        "story_count": { "type": "integer", "default": 10 },
+                        "total_seismic_weight_kn": { "type": "number", "default": 58000.0 },
+                        "short_period_spectral_accel_ss_g": { "type": "number", "default": 1.20 },
+                        "one_second_spectral_accel_s1_g": { "type": "number", "default": 0.48 }
+                    },
+                    "required": ["building_height_m", "story_count", "total_seismic_weight_kn"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_aerospace_orbital_mechanics".into(),
+                description: "Curtis / Vallado Keplerian two-body orbital mechanics, two-impulse Hohmann transfer delta-V, transfer time of flight, Tsiolkovsky propellant mass, and J2 nodal precession".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "initial_altitude_km": { "type": "number", "default": 400.0 },
+                        "target_altitude_km": { "type": "number", "default": 35786.0 },
+                        "spacecraft_wet_mass_kg": { "type": "number", "default": 3500.0 },
+                        "propulsion_isp_s": { "type": "number", "default": 318.0 },
+                        "inclination_deg": { "type": "number", "default": 28.5 }
+                    },
+                    "required": ["initial_altitude_km", "target_altitude_km", "spacecraft_wet_mass_kg"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_electronics_dc_dc_converter".into(),
+                description: "Synchronous DC-DC buck converter SMPS power stage, duty cycle, inductor ripple, output capacitor ESR ripple, MOSFET conduction and switching losses, and efficiency".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "input_voltage_v": { "type": "number", "default": 12.0 },
+                        "output_voltage_v": { "type": "number", "default": 3.3 },
+                        "rated_output_current_a": { "type": "number", "default": 20.0 },
+                        "switching_frequency_hz": { "type": "number", "default": 500000.0 }
+                    },
+                    "required": ["input_voltage_v", "output_voltage_v", "rated_output_current_a"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_science_fusion_tokamak".into(),
+                description: "Wesson / ITER thermonuclear D-T tokamak plasma equilibrium, safety factor q95, Troyon beta limit, Greenwald density limit, IPB98(y,2) confinement scaling, and fusion gain Q".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "major_radius_r0_m": { "type": "number", "default": 6.20 },
+                        "minor_radius_a_m": { "type": "number", "default": 2.00 },
+                        "toroidal_magnetic_field_t": { "type": "number", "default": 5.30 },
+                        "plasma_current_ma": { "type": "number", "default": 15.0 },
+                        "electron_density_10e20_m3": { "type": "number", "default": 1.01 },
+                        "plasma_temperature_kev": { "type": "number", "default": 13.0 }
+                    },
+                    "required": ["major_radius_r0_m", "minor_radius_a_m", "toroidal_magnetic_field_t", "plasma_current_ma"]
+                }),
+            },
         ]
     }
 

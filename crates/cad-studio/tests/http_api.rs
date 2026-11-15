@@ -6266,5 +6266,135 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 127. Plastic Injection Molding Process Physics & Clamp Tonnage (ISO 294 / SPE)
+    let res_molding = post(
+        addr,
+        "/api/sim/manufacturing/injection_molding",
+        r#"{
+            "resin": "ABS",
+            "nominal_wall_thickness_mm": 2.50,
+            "projected_area_cm2": 180.0,
+            "cavity_volume_cm3": 112.5,
+            "max_flow_length_mm": 175.0,
+            "cavity_count": 2
+        }"#,
+    )?;
+    assert_eq!(res_molding.status, 200);
+    let mold_json = json(&res_molding)?;
+    assert!(mold_json["cooling_time_s"].as_f64().unwrap() > 5.0);
+    assert!(mold_json["peak_cavity_pressure_bar"].as_f64().unwrap() > 200.0);
+    assert!(mold_json["recommended_clamp_tonnage_t"].as_f64().unwrap() > 80.0);
+    assert!(mold_json["is_safe"].as_bool().unwrap());
+
+    // 128. Structural Seismic Response Spectrum & Base Shear (ASCE 7-22 / Eurocode 8)
+    let res_seismic = post(
+        addr,
+        "/api/sim/civil/seismic_analysis",
+        r#"{
+            "building_height_m": 36.0,
+            "story_count": 10,
+            "total_seismic_weight_kn": 58000.0,
+            "short_period_spectral_accel_ss_g": 1.20,
+            "one_second_spectral_accel_s1_g": 0.48
+        }"#,
+    )?;
+    assert_eq!(res_seismic.status, 200);
+    let seis_json = json(&res_seismic)?;
+    assert!(seis_json["fundamental_period_ta_s"].as_f64().unwrap() > 0.8);
+    assert!(seis_json["total_base_shear_kn"].as_f64().unwrap() > 2000.0);
+    assert!(seis_json["base_overturning_moment_kn_m"].as_f64().unwrap() > 50000.0);
+    assert!(seis_json["is_safe"].as_bool().unwrap());
+
+    // 129. Spacecraft Orbital Mechanics & Hohmann Transfer (Curtis / Vallado)
+    let res_orbit = post(
+        addr,
+        "/api/sim/aerospace/orbital_mechanics",
+        r#"{
+            "initial_altitude_km": 400.0,
+            "target_altitude_km": 35786.0,
+            "spacecraft_wet_mass_kg": 3500.0,
+            "propulsion_isp_s": 318.0
+        }"#,
+    )?;
+    assert_eq!(res_orbit.status, 200);
+    let orbit_json = json(&res_orbit)?;
+    assert!(orbit_json["initial_orbital_speed_m_s"].as_f64().unwrap() > 7600.0);
+    assert!(orbit_json["total_delta_v_m_s"].as_f64().unwrap() > 3800.0);
+    assert!(orbit_json["transfer_time_of_flight_h"].as_f64().unwrap() > 5.0);
+    assert!(orbit_json["required_propellant_mass_kg"].as_f64().unwrap() > 2000.0);
+    assert!(orbit_json["is_safe"].as_bool().unwrap());
+
+    // 130. Synchronous DC-DC Buck Converter Power Stage & Efficiency (IEEE / Erickson)
+    let res_smps = post(
+        addr,
+        "/api/sim/electronics/dc_dc_converter",
+        r#"{
+            "input_voltage_v": 12.0,
+            "output_voltage_v": 3.3,
+            "rated_output_current_a": 20.0,
+            "switching_frequency_hz": 500000.0
+        }"#,
+    )?;
+    assert_eq!(res_smps.status, 200);
+    let smps_json = json(&res_smps)?;
+    assert!(smps_json["duty_cycle"].as_f64().unwrap() > 0.25);
+    assert!(smps_json["output_power_w"].as_f64().unwrap() > 60.0);
+    assert!(smps_json["efficiency_pct"].as_f64().unwrap() > 90.0);
+    assert!(smps_json["is_safe"].as_bool().unwrap());
+
+    // 131. Nuclear Fusion Tokamak Plasma Equilibrium & Confinement (Wesson / ITER)
+    let res_fusion = post(
+        addr,
+        "/api/sim/science/fusion_tokamak",
+        r#"{
+            "major_radius_r0_m": 6.20,
+            "minor_radius_a_m": 2.00,
+            "toroidal_magnetic_field_t": 5.30,
+            "plasma_current_ma": 15.0,
+            "electron_density_10e20_m3": 1.01,
+            "plasma_temperature_kev": 13.0
+        }"#,
+    )?;
+    assert_eq!(res_fusion.status, 200);
+    let fusion_json = json(&res_fusion)?;
+    assert!(fusion_json["safety_factor_q95"].as_f64().unwrap() > 2.8);
+    assert!(fusion_json["stored_thermal_energy_mj"].as_f64().unwrap() > 200.0);
+    assert!(fusion_json["fusion_power_mw"].as_f64().unwrap() > 300.0);
+    assert!(fusion_json["fusion_gain_factor_q"].as_f64().unwrap() > 5.0);
+    assert!(fusion_json["is_safe"].as_bool().unwrap());
+
+    // 132. Universal Commands Execution Verification (Batch 11 Domains)
+    for cmd_id in [
+        "sim.manufacturing.injection_molding",
+        "sim.civil.seismic_analysis",
+        "sim.aerospace.orbital_mechanics",
+        "sim.electronics.dc_dc_converter",
+        "sim.science.fusion_tokamak",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 133. Enterprise MCP Tool Calling (Batch 11 Domains)
+    for tool_name in [
+        "atlas_sim_manufacturing_injection_molding",
+        "atlas_sim_civil_seismic_analysis",
+        "atlas_sim_aerospace_orbital_mechanics",
+        "atlas_sim_electronics_dc_dc_converter",
+        "atlas_sim_science_fusion_tokamak",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 164, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

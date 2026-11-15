@@ -3358,5 +3358,215 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.manufacturing.injection_molding",
+            "Plastic Injection Molding Process Physics & Clamp Tonnage (ISO 294 / SPE)",
+            "Evaluates polymer melt cavity filling pressure, Fourier 1D transient cooling time, part cycle time, and machine clamping force requirement.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "nominal_wall_thickness_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Nominal part wall thickness in millimeters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(2.5)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(50.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "projected_area_cm2".into(),
+            arg_type: ArgumentType::Number,
+            description: "Total projected cavity area in cm²".into(),
+            required: true,
+            default_value: Some(serde_json::json!(180.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(50000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "cavity_volume_cm3".into(),
+            arg_type: ArgumentType::Number,
+            description: "Part cavity volume in cm³".into(),
+            required: true,
+            default_value: Some(serde_json::json!(112.5)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(100000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "max_flow_length_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Maximum flow length from gate in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(175.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(5000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.civil.seismic_analysis",
+            "Structural Seismic Response Spectrum & Base Shear (ASCE 7-22 / Eurocode 8)",
+            "Evaluates building equivalent lateral force (ELF) procedure, design response spectrum, fundamental period, base shear Vb, story shear distribution, and roof drift.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "building_height_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Total building height above ground grade in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(36.0)),
+            validation_rules: vec![ValidationRule::Min(2.0), ValidationRule::Max(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "story_count".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Total number of stories above base".into(),
+            required: true,
+            default_value: Some(serde_json::json!(10)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(200.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "total_seismic_weight_kn".into(),
+            arg_type: ArgumentType::Number,
+            description: "Effective total building seismic weight in kN".into(),
+            required: true,
+            default_value: Some(serde_json::json!(58000.0)),
+            validation_rules: vec![ValidationRule::Min(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "short_period_spectral_accel_ss_g".into(),
+            arg_type: ArgumentType::Number,
+            description: "Mapped short-period spectral acceleration Ss (g)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1.20)),
+            validation_rules: vec![ValidationRule::Min(0.01), ValidationRule::Max(5.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.aerospace.orbital_mechanics",
+            "Spacecraft Orbital Mechanics & Hohmann Transfer (Curtis / Vallado)",
+            "Evaluates circular orbit velocities, semi-major axis, two-impulse Hohmann transfer delta-V budget, time of flight, Tsiolkovsky propellant mass, and J2 nodal precession.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "initial_altitude_km".into(),
+            arg_type: ArgumentType::Number,
+            description: "Initial parking orbit altitude above Earth in km".into(),
+            required: true,
+            default_value: Some(serde_json::json!(400.0)),
+            validation_rules: vec![ValidationRule::Min(120.0), ValidationRule::Max(200000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "target_altitude_km".into(),
+            arg_type: ArgumentType::Number,
+            description: "Target orbit altitude above Earth in km".into(),
+            required: true,
+            default_value: Some(serde_json::json!(35786.0)),
+            validation_rules: vec![ValidationRule::Min(120.0), ValidationRule::Max(500000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "spacecraft_wet_mass_kg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Initial wet spacecraft mass in kilograms".into(),
+            required: true,
+            default_value: Some(serde_json::json!(3500.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(500000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "propulsion_isp_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rocket engine effective specific impulse Isp (seconds)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(318.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(5000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.electronics.dc_dc_converter",
+            "Synchronous DC-DC Buck Converter Power Stage & Efficiency (IEEE / Erickson)",
+            "Evaluates SMPS pulse-width modulation duty cycle, inductor ripple current, output voltage ripple, MOSFET conduction and switching losses, and overall conversion efficiency.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "input_voltage_v".into(),
+            arg_type: ArgumentType::Number,
+            description: "Nominal DC input supply voltage in Volts".into(),
+            required: true,
+            default_value: Some(serde_json::json!(12.0)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(1500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "output_voltage_v".into(),
+            arg_type: ArgumentType::Number,
+            description: "Regulated DC output load voltage in Volts".into(),
+            required: true,
+            default_value: Some(serde_json::json!(3.3)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rated_output_current_a".into(),
+            arg_type: ArgumentType::Number,
+            description: "Continuous DC output load current in Amperes".into(),
+            required: true,
+            default_value: Some(serde_json::json!(20.0)),
+            validation_rules: vec![ValidationRule::Min(0.01), ValidationRule::Max(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "switching_frequency_hz".into(),
+            arg_type: ArgumentType::Number,
+            description: "PWM switching frequency in Hertz".into(),
+            required: false,
+            default_value: Some(serde_json::json!(500000.0)),
+            validation_rules: vec![ValidationRule::Min(1000.0), ValidationRule::Max(10000000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.science.fusion_tokamak",
+            "Nuclear Fusion Tokamak Plasma Equilibrium & Confinement (Wesson / ITER)",
+            "Evaluates D-T fusion reaction thermal power, edge safety factor q95, Troyon beta limit, Greenwald density limit, IPB98(y,2) H-mode energy confinement time, and fusion gain factor Q.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "major_radius_r0_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Plasma toroidal major radius in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(6.20)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(50.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "minor_radius_a_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Plasma poloidal minor radius in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(2.00)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(20.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "toroidal_magnetic_field_t".into(),
+            arg_type: ArgumentType::Number,
+            description: "On-axis toroidal magnetic field in Tesla".into(),
+            required: true,
+            default_value: Some(serde_json::json!(5.30)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(30.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "plasma_current_ma".into(),
+            arg_type: ArgumentType::Number,
+            description: "Total toroidal plasma current in MegaAmperes".into(),
+            required: true,
+            default_value: Some(serde_json::json!(15.0)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(100.0)],
+        }),
+    )?;
+
     Ok(())
 }

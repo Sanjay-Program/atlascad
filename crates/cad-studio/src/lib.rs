@@ -5518,6 +5518,132 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_manufacturing_injection_molding(
+        &mut self,
+        req: &SimInjectionMoldingRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let resin = match req.resin.as_deref().unwrap_or("ABS") {
+            "Polypropylene" | "PP" => atlas_simulation_core::injection_molding::PolymerResin::Polypropylene,
+            "Polyamide66" | "PA66" => atlas_simulation_core::injection_molding::PolymerResin::Polyamide66,
+            "Polycarbonate" | "PC" => atlas_simulation_core::injection_molding::PolymerResin::Polycarbonate,
+            "Polyoxymethylene" | "POM" => atlas_simulation_core::injection_molding::PolymerResin::Polyoxymethylene,
+            _ => atlas_simulation_core::injection_molding::PolymerResin::ABS,
+        };
+        let prob = atlas_simulation_core::injection_molding::InjectionMoldingProblem {
+            problem_id: "injection_molding_sim".to_string(),
+            resin,
+            nominal_wall_thickness_mm: req.nominal_wall_thickness_mm.unwrap_or(2.50),
+            projected_area_cm2: req.projected_area_cm2.unwrap_or(180.0),
+            cavity_volume_cm3: req.cavity_volume_cm3.unwrap_or(112.5),
+            max_flow_length_mm: req.max_flow_length_mm.unwrap_or(175.0),
+            injection_time_s: req.injection_time_s.unwrap_or(1.5),
+            cavity_count: req.cavity_count.unwrap_or(2),
+            clamp_safety_factor: req.clamp_safety_factor.unwrap_or(1.20),
+        };
+        let res = atlas_simulation_core::injection_molding::solve_injection_molding(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_civil_seismic_analysis(
+        &mut self,
+        req: &SimSeismicAnalysisRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let site = match req.site_class.as_deref().unwrap_or("ClassD") {
+            "ClassA" => atlas_simulation_core::seismic_analysis::SeismicSiteClass::ClassA,
+            "ClassB" => atlas_simulation_core::seismic_analysis::SeismicSiteClass::ClassB,
+            "ClassC" => atlas_simulation_core::seismic_analysis::SeismicSiteClass::ClassC,
+            "ClassE" => atlas_simulation_core::seismic_analysis::SeismicSiteClass::ClassE,
+            _ => atlas_simulation_core::seismic_analysis::SeismicSiteClass::ClassD,
+        };
+        let framing = match req.framing_system.as_deref().unwrap_or("SteelSpecialMomentFrame") {
+            "ConcreteSpecialShearWall" => atlas_simulation_core::seismic_analysis::SeismicFramingSystem::ConcreteSpecialShearWall,
+            "SteelBucklingRestrainedBracedFrame" => atlas_simulation_core::seismic_analysis::SeismicFramingSystem::SteelBucklingRestrainedBracedFrame,
+            "SteelOrdinaryBracedFrame" => atlas_simulation_core::seismic_analysis::SeismicFramingSystem::SteelOrdinaryBracedFrame,
+            _ => atlas_simulation_core::seismic_analysis::SeismicFramingSystem::SteelSpecialMomentFrame,
+        };
+        let prob = atlas_simulation_core::seismic_analysis::SeismicAnalysisProblem {
+            problem_id: "seismic_analysis_sim".to_string(),
+            building_height_m: req.building_height_m.unwrap_or(36.0),
+            story_count: req.story_count.unwrap_or(10),
+            total_seismic_weight_kn: req.total_seismic_weight_kn.unwrap_or(58000.0),
+            short_period_spectral_accel_ss_g: req.short_period_spectral_accel_ss_g.unwrap_or(1.20),
+            one_second_spectral_accel_s1_g: req.one_second_spectral_accel_s1_g.unwrap_or(0.48),
+            long_period_transition_tl_s: req.long_period_transition_tl_s.unwrap_or(8.0),
+            site_class: site,
+            framing_system: framing,
+            importance_factor_ie: req.importance_factor_ie.unwrap_or(1.0),
+        };
+        let res = atlas_simulation_core::seismic_analysis::solve_seismic_analysis(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_aerospace_orbital_mechanics(
+        &mut self,
+        req: &SimOrbitalMechanicsRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::orbital_mechanics::OrbitalMechanicsProblem {
+            problem_id: "orbital_mechanics_sim".to_string(),
+            initial_altitude_km: req.initial_altitude_km.unwrap_or(400.0),
+            target_altitude_km: req.target_altitude_km.unwrap_or(35786.0),
+            spacecraft_wet_mass_kg: req.spacecraft_wet_mass_kg.unwrap_or(3500.0),
+            propulsion_isp_s: req.propulsion_isp_s.unwrap_or(318.0),
+            inclination_deg: req.inclination_deg.unwrap_or(28.5),
+        };
+        let res = atlas_simulation_core::orbital_mechanics::solve_orbital_mechanics(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_electronics_dc_dc_converter(
+        &mut self,
+        req: &SimDcDcConverterRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::dc_dc_converter::DcDcConverterProblem {
+            problem_id: "dc_dc_converter_sim".to_string(),
+            input_voltage_v: req.input_voltage_v.unwrap_or(12.0),
+            output_voltage_v: req.output_voltage_v.unwrap_or(3.3),
+            rated_output_current_a: req.rated_output_current_a.unwrap_or(20.0),
+            switching_frequency_hz: req.switching_frequency_hz.unwrap_or(500_000.0),
+            inductor_ripple_ratio: req.inductor_ripple_ratio.unwrap_or(0.30),
+            inductor_dcr_ohms: req.inductor_dcr_ohms.unwrap_or(0.0025),
+            high_side_rds_on_ohms: req.high_side_rds_on_ohms.unwrap_or(0.0045),
+            low_side_rds_on_ohms: req.low_side_rds_on_ohms.unwrap_or(0.0018),
+            high_side_qg_nc: req.high_side_qg_nc.unwrap_or(14.0),
+            low_side_qg_nc: req.low_side_qg_nc.unwrap_or(32.0),
+            switching_transition_time_ns: req.switching_transition_time_ns.unwrap_or(18.0),
+            gate_drive_voltage_v: req.gate_drive_voltage_v.unwrap_or(5.0),
+            output_capacitance_uf: req.output_capacitance_uf.unwrap_or(200.0),
+            output_capacitor_esr_ohms: req.output_capacitor_esr_ohms.unwrap_or(0.002),
+        };
+        let res = atlas_simulation_core::dc_dc_converter::solve_dc_dc_converter(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_science_fusion_tokamak(
+        &mut self,
+        req: &SimFusionTokamakRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::fusion_tokamak::FusionTokamakProblem {
+            problem_id: "fusion_tokamak_sim".to_string(),
+            major_radius_r0_m: req.major_radius_r0_m.unwrap_or(6.20),
+            minor_radius_a_m: req.minor_radius_a_m.unwrap_or(2.00),
+            elongation_kappa: req.elongation_kappa.unwrap_or(1.75),
+            triangularity_delta: req.triangularity_delta.unwrap_or(0.33),
+            toroidal_magnetic_field_t: req.toroidal_magnetic_field_t.unwrap_or(5.30),
+            plasma_current_ma: req.plasma_current_ma.unwrap_or(15.0),
+            electron_density_10e20_m3: req.electron_density_10e20_m3.unwrap_or(1.01),
+            plasma_temperature_kev: req.plasma_temperature_kev.unwrap_or(13.0),
+            auxiliary_heating_power_mw: req.auxiliary_heating_power_mw.unwrap_or(50.0),
+            average_ion_mass_amu: req.average_ion_mass_amu.unwrap_or(2.50),
+        };
+        let res = atlas_simulation_core::fusion_tokamak::solve_fusion_tokamak(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -7543,6 +7669,75 @@ namespace AtlasCAD.Unity
                     molded_beam_m: b,
                     design_draft_m: t,
                     vertical_center_of_gravity_kg_m: kg,
+                    ..Default::default()
+                })?
+            }
+            "sim.manufacturing.injection_molding" => {
+                let resin = req.arguments.get("resin").and_then(|v| v.as_str()).map(|s| s.to_string());
+                let h = req.arguments.get("nominal_wall_thickness_mm").and_then(|v| v.as_f64());
+                let a = req.arguments.get("projected_area_cm2").and_then(|v| v.as_f64());
+                let vol = req.arguments.get("cavity_volume_cm3").and_then(|v| v.as_f64());
+                let l = req.arguments.get("max_flow_length_mm").and_then(|v| v.as_f64());
+                self.sim_manufacturing_injection_molding(&SimInjectionMoldingRequest {
+                    resin,
+                    nominal_wall_thickness_mm: h,
+                    projected_area_cm2: a,
+                    cavity_volume_cm3: vol,
+                    max_flow_length_mm: l,
+                    ..Default::default()
+                })?
+            }
+            "sim.civil.seismic_analysis" => {
+                let hn = req.arguments.get("building_height_m").and_then(|v| v.as_f64());
+                let n = req.arguments.get("story_count").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let w = req.arguments.get("total_seismic_weight_kn").and_then(|v| v.as_f64());
+                let ss = req.arguments.get("short_period_spectral_accel_ss_g").and_then(|v| v.as_f64());
+                let s1 = req.arguments.get("one_second_spectral_accel_s1_g").and_then(|v| v.as_f64());
+                self.sim_civil_seismic_analysis(&SimSeismicAnalysisRequest {
+                    building_height_m: hn,
+                    story_count: n,
+                    total_seismic_weight_kn: w,
+                    short_period_spectral_accel_ss_g: ss,
+                    one_second_spectral_accel_s1_g: s1,
+                    ..Default::default()
+                })?
+            }
+            "sim.aerospace.orbital_mechanics" => {
+                let h1 = req.arguments.get("initial_altitude_km").and_then(|v| v.as_f64());
+                let h2 = req.arguments.get("target_altitude_km").and_then(|v| v.as_f64());
+                let m = req.arguments.get("spacecraft_wet_mass_kg").and_then(|v| v.as_f64());
+                let isp = req.arguments.get("propulsion_isp_s").and_then(|v| v.as_f64());
+                self.sim_aerospace_orbital_mechanics(&SimOrbitalMechanicsRequest {
+                    initial_altitude_km: h1,
+                    target_altitude_km: h2,
+                    spacecraft_wet_mass_kg: m,
+                    propulsion_isp_s: isp,
+                    ..Default::default()
+                })?
+            }
+            "sim.electronics.dc_dc_converter" => {
+                let vin = req.arguments.get("input_voltage_v").and_then(|v| v.as_f64());
+                let vout = req.arguments.get("output_voltage_v").and_then(|v| v.as_f64());
+                let iout = req.arguments.get("rated_output_current_a").and_then(|v| v.as_f64());
+                let fsw = req.arguments.get("switching_frequency_hz").and_then(|v| v.as_f64());
+                self.sim_electronics_dc_dc_converter(&SimDcDcConverterRequest {
+                    input_voltage_v: vin,
+                    output_voltage_v: vout,
+                    rated_output_current_a: iout,
+                    switching_frequency_hz: fsw,
+                    ..Default::default()
+                })?
+            }
+            "sim.science.fusion_tokamak" => {
+                let r0 = req.arguments.get("major_radius_r0_m").and_then(|v| v.as_f64());
+                let a = req.arguments.get("minor_radius_a_m").and_then(|v| v.as_f64());
+                let bt = req.arguments.get("toroidal_magnetic_field_t").and_then(|v| v.as_f64());
+                let ip = req.arguments.get("plasma_current_ma").and_then(|v| v.as_f64());
+                self.sim_science_fusion_tokamak(&SimFusionTokamakRequest {
+                    major_radius_r0_m: r0,
+                    minor_radius_a_m: a,
+                    toroidal_magnetic_field_t: bt,
+                    plasma_current_ma: ip,
                     ..Default::default()
                 })?
             }
@@ -9644,6 +9839,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/marine/ship_stability" => {
             match parse_body_or_default::<SimShipStabilityRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_marine_ship_stability(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/manufacturing/injection_molding" => {
+            match parse_body_or_default::<SimInjectionMoldingRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_manufacturing_injection_molding(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/civil/seismic_analysis" => {
+            match parse_body_or_default::<SimSeismicAnalysisRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_civil_seismic_analysis(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/aerospace/orbital_mechanics" => {
+            match parse_body_or_default::<SimOrbitalMechanicsRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_aerospace_orbital_mechanics(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/electronics/dc_dc_converter" => {
+            match parse_body_or_default::<SimDcDcConverterRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_electronics_dc_dc_converter(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/science/fusion_tokamak" => {
+            match parse_body_or_default::<SimFusionTokamakRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_science_fusion_tokamak(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -13062,4 +13302,116 @@ struct SimShipStabilityRequest {
     pub waterplane_coefficient_cwp: Option<f64>,
     #[serde(default)]
     pub vertical_center_of_gravity_kg_m: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimInjectionMoldingRequest {
+    #[serde(default)]
+    pub resin: Option<String>,
+    #[serde(default)]
+    pub nominal_wall_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub projected_area_cm2: Option<f64>,
+    #[serde(default)]
+    pub cavity_volume_cm3: Option<f64>,
+    #[serde(default)]
+    pub max_flow_length_mm: Option<f64>,
+    #[serde(default)]
+    pub injection_time_s: Option<f64>,
+    #[serde(default)]
+    pub cavity_count: Option<usize>,
+    #[serde(default)]
+    pub clamp_safety_factor: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimSeismicAnalysisRequest {
+    #[serde(default)]
+    pub building_height_m: Option<f64>,
+    #[serde(default)]
+    pub story_count: Option<usize>,
+    #[serde(default)]
+    pub total_seismic_weight_kn: Option<f64>,
+    #[serde(default)]
+    pub short_period_spectral_accel_ss_g: Option<f64>,
+    #[serde(default)]
+    pub one_second_spectral_accel_s1_g: Option<f64>,
+    #[serde(default)]
+    pub long_period_transition_tl_s: Option<f64>,
+    #[serde(default)]
+    pub site_class: Option<String>,
+    #[serde(default)]
+    pub framing_system: Option<String>,
+    #[serde(default)]
+    pub importance_factor_ie: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimOrbitalMechanicsRequest {
+    #[serde(default)]
+    pub initial_altitude_km: Option<f64>,
+    #[serde(default)]
+    pub target_altitude_km: Option<f64>,
+    #[serde(default)]
+    pub spacecraft_wet_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub propulsion_isp_s: Option<f64>,
+    #[serde(default)]
+    pub inclination_deg: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimDcDcConverterRequest {
+    #[serde(default)]
+    pub input_voltage_v: Option<f64>,
+    #[serde(default)]
+    pub output_voltage_v: Option<f64>,
+    #[serde(default)]
+    pub rated_output_current_a: Option<f64>,
+    #[serde(default)]
+    pub switching_frequency_hz: Option<f64>,
+    #[serde(default)]
+    pub inductor_ripple_ratio: Option<f64>,
+    #[serde(default)]
+    pub inductor_dcr_ohms: Option<f64>,
+    #[serde(default)]
+    pub high_side_rds_on_ohms: Option<f64>,
+    #[serde(default)]
+    pub low_side_rds_on_ohms: Option<f64>,
+    #[serde(default)]
+    pub high_side_qg_nc: Option<f64>,
+    #[serde(default)]
+    pub low_side_qg_nc: Option<f64>,
+    #[serde(default)]
+    pub switching_transition_time_ns: Option<f64>,
+    #[serde(default)]
+    pub gate_drive_voltage_v: Option<f64>,
+    #[serde(default)]
+    pub output_capacitance_uf: Option<f64>,
+    #[serde(default)]
+    pub output_capacitor_esr_ohms: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimFusionTokamakRequest {
+    #[serde(default)]
+    pub major_radius_r0_m: Option<f64>,
+    #[serde(default)]
+    pub minor_radius_a_m: Option<f64>,
+    #[serde(default)]
+    pub elongation_kappa: Option<f64>,
+    #[serde(default)]
+    pub triangularity_delta: Option<f64>,
+    #[serde(default)]
+    pub toroidal_magnetic_field_t: Option<f64>,
+    #[serde(default)]
+    pub plasma_current_ma: Option<f64>,
+    #[serde(default)]
+    pub electron_density_10e20_m3: Option<f64>,
+    #[serde(default)]
+    pub plasma_temperature_kev: Option<f64>,
+    #[serde(default)]
+    pub auxiliary_heating_power_mw: Option<f64>,
+    #[serde(default)]
+    pub average_ion_mass_amu: Option<f64>,
 }

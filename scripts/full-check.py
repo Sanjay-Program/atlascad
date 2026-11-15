@@ -1587,6 +1587,78 @@ def simulation_section(studio: Studio) -> None:
     check(ship_data.get("initial_metacentric_height_gm0_m", 0.0) > 1.0, "initial GM0 > 1.0 m")
     check(ship_data.get("max_gz_righting_arm_m", 0.0) > 0.5, "maximum GZ righting arm > 0.5 m")
     check(ship_data.get("is_safe", False) is True, "ship complies with IMO MSC.267(85) intact stability")
+
+    # 55. Plastic Injection Molding Process Physics & Clamp Tonnage (ISO 294 / SPE)
+    molding = studio.post("/api/sim/manufacturing/injection_molding", {
+        "resin": "ABS",
+        "nominal_wall_thickness_mm": 2.50,
+        "projected_area_cm2": 180.0,
+        "cavity_volume_cm3": 112.5,
+        "max_flow_length_mm": 175.0,
+        "cavity_count": 2
+    })
+    check(molding.status == 200, f"injection molding returns 200 (got {molding.status})")
+    molding_data = molding.json()
+    check(molding_data.get("cooling_time_s", 0.0) > 5.0, "cooling time > 5.0 s")
+    check(molding_data.get("peak_cavity_pressure_bar", 0.0) > 200.0, "peak cavity pressure > 200 bar")
+    check(molding_data.get("recommended_clamp_tonnage_t", 0.0) > 80.0, "recommended clamp tonnage > 80 tonnes")
+
+    # 56. Structural Seismic Response Spectrum & Base Shear (ASCE 7-22 / Eurocode 8)
+    seismic = studio.post("/api/sim/civil/seismic_analysis", {
+        "building_height_m": 36.0,
+        "story_count": 10,
+        "total_seismic_weight_kn": 58000.0,
+        "short_period_spectral_accel_ss_g": 1.20,
+        "one_second_spectral_accel_s1_g": 0.48
+    })
+    check(seismic.status == 200, f"seismic analysis returns 200 (got {seismic.status})")
+    seis_data = seismic.json()
+    check(seis_data.get("fundamental_period_ta_s", 0.0) > 0.8, "fundamental period > 0.8 s")
+    check(seis_data.get("total_base_shear_kn", 0.0) > 2000.0, "base shear Vb > 2000 kN")
+    check(seis_data.get("base_overturning_moment_kn_m", 0.0) > 50000.0, "overturning moment > 50000 kN·m")
+
+    # 57. Spacecraft Orbital Mechanics & Hohmann Transfer (Curtis / Vallado)
+    orbit = studio.post("/api/sim/aerospace/orbital_mechanics", {
+        "initial_altitude_km": 400.0,
+        "target_altitude_km": 35786.0,
+        "spacecraft_wet_mass_kg": 3500.0,
+        "propulsion_isp_s": 318.0
+    })
+    check(orbit.status == 200, f"orbital mechanics returns 200 (got {orbit.status})")
+    orbit_data = orbit.json()
+    check(orbit_data.get("initial_orbital_speed_m_s", 0.0) > 7600.0, "initial circular speed > 7600 m/s")
+    check(orbit_data.get("total_delta_v_m_s", 0.0) > 3800.0, "coplanar delta-V > 3800 m/s")
+    check(orbit_data.get("transfer_time_of_flight_h", 0.0) > 5.0, "time of flight > 5.0 h")
+
+    # 58. Synchronous DC-DC Buck Converter Power Stage & Efficiency (IEEE / Erickson)
+    smps = studio.post("/api/sim/electronics/dc_dc_converter", {
+        "input_voltage_v": 12.0,
+        "output_voltage_v": 3.3,
+        "rated_output_current_a": 20.0,
+        "switching_frequency_hz": 500000.0
+    })
+    check(smps.status == 200, f"DC-DC converter returns 200 (got {smps.status})")
+    smps_data = smps.json()
+    check(smps_data.get("duty_cycle", 0.0) > 0.25, "duty cycle > 0.25")
+    check(smps_data.get("output_power_w", 0.0) > 60.0, "output power > 60 W")
+    check(smps_data.get("efficiency_pct", 0.0) > 90.0, "full load efficiency > 90.0%")
+
+    # 59. Nuclear Fusion Tokamak Plasma Equilibrium & Confinement (Wesson / ITER)
+    fusion = studio.post("/api/sim/science/fusion_tokamak", {
+        "major_radius_r0_m": 6.20,
+        "minor_radius_a_m": 2.00,
+        "toroidal_magnetic_field_t": 5.30,
+        "plasma_current_ma": 15.0,
+        "electron_density_10e20_m3": 1.01,
+        "plasma_temperature_kev": 13.0
+    })
+    check(fusion.status == 200, f"fusion tokamak returns 200 (got {fusion.status})")
+    fusion_data = fusion.json()
+    check(fusion_data.get("safety_factor_q95", 0.0) > 2.8, "safety factor q95 > 2.8")
+    check(fusion_data.get("stored_thermal_energy_mj", 0.0) > 200.0, "stored thermal energy > 200 MJ")
+    check(fusion_data.get("fusion_power_mw", 0.0) > 300.0, "D-T fusion power > 300 MW")
+    check(fusion_data.get("fusion_gain_factor_q", 0.0) > 5.0, "fusion energy gain Q > 5.0")
+    check(fusion_data.get("is_safe", False) is True, "tokamak plasma satisfies disruption limits")
     report("simulation")
 
 

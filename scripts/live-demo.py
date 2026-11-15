@@ -2570,6 +2570,112 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 25.7 Enterprise MCP Tool Calling: 5 Batch-10 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # 26. BATCH 11 ADVANCED MULTI-DISCIPLINARY SIMULATION SOLVERS
+        print("\n--- 26. Batch 11 Advanced Solvers (Molding, Seismic, Orbital, DC-DC Buck, Fusion Tokamak) ---")
+
+        # 26.1 Plastic Injection Molding Process Physics & Clamp Tonnage (ISO 294 / SPE)
+        mold_res = http_request(port, "POST", "/api/sim/manufacturing/injection_molding", body={
+            "resin": "ABS",
+            "nominal_wall_thickness_mm": 2.50,
+            "projected_area_cm2": 180.0,
+            "cavity_volume_cm3": 112.5,
+            "max_flow_length_mm": 175.0,
+            "cavity_count": 2
+        })
+        check(mold_res.get("cooling_time_s", 0.0) > 5.0, "Molding cooling time > 5.0 s")
+        check(mold_res.get("peak_cavity_pressure_bar", 0.0) > 200.0, "Peak cavity pressure > 200 bar")
+        check(mold_res.get("recommended_clamp_tonnage_t", 0.0) > 80.0, "Recommended clamp tonnage > 80 t")
+        check(mold_res.get("is_safe", False) is True, "Injection molding process within limits")
+        print(f"  ✓ 26.1 Injection Molding (ISO 294): Resin = {mold_res['resin']}, t_cool = {mold_res['cooling_time_s']:.2f}s, t_cycle = {mold_res['total_cycle_time_s']:.2f}s, L/h = {mold_res['flow_length_to_thickness_ratio']:.1f}, P_fill = {mold_res['cavity_filling_pressure_bar']:.1f} bar (P_peak = {mold_res['peak_cavity_pressure_bar']:.1f} bar), F_clamp = {mold_res['required_clamp_force_tonnes']:.1f} t (Rating = {mold_res['recommended_clamp_tonnage_t']:.0f} t), Shot = {mold_res['total_shot_mass_g']:.1f} g")
+
+        # 26.2 Structural Seismic Response Spectrum & Base Shear (ASCE 7-22 / Eurocode 8)
+        seis_res = http_request(port, "POST", "/api/sim/civil/seismic_analysis", body={
+            "building_height_m": 36.0,
+            "story_count": 10,
+            "total_seismic_weight_kn": 58000.0,
+            "short_period_spectral_accel_ss_g": 1.20,
+            "one_second_spectral_accel_s1_g": 0.48
+        })
+        check(seis_res.get("fundamental_period_ta_s", 0.0) > 0.8, "Building fundamental period > 0.8 s")
+        check(seis_res.get("total_base_shear_kn", 0.0) > 2000.0, "Seismic base shear Vb > 2000 kN")
+        check(seis_res.get("base_overturning_moment_kn_m", 0.0) > 50000.0, "Overturning moment > 50000 kN·m")
+        check(seis_res.get("is_safe", False) is True, "Building seismic drift compliant")
+        print(f"  ✓ 26.2 Seismic Analysis (ASCE 7-22): hn = 36m (10 stories), Ta = {seis_res['fundamental_period_ta_s']:.2f}s, SDS = {seis_res['design_spectral_accel_sds_g']:.2f}g, Cs = {seis_res['seismic_response_coefficient_cs']:.4f}, Vb = {seis_res['total_base_shear_kn']:.1f} kN ({seis_res['base_shear_ratio_pct']:.2f}%), OTM = {seis_res['base_overturning_moment_kn_m']:.0f} kN·m, Roof Δ_inelastic = {seis_res['roof_displacement_inelastic_mm']:.1f} mm")
+
+        # 26.3 Spacecraft Orbital Mechanics & Hohmann Transfer (Curtis / Vallado)
+        orbit_res = http_request(port, "POST", "/api/sim/aerospace/orbital_mechanics", body={
+            "initial_altitude_km": 400.0,
+            "target_altitude_km": 35786.0,
+            "spacecraft_wet_mass_kg": 3500.0,
+            "propulsion_isp_s": 318.0
+        })
+        check(orbit_res.get("initial_orbital_speed_m_s", 0.0) > 7600.0, "LEO circular speed > 7600 m/s")
+        check(orbit_res.get("total_delta_v_m_s", 0.0) > 3800.0, "Coplanar Hohmann delta-V > 3800 m/s")
+        check(orbit_res.get("transfer_time_of_flight_h", 0.0) > 5.0, "Transfer TOF > 5.0 h")
+        check(orbit_res.get("is_safe", False) is True, "Orbital transfer feasible")
+        print(f"  ✓ 26.3 Orbital Mechanics (Curtis / NASA): LEO (400 km @ {orbit_res['initial_orbital_speed_m_s']:.1f} m/s) -> GEO (35786 km @ {orbit_res['target_orbital_speed_m_s']:.1f} m/s), Δv_coplanar = {orbit_res['total_delta_v_m_s']:.1f} m/s, Δv_plane = {orbit_res['total_delta_v_with_plane_change_m_s']:.1f} m/s, TOF = {orbit_res['transfer_time_of_flight_h']:.2f} h, Propellant = {orbit_res['required_propellant_mass_kg']:.1f} kg ({orbit_res['propellant_mass_fraction']*100.0:.1f}%)")
+
+        # 26.4 Synchronous DC-DC Buck Converter Power Stage & Efficiency (IEEE / Erickson)
+        smps_res = http_request(port, "POST", "/api/sim/electronics/dc_dc_converter", body={
+            "input_voltage_v": 12.0,
+            "output_voltage_v": 3.3,
+            "rated_output_current_a": 20.0,
+            "switching_frequency_hz": 500000.0
+        })
+        check(smps_res.get("duty_cycle", 0.0) > 0.25, "Duty cycle > 0.25")
+        check(smps_res.get("output_power_w", 0.0) > 60.0, "Output power > 60 W")
+        check(smps_res.get("efficiency_pct", 0.0) > 90.0, "Converter efficiency > 90.0%")
+        check(smps_res.get("is_safe", False) is True, "SMPS converter within ripple margins")
+        print(f"  ✓ 26.4 DC-DC Buck Converter (IEEE): 12V -> 3.3V @ 20A (500 kHz), D = {smps_res['duty_cycle']:.3f}, L = {smps_res['required_inductance_uh']:.2f} μH (I_pk = {smps_res['peak_inductor_current_a']:.2f}A), V_ripple = {smps_res['total_output_voltage_ripple_mv']:.1f} mV, P_out = {smps_res['output_power_w']:.1f} W, Loss = {smps_res['total_power_loss_w']:.2f} W, Eff = {smps_res['efficiency_pct']:.2f}%")
+
+        # 26.5 Nuclear Fusion Tokamak Plasma Equilibrium & Confinement (Wesson / ITER)
+        fus_res = http_request(port, "POST", "/api/sim/science/fusion_tokamak", body={
+            "major_radius_r0_m": 6.20,
+            "minor_radius_a_m": 2.00,
+            "toroidal_magnetic_field_t": 5.30,
+            "plasma_current_ma": 15.0,
+            "electron_density_10e20_m3": 1.01,
+            "plasma_temperature_kev": 13.0
+        })
+        check(fus_res.get("safety_factor_q95", 0.0) > 2.8, "Tokamak safety factor q95 > 2.8")
+        check(fus_res.get("stored_thermal_energy_mj", 0.0) > 200.0, "Stored plasma energy > 200 MJ")
+        check(fus_res.get("fusion_power_mw", 0.0) > 300.0, "Thermal fusion power > 300 MW")
+        check(fus_res.get("fusion_gain_factor_q", 0.0) > 5.0, "Fusion gain Q > 5.0")
+        check(fus_res.get("is_safe", False) is True, "Tokamak plasma within disruption limits")
+        print(f"  ✓ 26.5 Fusion Tokamak (Wesson / ITER): R0 = 6.2m, a = 2.0m, Bt = 5.3T, Ip = 15 MA, V = {fus_res['plasma_volume_m3']:.0f} m³, q95 = {fus_res['safety_factor_q95']:.2f} (>= 3.0), n/nG = {fus_res['greenwald_fraction']:.2f}, W_th = {fus_res['stored_thermal_energy_mj']:.0f} MJ, τ_E = {fus_res['energy_confinement_time_s']:.2f}s, P_fus = {fus_res['fusion_power_mw']:.0f} MW, P_alpha = {fus_res['alpha_heating_power_mw']:.0f} MW, Q = {fus_res['fusion_gain_factor_q']:.1f}, Lawson = {fus_res['lawson_triple_product_10e21_kev_s_m3']:.2f}e21")
+
+        # 26.6 Universal Commands Execution Verification (Batch 11 Domains)
+        for cmd_id in [
+            "sim.manufacturing.injection_molding",
+            "sim.civil.seismic_analysis",
+            "sim.aerospace.orbital_mechanics",
+            "sim.electronics.dc_dc_converter",
+            "sim.science.fusion_tokamak",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 26.6 Universal Commands: All 5 Batch-11 Engineering Commands verified via typed schema engine")
+
+        # 26.7 Enterprise MCP Tool Calling (Batch 11 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_manufacturing_injection_molding",
+            "atlas_sim_civil_seismic_analysis",
+            "atlas_sim_aerospace_orbital_mechanics",
+            "atlas_sim_electronics_dc_dc_converter",
+            "atlas_sim_science_fusion_tokamak",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 830,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 26.7 Enterprise MCP Tool Calling: 5 Batch-11 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

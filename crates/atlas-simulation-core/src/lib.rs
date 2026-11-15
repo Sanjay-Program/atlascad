@@ -20,6 +20,7 @@ pub mod chemical;
 pub mod chemical_reactor;
 pub mod convergence;
 pub mod daylighting;
+pub mod dc_dc_converter;
 pub mod digital_twin;
 pub mod distillation;
 pub mod elastoplasticity;
@@ -30,6 +31,7 @@ pub mod execution;
 pub mod fasteners;
 pub mod fracture;
 pub mod fsi;
+pub mod fusion_tokamak;
 pub mod gas_compression;
 pub mod gas_turbine;
 pub mod gear_fatigue;
@@ -44,6 +46,7 @@ pub mod hydraulic_actuator;
 pub mod hydrology;
 pub mod hypersonic;
 pub mod induction_motor;
+pub mod injection_molding;
 pub mod journal_bearing;
 pub mod machining_physics;
 pub mod marine;
@@ -52,6 +55,7 @@ pub mod materials;
 pub mod model;
 pub mod molecular;
 pub mod nuclear_shielding;
+pub mod orbital_mechanics;
 pub mod pcb_thermal;
 pub mod pile_foundation;
 pub mod piping_flexibility;
@@ -70,6 +74,7 @@ pub mod robotics;
 pub mod rock_mechanics;
 pub mod rocket_nozzle;
 pub mod rotor_dynamics;
+pub mod seismic_analysis;
 pub mod shafts_keys;
 pub mod sheet_metal;
 pub mod ship_stability;
@@ -396,5 +401,25 @@ pub mod prelude {
     pub use crate::wind_turbine::{
         WindTurbineProblem, WindTurbineResult,
         solve_wind_turbine, solve_wind_turbine_sim,
+    };
+    pub use crate::dc_dc_converter::{
+        DcDcConverterProblem, DcDcConverterResult,
+        solve_dc_dc_converter, solve_dc_dc_converter_sim,
+    };
+    pub use crate::fusion_tokamak::{
+        FusionTokamakProblem, FusionTokamakResult,
+        solve_fusion_tokamak, solve_fusion_tokamak_sim,
+    };
+    pub use crate::injection_molding::{
+        InjectionMoldingProblem, InjectionMoldingResult, PolymerResin,
+        solve_injection_molding, solve_injection_molding_sim,
+    };
+    pub use crate::orbital_mechanics::{
+        OrbitalMechanicsProblem, OrbitalMechanicsResult,
+        solve_orbital_mechanics, solve_orbital_mechanics_sim,
+    };
+    pub use crate::seismic_analysis::{
+        SeismicAnalysisProblem, SeismicAnalysisResult, SeismicFramingSystem,
+        SeismicSiteClass, StoryForceRecord, solve_seismic_analysis, solve_seismic_analysis_sim,
     };
 }
