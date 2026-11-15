@@ -25,10 +25,13 @@ pub mod execution;
 pub mod fasteners;
 pub mod fracture;
 pub mod fsi;
+pub mod gas_compression;
 pub mod gears;
 pub mod generative;
 pub mod geotechnical;
+pub mod geotechnical_bearing;
 pub mod heat_exchanger;
+pub mod heat_exchanger_rating;
 pub mod hydrology;
 pub mod hypersonic;
 pub mod machining_physics;
@@ -43,6 +46,7 @@ pub mod pressure_vessel;
 pub mod problem;
 pub mod provenance;
 pub mod psychrometrics;
+pub mod pumps;
 pub mod rainflow;
 pub mod robotics;
 pub mod rock_mechanics;
@@ -58,6 +62,7 @@ pub mod solver_settings;
 pub mod structural;
 pub mod structural_connections;
 pub mod thermal_stress;
+pub mod timber_fire;
 pub mod validation;
 pub mod water_hammer;
 pub mod welding;
@@ -120,6 +125,10 @@ pub mod prelude {
         solve_fracture_sim, solve_lefm_and_paris_growth,
     };
     pub use crate::fsi::{FsiProblem, solve_fsi_coupled};
+    pub use crate::gas_compression::{
+        CompressionStageData, GasCompressionProblem, GasCompressionResult, ProcessGas,
+        solve_gas_compression, solve_gas_compression_sim,
+    };
     pub use crate::gears::{
         GearToothProfile, GearType, InvoluteGearPairProblem, InvoluteGearPairResult,
         solve_gear_pair_sim, solve_involute_gear_pair,
@@ -131,7 +140,15 @@ pub mod prelude {
     pub use crate::geotechnical::{
         RetainingWallProblem, SoilProperties, solve_retaining_wall_pressures,
     };
+    pub use crate::geotechnical_bearing::{
+        GeotechnicalBearingProblem, GeotechnicalBearingResult, SoilType,
+        solve_geotechnical_bearing, solve_geotechnical_bearing_sim,
+    };
     pub use crate::heat_exchanger::{FlowArrangement, HeatExchangerProblem, solve_heat_exchanger};
+    pub use crate::heat_exchanger_rating::{
+        HeatExchangerRatingProblem, HeatExchangerRatingResult, TubeLayoutPattern,
+        solve_heat_exchanger_rating, solve_heat_exchanger_rating_sim,
+    };
     pub use crate::hydrology::{
         HydrologyProblem, HydrologyResult, LandUseCategory, PipeMaterial,
         solve_hydrology_sim, solve_rational_runoff_and_pipe,
@@ -194,6 +211,9 @@ pub mod prelude {
         PsychrometricProblem, PsychrometricResult, saturation_vapor_pressure_pa,
         solve_psychrometric_state, solve_psychrometrics_sim,
     };
+    pub use crate::pumps::{
+        PumpFluid, PumpProblem, PumpResult, solve_centrifugal_pump, solve_pump_sim,
+    };
     pub use crate::rainflow::{
         RainflowCycle, RainflowProblem, count_rainflow_cycles, solve_rainflow_fatigue,
     };
@@ -241,6 +261,10 @@ pub mod prelude {
     };
     pub use crate::thermal_stress::{
         BimetalStripProblem, ThermalStressProblem, solve_bimetal_deflection, solve_thermal_stress,
+    };
+    pub use crate::timber_fire::{
+        FireExposureSides, TimberFireProblem, TimberFireResult, TimberGrade,
+        iso834_temperature_c, solve_timber_fire, solve_timber_fire_sim,
     };
     pub use crate::validation::{AnalyticalComparison, ValidationStatus};
     pub use crate::water_hammer::{WaterHammerProblem, solve_water_hammer};

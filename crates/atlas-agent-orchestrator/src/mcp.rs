@@ -817,6 +817,79 @@ impl McpServer {
                     "required": ["applied_shear_force_kn", "weld_throat_thickness_mm", "weld_length_mm", "applied_weld_force_kn"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_hydraulic_pump".into(),
+                description: "ISO 9906 / ASME PTC 10 centrifugal pump characteristic curve, affinity laws, system head intersection, and cavitation margin".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "nominal_speed_rpm": { "type": "number", "default": 2950.0 },
+                        "nominal_impeller_diameter_mm": { "type": "number", "default": 250.0 },
+                        "shutoff_head_m": { "type": "number", "default": 85.0 },
+                        "system_static_head_m": { "type": "number", "default": 25.0 },
+                        "npsh_available_m": { "type": "number", "default": 6.5 }
+                    },
+                    "required": ["nominal_speed_rpm", "nominal_impeller_diameter_mm", "shutoff_head_m", "system_static_head_m"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_heat_exchanger_rating".into(),
+                description: "TEMA / Kern method shell-and-tube rating, counter-flow LMTD, F-correction, overall U, and surface area safety margin".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "hot_mass_flow_kg_s": { "type": "number", "default": 18.0 },
+                        "cold_mass_flow_kg_s": { "type": "number", "default": 24.66 },
+                        "shell_diameter_mm": { "type": "number", "default": 600.0 },
+                        "tube_count": { "type": "integer", "default": 380 },
+                        "tube_length_m": { "type": "number", "default": 4.5 }
+                    },
+                    "required": ["hot_mass_flow_kg_s", "cold_mass_flow_kg_s", "shell_diameter_mm", "tube_count", "tube_length_m"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_geotechnical_bearing".into(),
+                description: "Meyerhof / Eurocode 7 shallow foundation ultimate & allowable bearing capacity, and elastic immediate settlement".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "foundation_width_b_m": { "type": "number", "default": 2.20 },
+                        "foundation_length_l_m": { "type": "number", "default": 2.20 },
+                        "embedment_depth_df_m": { "type": "number", "default": 1.50 },
+                        "column_axial_load_kn": { "type": "number", "default": 1250.0 },
+                        "friction_angle_deg": { "type": "number", "default": 32.0 }
+                    },
+                    "required": ["foundation_width_b_m", "foundation_length_l_m", "embedment_depth_df_m", "column_axial_load_kn"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_gas_compression".into(),
+                description: "ASME PTC 10 multi-stage gas compression thermodynamics, optimal stage pressure ratio, intercooling heat duties, and power savings".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "mass_flow_kg_s": { "type": "number", "default": 4.5 },
+                        "inlet_pressure_bar": { "type": "number", "default": 1.0 },
+                        "target_outlet_pressure_bar": { "type": "number", "default": 30.0 },
+                        "number_of_stages": { "type": "integer", "default": 3 }
+                    },
+                    "required": ["mass_flow_kg_s", "inlet_pressure_bar", "target_outlet_pressure_bar", "number_of_stages"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_timber_fire".into(),
+                description: "Eurocode 5 EN 1995-1-2 structural timber fire resistance, 1D/effective charring depth, residual section modulus, and R30/R60/R90 verification".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "initial_breadth_mm": { "type": "number", "default": 200.0 },
+                        "initial_depth_mm": { "type": "number", "default": 500.0 },
+                        "fire_duration_min": { "type": "number", "default": 60.0 },
+                        "ambient_moment_ed_kn_m": { "type": "number", "default": 140.0 }
+                    },
+                    "required": ["initial_breadth_mm", "initial_depth_mm", "fire_duration_min", "ambient_moment_ed_kn_m"]
+                }),
+            },
         ]
     }
 

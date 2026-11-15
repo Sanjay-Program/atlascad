@@ -1193,6 +1193,69 @@ def simulation_section(studio: Studio) -> None:
     cn_data = conn.json()
     check(cn_data.get("total_connection_shear_capacity_kn", 0.0) > 350.0, "bolted connection shear capacity verified")
     check(cn_data.get("bolted_joint_safe") is True and cn_data.get("welded_joint_safe") is True, "connection code compliant")
+
+    # 25. Centrifugal Pumps & Affinity Laws (ISO 9906 / ASME PTC 10)
+    pump = studio.post("/api/sim/hydraulic/pump", {
+        "nominal_speed_rpm": 2950.0,
+        "nominal_impeller_diameter_mm": 250.0,
+        "shutoff_head_m": 85.0,
+        "system_static_head_m": 25.0,
+        "npsh_available_m": 6.5
+    })
+    check(pump.status == 200, f"centrifugal pump returns 200 (got {pump.status})")
+    pmp_data = pump.json()
+    check(abs(pmp_data.get("operating_flow_m3_hr", 0.0) - 100.0) < 1.0, "pump operating flow 100 m3/hr")
+    check(pmp_data.get("cavitation_safe") is True, "pump cavitation margin verified")
+
+    # 26. Shell-and-Tube Heat Exchangers (TEMA / Kern's Method)
+    hx = studio.post("/api/sim/thermal/heat_exchanger_rating", {
+        "hot_mass_flow_kg_s": 18.0,
+        "cold_mass_flow_kg_s": 24.66,
+        "shell_diameter_mm": 600.0,
+        "tube_count": 380,
+        "tube_length_m": 4.5
+    })
+    check(hx.status == 200, f"heat exchanger rating returns 200 (got {hx.status})")
+    hx_data = hx.json()
+    check(abs(hx_data.get("heat_duty_kw", 0.0) - 1548.0) < 2.0, "heat exchanger duty ~1548 kW")
+    check(hx_data.get("rating_adequate") is True, "heat exchanger surface rating adequate")
+
+    # 27. Geotechnical Shallow Foundation Bearing Capacity (Meyerhof / EC7)
+    bearing = studio.post("/api/sim/civil/geotechnical_bearing", {
+        "foundation_width_b_m": 2.20,
+        "foundation_length_l_m": 2.20,
+        "embedment_depth_df_m": 1.50,
+        "column_axial_load_kn": 1250.0,
+        "friction_angle_deg": 32.0
+    })
+    check(bearing.status == 200, f"geotechnical bearing returns 200 (got {bearing.status})")
+    brg_data = bearing.json()
+    check(brg_data.get("actual_factor_of_safety", 0.0) > 3.0, "bearing capacity factor of safety > 3.0")
+    check(brg_data.get("bearing_capacity_adequate") is True and brg_data.get("settlement_acceptable") is True, "foundation code compliant")
+
+    # 28. Multi-Stage Gas Compression & Intercooling (ASME PTC 10)
+    comp = studio.post("/api/sim/thermal/gas_compression", {
+        "mass_flow_kg_s": 4.5,
+        "inlet_pressure_bar": 1.0,
+        "target_outlet_pressure_bar": 30.0,
+        "number_of_stages": 3
+    })
+    check(comp.status == 200, f"gas compression returns 200 (got {comp.status})")
+    cmp_data = comp.json()
+    check(cmp_data.get("energy_savings_pct", 0.0) > 15.0, "intercooling energy savings > 15%")
+    check(cmp_data.get("total_brake_power_kw", 0.0) > 1200.0, "multi-stage compression power evaluated")
+
+    # 29. Structural Timber Fire Resistance (Eurocode 5 EN 1995-1-2)
+    timber = studio.post("/api/sim/structural/timber_fire", {
+        "initial_breadth_mm": 200.0,
+        "initial_depth_mm": 500.0,
+        "fire_duration_min": 60.0,
+        "ambient_moment_ed_kn_m": 140.0
+    })
+    check(timber.status == 200, f"timber fire returns 200 (got {timber.status})")
+    tmb_data = timber.json()
+    check(tmb_data.get("fire_resistance_verified") is True, "timber R60 fire resistance verified")
+    check(tmb_data.get("critical_fire_endurance_min", 0.0) >= 60.0, "critical fire endurance >= 60 min")
     report("simulation")
 
 

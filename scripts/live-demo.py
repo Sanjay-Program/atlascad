@@ -1942,6 +1942,112 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 19.7 Enterprise MCP Tool Calling: 5 New Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # -------------------------------------------------------------
+        # DEMO 20: Fluid Machinery, Thermal Rating, Geotechnical, Compression & Timber Fire
+        # -------------------------------------------------------------
+        print("\n" + "=" * 78)
+        print("  DEMO 20: PUMPS, HEAT EXCHANGERS, GEOTECHNICAL, COMPRESSION & TIMBER FIRE")
+        print("=" * 78)
+
+        # 20.1 Centrifugal Pumps & Affinity Laws (ISO 9906 / ASME PTC 10)
+        pump_res = http_request(port, "POST", "/api/sim/hydraulic/pump", body={
+            "nominal_speed_rpm": 2950.0,
+            "nominal_impeller_diameter_mm": 250.0,
+            "shutoff_head_m": 85.0,
+            "system_static_head_m": 25.0,
+            "npsh_available_m": 6.5
+        })
+        check(abs(pump_res.get("operating_flow_m3_hr", 0.0) - 100.0) < 1.0, "Pump operating flow 100 m3/hr")
+        check(abs(pump_res.get("operating_head_m", 0.0) - 57.0) < 1.0, "Pump operating head 57 m")
+        check(pump_res.get("brake_shaft_power_kw", 0.0) > 18.0, "Pump brake horsepower evaluated")
+        check(pump_res.get("cavitation_safe") is True, "Pump NPSH margin cavitation safe")
+        print(f"  ✓ 20.1 Centrifugal Pump (ISO 9906): Operating Point = {pump_res['operating_flow_m3_hr']:.1f} m³/h @ {pump_res['operating_head_m']:.1f} m Head, Power = {pump_res['brake_shaft_power_kw']:.1f} kW, η = {pump_res['operating_efficiency']*100:.1f}%, NPSH Margin = {pump_res['npsh_margin_m']:.2f} m (Cavitation Safe)")
+
+        # 20.2 Shell-and-Tube Heat Exchangers (TEMA / Kern's Method)
+        hx_res = http_request(port, "POST", "/api/sim/thermal/heat_exchanger_rating", body={
+            "hot_mass_flow_kg_s": 18.0,
+            "cold_mass_flow_kg_s": 24.66,
+            "shell_diameter_mm": 600.0,
+            "tube_count": 380,
+            "tube_length_m": 4.5
+        })
+        check(abs(hx_res.get("heat_duty_kw", 0.0) - 1548.0) < 2.0, "HX heat duty 1548 kW")
+        check(hx_res.get("overall_u_fouled_w_m2_k", 0.0) > 250.0, "HX fouled U evaluated")
+        check(hx_res.get("surface_margin_pct", 0.0) > 0.0, "HX surface area margin > 0%")
+        check(hx_res.get("rating_adequate") is True, "HX thermal rating adequate")
+        print(f"  ✓ 20.2 Shell-and-Tube Rating (TEMA): Duty Q = {hx_res['heat_duty_kw']:.1f} kW, Counter-Flow LMTD = {hx_res['lmtd_c']:.1f} °C, F = {hx_res['f_correction_factor']:.2f}, Fouled U = {hx_res['overall_u_fouled_w_m2_k']:.1f} W/m²K, Area Margin = +{hx_res['surface_margin_pct']:.1f}%")
+
+        # 20.3 Geotechnical Shallow Foundation Bearing Capacity (Meyerhof / EC7)
+        brg_res = http_request(port, "POST", "/api/sim/civil/geotechnical_bearing", body={
+            "foundation_width_b_m": 2.20,
+            "foundation_length_l_m": 2.20,
+            "embedment_depth_df_m": 1.50,
+            "column_axial_load_kn": 1250.0,
+            "friction_angle_deg": 32.0
+        })
+        check(brg_res.get("ultimate_bearing_capacity_qult_kpa", 0.0) > 1500.0, "Ultimate bearing capacity > 1500 kPa")
+        check(brg_res.get("actual_factor_of_safety", 0.0) > 3.0, "Bearing capacity FoS > 3.0")
+        check(brg_res.get("estimated_settlement_mm", 99.0) < 25.0, "Immediate elastic settlement < 25 mm")
+        check(brg_res.get("bearing_capacity_adequate") is True and brg_res.get("settlement_acceptable") is True, "Foundation EC7 compliant")
+        print(f"  ✓ 20.3 Geotechnical Bearing (Meyerhof / EC7): q_ult = {brg_res['ultimate_bearing_capacity_qult_kpa']:.1f} kPa, q_all = {brg_res['allowable_bearing_capacity_qall_kpa']:.1f} kPa, Applied = {brg_res['applied_contact_pressure_kpa']:.1f} kPa, FoS = {brg_res['actual_factor_of_safety']:.2f}, Settlement S_e = {brg_res['estimated_settlement_mm']:.1f} mm")
+
+        # 20.4 Multi-Stage Gas Compression & Intercooling (ASME PTC 10)
+        cmp_res = http_request(port, "POST", "/api/sim/thermal/gas_compression", body={
+            "mass_flow_kg_s": 4.5,
+            "inlet_pressure_bar": 1.0,
+            "target_outlet_pressure_bar": 30.0,
+            "number_of_stages": 3
+        })
+        check(abs(cmp_res.get("stage_pressure_ratio", 0.0) - 3.107) < 0.05, "Stage pressure ratio ~3.107")
+        check(cmp_res.get("total_brake_power_kw", 0.0) > 1200.0, "Compressor brake power evaluated")
+        check(cmp_res.get("energy_savings_pct", 0.0) > 15.0, "Intercooling energy savings > 15%")
+        print(f"  ✓ 20.4 Multi-Stage Gas Compression (ASME PTC 10): 3 Stages (r_p = {cmp_res['stage_pressure_ratio']:.3f}), Brake Power = {cmp_res['total_brake_power_kw']:.1f} kW, Intercooler Duty = {cmp_res['total_intercooler_duty_kw']:.1f} kW, Energy Savings = {cmp_res['energy_savings_pct']:.1f}%")
+
+        # 20.5 Structural Timber Fire Resistance (Eurocode 5 EN 1995-1-2)
+        tmb_res = http_request(port, "POST", "/api/sim/structural/timber_fire", body={
+            "initial_breadth_mm": 200.0,
+            "initial_depth_mm": 500.0,
+            "fire_duration_min": 60.0,
+            "ambient_moment_ed_kn_m": 140.0
+        })
+        check(abs(tmb_res.get("effective_char_depth_def_mm", 0.0) - 46.0) < 1.0, "Effective char depth 46 mm")
+        check(tmb_res.get("fire_utilization_ratio", 1.0) < 1.0, "Timber fire utilization ratio < 1.0")
+        check(tmb_res.get("fire_resistance_verified") is True, "Timber R60 verified")
+        check(tmb_res.get("critical_fire_endurance_min", 0.0) >= 60.0, "Critical endurance >= 60 min")
+        print(f"  ✓ 20.5 Structural Timber Fire (Eurocode 5): ISO 834 60-min T_g = {tmb_res['iso834_gas_temp_c']:.1f} °C, d_ef = {tmb_res['effective_char_depth_def_mm']:.1f} mm, Residual Core = {tmb_res['residual_breadth_bef_mm']:.0f}x{tmb_res['residual_depth_hef_mm']:.0f} mm, UR = {tmb_res['fire_utilization_ratio']:.2f} (R60 Verified, Critical: {tmb_res['critical_fire_endurance_min']:.0f} min)")
+
+        # 20.6 Universal Commands Execution Verification (Batch 5 Domains)
+        for cmd_id in [
+            "sim.hydraulic.pump",
+            "sim.thermal.heat_exchanger_rating",
+            "sim.civil.geotechnical_bearing",
+            "sim.thermal.gas_compression",
+            "sim.structural.timber_fire",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 20.6 Universal Commands: All 5 Batch-5 Engineering Commands verified via typed schema engine")
+
+        # 20.7 Enterprise MCP Tool Calling (Batch 5 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_hydraulic_pump",
+            "atlas_sim_heat_exchanger_rating",
+            "atlas_sim_geotechnical_bearing",
+            "atlas_sim_gas_compression",
+            "atlas_sim_timber_fire",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 600,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 20.7 Enterprise MCP Tool Calling: 5 Batch-5 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

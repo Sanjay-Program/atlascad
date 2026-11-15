@@ -4,6 +4,8 @@
 //! circle's tessellation, a rejected foreign origin, a refused oversized body. A test that only
 //! compared the server to itself would pass even if the viewport were blank.
 
+#![allow(clippy::unwrap_used)]
+
 use cad_studio::{default_project, start};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -5502,6 +5504,136 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
             addr,
             "/api/mcp",
             &format!(r#"{{"jsonrpc": "2.0", "id": 130, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
+    // 85. Centrifugal Pumps & Affinity Laws (ISO 9906 / ASME PTC 10)
+    let res_pump = post(
+        addr,
+        "/api/sim/hydraulic/pump",
+        r#"{
+            "nominal_speed_rpm": 2950.0,
+            "nominal_impeller_diameter_mm": 250.0,
+            "shutoff_head_m": 85.0,
+            "system_static_head_m": 25.0,
+            "npsh_available_m": 6.5
+        }"#,
+    )?;
+    assert_eq!(res_pump.status, 200);
+    let pump_json = json(&res_pump)?;
+    assert!((pump_json["operating_flow_m3_hr"].as_f64().unwrap() - 100.0).abs() < 1.0);
+    assert!((pump_json["operating_head_m"].as_f64().unwrap() - 57.0).abs() < 1.0);
+    assert!(pump_json["brake_shaft_power_kw"].as_f64().unwrap() > 18.0);
+    assert!(pump_json["npsh_margin_m"].as_f64().unwrap() > 3.0);
+    assert!(pump_json["cavitation_safe"].as_bool().unwrap());
+
+    // 86. Shell-and-Tube Heat Exchangers (TEMA / Kern's Method)
+    let res_hx = post(
+        addr,
+        "/api/sim/thermal/heat_exchanger_rating",
+        r#"{
+            "hot_mass_flow_kg_s": 18.0,
+            "cold_mass_flow_kg_s": 24.66,
+            "shell_diameter_mm": 600.0,
+            "tube_count": 380,
+            "tube_length_m": 4.5
+        }"#,
+    )?;
+    assert_eq!(res_hx.status, 200);
+    let hx_json = json(&res_hx)?;
+    assert!((hx_json["heat_duty_kw"].as_f64().unwrap() - 1548.0).abs() < 2.0);
+    assert!(hx_json["overall_u_fouled_w_m2_k"].as_f64().unwrap() > 250.0);
+    assert!(hx_json["surface_margin_pct"].as_f64().unwrap() > 0.0);
+    assert!(hx_json["rating_adequate"].as_bool().unwrap());
+
+    // 87. Geotechnical Shallow Foundation Bearing Capacity (Meyerhof / Eurocode 7)
+    let res_bearing = post(
+        addr,
+        "/api/sim/civil/geotechnical_bearing",
+        r#"{
+            "foundation_width_b_m": 2.20,
+            "foundation_length_l_m": 2.20,
+            "embedment_depth_df_m": 1.50,
+            "column_axial_load_kn": 1250.0,
+            "friction_angle_deg": 32.0
+        }"#,
+    )?;
+    assert_eq!(res_bearing.status, 200);
+    let bearing_json = json(&res_bearing)?;
+    assert!(bearing_json["ultimate_bearing_capacity_qult_kpa"].as_f64().unwrap() > 1500.0);
+    assert!(bearing_json["allowable_bearing_capacity_qall_kpa"].as_f64().unwrap() > 500.0);
+    assert!(bearing_json["actual_factor_of_safety"].as_f64().unwrap() > 3.0);
+    assert!(bearing_json["estimated_settlement_mm"].as_f64().unwrap() < 25.0);
+    assert!(bearing_json["bearing_capacity_adequate"].as_bool().unwrap());
+    assert!(bearing_json["settlement_acceptable"].as_bool().unwrap());
+
+    // 88. Multi-Stage Gas Compression & Intercooling (ASME PTC 10)
+    let res_comp = post(
+        addr,
+        "/api/sim/thermal/gas_compression",
+        r#"{
+            "mass_flow_kg_s": 4.5,
+            "inlet_pressure_bar": 1.0,
+            "target_outlet_pressure_bar": 30.0,
+            "number_of_stages": 3
+        }"#,
+    )?;
+    assert_eq!(res_comp.status, 200);
+    let comp_json = json(&res_comp)?;
+    assert!((comp_json["stage_pressure_ratio"].as_f64().unwrap() - 3.107).abs() < 0.05);
+    assert!(comp_json["total_brake_power_kw"].as_f64().unwrap() > 1200.0);
+    assert!(comp_json["total_intercooler_duty_kw"].as_f64().unwrap() > 300.0);
+    assert!(comp_json["energy_savings_pct"].as_f64().unwrap() > 15.0);
+
+    // 89. Structural Timber Fire Resistance (Eurocode 5 EN 1995-1-2)
+    let res_timber = post(
+        addr,
+        "/api/sim/structural/timber_fire",
+        r#"{
+            "initial_breadth_mm": 200.0,
+            "initial_depth_mm": 500.0,
+            "fire_duration_min": 60.0,
+            "ambient_moment_ed_kn_m": 140.0
+        }"#,
+    )?;
+    assert_eq!(res_timber.status, 200);
+    let timber_json = json(&res_timber)?;
+    assert!((timber_json["effective_char_depth_def_mm"].as_f64().unwrap() - 46.0).abs() < 1.0);
+    assert!((timber_json["residual_breadth_bef_mm"].as_f64().unwrap() - 108.0).abs() < 1.0);
+    assert!(timber_json["fire_utilization_ratio"].as_f64().unwrap() < 1.0);
+    assert!(timber_json["fire_resistance_verified"].as_bool().unwrap());
+    assert!(timber_json["critical_fire_endurance_min"].as_f64().unwrap() >= 60.0);
+
+    // 90. Universal Commands Execution Verification (Batch 5 Domains)
+    for cmd_id in [
+        "sim.hydraulic.pump",
+        "sim.thermal.heat_exchanger_rating",
+        "sim.civil.geotechnical_bearing",
+        "sim.thermal.gas_compression",
+        "sim.structural.timber_fire",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 91. Enterprise MCP Tool Calling (Batch 5 Domains)
+    for tool_name in [
+        "atlas_sim_hydraulic_pump",
+        "atlas_sim_heat_exchanger_rating",
+        "atlas_sim_geotechnical_bearing",
+        "atlas_sim_gas_compression",
+        "atlas_sim_timber_fire",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 140, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
         )?;
         assert_eq!(mcp_res.status, 200);
     }

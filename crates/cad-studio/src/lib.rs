@@ -4768,6 +4768,150 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_hydraulic_pump(
+        &mut self,
+        req: &SimPumpRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::pumps::PumpProblem {
+            problem_id: "centrifugal_pump_analysis".to_string(),
+            fluid: atlas_simulation_core::pumps::PumpFluid::Water20C,
+            nominal_speed_rpm: req.nominal_speed_rpm.unwrap_or(2950.0),
+            nominal_impeller_diameter_mm: req.nominal_impeller_diameter_mm.unwrap_or(250.0),
+            shutoff_head_m: req.shutoff_head_m.unwrap_or(85.0),
+            pump_curve_coeff_a: req.pump_curve_coeff_a.unwrap_or(0.0028),
+            bep_flow_m3_hr: req.bep_flow_m3_hr.unwrap_or(120.0),
+            peak_efficiency: req.peak_efficiency.unwrap_or(0.81),
+            target_speed_rpm: req.target_speed_rpm.or(Some(2950.0)),
+            target_impeller_diameter_mm: req.target_impeller_diameter_mm.or(Some(250.0)),
+            system_static_head_m: req.system_static_head_m.unwrap_or(25.0),
+            system_friction_coeff_k: req.system_friction_coeff_k.unwrap_or(0.0032),
+            npsh_available_m: req.npsh_available_m.unwrap_or(6.5),
+            npsh_required_m: req.npsh_required_m.unwrap_or(3.2),
+        };
+        let res = atlas_simulation_core::pumps::solve_centrifugal_pump(&prob);
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_heat_exchanger_rating(
+        &mut self,
+        req: &SimHeatExchangerRatingRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::heat_exchanger_rating::HeatExchangerRatingProblem {
+            problem_id: "shell_tube_hx_rating".to_string(),
+            hot_mass_flow_kg_s: req.hot_mass_flow_kg_s.unwrap_or(18.0),
+            hot_cp_j_kg_k: 2150.0,
+            hot_inlet_temp_c: req.hot_inlet_temp_c.unwrap_or(95.0),
+            hot_outlet_temp_c: req.hot_outlet_temp_c.unwrap_or(55.0),
+            hot_density_kg_m3: 850.0,
+            hot_viscosity_pa_s: 0.0035,
+            hot_conductivity_w_m_k: 0.135,
+            cold_mass_flow_kg_s: req.cold_mass_flow_kg_s.unwrap_or(24.66),
+            cold_cp_j_kg_k: 4180.0,
+            cold_inlet_temp_c: req.cold_inlet_temp_c.unwrap_or(25.0),
+            cold_outlet_temp_c: req.cold_outlet_temp_c.unwrap_or(40.0),
+            cold_density_kg_m3: 996.0,
+            cold_viscosity_pa_s: 0.0008,
+            cold_conductivity_w_m_k: 0.62,
+            shell_diameter_mm: req.shell_diameter_mm.unwrap_or(600.0),
+            baffle_spacing_mm: req.baffle_spacing_mm.unwrap_or(250.0),
+            tube_outer_diameter_mm: 19.05,
+            tube_wall_thickness_mm: 1.65,
+            tube_pitch_mm: 25.4,
+            layout_pattern: atlas_simulation_core::heat_exchanger_rating::TubeLayoutPattern::SquarePitch90,
+            tube_count: req.tube_count.unwrap_or(380),
+            tube_passes: req.tube_passes.unwrap_or(2),
+            tube_length_m: req.tube_length_m.unwrap_or(4.5),
+            tube_metal_conductivity_w_m_k: 45.0,
+            shell_fouling_factor: 0.00035,
+            tube_fouling_factor: 0.00018,
+        };
+        let res = atlas_simulation_core::heat_exchanger_rating::solve_heat_exchanger_rating(&prob);
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_geotechnical_bearing(
+        &mut self,
+        req: &SimGeotechnicalBearingRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::geotechnical_bearing::GeotechnicalBearingProblem {
+            problem_id: "shallow_foundation_bearing".to_string(),
+            soil_type: atlas_simulation_core::geotechnical_bearing::SoilType::MediumDenseSand,
+            footing_width_b_m: req.foundation_width_b_m.unwrap_or(2.20),
+            footing_length_l_m: req.foundation_length_l_m.unwrap_or(2.20),
+            embedment_depth_df_m: req.embedment_depth_df_m.unwrap_or(1.50),
+            soil_cohesion_kpa: req.cohesion_c_kpa,
+            friction_angle_deg: req.friction_angle_deg.or(Some(32.0)),
+            unit_weight_kn_m3: req.unit_weight_gamma_kn_m3.or(Some(18.5)),
+            elastic_modulus_mpa: req.elastic_modulus_es_mpa.or(Some(30.0)),
+            poissons_ratio: 0.30,
+            applied_load_kn: req.column_axial_load_kn.unwrap_or(1250.0),
+            target_factor_of_safety: req.factor_of_safety_target.unwrap_or(3.0),
+            max_allowable_settlement_mm: 25.0,
+        };
+        let res = atlas_simulation_core::geotechnical_bearing::solve_geotechnical_bearing(&prob);
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_gas_compression(
+        &mut self,
+        req: &SimGasCompressionRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let gas = match req.gas_type.as_deref().unwrap_or("air") {
+            "methane" | "naturalgas" => atlas_simulation_core::gas_compression::ProcessGas::MethaneNaturalGas,
+            "nitrogen" => atlas_simulation_core::gas_compression::ProcessGas::Nitrogen,
+            "hydrogen" => atlas_simulation_core::gas_compression::ProcessGas::Hydrogen,
+            "carbondioxide" => atlas_simulation_core::gas_compression::ProcessGas::CarbonDioxide,
+            _ => atlas_simulation_core::gas_compression::ProcessGas::Air,
+        };
+        let prob = atlas_simulation_core::gas_compression::GasCompressionProblem {
+            problem_id: "multistage_gas_compression".to_string(),
+            gas,
+            mass_flow_kg_s: req.mass_flow_kg_s.unwrap_or(4.5),
+            suction_pressure_bar: req.inlet_pressure_bar.unwrap_or(1.0),
+            suction_temp_c: req.inlet_temp_c.unwrap_or(20.0),
+            target_discharge_pressure_bar: req.target_outlet_pressure_bar.unwrap_or(30.0),
+            number_of_stages: req.number_of_stages.unwrap_or(3),
+            polytropic_efficiency: req.polytropic_efficiency.unwrap_or(0.82),
+            mechanical_efficiency: 0.98,
+            intercooler_temp_c: req.intercooler_exit_temp_c.or(Some(25.0)),
+            compressibility_factor_z: 1.0,
+        };
+        let res = atlas_simulation_core::gas_compression::solve_gas_compression(&prob);
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_timber_fire(
+        &mut self,
+        req: &SimTimberFireRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let grade = match req.timber_grade.as_deref().unwrap_or("GL28h") {
+            "GL24h" => atlas_simulation_core::timber_fire::TimberGrade::GlulamGL24h,
+            "GL32h" => atlas_simulation_core::timber_fire::TimberGrade::GlulamGL32h,
+            "C24" => atlas_simulation_core::timber_fire::TimberGrade::SoftwoodC24,
+            "C30" => atlas_simulation_core::timber_fire::TimberGrade::SoftwoodC30,
+            "D30" => atlas_simulation_core::timber_fire::TimberGrade::HardwoodD30,
+            _ => atlas_simulation_core::timber_fire::TimberGrade::GlulamGL28h,
+        };
+        let exposure = match req.exposure.as_deref().unwrap_or("three_sides") {
+            "four_sides" => atlas_simulation_core::timber_fire::FireExposureSides::FourSides,
+            "one_side" => atlas_simulation_core::timber_fire::FireExposureSides::OneSide,
+            _ => atlas_simulation_core::timber_fire::FireExposureSides::ThreeSides,
+        };
+        let prob = atlas_simulation_core::timber_fire::TimberFireProblem {
+            problem_id: "timber_fire_resistance".to_string(),
+            timber_grade: grade,
+            initial_breadth_mm: req.initial_breadth_mm.unwrap_or(200.0),
+            initial_depth_mm: req.initial_depth_mm.unwrap_or(500.0),
+            span_m: req.span_m.unwrap_or(8.0),
+            exposure,
+            fire_duration_min: req.fire_duration_min.unwrap_or(60.0),
+            ambient_moment_ed_kn_m: req.ambient_moment_ed_kn_m.unwrap_or(140.0),
+            fire_load_ratio_eta_fi: req.fire_load_ratio_eta_fi.unwrap_or(0.60),
+        };
+        let res = atlas_simulation_core::timber_fire::solve_timber_fire(&prob);
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -6376,6 +6520,81 @@ namespace AtlasCAD.Unity
                     number_of_bolts: None,
                     bolt_grade: None,
                     steel_grade: None,
+                })?
+            }
+            "sim.hydraulic.pump" => {
+                let n = req.arguments.get("nominal_speed_rpm").and_then(|v| v.as_f64());
+                let d = req.arguments.get("nominal_impeller_diameter_mm").and_then(|v| v.as_f64());
+                let h0 = req.arguments.get("shutoff_head_m").and_then(|v| v.as_f64());
+                let hstat = req.arguments.get("system_static_head_m").and_then(|v| v.as_f64());
+                let npsh = req.arguments.get("npsh_available_m").and_then(|v| v.as_f64());
+                self.sim_hydraulic_pump(&SimPumpRequest {
+                    nominal_speed_rpm: n,
+                    nominal_impeller_diameter_mm: d,
+                    shutoff_head_m: h0,
+                    system_static_head_m: hstat,
+                    npsh_available_m: npsh,
+                    ..Default::default()
+                })?
+            }
+            "sim.thermal.heat_exchanger_rating" => {
+                let m_hot = req.arguments.get("hot_mass_flow_kg_s").and_then(|v| v.as_f64());
+                let m_cold = req.arguments.get("cold_mass_flow_kg_s").and_then(|v| v.as_f64());
+                let ds = req.arguments.get("shell_diameter_mm").and_then(|v| v.as_f64());
+                let nt = req.arguments.get("tube_count").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let l = req.arguments.get("tube_length_m").and_then(|v| v.as_f64());
+                self.sim_heat_exchanger_rating(&SimHeatExchangerRatingRequest {
+                    hot_mass_flow_kg_s: m_hot,
+                    cold_mass_flow_kg_s: m_cold,
+                    shell_diameter_mm: ds,
+                    tube_count: nt,
+                    tube_length_m: l,
+                    ..Default::default()
+                })?
+            }
+            "sim.civil.geotechnical_bearing" => {
+                let b = req.arguments.get("foundation_width_b_m").and_then(|v| v.as_f64());
+                let l = req.arguments.get("foundation_length_l_m").and_then(|v| v.as_f64());
+                let df = req.arguments.get("embedment_depth_df_m").and_then(|v| v.as_f64());
+                let p = req.arguments.get("column_axial_load_kn").and_then(|v| v.as_f64());
+                let phi = req.arguments.get("friction_angle_deg").and_then(|v| v.as_f64());
+                self.sim_geotechnical_bearing(&SimGeotechnicalBearingRequest {
+                    foundation_width_b_m: b,
+                    foundation_length_l_m: l,
+                    embedment_depth_df_m: df,
+                    column_axial_load_kn: p,
+                    friction_angle_deg: phi,
+                    ..Default::default()
+                })?
+            }
+            "sim.thermal.gas_compression" => {
+                let m = req.arguments.get("mass_flow_kg_s").and_then(|v| v.as_f64());
+                let p_in = req.arguments.get("inlet_pressure_bar").and_then(|v| v.as_f64());
+                let p_out = req.arguments.get("target_outlet_pressure_bar").and_then(|v| v.as_f64());
+                let n_st = req.arguments.get("number_of_stages").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let eta = req.arguments.get("polytropic_efficiency").and_then(|v| v.as_f64());
+                self.sim_gas_compression(&SimGasCompressionRequest {
+                    mass_flow_kg_s: m,
+                    inlet_pressure_bar: p_in,
+                    target_outlet_pressure_bar: p_out,
+                    number_of_stages: n_st,
+                    polytropic_efficiency: eta,
+                    ..Default::default()
+                })?
+            }
+            "sim.structural.timber_fire" => {
+                let b = req.arguments.get("initial_breadth_mm").and_then(|v| v.as_f64());
+                let h = req.arguments.get("initial_depth_mm").and_then(|v| v.as_f64());
+                let t_fire = req.arguments.get("fire_duration_min").and_then(|v| v.as_f64());
+                let med = req.arguments.get("ambient_moment_ed_kn_m").and_then(|v| v.as_f64());
+                let eta = req.arguments.get("fire_load_ratio_eta_fi").and_then(|v| v.as_f64());
+                self.sim_timber_fire(&SimTimberFireRequest {
+                    initial_breadth_mm: b,
+                    initial_depth_mm: h,
+                    fire_duration_min: t_fire,
+                    ambient_moment_ed_kn_m: med,
+                    fire_load_ratio_eta_fi: eta,
+                    ..Default::default()
                 })?
             }
             "system.deploy.status" => self.deploy_status()?,
@@ -8206,6 +8425,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/structural/connections" => {
             match parse_body_or_default::<SimStructuralConnectionRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_structural_connections(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/hydraulic/pump" => {
+            match parse_body_or_default::<SimPumpRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_hydraulic_pump(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/thermal/heat_exchanger_rating" => {
+            match parse_body_or_default::<SimHeatExchangerRatingRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_heat_exchanger_rating(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/civil/geotechnical_bearing" => {
+            match parse_body_or_default::<SimGeotechnicalBearingRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_geotechnical_bearing(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/thermal/gas_compression" => {
+            match parse_body_or_default::<SimGasCompressionRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_gas_compression(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/structural/timber_fire" => {
+            match parse_body_or_default::<SimTimberFireRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_timber_fire(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -10867,4 +11131,125 @@ struct SimStructuralConnectionRequest {
     pub bolt_grade: Option<String>,
     #[serde(default)]
     pub steel_grade: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimPumpRequest {
+    #[serde(default)]
+    pub nominal_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub nominal_impeller_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub shutoff_head_m: Option<f64>,
+    #[serde(default)]
+    pub pump_curve_coeff_a: Option<f64>,
+    #[serde(default)]
+    pub bep_flow_m3_hr: Option<f64>,
+    #[serde(default)]
+    pub peak_efficiency: Option<f64>,
+    #[serde(default)]
+    pub target_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub target_impeller_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub system_static_head_m: Option<f64>,
+    #[serde(default)]
+    pub system_friction_coeff_k: Option<f64>,
+    #[serde(default)]
+    pub npsh_available_m: Option<f64>,
+    #[serde(default)]
+    pub npsh_required_m: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimHeatExchangerRatingRequest {
+    #[serde(default)]
+    pub hot_mass_flow_kg_s: Option<f64>,
+    #[serde(default)]
+    pub cold_mass_flow_kg_s: Option<f64>,
+    #[serde(default)]
+    pub hot_inlet_temp_c: Option<f64>,
+    #[serde(default)]
+    pub hot_outlet_temp_c: Option<f64>,
+    #[serde(default)]
+    pub cold_inlet_temp_c: Option<f64>,
+    #[serde(default)]
+    pub cold_outlet_temp_c: Option<f64>,
+    #[serde(default)]
+    pub shell_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub baffle_spacing_mm: Option<f64>,
+    #[serde(default)]
+    pub tube_count: Option<usize>,
+    #[serde(default)]
+    pub tube_passes: Option<usize>,
+    #[serde(default)]
+    pub tube_length_m: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimGeotechnicalBearingRequest {
+    #[serde(default)]
+    pub foundation_width_b_m: Option<f64>,
+    #[serde(default)]
+    pub foundation_length_l_m: Option<f64>,
+    #[serde(default)]
+    pub embedment_depth_df_m: Option<f64>,
+    #[serde(default)]
+    pub column_axial_load_kn: Option<f64>,
+    #[serde(default)]
+    pub friction_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub cohesion_c_kpa: Option<f64>,
+    #[serde(default)]
+    pub unit_weight_gamma_kn_m3: Option<f64>,
+    #[serde(default)]
+    pub elastic_modulus_es_mpa: Option<f64>,
+    #[serde(default)]
+    pub factor_of_safety_target: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimGasCompressionRequest {
+    #[serde(default)]
+    pub gas_type: Option<String>,
+    #[serde(default)]
+    pub mass_flow_kg_s: Option<f64>,
+    #[serde(default)]
+    pub inlet_pressure_bar: Option<f64>,
+    #[serde(default)]
+    pub inlet_temp_c: Option<f64>,
+    #[serde(default)]
+    pub target_outlet_pressure_bar: Option<f64>,
+    #[serde(default)]
+    pub number_of_stages: Option<usize>,
+    #[serde(default)]
+    pub polytropic_efficiency: Option<f64>,
+    #[serde(default)]
+    pub intercooler_exit_temp_c: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimTimberFireRequest {
+    #[serde(default)]
+    pub timber_grade: Option<String>,
+    #[serde(default)]
+    pub initial_breadth_mm: Option<f64>,
+    #[serde(default)]
+    pub initial_depth_mm: Option<f64>,
+    #[serde(default)]
+    pub span_m: Option<f64>,
+    #[serde(default)]
+    pub exposure: Option<String>,
+    #[serde(default)]
+    pub fire_duration_min: Option<f64>,
+    #[serde(default)]
+    pub ambient_moment_ed_kn_m: Option<f64>,
+    #[serde(default)]
+    pub fire_load_ratio_eta_fi: Option<f64>,
 }

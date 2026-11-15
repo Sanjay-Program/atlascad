@@ -1974,5 +1974,260 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    // --- 33. Centrifugal Pumps & Affinity Laws (ISO 9906) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.hydraulic.pump",
+            "Centrifugal Pump Performance, Affinity Laws & Operating Point (ISO 9906)",
+            "Calculates head-flow operating point, speed/diameter affinity scaling, brake horsepower, hydraulic efficiency, and NPSH cavitation margin.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "nominal_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Nominal pump speed in RPM".into(),
+            required: true,
+            default_value: Some(serde_json::json!(2950.0)),
+            validation_rules: vec![ValidationRule::Min(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "nominal_impeller_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Nominal impeller diameter in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(250.0)),
+            validation_rules: vec![ValidationRule::Min(20.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "shutoff_head_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Shutoff head H0 in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(85.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "system_static_head_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "System static elevation head in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(25.0)),
+            validation_rules: vec![ValidationRule::Min(0.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "npsh_available_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Net Positive Suction Head Available (NPSHA) in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(6.5)),
+            validation_rules: vec![ValidationRule::Min(0.1)],
+        }),
+    )?;
+
+    // --- 34. Shell-and-Tube Heat Exchangers (TEMA / Kern's Method) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.thermal.heat_exchanger_rating",
+            "Shell-and-Tube Heat Exchanger Rating & Kern Method (TEMA)",
+            "Calculates LMTD, F-correction factor, Kern shell-side Nu/ho, tube-side Dittus-Boelter hi, overall clean/fouled U, surface area margin, and shell/tube pressure drops.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "hot_mass_flow_kg_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Hot stream mass flowrate in kg/s".into(),
+            required: true,
+            default_value: Some(serde_json::json!(18.0)),
+            validation_rules: vec![ValidationRule::Min(0.01)],
+        })
+        .with_argument(CommandArgument {
+            name: "cold_mass_flow_kg_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Cold stream mass flowrate in kg/s".into(),
+            required: true,
+            default_value: Some(serde_json::json!(24.66)),
+            validation_rules: vec![ValidationRule::Min(0.01)],
+        })
+        .with_argument(CommandArgument {
+            name: "shell_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Shell internal diameter in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(600.0)),
+            validation_rules: vec![ValidationRule::Min(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "tube_count".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Total number of heat transfer tubes".into(),
+            required: true,
+            default_value: Some(serde_json::json!(380)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "tube_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Nominal tube length in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(4.5)),
+            validation_rules: vec![ValidationRule::Min(0.5)],
+        }),
+    )?;
+
+    // --- 35. Geotechnical Bearing Capacity & Settlement (Meyerhof / EC7) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.civil.geotechnical_bearing",
+            "Shallow Foundation Bearing Capacity & Elastic Settlement (Meyerhof / EC7)",
+            "Calculates ultimate bearing capacity q_ult, allowable capacity q_all, factor of safety, and elastic immediate settlement under column loading.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "foundation_width_b_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Footing width B in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(2.20)),
+            validation_rules: vec![ValidationRule::Min(0.2)],
+        })
+        .with_argument(CommandArgument {
+            name: "foundation_length_l_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Footing length L in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(2.20)),
+            validation_rules: vec![ValidationRule::Min(0.2)],
+        })
+        .with_argument(CommandArgument {
+            name: "embedment_depth_df_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Embedment depth D_f in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1.50)),
+            validation_rules: vec![ValidationRule::Min(0.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "column_axial_load_kn".into(),
+            arg_type: ArgumentType::Number,
+            description: "Applied column vertical load in kN".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1250.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "friction_angle_deg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Effective soil internal friction angle phi' in degrees".into(),
+            required: false,
+            default_value: Some(serde_json::json!(32.0)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(50.0)],
+        }),
+    )?;
+
+    // --- 36. Multi-Stage Gas Compression & Intercooling (ASME PTC 10) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.thermal.gas_compression",
+            "Multi-Stage Gas Compression & Intercooling Thermodynamics (ASME PTC 10)",
+            "Calculates stage pressure ratios, polytropic head, discharge temperatures, intercooling heat duties, total brake power, and energy savings.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "mass_flow_kg_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Gas mass flowrate in kg/s".into(),
+            required: true,
+            default_value: Some(serde_json::json!(4.5)),
+            validation_rules: vec![ValidationRule::Min(0.01)],
+        })
+        .with_argument(CommandArgument {
+            name: "inlet_pressure_bar".into(),
+            arg_type: ArgumentType::Number,
+            description: "Overall inlet suction pressure in bar".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1.0)),
+            validation_rules: vec![ValidationRule::Min(0.01)],
+        })
+        .with_argument(CommandArgument {
+            name: "target_outlet_pressure_bar".into(),
+            arg_type: ArgumentType::Number,
+            description: "Target final discharge pressure in bar".into(),
+            required: true,
+            default_value: Some(serde_json::json!(30.0)),
+            validation_rules: vec![ValidationRule::Min(0.1)],
+        })
+        .with_argument(CommandArgument {
+            name: "number_of_stages".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Number of compression stages".into(),
+            required: true,
+            default_value: Some(serde_json::json!(3)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "polytropic_efficiency".into(),
+            arg_type: ArgumentType::Number,
+            description: "Stage polytropic efficiency (0.5 to 0.95)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.82)),
+            validation_rules: vec![ValidationRule::Min(0.50), ValidationRule::Max(0.98)],
+        }),
+    )?;
+
+    // --- 37. Structural Timber Fire Resistance (Eurocode 5 EN 1995-1-2) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.structural.timber_fire",
+            "Structural Timber Fire Resistance & Charring Kinetics (Eurocode 5)",
+            "Calculates ISO 834 fire temperatures, 1D/effective charring depth, reduced residual cross-section, accidental fire design bending moment, and R30/R60/R90 verification.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "initial_breadth_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Initial timber breadth in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(200.0)),
+            validation_rules: vec![ValidationRule::Min(20.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "initial_depth_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Initial timber depth in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(500.0)),
+            validation_rules: vec![ValidationRule::Min(20.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "fire_duration_min".into(),
+            arg_type: ArgumentType::Number,
+            description: "Fire exposure duration in minutes (e.g. 30, 60, 90)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(60.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "ambient_moment_ed_kn_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Cold ULS design bending moment in kNm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(140.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "fire_load_ratio_eta_fi".into(),
+            arg_type: ArgumentType::Number,
+            description: "Accidental fire load combination factor eta_fi".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.60)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(1.0)],
+        }),
+    )?;
+
     Ok(())
 }
