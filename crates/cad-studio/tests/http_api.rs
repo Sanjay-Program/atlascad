@@ -5891,5 +5891,131 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 106. Hydrodynamic Journal Bearing (ISO 7902 / DIN 31652)
+    let res_bearing = post(
+        addr,
+        "/api/sim/tribology/journal_bearing",
+        r#"{
+            "journal_diameter_mm": 100.0,
+            "bearing_length_mm": 70.0,
+            "radial_clearance_um": 65.0,
+            "rotational_speed_rpm": 3000.0,
+            "radial_load_n": 12500.0,
+            "lubricant_viscosity_mpa_s": 25.0
+        }"#,
+    )?;
+    assert_eq!(res_bearing.status, 200);
+    let bearing_json = json(&res_bearing)?;
+    assert!(bearing_json["sommerfeld_number"].as_f64().unwrap() > 0.3);
+    assert!(bearing_json["minimum_film_thickness_um"].as_f64().unwrap() > 20.0);
+    assert!(bearing_json["hydrodynamic_power_loss_kw"].as_f64().unwrap() > 1.0);
+    assert!(bearing_json["is_safe"].as_bool().unwrap());
+
+    // 107. Wind Turbine Aerodynamics & BEM Power Curve (IEC 61400-1)
+    let res_wind = post(
+        addr,
+        "/api/sim/renewable/wind_turbine",
+        r#"{
+            "rotor_radius_m": 63.0,
+            "rated_power_mw": 4.0,
+            "rated_wind_speed_m_s": 11.5,
+            "tip_speed_ratio_optimal": 7.8
+        }"#,
+    )?;
+    assert_eq!(res_wind.status, 200);
+    let wind_json = json(&res_wind)?;
+    assert!(wind_json["rated_rotor_speed_rpm"].as_f64().unwrap() > 10.0);
+    assert!(wind_json["peak_aerodynamic_cp"].as_f64().unwrap() > 0.40);
+    assert!(wind_json["annual_energy_production_gwh"].as_f64().unwrap() > 10.0);
+    assert!(wind_json["is_safe"].as_bool().unwrap());
+
+    // 108. Steam Rankine Power Cycle & Condenser Thermodynamics (IAPWS-IF97 / ASME PTC 6)
+    let res_rankine = post(
+        addr,
+        "/api/sim/thermal/steam_rankine",
+        r#"{
+            "steam_mass_flow_kg_s": 120.0,
+            "boiler_pressure_bar": 120.0,
+            "superheater_temp_c": 540.0,
+            "condenser_pressure_bar": 0.08
+        }"#,
+    )?;
+    assert_eq!(res_rankine.status, 200);
+    let rankine_json = json(&res_rankine)?;
+    assert!(rankine_json["gross_electric_power_mw"].as_f64().unwrap() > 100.0);
+    assert!(rankine_json["cycle_thermal_efficiency_pct"].as_f64().unwrap() > 30.0);
+    assert!(rankine_json["cooling_water_flow_rate_kg_s"].as_f64().unwrap() > 3000.0);
+    assert!(rankine_json["is_safe"].as_bool().unwrap());
+
+    // 109. Deep Foundation Bored Pile Load Capacity & Settlement (Eurocode 7 / API RP 2A)
+    let res_pile = post(
+        addr,
+        "/api/sim/civil/pile_foundation",
+        r#"{
+            "pile_diameter_m": 1.0,
+            "pile_length_m": 20.0,
+            "applied_axial_load_kn": 3200.0
+        }"#,
+    )?;
+    assert_eq!(res_pile.status, 200);
+    let pile_json = json(&res_pile)?;
+    assert!(pile_json["ultimate_total_capacity_kn"].as_f64().unwrap() > 5000.0);
+    assert!(pile_json["design_bearing_resistance_kn"].as_f64().unwrap() > 4000.0);
+    assert!(pile_json["total_working_settlement_mm"].as_f64().unwrap() < 15.0);
+    assert!(pile_json["is_safe"].as_bool().unwrap());
+
+    // 110. Involute Gear Tooth Pitting & Root Bending Fatigue (ISO 6336 Method B / AGMA 2101)
+    let res_gear = post(
+        addr,
+        "/api/sim/mechanical/gear_fatigue",
+        r#"{
+            "transmitted_power_kw": 55.0,
+            "pinion_speed_rpm": 1450.0,
+            "pinion_teeth_z1": 21,
+            "gear_teeth_z2": 63,
+            "normal_module_mm": 4.0,
+            "face_width_mm": 50.0
+        }"#,
+    )?;
+    assert_eq!(res_gear.status, 200);
+    let gear_json = json(&res_gear)?;
+    assert!(gear_json["safety_factor_pitting"].as_f64().unwrap() >= 1.25);
+    assert!(gear_json["safety_factor_bending"].as_f64().unwrap() >= 1.40);
+    assert!(gear_json["tangential_force_n"].as_f64().unwrap() > 5000.0);
+    assert!(gear_json["is_safe"].as_bool().unwrap());
+
+    // 111. Universal Commands Execution Verification (Batch 8 Domains)
+    for cmd_id in [
+        "sim.tribology.journal_bearing",
+        "sim.renewable.wind_turbine",
+        "sim.thermal.steam_rankine",
+        "sim.civil.pile_foundation",
+        "sim.mechanical.gear_fatigue",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 112. Enterprise MCP Tool Calling (Batch 8 Domains)
+    for tool_name in [
+        "atlas_sim_tribology_journal_bearing",
+        "atlas_sim_renewable_wind_turbine",
+        "atlas_sim_thermal_steam_rankine",
+        "atlas_sim_civil_pile_foundation",
+        "atlas_sim_mechanical_gear_fatigue",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 161, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

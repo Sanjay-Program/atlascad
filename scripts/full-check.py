@@ -1385,6 +1385,74 @@ def simulation_section(studio: Studio) -> None:
     check(sol_data.get("collector_efficiency_pct", 0.0) > 50.0, "collector efficiency > 50%")
     check(sol_data.get("useful_thermal_power_w", 0.0) > 900.0, "useful solar heat > 900 W")
     check(sol_data.get("stagnation_temperature_c", 0.0) > 130.0, "stagnation temperature > 130 C")
+
+    # 40. Hydrodynamic Journal Bearing (ISO 7902 / DIN 31652)
+    bearing = studio.post("/api/sim/tribology/journal_bearing", {
+        "journal_diameter_mm": 100.0,
+        "bearing_length_mm": 70.0,
+        "radial_clearance_um": 65.0,
+        "rotational_speed_rpm": 3000.0,
+        "radial_load_n": 12500.0,
+        "lubricant_viscosity_mpa_s": 25.0
+    })
+    check(bearing.status == 200, f"journal bearing returns 200 (got {bearing.status})")
+    brg_data = bearing.json()
+    check(brg_data.get("sommerfeld_number", 0.0) > 0.3, "sommerfeld number > 0.3")
+    check(brg_data.get("minimum_film_thickness_um", 0.0) > 20.0, "min oil film thickness > 20 um")
+    check(brg_data.get("hydrodynamic_power_loss_kw", 0.0) > 1.0, "bearing friction loss > 1 kW")
+
+    # 41. Wind Turbine Aerodynamics & BEM Power Curve (IEC 61400-1)
+    wind = studio.post("/api/sim/renewable/wind_turbine", {
+        "rotor_radius_m": 63.0,
+        "rated_power_mw": 4.0,
+        "rated_wind_speed_m_s": 11.5,
+        "tip_speed_ratio_optimal": 7.8
+    })
+    check(wind.status == 200, f"wind turbine returns 200 (got {wind.status})")
+    wind_data = wind.json()
+    check(wind_data.get("rated_rotor_speed_rpm", 0.0) > 10.0, "rated rotor speed > 10 RPM")
+    check(wind_data.get("peak_aerodynamic_cp", 0.0) > 0.40, "peak aerodynamic Cp > 0.40")
+    check(wind_data.get("annual_energy_production_gwh", 0.0) > 10.0, "wind turbine AEP > 10 GWh")
+
+    # 42. Steam Rankine Power Cycle & Condenser Thermodynamics (IAPWS-IF97 / ASME PTC 6)
+    rankine = studio.post("/api/sim/thermal/steam_rankine", {
+        "steam_mass_flow_kg_s": 120.0,
+        "boiler_pressure_bar": 120.0,
+        "superheater_temp_c": 540.0,
+        "condenser_pressure_bar": 0.08
+    })
+    check(rankine.status == 200, f"steam rankine returns 200 (got {rankine.status})")
+    rnk_data = rankine.json()
+    check(rnk_data.get("gross_electric_power_mw", 0.0) > 100.0, "rankine gross electric power > 100 MW")
+    check(rnk_data.get("cycle_thermal_efficiency_pct", 0.0) > 30.0, "rankine cycle efficiency > 30%")
+    check(rnk_data.get("cooling_water_flow_rate_kg_s", 0.0) > 3000.0, "condenser cooling water > 3000 kg/s")
+
+    # 43. Deep Foundation Bored Pile Load Capacity & Settlement (Eurocode 7 / API RP 2A)
+    pile = studio.post("/api/sim/civil/pile_foundation", {
+        "pile_diameter_m": 1.0,
+        "pile_length_m": 20.0,
+        "applied_axial_load_kn": 3200.0
+    })
+    check(pile.status == 200, f"pile foundation returns 200 (got {pile.status})")
+    pile_data = pile.json()
+    check(pile_data.get("ultimate_total_capacity_kn", 0.0) > 5000.0, "pile ultimate capacity > 5000 kN")
+    check(pile_data.get("design_bearing_resistance_kn", 0.0) > 4000.0, "pile design resistance > 4000 kN")
+    check(pile_data.get("total_working_settlement_mm", 0.0) < 15.0, "pile settlement < 15 mm")
+
+    # 44. Involute Gear Tooth Pitting & Root Bending Fatigue (ISO 6336 Method B / AGMA 2101)
+    gear = studio.post("/api/sim/mechanical/gear_fatigue", {
+        "transmitted_power_kw": 55.0,
+        "pinion_speed_rpm": 1450.0,
+        "pinion_teeth_z1": 21,
+        "gear_teeth_z2": 63,
+        "normal_module_mm": 4.0,
+        "face_width_mm": 50.0
+    })
+    check(gear.status == 200, f"gear fatigue returns 200 (got {gear.status})")
+    gear_data = gear.json()
+    check(gear_data.get("safety_factor_pitting", 0.0) >= 1.25, "gear pitting safety factor >= 1.25")
+    check(gear_data.get("safety_factor_bending", 0.0) >= 1.40, "gear bending safety factor >= 1.40")
+    check(gear_data.get("tangential_force_n", 0.0) > 5000.0, "tangential gear force > 5000 N")
     report("simulation")
 
 

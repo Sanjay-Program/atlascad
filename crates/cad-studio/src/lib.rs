@@ -5145,6 +5145,134 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_tribology_journal_bearing(
+        &mut self,
+        req: &SimJournalBearingRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::journal_bearing::JournalBearingProblem {
+            problem_id: "journal_bearing_sim".to_string(),
+            journal_diameter_mm: req.journal_diameter_mm.unwrap_or(100.0),
+            bearing_length_mm: req.bearing_length_mm.unwrap_or(70.0),
+            radial_clearance_um: req.radial_clearance_um.unwrap_or(65.0),
+            rotational_speed_rpm: req.rotational_speed_rpm.unwrap_or(3000.0),
+            radial_load_n: req.radial_load_n.unwrap_or(12500.0),
+            lubricant_viscosity_mpa_s: req.lubricant_viscosity_mpa_s.unwrap_or(25.0),
+            lubricant_density_kg_m3: req.lubricant_density_kg_m3.unwrap_or(860.0),
+            lubricant_specific_heat_j_kg_k: req.lubricant_specific_heat_j_kg_k.unwrap_or(1950.0),
+            inlet_oil_temp_c: req.inlet_oil_temp_c.unwrap_or(45.0),
+            surface_roughness_rz_um: req.surface_roughness_rz_um.unwrap_or(3.0),
+        };
+        let res = atlas_simulation_core::journal_bearing::solve_journal_bearing(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_renewable_wind_turbine(
+        &mut self,
+        req: &SimWindTurbineRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::wind_turbine::WindTurbineProblem {
+            problem_id: "wind_turbine_sim".to_string(),
+            rotor_radius_m: req.rotor_radius_m.unwrap_or(63.0),
+            blade_count: req.blade_count.unwrap_or(3),
+            rated_power_mw: req.rated_power_mw.unwrap_or(4.0),
+            rated_wind_speed_m_s: req.rated_wind_speed_m_s.unwrap_or(11.5),
+            cut_in_wind_speed_m_s: req.cut_in_wind_speed_m_s.unwrap_or(3.0),
+            cut_out_wind_speed_m_s: req.cut_out_wind_speed_m_s.unwrap_or(25.0),
+            tip_speed_ratio_optimal: req.tip_speed_ratio_optimal.unwrap_or(7.8),
+            air_density_kg_m3: req.air_density_kg_m3.unwrap_or(1.225),
+            gearbox_efficiency: req.gearbox_efficiency.unwrap_or(0.97),
+            generator_efficiency: req.generator_efficiency.unwrap_or(0.95),
+            weibull_k_shape: req.weibull_k_shape.unwrap_or(2.0),
+            weibull_c_scale_m_s: req.weibull_c_scale_m_s.unwrap_or(8.5),
+            operating_wind_speed_m_s: req.operating_wind_speed_m_s,
+        };
+        let res = atlas_simulation_core::wind_turbine::solve_wind_turbine(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_thermal_steam_rankine(
+        &mut self,
+        req: &SimSteamRankineRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::steam_rankine::SteamRankineProblem {
+            problem_id: "steam_rankine_sim".to_string(),
+            steam_mass_flow_kg_s: req.steam_mass_flow_kg_s.unwrap_or(120.0),
+            boiler_pressure_bar: req.boiler_pressure_bar.unwrap_or(120.0),
+            superheater_temp_c: req.superheater_temp_c.unwrap_or(540.0),
+            condenser_pressure_bar: req.condenser_pressure_bar.unwrap_or(0.08),
+            turbine_isentropic_efficiency: req.turbine_isentropic_efficiency.unwrap_or(0.88),
+            pump_isentropic_efficiency: req.pump_isentropic_efficiency.unwrap_or(0.85),
+            generator_efficiency: req.generator_efficiency.unwrap_or(0.985),
+            boiler_efficiency: req.boiler_efficiency.unwrap_or(0.90),
+            cooling_water_temp_rise_c: req.cooling_water_temp_rise_c.unwrap_or(10.0),
+        };
+        let res = atlas_simulation_core::steam_rankine::solve_steam_rankine(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_civil_pile_foundation(
+        &mut self,
+        req: &SimPileFoundationRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::pile_foundation::PileFoundationProblem {
+            problem_id: "pile_foundation_sim".to_string(),
+            pile_diameter_m: req.pile_diameter_m.unwrap_or(1.0),
+            pile_length_m: req.pile_length_m.unwrap_or(20.0),
+            pile_elastic_modulus_gpa: req.pile_elastic_modulus_gpa.unwrap_or(30.0),
+            applied_axial_load_kn: req.applied_axial_load_kn.unwrap_or(3200.0),
+            soil_layers: vec![
+                atlas_simulation_core::pile_foundation::SoilLayerSpec {
+                    layer_thickness_m: 6.0,
+                    soil_type: atlas_simulation_core::pile_foundation::SoilLayerType::CohesiveClay { cu_kpa: 45.0 },
+                },
+                atlas_simulation_core::pile_foundation::SoilLayerSpec {
+                    layer_thickness_m: 8.0,
+                    soil_type: atlas_simulation_core::pile_foundation::SoilLayerType::CohesiveClay { cu_kpa: 80.0 },
+                },
+                atlas_simulation_core::pile_foundation::SoilLayerSpec {
+                    layer_thickness_m: 6.0,
+                    soil_type: atlas_simulation_core::pile_foundation::SoilLayerType::CohesionlessSand { friction_angle_deg: 35.0, unit_weight_kn_m3: 19.5 },
+                },
+            ],
+            groundwater_depth_m: req.groundwater_depth_m.unwrap_or(3.0),
+            base_soil_type: atlas_simulation_core::pile_foundation::SoilLayerType::CohesionlessSand { friction_angle_deg: 36.0, unit_weight_kn_m3: 20.0 },
+            partial_factor_base: req.partial_factor_base.unwrap_or(1.30),
+            partial_factor_shaft: req.partial_factor_shaft.unwrap_or(1.15),
+            max_allowable_settlement_mm: req.max_allowable_settlement_mm.unwrap_or(15.0),
+        };
+        let res = atlas_simulation_core::pile_foundation::solve_pile_foundation(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_mechanical_gear_fatigue(
+        &mut self,
+        req: &SimGearFatigueRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::gear_fatigue::GearFatigueProblem {
+            problem_id: "gear_fatigue_sim".to_string(),
+            transmitted_power_kw: req.transmitted_power_kw.unwrap_or(55.0),
+            pinion_speed_rpm: req.pinion_speed_rpm.unwrap_or(1450.0),
+            pinion_teeth_z1: req.pinion_teeth_z1.unwrap_or(21),
+            gear_teeth_z2: req.gear_teeth_z2.unwrap_or(63),
+            normal_module_mm: req.normal_module_mm.unwrap_or(4.0),
+            face_width_mm: req.face_width_mm.unwrap_or(50.0),
+            helix_angle_deg: req.helix_angle_deg.unwrap_or(15.0),
+            normal_pressure_angle_deg: req.normal_pressure_angle_deg.unwrap_or(20.0),
+            application_factor_ka: req.application_factor_ka.unwrap_or(1.25),
+            material_contact_fatigue_limit_mpa: req.material_contact_fatigue_limit_mpa.unwrap_or(1450.0),
+            material_bending_fatigue_limit_mpa: req.material_bending_fatigue_limit_mpa.unwrap_or(850.0),
+            required_safety_factor_pitting: req.required_safety_factor_pitting.unwrap_or(1.25),
+            required_safety_factor_bending: req.required_safety_factor_bending.unwrap_or(1.40),
+        };
+        let res = atlas_simulation_core::gear_fatigue::solve_gear_fatigue(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -6969,6 +7097,75 @@ namespace AtlasCAD.Unity
                     ambient_temp_c: t_amb,
                     fluid_inlet_temp_c: t_in,
                     fluid_flow_rate_kg_s: m_dot,
+                    ..Default::default()
+                })?
+            }
+            "sim.tribology.journal_bearing" => {
+                let d = req.arguments.get("journal_diameter_mm").and_then(|v| v.as_f64());
+                let l = req.arguments.get("bearing_length_mm").and_then(|v| v.as_f64());
+                let c = req.arguments.get("radial_clearance_um").and_then(|v| v.as_f64());
+                let rpm = req.arguments.get("rotational_speed_rpm").and_then(|v| v.as_f64());
+                let load = req.arguments.get("radial_load_n").and_then(|v| v.as_f64());
+                self.sim_tribology_journal_bearing(&SimJournalBearingRequest {
+                    journal_diameter_mm: d,
+                    bearing_length_mm: l,
+                    radial_clearance_um: c,
+                    rotational_speed_rpm: rpm,
+                    radial_load_n: load,
+                    ..Default::default()
+                })?
+            }
+            "sim.renewable.wind_turbine" => {
+                let r = req.arguments.get("rotor_radius_m").and_then(|v| v.as_f64());
+                let p = req.arguments.get("rated_power_mw").and_then(|v| v.as_f64());
+                let v_rated = req.arguments.get("rated_wind_speed_m_s").and_then(|v| v.as_f64());
+                let v_op = req.arguments.get("operating_wind_speed_m_s").and_then(|v| v.as_f64());
+                self.sim_renewable_wind_turbine(&SimWindTurbineRequest {
+                    rotor_radius_m: r,
+                    rated_power_mw: p,
+                    rated_wind_speed_m_s: v_rated,
+                    operating_wind_speed_m_s: v_op,
+                    ..Default::default()
+                })?
+            }
+            "sim.thermal.steam_rankine" => {
+                let m = req.arguments.get("steam_mass_flow_kg_s").and_then(|v| v.as_f64());
+                let p_b = req.arguments.get("boiler_pressure_bar").and_then(|v| v.as_f64());
+                let t_sup = req.arguments.get("superheater_temp_c").and_then(|v| v.as_f64());
+                let p_c = req.arguments.get("condenser_pressure_bar").and_then(|v| v.as_f64());
+                self.sim_thermal_steam_rankine(&SimSteamRankineRequest {
+                    steam_mass_flow_kg_s: m,
+                    boiler_pressure_bar: p_b,
+                    superheater_temp_c: t_sup,
+                    condenser_pressure_bar: p_c,
+                    ..Default::default()
+                })?
+            }
+            "sim.civil.pile_foundation" => {
+                let d = req.arguments.get("pile_diameter_m").and_then(|v| v.as_f64());
+                let l = req.arguments.get("pile_length_m").and_then(|v| v.as_f64());
+                let load = req.arguments.get("applied_axial_load_kn").and_then(|v| v.as_f64());
+                self.sim_civil_pile_foundation(&SimPileFoundationRequest {
+                    pile_diameter_m: d,
+                    pile_length_m: l,
+                    applied_axial_load_kn: load,
+                    ..Default::default()
+                })?
+            }
+            "sim.mechanical.gear_fatigue" => {
+                let p = req.arguments.get("transmitted_power_kw").and_then(|v| v.as_f64());
+                let rpm = req.arguments.get("pinion_speed_rpm").and_then(|v| v.as_f64());
+                let z1 = req.arguments.get("pinion_teeth_z1").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let z2 = req.arguments.get("gear_teeth_z2").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let mn = req.arguments.get("normal_module_mm").and_then(|v| v.as_f64());
+                let b = req.arguments.get("face_width_mm").and_then(|v| v.as_f64());
+                self.sim_mechanical_gear_fatigue(&SimGearFatigueRequest {
+                    transmitted_power_kw: p,
+                    pinion_speed_rpm: rpm,
+                    pinion_teeth_z1: z1,
+                    gear_teeth_z2: z2,
+                    normal_module_mm: mn,
+                    face_width_mm: b,
                     ..Default::default()
                 })?
             }
@@ -8935,6 +9132,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/thermal/solar_collector" => {
             match parse_body_or_default::<SimSolarCollectorRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_thermal_solar_collector(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/tribology/journal_bearing" => {
+            match parse_body_or_default::<SimJournalBearingRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_tribology_journal_bearing(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/renewable/wind_turbine" => {
+            match parse_body_or_default::<SimWindTurbineRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_renewable_wind_turbine(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/thermal/steam_rankine" => {
+            match parse_body_or_default::<SimSteamRankineRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_thermal_steam_rankine(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/civil/pile_foundation" => {
+            match parse_body_or_default::<SimPileFoundationRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_civil_pile_foundation(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/mechanical/gear_fatigue" => {
+            match parse_body_or_default::<SimGearFatigueRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_mechanical_gear_fatigue(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -11961,4 +12203,135 @@ struct SimSolarCollectorRequest {
     pub linear_heat_loss_a1: Option<f64>,
     #[serde(default)]
     pub quadratic_heat_loss_a2: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimJournalBearingRequest {
+    #[serde(default)]
+    pub journal_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub bearing_length_mm: Option<f64>,
+    #[serde(default)]
+    pub radial_clearance_um: Option<f64>,
+    #[serde(default)]
+    pub rotational_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub radial_load_n: Option<f64>,
+    #[serde(default)]
+    pub lubricant_viscosity_mpa_s: Option<f64>,
+    #[serde(default)]
+    pub lubricant_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub lubricant_specific_heat_j_kg_k: Option<f64>,
+    #[serde(default)]
+    pub inlet_oil_temp_c: Option<f64>,
+    #[serde(default)]
+    pub surface_roughness_rz_um: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimWindTurbineRequest {
+    #[serde(default)]
+    pub rotor_radius_m: Option<f64>,
+    #[serde(default)]
+    pub blade_count: Option<usize>,
+    #[serde(default)]
+    pub rated_power_mw: Option<f64>,
+    #[serde(default)]
+    pub rated_wind_speed_m_s: Option<f64>,
+    #[serde(default)]
+    pub cut_in_wind_speed_m_s: Option<f64>,
+    #[serde(default)]
+    pub cut_out_wind_speed_m_s: Option<f64>,
+    #[serde(default)]
+    pub tip_speed_ratio_optimal: Option<f64>,
+    #[serde(default)]
+    pub air_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub gearbox_efficiency: Option<f64>,
+    #[serde(default)]
+    pub generator_efficiency: Option<f64>,
+    #[serde(default)]
+    pub weibull_k_shape: Option<f64>,
+    #[serde(default)]
+    pub weibull_c_scale_m_s: Option<f64>,
+    #[serde(default)]
+    pub operating_wind_speed_m_s: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimSteamRankineRequest {
+    #[serde(default)]
+    pub steam_mass_flow_kg_s: Option<f64>,
+    #[serde(default)]
+    pub boiler_pressure_bar: Option<f64>,
+    #[serde(default)]
+    pub superheater_temp_c: Option<f64>,
+    #[serde(default)]
+    pub condenser_pressure_bar: Option<f64>,
+    #[serde(default)]
+    pub turbine_isentropic_efficiency: Option<f64>,
+    #[serde(default)]
+    pub pump_isentropic_efficiency: Option<f64>,
+    #[serde(default)]
+    pub generator_efficiency: Option<f64>,
+    #[serde(default)]
+    pub boiler_efficiency: Option<f64>,
+    #[serde(default)]
+    pub cooling_water_temp_rise_c: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimPileFoundationRequest {
+    #[serde(default)]
+    pub pile_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub pile_length_m: Option<f64>,
+    #[serde(default)]
+    pub pile_elastic_modulus_gpa: Option<f64>,
+    #[serde(default)]
+    pub applied_axial_load_kn: Option<f64>,
+    #[serde(default)]
+    pub groundwater_depth_m: Option<f64>,
+    #[serde(default)]
+    pub partial_factor_base: Option<f64>,
+    #[serde(default)]
+    pub partial_factor_shaft: Option<f64>,
+    #[serde(default)]
+    pub max_allowable_settlement_mm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimGearFatigueRequest {
+    #[serde(default)]
+    pub transmitted_power_kw: Option<f64>,
+    #[serde(default)]
+    pub pinion_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub pinion_teeth_z1: Option<usize>,
+    #[serde(default)]
+    pub gear_teeth_z2: Option<usize>,
+    #[serde(default)]
+    pub normal_module_mm: Option<f64>,
+    #[serde(default)]
+    pub face_width_mm: Option<f64>,
+    #[serde(default)]
+    pub helix_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub normal_pressure_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub application_factor_ka: Option<f64>,
+    #[serde(default)]
+    pub material_contact_fatigue_limit_mpa: Option<f64>,
+    #[serde(default)]
+    pub material_bending_fatigue_limit_mpa: Option<f64>,
+    #[serde(default)]
+    pub required_safety_factor_pitting: Option<f64>,
+    #[serde(default)]
+    pub required_safety_factor_bending: Option<f64>,
 }

@@ -1035,6 +1035,76 @@ impl McpServer {
                     "required": ["aperture_area_m2", "solar_irradiance_w_m2", "ambient_temp_c", "fluid_inlet_temp_c"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_tribology_journal_bearing".into(),
+                description: "ISO 7902 / DIN 31652 hydrodynamic fluid-film journal bearing mechanics, Sommerfeld number, eccentricity, minimum oil film, and power loss".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "journal_diameter_mm": { "type": "number", "default": 100.0 },
+                        "bearing_length_mm": { "type": "number", "default": 70.0 },
+                        "radial_clearance_um": { "type": "number", "default": 65.0 },
+                        "rotational_speed_rpm": { "type": "number", "default": 3000.0 },
+                        "radial_load_n": { "type": "number", "default": 12500.0 }
+                    },
+                    "required": ["journal_diameter_mm", "bearing_length_mm", "radial_clearance_um", "rotational_speed_rpm", "radial_load_n"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_renewable_wind_turbine".into(),
+                description: "IEC 61400-1 horizontal-axis wind turbine BEM aeromechanics, swept area, Betz limit, pitch-regulated power curve, and Weibull AEP".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "rotor_radius_m": { "type": "number", "default": 63.0 },
+                        "rated_power_mw": { "type": "number", "default": 4.0 },
+                        "rated_wind_speed_m_s": { "type": "number", "default": 11.5 }
+                    },
+                    "required": ["rotor_radius_m", "rated_power_mw", "rated_wind_speed_m_s"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_thermal_steam_rankine".into(),
+                description: "IAPWS-IF97 / ASME PTC 6 steam Rankine cycle, superheated turbine expansion, exhaust quality, thermal efficiency, and condenser duty".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "steam_mass_flow_kg_s": { "type": "number", "default": 120.0 },
+                        "boiler_pressure_bar": { "type": "number", "default": 120.0 },
+                        "superheater_temp_c": { "type": "number", "default": 540.0 }
+                    },
+                    "required": ["steam_mass_flow_kg_s", "boiler_pressure_bar", "superheater_temp_c"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_civil_pile_foundation".into(),
+                description: "Eurocode 7 / API RP 2A bored pile axial capacity, stratified shaft skin friction (alpha/beta), base end-bearing, and elastic settlement".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "pile_diameter_m": { "type": "number", "default": 1.0 },
+                        "pile_length_m": { "type": "number", "default": 20.0 },
+                        "applied_axial_load_kn": { "type": "number", "default": 3200.0 }
+                    },
+                    "required": ["pile_diameter_m", "pile_length_m", "applied_axial_load_kn"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_mechanical_gear_fatigue".into(),
+                description: "ISO 6336 Method B spur/helical gear pitting contact fatigue (sigma_H, S_H) and tooth root bending fatigue (sigma_F, S_F)".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "transmitted_power_kw": { "type": "number", "default": 55.0 },
+                        "pinion_speed_rpm": { "type": "number", "default": 1450.0 },
+                        "pinion_teeth_z1": { "type": "integer", "default": 21 },
+                        "gear_teeth_z2": { "type": "integer", "default": 63 },
+                        "normal_module_mm": { "type": "number", "default": 4.0 },
+                        "face_width_mm": { "type": "number", "default": 50.0 }
+                    },
+                    "required": ["transmitted_power_kw", "pinion_speed_rpm", "pinion_teeth_z1", "gear_teeth_z2", "normal_module_mm", "face_width_mm"]
+                }),
+            },
         ]
     }
 

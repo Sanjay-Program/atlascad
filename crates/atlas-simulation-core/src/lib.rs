@@ -29,6 +29,7 @@ pub mod fracture;
 pub mod fsi;
 pub mod gas_compression;
 pub mod gas_turbine;
+pub mod gear_fatigue;
 pub mod gears;
 pub mod generative;
 pub mod geotechnical;
@@ -40,6 +41,7 @@ pub mod hydraulic_actuator;
 pub mod hydrology;
 pub mod hypersonic;
 pub mod induction_motor;
+pub mod journal_bearing;
 pub mod machining_physics;
 pub mod marine;
 pub mod marine_propeller;
@@ -48,6 +50,7 @@ pub mod model;
 pub mod molecular;
 pub mod nuclear_shielding;
 pub mod pcb_thermal;
+pub mod pile_foundation;
 pub mod power_flow;
 pub mod pressure_vessel;
 pub mod problem;
@@ -68,6 +71,7 @@ pub mod slope_stability;
 pub mod solar;
 pub mod solar_thermal;
 pub mod springs;
+pub mod steam_rankine;
 pub mod solver_settings;
 pub mod structural;
 pub mod structural_connections;
@@ -76,6 +80,7 @@ pub mod timber_fire;
 pub mod validation;
 pub mod water_hammer;
 pub mod welding;
+pub mod wind_turbine;
 
 pub mod prelude {
     pub use crate::acoustics::{
@@ -151,6 +156,10 @@ pub mod prelude {
         AviationFuel, GasTurbineProblem, GasTurbineResult,
         solve_gas_turbine, solve_gas_turbine_sim, standard_atmosphere,
     };
+    pub use crate::gear_fatigue::{
+        GearFatigueProblem, GearFatigueResult,
+        solve_gear_fatigue, solve_gear_fatigue_sim,
+    };
     pub use crate::gears::{
         GearToothProfile, GearType, InvoluteGearPairProblem, InvoluteGearPairResult,
         solve_gear_pair_sim, solve_involute_gear_pair,
@@ -212,6 +221,10 @@ pub mod prelude {
         InductionMotorProblem, InductionMotorResult,
         solve_induction_motor, solve_induction_motor_sim,
     };
+    pub use crate::journal_bearing::{
+        JournalBearingProblem, JournalBearingResult,
+        solve_journal_bearing, solve_journal_bearing_sim,
+    };
     pub use crate::machining_physics::{
         KienzleMachiningProblem, KienzleMachiningResult, MachiningOperation, WorkpieceMachinability,
         solve_kienzle_machining, solve_machining_physics_sim,
@@ -234,6 +247,10 @@ pub mod prelude {
     pub use crate::pcb_thermal::{
         CopperWeightOz, PcbThermalProblem, PcbThermalResult, ThermalViaSpec, TraceLayer,
         solve_pcb_thermal, solve_pcb_thermal_sim,
+    };
+    pub use crate::pile_foundation::{
+        PileFoundationProblem, PileFoundationResult, SoilLayerSpec, SoilLayerType,
+        solve_pile_foundation, solve_pile_foundation_sim,
     };
     pub use crate::power_flow::{
         BusType, ComplexNumber, PowerFlowProblem, TransmissionLine, build_bus_admittance_matrix,
@@ -300,6 +317,10 @@ pub mod prelude {
         HelicalSpringProblem, HelicalSpringResult, SpringEndType, SpringMaterial,
         solve_helical_compression_spring, solve_helical_spring_sim,
     };
+    pub use crate::steam_rankine::{
+        SteamRankineProblem, SteamRankineResult,
+        solve_steam_rankine, solve_steam_rankine_sim,
+    };
     pub use crate::structural::{
         BucklingProblem, ColumnEndCondition, CompositeFailureProblem, CompositeLaminateProblem,
         FatigueProblem, LaminaStrengthLimits, OrthotropicLamina, solve_column_buckling,
@@ -321,5 +342,9 @@ pub mod prelude {
     pub use crate::welding::{
         HydrogenLevel, SteelComposition, WeldingProblem, WeldingProcess, WeldingResult,
         solve_welding_metallurgy, solve_welding_sim,
+    };
+    pub use crate::wind_turbine::{
+        WindTurbineProblem, WindTurbineResult,
+        solve_wind_turbine, solve_wind_turbine_sim,
     };
 }

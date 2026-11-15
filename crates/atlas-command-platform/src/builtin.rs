@@ -2707,5 +2707,236 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    // --- 48. Hydrodynamic Journal Bearings (ISO 7902 / DIN 31652) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.tribology.journal_bearing",
+            "Hydrodynamic Fluid-Film Journal Bearing Analysis (ISO 7902 / DIN 31652)",
+            "Evaluates fluid-film lubrication, Sommerfeld number, eccentricity ratio, minimum oil film thickness, friction torque, power loss, and oil temperature rise.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "journal_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Journal shaft diameter in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(100.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "bearing_length_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Bearing sleeve length in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(70.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "radial_clearance_um".into(),
+            arg_type: ArgumentType::Number,
+            description: "Radial clearance in micrometers (um)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(65.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rotational_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Shaft rotational speed in RPM".into(),
+            required: true,
+            default_value: Some(serde_json::json!(3000.0)),
+            validation_rules: vec![ValidationRule::Min(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "radial_load_n".into(),
+            arg_type: ArgumentType::Number,
+            description: "Radial load supported by bearing in Newtons".into(),
+            required: true,
+            default_value: Some(serde_json::json!(12500.0)),
+            validation_rules: vec![ValidationRule::Min(10.0)],
+        }),
+    )?;
+
+    // --- 49. Wind Turbine Aerodynamics & BEM Power Curve (IEC 61400-1) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.renewable.wind_turbine",
+            "Wind Turbine Aerodynamics, BEM Power Curve & AEP (IEC 61400-1)",
+            "Evaluates horizontal-axis wind turbine swept area, tip speed ratio, Betz limit performance, pitch-regulated power curve, aerodynamic thrust, and Weibull Annual Energy Production (AEP).",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "rotor_radius_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rotor blade radius in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(63.0)),
+            validation_rules: vec![ValidationRule::Min(2.0), ValidationRule::Max(150.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rated_power_mw".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rated generator capacity in Megawatts (MW)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(4.0)),
+            validation_rules: vec![ValidationRule::Min(0.01), ValidationRule::Max(25.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rated_wind_speed_m_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rated wind speed in m/s".into(),
+            required: true,
+            default_value: Some(serde_json::json!(11.5)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(25.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "operating_wind_speed_m_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Operating wind speed for instantaneous performance in m/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(9.0)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(50.0)],
+        }),
+    )?;
+
+    // --- 50. Steam Rankine Cycle & Condenser Thermodynamics (IAPWS-IF97 / ASME PTC 6) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.thermal.steam_rankine",
+            "Steam Rankine Power Cycle & Condenser Thermodynamics (IAPWS-IF97)",
+            "Solves superheated steam turbine expansion, wet exhaust quality, boiler heat input, net work, thermal efficiency, gross MW output, and condenser cooling duty.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "steam_mass_flow_kg_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Main steam mass flow rate in kg/s".into(),
+            required: true,
+            default_value: Some(serde_json::json!(120.0)),
+            validation_rules: vec![ValidationRule::Min(0.5)],
+        })
+        .with_argument(CommandArgument {
+            name: "boiler_pressure_bar".into(),
+            arg_type: ArgumentType::Number,
+            description: "Boiler operating pressure in bar".into(),
+            required: true,
+            default_value: Some(serde_json::json!(120.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(300.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "superheater_temp_c".into(),
+            arg_type: ArgumentType::Number,
+            description: "Superheater throttle temperature in degrees Celsius".into(),
+            required: true,
+            default_value: Some(serde_json::json!(540.0)),
+            validation_rules: vec![ValidationRule::Min(150.0), ValidationRule::Max(700.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "condenser_pressure_bar".into(),
+            arg_type: ArgumentType::Number,
+            description: "Condenser back-pressure in bar".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.08)),
+            validation_rules: vec![ValidationRule::Min(0.01), ValidationRule::Max(1.0)],
+        }),
+    )?;
+
+    // --- 51. Deep Foundation Bored Pile Load Capacity & Settlement (Eurocode 7 / API RP 2A) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.civil.pile_foundation",
+            "Deep Foundation Bored Pile Bearing Capacity & Settlement (Eurocode 7)",
+            "Evaluates stratified shaft skin friction (alpha & beta methods), base end-bearing, Eurocode 7 design compressive resistance (DA1/DA2), and elastic working settlement.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "pile_diameter_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Bored pile circular diameter in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1.0)),
+            validation_rules: vec![ValidationRule::Min(0.3), ValidationRule::Max(4.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "pile_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Embedded pile length in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(20.0)),
+            validation_rules: vec![ValidationRule::Min(2.0), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "applied_axial_load_kn".into(),
+            arg_type: ArgumentType::Number,
+            description: "Applied design axial working load in kN".into(),
+            required: true,
+            default_value: Some(serde_json::json!(3200.0)),
+            validation_rules: vec![ValidationRule::Min(10.0)],
+        }),
+    )?;
+
+    // --- 52. Gear Tooth Pitting & Bending Fatigue Life (ISO 6336 Method B) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.mechanical.gear_fatigue",
+            "Involute Gear Pitting & Tooth Root Bending Fatigue Rating (ISO 6336)",
+            "Evaluates Hertzian surface contact stress (sigma_H), pitting safety factors (S_H), root fillet bending stress (sigma_F), and tooth breakage fatigue safety factors (S_F).",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "transmitted_power_kw".into(),
+            arg_type: ArgumentType::Number,
+            description: "Transmitted mechanical power in kW".into(),
+            required: true,
+            default_value: Some(serde_json::json!(55.0)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(5000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "pinion_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Pinion rotational speed in RPM".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1450.0)),
+            validation_rules: vec![ValidationRule::Min(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "pinion_teeth_z1".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Number of teeth on pinion".into(),
+            required: true,
+            default_value: Some(serde_json::json!(21)),
+            validation_rules: vec![ValidationRule::Min(8.0), ValidationRule::Max(200.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "gear_teeth_z2".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Number of teeth on wheel gear".into(),
+            required: true,
+            default_value: Some(serde_json::json!(63)),
+            validation_rules: vec![ValidationRule::Min(8.0), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "normal_module_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Normal module in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(4.0)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(50.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "face_width_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Gear tooth face width in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(50.0)),
+            validation_rules: vec![ValidationRule::Min(2.0), ValidationRule::Max(500.0)],
+        }),
+    )?;
+
     Ok(())
 }

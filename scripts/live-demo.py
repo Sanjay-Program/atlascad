@@ -2260,6 +2260,111 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 22.7 Enterprise MCP Tool Calling: 5 Batch-7 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # =====================================================================
+        # 23. BATCH 8 ADVANCED INDUSTRIAL ENGINEERING SIMULATION SOLVERS
+        # =====================================================================
+        print("\n--- 23. Batch 8 Advanced Industrial Engineering Solvers (Tribology, Wind, Rankine, Foundation, Gears) ---")
+
+        # 23.1 Hydrodynamic Journal Bearing (ISO 7902 / DIN 31652)
+        brg_res = http_request(port, "POST", "/api/sim/tribology/journal_bearing", body={
+            "journal_diameter_mm": 100.0,
+            "bearing_length_mm": 70.0,
+            "radial_clearance_um": 65.0,
+            "rotational_speed_rpm": 3000.0,
+            "radial_load_n": 12500.0,
+            "lubricant_viscosity_mpa_s": 25.0
+        })
+        check(brg_res.get("sommerfeld_number", 0.0) > 0.3, "Sommerfeld number > 0.3")
+        check(brg_res.get("minimum_film_thickness_um", 0.0) > 20.0, "Min film thickness > 20 um")
+        check(brg_res.get("hydrodynamic_power_loss_kw", 0.0) > 1.0, "Power dissipation > 1 kW")
+        check(brg_res.get("is_safe", False) is True, "Journal bearing satisfies full hydrodynamic film")
+        print(f"  ✓ 23.1 Journal Bearing (ISO 7902): Sommerfeld S = {brg_res['sommerfeld_number']:.3f}, ε = {brg_res['eccentricity_ratio']:.3f}, hmin = {brg_res['minimum_film_thickness_um']:.1f} µm (hlim = {brg_res['permissible_minimum_film_thickness_um']:.1f} µm), P_loss = {brg_res['hydrodynamic_power_loss_kw']:.2f} kW, Q_oil = {brg_res['oil_flow_rate_l_min']:.1f} L/min, ΔT = {brg_res['lubricant_temp_rise_c']:.1f} °C, pmax = {brg_res['maximum_film_pressure_mpa']:.1f} MPa")
+
+        # 23.2 Wind Turbine Aerodynamics & BEM Power Curve (IEC 61400-1)
+        wind_res = http_request(port, "POST", "/api/sim/renewable/wind_turbine", body={
+            "rotor_radius_m": 63.0,
+            "rated_power_mw": 4.0,
+            "rated_wind_speed_m_s": 11.5,
+            "tip_speed_ratio_optimal": 7.8
+        })
+        check(wind_res.get("rated_rotor_speed_rpm", 0.0) > 10.0, "Rated rotor speed > 10 RPM")
+        check(wind_res.get("peak_aerodynamic_cp", 0.0) > 0.40, "Peak Cp > 0.40")
+        check(wind_res.get("annual_energy_production_gwh", 0.0) > 10.0, "AEP > 10 GWh")
+        check(wind_res.get("is_safe", False) is True, "Tip speed within IEC limits")
+        print(f"  ✓ 23.2 Wind Turbine BEM (IEC 61400-1): P_rated = {wind_res['operating_power_mw']:.1f} MW @ {wind_res['operating_wind_speed_m_s']:.1f} m/s, n_rotor = {wind_res['rated_rotor_speed_rpm']:.1f} RPM (Tip = {wind_res['blade_tip_speed_m_s']:.1f} m/s), Cp = {wind_res['peak_aerodynamic_cp']:.3f} (Betz = {wind_res['betz_limit_cp']:.3f}), Thrust = {wind_res['operating_thrust_kn']:.1f} kN, AEP = {wind_res['annual_energy_production_gwh']:.2f} GWh/yr (CF = {wind_res['capacity_factor_pct']:.1f}%)")
+
+        # 23.3 Steam Rankine Power Cycle & Condenser Thermodynamics (IAPWS-IF97 / ASME PTC 6)
+        rnk_res = http_request(port, "POST", "/api/sim/thermal/steam_rankine", body={
+            "steam_mass_flow_kg_s": 120.0,
+            "boiler_pressure_bar": 120.0,
+            "superheater_temp_c": 540.0,
+            "condenser_pressure_bar": 0.08
+        })
+        check(rnk_res.get("gross_electric_power_mw", 0.0) > 100.0, "Gross power > 100 MW")
+        check(rnk_res.get("cycle_thermal_efficiency_pct", 0.0) > 30.0, "Cycle efficiency > 30%")
+        check(rnk_res.get("cooling_water_flow_rate_kg_s", 0.0) > 3000.0, "Cooling water > 3000 kg/s")
+        check(rnk_res.get("is_safe", False) is True, "Exhaust dryness fraction safe against erosion")
+        print(f"  ✓ 23.3 Steam Rankine Cycle (IAPWS-IF97 / ASME): P_gross = {rnk_res['gross_electric_power_mw']:.1f} MW, η_th = {rnk_res['cycle_thermal_efficiency_pct']:.1f}%, w_net = {rnk_res['net_specific_work_kj_kg']:.1f} kJ/kg, x_exhaust = {rnk_res['turbine_exhaust_dryness_fraction']:.3f}, Q_cond = {rnk_res['condenser_thermal_duty_mw']:.1f} MW, m_cw = {rnk_res['cooling_water_flow_rate_kg_s']:.0f} kg/s")
+
+        # 23.4 Deep Foundation Bored Pile Load Capacity & Settlement (Eurocode 7 / API RP 2A)
+        pile_res = http_request(port, "POST", "/api/sim/civil/pile_foundation", body={
+            "pile_diameter_m": 1.0,
+            "pile_length_m": 20.0,
+            "applied_axial_load_kn": 3200.0
+        })
+        check(pile_res.get("ultimate_total_capacity_kn", 0.0) > 5000.0, "Ultimate capacity > 5000 kN")
+        check(pile_res.get("design_bearing_resistance_kn", 0.0) > 4000.0, "Design resistance > 4000 kN")
+        check(pile_res.get("total_working_settlement_mm", 0.0) < 15.0, "Settlement < 15 mm")
+        check(pile_res.get("is_safe", False) is True, "Pile complies with Eurocode 7 ULS & SLS")
+        print(f"  ✓ 23.4 Bored Pile Foundation (Eurocode 7 / API): Rc,k = {pile_res['ultimate_total_capacity_kn']:.0f} kN (Rs = {pile_res['ultimate_shaft_resistance_kn']:.0f} kN, Rb = {pile_res['ultimate_base_resistance_kn']:.0f} kN), Rc,d = {pile_res['design_bearing_resistance_kn']:.0f} kN, ODF = {pile_res['overdesign_factor']:.2f} vs {pile_res['applied_axial_load_kn']:.0f} kN load, s_tot = {pile_res['total_working_settlement_mm']:.2f} mm")
+
+        # 23.5 Involute Gear Tooth Pitting & Root Bending Fatigue (ISO 6336 Method B / AGMA 2101)
+        gear_res = http_request(port, "POST", "/api/sim/mechanical/gear_fatigue", body={
+            "transmitted_power_kw": 55.0,
+            "pinion_speed_rpm": 1450.0,
+            "pinion_teeth_z1": 21,
+            "gear_teeth_z2": 63,
+            "normal_module_mm": 4.0,
+            "face_width_mm": 50.0
+        })
+        check(gear_res.get("safety_factor_pitting", 0.0) >= 1.25, "Pitting safety factor >= 1.25")
+        check(gear_res.get("safety_factor_bending", 0.0) >= 1.40, "Bending safety factor >= 1.40")
+        check(gear_res.get("tangential_force_n", 0.0) > 5000.0, "Tangential force > 5000 N")
+        check(gear_res.get("is_safe", False) is True, "Helical gear pair satisfies ISO 6336 rating")
+        print(f"  ✓ 23.5 Involute Gear Fatigue (ISO 6336): Ft = {gear_res['tangential_force_n']:.0f} N @ {gear_res['pitch_line_velocity_m_s']:.1f} m/s, σH = {gear_res['effective_contact_stress_mpa']:.1f} MPa (SH = {gear_res['safety_factor_pitting']:.2f} >= 1.25), σF = {gear_res['effective_bending_stress_mpa']:.1f} MPa (SF = {gear_res['safety_factor_bending']:.2f} >= 1.40)")
+
+        # 23.6 Universal Commands Execution Verification (Batch 8 Domains)
+        for cmd_id in [
+            "sim.tribology.journal_bearing",
+            "sim.renewable.wind_turbine",
+            "sim.thermal.steam_rankine",
+            "sim.civil.pile_foundation",
+            "sim.mechanical.gear_fatigue",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 23.6 Universal Commands: All 5 Batch-8 Engineering Commands verified via typed schema engine")
+
+        # 23.7 Enterprise MCP Tool Calling (Batch 8 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_tribology_journal_bearing",
+            "atlas_sim_renewable_wind_turbine",
+            "atlas_sim_thermal_steam_rankine",
+            "atlas_sim_civil_pile_foundation",
+            "atlas_sim_mechanical_gear_fatigue",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 810,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 23.7 Enterprise MCP Tool Calling: 5 Batch-8 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")
