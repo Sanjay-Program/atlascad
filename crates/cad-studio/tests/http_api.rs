@@ -4817,5 +4817,68 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(mcp_3mf.status, 200);
 
+    // 53. Analytical Chemical Acid-Base Equilibria & Titration API
+    let titr_resp = post(
+        addr,
+        "/api/sim/chemical/acid_base",
+        r#"{"analyte_id": "acetic_acid", "analyte_concentration_m": 0.10, "analyte_volume_ml": 25.0, "titrant_id": "naoh", "titrant_concentration_m": 0.10, "temperature_c": 25.0}"#,
+    )?;
+    assert_eq!(titr_resp.status, 200);
+    let titr_json = json(&titr_resp)?;
+    let init_ph = titr_json["initial_ph"].as_f64().ok_or("initial_ph")?;
+    let v_eq = titr_json["equivalence_volume_ml"].as_f64().ok_or("v_eq")?;
+    let eq_ph = titr_json["equivalence_ph"].as_f64().ok_or("eq_ph")?;
+    let beta_max = titr_json["max_buffer_capacity"].as_f64().ok_or("beta_max")?;
+    assert!(init_ph > 2.8 && init_ph < 3.0);
+    assert!((v_eq - 25.0).abs() < 1e-4);
+    assert!(eq_ph > 8.5 && eq_ph < 9.0);
+    assert!(beta_max > 0.0);
+    assert!(titr_json["titration_curve"].as_array().map(|a| a.len()).unwrap_or(0) > 50);
+
+    // 54. Chemical Species Catalog API
+    let species_resp = get(addr, "/api/sim/chemical/species")?;
+    assert_eq!(species_resp.status, 200);
+    let species_json = json(&species_resp)?;
+    let species_list = species_json.as_array().ok_or("species list")?;
+    assert!(species_list.len() >= 18);
+    let has_acetic = species_list.iter().any(|s| s["id"] == "acetic_acid");
+    let has_naoh = species_list.iter().any(|s| s["id"] == "naoh");
+    let has_hcl = species_list.iter().any(|s| s["id"] == "hcl");
+    assert!(has_acetic && has_naoh && has_hcl);
+
+    // 55. Universal Commands: sim.chemical.acid_base & sim.chemical.species_catalog
+    let cmd_titr = post(
+        addr,
+        "/api/commands/execute",
+        r#"{"command_id": "sim.chemical.acid_base", "arguments": {"analyte_id": "hcl", "analyte_concentration_m": 0.10, "analyte_volume_ml": 25.0, "titrant_id": "naoh", "titrant_concentration_m": 0.10}}"#,
+    )?;
+    assert_eq!(cmd_titr.status, 200);
+    let cmd_titr_json = json(&cmd_titr)?;
+    assert_eq!(cmd_titr_json["status"], "Success");
+    let cmd_veq = cmd_titr_json["output"]["equivalence_volume_ml"].as_f64().ok_or("cmd_veq")?;
+    assert!((cmd_veq - 25.0).abs() < 1e-4);
+
+    let cmd_cat = post(
+        addr,
+        "/api/commands/execute",
+        r#"{"command_id": "sim.chemical.species_catalog", "arguments": {}}"#,
+    )?;
+    assert_eq!(cmd_cat.status, 200);
+
+    // 56. Enterprise MCP Tools: atlas_chemical_acid_base & atlas_chemical_species_catalog
+    let mcp_acid_base = post(
+        addr,
+        "/api/mcp",
+        r#"{"jsonrpc": "2.0", "id": 103, "method": "tools/call", "params": {"name": "atlas_chemical_acid_base", "arguments": {"analyte_id": "acetic_acid"}}}"#,
+    )?;
+    assert_eq!(mcp_acid_base.status, 200);
+
+    let mcp_species = post(
+        addr,
+        "/api/mcp",
+        r#"{"jsonrpc": "2.0", "id": 104, "method": "tools/call", "params": {"name": "atlas_chemical_species_catalog", "arguments": {}}}"#,
+    )?;
+    assert_eq!(mcp_species.status, 200);
+
     Ok(())
 }

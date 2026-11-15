@@ -418,6 +418,28 @@ def run_live_demo() -> None:
         check(0.0 < beta < 1.0, f"Two-phase equilibrium verified (beta = {beta:.3f})")
         print(f"  ✓ 11.3 Chemical Engineering: Vapor Fraction beta = {beta:.4f}, Liquid Fraction = {chem['scalar_metrics']['liquid_fraction']:.4f}")
 
+        # 11.3b Analytical Chemical Acid-Base Equilibria & Henderson-Hasselbalch Titration
+        titr = http_request(port, "POST", "/api/sim/chemical/acid_base", body={
+            "analyte_id": "acetic_acid",
+            "analyte_concentration_m": 0.10,
+            "analyte_volume_ml": 25.0,
+            "titrant_id": "naoh",
+            "titrant_concentration_m": 0.10,
+            "temperature_c": 25.0,
+        })
+        check("initial_ph" in titr and 2.8 < titr["initial_ph"] < 3.0, "Initial pH accurately computed")
+        check(abs(titr["equivalence_volume_ml"] - 25.0) < 1e-4, "Stoichiometric equivalence volume verified (V_eq = 25.0 mL)")
+        check(titr["equivalence_ph"] > 8.5, "Weak acid equivalence pH is basic due to acetate hydrolysis")
+        check(abs(titr["half_equivalence_ph"] - 4.757) < 0.05, "Half-equivalence pH matches pKa = 4.757")
+        check(titr["max_buffer_capacity"] > 0.0, "Positive buffer capacity computed")
+        check(len(titr.get("titration_curve", [])) > 50, "Full analytical titration curve computed")
+        print(f"  ✓ 11.3b Acid-Base Titration: Initial pH = {titr['initial_ph']:.2f}, V_eq = {titr['equivalence_volume_ml']:.2f} mL (pH {titr['equivalence_ph']:.2f}), pKa = {titr['half_equivalence_ph']:.2f}, β_max = {titr['max_buffer_capacity']:.4f}")
+
+        # 11.3c Chemical Species Catalog
+        species_cat = http_request(port, "GET", "/api/sim/chemical/species")
+        check(isinstance(species_cat, list) and len(species_cat) >= 18, f"Chemical species catalog loaded ({len(species_cat)} species)")
+        print(f"  ✓ 11.3c Chemical Species Catalog: {len(species_cat)} acids, bases, salts, and solvents verified")
+
         # 11.4 Molecular Dynamics & Interatomic Potentials
         mol = http_request(port, "POST", "/api/sim/molecular", body={})
         check(mol["status"] == "Converged", "Molecular dynamics Verlet integration converged")
@@ -1020,7 +1042,15 @@ def run_live_demo() -> None:
             "params": {"name": "atlas_export_threemf", "arguments": {}}
         })
         check(mcp_3mf.get("result", {}).get("isError") == False, "MCP atlas_export_threemf executed without error")
-        print(f"  ✓ 12.12 MCP Server: Initialized JSON-RPC 2.0, queried {len(tool_list)} tools, successfully invoked atlas_cad_create_solid, atlas_export_step, and atlas_export_threemf")
+
+        mcp_acid = http_request(port, "POST", "/api/mcp", body={
+            "jsonrpc": "2.0",
+            "id": 6,
+            "method": "tools/call",
+            "params": {"name": "atlas_chemical_acid_base", "arguments": {"analyte_id": "acetic_acid"}}
+        })
+        check(mcp_acid.get("result", {}).get("isError") == False, "MCP atlas_chemical_acid_base executed without error")
+        print(f"  ✓ 12.12 MCP Server: Initialized JSON-RPC 2.0, queried {len(tool_list)} tools, successfully invoked atlas_cad_create_solid, atlas_export_step, atlas_export_threemf, and atlas_chemical_acid_base")
 
         # 12.13 Autonomous End-to-End Generative Closed-Loop Workflow Execution
         wf_all = http_request(port, "POST", "/api/agents/workflows/run_all", body={

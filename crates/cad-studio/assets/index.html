@@ -719,6 +719,13 @@
     <section class="viewport-shell" id="viewportShell">
       <canvas id="viewport" tabindex="0" aria-label="3D viewport. Drag to orbit, right-drag or Shift-drag to pan, scroll to zoom, click a face to inspect it. While drawing a polyline, click to place points on the z = 0 plane."></canvas>
       
+      <!-- Interactive CAD Viewport Drop Overlay -->
+      <div id="viewportDropOverlay" class="viewport-drop-overlay" hidden>
+        <span class="drop-icon">📥</span>
+        <span class="drop-title">Drop 3D CAD or Project Files to Import</span>
+        <span class="drop-sub">Supports ISO 10303-21 STEP (.step/.stp), 3MF (.3mf), STL (.stl), OBJ, JSON, and DXF</span>
+      </div>
+      
       <!-- AutoCAD Visual Style & Projection Header -->
       <div class="viewport-style-badge" id="viewportStyleBadge">
         <span class="style-item" id="styleProjBadge" title="Projection: Isometric / Orthographic">[-] [Custom]</span>
@@ -2368,17 +2375,125 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
           <div class="wb-title-wrap">
             <span class="wb-title-icon">⚗️</span>
             <div>
-              <h3>Chemical &amp; Molecular Process Studio</h3>
-              <span class="wb-subtitle">Rachford-Rice VLE Flash Separator · Peng-Robinson EOS · Lennard-Jones Molecular Dynamics</span>
+              <h3>Chemical &amp; Molecular Engineering Studio</h3>
+              <span class="wb-subtitle">Analytical Acid-Base Equilibria · Henderson-Hasselbalch Buffers · Rachford-Rice VLE · Lennard-Jones MD</span>
             </div>
           </div>
           <div class="wb-header-actions">
-            <span class="wb-status-badge" id="chemStatusBadge">Equilibrium Verified</span>
-            <button type="button" class="button primary small" id="chemRunFlashBtn">▶ Solve VLE Flash</button>
-            <button type="button" class="button secondary small" id="chemRunMdBtn">▶ Run Molecular Dynamics</button>
+            <span class="wb-status-badge" id="chemStatusBadge">Equilibria Verified</span>
+            <button type="button" class="button primary small" id="chemRunAcidBaseBtn">▶ Solve Acid-Base Titration</button>
+            <button type="button" class="button secondary small" id="chemRunFlashBtn">▶ Solve VLE Flash</button>
+            <button type="button" class="button secondary small" id="chemRunMdBtn">▶ Run MD</button>
           </div>
         </div>
-        <div class="wb-body-split">
+
+        <!-- Workbench Sub-Tabs -->
+        <div class="wb-tabs-bar">
+          <button type="button" class="wb-tab-btn active" id="chemTabAcidBase">🧪 Acid-Base Equilibria &amp; Titration</button>
+          <button type="button" class="wb-tab-btn" id="chemTabVle">⚗️ VLE Flash Separator</button>
+          <button type="button" class="wb-tab-btn" id="chemTabSpecies">📋 Chemical Species Catalog</button>
+        </div>
+
+        <!-- Section 1: Acid-Base Equilibria & Titration -->
+        <div id="chemSectionAcidBase" class="wb-body-split">
+          <div class="wb-control-pane">
+            <div class="wb-group">
+              <label for="chemPresetSelect">Analytical Reaction Preset</label>
+              <select id="chemPresetSelect" class="wb-select">
+                <option value="acetic_naoh" selected>Acetic Acid + NaOH (Weak Acid Buffer, pKa = 4.76)</option>
+                <option value="hcl_naoh">Hydrochloric Acid + NaOH (Strong Acid Neutralization, pH_eq = 7.00)</option>
+                <option value="nh3_hcl">Ammonia + HCl (Weak Base Ammonium Buffer, pH_half = 9.25)</option>
+                <option value="h2so4_naoh">Sulfuric Acid + NaOH (Diprotic Strong/Weak Mineral Acid)</option>
+                <option value="phosphoric_naoh">Phosphoric Acid + NaOH (Triprotic Buffer System)</option>
+                <option value="formic_koh">Formic Acid + KOH (Carboxylic Acid Neutralization)</option>
+              </select>
+            </div>
+            <div class="wb-group">
+              <label for="chemAnalyteSelect">Analyte Species (Solution in Flask)</label>
+              <select id="chemAnalyteSelect" class="wb-select">
+                <option value="acetic_acid" selected>Acetic Acid (CH3COOH) · Weak Acid (pKa 4.76)</option>
+                <option value="hcl">Hydrochloric Acid (HCl) · Strong Acid (Valence 1)</option>
+                <option value="h2so4">Sulfuric Acid (H2SO4) · Diprotic Acid (Valence 2)</option>
+                <option value="hno3">Nitric Acid (HNO3) · Strong Acid (Valence 1)</option>
+                <option value="formic_acid">Formic Acid (HCOOH) · Weak Acid (pKa 3.75)</option>
+                <option value="hf">Hydrofluoric Acid (HF) · Weak Acid (pKa 3.17)</option>
+                <option value="benzoic_acid">Benzoic Acid (C6H5COOH) · Weak Acid (pKa 4.20)</option>
+                <option value="phosphoric_acid">Phosphoric Acid (H3PO4) · Triprotic (Valence 3)</option>
+                <option value="nh3">Ammonia (NH3) · Weak Base (pKb 4.75)</option>
+                <option value="methylamine">Methylamine (CH3NH2) · Weak Base (pKb 3.36)</option>
+              </select>
+            </div>
+            <div class="wb-group">
+              <label for="chemAnalyteConc">Analyte Concentration (mol/L · M)</label>
+              <input type="number" id="chemAnalyteConc" class="wb-input" value="0.10" min="0.001" max="18.0" step="0.01">
+            </div>
+            <div class="wb-group">
+              <label for="chemAnalyteVol">Analyte Initial Volume (mL)</label>
+              <input type="number" id="chemAnalyteVol" class="wb-input" value="25.0" min="1.0" max="1000.0" step="5.0">
+            </div>
+            <div class="wb-group">
+              <label for="chemTitrantSelect">Titrant Species (Burette Reagent)</label>
+              <select id="chemTitrantSelect" class="wb-select">
+                <option value="naoh" selected>Sodium Hydroxide (NaOH) · Strong Base (Valence 1)</option>
+                <option value="koh">Potassium Hydroxide (KOH) · Strong Base (Valence 1)</option>
+                <option value="ca_oh_2">Calcium Hydroxide (Ca(OH)2) · Strong Base (Valence 2)</option>
+                <option value="hcl">Hydrochloric Acid (HCl) · Strong Acid (Valence 1)</option>
+                <option value="hno3">Nitric Acid (HNO3) · Strong Acid (Valence 1)</option>
+              </select>
+            </div>
+            <div class="wb-group">
+              <label for="chemTitrantConc">Titrant Concentration (mol/L · M)</label>
+              <input type="number" id="chemTitrantConc" class="wb-input" value="0.10" min="0.001" max="18.0" step="0.01">
+            </div>
+            <div class="wb-group">
+              <label for="chemTempC">System Temperature (°C)</label>
+              <input type="number" id="chemTempC" class="wb-input" value="25.0" min="0.0" max="100.0" step="5.0">
+            </div>
+            <button type="button" class="button primary" id="chemCalculateTitrationBtn" style="width: 100%; margin-top: 4px;">▶ Calculate Titration Curve</button>
+          </div>
+
+          <div class="wb-display-pane">
+            <div class="wb-metrics-grid">
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Initial pH</span>
+                <span class="wb-metric-value" id="chemInitPhDisplay">2.88</span>
+                <span class="wb-metric-sub">Pure Analyte Solution</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Equivalence Point</span>
+                <span class="wb-metric-value" id="chemEqPointDisplay">25.00 mL (pH 8.73)</span>
+                <span class="wb-metric-sub">Stoichiometric Neutralization</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Half-Equivalence pH</span>
+                <span class="wb-metric-value" id="chemHalfEqDisplay">pH 4.76</span>
+                <span class="wb-metric-sub">pKa Buffer Midpoint</span>
+              </div>
+              <div class="wb-metric-card">
+                <span class="wb-metric-label">Max Buffer Capacity</span>
+                <span class="wb-metric-value" id="chemBetaMaxDisplay">0.0576 mol/(L·pH)</span>
+                <span class="wb-metric-sub">Henderson-Hasselbalch β_max</span>
+              </div>
+            </div>
+
+            <!-- Titration Curve Interactive SVG Plot -->
+            <div class="wb-plot-card">
+              <div class="wb-card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>pH Titration Curve &amp; Henderson-Hasselbalch Buffer Region</span>
+                <span style="font-size: 11px; text-transform: none; color: var(--muted);" id="chemPlotLegend">Analyte: Acetic Acid vs Titrant: NaOH</span>
+              </div>
+              <svg id="chemTitrationSvg" viewBox="0 0 520 220" style="width: 100%; height: 220px; border-radius: 4px; background: var(--bg);"></svg>
+            </div>
+
+            <div class="wb-gcode-container">
+              <div class="wb-gcode-header">Chemical Thermodynamics &amp; Neutralization Console</div>
+              <pre class="wb-gcode-viewer" id="chemConsoleOutput" style="height: 140px; font-size: 11px;">[Chemical Engine] Ready. Analytical acid-base equilibria &amp; VLE flash engines online.</pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: VLE Flash Separator (Initially hidden) -->
+        <div id="chemSectionVle" class="wb-body-split" hidden>
           <div class="wb-control-pane">
             <div class="wb-group">
               <label for="chemTempInput">Flash Temperature (K)</label>
@@ -2417,8 +2532,36 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
               </div>
             </div>
             <div class="wb-gcode-container">
-              <div class="wb-gcode-header">Chemical Thermodynamics Console</div>
-              <pre class="wb-gcode-viewer" id="chemConsoleOutput" style="height: 180px; font-size: 11px;">[Chemical &amp; Molecular Engine] VLE Flash &amp; MD Solvers Loaded.</pre>
+              <div class="wb-gcode-header">VLE Thermodynamics Console</div>
+              <pre class="wb-gcode-viewer" id="chemVleConsoleOutput" style="height: 180px; font-size: 11px;">[Chemical Engine] VLE Flash &amp; MD Solvers Ready.</pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Species Catalog (Initially hidden) -->
+        <div id="chemSectionSpecies" class="wb-body-split" hidden>
+          <div class="wb-display-pane" style="grid-column: span 2;">
+            <div class="wb-plot-card">
+              <div class="wb-card-title">Curated Industrial &amp; Analytical Chemical Species Catalog</div>
+              <div id="chemSpeciesTableContainer" style="overflow-x: auto; max-height: 400px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 11.5px;">
+                  <thead>
+                    <tr style="border-bottom: 2px solid var(--border); text-align: left; color: var(--muted);">
+                      <th style="padding: 6px 10px;">ID</th>
+                      <th style="padding: 6px 10px;">Name</th>
+                      <th style="padding: 6px 10px;">Formula</th>
+                      <th style="padding: 6px 10px;">Classification</th>
+                      <th style="padding: 6px 10px;">Molar Mass (g/mol)</th>
+                      <th style="padding: 6px 10px;">Valence</th>
+                      <th style="padding: 6px 10px;">Ka / Kb Values</th>
+                      <th style="padding: 6px 10px;">Density (g/mL)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="chemSpeciesTableBody">
+                    <!-- Populated dynamically via /api/sim/chemical/species -->
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>

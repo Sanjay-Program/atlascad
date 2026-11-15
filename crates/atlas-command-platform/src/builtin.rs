@@ -784,6 +784,66 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
 
     registry.register(
         CommandSchema::new(
+            "sim.chemical.acid_base",
+            "Analytical Acid-Base Equilibria & Titration Solver",
+            "Computes rigorous pH titration curves, equivalence points, Henderson-Hasselbalch buffer capacities, and neutralization enthalpy.",
+            CommandCategory::Chemical,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "analyte_id".into(),
+            arg_type: ArgumentType::String,
+            description: "Chemical species identifier for analyte (e.g. hcl, acetic_acid, h2so4, nh3)".into(),
+            required: false,
+            default_value: Some(serde_json::json!("acetic_acid")),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "analyte_concentration_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Analyte molar concentration in mol/L (M)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.10)),
+            validation_rules: vec![ValidationRule::Min(0.0001)],
+        })
+        .with_argument(CommandArgument {
+            name: "analyte_volume_ml".into(),
+            arg_type: ArgumentType::Number,
+            description: "Analyte initial volume in mL".into(),
+            required: false,
+            default_value: Some(serde_json::json!(25.0)),
+            validation_rules: vec![ValidationRule::Min(0.001)],
+        })
+        .with_argument(CommandArgument {
+            name: "titrant_id".into(),
+            arg_type: ArgumentType::String,
+            description: "Chemical species identifier for titrant (e.g. naoh, koh, hcl)".into(),
+            required: false,
+            default_value: Some(serde_json::json!("naoh")),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "titrant_concentration_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Titrant molar concentration in mol/L (M)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.10)),
+            validation_rules: vec![ValidationRule::Min(0.0001)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.chemical.species_catalog",
+            "Chemical Acid-Base & Solvent Species Catalog",
+            "Returns standardized thermodynamic parameters, Ka/Kb values, valence, and molar mass for chemical engineering species.",
+            CommandCategory::Chemical,
+        )
+        .with_permission(CommandPermission::ReadOnly),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
             "sim.robotics.kinematics",
             "6-DOF Manipulator Forward & Inverse Kinematics",
             "Evaluates Denavit-Hartenberg homogeneous transforms, Damped Least Squares inverse kinematics, and Yoshikawa manipulability.",

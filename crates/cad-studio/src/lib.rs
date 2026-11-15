@@ -4007,6 +4007,36 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_chemical_acid_base(
+        &mut self,
+        req: &SimAcidBaseRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::chemical::AcidBaseProblem {
+            analyte_id: req
+                .analyte_id
+                .clone()
+                .unwrap_or_else(|| "acetic_acid".to_string()),
+            analyte_concentration_m: req.analyte_concentration_m.unwrap_or(0.10),
+            analyte_volume_ml: req.analyte_volume_ml.unwrap_or(25.0),
+            titrant_id: req
+                .titrant_id
+                .clone()
+                .unwrap_or_else(|| "naoh".to_string()),
+            titrant_concentration_m: req.titrant_concentration_m.unwrap_or(0.10),
+            temperature_c: req.temperature_c.unwrap_or(25.0),
+            titrant_max_volume_ml: req.titrant_max_volume_ml,
+            step_count: req.step_count,
+        };
+        let res = atlas_simulation_core::chemical::solve_acid_base_titration(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_chemical_species(&self) -> Result<serde_json::Value, StudioError> {
+        let catalog = atlas_simulation_core::chemical::get_standard_species_catalog();
+        serde_json::to_value(&catalog).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -5090,6 +5120,44 @@ namespace AtlasCAD.Unity
                 let hud = req.arguments.get("include_hud").and_then(|v| v.as_bool());
                 self.export_unity_package(hud)?
             }
+            "sim.chemical.acid_base" => {
+                let analyte = req
+                    .arguments
+                    .get("analyte_id")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let ca = req
+                    .arguments
+                    .get("analyte_concentration_m")
+                    .and_then(|v| v.as_f64());
+                let va = req
+                    .arguments
+                    .get("analyte_volume_ml")
+                    .and_then(|v| v.as_f64());
+                let titrant = req
+                    .arguments
+                    .get("titrant_id")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let cb = req
+                    .arguments
+                    .get("titrant_concentration_m")
+                    .and_then(|v| v.as_f64());
+                let temp = req
+                    .arguments
+                    .get("temperature_c")
+                    .and_then(|v| v.as_f64());
+                self.sim_chemical_acid_base(&SimAcidBaseRequest {
+                    analyte_id: analyte,
+                    analyte_concentration_m: ca,
+                    analyte_volume_ml: va,
+                    titrant_id: titrant,
+                    titrant_concentration_m: cb,
+                    temperature_c: temp,
+                    ..Default::default()
+                })?
+            }
+            "sim.chemical.species_catalog" => self.sim_chemical_species()?,
             "system.deploy.status" => self.deploy_status()?,
             _ => serde_json::json!({
                 "status": "Executed",
@@ -6133,6 +6201,12 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
                 Err(error) => error_response(&error),
             }
         }
+        ("GET", "/api/sim/chemical/species") => {
+            match with_state(state, |state| state.sim_chemical_species()) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            }
+        }
         ("POST", path) if path.starts_with("/api/") => {
             match require_same_origin(request, port, shared).and_then(|()| require_json(request)) {
                 Ok(()) => post_route(state, request),
@@ -6867,6 +6941,17 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                 Ok(payload) => json_response(200, payload),
                 Err(error) => error_response(&error),
             },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/chemical/acid_base" => match parse_body_or_default::<SimAcidBaseRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_chemical_acid_base(&body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/sim/chemical/species" => match with_state(state, |state| state.sim_chemical_species()) {
+            Ok(payload) => json_response(200, payload),
             Err(error) => error_response(&error),
         },
         "/api/sim/molecular" => match parse_body_or_default::<SimMolecularRequest>(request) {
@@ -8555,6 +8640,27 @@ struct SimChemicalRequest {
     pub temperature_k: Option<f64>,
     #[serde(default)]
     pub pressure_bar: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimAcidBaseRequest {
+    #[serde(default)]
+    pub analyte_id: Option<String>,
+    #[serde(default)]
+    pub analyte_concentration_m: Option<f64>,
+    #[serde(default)]
+    pub analyte_volume_ml: Option<f64>,
+    #[serde(default)]
+    pub titrant_id: Option<String>,
+    #[serde(default)]
+    pub titrant_concentration_m: Option<f64>,
+    #[serde(default)]
+    pub temperature_c: Option<f64>,
+    #[serde(default)]
+    pub titrant_max_volume_ml: Option<f64>,
+    #[serde(default)]
+    pub step_count: Option<usize>,
 }
 
 #[derive(Debug, Default, Deserialize)]

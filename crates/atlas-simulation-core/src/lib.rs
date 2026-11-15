@@ -64,7 +64,12 @@ pub mod prelude {
     };
     pub use crate::cavitation::{CavitationProblem, solve_cavitation_npsh};
     pub use crate::cfd::{FluidProperties, PipeFlowProblem, solve_pipe_flow};
-    pub use crate::chemical::{ChemicalComponent, FlashProblem, solve_rachford_rice_flash};
+    pub use crate::chemical::{
+        AcidBaseEquilibriumResult, AcidBaseNature, AcidBaseProblem, ChemicalComponent,
+        ChemicalSpecies, FlashProblem, TitrationDataPoint, find_species_by_id,
+        get_standard_species_catalog, solve_acid_base_titration, solve_chemical_titration_sim,
+        solve_rachford_rice_flash,
+    };
     pub use crate::convergence::{ConvergenceMonitor, IterationTelemetry};
     pub use crate::digital_twin::{
         DigitalTwinProblem, StrainRosetteTelemetry, StressCycleBlock, solve_digital_twin,

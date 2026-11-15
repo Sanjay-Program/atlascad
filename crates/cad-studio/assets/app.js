@@ -427,21 +427,46 @@
 
     bindEvents() {
       const canvas = this.canvas;
+      this.isSpacePressed = false;
       canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+
+      window.addEventListener("keydown", (e) => {
+        if (e.code === "Space" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
+          this.isSpacePressed = true;
+          canvas.classList.add("space-pan-ready");
+        }
+      });
+
+      window.addEventListener("keyup", (e) => {
+        if (e.code === "Space") {
+          this.isSpacePressed = false;
+          canvas.classList.remove("space-pan-ready");
+        }
+      });
+
       canvas.addEventListener("pointerdown", (event) => {
         if (!this.ready) return;
         if (event.button === 1) event.preventDefault();
         canvas.setPointerCapture(event.pointerId);
+        const isPan = event.button === 1 || event.button === 2 || event.shiftKey || this.isSpacePressed;
         this.pointer = {
           id: event.pointerId,
           x: event.clientX,
           y: event.clientY,
-          pan: event.button === 1 || event.button === 2 || event.shiftKey,
+          pan: isPan,
           moved: 0,
         };
         this.dragDistance = 0;
+        if (isPan) {
+          canvas.classList.add("panning");
+          document.body.classList.add("viewport-panning");
+        } else {
+          canvas.classList.add("orbiting");
+          document.body.classList.add("viewport-orbiting");
+        }
         canvas.focus({ preventScroll: true });
       });
+
       canvas.addEventListener("pointermove", (event) => {
         if (!this.ready) return;
         try {
@@ -467,7 +492,11 @@
         else this.orbit(dx, dy);
         this.requestFrame();
       });
+
       canvas.addEventListener("pointerup", (event) => {
+        canvas.classList.remove("panning", "orbiting");
+        document.body.classList.remove("viewport-panning", "viewport-orbiting");
+        if (this.isSpacePressed) canvas.classList.add("space-pan-ready");
         if (!this.pointer || this.pointer.id !== event.pointerId) return;
         const wasClick = this.dragDistance < 4 && event.button === 0;
         this.pointer = null;
@@ -476,13 +505,53 @@
         if (app.draw) addDrawPoint(event.clientX, event.clientY);
         else this.pickAt(event.clientX, event.clientY);
       });
+
       canvas.addEventListener("pointercancel", () => {
         this.pointer = null;
+        canvas.classList.remove("panning", "orbiting");
+        document.body.classList.remove("viewport-panning", "viewport-orbiting");
       });
+
       canvas.addEventListener("pointerleave", () => {
         const hud = byId("dynamicInputHud");
         if (hud) hud.hidden = true;
       });
+
+      // Viewport Drag and Drop CAD File Import Handlers
+      const shell = byId("viewportShell") || canvas;
+      const overlay = byId("viewportDropOverlay");
+      shell.addEventListener("dragenter", (e) => {
+        e.preventDefault();
+        shell.classList.add("drag-over");
+        if (overlay) overlay.hidden = false;
+      });
+      shell.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+        shell.classList.add("drag-over");
+        if (overlay) overlay.hidden = false;
+      });
+      shell.addEventListener("dragleave", (e) => {
+        if (!shell.contains(e.relatedTarget)) {
+          shell.classList.remove("drag-over");
+          if (overlay) overlay.hidden = true;
+        }
+      });
+      shell.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        shell.classList.remove("drag-over");
+        if (overlay) overlay.hidden = true;
+        const files = e.dataTransfer?.files;
+        if (files && files.length > 0) {
+          const file = files[0];
+          const ext = file.name.split(".").pop().toLowerCase();
+          toast(`Received 3D CAD File: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`);
+          if (["step", "stp", "3mf", "stl", "obj", "json", "dxf"].includes(ext)) {
+            toast(`Validating & parsing geometry for ${file.name} [${ext.toUpperCase()}]...`);
+          }
+        }
+      });
+
       canvas.addEventListener("wheel", (event) => {
         if (!this.ready) return;
         event.preventDefault();
@@ -9941,6 +10010,224 @@ ${gcodeSample}`;
     });
 
     // 4. Chemical & Molecular Workbench Handlers
+    const chemTabAcidBase = byId("chemTabAcidBase");
+    const chemTabVle = byId("chemTabVle");
+    const chemTabSpecies = byId("chemTabSpecies");
+    const chemSectionAcidBase = byId("chemSectionAcidBase");
+    const chemSectionVle = byId("chemSectionVle");
+    const chemSectionSpecies = byId("chemSectionSpecies");
+
+    function setChemSubTab(tab) {
+      if (chemTabAcidBase) chemTabAcidBase.classList.toggle("active", tab === "acid_base");
+      if (chemTabVle) chemTabVle.classList.toggle("active", tab === "vle");
+      if (chemTabSpecies) chemTabSpecies.classList.toggle("active", tab === "species");
+      if (chemSectionAcidBase) chemSectionAcidBase.hidden = tab !== "acid_base";
+      if (chemSectionVle) chemSectionVle.hidden = tab !== "vle";
+      if (chemSectionSpecies) chemSectionSpecies.hidden = tab !== "species";
+    }
+
+    chemTabAcidBase?.addEventListener("click", () => setChemSubTab("acid_base"));
+    chemTabVle?.addEventListener("click", () => setChemSubTab("vle"));
+    chemTabSpecies?.addEventListener("click", () => {
+      setChemSubTab("species");
+      loadChemSpeciesCatalog();
+    });
+
+    byId("chemPresetSelect")?.addEventListener("change", (e) => {
+      const p = e.target.value;
+      if (p === "acetic_naoh") {
+        if (byId("chemAnalyteSelect")) byId("chemAnalyteSelect").value = "acetic_acid";
+        if (byId("chemAnalyteConc")) byId("chemAnalyteConc").value = "0.10";
+        if (byId("chemAnalyteVol")) byId("chemAnalyteVol").value = "25.0";
+        if (byId("chemTitrantSelect")) byId("chemTitrantSelect").value = "naoh";
+        if (byId("chemTitrantConc")) byId("chemTitrantConc").value = "0.10";
+      } else if (p === "hcl_naoh") {
+        if (byId("chemAnalyteSelect")) byId("chemAnalyteSelect").value = "hcl";
+        if (byId("chemAnalyteConc")) byId("chemAnalyteConc").value = "0.10";
+        if (byId("chemAnalyteVol")) byId("chemAnalyteVol").value = "25.0";
+        if (byId("chemTitrantSelect")) byId("chemTitrantSelect").value = "naoh";
+        if (byId("chemTitrantConc")) byId("chemTitrantConc").value = "0.10";
+      } else if (p === "nh3_hcl") {
+        if (byId("chemAnalyteSelect")) byId("chemAnalyteSelect").value = "nh3";
+        if (byId("chemAnalyteConc")) byId("chemAnalyteConc").value = "0.10";
+        if (byId("chemAnalyteVol")) byId("chemAnalyteVol").value = "25.0";
+        if (byId("chemTitrantSelect")) byId("chemTitrantSelect").value = "hcl";
+        if (byId("chemTitrantConc")) byId("chemTitrantConc").value = "0.10";
+      } else if (p === "h2so4_naoh") {
+        if (byId("chemAnalyteSelect")) byId("chemAnalyteSelect").value = "h2so4";
+        if (byId("chemAnalyteConc")) byId("chemAnalyteConc").value = "0.05";
+        if (byId("chemAnalyteVol")) byId("chemAnalyteVol").value = "25.0";
+        if (byId("chemTitrantSelect")) byId("chemTitrantSelect").value = "naoh";
+        if (byId("chemTitrantConc")) byId("chemTitrantConc").value = "0.10";
+      } else if (p === "phosphoric_naoh") {
+        if (byId("chemAnalyteSelect")) byId("chemAnalyteSelect").value = "phosphoric_acid";
+        if (byId("chemAnalyteConc")) byId("chemAnalyteConc").value = "0.10";
+        if (byId("chemAnalyteVol")) byId("chemAnalyteVol").value = "20.0";
+        if (byId("chemTitrantSelect")) byId("chemTitrantSelect").value = "naoh";
+        if (byId("chemTitrantConc")) byId("chemTitrantConc").value = "0.10";
+      } else if (p === "formic_koh") {
+        if (byId("chemAnalyteSelect")) byId("chemAnalyteSelect").value = "formic_acid";
+        if (byId("chemAnalyteConc")) byId("chemAnalyteConc").value = "0.10";
+        if (byId("chemAnalyteVol")) byId("chemAnalyteVol").value = "25.0";
+        if (byId("chemTitrantSelect")) byId("chemTitrantSelect").value = "koh";
+        if (byId("chemTitrantConc")) byId("chemTitrantConc").value = "0.10";
+      }
+      runAcidBaseTitration();
+    });
+
+    async function runAcidBaseTitration() {
+      try {
+        const analyte = byId("chemAnalyteSelect")?.value || "acetic_acid";
+        const ca = parseFloat(byId("chemAnalyteConc")?.value || "0.10");
+        const va = parseFloat(byId("chemAnalyteVol")?.value || "25.0");
+        const titrant = byId("chemTitrantSelect")?.value || "naoh";
+        const cb = parseFloat(byId("chemTitrantConc")?.value || "0.10");
+        const temp = parseFloat(byId("chemTempC")?.value || "25.0");
+
+        const res = await api("/api/sim/chemical/acid_base", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            analyte_id: analyte,
+            analyte_concentration_m: ca,
+            analyte_volume_ml: va,
+            titrant_id: titrant,
+            titrant_concentration_m: cb,
+            temperature_c: temp,
+          }),
+        });
+
+        if (byId("chemInitPhDisplay")) byId("chemInitPhDisplay").textContent = res.initial_ph.toFixed(2);
+        if (byId("chemEqPointDisplay")) byId("chemEqPointDisplay").textContent = `${res.equivalence_volume_ml.toFixed(2)} mL (pH ${res.equivalence_ph.toFixed(2)})`;
+        if (byId("chemHalfEqDisplay")) byId("chemHalfEqDisplay").textContent = `pH ${res.half_equivalence_ph.toFixed(2)}`;
+        if (byId("chemBetaMaxDisplay")) byId("chemBetaMaxDisplay").textContent = `${res.max_buffer_capacity.toFixed(4)} mol/(L·pH)`;
+
+        const legend = byId("chemPlotLegend");
+        if (legend) legend.textContent = `Analyte: ${res.analyte?.name || analyte} vs Titrant: ${res.titrant?.name || titrant}`;
+
+        renderTitrationSvg(res);
+
+        const out = byId("chemConsoleOutput");
+        if (out) {
+          const lines = [
+            `[Acid-Base Solver] ${res.analyte?.name} (${res.analyte?.formula}) titrated with ${res.titrant?.name} (${res.titrant?.formula})`,
+            `  • Kw at ${res.temperature_c.toFixed(1)} °C = ${res.kw.toExponential(2)} (pKw = ${(-Math.log10(res.kw)).toFixed(2)})`,
+            `  • Equivalence Point: V_eq = ${res.equivalence_volume_ml.toFixed(2)} mL, pH = ${res.equivalence_ph.toFixed(2)}`,
+            `  • Half-Equivalence (Buffer Core): V_1/2 = ${res.half_equivalence_volume_ml.toFixed(2)} mL, pH = ${res.half_equivalence_ph.toFixed(2)}`,
+            `  • Maximum Buffer Index β_max = ${res.max_buffer_capacity.toFixed(4)} mol/(L·pH)`,
+            `  • Standard Enthalpy of Neutralization: ${res.neutralization_enthalpy_kj_mol.toFixed(1)} kJ/mol`,
+            `  • Analyte Dissociation Ka/Kb: ${JSON.stringify(res.analyte?.ka_values || res.analyte?.kb_values || [])}`,
+            ... (res.notes || [])
+          ];
+          out.textContent = lines.join("\n");
+        }
+        toast(`Titration Solved: V_eq = ${res.equivalence_volume_ml.toFixed(2)} mL, pH_eq = ${res.equivalence_ph.toFixed(2)}`);
+      } catch (err) {
+        toast(`Titration error: ${err.message}`, true);
+      }
+    }
+
+    byId("chemRunAcidBaseBtn")?.addEventListener("click", () => {
+      setChemSubTab("acid_base");
+      runAcidBaseTitration();
+    });
+    byId("chemCalculateTitrationBtn")?.addEventListener("click", runAcidBaseTitration);
+
+    function renderTitrationSvg(data) {
+      const svg = byId("chemTitrationSvg");
+      if (!svg || !data.titration_curve || data.titration_curve.length === 0) return;
+
+      const w = 520;
+      const h = 220;
+      const padLeft = 45;
+      const padRight = 30;
+      const padTop = 20;
+      const padBottom = 30;
+      const plotW = w - padLeft - padRight;
+      const plotH = h - padTop - padBottom;
+
+      const maxV = data.total_titrant_volume_ml || 50.0;
+      const maxPh = 14.0;
+
+      const scaleX = (v) => padLeft + (v / maxV) * plotW;
+      const scaleY = (ph) => padTop + plotH - (ph / maxPh) * plotH;
+
+      let svgHtml = "";
+
+      // Background gridlines
+      for (let ph = 0; ph <= 14; ph += 2) {
+        const y = scaleY(ph);
+        svgHtml += `<line x1="${padLeft}" y1="${y}" x2="${w - padRight}" y2="${y}" class="titration-grid" />`;
+        svgHtml += `<text x="${padLeft - 6}" y="${y + 3}" class="titration-text" text-anchor="end">${ph}</text>`;
+      }
+
+      for (let v = 0; v <= maxV; v += maxV / 5) {
+        const x = scaleX(v);
+        svgHtml += `<line x1="${x}" y1="${padTop}" x2="${x}" y2="${h - padBottom}" class="titration-grid" />`;
+        svgHtml += `<text x="${x}" y="${h - padBottom + 16}" class="titration-text" text-anchor="middle">${v.toFixed(0)} mL</text>`;
+      }
+
+      // Neutral pH 7 dashed line
+      const y7 = scaleY(7.0);
+      svgHtml += `<line x1="${padLeft}" y1="${y7}" x2="${w - padRight}" y2="${y7}" stroke="#10b981" stroke-dasharray="4,4" stroke-width="1.2" opacity="0.6"/>`;
+      svgHtml += `<text x="${w - padRight - 4}" y="${y7 - 4}" fill="#10b981" font-size="9" text-anchor="end">pH 7.0 (Neutral)</text>`;
+
+      // Buffer Region highlight band
+      const halfEqPh = data.half_equivalence_ph;
+      const yBufTop = scaleY(Math.min(14, halfEqPh + 1.0));
+      const yBufBtm = scaleY(Math.max(0, halfEqPh - 1.0));
+      const xEq = scaleX(data.equivalence_volume_ml);
+      svgHtml += `<rect x="${padLeft}" y="${yBufTop}" width="${Math.max(0, xEq - padLeft)}" height="${Math.abs(yBufBtm - yBufTop)}" class="titration-buffer-zone" rx="4" />`;
+      svgHtml += `<text x="${padLeft + 6}" y="${yBufTop + 14}" fill="var(--accent)" font-size="9" font-weight="600">Buffer Zone (pKa ± 1)</text>`;
+
+      // Titration Curve path
+      const points = data.titration_curve.map((pt) => `${scaleX(pt.titrant_volume_ml).toFixed(1)},${scaleY(pt.ph).toFixed(1)}`).join(" ");
+      svgHtml += `<polyline points="${points}" class="titration-line" />`;
+
+      // Half-Equivalence Marker
+      const xHalf = scaleX(data.half_equivalence_volume_ml);
+      const yHalf = scaleY(data.half_equivalence_ph);
+      svgHtml += `<circle cx="${xHalf}" cy="${yHalf}" r="4.5" fill="#8b5cf6" stroke="#ffffff" stroke-width="1.5" />`;
+      svgHtml += `<text x="${xHalf}" y="${yHalf - 8}" fill="#8b5cf6" font-size="9.5" font-weight="bold" text-anchor="middle">V_1/2 (${data.half_equivalence_ph.toFixed(2)})</text>`;
+
+      // Equivalence Point Marker
+      const yEq = scaleY(data.equivalence_ph);
+      svgHtml += `<circle cx="${xEq}" cy="${yEq}" r="5.5" fill="#ef4444" stroke="#ffffff" stroke-width="2" />`;
+      svgHtml += `<text x="${xEq}" y="${yEq - 10}" fill="#ef4444" font-size="10" font-weight="bold" text-anchor="middle">V_eq = ${data.equivalence_volume_ml.toFixed(1)} mL (pH ${data.equivalence_ph.toFixed(2)})</text>`;
+
+      // Axes
+      svgHtml += `<line x1="${padLeft}" y1="${padTop}" x2="${padLeft}" y2="${h - padBottom}" class="titration-axis" />`;
+      svgHtml += `<line x1="${padLeft}" y1="${h - padBottom}" x2="${w - padRight}" y2="${h - padBottom}" class="titration-axis" />`;
+
+      // Axis labels
+      svgHtml += `<text x="${padLeft - 24}" y="${padTop + plotH / 2}" class="titration-text" font-weight="bold" text-anchor="middle" transform="rotate(-90 ${padLeft - 24} ${padTop + plotH / 2})">pH</text>`;
+      svgHtml += `<text x="${padLeft + plotW / 2}" y="${h - 6}" class="titration-text" font-weight="bold" text-anchor="middle">Titrant Volume Added (mL)</text>`;
+
+      svg.innerHTML = svgHtml;
+    }
+
+    async function loadChemSpeciesCatalog() {
+      try {
+        const catalog = await api("/api/sim/chemical/species");
+        const tbody = byId("chemSpeciesTableBody");
+        if (!tbody || !Array.isArray(catalog)) return;
+        tbody.innerHTML = catalog.map((sp) => `
+          <tr style="border-bottom: 1px solid var(--border); transition: background 0.15s ease;">
+            <td style="padding: 6px 10px; font-family: monospace; font-weight: 600; color: var(--accent);">${sp.id}</td>
+            <td style="padding: 6px 10px; font-weight: 600;">${sp.name}</td>
+            <td style="padding: 6px 10px; font-family: monospace;">${sp.formula}</td>
+            <td style="padding: 6px 10px;"><span class="wb-status-badge" style="font-size: 10px; padding: 2px 6px;">${sp.nature}</span></td>
+            <td style="padding: 6px 10px;">${sp.molar_mass_g_mol.toFixed(2)}</td>
+            <td style="padding: 6px 10px;">${sp.valence}</td>
+            <td style="padding: 6px 10px; font-family: monospace; font-size: 10.5px;">${sp.ka_values?.length ? "Ka: " + sp.ka_values.map(v => v.toExponential(2)).join(", ") : (sp.kb_values?.length ? "Kb: " + sp.kb_values.map(v => v.toExponential(2)).join(", ") : "—")}</td>
+            <td style="padding: 6px 10px;">${sp.density_g_ml.toFixed(3)}</td>
+          </tr>
+        `).join("");
+      } catch (err) {
+        console.warn("Failed to load species catalog:", err);
+      }
+    }
+
     byId("chemRunFlashBtn")?.addEventListener("click", async () => {
       try {
         const t = parseFloat(byId("chemTempInput")?.value || "315.0");

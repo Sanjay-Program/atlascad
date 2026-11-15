@@ -442,6 +442,29 @@ impl McpServer {
                 }),
             },
             McpToolDefinition {
+                name: "atlas_chemical_acid_base".into(),
+                description: "Simulate rigorous analytical acid-base equilibria, Henderson-Hasselbalch buffer capacities, and pH titration curves".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "analyte_id": { "type": "string", "default": "acetic_acid" },
+                        "analyte_concentration_m": { "type": "number", "default": 0.10 },
+                        "analyte_volume_ml": { "type": "number", "default": 25.0 },
+                        "titrant_id": { "type": "string", "default": "naoh" },
+                        "titrant_concentration_m": { "type": "number", "default": 0.10 },
+                        "temperature_c": { "type": "number", "default": 25.0 }
+                    }
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_chemical_species_catalog".into(),
+                description: "Retrieve comprehensive thermodynamic catalog of industrial strong/weak acids, strong/weak bases, and buffer salts".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {}
+                }),
+            },
+            McpToolDefinition {
                 name: "atlas_robotics_kinematics".into(),
                 description: "Simulate 6-DOF manipulator forward kinematics, DLS inverse kinematics, and Yoshikawa manipulability".into(),
                 input_schema: serde_json::json!({
