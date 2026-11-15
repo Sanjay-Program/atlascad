@@ -8,13 +8,16 @@ pub mod aerodynamics;
 pub mod aeroelasticity;
 pub mod automotive_braking;
 pub mod battery_ev;
+pub mod battery_thermal;
 pub mod belt_transmission;
 pub mod biomedical;
 pub mod boundary_conditions;
 pub mod building_physics;
 pub mod cavitation;
 pub mod cfd;
+pub mod channel_hydraulics;
 pub mod chemical;
+pub mod chemical_reactor;
 pub mod convergence;
 pub mod daylighting;
 pub mod digital_twin;
@@ -61,6 +64,7 @@ pub mod rainflow;
 pub mod reinforced_concrete;
 pub mod robotics;
 pub mod rock_mechanics;
+pub mod rocket_nozzle;
 pub mod rotor_dynamics;
 pub mod shafts_keys;
 pub mod sheet_metal;
@@ -77,6 +81,7 @@ pub mod structural;
 pub mod structural_connections;
 pub mod thermal_stress;
 pub mod timber_fire;
+pub mod transmission_line;
 pub mod validation;
 pub mod water_hammer;
 pub mod welding;
@@ -98,6 +103,10 @@ pub mod prelude {
     pub use crate::battery_ev::{
         BatteryPackProblem, VehicleDynamicsProblem, solve_battery_pack, solve_vehicle_dynamics,
     };
+    pub use crate::battery_thermal::{
+        BatteryThermalProblem, BatteryThermalResult,
+        solve_battery_thermal, solve_battery_thermal_sim,
+    };
     pub use crate::belt_transmission::{
         BeltProfile, BeltTransmissionProblem, BeltTransmissionResult,
         solve_belt_transmission, solve_belt_transmission_sim,
@@ -112,12 +121,20 @@ pub mod prelude {
     };
     pub use crate::cavitation::{CavitationProblem, solve_cavitation_npsh};
     pub use crate::cfd::{FluidProperties, PipeFlowProblem, solve_pipe_flow};
+    pub use crate::channel_hydraulics::{
+        ChannelFlowRegime, ChannelHydraulicsProblem, ChannelHydraulicsResult,
+        solve_channel_hydraulics, solve_channel_hydraulics_sim,
+    };
     pub use crate::chemical::{
         AcidBaseEquilibriumResult, AcidBaseNature, AcidBaseProblem, ChemicalComponent,
         ChemicalSpecies, FlashProblem, ReactionKineticsProblem, ReactionKineticsResult,
         ReactionOrder, TitrationDataPoint, find_species_by_id, get_standard_species_catalog,
         solve_acid_base_titration, solve_chemical_titration_sim, solve_rachford_rice_flash,
         solve_reaction_kinetics, solve_reaction_kinetics_sim,
+    };
+    pub use crate::chemical_reactor::{
+        ChemicalReactorProblem, ChemicalReactorResult,
+        solve_chemical_reactor, solve_chemical_reactor_sim,
     };
     pub use crate::convergence::{ConvergenceMonitor, IterationTelemetry};
     pub use crate::daylighting::{
@@ -285,6 +302,10 @@ pub mod prelude {
         BlastVibrationProblem, HoekBrownProblem, RmrClassificationProblem, solve_blast_vibration,
         solve_hoek_brown, solve_rmr_classification,
     };
+    pub use crate::rocket_nozzle::{
+        NozzleExpansionRegime, RocketNozzleProblem, RocketNozzleResult,
+        solve_rocket_nozzle, solve_rocket_nozzle_sim,
+    };
     pub use crate::rotor_dynamics::{
         BearingType, RotorDynamicsProblem, RotorDynamicsResult, solve_rotor_dynamics,
         solve_rotor_dynamics_sim,
@@ -336,6 +357,10 @@ pub mod prelude {
     pub use crate::timber_fire::{
         FireExposureSides, TimberFireProblem, TimberFireResult, TimberGrade,
         iso834_temperature_c, solve_timber_fire, solve_timber_fire_sim,
+    };
+    pub use crate::transmission_line::{
+        TransmissionLineProblem, TransmissionLineResult,
+        solve_transmission_line, solve_transmission_line_sim,
     };
     pub use crate::validation::{AnalyticalComparison, ValidationStatus};
     pub use crate::water_hammer::{WaterHammerProblem, solve_water_hammer};

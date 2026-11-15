@@ -2938,5 +2938,207 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.energy.battery_thermal",
+            "Battery Pack Liquid Cooling & Thermal Management (IEC 62660 / SAE J2464)",
+            "Evaluates lithium-ion cell heat generation, liquid cooling plate convective dissipation, coolant temperature rise across channels, and inter-cell thermal gradients.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "cell_count_series".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Number of cells in series".into(),
+            required: true,
+            default_value: Some(serde_json::json!(96)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "cell_count_parallel".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Number of cell strings in parallel".into(),
+            required: true,
+            default_value: Some(serde_json::json!(4)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "operating_current_a".into(),
+            arg_type: ArgumentType::Number,
+            description: "Total pack continuous discharge current in A".into(),
+            required: true,
+            default_value: Some(serde_json::json!(200.0)),
+            validation_rules: vec![ValidationRule::Min(0.1)],
+        })
+        .with_argument(CommandArgument {
+            name: "coolant_flow_rate_l_min".into(),
+            arg_type: ArgumentType::Number,
+            description: "Liquid coolant volume flow rate in L/min".into(),
+            required: true,
+            default_value: Some(serde_json::json!(15.0)),
+            validation_rules: vec![ValidationRule::Min(0.5)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.aerospace.rocket_nozzle",
+            "Rocket Engine De Laval Nozzle Supersonic Gas Dynamics (NASA SP-8039)",
+            "Evaluates isentropic compressible expansion, throat critical parameters, exit Mach number, sea-level and vacuum specific impulses, and Summerfield flow separation.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "chamber_pressure_bar".into(),
+            arg_type: ArgumentType::Number,
+            description: "Stagnation chamber pressure in bar".into(),
+            required: true,
+            default_value: Some(serde_json::json!(100.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "chamber_temperature_k".into(),
+            arg_type: ArgumentType::Number,
+            description: "Combustion chamber temperature in Kelvin".into(),
+            required: true,
+            default_value: Some(serde_json::json!(3500.0)),
+            validation_rules: vec![ValidationRule::Min(1000.0), ValidationRule::Max(5000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "throat_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Nozzle throat diameter in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(120.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(2000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "expansion_ratio_eps".into(),
+            arg_type: ArgumentType::Number,
+            description: "Nozzle area expansion ratio Ae/At".into(),
+            required: true,
+            default_value: Some(serde_json::json!(16.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(300.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.chemical.cstr_reactor",
+            "CSTR Chemical Reactor Kinetics & Thermal Multiplicity (Fogler / DIERS)",
+            "Evaluates Arrhenius reaction kinetics, Damköhler number, Van Heerden heat generation vs removal curves, and thermal runaway ignition stability margins.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "reactor_volume_m3".into(),
+            arg_type: ArgumentType::Number,
+            description: "Liquid reactor volume in m³".into(),
+            required: true,
+            default_value: Some(serde_json::json!(2.50)),
+            validation_rules: vec![ValidationRule::Min(0.01), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "feed_volumetric_flow_m3_h".into(),
+            arg_type: ArgumentType::Number,
+            description: "Feed volumetric flow rate in m³/h".into(),
+            required: true,
+            default_value: Some(serde_json::json!(5.0)),
+            validation_rules: vec![ValidationRule::Min(0.01), ValidationRule::Max(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "feed_reactant_concentration_mol_m3".into(),
+            arg_type: ArgumentType::Number,
+            description: "Reactant feed concentration in mol/m³".into(),
+            required: true,
+            default_value: Some(serde_json::json!(2000.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.civil.channel_hydraulics",
+            "Open Channel Flow Manning Hydraulics & Hydraulic Jump (Chow / USBR)",
+            "Evaluates uniform open channel flow, normal and critical depths, Froude number regime, sequent conjugate depths, and turbulent energy dissipation across hydraulic jumps.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "bottom_width_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Channel bed bottom width in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(6.0)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "side_slope_z".into(),
+            arg_type: ArgumentType::Number,
+            description: "Side slope ratio z:1 (horizontal to vertical)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1.5)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "discharge_rate_m3_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Design volumetric discharge rate in m³/s".into(),
+            required: true,
+            default_value: Some(serde_json::json!(45.0)),
+            validation_rules: vec![ValidationRule::Min(0.01)],
+        })
+        .with_argument(CommandArgument {
+            name: "bed_slope_s0".into(),
+            arg_type: ArgumentType::Number,
+            description: "Longitudinal bed slope S0 (m/m)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(0.0015)),
+            validation_rules: vec![ValidationRule::Min(0.00001), ValidationRule::Max(0.5)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.electrical.transmission_line",
+            "Overhead Transmission Line Catenary Sag & Tension (IEEE 738 / IEC 60826)",
+            "Evaluates conductor catenary profile, change-of-state equation under thermal and storm loading, maximum hot sag, and mechanical factors of safety against breaking load.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "span_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Horizontal span length in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(350.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(2000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "conductor_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Conductor outer diameter in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(28.14)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rated_tensile_strength_kn".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rated tensile breaking strength in kN".into(),
+            required: true,
+            default_value: Some(serde_json::json!(140.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "initial_horizontal_tension_kn".into(),
+            arg_type: ArgumentType::Number,
+            description: "Initial baseline tension at reference temp in kN".into(),
+            required: true,
+            default_value: Some(serde_json::json!(28.0)),
+            validation_rules: vec![ValidationRule::Min(0.5)],
+        }),
+    )?;
+
     Ok(())
 }

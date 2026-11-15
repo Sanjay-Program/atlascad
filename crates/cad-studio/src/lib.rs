@@ -5273,6 +5273,124 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_energy_battery_thermal(
+        &mut self,
+        req: &SimBatteryThermalRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::battery_thermal::BatteryThermalProblem {
+            problem_id: "battery_thermal_sim".to_string(),
+            cell_count_series: req.cell_count_series.unwrap_or(96),
+            cell_count_parallel: req.cell_count_parallel.unwrap_or(4),
+            cell_capacity_ah: req.cell_capacity_ah.unwrap_or(50.0),
+            nominal_cell_voltage_v: req.nominal_cell_voltage_v.unwrap_or(3.70),
+            internal_resistance_mohm: req.internal_resistance_mohm.unwrap_or(1.20),
+            entropic_coefficient_mv_k: req.entropic_coefficient_mv_k.unwrap_or(-0.22),
+            operating_current_a: req.operating_current_a.unwrap_or(200.0),
+            ambient_temp_c: req.ambient_temp_c.unwrap_or(25.0),
+            coolant_inlet_temp_c: req.coolant_inlet_temp_c.unwrap_or(20.0),
+            coolant_flow_rate_l_min: req.coolant_flow_rate_l_min.unwrap_or(15.0),
+            coolant_density_kg_m3: req.coolant_density_kg_m3.unwrap_or(1060.0),
+            coolant_specific_heat_j_kg_k: req.coolant_specific_heat_j_kg_k.unwrap_or(3400.0),
+            convective_htc_w_m2_k: req.convective_htc_w_m2_k.unwrap_or(850.0),
+            cell_contact_area_m2: req.cell_contact_area_m2.unwrap_or(0.025),
+            cell_mass_kg: req.cell_mass_kg.unwrap_or(0.85),
+            cell_specific_heat_j_kg_k: req.cell_specific_heat_j_kg_k.unwrap_or(1050.0),
+        };
+        let res = atlas_simulation_core::battery_thermal::solve_battery_thermal(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_aerospace_rocket_nozzle(
+        &mut self,
+        req: &SimRocketNozzleRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::rocket_nozzle::RocketNozzleProblem {
+            problem_id: "rocket_nozzle_sim".to_string(),
+            chamber_pressure_bar: req.chamber_pressure_bar.unwrap_or(100.0),
+            chamber_temperature_k: req.chamber_temperature_k.unwrap_or(3500.0),
+            throat_diameter_mm: req.throat_diameter_mm.unwrap_or(120.0),
+            expansion_ratio_eps: req.expansion_ratio_eps.unwrap_or(16.0),
+            specific_heat_ratio_gamma: req.specific_heat_ratio_gamma.unwrap_or(1.22),
+            molecular_weight_g_mol: req.molecular_weight_g_mol.unwrap_or(22.5),
+            ambient_pressure_bar: req.ambient_pressure_bar.unwrap_or(1.01325),
+            discharge_coefficient_cd: req.discharge_coefficient_cd.unwrap_or(0.985),
+            thrust_efficiency_cf: req.thrust_efficiency_cf.unwrap_or(0.975),
+        };
+        let res = atlas_simulation_core::rocket_nozzle::solve_rocket_nozzle(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_chemical_cstr_reactor(
+        &mut self,
+        req: &SimCstrReactorRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::chemical_reactor::ChemicalReactorProblem {
+            problem_id: "cstr_reactor_sim".to_string(),
+            reactor_volume_m3: req.reactor_volume_m3.unwrap_or(2.50),
+            feed_volumetric_flow_m3_h: req.feed_volumetric_flow_m3_h.unwrap_or(5.0),
+            feed_reactant_concentration_mol_m3: req.feed_reactant_concentration_mol_m3.unwrap_or(2000.0),
+            feed_temperature_c: req.feed_temperature_c.unwrap_or(25.0),
+            pre_exponential_factor_s_inv: req.pre_exponential_factor_s_inv.unwrap_or(4.5e9),
+            activation_energy_kj_mol: req.activation_energy_kj_mol.unwrap_or(75.0),
+            reaction_enthalpy_kj_mol: req.reaction_enthalpy_kj_mol.unwrap_or(-85.0),
+            fluid_density_kg_m3: req.fluid_density_kg_m3.unwrap_or(1020.0),
+            fluid_specific_heat_j_kg_k: req.fluid_specific_heat_j_kg_k.unwrap_or(3800.0),
+            jacket_overall_ua_w_k: req.jacket_overall_ua_w_k.unwrap_or(4500.0),
+            coolant_temperature_c: req.coolant_temperature_c.unwrap_or(18.0),
+            max_allowable_reactor_temp_c: req.max_allowable_reactor_temp_c.unwrap_or(95.0),
+        };
+        let res = atlas_simulation_core::chemical_reactor::solve_chemical_reactor(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_civil_channel_hydraulics(
+        &mut self,
+        req: &SimChannelHydraulicsRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::channel_hydraulics::ChannelHydraulicsProblem {
+            problem_id: "channel_hydraulics_sim".to_string(),
+            bottom_width_m: req.bottom_width_m.unwrap_or(6.0),
+            side_slope_z: req.side_slope_z.unwrap_or(1.5),
+            bed_slope_s0: req.bed_slope_s0.unwrap_or(0.0015),
+            manning_roughness_n: req.manning_roughness_n.unwrap_or(0.025),
+            discharge_rate_m3_s: req.discharge_rate_m3_s.unwrap_or(45.0),
+            upstream_jump_depth_m: req.upstream_jump_depth_m.or(Some(0.85)),
+        };
+        let res = atlas_simulation_core::channel_hydraulics::solve_channel_hydraulics(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_electrical_transmission_line(
+        &mut self,
+        req: &SimTransmissionLineRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::transmission_line::TransmissionLineProblem {
+            problem_id: "transmission_line_sim".to_string(),
+            span_length_m: req.span_length_m.unwrap_or(350.0),
+            conductor_diameter_mm: req.conductor_diameter_mm.unwrap_or(28.14),
+            conductor_unit_mass_kg_m: req.conductor_unit_mass_kg_m.unwrap_or(1.628),
+            rated_tensile_strength_kn: req.rated_tensile_strength_kn.unwrap_or(140.0),
+            metallic_cross_section_mm2: req.metallic_cross_section_mm2.unwrap_or(468.6),
+            elastic_modulus_gpa: req.elastic_modulus_gpa.unwrap_or(69.0),
+            thermal_expansion_coeff_per_c: req.thermal_expansion_coeff_per_c.unwrap_or(19.3e-6),
+            reference_temp_c: req.reference_temp_c.unwrap_or(15.0),
+            initial_horizontal_tension_kn: req.initial_horizontal_tension_kn.unwrap_or(28.0),
+            max_operating_temp_c: req.max_operating_temp_c.unwrap_or(80.0),
+            storm_ice_thickness_mm: req.storm_ice_thickness_mm.unwrap_or(12.5),
+            storm_wind_pressure_pa: req.storm_wind_pressure_pa.unwrap_or(400.0),
+            storm_ambient_temp_c: req.storm_ambient_temp_c.unwrap_or(-5.0),
+            crossarm_height_m: req.crossarm_height_m.unwrap_or(22.0),
+            min_ground_clearance_required_m: req.min_ground_clearance_required_m.unwrap_or(8.0),
+        };
+        let res = atlas_simulation_core::transmission_line::solve_transmission_line(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -7166,6 +7284,69 @@ namespace AtlasCAD.Unity
                     gear_teeth_z2: z2,
                     normal_module_mm: mn,
                     face_width_mm: b,
+                    ..Default::default()
+                })?
+            }
+            "sim.energy.battery_thermal" => {
+                let ns = req.arguments.get("cell_count_series").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let np = req.arguments.get("cell_count_parallel").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let curr = req.arguments.get("operating_current_a").and_then(|v| v.as_f64());
+                let flow = req.arguments.get("coolant_flow_rate_l_min").and_then(|v| v.as_f64());
+                self.sim_energy_battery_thermal(&SimBatteryThermalRequest {
+                    cell_count_series: ns,
+                    cell_count_parallel: np,
+                    operating_current_a: curr,
+                    coolant_flow_rate_l_min: flow,
+                    ..Default::default()
+                })?
+            }
+            "sim.aerospace.rocket_nozzle" => {
+                let pc = req.arguments.get("chamber_pressure_bar").and_then(|v| v.as_f64());
+                let tc = req.arguments.get("chamber_temperature_k").and_then(|v| v.as_f64());
+                let dt = req.arguments.get("throat_diameter_mm").and_then(|v| v.as_f64());
+                let eps = req.arguments.get("expansion_ratio_eps").and_then(|v| v.as_f64());
+                self.sim_aerospace_rocket_nozzle(&SimRocketNozzleRequest {
+                    chamber_pressure_bar: pc,
+                    chamber_temperature_k: tc,
+                    throat_diameter_mm: dt,
+                    expansion_ratio_eps: eps,
+                    ..Default::default()
+                })?
+            }
+            "sim.chemical.cstr_reactor" => {
+                let vol = req.arguments.get("reactor_volume_m3").and_then(|v| v.as_f64());
+                let v0 = req.arguments.get("feed_volumetric_flow_m3_h").and_then(|v| v.as_f64());
+                let ca0 = req.arguments.get("feed_reactant_concentration_mol_m3").and_then(|v| v.as_f64());
+                self.sim_chemical_cstr_reactor(&SimCstrReactorRequest {
+                    reactor_volume_m3: vol,
+                    feed_volumetric_flow_m3_h: v0,
+                    feed_reactant_concentration_mol_m3: ca0,
+                    ..Default::default()
+                })?
+            }
+            "sim.civil.channel_hydraulics" => {
+                let b = req.arguments.get("bottom_width_m").and_then(|v| v.as_f64());
+                let z = req.arguments.get("side_slope_z").and_then(|v| v.as_f64());
+                let q = req.arguments.get("discharge_rate_m3_s").and_then(|v| v.as_f64());
+                let s0 = req.arguments.get("bed_slope_s0").and_then(|v| v.as_f64());
+                self.sim_civil_channel_hydraulics(&SimChannelHydraulicsRequest {
+                    bottom_width_m: b,
+                    side_slope_z: z,
+                    discharge_rate_m3_s: q,
+                    bed_slope_s0: s0,
+                    ..Default::default()
+                })?
+            }
+            "sim.electrical.transmission_line" => {
+                let span = req.arguments.get("span_length_m").and_then(|v| v.as_f64());
+                let d = req.arguments.get("conductor_diameter_mm").and_then(|v| v.as_f64());
+                let rts = req.arguments.get("rated_tensile_strength_kn").and_then(|v| v.as_f64());
+                let h0 = req.arguments.get("initial_horizontal_tension_kn").and_then(|v| v.as_f64());
+                self.sim_electrical_transmission_line(&SimTransmissionLineRequest {
+                    span_length_m: span,
+                    conductor_diameter_mm: d,
+                    rated_tensile_strength_kn: rts,
+                    initial_horizontal_tension_kn: h0,
                     ..Default::default()
                 })?
             }
@@ -9177,6 +9358,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/mechanical/gear_fatigue" => {
             match parse_body_or_default::<SimGearFatigueRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_mechanical_gear_fatigue(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/energy/battery_thermal" => {
+            match parse_body_or_default::<SimBatteryThermalRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_energy_battery_thermal(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/aerospace/rocket_nozzle" => {
+            match parse_body_or_default::<SimRocketNozzleRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_aerospace_rocket_nozzle(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/chemical/cstr_reactor" => {
+            match parse_body_or_default::<SimCstrReactorRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_chemical_cstr_reactor(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/civil/channel_hydraulics" => {
+            match parse_body_or_default::<SimChannelHydraulicsRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_civil_channel_hydraulics(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/electrical/transmission_line" => {
+            match parse_body_or_default::<SimTransmissionLineRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_electrical_transmission_line(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12334,4 +12560,145 @@ struct SimGearFatigueRequest {
     pub required_safety_factor_pitting: Option<f64>,
     #[serde(default)]
     pub required_safety_factor_bending: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimBatteryThermalRequest {
+    #[serde(default)]
+    pub cell_count_series: Option<usize>,
+    #[serde(default)]
+    pub cell_count_parallel: Option<usize>,
+    #[serde(default)]
+    pub cell_capacity_ah: Option<f64>,
+    #[serde(default)]
+    pub nominal_cell_voltage_v: Option<f64>,
+    #[serde(default)]
+    pub internal_resistance_mohm: Option<f64>,
+    #[serde(default)]
+    pub entropic_coefficient_mv_k: Option<f64>,
+    #[serde(default)]
+    pub operating_current_a: Option<f64>,
+    #[serde(default)]
+    pub ambient_temp_c: Option<f64>,
+    #[serde(default)]
+    pub coolant_inlet_temp_c: Option<f64>,
+    #[serde(default)]
+    pub coolant_flow_rate_l_min: Option<f64>,
+    #[serde(default)]
+    pub coolant_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub coolant_specific_heat_j_kg_k: Option<f64>,
+    #[serde(default)]
+    pub convective_htc_w_m2_k: Option<f64>,
+    #[serde(default)]
+    pub cell_contact_area_m2: Option<f64>,
+    #[serde(default)]
+    pub cell_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub cell_specific_heat_j_kg_k: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimRocketNozzleRequest {
+    #[serde(default)]
+    pub chamber_pressure_bar: Option<f64>,
+    #[serde(default)]
+    pub chamber_temperature_k: Option<f64>,
+    #[serde(default)]
+    pub throat_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub expansion_ratio_eps: Option<f64>,
+    #[serde(default)]
+    pub specific_heat_ratio_gamma: Option<f64>,
+    #[serde(default)]
+    pub molecular_weight_g_mol: Option<f64>,
+    #[serde(default)]
+    pub ambient_pressure_bar: Option<f64>,
+    #[serde(default)]
+    pub discharge_coefficient_cd: Option<f64>,
+    #[serde(default)]
+    pub thrust_efficiency_cf: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimCstrReactorRequest {
+    #[serde(default)]
+    pub reactor_volume_m3: Option<f64>,
+    #[serde(default)]
+    pub feed_volumetric_flow_m3_h: Option<f64>,
+    #[serde(default)]
+    pub feed_reactant_concentration_mol_m3: Option<f64>,
+    #[serde(default)]
+    pub feed_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub pre_exponential_factor_s_inv: Option<f64>,
+    #[serde(default)]
+    pub activation_energy_kj_mol: Option<f64>,
+    #[serde(default)]
+    pub reaction_enthalpy_kj_mol: Option<f64>,
+    #[serde(default)]
+    pub fluid_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub fluid_specific_heat_j_kg_k: Option<f64>,
+    #[serde(default)]
+    pub jacket_overall_ua_w_k: Option<f64>,
+    #[serde(default)]
+    pub coolant_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub max_allowable_reactor_temp_c: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimChannelHydraulicsRequest {
+    #[serde(default)]
+    pub bottom_width_m: Option<f64>,
+    #[serde(default)]
+    pub side_slope_z: Option<f64>,
+    #[serde(default)]
+    pub bed_slope_s0: Option<f64>,
+    #[serde(default)]
+    pub manning_roughness_n: Option<f64>,
+    #[serde(default)]
+    pub discharge_rate_m3_s: Option<f64>,
+    #[serde(default)]
+    pub upstream_jump_depth_m: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimTransmissionLineRequest {
+    #[serde(default)]
+    pub span_length_m: Option<f64>,
+    #[serde(default)]
+    pub conductor_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub conductor_unit_mass_kg_m: Option<f64>,
+    #[serde(default)]
+    pub rated_tensile_strength_kn: Option<f64>,
+    #[serde(default)]
+    pub metallic_cross_section_mm2: Option<f64>,
+    #[serde(default)]
+    pub elastic_modulus_gpa: Option<f64>,
+    #[serde(default)]
+    pub thermal_expansion_coeff_per_c: Option<f64>,
+    #[serde(default)]
+    pub reference_temp_c: Option<f64>,
+    #[serde(default)]
+    pub initial_horizontal_tension_kn: Option<f64>,
+    #[serde(default)]
+    pub max_operating_temp_c: Option<f64>,
+    #[serde(default)]
+    pub storm_ice_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub storm_wind_pressure_pa: Option<f64>,
+    #[serde(default)]
+    pub storm_ambient_temp_c: Option<f64>,
+    #[serde(default)]
+    pub crossarm_height_m: Option<f64>,
+    #[serde(default)]
+    pub min_ground_clearance_required_m: Option<f64>,
 }

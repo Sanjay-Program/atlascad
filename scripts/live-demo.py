@@ -2365,6 +2365,107 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 23.7 Enterprise MCP Tool Calling: 5 Batch-8 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # =====================================================================
+        # 24. BATCH 9 ADVANCED INDUSTRIAL ENGINEERING SIMULATION SOLVERS
+        # =====================================================================
+        print("\n--- 24. Batch 9 Advanced Industrial Engineering Solvers (Battery, Rocket, CSTR, Hydraulics, Catenary) ---")
+
+        # 24.1 Battery Pack Liquid Cooling & Thermal Management (IEC 62660 / SAE J2464)
+        bat_res = http_request(port, "POST", "/api/sim/energy/battery_thermal", body={
+            "cell_count_series": 96,
+            "cell_count_parallel": 4,
+            "operating_current_a": 200.0,
+            "coolant_flow_rate_l_min": 15.0
+        })
+        check(bat_res.get("total_pack_energy_kwh", 0.0) > 60.0, "Battery pack energy > 60 kWh")
+        check(bat_res.get("total_pack_heat_dissipation_w", 0.0) > 1500.0, "Total pack heat > 1500 W")
+        check(bat_res.get("maximum_cell_temp_c", 0.0) < 50.0, "Maximum cell temp < 50 °C")
+        check(bat_res.get("is_safe", False) is True, "Battery pack within safe thermal thresholds")
+        print(f"  ✓ 24.1 Battery Thermal (IEC 62660): Energy = {bat_res['total_pack_energy_kwh']:.1f} kWh ({bat_res['total_cells_count']} cells @ {bat_res['nominal_pack_voltage_v']:.1f}V), Q_pack = {bat_res['total_pack_heat_dissipation_w']:.1f} W (Joule = {bat_res['cell_joule_heat_w']:.2f}W/cell), Coolant ΔT = +{bat_res['coolant_temperature_rise_c']:.2f} °C, T_cell = {bat_res['minimum_cell_temp_c']:.1f} - {bat_res['maximum_cell_temp_c']:.1f} °C (Grad = {bat_res['max_pack_temperature_gradient_c']:.2f} °C)")
+
+        # 24.2 Rocket Engine De Laval Nozzle Supersonic Gas Dynamics (NASA SP-8039)
+        rkt_res = http_request(port, "POST", "/api/sim/aerospace/rocket_nozzle", body={
+            "chamber_pressure_bar": 100.0,
+            "chamber_temperature_k": 3500.0,
+            "throat_diameter_mm": 120.0,
+            "expansion_ratio_eps": 16.0
+        })
+        check(rkt_res.get("exit_mach_number", 0.0) > 3.0, "Exit Mach number > 3.0")
+        check(rkt_res.get("net_thrust_kn", 0.0) > 140.0, "Net thrust > 140 kN")
+        check(rkt_res.get("operating_specific_impulse_s", 0.0) > 250.0, "Sea-level Isp > 250 s")
+        check(rkt_res.get("is_safe", False) is True, "Nozzle free from separation shocks")
+        print(f"  ✓ 24.2 Rocket Nozzle (NASA SP-8039): Mach = {rkt_res['exit_mach_number']:.2f}, c* = {rkt_res['characteristic_velocity_m_s']:.0f} m/s, m_dot = {rkt_res['propellant_mass_flow_kg_s']:.1f} kg/s, F_sl = {rkt_res['net_thrust_kn']:.1f} kN (F_vac = {rkt_res['vacuum_thrust_kn']:.1f} kN), Isp_sl = {rkt_res['operating_specific_impulse_s']:.1f}s (Isp_vac = {rkt_res['vacuum_specific_impulse_s']:.1f}s), Pe = {rkt_res['exit_pressure_bar']:.3f} bar ({rkt_res['expansion_regime']})")
+
+        # 24.3 CSTR Chemical Reactor Kinetics & Thermal Multiplicity (Fogler / DIERS)
+        cstr_res = http_request(port, "POST", "/api/sim/chemical/cstr_reactor", body={
+            "reactor_volume_m3": 2.50,
+            "feed_volumetric_flow_m3_h": 5.0,
+            "feed_reactant_concentration_mol_m3": 2000.0
+        })
+        check(cstr_res.get("fractional_conversion", 0.0) > 0.50, "Reactant conversion > 50%")
+        check(cstr_res.get("heat_generation_rate_kw", 0.0) > 80.0, "Reaction heat > 80 kW")
+        check(cstr_res.get("thermal_stability_margin_w_k", 0.0) > 0.0, "Positive stability margin")
+        check(cstr_res.get("is_safe", False) is True, "CSTR operating stably without runaway")
+        print(f"  ✓ 24.3 CSTR Kinetics (Fogler / DIERS): τ = {cstr_res['residence_time_minutes']:.1f} min, T_ss = {cstr_res['reactor_temperature_c']:.1f} °C, X = {cstr_res['fractional_conversion']*100:.1f}%, Da = {cstr_res['damkohler_number']:.2f}, Q_gen = {cstr_res['heat_generation_rate_kw']:.1f} kW, Jacket = {cstr_res['jacket_cooling_duty_kw']:.1f} kW, Stability Margin = {cstr_res['thermal_stability_margin_w_k']:.1f} W/K")
+
+        # 24.4 Open Channel Manning Hydraulics & Hydraulic Jump (Chow / USBR)
+        hyd_res = http_request(port, "POST", "/api/sim/civil/channel_hydraulics", body={
+            "bottom_width_m": 6.0,
+            "side_slope_z": 1.5,
+            "discharge_rate_m3_s": 45.0,
+            "bed_slope_s0": 0.0015
+        })
+        check(hyd_res.get("normal_depth_m", 0.0) > 1.5, "Normal depth > 1.5 m")
+        check(hyd_res.get("critical_depth_m", 0.0) > 1.0, "Critical depth > 1.0 m")
+        check(hyd_res.get("jump_head_loss_m", 0.0) > 0.5, "Jump head loss > 0.5 m")
+        check(hyd_res.get("is_safe", False) is True, "Channel hydraulics within stable velocity limits")
+        print(f"  ✓ 24.4 Open Channel Hydraulics (Chow / USBR): yn = {hyd_res['normal_depth_m']:.2f} m, yc = {hyd_res['critical_depth_m']:.2f} m, vn = {hyd_res['normal_velocity_m_s']:.2f} m/s (Fr = {hyd_res['normal_froude_number']:.2f}, {hyd_res['flow_regime']}), Jump y1 = {hyd_res['jump_upstream_depth_m']:.2f} m -> y2 = {hyd_res['jump_downstream_depth_m']:.2f} m, ΔE = {hyd_res['jump_head_loss_m']:.2f} m (Loss = {hyd_res['jump_energy_dissipation_pct']:.1f}%), P_diss = {hyd_res['jump_power_dissipated_kw']:.1f} kW")
+
+        # 24.5 Overhead Transmission Line Catenary Sag & Tension (IEEE 738 / IEC 60826)
+        line_res = http_request(port, "POST", "/api/sim/electrical/transmission_line", body={
+            "span_length_m": 350.0,
+            "conductor_diameter_mm": 28.14,
+            "rated_tensile_strength_kn": 140.0,
+            "initial_horizontal_tension_kn": 28.0
+        })
+        check(line_res.get("everyday_sag_m", 0.0) > 7.0, "Everyday sag > 7 m")
+        check(line_res.get("max_hot_sag_m", 0.0) > 9.0, "Hot sag > 9 m")
+        check(line_res.get("storm_safety_factor", 0.0) >= 2.0, "Storm safety factor >= 2.0")
+        check(line_res.get("is_safe", False) is True, "Transmission catenary safe")
+        print(f"  ✓ 24.5 Transmission Line (IEEE 738): Span = 350m, Sag_ref = {line_res['everyday_sag_m']:.2f} m (T = {line_res['everyday_tension_kn']:.1f} kN), Sag_hot = {line_res['max_hot_sag_m']:.2f} m (Clearance = {line_res['available_hot_ground_clearance_m']:.2f} m >= 8.0m), Storm T_clamp = {line_res['peak_storm_clamp_tension_kn']:.1f} kN, SF = {line_res['storm_safety_factor']:.2f} >= 2.0")
+
+        # 24.6 Universal Commands Execution Verification (Batch 9 Domains)
+        for cmd_id in [
+            "sim.energy.battery_thermal",
+            "sim.aerospace.rocket_nozzle",
+            "sim.chemical.cstr_reactor",
+            "sim.civil.channel_hydraulics",
+            "sim.electrical.transmission_line",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 24.6 Universal Commands: All 5 Batch-9 Engineering Commands verified via typed schema engine")
+
+        # 24.7 Enterprise MCP Tool Calling (Batch 9 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_energy_battery_thermal",
+            "atlas_sim_aerospace_rocket_nozzle",
+            "atlas_sim_chemical_cstr_reactor",
+            "atlas_sim_civil_channel_hydraulics",
+            "atlas_sim_electrical_transmission_line",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 820,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 24.7 Enterprise MCP Tool Calling: 5 Batch-9 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

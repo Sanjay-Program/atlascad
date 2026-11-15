@@ -1453,6 +1453,70 @@ def simulation_section(studio: Studio) -> None:
     check(gear_data.get("safety_factor_pitting", 0.0) >= 1.25, "gear pitting safety factor >= 1.25")
     check(gear_data.get("safety_factor_bending", 0.0) >= 1.40, "gear bending safety factor >= 1.40")
     check(gear_data.get("tangential_force_n", 0.0) > 5000.0, "tangential gear force > 5000 N")
+
+    # 45. Battery Pack Thermal Management (IEC 62660 / SAE J2464)
+    bat = studio.post("/api/sim/energy/battery_thermal", {
+        "cell_count_series": 96,
+        "cell_count_parallel": 4,
+        "operating_current_a": 200.0,
+        "coolant_flow_rate_l_min": 15.0
+    })
+    check(bat.status == 200, f"battery thermal returns 200 (got {bat.status})")
+    bat_data = bat.json()
+    check(bat_data.get("total_pack_energy_kwh", 0.0) > 60.0, "battery pack energy > 60 kWh")
+    check(bat_data.get("total_pack_heat_dissipation_w", 0.0) > 1500.0, "pack heat dissipation > 1500 W")
+    check(bat_data.get("maximum_cell_temp_c", 0.0) < 50.0, "max cell temperature < 50 C")
+
+    # 46. Rocket Engine De Laval Nozzle Supersonic Gas Dynamics (NASA SP-8039)
+    rkt = studio.post("/api/sim/aerospace/rocket_nozzle", {
+        "chamber_pressure_bar": 100.0,
+        "chamber_temperature_k": 3500.0,
+        "throat_diameter_mm": 120.0,
+        "expansion_ratio_eps": 16.0
+    })
+    check(rkt.status == 200, f"rocket nozzle returns 200 (got {rkt.status})")
+    rkt_data = rkt.json()
+    check(rkt_data.get("exit_mach_number", 0.0) > 3.0, "exit Mach number > 3.0")
+    check(rkt_data.get("net_thrust_kn", 0.0) > 140.0, "net thrust > 140 kN")
+    check(rkt_data.get("operating_specific_impulse_s", 0.0) > 250.0, "operating Isp > 250s")
+
+    # 47. CSTR Chemical Reactor Kinetics & Thermal Multiplicity (Fogler / DIERS)
+    cstr = studio.post("/api/sim/chemical/cstr_reactor", {
+        "reactor_volume_m3": 2.50,
+        "feed_volumetric_flow_m3_h": 5.0,
+        "feed_reactant_concentration_mol_m3": 2000.0
+    })
+    check(cstr.status == 200, f"cstr reactor returns 200 (got {cstr.status})")
+    cstr_data = cstr.json()
+    check(cstr_data.get("fractional_conversion", 0.0) > 0.50, "conversion > 50%")
+    check(cstr_data.get("heat_generation_rate_kw", 0.0) > 80.0, "heat generation > 80 kW")
+    check(cstr_data.get("thermal_stability_margin_w_k", 0.0) > 0.0, "stability margin > 0 W/K")
+
+    # 48. Open Channel Manning Hydraulics & Hydraulic Jump (Chow / USBR)
+    hyd = studio.post("/api/sim/civil/channel_hydraulics", {
+        "bottom_width_m": 6.0,
+        "side_slope_z": 1.5,
+        "discharge_rate_m3_s": 45.0,
+        "bed_slope_s0": 0.0015
+    })
+    check(hyd.status == 200, f"channel hydraulics returns 200 (got {hyd.status})")
+    hyd_data = hyd.json()
+    check(hyd_data.get("normal_depth_m", 0.0) > 1.5, "normal depth > 1.5 m")
+    check(hyd_data.get("critical_depth_m", 0.0) > 1.0, "critical depth > 1.0 m")
+    check(hyd_data.get("jump_head_loss_m", 0.0) > 0.5, "jump head loss > 0.5 m")
+
+    # 49. Overhead Transmission Line Catenary Sag & Tension (IEEE 738 / IEC 60826)
+    line = studio.post("/api/sim/electrical/transmission_line", {
+        "span_length_m": 350.0,
+        "conductor_diameter_mm": 28.14,
+        "rated_tensile_strength_kn": 140.0,
+        "initial_horizontal_tension_kn": 28.0
+    })
+    check(line.status == 200, f"transmission line returns 200 (got {line.status})")
+    line_data = line.json()
+    check(line_data.get("everyday_sag_m", 0.0) > 7.0, "everyday sag > 7 m")
+    check(line_data.get("max_hot_sag_m", 0.0) > 9.0, "hot sag > 9 m")
+    check(line_data.get("storm_safety_factor", 0.0) >= 2.0, "storm safety factor >= 2.0")
     report("simulation")
 
 

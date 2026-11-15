@@ -6017,5 +6017,127 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 113. Battery Pack Liquid Cooling & Thermal Management (IEC 62660 / SAE J2464)
+    let res_bat = post(
+        addr,
+        "/api/sim/energy/battery_thermal",
+        r#"{
+            "cell_count_series": 96,
+            "cell_count_parallel": 4,
+            "operating_current_a": 200.0,
+            "coolant_flow_rate_l_min": 15.0
+        }"#,
+    )?;
+    assert_eq!(res_bat.status, 200);
+    let bat_json = json(&res_bat)?;
+    assert!(bat_json["total_pack_energy_kwh"].as_f64().unwrap() > 60.0);
+    assert!(bat_json["total_pack_heat_dissipation_w"].as_f64().unwrap() > 1500.0);
+    assert!(bat_json["maximum_cell_temp_c"].as_f64().unwrap() < 50.0);
+    assert!(bat_json["is_safe"].as_bool().unwrap());
+
+    // 114. Rocket Engine De Laval Nozzle Supersonic Gas Dynamics (NASA SP-8039)
+    let res_rocket = post(
+        addr,
+        "/api/sim/aerospace/rocket_nozzle",
+        r#"{
+            "chamber_pressure_bar": 100.0,
+            "chamber_temperature_k": 3500.0,
+            "throat_diameter_mm": 120.0,
+            "expansion_ratio_eps": 16.0
+        }"#,
+    )?;
+    assert_eq!(res_rocket.status, 200);
+    let rkt_json = json(&res_rocket)?;
+    assert!(rkt_json["exit_mach_number"].as_f64().unwrap() > 3.0);
+    assert!(rkt_json["net_thrust_kn"].as_f64().unwrap() > 140.0);
+    assert!(rkt_json["operating_specific_impulse_s"].as_f64().unwrap() > 250.0);
+    assert!(rkt_json["is_safe"].as_bool().unwrap());
+
+    // 115. CSTR Chemical Reactor Kinetics & Thermal Multiplicity (Fogler / DIERS)
+    let res_cstr = post(
+        addr,
+        "/api/sim/chemical/cstr_reactor",
+        r#"{
+            "reactor_volume_m3": 2.50,
+            "feed_volumetric_flow_m3_h": 5.0,
+            "feed_reactant_concentration_mol_m3": 2000.0
+        }"#,
+    )?;
+    assert_eq!(res_cstr.status, 200);
+    let cstr_json = json(&res_cstr)?;
+    assert!(cstr_json["fractional_conversion"].as_f64().unwrap() > 0.50);
+    assert!(cstr_json["heat_generation_rate_kw"].as_f64().unwrap() > 80.0);
+    assert!(cstr_json["thermal_stability_margin_w_k"].as_f64().unwrap() > 0.0);
+    assert!(cstr_json["is_safe"].as_bool().unwrap());
+
+    // 116. Open Channel Manning Hydraulics & Hydraulic Jump (Chow / USBR)
+    let res_hyd = post(
+        addr,
+        "/api/sim/civil/channel_hydraulics",
+        r#"{
+            "bottom_width_m": 6.0,
+            "side_slope_z": 1.5,
+            "discharge_rate_m3_s": 45.0,
+            "bed_slope_s0": 0.0015
+        }"#,
+    )?;
+    assert_eq!(res_hyd.status, 200);
+    let hyd_json = json(&res_hyd)?;
+    assert!(hyd_json["normal_depth_m"].as_f64().unwrap() > 1.5);
+    assert!(hyd_json["critical_depth_m"].as_f64().unwrap() > 1.0);
+    assert!(hyd_json["jump_head_loss_m"].as_f64().unwrap() > 0.5);
+    assert!(hyd_json["is_safe"].as_bool().unwrap());
+
+    // 117. Overhead Transmission Line Catenary Sag & Tension (IEEE 738 / IEC 60826)
+    let res_line = post(
+        addr,
+        "/api/sim/electrical/transmission_line",
+        r#"{
+            "span_length_m": 350.0,
+            "conductor_diameter_mm": 28.14,
+            "rated_tensile_strength_kn": 140.0,
+            "initial_horizontal_tension_kn": 28.0
+        }"#,
+    )?;
+    assert_eq!(res_line.status, 200);
+    let line_json = json(&res_line)?;
+    assert!(line_json["everyday_sag_m"].as_f64().unwrap() > 7.0);
+    assert!(line_json["max_hot_sag_m"].as_f64().unwrap() > 9.0);
+    assert!(line_json["storm_safety_factor"].as_f64().unwrap() >= 2.0);
+    assert!(line_json["is_safe"].as_bool().unwrap());
+
+    // 118. Universal Commands Execution Verification (Batch 9 Domains)
+    for cmd_id in [
+        "sim.energy.battery_thermal",
+        "sim.aerospace.rocket_nozzle",
+        "sim.chemical.cstr_reactor",
+        "sim.civil.channel_hydraulics",
+        "sim.electrical.transmission_line",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 119. Enterprise MCP Tool Calling (Batch 9 Domains)
+    for tool_name in [
+        "atlas_sim_energy_battery_thermal",
+        "atlas_sim_aerospace_rocket_nozzle",
+        "atlas_sim_chemical_cstr_reactor",
+        "atlas_sim_civil_channel_hydraulics",
+        "atlas_sim_electrical_transmission_line",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 162, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

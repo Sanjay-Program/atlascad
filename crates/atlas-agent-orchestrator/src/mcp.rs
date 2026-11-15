@@ -1105,6 +1105,75 @@ impl McpServer {
                     "required": ["transmitted_power_kw", "pinion_speed_rpm", "pinion_teeth_z1", "gear_teeth_z2", "normal_module_mm", "face_width_mm"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_energy_battery_thermal".into(),
+                description: "IEC 62660 / SAE J2464 battery pack liquid cooling plate thermal analysis, Joule/entropic heat, coolant temperature rise, and cell thermal gradient".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "cell_count_series": { "type": "integer", "default": 96 },
+                        "cell_count_parallel": { "type": "integer", "default": 4 },
+                        "operating_current_a": { "type": "number", "default": 200.0 },
+                        "coolant_flow_rate_l_min": { "type": "number", "default": 15.0 }
+                    },
+                    "required": ["cell_count_series", "cell_count_parallel", "operating_current_a", "coolant_flow_rate_l_min"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_aerospace_rocket_nozzle".into(),
+                description: "NASA SP-8039 rocket engine De Laval nozzle isentropic compressible gas dynamics, characteristic velocity c*, exit Mach, sea-level/vacuum Isp, and flow separation".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "chamber_pressure_bar": { "type": "number", "default": 100.0 },
+                        "chamber_temperature_k": { "type": "number", "default": 3500.0 },
+                        "throat_diameter_mm": { "type": "number", "default": 120.0 },
+                        "expansion_ratio_eps": { "type": "number", "default": 16.0 }
+                    },
+                    "required": ["chamber_pressure_bar", "chamber_temperature_k", "throat_diameter_mm", "expansion_ratio_eps"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_chemical_cstr_reactor".into(),
+                description: "Continuous stirred-tank reactor (CSTR) Arrhenius kinetics, Damköhler number, Van Heerden heat generation vs removal, and thermal runaway ignition stability".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "reactor_volume_m3": { "type": "number", "default": 2.50 },
+                        "feed_volumetric_flow_m3_h": { "type": "number", "default": 5.0 },
+                        "feed_reactant_concentration_mol_m3": { "type": "number", "default": 2000.0 }
+                    },
+                    "required": ["reactor_volume_m3", "feed_volumetric_flow_m3_h", "feed_reactant_concentration_mol_m3"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_civil_channel_hydraulics".into(),
+                description: "Manning open channel uniform flow hydraulics, normal and critical depths, Froude regime, sequent depths, and hydraulic jump energy dissipation".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "bottom_width_m": { "type": "number", "default": 6.0 },
+                        "side_slope_z": { "type": "number", "default": 1.5 },
+                        "discharge_rate_m3_s": { "type": "number", "default": 45.0 },
+                        "bed_slope_s0": { "type": "number", "default": 0.0015 }
+                    },
+                    "required": ["bottom_width_m", "discharge_rate_m3_s", "bed_slope_s0"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_electrical_transmission_line".into(),
+                description: "IEEE 738 / IEC 60826 overhead transmission conductor catenary sag and tension, change-of-state cubic equation, hot sag, storm tension, and safety factors".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "span_length_m": { "type": "number", "default": 350.0 },
+                        "conductor_diameter_mm": { "type": "number", "default": 28.14 },
+                        "rated_tensile_strength_kn": { "type": "number", "default": 140.0 },
+                        "initial_horizontal_tension_kn": { "type": "number", "default": 28.0 }
+                    },
+                    "required": ["span_length_m", "conductor_diameter_mm", "rated_tensile_strength_kn", "initial_horizontal_tension_kn"]
+                }),
+            },
         ]
     }
 
