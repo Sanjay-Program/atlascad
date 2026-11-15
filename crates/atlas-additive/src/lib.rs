@@ -8,6 +8,7 @@
 pub mod estimation;
 pub mod gcode;
 pub mod infill;
+pub mod process_profiles;
 pub mod settings;
 pub mod slicer;
 pub mod supports;
@@ -16,6 +17,10 @@ pub mod prelude {
     pub use crate::estimation::PrintEstimation;
     pub use crate::gcode::GCodeEmitter;
     pub use crate::infill::{InfillLine, generate_infill};
+    pub use crate::process_profiles::{
+        AdditiveProcessProblem, AdditiveProcessResult, AdditiveTechnology, SlaResinParameters,
+        SlmMetalParameters, evaluate_additive_process,
+    };
     pub use crate::settings::{FilamentMaterial, InfillPattern, PrinterDialect, SlicerSettings};
     pub use crate::slicer::{
         MoveType, SlicedLayer, SlicedModel, compute_adaptive_layer_height,

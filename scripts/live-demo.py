@@ -1486,6 +1486,149 @@ def run_live_demo() -> None:
         check("hypersonic_full_vehicle_master" in template_ids, "'hypersonic_full_vehicle_master' template registered")
         print(f"  ✓ 15.7 Multi-Agent Orchestrator: All 44 Specialists (28 Engineering + 16 Creative) & 16 Workflow Templates Verified")
 
+        # 16. Advanced Manufacturing, Fasteners, Kinetics, Additive Physics & Acoustics
+        # 16.1 Sheet Metal Bending & Flat Pattern Unfolding (DIN 6935)
+        sm_res = http_request(port, "POST", "/api/cad/sheet_metal/unfold", body={
+            "material": "carbon_steel",
+            "thickness_mm": 2.0,
+            "flange_lengths_mm": [50.0, 50.0],
+            "bend_angles_deg": [90.0],
+            "inner_radii_mm": [2.0],
+            "die_opening_width_mm": 16.0
+        })
+        check(abs(sm_res.get("total_flat_length_mm", 0.0) - 96.398) < 0.1, "Sheet metal flat blank length = 96.40 mm")
+        check(sm_res.get("total_forming_force_kn", 0.0) > 10.0, "Press-brake forming force computed")
+        bends = sm_res.get("bends", [])
+        check(len(bends) == 1, "Single 90-degree bend analyzed")
+        check(abs(bends[0].get("bend_allowance_mm", 0.0) - 4.398) < 0.1, "Bend Allowance (BA) = 4.40 mm")
+        check(abs(bends[0].get("bend_deduction_mm", 0.0) - 3.602) < 0.1, "Bend Deduction (BD) = 3.60 mm")
+        print(f"  ✓ 16.1 Sheet Metal Unfolding (DIN 6935): Flat Blank = {sm_res['total_flat_length_mm']:.2f} mm (BA = {bends[0]['bend_allowance_mm']:.2f} mm, BD = {bends[0]['bend_deduction_mm']:.2f} mm, Forming Force = {sm_res['total_forming_force_kn']:.1f} kN)")
+
+        # 16.2 Standard Fasteners & Bolted Joint Analysis (ISO 4014 / ISO 898-1)
+        fast_res = http_request(port, "POST", "/api/cad/hardware/fastener", body={
+            "thread_size": "M10",
+            "bolt_class": "8.8",
+            "clamped_length_mm": 40.0,
+            "applied_tension_load_kn": 12.0,
+            "applied_shear_load_kn": 5.0,
+            "torque_coefficient_k": 0.18
+        })
+        check(abs(fast_res.get("tensile_stress_area_mm2", 0.0) - 58.0) < 1.0, "M10 tensile stress area At = 58.0 mm²")
+        check(abs(fast_res.get("proof_load_kn", 0.0) - 34.79) < 1.0, "Class 8.8 proof load Fp = 34.8 kN")
+        check(abs(fast_res.get("tightening_torque_nm", 0.0) - 46.97) < 1.5, "Tightening torque T = 47.0 N·m")
+        check(fast_res.get("tensile_safety_factor", 0.0) > 1.15, "Tensile factor of safety > 1.15")
+
+        fast_cat = http_request(port, "GET", "/api/cad/hardware/fasteners")
+        check(isinstance(fast_cat, list) and len(fast_cat) >= 10, "Fasteners catalog contains M3 to M36")
+        check(any(b.get("designation") == "M10" for b in fast_cat), "Fastener M10 in catalog")
+        print(f"  ✓ 16.2 Bolted Joint Mechanics (ISO 898-1): M10 Class 8.8 Preload = {fast_res['recommended_preload_kn']:.1f} kN, Torque = {fast_res['tightening_torque_nm']:.1f} N·m, FoS = {fast_res['tensile_safety_factor']:.2f}")
+
+        # 16.3 Chemical Reaction Kinetics & Continuous Reactor Sizing
+        kin_res = http_request(port, "POST", "/api/sim/chemical/kinetics", body={
+            "reaction_name": "Thermal Dissociation A -> B",
+            "order": "first_order",
+            "initial_concentration_m": 2.0,
+            "rate_constant_k": 0.05,
+            "volumetric_flow_m3_s": 0.005,
+            "target_conversion": 0.80
+        })
+        check(abs(kin_res.get("half_life_seconds", 0.0) - 13.86) < 0.1, "1st-order reaction half-life t1/2 = 13.86 s")
+        check(abs(kin_res.get("cstr_volume_m3", 0.0) - 0.40) < 0.02, "CSTR volume for X=0.80 is 0.40 m³")
+        check(abs(kin_res.get("pfr_volume_m3", 0.0) - 0.161) < 0.02, "PFR volume for X=0.80 is 0.161 m³")
+        check(kin_res.get("cstr_volume_m3", 0.0) > kin_res.get("pfr_volume_m3", 0.0), "V_CSTR > V_PFR relationship verified")
+        print(f"  ✓ 16.3 Chemical Reaction Kinetics: k = {kin_res['rate_constant_k']:.3f} s⁻¹, t½ = {kin_res['half_life_seconds']:.2f} s, CSTR Vol = {kin_res['cstr_volume_m3']:.3f} m³, PFR Vol = {kin_res['pfr_volume_m3']:.3f} m³")
+
+        # 16.4 Multi-Technology Additive Manufacturing Process Profiles
+        sla_res = http_request(port, "POST", "/api/additive/process_profile", body={
+            "technology": "sla_dlp_msla",
+            "part_height_mm": 60.0,
+            "part_volume_cm3": 35.0,
+            "layer_height_mm": 0.050
+        })
+        check(sla_res.get("total_layers") == 1200, "SLA part layers = 1200")
+        check(abs(sla_res.get("jacobs_cure_depth_mm", 0.0) - 0.0675) < 0.005, "Jacobs cure depth Cd = 0.0675 mm (1.35x layer)")
+        check(sla_res.get("total_build_time_hours", 0.0) > 0.0, "SLA build time evaluated")
+
+        slm_res = http_request(port, "POST", "/api/additive/process_profile", body={
+            "technology": "slm_metal_pbf",
+            "part_height_mm": 40.0,
+            "part_volume_cm3": 25.0,
+            "layer_height_mm": 0.040,
+            "laser_power_w": 280.0,
+            "scan_speed_mm_s": 1100.0,
+            "hatch_spacing_mm": 0.105
+        })
+        check(abs(slm_res.get("volumetric_energy_density_j_mm3", 0.0) - 60.6) < 1.0, "SLM VED = 60.6 J/mm³")
+        check("Optimal Conduction" in slm_res.get("process_regime", ""), "SLM operates in optimal conduction regime")
+        print(f"  ✓ 16.4 Additive Process Physics: SLA Jacobs Cd = {sla_res['jacobs_cure_depth_mm']:.4f} mm ({sla_res['total_build_time_hours']:.1f} hrs), SLM Metal VED = {slm_res['volumetric_energy_density_j_mm3']:.1f} J/mm³ (Conduction Melting)")
+
+        # 16.5 Outdoor Environmental Noise Propagation (ISO 9613-2)
+        noise_res = http_request(port, "POST", "/api/sim/acoustics/outdoor_noise", body={
+            "source_name": "Rooftop Industrial Chiller",
+            "sound_power_lwa": 102.0,
+            "distance_m": 120.0,
+            "source_height_m": 2.5,
+            "receiver_height_m": 1.5,
+            "barrier_height_m": 3.5,
+            "barrier_distance_m": 15.0,
+            "ground_factor": 0.70,
+            "regulatory_limit_dba": 50.0
+        })
+        check(abs(noise_res.get("divergence_attenuation_db", 0.0) - 52.58) < 0.2, "Geometrical divergence attenuation = 52.58 dB")
+        check(noise_res.get("barrier_attenuation_db", 0.0) > 5.0, "Maekawa barrier diffraction attenuation > 5.0 dB")
+        check(noise_res.get("received_sound_level_dba", 100.0) < 50.0, "Received level conforms to 50 dBA regulatory limit")
+        check(noise_res.get("is_compliant") == True, "ISO 9613-2 noise receiver is compliant")
+        print(f"  ✓ 16.5 Outdoor Environmental Noise (ISO 9613-2): LwA = {noise_res['sound_power_lwa']:.1f} dBA @ 120m -> {noise_res['received_sound_level_dba']:.1f} dBA (Δ = -{noise_res['total_attenuation_db']:.1f} dB, Barrier -{noise_res['barrier_attenuation_db']:.1f} dB)")
+
+        # 16.6 Universal Command Platform Executions
+        cmd_sm = http_request(port, "POST", "/api/commands/execute", body={
+            "command_id": "cad.sheet_metal.unfold",
+            "arguments": {"thickness_mm": 2.0, "flange_lengths_mm": [50.0, 50.0]}
+        })
+        check(cmd_sm.get("status") == "Success", "cad.sheet_metal.unfold command succeeded")
+
+        cmd_fast = http_request(port, "POST", "/api/commands/execute", body={
+            "command_id": "cad.hardware.fastener",
+            "arguments": {"thread_size": "M10", "bolt_class": "8.8"}
+        })
+        check(cmd_fast.get("status") == "Success", "cad.hardware.fastener command succeeded")
+
+        cmd_kin = http_request(port, "POST", "/api/commands/execute", body={
+            "command_id": "sim.chemical.kinetics",
+            "arguments": {"initial_concentration_m": 2.0, "rate_constant_k": 0.05, "target_conversion": 0.80}
+        })
+        check(cmd_kin.get("status") == "Success", "sim.chemical.kinetics command succeeded")
+
+        cmd_add = http_request(port, "POST", "/api/commands/execute", body={
+            "command_id": "additive.process_profile.solve",
+            "arguments": {"technology": "sla_dlp_msla", "part_height_mm": 60.0, "part_volume_cm3": 35.0, "layer_height_mm": 0.050}
+        })
+        check(cmd_add.get("status") == "Success", "additive.process_profile.solve command succeeded")
+
+        cmd_noise = http_request(port, "POST", "/api/commands/execute", body={
+            "command_id": "sim.acoustics.outdoor_noise",
+            "arguments": {"sound_power_lwa": 102.0, "distance_m": 120.0}
+        })
+        check(cmd_noise.get("status") == "Success", "sim.acoustics.outdoor_noise command succeeded")
+        print(f"  ✓ 16.6 Universal Commands: Sheet metal, Fasteners, Kinetics, Additive profiles, and Outdoor noise verified")
+
+        # 16.7 Enterprise MCP Tool Calling
+        for mcp_tool_name, mcp_args in [
+            ("atlas_cad_sheet_metal_unfold", {"thickness_mm": 2.0}),
+            ("atlas_cad_hardware_fastener", {"thread_size": "M10"}),
+            ("atlas_chemical_kinetics", {"initial_concentration_m": 1.0}),
+            ("atlas_additive_process_profile", {"technology": "sla_dlp_msla", "part_height_mm": 50.0, "part_volume_cm3": 20.0, "layer_height_mm": 0.05}),
+            ("atlas_acoustics_outdoor_noise", {"sound_power_lwa": 100.0, "distance_m": 50.0}),
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 200,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": mcp_args}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 16.7 Enterprise MCP Tool Calling: 5 New Engineering Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

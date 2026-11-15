@@ -920,6 +920,77 @@ def simulation_section(studio: Studio) -> None:
     check(cam_data.get("kinematic_cycle_time_seconds", 0.0) > 0.0, "kinematic cycle time is calculated")
     check(cam_data.get("tool_wear_fraction", -1.0) >= 0.0, "Taylor tool wear fraction is calculated")
     check("G" in cam_data.get("gcode_preview", ""), "G-code preview is returned")
+
+    # 5. Sheet Metal Bending & Flat Pattern Unfolding (DIN 6935)
+    sm = studio.post("/api/cad/sheet_metal/unfold", {
+        "material": "carbon_steel",
+        "thickness_mm": 2.0,
+        "flange_lengths_mm": [50.0, 50.0],
+        "bend_angles_deg": [90.0],
+        "inner_radii_mm": [2.0],
+        "die_opening_width_mm": 16.0
+    })
+    check(sm.status == 200, f"sheet metal unfolding returns 200 (got {sm.status})")
+    sm_data = sm.json()
+    check(abs(sm_data.get("total_flat_length_mm", 0.0) - 96.398) < 0.1, "flat blank length is 96.40 mm")
+    check(sm_data.get("total_forming_force_kn", 0.0) > 10.0, "forming tonnage calculated")
+
+    # 6. Standard Fasteners & Bolted Joint Analysis (ISO 4014 / ISO 898-1)
+    fast = studio.post("/api/cad/hardware/fastener", {
+        "thread_size": "M10",
+        "bolt_class": "8.8",
+        "clamped_length_mm": 40.0,
+        "applied_tension_load_kn": 12.0,
+        "applied_shear_load_kn": 5.0,
+        "torque_coefficient_k": 0.18
+    })
+    check(fast.status == 200, f"fasteners calculation returns 200 (got {fast.status})")
+    fast_data = fast.json()
+    check(abs(fast_data.get("tensile_stress_area_mm2", 0.0) - 58.0) < 1.0, "M10 stress area is 58 mm²")
+    check(abs(fast_data.get("tightening_torque_nm", 0.0) - 46.97) < 1.5, "tightening torque is 47 N·m")
+
+    # 7. Chemical Kinetics & Reactor Design (Levenspiel)
+    kin = studio.post("/api/sim/chemical/kinetics", {
+        "reaction_name": "Thermal Dissociation A -> B",
+        "order": "first_order",
+        "initial_concentration_m": 2.0,
+        "rate_constant_k": 0.05,
+        "volumetric_flow_m3_s": 0.005,
+        "target_conversion": 0.80
+    })
+    check(kin.status == 200, f"chemical kinetics returns 200 (got {kin.status})")
+    kin_data = kin.json()
+    check(abs(kin_data.get("half_life_seconds", 0.0) - 13.86) < 0.1, "half life is 13.86 s")
+    check(kin_data.get("cstr_volume_m3", 0.0) > kin_data.get("pfr_volume_m3", 0.0), "V_CSTR > V_PFR")
+
+    # 8. Additive Process Profiles (SLA Jacobs working curve)
+    sla = studio.post("/api/additive/process_profile", {
+        "technology": "sla_dlp_msla",
+        "part_height_mm": 60.0,
+        "part_volume_cm3": 35.0,
+        "layer_height_mm": 0.050
+    })
+    check(sla.status == 200, f"additive process profile returns 200 (got {sla.status})")
+    sla_data = sla.json()
+    check(sla_data.get("total_layers", 0) == 1200, "SLA layers match 1200")
+    check(abs(sla_data.get("jacobs_cure_depth_mm", 0.0) - 0.0675) < 0.005, "Jacobs cure depth matches")
+
+    # 9. Outdoor Environmental Noise (ISO 9613-2)
+    noise = studio.post("/api/sim/acoustics/outdoor_noise", {
+        "source_name": "Rooftop Chiller",
+        "sound_power_lwa": 102.0,
+        "distance_m": 120.0,
+        "source_height_m": 2.5,
+        "receiver_height_m": 1.5,
+        "barrier_height_m": 3.5,
+        "barrier_distance_m": 15.0,
+        "ground_factor": 0.70,
+        "regulatory_limit_dba": 50.0
+    })
+    check(noise.status == 200, f"outdoor noise returns 200 (got {noise.status})")
+    noise_data = noise.json()
+    check(abs(noise_data.get("divergence_attenuation_db", 0.0) - 52.58) < 0.2, "divergence matches ISO 9613-2")
+    check(noise_data.get("is_compliant") is True, "receiver is compliant")
     report("simulation")
 
 

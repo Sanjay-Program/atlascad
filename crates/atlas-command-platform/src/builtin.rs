@@ -882,5 +882,316 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         .with_permission(CommandPermission::SimulationRun),
     )?;
 
+    // --- 13. Sheet Metal Bending & Flat Pattern Unfolding ---
+    registry.register(
+        CommandSchema::new(
+            "cad.sheet_metal.unfold",
+            "Sheet Metal Bend Allowance & Flat Pattern Unfolding",
+            "Calculates neutral axis K-factor, bend allowance (BA), outside setback (OSSB), bend deduction (BD), flat blank dimensions, and press-brake forming tonnage.",
+            CommandCategory::Features,
+        )
+        .with_permission(CommandPermission::GeometryCreate)
+        .with_argument(CommandArgument {
+            name: "material".into(),
+            arg_type: ArgumentType::String,
+            description: "Sheet metal material (carbon_steel, stainless_steel, aluminum_5052, copper, brass)".into(),
+            required: false,
+            default_value: Some(serde_json::json!("carbon_steel")),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "thickness_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Sheet plate thickness in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(2.0)),
+            validation_rules: vec![ValidationRule::Min(0.1)],
+        })
+        .with_argument(CommandArgument {
+            name: "flange_lengths_mm".into(),
+            arg_type: ArgumentType::Array,
+            description: "List of flange lengths along bend sequence in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!([50.0, 50.0])),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "bend_angles_deg".into(),
+            arg_type: ArgumentType::Array,
+            description: "List of bend angles in degrees (e.g. [90.0])".into(),
+            required: false,
+            default_value: Some(serde_json::json!([90.0])),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "inner_radii_mm".into(),
+            arg_type: ArgumentType::Array,
+            description: "List of inner bend radii in mm (e.g. [2.0])".into(),
+            required: false,
+            default_value: Some(serde_json::json!([2.0])),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "die_opening_width_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "V-die opening width for press-brake forming tonnage calculation in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(16.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        }),
+    )?;
+
+    // --- 14. Standard Fasteners & Bolted Joint Analysis ---
+    registry.register(
+        CommandSchema::new(
+            "cad.hardware.fastener",
+            "ISO Metric Bolt Sizing & Preload Torque Analysis",
+            "Computes tensile stress area, proof load, clamping preload, tightening torque, and joint separation safety factor for ISO standard fasteners.",
+            CommandCategory::Assemblies,
+        )
+        .with_permission(CommandPermission::ReadOnly)
+        .with_argument(CommandArgument {
+            name: "thread_size".into(),
+            arg_type: ArgumentType::String,
+            description: "ISO metric thread size (e.g. M3, M4, M5, M6, M8, M10, M12, M16, M20, M24, M30, M36)".into(),
+            required: true,
+            default_value: Some(serde_json::json!("M10")),
+            validation_rules: vec![ValidationRule::NonEmpty],
+        })
+        .with_argument(CommandArgument {
+            name: "bolt_class".into(),
+            arg_type: ArgumentType::String,
+            description: "ISO 898-1 bolt property class (4.8, 8.8, 10.9, 12.9, A2-70)".into(),
+            required: false,
+            default_value: Some(serde_json::json!("8.8")),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "clamped_length_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Grip length / clamped joint thickness in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(40.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "applied_tension_load_kn".into(),
+            arg_type: ArgumentType::Number,
+            description: "External tensile working load applied to joint in kN".into(),
+            required: false,
+            default_value: Some(serde_json::json!(12.0)),
+            validation_rules: vec![ValidationRule::Min(0.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "applied_shear_load_kn".into(),
+            arg_type: ArgumentType::Number,
+            description: "External transverse shear load applied to joint in kN".into(),
+            required: false,
+            default_value: Some(serde_json::json!(5.0)),
+            validation_rules: vec![ValidationRule::Min(0.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "torque_coefficient_k".into(),
+            arg_type: ArgumentType::Number,
+            description: "Nut factor / friction torque coefficient K (0.15 lubricated, 0.20 dry zinc-plated)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.18)),
+            validation_rules: vec![ValidationRule::Min(0.05)],
+        }),
+    )?;
+
+    // --- 15. Chemical Reaction Kinetics & Continuous Reactor Sizing ---
+    registry.register(
+        CommandSchema::new(
+            "sim.chemical.kinetics",
+            "Chemical Reaction Kinetics & CSTR/PFR Reactor Design",
+            "Evaluates Arrhenius rate constants, reaction order concentration profiles, half-life, Damköhler number, and CSTR/PFR reactor volumes.",
+            CommandCategory::Chemical,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "reaction_name".into(),
+            arg_type: ArgumentType::String,
+            description: "Descriptive chemical reaction equation or identifier".into(),
+            required: false,
+            default_value: Some(serde_json::json!("A -> Products")),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "order".into(),
+            arg_type: ArgumentType::String,
+            description: "Reaction order (first_order, second_order, reversible_first_order)".into(),
+            required: false,
+            default_value: Some(serde_json::json!("first_order")),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "initial_concentration_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Initial reactant concentration in mol/L (M)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1.0)),
+            validation_rules: vec![ValidationRule::Min(0.0001)],
+        })
+        .with_argument(CommandArgument {
+            name: "rate_constant_k".into(),
+            arg_type: ArgumentType::Number,
+            description: "Reaction rate constant k at operating temperature".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.05)),
+            validation_rules: vec![ValidationRule::Min(0.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "temperature_k".into(),
+            arg_type: ArgumentType::Number,
+            description: "Reaction operating temperature in Kelvin".into(),
+            required: false,
+            default_value: Some(serde_json::json!(298.15)),
+            validation_rules: vec![ValidationRule::Min(50.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "volumetric_flow_m3_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Continuous feed volumetric flow rate in m³/s for reactor volume sizing".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.005)),
+            validation_rules: vec![ValidationRule::Min(0.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "target_conversion".into(),
+            arg_type: ArgumentType::Number,
+            description: "Target fractional conversion X (0.0 to 0.999)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.80)),
+            validation_rules: vec![ValidationRule::Min(0.01), ValidationRule::Max(0.999)],
+        }),
+    )?;
+
+    // --- 16. Multi-Technology Additive Manufacturing Process Profiles ---
+    registry.register(
+        CommandSchema::new(
+            "additive.process_profile.solve",
+            "Multi-Technology Additive Process Physics & Layer Profiling",
+            "Solves Jacobs working curve exposure for SLA/DLP photopolymers, Volumetric Energy Density (VED) for SLM metal powder bed fusion, and layer-by-layer cycle times.",
+            CommandCategory::Additive,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "technology".into(),
+            arg_type: ArgumentType::String,
+            description: "Additive technology (fdm_fff, sla_dlp_msla, slm_metal_pbf, sls_polymer)".into(),
+            required: true,
+            default_value: Some(serde_json::json!("sla_dlp_msla")),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "part_height_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Overall part Z height in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(80.0)),
+            validation_rules: vec![ValidationRule::Min(0.1)],
+        })
+        .with_argument(CommandArgument {
+            name: "part_volume_cm3".into(),
+            arg_type: ArgumentType::Number,
+            description: "Solid part volume in cm³".into(),
+            required: true,
+            default_value: Some(serde_json::json!(45.0)),
+            validation_rules: vec![ValidationRule::Min(0.01)],
+        })
+        .with_argument(CommandArgument {
+            name: "layer_height_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Slicing layer thickness in mm (e.g. 0.050 mm for SLA, 0.040 mm for SLM, 0.200 mm for FDM)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(0.050)),
+            validation_rules: vec![ValidationRule::Min(0.005)],
+        }),
+    )?;
+
+    // --- 17. Outdoor Environmental Noise (ISO 9613-2) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.acoustics.outdoor_noise",
+            "ISO 9613-2 Outdoor Environmental Noise Propagation",
+            "Calculates geometrical divergence, atmospheric absorption, ground reflection/absorption, and Maekawa barrier diffraction attenuation.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "source_name".into(),
+            arg_type: ArgumentType::String,
+            description: "Name/description of exterior sound source".into(),
+            required: false,
+            default_value: Some(serde_json::json!("Industrial Rooftop Chiller")),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "sound_power_lwa".into(),
+            arg_type: ArgumentType::Number,
+            description: "Total A-weighted sound power level LwA in dBA".into(),
+            required: true,
+            default_value: Some(serde_json::json!(102.0)),
+            validation_rules: vec![ValidationRule::Min(0.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "distance_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Direct propagation distance from source to receiver in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(120.0)),
+            validation_rules: vec![ValidationRule::Min(0.5)],
+        })
+        .with_argument(CommandArgument {
+            name: "source_height_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Source elevation height in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(2.5)),
+            validation_rules: vec![ValidationRule::Min(0.1)],
+        })
+        .with_argument(CommandArgument {
+            name: "receiver_height_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Receiver elevation height in meters (standard observer = 1.5m)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1.5)),
+            validation_rules: vec![ValidationRule::Min(0.1)],
+        })
+        .with_argument(CommandArgument {
+            name: "barrier_height_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Acoustic barrier screen height in meters (optional)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(3.5)),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "barrier_distance_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Distance from source to acoustic barrier in meters (optional)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(15.0)),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "ground_factor".into(),
+            arg_type: ArgumentType::Number,
+            description: "ISO 9613-2 ground porosity factor G (0.0 hard, 1.0 porous vegetation)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.70)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "regulatory_limit_dba".into(),
+            arg_type: ArgumentType::Number,
+            description: "Target regulatory permissible noise threshold in dBA".into(),
+            required: false,
+            default_value: Some(serde_json::json!(50.0)),
+            validation_rules: vec![ValidationRule::Min(10.0)],
+        }),
+    )?;
+
     Ok(())
 }

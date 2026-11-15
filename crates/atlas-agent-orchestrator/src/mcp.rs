@@ -508,6 +508,88 @@ impl McpServer {
                     }
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_cad_sheet_metal_unfold".into(),
+                description: "Calculate neutral axis K-factor, bend allowance (BA), outside setback, bend deduction, flat blank dimensions, and forming force".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "material": { "type": "string", "enum": ["carbon_steel", "stainless_steel", "aluminum_5052", "copper", "brass"], "default": "carbon_steel" },
+                        "thickness_mm": { "type": "number", "minimum": 0.1, "default": 2.0 },
+                        "flange_lengths_mm": { "type": "array", "items": { "type": "number" }, "default": [50.0, 50.0] },
+                        "bend_angles_deg": { "type": "array", "items": { "type": "number" }, "default": [90.0] },
+                        "inner_radii_mm": { "type": "array", "items": { "type": "number" }, "default": [2.0] },
+                        "die_opening_width_mm": { "type": "number", "default": 16.0 }
+                    },
+                    "required": ["thickness_mm", "flange_lengths_mm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_cad_hardware_fastener".into(),
+                description: "Evaluate ISO metric bolt sizing, tensile stress area, proof load, tightening torque, and joint safety factors".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "thread_size": { "type": "string", "default": "M10" },
+                        "bolt_class": { "type": "string", "enum": ["4.8", "8.8", "10.9", "12.9", "A2-70"], "default": "8.8" },
+                        "clamped_length_mm": { "type": "number", "default": 40.0 },
+                        "applied_tension_load_kn": { "type": "number", "default": 12.0 },
+                        "applied_shear_load_kn": { "type": "number", "default": 5.0 },
+                        "torque_coefficient_k": { "type": "number", "default": 0.18 }
+                    },
+                    "required": ["thread_size"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_chemical_kinetics".into(),
+                description: "Solve chemical reaction kinetics, half-life, Damköhler number, and continuous CSTR/PFR reactor sizing".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "reaction_name": { "type": "string", "default": "A -> Products" },
+                        "order": { "type": "string", "enum": ["first_order", "second_order", "reversible_first_order"], "default": "first_order" },
+                        "initial_concentration_m": { "type": "number", "default": 1.0 },
+                        "rate_constant_k": { "type": "number", "default": 0.05 },
+                        "temperature_k": { "type": "number", "default": 298.15 },
+                        "volumetric_flow_m3_s": { "type": "number", "default": 0.005 },
+                        "target_conversion": { "type": "number", "default": 0.80 }
+                    },
+                    "required": ["initial_concentration_m"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_additive_process_profile".into(),
+                description: "Evaluate additive manufacturing physics: Jacobs working curve (SLA) or Volumetric Energy Density (SLM)".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "technology": { "type": "string", "enum": ["fdm_fff", "sla_dlp_msla", "slm_metal_pbf", "sls_polymer"], "default": "sla_dlp_msla" },
+                        "part_height_mm": { "type": "number", "default": 80.0 },
+                        "part_volume_cm3": { "type": "number", "default": 45.0 },
+                        "layer_height_mm": { "type": "number", "default": 0.050 }
+                    },
+                    "required": ["technology", "part_height_mm", "part_volume_cm3", "layer_height_mm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_acoustics_outdoor_noise".into(),
+                description: "ISO 9613-2 outdoor environmental sound propagation with geometrical divergence, atmospheric absorption, ground effect, and barrier diffraction".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "source_name": { "type": "string", "default": "Industrial Rooftop Chiller" },
+                        "sound_power_lwa": { "type": "number", "default": 102.0 },
+                        "distance_m": { "type": "number", "default": 120.0 },
+                        "source_height_m": { "type": "number", "default": 2.5 },
+                        "receiver_height_m": { "type": "number", "default": 1.5 },
+                        "barrier_height_m": { "type": "number", "default": 3.5 },
+                        "barrier_distance_m": { "type": "number", "default": 15.0 },
+                        "ground_factor": { "type": "number", "default": 0.70 },
+                        "regulatory_limit_dba": { "type": "number", "default": 50.0 }
+                    },
+                    "required": ["sound_power_lwa", "distance_m"]
+                }),
+            },
         ]
     }
 

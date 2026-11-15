@@ -4880,5 +4880,184 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(mcp_species.status, 200);
 
+    // 57. Sheet Metal Bending & Flat Pattern Unfolding API (DIN 6935)
+    let sm_resp = post(
+        addr,
+        "/api/cad/sheet_metal/unfold",
+        r#"{"material": "carbon_steel", "thickness_mm": 2.0, "flange_lengths_mm": [50.0, 50.0], "bend_angles_deg": [90.0], "inner_radii_mm": [2.0], "die_opening_width_mm": 16.0}"#,
+    )?;
+    assert_eq!(sm_resp.status, 200);
+    let sm_json = json(&sm_resp)?;
+    let flat_len = sm_json["total_flat_length_mm"].as_f64().ok_or("flat_len")?;
+    let forming_force = sm_json["total_forming_force_kn"].as_f64().ok_or("forming_force")?;
+    assert!((flat_len - 96.398).abs() < 0.1);
+    assert!(forming_force > 10.0 && forming_force < 40.0);
+    let sm_bends = sm_json["bends"].as_array().ok_or("sm_bends")?;
+    assert_eq!(sm_bends.len(), 1);
+    let ba = sm_bends[0]["bend_allowance_mm"].as_f64().ok_or("ba")?;
+    let bd = sm_bends[0]["bend_deduction_mm"].as_f64().ok_or("bd")?;
+    assert!((ba - 4.398).abs() < 0.1);
+    assert!((bd - 3.602).abs() < 0.1);
+
+    // 58. Standard Fasteners & Bolted Joint Analysis API (ISO 4014 / ISO 898-1)
+    let fast_resp = post(
+        addr,
+        "/api/cad/hardware/fastener",
+        r#"{"thread_size": "M10", "bolt_class": "8.8", "clamped_length_mm": 40.0, "applied_tension_load_kn": 12.0, "applied_shear_load_kn": 5.0, "torque_coefficient_k": 0.18}"#,
+    )?;
+    assert_eq!(fast_resp.status, 200);
+    let fast_json = json(&fast_resp)?;
+    let at = fast_json["tensile_stress_area_mm2"].as_f64().ok_or("at")?;
+    let fp = fast_json["proof_load_kn"].as_f64().ok_or("fp")?;
+    let torque = fast_json["tightening_torque_nm"].as_f64().ok_or("torque")?;
+    let fos_t = fast_json["tensile_safety_factor"].as_f64().ok_or("fos_t")?;
+    assert!((at - 58.0).abs() < 1.0);
+    assert!((fp - 34.79).abs() < 1.0);
+    assert!((torque - 46.97).abs() < 1.5);
+    assert!(fos_t > 1.15 && fos_t < 1.30);
+
+    let fast_cat_resp = get(addr, "/api/cad/hardware/fasteners")?;
+    assert_eq!(fast_cat_resp.status, 200);
+    let fast_cat_json = json(&fast_cat_resp)?;
+    let fast_list = fast_cat_json.as_array().ok_or("fasteners list")?;
+    assert!(fast_list.len() >= 10);
+    assert!(fast_list.iter().any(|b| b["designation"] == "M10"));
+    assert!(fast_list.iter().any(|b| b["designation"] == "M16"));
+
+    // 59. Chemical Reaction Kinetics & Reactor Sizing API
+    let kin_resp = post(
+        addr,
+        "/api/sim/chemical/kinetics",
+        r#"{"reaction_name": "Thermal Dissociation A -> B", "order": "first_order", "initial_concentration_m": 2.0, "rate_constant_k": 0.05, "volumetric_flow_m3_s": 0.005, "target_conversion": 0.80}"#,
+    )?;
+    assert_eq!(kin_resp.status, 200);
+    let kin_json = json(&kin_resp)?;
+    let t_half = kin_json["half_life_seconds"].as_f64().ok_or("t_half")?;
+    let v_cstr = kin_json["cstr_volume_m3"].as_f64().ok_or("v_cstr")?;
+    let v_pfr = kin_json["pfr_volume_m3"].as_f64().ok_or("v_pfr")?;
+    assert!((t_half - 13.86).abs() < 0.1);
+    assert!((v_cstr - 0.40).abs() < 0.02);
+    assert!((v_pfr - 0.161).abs() < 0.02);
+    assert!(v_cstr > v_pfr);
+
+    // 60. Multi-Technology Additive Manufacturing Process Profiles API
+    let add_sla_resp = post(
+        addr,
+        "/api/additive/process_profile",
+        r#"{"technology": "sla_dlp_msla", "part_height_mm": 60.0, "part_volume_cm3": 35.0, "layer_height_mm": 0.050}"#,
+    )?;
+    assert_eq!(add_sla_resp.status, 200);
+    let add_sla_json = json(&add_sla_resp)?;
+    assert_eq!(add_sla_json["total_layers"], 1200);
+    let cure_depth = add_sla_json["jacobs_cure_depth_mm"].as_f64().ok_or("cure_depth")?;
+    assert!((cure_depth - 0.0675).abs() < 0.005);
+    assert!(add_sla_json["total_build_time_hours"].as_f64().unwrap_or(0.0) > 0.0);
+
+    let add_slm_resp = post(
+        addr,
+        "/api/additive/process_profile",
+        r#"{"technology": "slm_metal_pbf", "part_height_mm": 40.0, "part_volume_cm3": 25.0, "layer_height_mm": 0.040, "laser_power_w": 280.0, "scan_speed_mm_s": 1100.0, "hatch_spacing_mm": 0.105}"#,
+    )?;
+    assert_eq!(add_slm_resp.status, 200);
+    let add_slm_json = json(&add_slm_resp)?;
+    let ved = add_slm_json["volumetric_energy_density_j_mm3"].as_f64().ok_or("ved")?;
+    assert!((ved - 60.6).abs() < 1.0);
+    let regime = add_slm_json["process_regime"].as_str().unwrap_or("");
+    assert!(regime.contains("Optimal Conduction"));
+
+    // 61. Outdoor Environmental Noise (ISO 9613-2) API
+    let noise_resp = post(
+        addr,
+        "/api/sim/acoustics/outdoor_noise",
+        r#"{"source_name": "Rooftop Industrial Chiller", "sound_power_lwa": 102.0, "distance_m": 120.0, "source_height_m": 2.5, "receiver_height_m": 1.5, "barrier_height_m": 3.5, "barrier_distance_m": 15.0, "ground_factor": 0.70, "regulatory_limit_dba": 50.0}"#,
+    )?;
+    assert_eq!(noise_resp.status, 200);
+    let noise_json = json(&noise_resp)?;
+    let div_att = noise_json["divergence_attenuation_db"].as_f64().ok_or("div_att")?;
+    let bar_att = noise_json["barrier_attenuation_db"].as_f64().ok_or("bar_att")?;
+    let rec_dba = noise_json["received_sound_level_dba"].as_f64().ok_or("rec_dba")?;
+    let compliant = noise_json["is_compliant"].as_bool().ok_or("compliant")?;
+    assert!((div_att - 52.58).abs() < 0.2);
+    assert!(bar_att > 5.0 && bar_att <= 20.0);
+    assert!(rec_dba < 50.0);
+    assert!(compliant);
+
+    // 62. Universal Commands Execution Verification
+    let cmd_sm = post(
+        addr,
+        "/api/commands/execute",
+        r#"{"command_id": "cad.sheet_metal.unfold", "arguments": {"thickness_mm": 2.0, "flange_lengths_mm": [50.0, 50.0]}}"#,
+    )?;
+    assert_eq!(cmd_sm.status, 200);
+    assert_eq!(json(&cmd_sm)?["status"], "Success");
+
+    let cmd_fast = post(
+        addr,
+        "/api/commands/execute",
+        r#"{"command_id": "cad.hardware.fastener", "arguments": {"thread_size": "M10", "bolt_class": "8.8"}}"#,
+    )?;
+    assert_eq!(cmd_fast.status, 200);
+    assert_eq!(json(&cmd_fast)?["status"], "Success");
+
+    let cmd_kin = post(
+        addr,
+        "/api/commands/execute",
+        r#"{"command_id": "sim.chemical.kinetics", "arguments": {"initial_concentration_m": 2.0, "rate_constant_k": 0.05, "target_conversion": 0.80}}"#,
+    )?;
+    assert_eq!(cmd_kin.status, 200);
+    assert_eq!(json(&cmd_kin)?["status"], "Success");
+
+    let cmd_add = post(
+        addr,
+        "/api/commands/execute",
+        r#"{"command_id": "additive.process_profile.solve", "arguments": {"technology": "sla_dlp_msla", "part_height_mm": 60.0, "part_volume_cm3": 35.0, "layer_height_mm": 0.050}}"#,
+    )?;
+    assert_eq!(cmd_add.status, 200);
+    assert_eq!(json(&cmd_add)?["status"], "Success");
+
+    let cmd_noise = post(
+        addr,
+        "/api/commands/execute",
+        r#"{"command_id": "sim.acoustics.outdoor_noise", "arguments": {"sound_power_lwa": 102.0, "distance_m": 120.0}}"#,
+    )?;
+    assert_eq!(cmd_noise.status, 200);
+    assert_eq!(json(&cmd_noise)?["status"], "Success");
+
+    // 63. Enterprise MCP Tools Verification
+    let mcp_sm = post(
+        addr,
+        "/api/mcp",
+        r#"{"jsonrpc": "2.0", "id": 105, "method": "tools/call", "params": {"name": "atlas_cad_sheet_metal_unfold", "arguments": {"thickness_mm": 2.0}}}"#,
+    )?;
+    assert_eq!(mcp_sm.status, 200);
+
+    let mcp_fast = post(
+        addr,
+        "/api/mcp",
+        r#"{"jsonrpc": "2.0", "id": 106, "method": "tools/call", "params": {"name": "atlas_cad_hardware_fastener", "arguments": {"thread_size": "M10"}}}"#,
+    )?;
+    assert_eq!(mcp_fast.status, 200);
+
+    let mcp_kin = post(
+        addr,
+        "/api/mcp",
+        r#"{"jsonrpc": "2.0", "id": 107, "method": "tools/call", "params": {"name": "atlas_chemical_kinetics", "arguments": {"initial_concentration_m": 1.0}}}"#,
+    )?;
+    assert_eq!(mcp_kin.status, 200);
+
+    let mcp_add = post(
+        addr,
+        "/api/mcp",
+        r#"{"jsonrpc": "2.0", "id": 108, "method": "tools/call", "params": {"name": "atlas_additive_process_profile", "arguments": {"technology": "sla_dlp_msla", "part_height_mm": 50.0, "part_volume_cm3": 20.0, "layer_height_mm": 0.05}}}"#,
+    )?;
+    assert_eq!(mcp_add.status, 200);
+
+    let mcp_noise = post(
+        addr,
+        "/api/mcp",
+        r#"{"jsonrpc": "2.0", "id": 109, "method": "tools/call", "params": {"name": "atlas_acoustics_outdoor_noise", "arguments": {"sound_power_lwa": 100.0, "distance_m": 50.0}}}"#,
+    )?;
+    assert_eq!(mcp_noise.status, 200);
+
     Ok(())
 }

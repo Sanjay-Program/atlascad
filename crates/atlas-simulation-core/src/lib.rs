@@ -20,6 +20,7 @@ pub mod electromagnetics;
 pub mod engine;
 pub mod environmental;
 pub mod execution;
+pub mod fasteners;
 pub mod fsi;
 pub mod generative;
 pub mod geotechnical;
@@ -36,6 +37,7 @@ pub mod provenance;
 pub mod rainflow;
 pub mod robotics;
 pub mod rock_mechanics;
+pub mod sheet_metal;
 pub mod shock_response;
 pub mod signal_integrity;
 pub mod solar;
@@ -46,7 +48,10 @@ pub mod validation;
 pub mod water_hammer;
 
 pub mod prelude {
-    pub use crate::acoustics::{AcousticsProblem, solve_acoustics};
+    pub use crate::acoustics::{
+        AcousticsProblem, OutdoorNoiseProblem, OutdoorNoiseResult, solve_acoustics,
+        solve_outdoor_noise_propagation, solve_outdoor_noise_sim,
+    };
     pub use crate::aerodynamics::{
         NormalShockProblem, WingAeroProblem, solve_normal_shock, solve_wing_aerodynamics,
     };
@@ -66,9 +71,10 @@ pub mod prelude {
     pub use crate::cfd::{FluidProperties, PipeFlowProblem, solve_pipe_flow};
     pub use crate::chemical::{
         AcidBaseEquilibriumResult, AcidBaseNature, AcidBaseProblem, ChemicalComponent,
-        ChemicalSpecies, FlashProblem, TitrationDataPoint, find_species_by_id,
-        get_standard_species_catalog, solve_acid_base_titration, solve_chemical_titration_sim,
-        solve_rachford_rice_flash,
+        ChemicalSpecies, FlashProblem, ReactionKineticsProblem, ReactionKineticsResult,
+        ReactionOrder, TitrationDataPoint, find_species_by_id, get_standard_species_catalog,
+        solve_acid_base_titration, solve_chemical_titration_sim, solve_rachford_rice_flash,
+        solve_reaction_kinetics, solve_reaction_kinetics_sim,
     };
     pub use crate::convergence::{ConvergenceMonitor, IterationTelemetry};
     pub use crate::digital_twin::{
@@ -82,6 +88,10 @@ pub mod prelude {
         solve_plume_dispersion,
     };
     pub use crate::execution::{SimulationResult, SimulationStatus};
+    pub use crate::fasteners::{
+        BoltPropertyClass, BoltedJointProblem, BoltedJointResult, MetricThreadSpec,
+        get_standard_metric_threads, solve_bolted_joint, solve_bolted_joint_sim,
+    };
     pub use crate::fsi::{FsiProblem, solve_fsi_coupled};
     pub use crate::generative::{
         GenerativeMesh, GenerativeSolution, TopologyOptProblem, filter_sensitivities,
@@ -143,6 +153,10 @@ pub mod prelude {
     pub use crate::rock_mechanics::{
         BlastVibrationProblem, HoekBrownProblem, RmrClassificationProblem, solve_blast_vibration,
         solve_hoek_brown, solve_rmr_classification,
+    };
+    pub use crate::sheet_metal::{
+        SheetMetalBend, SheetMetalMaterial, SheetMetalPartProblem, SheetMetalUnfoldResult,
+        solve_sheet_metal_sim, solve_sheet_metal_unfold,
     };
     pub use crate::shock_response::{ShockResponseProblem, solve_shock_response_spectrum};
     pub use crate::signal_integrity::{PcbTransmissionLineProblem, solve_pcb_signal_integrity};

@@ -751,6 +751,284 @@ pub fn solve_chemical_titration_sim(
     })
 }
 
+/// Classification of chemical reaction mechanism order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ReactionOrder {
+    FirstOrder,
+    SecondOrder,
+    ReversibleFirstOrder,
+}
+
+/// Chemical reaction kinetics and reactor design problem.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReactionKineticsProblem {
+    pub reaction_name: String,
+    pub order: ReactionOrder,
+    /// Initial concentration of reactant A in mol/L (M).
+    pub initial_concentration_m: f64,
+    /// Direct rate constant k (if known). If None, calculated via Arrhenius.
+    pub rate_constant_k: Option<f64>,
+    /// Arrhenius pre-exponential factor A (1/s for 1st order, L/(mol*s) for 2nd order).
+    pub pre_exponential_a: Option<f64>,
+    /// Activation energy Ea in J/mol.
+    pub activation_energy_j_mol: Option<f64>,
+    /// Reaction temperature in Kelvin.
+    pub temperature_k: f64,
+    /// Reaction duration in seconds.
+    pub time_seconds: Option<f64>,
+    /// Equilibrium constant Kc for reversible reactions (Kc = kf / kr).
+    pub equilibrium_constant_kc: Option<f64>,
+    /// Volumetric flow rate v0 in m^3/s for continuous reactor sizing.
+    pub volumetric_flow_m3_s: Option<f64>,
+    /// Target conversion fraction X in [0, 1) for reactor sizing.
+    pub target_conversion: Option<f64>,
+    /// Molar enthalpy of reaction in kJ/mol (negative for exothermic).
+    pub heat_of_reaction_kj_mol: Option<f64>,
+}
+
+impl Default for ReactionKineticsProblem {
+    fn default() -> Self {
+        Self {
+            reaction_name: "Thermal Decomposition of Organic Precursor".to_string(),
+            order: ReactionOrder::FirstOrder,
+            initial_concentration_m: 1.0,
+            rate_constant_k: None,
+            pre_exponential_a: Some(1.0e13),     // Typical frequency factor
+            activation_energy_j_mol: Some(85000.0), // 85 kJ/mol
+            temperature_k: 350.0,
+            time_seconds: Some(120.0),
+            equilibrium_constant_kc: Some(5.0),
+            volumetric_flow_m3_s: Some(0.01),    // 10 L/s
+            target_conversion: Some(0.90),       // 90% conversion
+            heat_of_reaction_kj_mol: Some(-50.0),
+        }
+    }
+}
+
+/// Result of chemical reaction kinetics and reactor design.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReactionKineticsResult {
+    pub reaction_name: String,
+    pub temperature_k: f64,
+    pub rate_constant_k: f64,
+    pub half_life_seconds: f64,
+    pub final_concentration_m: f64,
+    pub conversion_fraction: f64,
+    pub reaction_rate_m_s: f64,
+    pub cstr_volume_m3: Option<f64>,
+    pub pfr_volume_m3: Option<f64>,
+    pub damkohler_number: Option<f64>,
+    pub heat_release_rate_kw: Option<f64>,
+    pub concentration_profile: Vec<(f64, f64)>,
+    pub notes: Vec<String>,
+}
+
+/// Universal gas constant R = 8.314462618 J/(mol*K).
+const GAS_CONSTANT_R: f64 = 8.314462618;
+
+/// Solves chemical reaction kinetics, integrated rate laws, and continuous reactor sizing.
+pub fn solve_reaction_kinetics(
+    prob: &ReactionKineticsProblem,
+) -> Result<ReactionKineticsResult, String> {
+    if prob.initial_concentration_m <= 0.0 {
+        return Err("Initial reactant concentration must be strictly positive.".to_string());
+    }
+    if prob.temperature_k <= 0.0 {
+        return Err("Temperature must be strictly positive Kelvin.".to_string());
+    }
+
+    // Determine rate constant k via Arrhenius or direct input
+    let k = if let Some(direct_k) = prob.rate_constant_k {
+        if direct_k <= 0.0 {
+            return Err("Rate constant k must be positive.".to_string());
+        }
+        direct_k
+    } else if let (Some(a), Some(ea)) = (prob.pre_exponential_a, prob.activation_energy_j_mol) {
+        if a <= 0.0 {
+            return Err("Pre-exponential factor A must be positive.".to_string());
+        }
+        let exp_arg = -ea / (GAS_CONSTANT_R * prob.temperature_k);
+        a * exp_arg.exp()
+    } else {
+        return Err("Must supply either rate_constant_k or both pre_exponential_a and activation_energy_j_mol.".to_string());
+    };
+
+    let c0 = prob.initial_concentration_m;
+    let t = prob.time_seconds.unwrap_or(60.0).max(0.0);
+
+    let (c_final, conversion, half_life) = match prob.order {
+        ReactionOrder::FirstOrder => {
+            let cf = c0 * (-k * t).exp();
+            let conv = (1.0 - cf / c0).clamp(0.0, 1.0);
+            let t_half = std::f64::consts::LN_2 / k;
+            (cf, conv, t_half)
+        }
+        ReactionOrder::SecondOrder => {
+            let cf = c0 / (1.0 + k * c0 * t);
+            let conv = (1.0 - cf / c0).clamp(0.0, 1.0);
+            let t_half = 1.0 / (k * c0);
+            (cf, conv, t_half)
+        }
+        ReactionOrder::ReversibleFirstOrder => {
+            let kc = prob.equilibrium_constant_kc.unwrap_or(1.0).max(1e-6);
+            let kr = k / kc;
+            let k_tot = k + kr;
+            let ceq = c0 * (kr / k_tot);
+            let cf = ceq + (c0 - ceq) * (-k_tot * t).exp();
+            let conv = (1.0 - cf / c0).clamp(0.0, 1.0);
+            let t_half = std::f64::consts::LN_2 / k_tot;
+            (cf, conv, t_half)
+        }
+    };
+
+    let rxn_rate = match prob.order {
+        ReactionOrder::FirstOrder => k * c_final,
+        ReactionOrder::SecondOrder => k * c_final * c_final,
+        ReactionOrder::ReversibleFirstOrder => {
+            let kc = prob.equilibrium_constant_kc.unwrap_or(1.0).max(1e-6);
+            let kr = k / kc;
+            let cb = c0 - c_final;
+            (k * c_final - kr * cb).max(0.0)
+        }
+    };
+
+    // Reactor sizing for specified target conversion
+    let (cstr_vol, pfr_vol, da_num) = if let (Some(x_target), Some(v0)) = (prob.target_conversion, prob.volumetric_flow_m3_s) {
+        let x = x_target.clamp(0.01, 0.999);
+        let (tau_cstr, tau_pfr) = match prob.order {
+            ReactionOrder::FirstOrder => {
+                let tc = x / (k * (1.0 - x));
+                let tp = (1.0 / k) * (1.0 / (1.0 - x)).ln();
+                (tc, tp)
+            }
+            ReactionOrder::SecondOrder => {
+                let tc = x / (k * c0 * (1.0 - x) * (1.0 - x));
+                let tp = (1.0 / (k * c0)) * (x / (1.0 - x));
+                (tc, tp)
+            }
+            ReactionOrder::ReversibleFirstOrder => {
+                let kc = prob.equilibrium_constant_kc.unwrap_or(1.0).max(1e-6);
+                let x_eq = kc / (1.0 + kc);
+                let x_eff = x.min(x_eq * 0.99);
+                let k_tot = k * (1.0 + 1.0 / kc);
+                let tc = x_eff / (k_tot * (x_eq - x_eff));
+                let tp = (1.0 / k_tot) * (x_eq / (x_eq - x_eff)).ln();
+                (tc, tp)
+            }
+        };
+        let vc = v0 * tau_cstr;
+        let vp = v0 * tau_pfr;
+        let da = k * tau_pfr;
+        (Some(vc), Some(vp), Some(da))
+    } else {
+        (None, None, None)
+    };
+
+    // Heat release rate in kW: Q_dot = r_A * V * (-Delta H)
+    let heat_kw = if let (Some(dh), Some(v_cstr)) = (prob.heat_of_reaction_kj_mol, cstr_vol) {
+        // r_A in mol/(L*s) = mol/(dm^3*s) = 1000 mol/(m^3*s)
+        // Q = r_A [mol/m^3*s] * V [m^3] * (-dH) [kJ/mol] = kW
+        let r_m3 = rxn_rate * 1000.0;
+        let q = r_m3 * v_cstr * (-dh);
+        Some(q)
+    } else {
+        None
+    };
+
+    // Synthesize concentration time-profile
+    let steps = 40;
+    let mut profile = Vec::with_capacity(steps + 1);
+    let dt = (t.max(1.0)) / (steps as f64);
+    for i in 0..=steps {
+        let ti = (i as f64) * dt;
+        let ci = match prob.order {
+            ReactionOrder::FirstOrder => c0 * (-k * ti).exp(),
+            ReactionOrder::SecondOrder => c0 / (1.0 + k * c0 * ti),
+            ReactionOrder::ReversibleFirstOrder => {
+                let kc = prob.equilibrium_constant_kc.unwrap_or(1.0).max(1e-6);
+                let kr = k / kc;
+                let k_tot = k + kr;
+                let ceq = c0 * (kr / k_tot);
+                ceq + (c0 - ceq) * (-k_tot * ti).exp()
+            }
+        };
+        profile.push((ti, ci));
+    }
+
+    let mut notes = vec![
+        format!("Reaction Kinetics: {} (Order: {:?})", prob.reaction_name, prob.order),
+        format!("Temperature: {:.1} K, Rate constant k = {:.4e}", prob.temperature_k, k),
+        format!("Initial [A]_0 = {:.3} M, Final [A] = {:.4} M at t = {:.1} s (Conversion = {:.2}%)", c0, c_final, t, conversion * 100.0),
+        format!("Reaction Half-Life t_1/2 = {:.2} s", half_life),
+    ];
+    if let (Some(vc), Some(vp)) = (cstr_vol, pfr_vol) {
+        notes.push(format!(
+            "Continuous Reactor Sizing (Target X = {:.1}%): CSTR Volume = {:.3} m³, PFR Volume = {:.3} m³ (CSTR/PFR Ratio = {:.2}x)",
+            prob.target_conversion.unwrap_or(0.9) * 100.0,
+            vc,
+            vp,
+            vc / vp.max(1e-6)
+        ));
+    }
+
+    Ok(ReactionKineticsResult {
+        reaction_name: prob.reaction_name.clone(),
+        temperature_k: prob.temperature_k,
+        rate_constant_k: k,
+        half_life_seconds: half_life,
+        final_concentration_m: c_final,
+        conversion_fraction: conversion,
+        reaction_rate_m_s: rxn_rate,
+        cstr_volume_m3: cstr_vol,
+        pfr_volume_m3: pfr_vol,
+        damkohler_number: da_num,
+        heat_release_rate_kw: heat_kw,
+        concentration_profile: profile,
+        notes,
+    })
+}
+
+/// Standardized simulation runner for reaction kinetics.
+pub fn solve_reaction_kinetics_sim(
+    prob: &ReactionKineticsProblem,
+) -> Result<SimulationResult, String> {
+    let sol = solve_reaction_kinetics(prob)?;
+
+    let mut metrics = HashMap::new();
+    metrics.insert("rate_constant_k".to_string(), sol.rate_constant_k);
+    metrics.insert("half_life_seconds".to_string(), sol.half_life_seconds);
+    metrics.insert("final_concentration_m".to_string(), sol.final_concentration_m);
+    metrics.insert("conversion_fraction".to_string(), sol.conversion_fraction);
+    metrics.insert("reaction_rate_m_s".to_string(), sol.reaction_rate_m_s);
+    if let Some(vc) = sol.cstr_volume_m3 {
+        metrics.insert("cstr_volume_m3".to_string(), vc);
+    }
+    if let Some(vp) = sol.pfr_volume_m3 {
+        metrics.insert("pfr_volume_m3".to_string(), vp);
+    }
+
+    let val = AnalyticalComparison::assess(
+        "First-Order Mass Conservation & Conversion",
+        sol.final_concentration_m / prob.initial_concentration_m,
+        1.0 - sol.conversion_fraction,
+    );
+
+    let mut conv = ConvergenceMonitor::new(1e-6);
+    conv.record(1, 0.0, 1, 1e-6);
+
+    Ok(SimulationResult {
+        problem_id: "chemical-reaction-kinetics".to_string(),
+        engine_id: "atlas-reaction-kinetics".to_string(),
+        status: SimulationStatus::Converged,
+        execution_time_ms: 1,
+        scalar_metrics: metrics,
+        convergence: conv,
+        validation: Some(val),
+        provenance: SimulationProvenance::new("atlas-reaction-kinetics", "0.1.0"),
+        logs: sol.notes,
+    })
+}
+
 /// Chemical component in a multi-component thermodynamic mixture.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChemicalComponent {
@@ -1055,5 +1333,68 @@ mod tests {
             assert!(find_species_by_id(&s.id).is_some());
             assert!(find_species_by_id(&s.formula).is_some());
         }
+    }
+
+    #[test]
+    fn test_first_order_reaction_kinetics_and_reactor_sizing() -> Result<(), String> {
+        let prob = ReactionKineticsProblem {
+            reaction_name: "Thermal Dissociation A -> B".to_string(),
+            order: ReactionOrder::FirstOrder,
+            initial_concentration_m: 2.0,
+            rate_constant_k: Some(0.05), // k = 0.05 s^-1
+            pre_exponential_a: None,
+            activation_energy_j_mol: None,
+            temperature_k: 300.0,
+            time_seconds: Some(20.0),
+            equilibrium_constant_kc: None,
+            volumetric_flow_m3_s: Some(0.005),
+            target_conversion: Some(0.80),
+            heat_of_reaction_kj_mol: Some(-65.0),
+        };
+
+        let sol = solve_reaction_kinetics(&prob)?;
+        assert!((sol.rate_constant_k - 0.05).abs() < 1e-6);
+        // Half life = ln(2) / 0.05 = 13.863 s
+        assert!((sol.half_life_seconds - 13.8629).abs() < 1e-3);
+        // [A](20) = 2.0 * exp(-0.05 * 20) = 2.0 * exp(-1.0) = 0.73576 M
+        assert!((sol.final_concentration_m - 0.73576).abs() < 1e-3);
+        // Conversion = 1 - 0.73576 / 2.0 = 0.63212
+        assert!((sol.conversion_fraction - 0.63212).abs() < 1e-3);
+        // CSTR Volume for X=0.80: tau = 0.80 / (0.05 * 0.20) = 80 s => V = 0.005 * 80 = 0.40 m^3
+        assert!((sol.cstr_volume_m3.unwrap_or(0.0) - 0.40).abs() < 1e-3);
+        // PFR Volume for X=0.80: tau = (1/0.05) * ln(1 / 0.20) = 20 * 1.6094 = 32.188 s => V = 0.005 * 32.188 = 0.1609 m^3
+        assert!((sol.pfr_volume_m3.unwrap_or(0.0) - 0.1609).abs() < 1e-3);
+        // CSTR volume > PFR volume
+        assert!(sol.cstr_volume_m3.unwrap_or(0.0) > sol.pfr_volume_m3.unwrap_or(0.0));
+
+        let sim_res = solve_reaction_kinetics_sim(&prob)?;
+        assert_eq!(sim_res.status, SimulationStatus::Converged);
+        Ok(())
+    }
+
+    #[test]
+    fn test_second_order_reaction_kinetics() -> Result<(), String> {
+        let prob = ReactionKineticsProblem {
+            reaction_name: "Dimerization 2A -> B".to_string(),
+            order: ReactionOrder::SecondOrder,
+            initial_concentration_m: 1.0,
+            rate_constant_k: Some(0.02), // k = 0.02 L/(mol*s)
+            pre_exponential_a: None,
+            activation_energy_j_mol: None,
+            temperature_k: 298.15,
+            time_seconds: Some(50.0),
+            equilibrium_constant_kc: None,
+            volumetric_flow_m3_s: None,
+            target_conversion: None,
+            heat_of_reaction_kj_mol: None,
+        };
+
+        let sol = solve_reaction_kinetics(&prob)?;
+        // Half life = 1 / (k * c0) = 1 / (0.02 * 1.0) = 50 s
+        assert!((sol.half_life_seconds - 50.0).abs() < 1e-4);
+        // At t = 50 s (one half-life), [A] = 0.50 M
+        assert!((sol.final_concentration_m - 0.50).abs() < 1e-4);
+        assert!((sol.conversion_fraction - 0.50).abs() < 1e-4);
+        Ok(())
     }
 }

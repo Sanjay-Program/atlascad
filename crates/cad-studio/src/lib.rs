@@ -4037,6 +4037,233 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&catalog).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn cad_sheet_metal_unfold(
+        &mut self,
+        req: &CadSheetMetalUnfoldRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mat = match req.material.as_deref().unwrap_or("carbon_steel") {
+            "stainless_steel" | "stainless" => {
+                atlas_simulation_core::sheet_metal::SheetMetalMaterial::StainlessSteel
+            }
+            "aluminum_5052" | "aluminum" | "al5052" => {
+                atlas_simulation_core::sheet_metal::SheetMetalMaterial::Aluminum5052
+            }
+            "copper" | "copper_c11000" => {
+                atlas_simulation_core::sheet_metal::SheetMetalMaterial::CopperC11000
+            }
+            "brass" | "brass_c26000" => {
+                atlas_simulation_core::sheet_metal::SheetMetalMaterial::BrassC26000
+            }
+            _ => atlas_simulation_core::sheet_metal::SheetMetalMaterial::CarbonSteel,
+        };
+
+        let thickness = req.thickness_mm.unwrap_or(2.0);
+        let width = req.width_mm.unwrap_or(100.0);
+        let flanges = req
+            .flange_lengths_mm
+            .clone()
+            .unwrap_or_else(|| vec![50.0, 50.0]);
+        let angles = req.bend_angles_deg.clone().unwrap_or_else(|| vec![90.0]);
+        let radii = req.inner_radii_mm.clone().unwrap_or_else(|| vec![2.0]);
+
+        let mut bends = Vec::new();
+        let bend_count = if flanges.len() >= 2 {
+            flanges.len() - 1
+        } else {
+            1
+        };
+        for i in 0..bend_count {
+            let f1 = flanges.get(i).copied().unwrap_or(50.0);
+            let f2 = flanges.get(i + 1).copied().unwrap_or(50.0);
+            let angle = angles.get(i).copied().unwrap_or(90.0);
+            let radius = radii.get(i).copied().unwrap_or(2.0);
+            bends.push(atlas_simulation_core::sheet_metal::SheetMetalBend {
+                bend_id: format!("bend_{}", i + 1),
+                bend_angle_deg: angle,
+                inside_radius_mm: radius,
+                k_factor: None,
+                flange1_length_mm: f1,
+                flange2_length_mm: f2,
+            });
+        }
+
+        let prob = atlas_simulation_core::sheet_metal::SheetMetalPartProblem {
+            thickness_mm: thickness,
+            width_mm: width,
+            material: mat,
+            bends,
+            uts_mpa: None,
+            die_opening_v_mm: req.die_opening_width_mm,
+        };
+
+        let res = atlas_simulation_core::sheet_metal::solve_sheet_metal_unfold(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn cad_hardware_fastener(
+        &mut self,
+        req: &CadHardwareFastenerRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let des = req.thread_size.clone().unwrap_or_else(|| "M10".to_string());
+        let prop = match req.bolt_class.as_deref().unwrap_or("8.8") {
+            "4.8" => atlas_simulation_core::fasteners::BoltPropertyClass::Class4_8,
+            "10.9" => atlas_simulation_core::fasteners::BoltPropertyClass::Class10_9,
+            "12.9" => atlas_simulation_core::fasteners::BoltPropertyClass::Class12_9,
+            "A2-70" | "a2-70" | "stainless" => {
+                atlas_simulation_core::fasteners::BoltPropertyClass::StainlessA2_70
+            }
+            _ => atlas_simulation_core::fasteners::BoltPropertyClass::Class8_8,
+        };
+
+        let prob = atlas_simulation_core::fasteners::BoltedJointProblem {
+            designation: des,
+            property_class: prop,
+            grip_length_mm: req.clamped_length_mm.unwrap_or(40.0),
+            torque_coefficient_k: req.torque_coefficient_k,
+            external_tensile_kn: req.applied_tension_load_kn,
+            external_shear_kn: req.applied_shear_load_kn,
+            joint_stiffness_constant_c: Some(0.25),
+            bolt_count: req.bolt_count,
+        };
+
+        let res = atlas_simulation_core::fasteners::solve_bolted_joint(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn cad_hardware_fasteners(&self) -> Result<serde_json::Value, StudioError> {
+        let catalog = atlas_simulation_core::fasteners::get_standard_metric_threads();
+        serde_json::to_value(&catalog).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_chemical_kinetics(
+        &mut self,
+        req: &SimChemicalKineticsRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let order = match req.order.as_deref().unwrap_or("first_order") {
+            "second_order" | "second" => {
+                atlas_simulation_core::chemical::ReactionOrder::SecondOrder
+            }
+            "reversible_first_order" | "reversible" => {
+                atlas_simulation_core::chemical::ReactionOrder::ReversibleFirstOrder
+            }
+            _ => atlas_simulation_core::chemical::ReactionOrder::FirstOrder,
+        };
+
+        let prob = atlas_simulation_core::chemical::ReactionKineticsProblem {
+            reaction_name: req
+                .reaction_name
+                .clone()
+                .unwrap_or_else(|| "A -> Products".to_string()),
+            order,
+            initial_concentration_m: req.initial_concentration_m.unwrap_or(1.0),
+            rate_constant_k: req.rate_constant_k,
+            pre_exponential_a: req.pre_exponential_a,
+            activation_energy_j_mol: req.activation_energy_j_mol,
+            temperature_k: req.temperature_k.unwrap_or(298.15),
+            time_seconds: req.time_seconds,
+            equilibrium_constant_kc: None,
+            volumetric_flow_m3_s: req.volumetric_flow_m3_s,
+            target_conversion: req.target_conversion,
+            heat_of_reaction_kj_mol: req.heat_of_reaction_kj_mol,
+        };
+
+        let res = atlas_simulation_core::chemical::solve_reaction_kinetics(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn additive_process_profile(
+        &mut self,
+        req: &AdditiveProcessProfileRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let tech = match req.technology.as_deref().unwrap_or("sla_dlp_msla") {
+            "fdm_fff" | "fdm" => atlas_additive::process_profiles::AdditiveTechnology::FdmFff,
+            "slm_metal_pbf" | "slm" | "dmls" => {
+                atlas_additive::process_profiles::AdditiveTechnology::SlmMetalPbf
+            }
+            "sls_polymer" | "sls" => {
+                atlas_additive::process_profiles::AdditiveTechnology::SlsPolymer
+            }
+            _ => atlas_additive::process_profiles::AdditiveTechnology::SlaDlpMsla,
+        };
+
+        let sla_params = if tech == atlas_additive::process_profiles::AdditiveTechnology::SlaDlpMsla
+        {
+            let mut s = atlas_additive::process_profiles::SlaResinParameters::default();
+            if let Some(ref name) = req.resin_name {
+                s.resin_name.clone_from(name);
+            }
+            if let Some(irr) = req.light_irradiance_mw_cm2 {
+                s.light_irradiance_mw_cm2 = irr;
+            }
+            Some(s)
+        } else {
+            None
+        };
+
+        let slm_params = if tech == atlas_additive::process_profiles::AdditiveTechnology::SlmMetalPbf
+        {
+            let mut slm = atlas_additive::process_profiles::SlmMetalParameters::default();
+            if let Some(p) = req.laser_power_w {
+                slm.laser_power_w = p;
+            }
+            if let Some(v) = req.scan_speed_mm_s {
+                slm.scan_speed_mm_s = v;
+            }
+            if let Some(h) = req.hatch_spacing_mm {
+                slm.hatch_spacing_mm = h;
+            }
+            if let Some(t) = req.layer_height_mm {
+                slm.layer_thickness_mm = t;
+            }
+            Some(slm)
+        } else {
+            None
+        };
+
+        let prob = atlas_additive::process_profiles::AdditiveProcessProblem {
+            technology: tech,
+            part_volume_cm3: req.part_volume_cm3.unwrap_or(45.0),
+            part_height_mm: req.part_height_mm.unwrap_or(75.0),
+            layer_height_mm: req.layer_height_mm.unwrap_or(0.050),
+            sla_params,
+            slm_params,
+            material_cost_per_kg_usd: req.material_cost_per_kg_usd,
+        };
+
+        let res = atlas_additive::process_profiles::evaluate_additive_process(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_acoustics_outdoor_noise(
+        &mut self,
+        req: &SimOutdoorNoiseRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::acoustics::OutdoorNoiseProblem {
+            source_name: req
+                .source_name
+                .clone()
+                .unwrap_or_else(|| "Industrial Rooftop Chiller Unit".to_string()),
+            sound_power_lwa: req.sound_power_lwa.unwrap_or(102.0),
+            distance_m: req.distance_m.unwrap_or(120.0),
+            source_height_m: req.source_height_m.unwrap_or(2.5),
+            receiver_height_m: req.receiver_height_m.unwrap_or(1.5),
+            barrier_height_m: req.barrier_height_m,
+            barrier_distance_m: req.barrier_distance_m,
+            ground_factor: req.ground_factor.unwrap_or(0.70),
+            ambient_temp_c: req.ambient_temp_c,
+            relative_humidity_pct: req.relative_humidity_pct,
+            regulatory_limit_dba: req.regulatory_limit_dba,
+        };
+
+        let res = atlas_simulation_core::acoustics::solve_outdoor_noise_propagation(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -5158,6 +5385,231 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.chemical.species_catalog" => self.sim_chemical_species()?,
+            "cad.sheet_metal.unfold" => {
+                let mat = req
+                    .arguments
+                    .get("material")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let thickness = req
+                    .arguments
+                    .get("thickness_mm")
+                    .and_then(|v| v.as_f64());
+                let flanges = req
+                    .arguments
+                    .get("flange_lengths_mm")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| arr.iter().filter_map(|x| x.as_f64()).collect());
+                let angles = req
+                    .arguments
+                    .get("bend_angles_deg")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| arr.iter().filter_map(|x| x.as_f64()).collect());
+                let radii = req
+                    .arguments
+                    .get("inner_radii_mm")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| arr.iter().filter_map(|x| x.as_f64()).collect());
+                let die = req
+                    .arguments
+                    .get("die_opening_width_mm")
+                    .and_then(|v| v.as_f64());
+                self.cad_sheet_metal_unfold(&CadSheetMetalUnfoldRequest {
+                    material: mat,
+                    thickness_mm: thickness,
+                    width_mm: Some(100.0),
+                    flange_lengths_mm: flanges,
+                    bend_angles_deg: angles,
+                    inner_radii_mm: radii,
+                    die_opening_width_mm: die,
+                })?
+            }
+            "cad.hardware.fastener" => {
+                let size = req
+                    .arguments
+                    .get("thread_size")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let class = req
+                    .arguments
+                    .get("bolt_class")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let length = req
+                    .arguments
+                    .get("clamped_length_mm")
+                    .and_then(|v| v.as_f64());
+                let tens = req
+                    .arguments
+                    .get("applied_tension_load_kn")
+                    .and_then(|v| v.as_f64());
+                let shear = req
+                    .arguments
+                    .get("applied_shear_load_kn")
+                    .and_then(|v| v.as_f64());
+                let k = req
+                    .arguments
+                    .get("torque_coefficient_k")
+                    .and_then(|v| v.as_f64());
+                self.cad_hardware_fastener(&CadHardwareFastenerRequest {
+                    thread_size: size,
+                    bolt_class: class,
+                    clamped_length_mm: length,
+                    applied_tension_load_kn: tens,
+                    applied_shear_load_kn: shear,
+                    torque_coefficient_k: k,
+                    bolt_count: Some(1),
+                })?
+            }
+            "sim.chemical.kinetics" => {
+                let name = req
+                    .arguments
+                    .get("reaction_name")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let order = req
+                    .arguments
+                    .get("order")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let conc = req
+                    .arguments
+                    .get("initial_concentration_m")
+                    .and_then(|v| v.as_f64());
+                let k = req
+                    .arguments
+                    .get("rate_constant_k")
+                    .and_then(|v| v.as_f64());
+                let temp = req
+                    .arguments
+                    .get("temperature_k")
+                    .and_then(|v| v.as_f64());
+                let flow = req
+                    .arguments
+                    .get("volumetric_flow_m3_s")
+                    .and_then(|v| v.as_f64());
+                let x = req
+                    .arguments
+                    .get("target_conversion")
+                    .and_then(|v| v.as_f64());
+                self.sim_chemical_kinetics(&SimChemicalKineticsRequest {
+                    reaction_name: name,
+                    order,
+                    initial_concentration_m: conc,
+                    rate_constant_k: k,
+                    pre_exponential_a: None,
+                    activation_energy_j_mol: None,
+                    temperature_k: temp,
+                    time_seconds: None,
+                    volumetric_flow_m3_s: flow,
+                    target_conversion: x,
+                    heat_of_reaction_kj_mol: None,
+                })?
+            }
+            "additive.process_profile.solve" => {
+                let tech = req
+                    .arguments
+                    .get("technology")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let h = req
+                    .arguments
+                    .get("part_height_mm")
+                    .and_then(|v| v.as_f64());
+                let vol = req
+                    .arguments
+                    .get("part_volume_cm3")
+                    .and_then(|v| v.as_f64());
+                let layer = req
+                    .arguments
+                    .get("layer_height_mm")
+                    .and_then(|v| v.as_f64());
+                let power = req
+                    .arguments
+                    .get("laser_power_w")
+                    .and_then(|v| v.as_f64());
+                let speed = req
+                    .arguments
+                    .get("scan_speed_mm_s")
+                    .and_then(|v| v.as_f64());
+                let hatch = req
+                    .arguments
+                    .get("hatch_spacing_mm")
+                    .and_then(|v| v.as_f64());
+                let resin = req
+                    .arguments
+                    .get("resin_name")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let irr = req
+                    .arguments
+                    .get("light_irradiance_mw_cm2")
+                    .and_then(|v| v.as_f64());
+                self.additive_process_profile(&AdditiveProcessProfileRequest {
+                    technology: tech,
+                    part_height_mm: h,
+                    part_volume_cm3: vol,
+                    layer_height_mm: layer,
+                    laser_power_w: power,
+                    scan_speed_mm_s: speed,
+                    hatch_spacing_mm: hatch,
+                    resin_name: resin,
+                    light_irradiance_mw_cm2: irr,
+                    material_cost_per_kg_usd: None,
+                })?
+            }
+            "sim.acoustics.outdoor_noise" => {
+                let name = req
+                    .arguments
+                    .get("source_name")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let lwa = req
+                    .arguments
+                    .get("sound_power_lwa")
+                    .and_then(|v| v.as_f64());
+                let dist = req
+                    .arguments
+                    .get("distance_m")
+                    .and_then(|v| v.as_f64());
+                let hs = req
+                    .arguments
+                    .get("source_height_m")
+                    .and_then(|v| v.as_f64());
+                let hr = req
+                    .arguments
+                    .get("receiver_height_m")
+                    .and_then(|v| v.as_f64());
+                let hb = req
+                    .arguments
+                    .get("barrier_height_m")
+                    .and_then(|v| v.as_f64());
+                let db = req
+                    .arguments
+                    .get("barrier_distance_m")
+                    .and_then(|v| v.as_f64());
+                let g = req
+                    .arguments
+                    .get("ground_factor")
+                    .and_then(|v| v.as_f64());
+                let limit = req
+                    .arguments
+                    .get("regulatory_limit_dba")
+                    .and_then(|v| v.as_f64());
+                self.sim_acoustics_outdoor_noise(&SimOutdoorNoiseRequest {
+                    source_name: name,
+                    sound_power_lwa: lwa,
+                    distance_m: dist,
+                    source_height_m: hs,
+                    receiver_height_m: hr,
+                    barrier_height_m: hb,
+                    barrier_distance_m: db,
+                    ground_factor: g,
+                    ambient_temp_c: None,
+                    relative_humidity_pct: None,
+                    regulatory_limit_dba: limit,
+                })?
+            }
             "system.deploy.status" => self.deploy_status()?,
             _ => serde_json::json!({
                 "status": "Executed",
@@ -6207,6 +6659,12 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
                 Err(error) => error_response(&error),
             }
         }
+        ("GET", "/api/cad/hardware/fasteners") => {
+            match with_state(state, |state| state.cad_hardware_fasteners()) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            }
+        }
         ("POST", path) if path.starts_with("/api/") => {
             match require_same_origin(request, port, shared).and_then(|()| require_json(request)) {
                 Ok(()) => post_route(state, request),
@@ -6827,6 +7285,39 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             },
             Err(error) => error_response(&error),
         },
+        "/api/cad/sheet_metal/unfold" => {
+            match parse_body_or_default::<CadSheetMetalUnfoldRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.cad_sheet_metal_unfold(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/cad/hardware/fastener" => {
+            match parse_body_or_default::<CadHardwareFastenerRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.cad_hardware_fastener(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/cad/hardware/fasteners" => {
+            match with_state(state, |state| state.cad_hardware_fasteners()) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/additive/process_profile" => {
+            match parse_body_or_default::<AdditiveProcessProfileRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.additive_process_profile(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
         "/api/additive/slice" => match parse_body_or_default::<AdditiveSliceRequest>(request) {
             Ok(body) => match with_state(state, |state| state.additive_slice(&body)) {
                 Ok(payload) => json_response(200, payload),
@@ -6954,6 +7445,15 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             Ok(payload) => json_response(200, payload),
             Err(error) => error_response(&error),
         },
+        "/api/sim/chemical/kinetics" => {
+            match parse_body_or_default::<SimChemicalKineticsRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_chemical_kinetics(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        },
         "/api/sim/molecular" => match parse_body_or_default::<SimMolecularRequest>(request) {
             Ok(body) => match with_state(state, |state| state.sim_molecular(&body)) {
                 Ok(payload) => json_response(200, payload),
@@ -7070,6 +7570,15 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                 Err(error) => error_response(&error),
             },
             Err(error) => error_response(&error),
+        },
+        "/api/sim/acoustics/outdoor_noise" => {
+            match parse_body_or_default::<SimOutdoorNoiseRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_acoustics_outdoor_noise(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
         },
         "/api/sim/solar" => match parse_body_or_default::<SimSolarRequest>(request) {
             Ok(body) => match with_state(state, |state| state.sim_solar(&body)) {
@@ -9014,4 +9523,121 @@ struct SimNuclearShieldingRequest {
     pub lead_shield_thickness_cm: Option<f64>,
     #[serde(default)]
     pub concrete_shield_thickness_cm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CadSheetMetalUnfoldRequest {
+    #[serde(default)]
+    pub material: Option<String>,
+    #[serde(default)]
+    pub thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub width_mm: Option<f64>,
+    #[serde(default)]
+    pub flange_lengths_mm: Option<Vec<f64>>,
+    #[serde(default)]
+    pub bend_angles_deg: Option<Vec<f64>>,
+    #[serde(default)]
+    pub inner_radii_mm: Option<Vec<f64>>,
+    #[serde(default)]
+    pub die_opening_width_mm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CadHardwareFastenerRequest {
+    #[serde(default)]
+    pub thread_size: Option<String>,
+    #[serde(default)]
+    pub bolt_class: Option<String>,
+    #[serde(default)]
+    pub clamped_length_mm: Option<f64>,
+    #[serde(default)]
+    pub applied_tension_load_kn: Option<f64>,
+    #[serde(default)]
+    pub applied_shear_load_kn: Option<f64>,
+    #[serde(default)]
+    pub torque_coefficient_k: Option<f64>,
+    #[serde(default)]
+    pub bolt_count: Option<u32>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimChemicalKineticsRequest {
+    #[serde(default)]
+    pub reaction_name: Option<String>,
+    #[serde(default)]
+    pub order: Option<String>,
+    #[serde(default)]
+    pub initial_concentration_m: Option<f64>,
+    #[serde(default)]
+    pub rate_constant_k: Option<f64>,
+    #[serde(default)]
+    pub pre_exponential_a: Option<f64>,
+    #[serde(default)]
+    pub activation_energy_j_mol: Option<f64>,
+    #[serde(default)]
+    pub temperature_k: Option<f64>,
+    #[serde(default)]
+    pub time_seconds: Option<f64>,
+    #[serde(default)]
+    pub volumetric_flow_m3_s: Option<f64>,
+    #[serde(default)]
+    pub target_conversion: Option<f64>,
+    #[serde(default)]
+    pub heat_of_reaction_kj_mol: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AdditiveProcessProfileRequest {
+    #[serde(default)]
+    pub technology: Option<String>,
+    #[serde(default)]
+    pub part_height_mm: Option<f64>,
+    #[serde(default)]
+    pub part_volume_cm3: Option<f64>,
+    #[serde(default)]
+    pub layer_height_mm: Option<f64>,
+    #[serde(default)]
+    pub laser_power_w: Option<f64>,
+    #[serde(default)]
+    pub scan_speed_mm_s: Option<f64>,
+    #[serde(default)]
+    pub hatch_spacing_mm: Option<f64>,
+    #[serde(default)]
+    pub resin_name: Option<String>,
+    #[serde(default)]
+    pub light_irradiance_mw_cm2: Option<f64>,
+    #[serde(default)]
+    pub material_cost_per_kg_usd: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimOutdoorNoiseRequest {
+    #[serde(default)]
+    pub source_name: Option<String>,
+    #[serde(default)]
+    pub sound_power_lwa: Option<f64>,
+    #[serde(default)]
+    pub distance_m: Option<f64>,
+    #[serde(default)]
+    pub source_height_m: Option<f64>,
+    #[serde(default)]
+    pub receiver_height_m: Option<f64>,
+    #[serde(default)]
+    pub barrier_height_m: Option<f64>,
+    #[serde(default)]
+    pub barrier_distance_m: Option<f64>,
+    #[serde(default)]
+    pub ground_factor: Option<f64>,
+    #[serde(default)]
+    pub ambient_temp_c: Option<f64>,
+    #[serde(default)]
+    pub relative_humidity_pct: Option<f64>,
+    #[serde(default)]
+    pub regulatory_limit_dba: Option<f64>,
 }
