@@ -5372,5 +5372,139 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 78. Lateral Rotor Dynamics & API 617 Critical Speeds
+    let res_rotor = post(
+        addr,
+        "/api/sim/rotordynamics/api617",
+        r#"{
+            "operating_speed_rpm": 12000.0,
+            "shaft_span_m": 1.20,
+            "shaft_diameter_m": 0.080,
+            "disc_mass_kg": 45.0,
+            "unbalance_g_mm": 15.0
+        }"#,
+    )?;
+    assert_eq!(res_rotor.status, 200);
+    let rotor_json = json(&res_rotor)?;
+    assert!(rotor_json["critical_speed_rigid_rpm"].as_f64().unwrap() > 3000.0);
+    assert!(rotor_json["critical_speed_first_rpm"].as_f64().unwrap() > 2000.0);
+    assert!(rotor_json["actual_margin_pct"].as_f64().unwrap() > 20.0);
+    assert!(rotor_json["api617_margin_compliant"].as_bool().unwrap());
+    assert!(rotor_json["vibration_compliant"].as_bool().unwrap());
+
+    // 79. Welding Metallurgy & Cooling Rates (AWS D1.1 / ISO 15614)
+    let res_weld = post(
+        addr,
+        "/api/cam/welding/metallurgy",
+        r#"{
+            "arc_voltage_v": 28.0,
+            "welding_current_a": 240.0,
+            "travel_speed_mm_s": 4.5,
+            "plate_thickness_mm": 25.0,
+            "preheat_temp_c": 20.0
+        }"#,
+    )?;
+    assert_eq!(res_weld.status, 200);
+    let weld_json = json(&res_weld)?;
+    assert!(weld_json["gross_heat_input_kj_mm"].as_f64().unwrap() > 1.2);
+    assert!(weld_json["net_heat_input_kj_mm"].as_f64().unwrap() > 1.0);
+    assert!(weld_json["cooling_time_t8_5_s"].as_f64().unwrap() > 2.0);
+    assert!(weld_json["carbon_equivalent_iiw"].as_f64().unwrap() > 0.35);
+    assert!(weld_json["haz_hardness_acceptable"].as_bool().unwrap());
+
+    // 80. Binary Distillation Column Design (McCabe-Thiele)
+    let res_dist = post(
+        addr,
+        "/api/sim/chemical/distillation",
+        r#"{
+            "feed_rate_kmol_hr": 100.0,
+            "feed_mole_fraction_zf": 0.45,
+            "distillate_mole_fraction_xd": 0.95,
+            "bottoms_mole_fraction_xb": 0.05,
+            "relative_volatility_alpha": 2.45,
+            "reflux_multiplier": 1.30
+        }"#,
+    )?;
+    assert_eq!(res_dist.status, 200);
+    let dist_json = json(&res_dist)?;
+    assert!(dist_json["fenske_minimum_stages"].as_f64().unwrap() > 5.5);
+    assert!(dist_json["minimum_reflux_ratio_rmin"].as_f64().unwrap() > 0.9);
+    assert!(dist_json["theoretical_stages_count"].as_u64().unwrap() >= 10);
+    assert!(dist_json["condenser_duty_kw"].as_f64().unwrap() > 500.0);
+
+    // 81. PCB Trace Current Carrying Ampacity & Thermal Vias (IPC-2152)
+    let res_pcb = post(
+        addr,
+        "/api/sim/ecad/pcb_thermal",
+        r#"{
+            "trace_width_mm": 2.50,
+            "trace_length_mm": 50.0,
+            "current_a": 5.5,
+            "allowable_temp_rise_c": 20.0,
+            "component_heat_power_w": 3.5
+        }"#,
+    )?;
+    assert_eq!(res_pcb.status, 200);
+    let pcb_json = json(&res_pcb)?;
+    assert!(pcb_json["allowable_current_ipc2152_a"].as_f64().unwrap() > 6.0);
+    assert!(pcb_json["current_margin_factor"].as_f64().unwrap() > 1.0);
+    assert!(pcb_json["trace_resistance_mohm"].as_f64().unwrap() > 8.0);
+    assert!(pcb_json["via_array_thermal_resistance_k_w"].as_f64().unwrap() > 5.0);
+    assert!(pcb_json["thermal_limits_satisfied"].as_bool().unwrap());
+
+    // 82. Structural Steel Bolted & Welded Connections (Eurocode 3 / AISC 360)
+    let res_conn = post(
+        addr,
+        "/api/sim/structural/connections",
+        r#"{
+            "applied_shear_force_kn": 180.0,
+            "applied_tension_force_kn": 80.0,
+            "weld_throat_thickness_mm": 6.0,
+            "weld_length_mm": 220.0,
+            "applied_weld_force_kn": 150.0
+        }"#,
+    )?;
+    assert_eq!(res_conn.status, 200);
+    let conn_json = json(&res_conn)?;
+    assert!(conn_json["single_bolt_shear_resistance_kn"].as_f64().unwrap() > 85.0);
+    assert!(conn_json["total_connection_shear_capacity_kn"].as_f64().unwrap() > 350.0);
+    assert!(conn_json["bolt_interaction_utilization"].as_f64().unwrap() < 1.0);
+    assert!(conn_json["bolted_joint_safe"].as_bool().unwrap());
+    assert!(conn_json["weld_utilization"].as_f64().unwrap() < 1.0);
+    assert!(conn_json["welded_joint_safe"].as_bool().unwrap());
+
+    // 83. Universal Commands Execution Verification (Next 5 Advanced Domains)
+    for cmd_id in [
+        "sim.rotordynamics.api617",
+        "cam.welding.metallurgy",
+        "sim.chemical.distillation",
+        "sim.ecad.pcb_thermal",
+        "sim.structural.connections",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 84. Enterprise MCP Tool Calling (Next 5 Advanced Domains)
+    for tool_name in [
+        "atlas_sim_rotordynamics",
+        "atlas_cam_welding_metallurgy",
+        "atlas_sim_chemical_distillation",
+        "atlas_sim_pcb_thermal",
+        "atlas_sim_structural_connections",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 130, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

@@ -4633,6 +4633,141 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_rotordynamics_api617(
+        &mut self,
+        req: &SimRotorDynamicsRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::rotor_dynamics::RotorDynamicsProblem {
+            problem_id: "api617_rotor_dynamics_simulation".to_string(),
+            operating_speed_rpm: req.operating_speed_rpm.unwrap_or(12000.0),
+            shaft_span_m: req.shaft_span_m.unwrap_or(1.20),
+            shaft_diameter_m: req.shaft_diameter_m.unwrap_or(0.080),
+            shaft_inner_diameter_m: 0.0,
+            shaft_modulus_pa: 210.0e9,
+            shaft_density_kg_m3: 7850.0,
+            disc_mass_kg: req.disc_mass_kg.unwrap_or(45.0),
+            disc_polar_inertia_kg_m2: 0.45,
+            disc_diametral_inertia_kg_m2: 0.225,
+            bearing_type: atlas_simulation_core::rotor_dynamics::BearingType::HydrodynamicJournal,
+            bearing_stiffness_n_m: Some(4.5e7),
+            bearing_damping_ns_m: Some(12000.0),
+            unbalance_g_mm: req.unbalance_g_mm.unwrap_or(15.0),
+        };
+        let res = atlas_simulation_core::rotor_dynamics::solve_rotor_dynamics(&prob);
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn cam_welding_metallurgy(
+        &mut self,
+        req: &CamWeldingRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let proc = match req.process.as_deref().unwrap_or("gmaw") {
+            "smaw" => atlas_simulation_core::welding::WeldingProcess::Smaw,
+            "fcaw" => atlas_simulation_core::welding::WeldingProcess::Fcaw,
+            "gtaw" => atlas_simulation_core::welding::WeldingProcess::Gtaw,
+            "saw" => atlas_simulation_core::welding::WeldingProcess::Saw,
+            "laser" => atlas_simulation_core::welding::WeldingProcess::Laser,
+            _ => atlas_simulation_core::welding::WeldingProcess::Gmaw,
+        };
+        let prob = atlas_simulation_core::welding::WeldingProblem {
+            problem_id: "welding_metallurgy_simulation".to_string(),
+            process: proc,
+            arc_voltage_v: req.arc_voltage_v.unwrap_or(28.0),
+            welding_current_a: req.welding_current_a.unwrap_or(240.0),
+            travel_speed_mm_s: req.travel_speed_mm_s.unwrap_or(4.5),
+            plate_thickness_mm: req.plate_thickness_mm.unwrap_or(25.0),
+            preheat_temp_c: req.preheat_temp_c.unwrap_or(20.0),
+            composition: atlas_simulation_core::welding::SteelComposition::default(),
+            hydrogen_level: atlas_simulation_core::welding::HydrogenLevel::H5,
+            joint_restraint_factor: 1.0,
+        };
+        let res = atlas_simulation_core::welding::solve_welding_metallurgy(&prob);
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_chemical_distillation(
+        &mut self,
+        req: &SimDistillationRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::distillation::DistillationProblem {
+            problem_id: "mccabe_thiele_distillation".to_string(),
+            light_key_name: "Benzene".to_string(),
+            heavy_key_name: "Toluene".to_string(),
+            feed_rate_kmol_hr: req.feed_rate_kmol_hr.unwrap_or(100.0),
+            feed_mole_fraction_zf: req.feed_mole_fraction_zf.unwrap_or(0.45),
+            distillate_mole_fraction_xd: req.distillate_mole_fraction_xd.unwrap_or(0.95),
+            bottoms_mole_fraction_xb: req.bottoms_mole_fraction_xb.unwrap_or(0.05),
+            relative_volatility_alpha: req.relative_volatility_alpha.unwrap_or(2.45),
+            feed_condition: atlas_simulation_core::distillation::FeedThermalCondition::SaturatedLiquid,
+            reflux_multiplier: req.reflux_multiplier.unwrap_or(1.30),
+            heat_of_vaporization_kj_mol: 30.8,
+            tray_efficiency: 0.72,
+        };
+        let res = atlas_simulation_core::distillation::solve_distillation_column(&prob);
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_ecad_pcb_thermal(
+        &mut self,
+        req: &SimPcbThermalRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let mut via_spec = atlas_simulation_core::pcb_thermal::ThermalViaSpec::default();
+        if let Some(vc) = req.via_count {
+            via_spec.via_count = vc;
+        }
+        let prob = atlas_simulation_core::pcb_thermal::PcbThermalProblem {
+            problem_id: "ipc2152_pcb_thermal_analysis".to_string(),
+            layer: atlas_simulation_core::pcb_thermal::TraceLayer::ExternalSurface,
+            copper_weight: atlas_simulation_core::pcb_thermal::CopperWeightOz::OneOz,
+            trace_width_mm: req.trace_width_mm.unwrap_or(2.50),
+            trace_length_mm: req.trace_length_mm.unwrap_or(50.0),
+            current_a: req.current_a.unwrap_or(5.5),
+            ambient_temp_c: 25.0,
+            allowable_temp_rise_c: req.allowable_temp_rise_c.unwrap_or(20.0),
+            component_heat_power_w: req.component_heat_power_w.unwrap_or(3.5),
+            thermal_vias: via_spec,
+        };
+        let res = atlas_simulation_core::pcb_thermal::solve_pcb_thermal(&prob);
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_structural_connections(
+        &mut self,
+        req: &SimStructuralConnectionRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let b_grade = match req.bolt_grade.as_deref().unwrap_or("8.8") {
+            "4.6" => atlas_simulation_core::structural_connections::BoltGrade::Class4_6,
+            "10.9" => atlas_simulation_core::structural_connections::BoltGrade::Class10_9,
+            _ => atlas_simulation_core::structural_connections::BoltGrade::Class8_8,
+        };
+        let s_grade = match req.steel_grade.as_deref().unwrap_or("S355") {
+            "S235" => atlas_simulation_core::structural_connections::StructuralSteelGrade::S235,
+            "S275" => atlas_simulation_core::structural_connections::StructuralSteelGrade::S275,
+            "S460" => atlas_simulation_core::structural_connections::StructuralSteelGrade::S460,
+            _ => atlas_simulation_core::structural_connections::StructuralSteelGrade::S355,
+        };
+        let prob = atlas_simulation_core::structural_connections::ConnectionProblem {
+            problem_id: "structural_connection_ec3".to_string(),
+            bolt_grade: b_grade,
+            bolt_diameter: atlas_simulation_core::structural_connections::BoltDiameter::M20,
+            number_of_bolts: req.number_of_bolts.unwrap_or(4),
+            shear_planes: 1,
+            steel_grade: s_grade,
+            plate_thickness_mm: 12.0,
+            end_distance_e1_mm: 45.0,
+            edge_distance_e2_mm: 40.0,
+            pitch_p1_mm: 70.0,
+            applied_shear_force_kn: req.applied_shear_force_kn.unwrap_or(180.0),
+            applied_tension_force_kn: req.applied_tension_force_kn.unwrap_or(80.0),
+            weld_throat_thickness_mm: req.weld_throat_thickness_mm.unwrap_or(6.0),
+            weld_length_mm: req.weld_length_mm.unwrap_or(220.0),
+            applied_weld_force_kn: req.applied_weld_force_kn.unwrap_or(150.0),
+            weld_load_angle_deg: 45.0,
+        };
+        let res = atlas_simulation_core::structural_connections::solve_structural_connection(&prob);
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -6164,6 +6299,83 @@ namespace AtlasCAD.Unity
                     min_stress_mpa: s_min,
                     initial_crack_depth_a0_mm: a0,
                     plate_width_w_mm: w,
+                })?
+            }
+            "sim.rotordynamics.api617" => {
+                let n_rpm = req.arguments.get("operating_speed_rpm").and_then(|v| v.as_f64());
+                let l = req.arguments.get("shaft_span_m").and_then(|v| v.as_f64());
+                let d = req.arguments.get("shaft_diameter_m").and_then(|v| v.as_f64());
+                let m = req.arguments.get("disc_mass_kg").and_then(|v| v.as_f64());
+                let u = req.arguments.get("unbalance_g_mm").and_then(|v| v.as_f64());
+                self.sim_rotordynamics_api617(&SimRotorDynamicsRequest {
+                    operating_speed_rpm: n_rpm,
+                    shaft_span_m: l,
+                    shaft_diameter_m: d,
+                    disc_mass_kg: m,
+                    unbalance_g_mm: u,
+                })?
+            }
+            "cam.welding.metallurgy" => {
+                let v = req.arguments.get("arc_voltage_v").and_then(|v| v.as_f64());
+                let i = req.arguments.get("welding_current_a").and_then(|v| v.as_f64());
+                let s = req.arguments.get("travel_speed_mm_s").and_then(|v| v.as_f64());
+                let t = req.arguments.get("plate_thickness_mm").and_then(|v| v.as_f64());
+                let tp = req.arguments.get("preheat_temp_c").and_then(|v| v.as_f64());
+                self.cam_welding_metallurgy(&CamWeldingRequest {
+                    arc_voltage_v: v,
+                    welding_current_a: i,
+                    travel_speed_mm_s: s,
+                    plate_thickness_mm: t,
+                    preheat_temp_c: tp,
+                    process: None,
+                })?
+            }
+            "sim.chemical.distillation" => {
+                let f = req.arguments.get("feed_rate_kmol_hr").and_then(|v| v.as_f64());
+                let zf = req.arguments.get("feed_mole_fraction_zf").and_then(|v| v.as_f64());
+                let xd = req.arguments.get("distillate_mole_fraction_xd").and_then(|v| v.as_f64());
+                let xb = req.arguments.get("bottoms_mole_fraction_xb").and_then(|v| v.as_f64());
+                let a = req.arguments.get("relative_volatility_alpha").and_then(|v| v.as_f64());
+                let r_mult = req.arguments.get("reflux_multiplier").and_then(|v| v.as_f64());
+                self.sim_chemical_distillation(&SimDistillationRequest {
+                    feed_rate_kmol_hr: f,
+                    feed_mole_fraction_zf: zf,
+                    distillate_mole_fraction_xd: xd,
+                    bottoms_mole_fraction_xb: xb,
+                    relative_volatility_alpha: a,
+                    reflux_multiplier: r_mult,
+                })?
+            }
+            "sim.ecad.pcb_thermal" => {
+                let w = req.arguments.get("trace_width_mm").and_then(|v| v.as_f64());
+                let l = req.arguments.get("trace_length_mm").and_then(|v| v.as_f64());
+                let i = req.arguments.get("current_a").and_then(|v| v.as_f64());
+                let dt = req.arguments.get("allowable_temp_rise_c").and_then(|v| v.as_f64());
+                let p = req.arguments.get("component_heat_power_w").and_then(|v| v.as_f64());
+                self.sim_ecad_pcb_thermal(&SimPcbThermalRequest {
+                    trace_width_mm: w,
+                    trace_length_mm: l,
+                    current_a: i,
+                    allowable_temp_rise_c: dt,
+                    component_heat_power_w: p,
+                    via_count: None,
+                })?
+            }
+            "sim.structural.connections" => {
+                let v = req.arguments.get("applied_shear_force_kn").and_then(|v| v.as_f64());
+                let n = req.arguments.get("applied_tension_force_kn").and_then(|v| v.as_f64());
+                let a = req.arguments.get("weld_throat_thickness_mm").and_then(|v| v.as_f64());
+                let l = req.arguments.get("weld_length_mm").and_then(|v| v.as_f64());
+                let fw = req.arguments.get("applied_weld_force_kn").and_then(|v| v.as_f64());
+                self.sim_structural_connections(&SimStructuralConnectionRequest {
+                    applied_shear_force_kn: v,
+                    applied_tension_force_kn: n,
+                    weld_throat_thickness_mm: a,
+                    weld_length_mm: l,
+                    applied_weld_force_kn: fw,
+                    number_of_bolts: None,
+                    bolt_grade: None,
+                    steel_grade: None,
                 })?
             }
             "system.deploy.status" => self.deploy_status()?,
@@ -7949,6 +8161,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/structural/fracture" => {
             match parse_body_or_default::<SimFractureRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_structural_fracture(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/rotordynamics/api617" => {
+            match parse_body_or_default::<SimRotorDynamicsRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_rotordynamics_api617(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/cam/welding/metallurgy" => {
+            match parse_body_or_default::<CamWeldingRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.cam_welding_metallurgy(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/chemical/distillation" => {
+            match parse_body_or_default::<SimDistillationRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_chemical_distillation(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/ecad/pcb_thermal" => {
+            match parse_body_or_default::<SimPcbThermalRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_ecad_pcb_thermal(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/structural/connections" => {
+            match parse_body_or_default::<SimStructuralConnectionRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_structural_connections(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -10523,4 +10780,91 @@ struct SimFractureRequest {
     pub initial_crack_depth_a0_mm: Option<f64>,
     #[serde(default)]
     pub plate_width_w_mm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimRotorDynamicsRequest {
+    #[serde(default)]
+    pub operating_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub shaft_span_m: Option<f64>,
+    #[serde(default)]
+    pub shaft_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub disc_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub unbalance_g_mm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CamWeldingRequest {
+    #[serde(default)]
+    pub arc_voltage_v: Option<f64>,
+    #[serde(default)]
+    pub welding_current_a: Option<f64>,
+    #[serde(default)]
+    pub travel_speed_mm_s: Option<f64>,
+    #[serde(default)]
+    pub plate_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub preheat_temp_c: Option<f64>,
+    #[serde(default)]
+    pub process: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimDistillationRequest {
+    #[serde(default)]
+    pub feed_rate_kmol_hr: Option<f64>,
+    #[serde(default)]
+    pub feed_mole_fraction_zf: Option<f64>,
+    #[serde(default)]
+    pub distillate_mole_fraction_xd: Option<f64>,
+    #[serde(default)]
+    pub bottoms_mole_fraction_xb: Option<f64>,
+    #[serde(default)]
+    pub relative_volatility_alpha: Option<f64>,
+    #[serde(default)]
+    pub reflux_multiplier: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimPcbThermalRequest {
+    #[serde(default)]
+    pub trace_width_mm: Option<f64>,
+    #[serde(default)]
+    pub trace_length_mm: Option<f64>,
+    #[serde(default)]
+    pub current_a: Option<f64>,
+    #[serde(default)]
+    pub allowable_temp_rise_c: Option<f64>,
+    #[serde(default)]
+    pub component_heat_power_w: Option<f64>,
+    #[serde(default)]
+    pub via_count: Option<usize>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimStructuralConnectionRequest {
+    #[serde(default)]
+    pub applied_shear_force_kn: Option<f64>,
+    #[serde(default)]
+    pub applied_tension_force_kn: Option<f64>,
+    #[serde(default)]
+    pub weld_throat_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub weld_length_mm: Option<f64>,
+    #[serde(default)]
+    pub applied_weld_force_kn: Option<f64>,
+    #[serde(default)]
+    pub number_of_bolts: Option<usize>,
+    #[serde(default)]
+    pub bolt_grade: Option<String>,
+    #[serde(default)]
+    pub steel_grade: Option<String>,
 }

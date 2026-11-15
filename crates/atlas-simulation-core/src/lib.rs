@@ -16,6 +16,7 @@ pub mod chemical;
 pub mod convergence;
 pub mod daylighting;
 pub mod digital_twin;
+pub mod distillation;
 pub mod elastoplasticity;
 pub mod electromagnetics;
 pub mod engine;
@@ -36,6 +37,7 @@ pub mod materials;
 pub mod model;
 pub mod molecular;
 pub mod nuclear_shielding;
+pub mod pcb_thermal;
 pub mod power_flow;
 pub mod pressure_vessel;
 pub mod problem;
@@ -44,6 +46,7 @@ pub mod psychrometrics;
 pub mod rainflow;
 pub mod robotics;
 pub mod rock_mechanics;
+pub mod rotor_dynamics;
 pub mod shafts_keys;
 pub mod sheet_metal;
 pub mod shock_response;
@@ -53,9 +56,11 @@ pub mod solar;
 pub mod springs;
 pub mod solver_settings;
 pub mod structural;
+pub mod structural_connections;
 pub mod thermal_stress;
 pub mod validation;
 pub mod water_hammer;
+pub mod welding;
 
 pub mod prelude {
     pub use crate::acoustics::{
@@ -93,6 +98,10 @@ pub mod prelude {
     };
     pub use crate::digital_twin::{
         DigitalTwinProblem, StrainRosetteTelemetry, StressCycleBlock, solve_digital_twin,
+    };
+    pub use crate::distillation::{
+        DistillationProblem, DistillationResult, FeedThermalCondition, StagePoint,
+        solve_distillation_column, solve_distillation_sim,
     };
     pub use crate::elastoplasticity::{ElastoplasticProblem, solve_elastoplasticity};
     pub use crate::electromagnetics::{MicrostripProblem, solve_microstrip_line};
@@ -167,6 +176,10 @@ pub mod prelude {
     pub use crate::nuclear_shielding::{
         RadiationShieldingProblem, ShieldLayer, solve_radiation_shielding,
     };
+    pub use crate::pcb_thermal::{
+        CopperWeightOz, PcbThermalProblem, PcbThermalResult, ThermalViaSpec, TraceLayer,
+        solve_pcb_thermal, solve_pcb_thermal_sim,
+    };
     pub use crate::power_flow::{
         BusType, ComplexNumber, PowerFlowProblem, TransmissionLine, build_bus_admittance_matrix,
         solve_power_flow, y_bus_frobenius_norm,
@@ -193,6 +206,10 @@ pub mod prelude {
         BlastVibrationProblem, HoekBrownProblem, RmrClassificationProblem, solve_blast_vibration,
         solve_hoek_brown, solve_rmr_classification,
     };
+    pub use crate::rotor_dynamics::{
+        BearingType, RotorDynamicsProblem, RotorDynamicsResult, solve_rotor_dynamics,
+        solve_rotor_dynamics_sim,
+    };
     pub use crate::shafts_keys::{
         Din6885KeyDimensions, HubMaterial, ShaftKeyProblem, ShaftKeyResult, ShaftMaterial,
         lookup_din6885_key, solve_shaft_and_key, solve_shaft_keys_sim,
@@ -218,9 +235,17 @@ pub mod prelude {
         FatigueProblem, LaminaStrengthLimits, OrthotropicLamina, solve_column_buckling,
         solve_composite_failure, solve_composite_laminate, solve_fatigue_safety,
     };
+    pub use crate::structural_connections::{
+        BoltDiameter, BoltGrade, ConnectionProblem, ConnectionResult, StructuralSteelGrade,
+        solve_structural_connection, solve_structural_connection_sim,
+    };
     pub use crate::thermal_stress::{
         BimetalStripProblem, ThermalStressProblem, solve_bimetal_deflection, solve_thermal_stress,
     };
     pub use crate::validation::{AnalyticalComparison, ValidationStatus};
     pub use crate::water_hammer::{WaterHammerProblem, solve_water_hammer};
+    pub use crate::welding::{
+        HydrogenLevel, SteelComposition, WeldingProblem, WeldingProcess, WeldingResult,
+        solve_welding_metallurgy, solve_welding_sim,
+    };
 }

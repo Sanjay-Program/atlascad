@@ -1743,5 +1743,236 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    // --- 28. Rotor Dynamics & Critical Speeds (API 617) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.rotordynamics.api617",
+            "Lateral Rotor Dynamics, Critical Speeds & Campbell Split",
+            "Calculates rigid and flexible-bearing lateral critical speeds, gyroscopic Campbell whirl splitting, unbalance vibration response, and API 617 separation margins.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "operating_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Operating rotational speed in RPM".into(),
+            required: true,
+            default_value: Some(serde_json::json!(12000.0)),
+            validation_rules: vec![ValidationRule::Min(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "shaft_span_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Bearing-to-bearing shaft span in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1.20)),
+            validation_rules: vec![ValidationRule::Min(0.05)],
+        })
+        .with_argument(CommandArgument {
+            name: "shaft_diameter_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Shaft outer diameter in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(0.080)),
+            validation_rules: vec![ValidationRule::Min(0.005)],
+        })
+        .with_argument(CommandArgument {
+            name: "disc_mass_kg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Center disc / impeller mass in kg".into(),
+            required: true,
+            default_value: Some(serde_json::json!(45.0)),
+            validation_rules: vec![ValidationRule::Min(0.1)],
+        }),
+    )?;
+
+    // --- 29. Welding Metallurgy & Cooling Rates (AWS D1.1 / ISO 15614) ---
+    registry.register(
+        CommandSchema::new(
+            "cam.welding.metallurgy",
+            "Welding Metallurgy, Net Heat Input & t8/5 Cooling Time",
+            "Calculates net arc heat input, 2D/3D Rosenthal cooling rates (t8/5), IIW/Ito-Bessyo Carbon Equivalents, preheat temperatures, and peak HAZ hardness.",
+            CommandCategory::Cnc,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "arc_voltage_v".into(),
+            arg_type: ArgumentType::Number,
+            description: "Arc voltage in Volts".into(),
+            required: true,
+            default_value: Some(serde_json::json!(28.0)),
+            validation_rules: vec![ValidationRule::Min(5.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "welding_current_a".into(),
+            arg_type: ArgumentType::Number,
+            description: "Welding current in Amperes".into(),
+            required: true,
+            default_value: Some(serde_json::json!(240.0)),
+            validation_rules: vec![ValidationRule::Min(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "travel_speed_mm_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Torch travel speed in mm/s".into(),
+            required: true,
+            default_value: Some(serde_json::json!(4.5)),
+            validation_rules: vec![ValidationRule::Min(0.5)],
+        })
+        .with_argument(CommandArgument {
+            name: "plate_thickness_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Base plate thickness in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(25.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        }),
+    )?;
+
+    // --- 30. Binary Distillation Column Design (McCabe-Thiele) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.chemical.distillation",
+            "Binary Distillation Column Design & McCabe-Thiele Stepping",
+            "Calculates Fenske minimum theoretical stages, Underwood minimum reflux R_min, McCabe-Thiele stage stepping, optimal feed tray, and condenser/reboiler duty.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "feed_rate_kmol_hr".into(),
+            arg_type: ArgumentType::Number,
+            description: "Feed molar rate in kmol/hr".into(),
+            required: true,
+            default_value: Some(serde_json::json!(100.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "feed_mole_fraction_zf".into(),
+            arg_type: ArgumentType::Number,
+            description: "Feed light key mole fraction (0.0 to 1.0)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(0.45)),
+            validation_rules: vec![ValidationRule::Min(0.01), ValidationRule::Max(0.99)],
+        })
+        .with_argument(CommandArgument {
+            name: "distillate_mole_fraction_xd".into(),
+            arg_type: ArgumentType::Number,
+            description: "Distillate product mole fraction (0.0 to 1.0)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(0.95)),
+            validation_rules: vec![ValidationRule::Min(0.01), ValidationRule::Max(0.999)],
+        })
+        .with_argument(CommandArgument {
+            name: "bottoms_mole_fraction_xb".into(),
+            arg_type: ArgumentType::Number,
+            description: "Bottoms product mole fraction (0.0 to 1.0)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(0.05)),
+            validation_rules: vec![ValidationRule::Min(0.001), ValidationRule::Max(0.99)],
+        })
+        .with_argument(CommandArgument {
+            name: "relative_volatility_alpha".into(),
+            arg_type: ArgumentType::Number,
+            description: "Relative volatility alpha (alpha = K_light / K_heavy)".into(),
+            required: true,
+            default_value: Some(serde_json::json!(2.45)),
+            validation_rules: vec![ValidationRule::Min(1.05)],
+        }),
+    )?;
+
+    // --- 31. PCB Trace Ampacity & Thermal Vias (IPC-2152) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.ecad.pcb_thermal",
+            "PCB Trace Current Ampacity & Thermal Via Arrays (IPC-2152)",
+            "Calculates allowable continuous current for temperature rise, copper trace Joule heating, and thermal via conduction matrix.",
+            CommandCategory::Electronics,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "trace_width_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Trace width in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(2.50)),
+            validation_rules: vec![ValidationRule::Min(0.1)],
+        })
+        .with_argument(CommandArgument {
+            name: "trace_length_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Trace length in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(50.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "current_a".into(),
+            arg_type: ArgumentType::Number,
+            description: "Continuous current in Amperes".into(),
+            required: true,
+            default_value: Some(serde_json::json!(5.5)),
+            validation_rules: vec![ValidationRule::Min(0.01)],
+        })
+        .with_argument(CommandArgument {
+            name: "allowable_temp_rise_c".into(),
+            arg_type: ArgumentType::Number,
+            description: "Allowable temperature rise in °C".into(),
+            required: false,
+            default_value: Some(serde_json::json!(20.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        }),
+    )?;
+
+    // --- 32. Structural Connections (Eurocode 3 / AISC 360) ---
+    registry.register(
+        CommandSchema::new(
+            "sim.structural.connections",
+            "Structural Steel Bolted & Welded Connections (EC3 / AISC 360)",
+            "Calculates bolt shear resistance, plate bearing, bolt tension, combined interaction, and fillet weld directional throat stresses.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "applied_shear_force_kn".into(),
+            arg_type: ArgumentType::Number,
+            description: "Design applied shear force V_Ed in kN".into(),
+            required: true,
+            default_value: Some(serde_json::json!(180.0)),
+            validation_rules: vec![ValidationRule::Min(0.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "applied_tension_force_kn".into(),
+            arg_type: ArgumentType::Number,
+            description: "Design applied tension force N_Ed in kN".into(),
+            required: false,
+            default_value: Some(serde_json::json!(80.0)),
+            validation_rules: vec![ValidationRule::Min(0.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "weld_throat_thickness_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Fillet weld throat thickness a in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(6.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "weld_length_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Total fillet weld effective length in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(220.0)),
+            validation_rules: vec![ValidationRule::Min(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "applied_weld_force_kn".into(),
+            arg_type: ArgumentType::Number,
+            description: "Design applied force on fillet weld in kN".into(),
+            required: true,
+            default_value: Some(serde_json::json!(150.0)),
+            validation_rules: vec![ValidationRule::Min(0.0)],
+        }),
+    )?;
+
     Ok(())
 }

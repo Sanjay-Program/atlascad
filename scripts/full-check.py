@@ -1128,6 +1128,71 @@ def simulation_section(studio: Studio) -> None:
     fr_data = frac.json()
     check(abs(fr_data.get("initial_stress_intensity_k1_mpa_m05", 0.0) - 13.9) < 1.0, "K_I ~ 13.9 MPa*m^0.5")
     check(fr_data.get("is_safe_against_fast_fracture") is True, "safe against brittle fast fracture")
+
+    # 20. Lateral Rotor Dynamics & API 617 Critical Speeds
+    rotor = studio.post("/api/sim/rotordynamics/api617", {
+        "operating_speed_rpm": 12000.0,
+        "shaft_span_m": 1.20,
+        "shaft_diameter_m": 0.080,
+        "disc_mass_kg": 45.0,
+        "unbalance_g_mm": 15.0
+    })
+    check(rotor.status == 200, f"rotordynamics returns 200 (got {rotor.status})")
+    rot_data = rotor.json()
+    check(rot_data.get("critical_speed_first_rpm", 0.0) > 2000.0, "flexible 1st critical speed calculated")
+    check(rot_data.get("api617_margin_compliant") is True, "API 617 separation margin compliant")
+
+    # 21. Welding Metallurgy & Cooling Rates (AWS D1.1 / ISO 15614)
+    weld = studio.post("/api/cam/welding/metallurgy", {
+        "arc_voltage_v": 28.0,
+        "welding_current_a": 240.0,
+        "travel_speed_mm_s": 4.5,
+        "plate_thickness_mm": 25.0,
+        "preheat_temp_c": 20.0
+    })
+    check(weld.status == 200, f"welding returns 200 (got {weld.status})")
+    wld_data = weld.json()
+    check(wld_data.get("net_heat_input_kj_mm", 0.0) > 1.0, "net heat input > 1.0 kJ/mm")
+    check(wld_data.get("haz_hardness_acceptable") is True, "HAZ peak hardness acceptable")
+
+    # 22. Binary Distillation Column Design (McCabe-Thiele)
+    dist = studio.post("/api/sim/chemical/distillation", {
+        "feed_rate_kmol_hr": 100.0,
+        "feed_mole_fraction_zf": 0.45,
+        "distillate_mole_fraction_xd": 0.95,
+        "bottoms_mole_fraction_xb": 0.05,
+        "relative_volatility_alpha": 2.45
+    })
+    check(dist.status == 200, f"distillation returns 200 (got {dist.status})")
+    dst_data = dist.json()
+    check(dst_data.get("theoretical_stages_count", 0) >= 10, "McCabe-Thiele theoretical stages calculated")
+    check(dst_data.get("operating_reflux_ratio", 0.0) > dst_data.get("minimum_reflux_ratio_rmin", 0.0), "operating reflux > R_min")
+
+    # 23. PCB Trace Current Carrying Ampacity & Thermal Vias (IPC-2152)
+    pcb = studio.post("/api/sim/ecad/pcb_thermal", {
+        "trace_width_mm": 2.50,
+        "trace_length_mm": 50.0,
+        "current_a": 5.5,
+        "allowable_temp_rise_c": 20.0,
+        "component_heat_power_w": 3.5
+    })
+    check(pcb.status == 200, f"pcb thermal returns 200 (got {pcb.status})")
+    pcb_data = pcb.json()
+    check(pcb_data.get("allowable_current_ipc2152_a", 0.0) > 6.0, "IPC-2152 allowable current > 6.0 A")
+    check(pcb_data.get("thermal_limits_satisfied") is True, "PCB thermal limits satisfied")
+
+    # 24. Structural Steel Bolted & Welded Connections (Eurocode 3 / AISC 360)
+    conn = studio.post("/api/sim/structural/connections", {
+        "applied_shear_force_kn": 180.0,
+        "applied_tension_force_kn": 80.0,
+        "weld_throat_thickness_mm": 6.0,
+        "weld_length_mm": 220.0,
+        "applied_weld_force_kn": 150.0
+    })
+    check(conn.status == 200, f"structural connection returns 200 (got {conn.status})")
+    cn_data = conn.json()
+    check(cn_data.get("total_connection_shear_capacity_kn", 0.0) > 350.0, "bolted connection shear capacity verified")
+    check(cn_data.get("bolted_joint_safe") is True and cn_data.get("welded_joint_safe") is True, "connection code compliant")
     report("simulation")
 
 

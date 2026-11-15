@@ -1840,6 +1840,108 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 18.7 Enterprise MCP Tool Calling: 5 New Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # ==============================================================================
+        # DEMO 19: ADVANCED ROTOR, METALLURGY, CHEMICAL, ECAD & STRUCTURAL WORKBENCHES
+        # ==============================================================================
+        print("\n[19/19] ROTORDYNAMICS, WELDING METALLURGY, DISTILLATION, PCB THERMAL & CONNECTIONS")
+
+        # 19.1 Lateral Rotor Dynamics & API 617 Critical Speeds
+        rotor_res = http_request(port, "POST", "/api/sim/rotordynamics/api617", body={
+            "operating_speed_rpm": 12000.0,
+            "shaft_span_m": 1.20,
+            "shaft_diameter_m": 0.080,
+            "disc_mass_kg": 45.0,
+            "unbalance_g_mm": 15.0
+        })
+        check(rotor_res.get("critical_speed_first_rpm", 0.0) > 2000.0, "Flexible 1st critical speed calculated")
+        check(rotor_res.get("api617_margin_compliant") is True, "API 617 separation margin compliant")
+        check(rotor_res.get("vibration_compliant") is True, "Unbalance response within API 617 limit")
+        print(f"  ✓ 19.1 Rotor Dynamics (API 617): 1st N_cr = {rotor_res['critical_speed_first_rpm']:.0f} RPM, Operating SM = {rotor_res['actual_margin_pct']:.1f}% (Req {rotor_res['api617_required_margin_pct']:.0f}%), Vib = {rotor_res['unbalance_peak_displacement_um_pk_pk']:.2f} µm pk-pk")
+
+        # 19.2 Welding Metallurgy & Cooling Rates (AWS D1.1 / ISO 15614)
+        weld_res = http_request(port, "POST", "/api/cam/welding/metallurgy", body={
+            "arc_voltage_v": 28.0,
+            "welding_current_a": 240.0,
+            "travel_speed_mm_s": 4.5,
+            "plate_thickness_mm": 25.0,
+            "preheat_temp_c": 20.0
+        })
+        check(weld_res.get("net_heat_input_kj_mm", 0.0) > 1.0, "Net heat input > 1.0 kJ/mm")
+        check(weld_res.get("cooling_time_t8_5_s", 0.0) > 2.0, "Cooling time t8/5 calculated")
+        check(weld_res.get("haz_hardness_acceptable") is True, "HAZ peak hardness acceptable")
+        print(f"  ✓ 19.2 Welding Metallurgy: E_net = {weld_res['net_heat_input_kj_mm']:.2f} kJ/mm, t8/5 = {weld_res['cooling_time_t8_5_s']:.1f}s ({weld_res['heat_conduction_regime']}), CE = {weld_res['carbon_equivalent_iiw']:.2f}, HAZ Peak = {weld_res['max_haz_hardness_hv']:.0f} HV")
+
+        # 19.3 Binary Distillation Column Design (McCabe-Thiele)
+        dist_res = http_request(port, "POST", "/api/sim/chemical/distillation", body={
+            "feed_rate_kmol_hr": 100.0,
+            "feed_mole_fraction_zf": 0.45,
+            "distillate_mole_fraction_xd": 0.95,
+            "bottoms_mole_fraction_xb": 0.05,
+            "relative_volatility_alpha": 2.45
+        })
+        check(dist_res.get("fenske_minimum_stages", 0.0) > 5.5, "Fenske minimum stages calculated")
+        check(dist_res.get("theoretical_stages_count", 0) >= 10, "Theoretical stage count calculated")
+        check(dist_res.get("condenser_duty_kw", 0.0) > 500.0, "Condenser heat duty calculated")
+        print(f"  ✓ 19.3 Binary Distillation: N_theor = {dist_res['theoretical_stages_count']} stages (Feed: Stage {dist_res['optimal_feed_stage']}), R = {dist_res['operating_reflux_ratio']:.2f} (R_min {dist_res['minimum_reflux_ratio_rmin']:.2f}), Q_c = {dist_res['condenser_duty_kw']:.1f} kW")
+
+        # 19.4 PCB Trace Current Carrying Ampacity & Thermal Vias (IPC-2152)
+        pcb_res = http_request(port, "POST", "/api/sim/ecad/pcb_thermal", body={
+            "trace_width_mm": 2.50,
+            "trace_length_mm": 50.0,
+            "current_a": 5.5,
+            "allowable_temp_rise_c": 20.0,
+            "component_heat_power_w": 3.5
+        })
+        check(pcb_res.get("allowable_current_ipc2152_a", 0.0) > 6.0, "IPC-2152 allowable current evaluated")
+        check(pcb_res.get("current_margin_factor", 0.0) > 1.0, "Current margin factor verified")
+        check(pcb_res.get("thermal_limits_satisfied") is True, "FR-4 temperature limits satisfied")
+        print(f"  ✓ 19.4 PCB Trace Ampacity (IPC-2152): I_allow = {pcb_res['allowable_current_ipc2152_a']:.2f} A (Margin {pcb_res['current_margin_factor']:.2f}x), R_trace = {pcb_res['trace_resistance_mohm']:.1f} mΩ, Via Array R_th = {pcb_res['via_array_thermal_resistance_k_w']:.2f} K/W (T_peak = {pcb_res['peak_component_temp_c']:.1f} °C)")
+
+        # 19.5 Structural Steel Bolted & Welded Connections (Eurocode 3 / AISC 360)
+        conn_res = http_request(port, "POST", "/api/sim/structural/connections", body={
+            "applied_shear_force_kn": 180.0,
+            "applied_tension_force_kn": 80.0,
+            "weld_throat_thickness_mm": 6.0,
+            "weld_length_mm": 220.0,
+            "applied_weld_force_kn": 150.0
+        })
+        check(conn_res.get("total_connection_shear_capacity_kn", 0.0) > 350.0, "Connection shear capacity verified")
+        check(conn_res.get("bolt_interaction_utilization", 1.0) < 1.0, "Bolt shear-tension interaction compliant")
+        check(conn_res.get("weld_utilization", 1.0) < 1.0, "Fillet weld von Mises stress compliant")
+        print(f"  ✓ 19.5 Structural Connections (EC3 / AISC): 4x M20 8.8 Shear Cap = {conn_res['total_connection_shear_capacity_kn']:.1f} kN, Bolt Interaction = {conn_res['bolt_interaction_utilization']:.2f}, Fillet Weld σ_w = {conn_res['weld_equivalent_stress_mpa']:.1f} MPa (Util {conn_res['weld_utilization']:.2f})")
+
+        # 19.6 Universal Commands Execution Verification (5 Advanced Domains)
+        for cmd_id in [
+            "sim.rotordynamics.api617",
+            "cam.welding.metallurgy",
+            "sim.chemical.distillation",
+            "sim.ecad.pcb_thermal",
+            "sim.structural.connections",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 19.6 Universal Commands: All 5 New Engineering Commands verified via typed schema engine")
+
+        # 19.7 Enterprise MCP Tool Calling (5 Advanced Domains)
+        for mcp_tool_name in [
+            "atlas_sim_rotordynamics",
+            "atlas_cam_welding_metallurgy",
+            "atlas_sim_chemical_distillation",
+            "atlas_sim_pcb_thermal",
+            "atlas_sim_structural_connections",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 500,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 19.7 Enterprise MCP Tool Calling: 5 New Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

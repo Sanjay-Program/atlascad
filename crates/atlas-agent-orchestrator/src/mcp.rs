@@ -745,6 +745,78 @@ impl McpServer {
                     "required": ["max_stress_mpa", "initial_crack_depth_a0_mm", "plate_width_w_mm"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_rotordynamics".into(),
+                description: "API 617 lateral rotor dynamics, flexible-bearing critical speeds, Campbell gyroscopic split, and unbalance response".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "operating_speed_rpm": { "type": "number", "default": 12000.0 },
+                        "shaft_span_m": { "type": "number", "default": 1.20 },
+                        "shaft_diameter_m": { "type": "number", "default": 0.080 },
+                        "disc_mass_kg": { "type": "number", "default": 45.0 }
+                    },
+                    "required": ["operating_speed_rpm", "shaft_span_m", "shaft_diameter_m", "disc_mass_kg"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_cam_welding_metallurgy".into(),
+                description: "AWS D1.1 / ISO 15614 arc welding heat input, 2D/3D Rosenthal t8/5 cooling rates, carbon equivalents, and HAZ hardness".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "arc_voltage_v": { "type": "number", "default": 28.0 },
+                        "welding_current_a": { "type": "number", "default": 240.0 },
+                        "travel_speed_mm_s": { "type": "number", "default": 4.5 },
+                        "plate_thickness_mm": { "type": "number", "default": 25.0 }
+                    },
+                    "required": ["arc_voltage_v", "welding_current_a", "travel_speed_mm_s", "plate_thickness_mm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_chemical_distillation".into(),
+                description: "Binary distillation column McCabe-Thiele design, Fenske minimum stages, Underwood R_min, and reboiler/condenser duties".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "feed_rate_kmol_hr": { "type": "number", "default": 100.0 },
+                        "feed_mole_fraction_zf": { "type": "number", "default": 0.45 },
+                        "distillate_mole_fraction_xd": { "type": "number", "default": 0.95 },
+                        "bottoms_mole_fraction_xb": { "type": "number", "default": 0.05 },
+                        "relative_volatility_alpha": { "type": "number", "default": 2.45 }
+                    },
+                    "required": ["feed_rate_kmol_hr", "feed_mole_fraction_zf", "distillate_mole_fraction_xd", "bottoms_mole_fraction_xb"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_pcb_thermal".into(),
+                description: "IPC-2152 PCB copper trace current carrying ampacity, allowable temperature rise, Joule heating, and thermal via arrays".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "trace_width_mm": { "type": "number", "default": 2.50 },
+                        "trace_length_mm": { "type": "number", "default": 50.0 },
+                        "current_a": { "type": "number", "default": 5.5 },
+                        "allowable_temp_rise_c": { "type": "number", "default": 20.0 }
+                    },
+                    "required": ["trace_width_mm", "trace_length_mm", "current_a"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_structural_connections".into(),
+                description: "Eurocode 3 / AISC 360 structural steel bolted joint shear/bearing/tension and fillet weld directional throat stresses".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "applied_shear_force_kn": { "type": "number", "default": 180.0 },
+                        "applied_tension_force_kn": { "type": "number", "default": 80.0 },
+                        "weld_throat_thickness_mm": { "type": "number", "default": 6.0 },
+                        "weld_length_mm": { "type": "number", "default": 220.0 },
+                        "applied_weld_force_kn": { "type": "number", "default": 150.0 }
+                    },
+                    "required": ["applied_shear_force_kn", "weld_throat_thickness_mm", "weld_length_mm", "applied_weld_force_kn"]
+                }),
+            },
         ]
     }
 
