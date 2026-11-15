@@ -3140,5 +3140,223 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.piping.flexibility",
+            "Piping Flexibility & Thermal Expansion Stress Analysis (ASME B31.3 / B31.1)",
+            "Evaluates thermal displacement stress range, expansion U-loop sizing, flexibility factor, and anchor reaction loads for high-temperature process piping systems.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "nominal_pipe_size_inches".into(),
+            arg_type: ArgumentType::Number,
+            description: "Nominal pipe size in inches (e.g. 8.0)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(8.0)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(96.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "total_line_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Total anchor-to-anchor run length in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(60.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(5000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "design_temperature_c".into(),
+            arg_type: ArgumentType::Number,
+            description: "Design operating temperature in degrees Celsius".into(),
+            required: true,
+            default_value: Some(serde_json::json!(260.0)),
+            validation_rules: vec![ValidationRule::Min(-273.15), ValidationRule::Max(1200.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "expansion_loop_height_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Height of expansion U-loop in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(7.5)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(100.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.automotive.quarter_car",
+            "Automotive Suspension Kinematics & Quarter-Car Ride Dynamics (ISO 2631 / Milliken)",
+            "Evaluates two-degree-of-freedom quarter-car ride comfort, sprung and unsprung natural frequencies, RMS chassis acceleration, suspension stroke, and road roughness ISO PSD response.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "sprung_mass_kg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Sprung quarter-car chassis mass in kg".into(),
+            required: true,
+            default_value: Some(serde_json::json!(400.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(5000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "unsprung_mass_kg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Unsprung wheel and hub assembly mass in kg".into(),
+            required: true,
+            default_value: Some(serde_json::json!(45.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "suspension_stiffness_n_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Suspension spring stiffness in N/m".into(),
+            required: true,
+            default_value: Some(serde_json::json!(30000.0)),
+            validation_rules: vec![ValidationRule::Min(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "suspension_damping_n_s_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Suspension damper damping coefficient in N·s/m".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1800.0)),
+            validation_rules: vec![ValidationRule::Min(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "vehicle_speed_km_h".into(),
+            arg_type: ArgumentType::Number,
+            description: "Vehicle forward speed in km/h".into(),
+            required: false,
+            default_value: Some(serde_json::json!(100.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(500.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.electrical.power_transformer",
+            "Power Transformer Electromagnetics & Thermal Rating (IEC 60076 / IEEE C57)",
+            "Evaluates transformer magnetic flux density, core and copper losses, percentage impedance, voltage regulation at rated power factor, winding hot-spot temperature, and relative rate of thermal aging.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "rated_power_mva".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rated apparent power in MVA".into(),
+            required: true,
+            default_value: Some(serde_json::json!(40.0)),
+            validation_rules: vec![ValidationRule::Min(0.01), ValidationRule::Max(2000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "primary_voltage_kv".into(),
+            arg_type: ArgumentType::Number,
+            description: "Primary line-to-line voltage in kV".into(),
+            required: true,
+            default_value: Some(serde_json::json!(132.0)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(1500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "secondary_voltage_kv".into(),
+            arg_type: ArgumentType::Number,
+            description: "Secondary line-to-line voltage in kV".into(),
+            required: true,
+            default_value: Some(serde_json::json!(33.0)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(1500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "percent_impedance".into(),
+            arg_type: ArgumentType::Number,
+            description: "Percentage short-circuit impedance (%Z)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(10.5)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(50.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.thermal.refrigeration_cycle",
+            "Vapor Compression Refrigeration Cycle & Heat Pump COP (ASHRAE / AHRI 550/590)",
+            "Evaluates thermodynamic vapor-compression cycle states, evaporating/condensing pressures, COP in cooling and heating, compressor shaft power, and discharge temperature.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "refrigerant".into(),
+            arg_type: ArgumentType::String,
+            description: "Refrigerant fluid type (R410A, R134a, R32, R290)".into(),
+            required: false,
+            default_value: Some(serde_json::json!("R410A")),
+            validation_rules: vec![],
+        })
+        .with_argument(CommandArgument {
+            name: "design_cooling_capacity_kw".into(),
+            arg_type: ArgumentType::Number,
+            description: "Evaporator cooling capacity in kW".into(),
+            required: true,
+            default_value: Some(serde_json::json!(100.0)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(100000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "evaporating_temperature_c".into(),
+            arg_type: ArgumentType::Number,
+            description: "Evaporating saturation temperature in °C".into(),
+            required: false,
+            default_value: Some(serde_json::json!(5.0)),
+            validation_rules: vec![ValidationRule::Min(-100.0), ValidationRule::Max(30.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "condensing_temperature_c".into(),
+            arg_type: ArgumentType::Number,
+            description: "Condensing saturation temperature in °C".into(),
+            required: false,
+            default_value: Some(serde_json::json!(45.0)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(120.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.marine.ship_stability",
+            "Ship Hydrostatic Intact Stability & GZ Righting Arm (IMO Resolution MSC.267(85))",
+            "Evaluates vessel hydrostatic displacement, transverse metacentric height GM0, righting arm GZ curve up to 60 deg, and IMO intact stability criteria compliance.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "length_bp_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Ship length between perpendiculars in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(120.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "beam_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Molded breadth/beam in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(20.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "draft_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Design waterline draft in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(7.0)),
+            validation_rules: vec![ValidationRule::Min(0.2), ValidationRule::Max(35.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "vertical_center_of_gravity_kg_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Vertical center of gravity above keel (KG) in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(7.2)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(50.0)],
+        }),
+    )?;
+
     Ok(())
 }

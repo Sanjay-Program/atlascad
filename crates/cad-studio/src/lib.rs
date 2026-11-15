@@ -5391,6 +5391,133 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_piping_flexibility(
+        &mut self,
+        req: &SimPipingFlexibilityRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::piping_flexibility::PipingFlexibilityProblem {
+            problem_id: "piping_flexibility_sim".to_string(),
+            nominal_outside_diameter_mm: req.nominal_outside_diameter_mm.unwrap_or(219.1),
+            wall_thickness_mm: req.wall_thickness_mm.unwrap_or(8.18),
+            anchor_distance_m: req.anchor_distance_m.unwrap_or(60.0),
+            design_temperature_c: req.design_temperature_c.unwrap_or(260.0),
+            ambient_temperature_c: req.ambient_temperature_c.unwrap_or(20.0),
+            thermal_expansion_coeff_per_c: req.thermal_expansion_coeff_per_c.unwrap_or(12.8e-6),
+            elastic_modulus_gpa: req.elastic_modulus_gpa.unwrap_or(190.0),
+            cold_allowable_stress_mpa: req.cold_allowable_stress_mpa.unwrap_or(137.9),
+            hot_allowable_stress_mpa: req.hot_allowable_stress_mpa.unwrap_or(125.0),
+            sustained_stress_sl_mpa: req.sustained_stress_sl_mpa.unwrap_or(65.0),
+            total_thermal_cycles: req.total_thermal_cycles.unwrap_or(5000),
+            loop_height_m: req.loop_height_m.unwrap_or(7.5),
+            loop_width_m: req.loop_width_m.unwrap_or(5.0),
+            bend_radius_mm: req.bend_radius_mm.or(Some(304.8)),
+        };
+        let res = atlas_simulation_core::piping_flexibility::solve_piping_flexibility(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_automotive_quarter_car(
+        &mut self,
+        req: &SimQuarterCarRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let roughness = match req.road_class.as_deref().unwrap_or("ClassBGood") {
+            "ClassAVeryGood" => atlas_simulation_core::quarter_car::RoadRoughnessClass::ClassAVeryGood,
+            "ClassCAverage" => atlas_simulation_core::quarter_car::RoadRoughnessClass::ClassCAverage,
+            "ClassDPoor" => atlas_simulation_core::quarter_car::RoadRoughnessClass::ClassDPoor,
+            _ => atlas_simulation_core::quarter_car::RoadRoughnessClass::ClassBGood,
+        };
+        let prob = atlas_simulation_core::quarter_car::QuarterCarProblem {
+            problem_id: "quarter_car_sim".to_string(),
+            sprung_mass_kg: req.sprung_mass_kg.unwrap_or(320.0),
+            unsprung_mass_kg: req.unsprung_mass_kg.unwrap_or(45.0),
+            suspension_stiffness_n_m: req.suspension_stiffness_n_m.unwrap_or(28000.0),
+            suspension_damping_n_s_m: req.suspension_damping_n_s_m.unwrap_or(1650.0),
+            tire_stiffness_n_m: req.tire_stiffness_n_m.unwrap_or(210000.0),
+            vehicle_speed_km_h: req.vehicle_speed_km_h.unwrap_or(100.0),
+            road_class: roughness,
+            max_allowable_stroke_mm: req.max_allowable_stroke_mm.unwrap_or(75.0),
+        };
+        let res = atlas_simulation_core::quarter_car::solve_quarter_car(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_electrical_power_transformer(
+        &mut self,
+        req: &SimPowerTransformerRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let cooling = match req.cooling_class.as_deref().unwrap_or("ONAN") {
+            "ONAF" => atlas_simulation_core::power_transformer::TransformerCoolingClass::ONAF,
+            "OFAF" => atlas_simulation_core::power_transformer::TransformerCoolingClass::OFAF,
+            _ => atlas_simulation_core::power_transformer::TransformerCoolingClass::ONAN,
+        };
+        let prob = atlas_simulation_core::power_transformer::PowerTransformerProblem {
+            problem_id: "power_transformer_sim".to_string(),
+            rated_apparent_power_mva: req.rated_apparent_power_mva.unwrap_or(40.0),
+            primary_voltage_kv: req.primary_voltage_kv.unwrap_or(110.0),
+            secondary_voltage_kv: req.secondary_voltage_kv.unwrap_or(33.0),
+            percent_impedance_z: req.percent_impedance_z.unwrap_or(10.5),
+            no_load_loss_kw: req.no_load_loss_kw.unwrap_or(22.0),
+            load_loss_kw: req.load_loss_kw.unwrap_or(165.0),
+            operating_load_factor: req.operating_load_factor.unwrap_or(1.0),
+            operating_power_factor: req.operating_power_factor.unwrap_or(0.85),
+            ambient_temperature_c: req.ambient_temperature_c.unwrap_or(30.0),
+            rated_top_oil_rise_c: req.rated_top_oil_rise_c.unwrap_or(55.0),
+            rated_winding_rise_c: req.rated_winding_rise_c.unwrap_or(65.0),
+            hot_spot_factor_h: req.hot_spot_factor_h.unwrap_or(1.15),
+            cooling_class: cooling,
+        };
+        let res = atlas_simulation_core::power_transformer::solve_power_transformer(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_thermal_refrigeration_cycle(
+        &mut self,
+        req: &SimRefrigerationCycleRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let ref_type = match req.refrigerant.as_deref().unwrap_or("R410A") {
+            "R134a" => atlas_simulation_core::refrigeration_cycle::RefrigerantType::R134a,
+            "R32" => atlas_simulation_core::refrigeration_cycle::RefrigerantType::R32,
+            "R290" => atlas_simulation_core::refrigeration_cycle::RefrigerantType::R290,
+            _ => atlas_simulation_core::refrigeration_cycle::RefrigerantType::R410A,
+        };
+        let prob = atlas_simulation_core::refrigeration_cycle::RefrigerationCycleProblem {
+            problem_id: "refrigeration_cycle_sim".to_string(),
+            refrigerant: ref_type,
+            design_cooling_capacity_kw: req.design_cooling_capacity_kw.unwrap_or(100.0),
+            evaporating_temperature_c: req.evaporating_temperature_c.unwrap_or(5.0),
+            condensing_temperature_c: req.condensing_temperature_c.unwrap_or(45.0),
+            superheat_k: req.superheat_k.unwrap_or(5.0),
+            subcooling_k: req.subcooling_k.unwrap_or(5.0),
+            compressor_isentropic_efficiency: req.compressor_isentropic_efficiency.unwrap_or(0.78),
+            compressor_mechanical_efficiency: req.compressor_mechanical_efficiency.unwrap_or(0.92),
+        };
+        let res = atlas_simulation_core::refrigeration_cycle::solve_refrigeration_cycle(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_marine_ship_stability(
+        &mut self,
+        req: &SimShipStabilityRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::ship_stability::ShipStabilityProblem {
+            problem_id: "ship_stability_sim".to_string(),
+            length_between_perpendiculars_m: req.length_between_perpendiculars_m.unwrap_or(140.0),
+            molded_beam_m: req.molded_beam_m.unwrap_or(22.0),
+            design_draft_m: req.design_draft_m.unwrap_or(7.5),
+            molded_depth_m: req.molded_depth_m.unwrap_or(11.5),
+            block_coefficient_cb: req.block_coefficient_cb.unwrap_or(0.68),
+            waterplane_coefficient_cwp: req.waterplane_coefficient_cwp.unwrap_or(0.78),
+            vertical_center_of_gravity_kg_m: req.vertical_center_of_gravity_kg_m.unwrap_or(7.20),
+        };
+        let res = atlas_simulation_core::ship_stability::solve_ship_stability(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -7347,6 +7474,75 @@ namespace AtlasCAD.Unity
                     conductor_diameter_mm: d,
                     rated_tensile_strength_kn: rts,
                     initial_horizontal_tension_kn: h0,
+                    ..Default::default()
+                })?
+            }
+            "sim.piping.flexibility" => {
+                let od = req.arguments.get("nominal_outside_diameter_mm").or_else(|| req.arguments.get("pipe_outer_diameter_mm")).and_then(|v| v.as_f64());
+                let l = req.arguments.get("anchor_distance_m").or_else(|| req.arguments.get("total_line_length_m")).and_then(|v| v.as_f64());
+                let t = req.arguments.get("design_temperature_c").and_then(|v| v.as_f64());
+                let h = req.arguments.get("loop_height_m").or_else(|| req.arguments.get("expansion_loop_height_m")).and_then(|v| v.as_f64());
+                self.sim_piping_flexibility(&SimPipingFlexibilityRequest {
+                    nominal_outside_diameter_mm: od,
+                    anchor_distance_m: l,
+                    design_temperature_c: t,
+                    loop_height_m: h,
+                    ..Default::default()
+                })?
+            }
+            "sim.automotive.quarter_car" => {
+                let ms = req.arguments.get("sprung_mass_kg").and_then(|v| v.as_f64());
+                let mu = req.arguments.get("unsprung_mass_kg").and_then(|v| v.as_f64());
+                let ks = req.arguments.get("suspension_stiffness_n_m").and_then(|v| v.as_f64());
+                let cs = req.arguments.get("suspension_damping_n_s_m").and_then(|v| v.as_f64());
+                let v = req.arguments.get("vehicle_speed_km_h").and_then(|v| v.as_f64());
+                let road = req.arguments.get("road_class").or_else(|| req.arguments.get("road_roughness_class")).and_then(|v| v.as_str()).map(|s| s.to_string());
+                self.sim_automotive_quarter_car(&SimQuarterCarRequest {
+                    sprung_mass_kg: ms,
+                    unsprung_mass_kg: mu,
+                    suspension_stiffness_n_m: ks,
+                    suspension_damping_n_s_m: cs,
+                    vehicle_speed_km_h: v,
+                    road_class: road,
+                    ..Default::default()
+                })?
+            }
+            "sim.electrical.power_transformer" => {
+                let s = req.arguments.get("rated_apparent_power_mva").or_else(|| req.arguments.get("rated_power_mva")).and_then(|v| v.as_f64());
+                let v1 = req.arguments.get("primary_voltage_kv").and_then(|v| v.as_f64());
+                let v2 = req.arguments.get("secondary_voltage_kv").and_then(|v| v.as_f64());
+                let z = req.arguments.get("percent_impedance_z").or_else(|| req.arguments.get("percent_impedance")).and_then(|v| v.as_f64());
+                self.sim_electrical_power_transformer(&SimPowerTransformerRequest {
+                    rated_apparent_power_mva: s,
+                    primary_voltage_kv: v1,
+                    secondary_voltage_kv: v2,
+                    percent_impedance_z: z,
+                    ..Default::default()
+                })?
+            }
+            "sim.thermal.refrigeration_cycle" => {
+                let ref_str = req.arguments.get("refrigerant").and_then(|v| v.as_str()).map(|s| s.to_string());
+                let q = req.arguments.get("design_cooling_capacity_kw").and_then(|v| v.as_f64());
+                let t_e = req.arguments.get("evaporating_temperature_c").and_then(|v| v.as_f64());
+                let t_c = req.arguments.get("condensing_temperature_c").and_then(|v| v.as_f64());
+                self.sim_thermal_refrigeration_cycle(&SimRefrigerationCycleRequest {
+                    refrigerant: ref_str,
+                    design_cooling_capacity_kw: q,
+                    evaporating_temperature_c: t_e,
+                    condensing_temperature_c: t_c,
+                    ..Default::default()
+                })?
+            }
+            "sim.marine.ship_stability" => {
+                let lbp = req.arguments.get("length_between_perpendiculars_m").or_else(|| req.arguments.get("length_bp_m")).and_then(|v| v.as_f64());
+                let b = req.arguments.get("molded_beam_m").or_else(|| req.arguments.get("beam_m")).and_then(|v| v.as_f64());
+                let t = req.arguments.get("design_draft_m").or_else(|| req.arguments.get("draft_m")).and_then(|v| v.as_f64());
+                let kg = req.arguments.get("vertical_center_of_gravity_kg_m").and_then(|v| v.as_f64());
+                self.sim_marine_ship_stability(&SimShipStabilityRequest {
+                    length_between_perpendiculars_m: lbp,
+                    molded_beam_m: b,
+                    design_draft_m: t,
+                    vertical_center_of_gravity_kg_m: kg,
                     ..Default::default()
                 })?
             }
@@ -9403,6 +9599,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/electrical/transmission_line" => {
             match parse_body_or_default::<SimTransmissionLineRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_electrical_transmission_line(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/piping/flexibility" => {
+            match parse_body_or_default::<SimPipingFlexibilityRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_piping_flexibility(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/automotive/quarter_car" => {
+            match parse_body_or_default::<SimQuarterCarRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_automotive_quarter_car(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/electrical/power_transformer" => {
+            match parse_body_or_default::<SimPowerTransformerRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_electrical_power_transformer(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/thermal/refrigeration_cycle" => {
+            match parse_body_or_default::<SimRefrigerationCycleRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_thermal_refrigeration_cycle(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/marine/ship_stability" => {
+            match parse_body_or_default::<SimShipStabilityRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_marine_ship_stability(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12701,4 +12942,124 @@ struct SimTransmissionLineRequest {
     pub crossarm_height_m: Option<f64>,
     #[serde(default)]
     pub min_ground_clearance_required_m: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimPipingFlexibilityRequest {
+    #[serde(default)]
+    pub nominal_outside_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub wall_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub anchor_distance_m: Option<f64>,
+    #[serde(default)]
+    pub design_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub ambient_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub thermal_expansion_coeff_per_c: Option<f64>,
+    #[serde(default)]
+    pub elastic_modulus_gpa: Option<f64>,
+    #[serde(default)]
+    pub cold_allowable_stress_mpa: Option<f64>,
+    #[serde(default)]
+    pub hot_allowable_stress_mpa: Option<f64>,
+    #[serde(default)]
+    pub sustained_stress_sl_mpa: Option<f64>,
+    #[serde(default)]
+    pub total_thermal_cycles: Option<usize>,
+    #[serde(default)]
+    pub loop_height_m: Option<f64>,
+    #[serde(default)]
+    pub loop_width_m: Option<f64>,
+    #[serde(default)]
+    pub bend_radius_mm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimQuarterCarRequest {
+    #[serde(default)]
+    pub sprung_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub unsprung_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub suspension_stiffness_n_m: Option<f64>,
+    #[serde(default)]
+    pub suspension_damping_n_s_m: Option<f64>,
+    #[serde(default)]
+    pub tire_stiffness_n_m: Option<f64>,
+    #[serde(default)]
+    pub vehicle_speed_km_h: Option<f64>,
+    #[serde(default)]
+    pub road_class: Option<String>,
+    #[serde(default)]
+    pub max_allowable_stroke_mm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimPowerTransformerRequest {
+    #[serde(default)]
+    pub rated_apparent_power_mva: Option<f64>,
+    #[serde(default)]
+    pub primary_voltage_kv: Option<f64>,
+    #[serde(default)]
+    pub secondary_voltage_kv: Option<f64>,
+    #[serde(default)]
+    pub percent_impedance_z: Option<f64>,
+    #[serde(default)]
+    pub no_load_loss_kw: Option<f64>,
+    #[serde(default)]
+    pub load_loss_kw: Option<f64>,
+    #[serde(default)]
+    pub operating_load_factor: Option<f64>,
+    #[serde(default)]
+    pub operating_power_factor: Option<f64>,
+    #[serde(default)]
+    pub ambient_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub rated_top_oil_rise_c: Option<f64>,
+    #[serde(default)]
+    pub rated_winding_rise_c: Option<f64>,
+    #[serde(default)]
+    pub hot_spot_factor_h: Option<f64>,
+    #[serde(default)]
+    pub cooling_class: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimRefrigerationCycleRequest {
+    #[serde(default)]
+    pub refrigerant: Option<String>,
+    #[serde(default)]
+    pub design_cooling_capacity_kw: Option<f64>,
+    #[serde(default)]
+    pub evaporating_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub condensing_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub superheat_k: Option<f64>,
+    #[serde(default)]
+    pub subcooling_k: Option<f64>,
+    #[serde(default)]
+    pub compressor_isentropic_efficiency: Option<f64>,
+    #[serde(default)]
+    pub compressor_mechanical_efficiency: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimShipStabilityRequest {
+    #[serde(default)]
+    pub length_between_perpendiculars_m: Option<f64>,
+    #[serde(default)]
+    pub molded_beam_m: Option<f64>,
+    #[serde(default)]
+    pub design_draft_m: Option<f64>,
+    #[serde(default)]
+    pub molded_depth_m: Option<f64>,
+    #[serde(default)]
+    pub block_coefficient_cb: Option<f64>,
+    #[serde(default)]
+    pub waterplane_coefficient_cwp: Option<f64>,
+    #[serde(default)]
+    pub vertical_center_of_gravity_kg_m: Option<f64>,
 }

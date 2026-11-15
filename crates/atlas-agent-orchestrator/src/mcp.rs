@@ -1174,6 +1174,91 @@ impl McpServer {
                     "required": ["span_length_m", "conductor_diameter_mm", "rated_tensile_strength_kn", "initial_horizontal_tension_kn"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_piping_flexibility".into(),
+                description: "ASME B31.3 / B31.1 process piping thermal expansion stress range, guided U-loop sizing, flexibility factor, and anchor reaction loads".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "nominal_pipe_size_inches": { "type": "number", "default": 8.0 },
+                        "pipe_outer_diameter_mm": { "type": "number", "default": 219.1 },
+                        "wall_thickness_mm": { "type": "number", "default": 8.18 },
+                        "total_line_length_m": { "type": "number", "default": 60.0 },
+                        "design_temperature_c": { "type": "number", "default": 260.0 },
+                        "ambient_temperature_c": { "type": "number", "default": 20.0 },
+                        "expansion_loop_height_m": { "type": "number", "default": 7.5 },
+                        "expansion_loop_width_m": { "type": "number", "default": 5.0 }
+                    },
+                    "required": ["total_line_length_m", "design_temperature_c"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_automotive_quarter_car".into(),
+                description: "ISO 2631 / Milliken quarter-car ride dynamics, 2-DOF frequencies, RMS vertical acceleration, suspension travel, and road roughness ISO PSD response".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "sprung_mass_kg": { "type": "number", "default": 400.0 },
+                        "unsprung_mass_kg": { "type": "number", "default": 45.0 },
+                        "suspension_stiffness_n_m": { "type": "number", "default": 30000.0 },
+                        "suspension_damping_n_s_m": { "type": "number", "default": 1800.0 },
+                        "tire_stiffness_n_m": { "type": "number", "default": 200000.0 },
+                        "vehicle_speed_km_h": { "type": "number", "default": 100.0 },
+                        "road_roughness_class": { "type": "string", "default": "ClassBGood" }
+                    },
+                    "required": ["sprung_mass_kg", "unsprung_mass_kg", "suspension_stiffness_n_m", "suspension_damping_n_s_m"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_electrical_power_transformer".into(),
+                description: "IEC 60076 / IEEE C57 power transformer electromagnetics, core and copper losses, percentage impedance, voltage regulation, hot-spot temperature, and aging rate".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "rated_power_mva": { "type": "number", "default": 40.0 },
+                        "primary_voltage_kv": { "type": "number", "default": 132.0 },
+                        "secondary_voltage_kv": { "type": "number", "default": 33.0 },
+                        "frequency_hz": { "type": "number", "default": 50.0 },
+                        "no_load_core_loss_kw": { "type": "number", "default": 25.0 },
+                        "full_load_copper_loss_kw": { "type": "number", "default": 160.0 },
+                        "percent_impedance": { "type": "number", "default": 10.5 }
+                    },
+                    "required": ["rated_power_mva", "primary_voltage_kv", "secondary_voltage_kv"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_thermal_refrigeration_cycle".into(),
+                description: "ASHRAE / AHRI vapor compression refrigeration and heat pump thermodynamic cycle, COP, mass flow rate, compressor power, and discharge temperature".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "refrigerant": { "type": "string", "default": "R410A" },
+                        "design_cooling_capacity_kw": { "type": "number", "default": 100.0 },
+                        "evaporating_temperature_c": { "type": "number", "default": 5.0 },
+                        "condensing_temperature_c": { "type": "number", "default": 45.0 },
+                        "superheat_k": { "type": "number", "default": 5.0 },
+                        "subcooling_k": { "type": "number", "default": 5.0 },
+                        "compressor_isentropic_efficiency": { "type": "number", "default": 0.78 }
+                    },
+                    "required": ["design_cooling_capacity_kw"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_marine_ship_stability".into(),
+                description: "IMO Resolution MSC.267(85) ship hydrostatic intact stability, displacement, metacentric height GM0, righting arm GZ curve, and dynamic stability criteria".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "length_bp_m": { "type": "number", "default": 120.0 },
+                        "beam_m": { "type": "number", "default": 20.0 },
+                        "draft_m": { "type": "number", "default": 7.0 },
+                        "depth_m": { "type": "number", "default": 11.5 },
+                        "block_coefficient": { "type": "number", "default": 0.68 },
+                        "vertical_center_of_gravity_kg_m": { "type": "number", "default": 7.2 }
+                    },
+                    "required": ["length_bp_m", "beam_m", "draft_m", "vertical_center_of_gravity_kg_m"]
+                }),
+            },
         ]
     }
 

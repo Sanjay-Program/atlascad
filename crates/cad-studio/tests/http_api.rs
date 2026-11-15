@@ -6139,5 +6139,132 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 120. Piping Flexibility & Thermal Expansion Stress Analysis (ASME B31.3 / B31.1)
+    let res_piping = post(
+        addr,
+        "/api/sim/piping/flexibility",
+        r#"{
+            "nominal_outside_diameter_mm": 219.1,
+            "anchor_distance_m": 60.0,
+            "design_temperature_c": 260.0,
+            "loop_height_m": 7.5,
+            "loop_width_m": 5.0
+        }"#,
+    )?;
+    assert_eq!(res_piping.status, 200);
+    let piping_json = json(&res_piping)?;
+    assert!(piping_json["thermal_growth_mm"].as_f64().unwrap() > 100.0);
+    assert!(piping_json["displacement_stress_se_mpa"].as_f64().unwrap() > 50.0);
+    assert!(piping_json["stress_ratio"].as_f64().unwrap() <= 1.0);
+    assert!(piping_json["is_safe"].as_bool().unwrap());
+
+    // 121. Automotive Suspension Kinematics & Quarter-Car Ride Dynamics (ISO 2631 / Milliken)
+    let res_qc = post(
+        addr,
+        "/api/sim/automotive/quarter_car",
+        r#"{
+            "sprung_mass_kg": 320.0,
+            "unsprung_mass_kg": 45.0,
+            "suspension_stiffness_n_m": 28000.0,
+            "suspension_damping_n_s_m": 1650.0,
+            "vehicle_speed_km_h": 100.0,
+            "road_class": "ClassBGood"
+        }"#,
+    )?;
+    assert_eq!(res_qc.status, 200);
+    let qc_json = json(&res_qc)?;
+    assert!(qc_json["body_bounce_frequency_hz"].as_f64().unwrap() > 1.0);
+    assert!(qc_json["wheel_hop_frequency_hz"].as_f64().unwrap() > 8.0);
+    assert!(qc_json["body_acceleration_rms_m_s2"].as_f64().unwrap() > 0.1);
+    assert!(qc_json["is_safe"].as_bool().unwrap());
+
+    // 122. Power Transformer Electromagnetics & Thermal Rating (IEC 60076 / IEEE C57)
+    let res_trans = post(
+        addr,
+        "/api/sim/electrical/power_transformer",
+        r#"{
+            "rated_apparent_power_mva": 40.0,
+            "primary_voltage_kv": 110.0,
+            "secondary_voltage_kv": 33.0,
+            "percent_impedance_z": 10.5,
+            "no_load_loss_kw": 22.0,
+            "load_loss_kw": 165.0
+        }"#,
+    )?;
+    assert_eq!(res_trans.status, 200);
+    let trans_json = json(&res_trans)?;
+    assert!(trans_json["operating_efficiency_pct"].as_f64().unwrap() > 99.0);
+    assert!(trans_json["hot_spot_temperature_c"].as_f64().unwrap() > 80.0);
+    assert!(trans_json["relative_insulation_aging_factor"].as_f64().unwrap() < 2.0);
+    assert!(trans_json["is_safe"].as_bool().unwrap());
+
+    // 123. Vapor Compression Refrigeration Cycle & Heat Pump COP (ASHRAE / AHRI 550/590)
+    let res_ref = post(
+        addr,
+        "/api/sim/thermal/refrigeration_cycle",
+        r#"{
+            "refrigerant": "R410A",
+            "design_cooling_capacity_kw": 100.0,
+            "evaporating_temperature_c": 5.0,
+            "condensing_temperature_c": 45.0
+        }"#,
+    )?;
+    assert_eq!(res_ref.status, 200);
+    let ref_json = json(&res_ref)?;
+    assert!(ref_json["coefficient_of_performance_cooling"].as_f64().unwrap() > 2.0);
+    assert!(ref_json["compressor_electrical_power_kw"].as_f64().unwrap() > 15.0);
+    assert!(ref_json["is_safe"].as_bool().unwrap());
+
+    // 124. Ship Hydrostatic Intact Stability & GZ Righting Arm (IMO Resolution MSC.267(85))
+    let res_ship = post(
+        addr,
+        "/api/sim/marine/ship_stability",
+        r#"{
+            "length_between_perpendiculars_m": 140.0,
+            "molded_beam_m": 22.0,
+            "design_draft_m": 7.5,
+            "vertical_center_of_gravity_kg_m": 7.20
+        }"#,
+    )?;
+    assert_eq!(res_ship.status, 200);
+    let ship_json = json(&res_ship)?;
+    assert!(ship_json["displacement_mass_tonnes"].as_f64().unwrap() > 15000.0);
+    assert!(ship_json["initial_metacentric_height_gm0_m"].as_f64().unwrap() > 1.0);
+    assert!(ship_json["max_gz_righting_arm_m"].as_f64().unwrap() > 0.5);
+    assert!(ship_json["is_safe"].as_bool().unwrap());
+
+    // 125. Universal Commands Execution Verification (Batch 10 Domains)
+    for cmd_id in [
+        "sim.piping.flexibility",
+        "sim.automotive.quarter_car",
+        "sim.electrical.power_transformer",
+        "sim.thermal.refrigeration_cycle",
+        "sim.marine.ship_stability",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 126. Enterprise MCP Tool Calling (Batch 10 Domains)
+    for tool_name in [
+        "atlas_sim_piping_flexibility",
+        "atlas_sim_automotive_quarter_car",
+        "atlas_sim_electrical_power_transformer",
+        "atlas_sim_thermal_refrigeration_cycle",
+        "atlas_sim_marine_ship_stability",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 163, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

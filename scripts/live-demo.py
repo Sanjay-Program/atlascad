@@ -2466,6 +2466,110 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 24.7 Enterprise MCP Tool Calling: 5 Batch-9 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # 25. BATCH 10 ADVANCED MULTI-DISCIPLINARY SIMULATION SOLVERS
+        print("\n--- 25. Batch 10 Advanced Engineering Solvers (Piping, Quarter-Car, Transformer, Refrigeration, Ship) ---")
+
+        # 25.1 Piping Flexibility & Thermal Expansion Stress Analysis (ASME B31.3 / B31.1)
+        pipe_res = http_request(port, "POST", "/api/sim/piping/flexibility", body={
+            "nominal_outside_diameter_mm": 219.1,
+            "anchor_distance_m": 60.0,
+            "design_temperature_c": 260.0,
+            "loop_height_m": 7.5,
+            "loop_width_m": 5.0
+        })
+        check(pipe_res.get("thermal_growth_mm", 0.0) > 100.0, "Pipe thermal growth > 100 mm")
+        check(pipe_res.get("displacement_stress_se_mpa", 0.0) > 50.0, "Displacement stress SE > 50 MPa")
+        check(pipe_res.get("stress_ratio", 99.0) <= 1.0, "Piping stress ratio <= 1.0 (ASME B31.3)")
+        check(pipe_res.get("is_safe", False) is True, "Piping flexibility safe")
+        print(f"  ✓ 25.1 Piping Flexibility (ASME B31.3): Growth = {pipe_res['thermal_growth_mm']:.1f} mm, SE = {pipe_res['displacement_stress_se_mpa']:.1f} MPa (SA = {pipe_res['allowable_stress_range_sa_mpa']:.1f} MPa, f = {pipe_res['cyclic_factor_f']:.2f}), Ratio = {pipe_res['stress_ratio']:.2f} <= 1.0, F_anchor = {pipe_res['anchor_reaction_force_kn']:.1f} kN")
+
+        # 25.2 Automotive Suspension Kinematics & Quarter-Car Ride Dynamics (ISO 2631 / Milliken)
+        qc_res = http_request(port, "POST", "/api/sim/automotive/quarter_car", body={
+            "sprung_mass_kg": 320.0,
+            "unsprung_mass_kg": 45.0,
+            "suspension_stiffness_n_m": 28000.0,
+            "suspension_damping_n_s_m": 1650.0,
+            "vehicle_speed_km_h": 100.0,
+            "road_class": "ClassBGood"
+        })
+        check(qc_res.get("body_bounce_frequency_hz", 0.0) > 1.0, "Body bounce frequency > 1.0 Hz")
+        check(qc_res.get("wheel_hop_frequency_hz", 0.0) > 8.0, "Wheel-hop frequency > 8.0 Hz")
+        check(qc_res.get("body_acceleration_rms_m_s2", 0.0) > 0.1, "Chassis RMS accel > 0.1 m/s²")
+        check(qc_res.get("is_safe", False) is True, "Quarter car within stroke limits")
+        print(f"  ✓ 25.2 Quarter-Car Dynamics (ISO 2631): f_body = {qc_res['body_bounce_frequency_hz']:.2f} Hz, f_hop = {qc_res['wheel_hop_frequency_hz']:.2f} Hz, zeta = {qc_res['damping_ratio_zeta']:.2f}, RMS a_w = {qc_res['body_acceleration_rms_m_s2']:.2f} m/s² ({qc_res['ride_comfort_rating']}), RMS Stroke = {qc_res['suspension_deflection_rms_mm']:.1f} mm, DLC = {qc_res['dynamic_load_coefficient']:.2f}")
+
+        # 25.3 Power Transformer Electromagnetics & Thermal Rating (IEC 60076 / IEEE C57)
+        trans_res = http_request(port, "POST", "/api/sim/electrical/power_transformer", body={
+            "rated_apparent_power_mva": 40.0,
+            "primary_voltage_kv": 110.0,
+            "secondary_voltage_kv": 33.0,
+            "percent_impedance_z": 10.5,
+            "no_load_loss_kw": 22.0,
+            "load_loss_kw": 165.0
+        })
+        check(trans_res.get("operating_efficiency_pct", 0.0) > 99.0, "Transformer efficiency > 99.0%")
+        check(trans_res.get("hot_spot_temperature_c", 0.0) > 80.0, "Hot spot temp > 80 °C")
+        check(trans_res.get("relative_insulation_aging_factor", 99.0) < 2.0, "Aging factor < 2.0")
+        check(trans_res.get("is_safe", False) is True, "Transformer thermal safe")
+        print(f"  ✓ 25.3 Power Transformer (IEC 60076): Rating = 40.0 MVA (110/33 kV), Eff = {trans_res['operating_efficiency_pct']:.2f}% (Max = {trans_res['maximum_efficiency_pct']:.2f}% @ beta = {trans_res['optimal_load_factor_max_eff']:.2f}), Loss = {trans_res['total_operating_loss_kw']:.1f} kW, Reg = {trans_res['percent_voltage_regulation']:.2f}%, T_oil = {trans_res['top_oil_temperature_c']:.1f} °C, T_hs = {trans_res['hot_spot_temperature_c']:.1f} °C, Aging = {trans_res['relative_insulation_aging_factor']:.2f}x")
+
+        # 25.4 Vapor Compression Refrigeration Cycle & Heat Pump COP (ASHRAE / AHRI 550/590)
+        ref_res = http_request(port, "POST", "/api/sim/thermal/refrigeration_cycle", body={
+            "refrigerant": "R410A",
+            "design_cooling_capacity_kw": 100.0,
+            "evaporating_temperature_c": 5.0,
+            "condensing_temperature_c": 45.0
+        })
+        check(ref_res.get("coefficient_of_performance_cooling", 0.0) > 2.0, "Cooling COP > 2.0")
+        check(ref_res.get("compressor_electrical_power_kw", 0.0) > 15.0, "Compressor power > 15 kW")
+        check(ref_res.get("is_safe", False) is True, "Refrigeration cycle operating safe")
+        print(f"  ✓ 25.4 Refrigeration Cycle (ASHRAE): R410A @ 100 kW, P_evap = {ref_res['evaporating_pressure_bar']:.2f} bar, P_cond = {ref_res['condensing_pressure_bar']:.2f} bar (rp = {ref_res['pressure_ratio']:.2f}), m_dot = {ref_res['refrigerant_mass_flow_kg_s']:.3f} kg/s, W_elec = {ref_res['compressor_electrical_power_kw']:.1f} kW, COP_R = {ref_res['coefficient_of_performance_cooling']:.2f}, COP_HP = {ref_res['coefficient_of_performance_heating']:.2f}, T_dis = {ref_res['compressor_discharge_temperature_c']:.1f} °C")
+
+        # 25.5 Ship Hydrostatic Intact Stability & GZ Righting Arm (IMO Resolution MSC.267(85))
+        ship_res = http_request(port, "POST", "/api/sim/marine/ship_stability", body={
+            "length_between_perpendiculars_m": 140.0,
+            "molded_beam_m": 22.0,
+            "design_draft_m": 7.5,
+            "vertical_center_of_gravity_kg_m": 7.20
+        })
+        check(ship_res.get("displacement_mass_tonnes", 0.0) > 15000.0, "Ship displacement > 15000 tonnes")
+        check(ship_res.get("initial_metacentric_height_gm0_m", 0.0) > 1.0, "Initial GM0 > 1.0 m")
+        check(ship_res.get("max_gz_righting_arm_m", 0.0) > 0.5, "Max GZ arm > 0.5 m")
+        check(ship_res.get("is_safe", False) is True, "Ship meets IMO intact stability criteria")
+        print(f"  ✓ 25.5 Ship Stability (IMO MSC.267): Disp = {ship_res['displacement_mass_tonnes']:.0f} t, KB = {ship_res['center_of_buoyancy_kb_m']:.2f}m, BM = {ship_res['metacentric_radius_bm_m']:.2f}m, GM0 = {ship_res['initial_metacentric_height_gm0_m']:.2f}m (>= 0.15m), GZ_max = {ship_res['max_gz_righting_arm_m']:.2f}m @ {ship_res['angle_of_max_gz_deg']:.0f}°, Area_30 = {ship_res['area_under_gz_30deg_m_rad']:.3f} m·rad (>= 0.055), Area_40 = {ship_res['area_under_gz_40deg_m_rad']:.3f} m·rad (>= 0.090)")
+
+        # 25.6 Universal Commands Execution Verification (Batch 10 Domains)
+        for cmd_id in [
+            "sim.piping.flexibility",
+            "sim.automotive.quarter_car",
+            "sim.electrical.power_transformer",
+            "sim.thermal.refrigeration_cycle",
+            "sim.marine.ship_stability",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 25.6 Universal Commands: All 5 Batch-10 Engineering Commands verified via typed schema engine")
+
+        # 25.7 Enterprise MCP Tool Calling (Batch 10 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_piping_flexibility",
+            "atlas_sim_automotive_quarter_car",
+            "atlas_sim_electrical_power_transformer",
+            "atlas_sim_thermal_refrigeration_cycle",
+            "atlas_sim_marine_ship_stability",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 825,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 25.7 Enterprise MCP Tool Calling: 5 Batch-10 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

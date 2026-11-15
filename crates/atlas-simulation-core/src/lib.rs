@@ -54,13 +54,17 @@ pub mod molecular;
 pub mod nuclear_shielding;
 pub mod pcb_thermal;
 pub mod pile_foundation;
+pub mod piping_flexibility;
 pub mod power_flow;
+pub mod power_transformer;
 pub mod pressure_vessel;
 pub mod problem;
 pub mod provenance;
 pub mod psychrometrics;
 pub mod pumps;
+pub mod quarter_car;
 pub mod rainflow;
+pub mod refrigeration_cycle;
 pub mod reinforced_concrete;
 pub mod robotics;
 pub mod rock_mechanics;
@@ -68,6 +72,7 @@ pub mod rocket_nozzle;
 pub mod rotor_dynamics;
 pub mod shafts_keys;
 pub mod sheet_metal;
+pub mod ship_stability;
 pub mod shock_response;
 pub mod short_circuit;
 pub mod signal_integrity;
@@ -269,9 +274,17 @@ pub mod prelude {
         PileFoundationProblem, PileFoundationResult, SoilLayerSpec, SoilLayerType,
         solve_pile_foundation, solve_pile_foundation_sim,
     };
+    pub use crate::piping_flexibility::{
+        PipingFlexibilityProblem, PipingFlexibilityResult,
+        solve_piping_flexibility, solve_piping_flexibility_sim,
+    };
     pub use crate::power_flow::{
         BusType, ComplexNumber, PowerFlowProblem, TransmissionLine, build_bus_admittance_matrix,
         solve_power_flow, y_bus_frobenius_norm,
+    };
+    pub use crate::power_transformer::{
+        PowerTransformerProblem, PowerTransformerResult, TransformerCoolingClass,
+        solve_power_transformer, solve_power_transformer_sim,
     };
     pub use crate::pressure_vessel::{
         HeadType, JointEfficiencyType, PressureVesselProblem, PressureVesselResult,
@@ -286,8 +299,16 @@ pub mod prelude {
     pub use crate::pumps::{
         PumpFluid, PumpProblem, PumpResult, solve_centrifugal_pump, solve_pump_sim,
     };
+    pub use crate::quarter_car::{
+        QuarterCarProblem, QuarterCarResult, RoadRoughnessClass,
+        solve_quarter_car, solve_quarter_car_sim,
+    };
     pub use crate::rainflow::{
         RainflowCycle, RainflowProblem, count_rainflow_cycles, solve_rainflow_fatigue,
+    };
+    pub use crate::refrigeration_cycle::{
+        RefrigerantType, RefrigerationCycleProblem, RefrigerationCycleResult,
+        solve_refrigeration_cycle, solve_refrigeration_cycle_sim,
     };
     pub use crate::reinforced_concrete::{
         ConcreteGrade, ReinforcedConcreteProblem, ReinforcedConcreteResult,
@@ -317,6 +338,10 @@ pub mod prelude {
     pub use crate::sheet_metal::{
         SheetMetalBend, SheetMetalMaterial, SheetMetalPartProblem, SheetMetalUnfoldResult,
         solve_sheet_metal_sim, solve_sheet_metal_unfold,
+    };
+    pub use crate::ship_stability::{
+        ShipStabilityProblem, ShipStabilityResult,
+        solve_ship_stability, solve_ship_stability_sim,
     };
     pub use crate::shock_response::{ShockResponseProblem, solve_shock_response_spectrum};
     pub use crate::short_circuit::{

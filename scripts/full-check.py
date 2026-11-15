@@ -1517,6 +1517,76 @@ def simulation_section(studio: Studio) -> None:
     check(line_data.get("everyday_sag_m", 0.0) > 7.0, "everyday sag > 7 m")
     check(line_data.get("max_hot_sag_m", 0.0) > 9.0, "hot sag > 9 m")
     check(line_data.get("storm_safety_factor", 0.0) >= 2.0, "storm safety factor >= 2.0")
+
+    # 50. Piping Flexibility & Thermal Expansion Stress Analysis (ASME B31.3 / B31.1)
+    piping = studio.post("/api/sim/piping/flexibility", {
+        "nominal_outside_diameter_mm": 219.1,
+        "anchor_distance_m": 60.0,
+        "design_temperature_c": 260.0,
+        "loop_height_m": 7.5,
+        "loop_width_m": 5.0
+    })
+    check(piping.status == 200, f"piping flexibility returns 200 (got {piping.status})")
+    piping_data = piping.json()
+    check(piping_data.get("thermal_growth_mm", 0.0) > 100.0, "thermal expansion growth > 100 mm")
+    check(piping_data.get("displacement_stress_se_mpa", 0.0) > 50.0, "displacement stress SE > 50 MPa")
+    check(piping_data.get("stress_ratio", 99.0) <= 1.0, "piping stress ratio <= 1.0 (ASME B31.3 compliant)")
+
+    # 51. Automotive Suspension Kinematics & Quarter-Car Ride Dynamics (ISO 2631 / Milliken)
+    qc = studio.post("/api/sim/automotive/quarter_car", {
+        "sprung_mass_kg": 320.0,
+        "unsprung_mass_kg": 45.0,
+        "suspension_stiffness_n_m": 28000.0,
+        "suspension_damping_n_s_m": 1650.0,
+        "vehicle_speed_km_h": 100.0,
+        "road_class": "ClassBGood"
+    })
+    check(qc.status == 200, f"quarter-car dynamics returns 200 (got {qc.status})")
+    qc_data = qc.json()
+    check(qc_data.get("body_bounce_frequency_hz", 0.0) > 1.0, "body bounce frequency > 1.0 Hz")
+    check(qc_data.get("wheel_hop_frequency_hz", 0.0) > 8.0, "wheel-hop frequency > 8.0 Hz")
+    check(qc_data.get("body_acceleration_rms_m_s2", 0.0) > 0.1, "chassis RMS acceleration > 0.1 m/s²")
+
+    # 52. Power Transformer Electromagnetics & Thermal Rating (IEC 60076 / IEEE C57)
+    trans = studio.post("/api/sim/electrical/power_transformer", {
+        "rated_apparent_power_mva": 40.0,
+        "primary_voltage_kv": 110.0,
+        "secondary_voltage_kv": 33.0,
+        "percent_impedance_z": 10.5,
+        "no_load_loss_kw": 22.0,
+        "load_loss_kw": 165.0
+    })
+    check(trans.status == 200, f"power transformer returns 200 (got {trans.status})")
+    trans_data = trans.json()
+    check(trans_data.get("operating_efficiency_pct", 0.0) > 99.0, "full load efficiency > 99.0%")
+    check(trans_data.get("hot_spot_temperature_c", 0.0) > 80.0, "hot-spot winding temp > 80°C")
+    check(trans_data.get("relative_insulation_aging_factor", 99.0) < 2.0, "insulation aging factor < 2.0")
+
+    # 53. Vapor Compression Refrigeration Cycle & Heat Pump COP (ASHRAE / AHRI 550/590)
+    ref = studio.post("/api/sim/thermal/refrigeration_cycle", {
+        "refrigerant": "R410A",
+        "design_cooling_capacity_kw": 100.0,
+        "evaporating_temperature_c": 5.0,
+        "condensing_temperature_c": 45.0
+    })
+    check(ref.status == 200, f"refrigeration cycle returns 200 (got {ref.status})")
+    ref_data = ref.json()
+    check(ref_data.get("coefficient_of_performance_cooling", 0.0) > 2.0, "refrigeration COP > 2.0")
+    check(ref_data.get("compressor_electrical_power_kw", 0.0) > 15.0, "compressor power > 15 kW")
+
+    # 54. Ship Hydrostatic Intact Stability & GZ Righting Arm (IMO Resolution MSC.267(85))
+    ship = studio.post("/api/sim/marine/ship_stability", {
+        "length_between_perpendiculars_m": 140.0,
+        "molded_beam_m": 22.0,
+        "design_draft_m": 7.5,
+        "vertical_center_of_gravity_kg_m": 7.20
+    })
+    check(ship.status == 200, f"ship stability returns 200 (got {ship.status})")
+    ship_data = ship.json()
+    check(ship_data.get("displacement_mass_tonnes", 0.0) > 15000.0, "ship displacement > 15000 tonnes")
+    check(ship_data.get("initial_metacentric_height_gm0_m", 0.0) > 1.0, "initial GM0 > 1.0 m")
+    check(ship_data.get("max_gz_righting_arm_m", 0.0) > 0.5, "maximum GZ righting arm > 0.5 m")
+    check(ship_data.get("is_safe", False) is True, "ship complies with IMO MSC.267(85) intact stability")
     report("simulation")
 
 
