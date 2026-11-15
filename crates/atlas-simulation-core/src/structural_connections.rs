@@ -246,11 +246,10 @@ pub fn solve_structural_connection(prob: &ConnectionProblem) -> ConnectionResult
     let alpha_b = (prob.end_distance_e1_mm / (3.0 * d_0))
         .min((prob.pitch_p1_mm / (3.0 * d_0)) - 0.25)
         .min(f_ub / f_u)
-        .min(1.0)
-        .max(0.1);
+        .clamp(0.1, 1.0);
 
     // k1 = min( 2.8 * (e2 / d_0) - 1.7, 2.5 )
-    let k1 = (2.8 * (prob.edge_distance_e2_mm / d_0) - 1.7).min(2.5).max(0.1);
+    let k1 = (2.8 * (prob.edge_distance_e2_mm / d_0) - 1.7).clamp(0.1, 2.5);
 
     let f_b_rd_single = (k1 * alpha_b * f_u * d * t) / (gamma_m2 * 1000.0); // kN
     let total_bearing_cap = f_b_rd_single * n_bolts;

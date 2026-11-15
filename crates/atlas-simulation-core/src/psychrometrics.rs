@@ -68,12 +68,12 @@ pub fn saturation_vapor_pressure_pa(temp_c: f64) -> f64 {
 /// Solves moist air thermodynamic state properties per ASHRAE equations.
 pub fn solve_psychrometric_state(prob: &PsychrometricProblem) -> Result<PsychrometricResult, String> {
     let t_db = prob.dry_bulb_temp_c;
-    if t_db < -60.0 || t_db > 95.0 {
+    if !(-60.0..=95.0).contains(&t_db) {
         return Err("Dry bulb temperature must be between -60°C and +95°C.".to_string());
     }
 
     let p_atm = prob.atmospheric_pressure_pa.unwrap_or(101325.0);
-    if p_atm < 30000.0 || p_atm > 150000.0 {
+    if !(30000.0..=150000.0).contains(&p_atm) {
         return Err("Atmospheric pressure must be between 30 kPa and 150 kPa.".to_string());
     }
 

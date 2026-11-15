@@ -164,7 +164,7 @@ pub fn solve_rational_runoff_and_pipe(prob: &HydrologyProblem) -> Result<Hydrolo
     let velocity_m_s = q_peak_m3_s / a_pipe_m2;
 
     // Self-cleansing velocity criteria (0.9 m/s <= V <= 3.5 m/s):
-    let is_self_clean = velocity_m_s >= 0.90 && velocity_m_s <= 4.0;
+    let is_self_clean = (0.90..=4.0).contains(&velocity_m_s);
 
     // Safety capacity margin:
     let capacity_margin_pct = ((q_cap_m3_s - q_peak_m3_s) / q_peak_m3_s) * 100.0;
