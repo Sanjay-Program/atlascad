@@ -106,6 +106,11 @@ pub mod hydraulic_turbine;
 pub mod stent_expansion;
 pub mod microwave_waveguide;
 pub mod gis_dielectric;
+pub mod pem_fuel_cell;
+pub mod superconducting_magnet;
+pub mod reentry_aerothermodynamics;
+pub mod lpbf_meltpool;
+pub mod phononic_bandgap;
 
 pub mod prelude {
     pub use crate::acoustics::{
@@ -471,5 +476,25 @@ pub mod prelude {
     pub use crate::gis_dielectric::{
         GisDielectricProblem, GisDielectricResult, GisInsulatingGas,
         solve_gis_dielectric, solve_gis_dielectric_sim,
+    };
+    pub use crate::pem_fuel_cell::{
+        PemFuelCellProblem, PemFuelCellResult,
+        solve_pem_fuel_cell, solve_pem_fuel_cell_sim,
+    };
+    pub use crate::superconducting_magnet::{
+        CryoMagnetProblem, CryoMagnetResult, SuperconductorMaterial,
+        solve_cryo_magnet, solve_cryo_magnet_sim,
+    };
+    pub use crate::reentry_aerothermodynamics::{
+        ReentryProblem, ReentryResult,
+        solve_reentry_aerothermodynamics, solve_reentry_aerothermodynamics_sim,
+    };
+    pub use crate::lpbf_meltpool::{
+        LpbfPowderMaterial, LpbfProblem, LpbfProcessRegime, LpbfResult,
+        solve_lpbf_meltpool, solve_lpbf_meltpool_sim,
+    };
+    pub use crate::phononic_bandgap::{
+        PhononicCrystalProblem, PhononicCrystalResult, PhononicLayer,
+        solve_phononic_bandgap, solve_phononic_bandgap_sim,
     };
 }

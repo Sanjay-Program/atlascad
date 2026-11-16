@@ -1473,6 +1473,77 @@ impl McpServer {
                     "required": ["rated_voltage_kv_rms", "conductor_radius_mm", "enclosure_radius_mm"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_energy_pem_fuel_cell".into(),
+                description: "Larminie / Barbir proton exchange membrane fuel cell electrochemistry, Nernst potential, Tafel activation, Springer membrane ohmic resistance, concentration losses, stack power, and H2 consumption".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "cell_count": { "type": "integer", "default": 360 },
+                        "active_cell_area_cm2": { "type": "number", "default": 280.0 },
+                        "operating_temperature_c": { "type": "number", "default": 75.0 },
+                        "operating_current_density_a_cm2": { "type": "number", "default": 1.20 }
+                    },
+                    "required": ["cell_count", "active_cell_area_cm2"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_science_superconducting_magnet".into(),
+                description: "Wilson / CERN superconducting solenoid magnet Biot-Savart field, stored magnetic energy, load line critical current margin, Lorentz hoop stress, and quench dump protection with adiabatic hotspot temperature".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "inner_radius_m": { "type": "number", "default": 0.35 },
+                        "outer_radius_m": { "type": "number", "default": 0.48 },
+                        "coil_length_m": { "type": "number", "default": 1.25 },
+                        "turns_count": { "type": "integer", "default": 2600 },
+                        "operating_current_a": { "type": "number", "default": 1400.0 }
+                    },
+                    "required": ["inner_radius_m", "outer_radius_m", "coil_length_m", "turns_count"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_aerospace_reentry_aerothermodynamics".into(),
+                description: "Sutton-Graves / Fay-Riddell / NASA SP-8000 hypersonic entry stagnation point convective and radiative heat flux, shock standoff distance, radiative equilibrium wall temperature, and TPS ablation sizing".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "freestream_velocity_m_s": { "type": "number", "default": 7400.0 },
+                        "altitude_km": { "type": "number", "default": 62.0 },
+                        "nose_radius_m": { "type": "number", "default": 1.15 },
+                        "vehicle_mass_kg": { "type": "number", "default": 5200.0 }
+                    },
+                    "required": ["freestream_velocity_m_s", "altitude_km", "nose_radius_m"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_manufacturing_lpbf_meltpool".into(),
+                description: "King / Rosenthal laser powder bed fusion (LPBF/DMLS) moving Gaussian laser thermals, volumetric energy density (VED), King normalized enthalpy, melt pool dimensions, cooling rate, and conduction vs keyhole defect regimes".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "laser_power_w": { "type": "number", "default": 250.0 },
+                        "scan_speed_mm_s": { "type": "number", "default": 950.0 },
+                        "beam_diameter_um": { "type": "number", "default": 80.0 },
+                        "layer_thickness_um": { "type": "number", "default": 40.0 }
+                    },
+                    "required": ["laser_power_w", "scan_speed_mm_s"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_acoustics_phononic_bandgap".into(),
+                description: "Mead / Brillouin / Sigalas 1D periodic acoustic metamaterial and phononic crystal Floquet-Bloch dispersion, Bragg stopbands, evanescent attenuation decay, and transmission loss (TL) in dB".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "unit_cell_count": { "type": "integer", "default": 8 },
+                        "layer_a_thickness_mm": { "type": "number", "default": 24.0 },
+                        "layer_b_thickness_mm": { "type": "number", "default": 16.0 },
+                        "excitation_frequency_hz": { "type": "number", "default": 24000.0 }
+                    },
+                    "required": ["unit_cell_count"]
+                }),
+            },
         ]
     }
 

@@ -5860,6 +5860,113 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_energy_pem_fuel_cell(
+        &mut self,
+        req: &SimPemFuelCellRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::pem_fuel_cell::PemFuelCellProblem {
+            problem_id: "pem_fuel_cell_sim".to_string(),
+            cell_count: req.cell_count.unwrap_or(360),
+            active_cell_area_cm2: req.active_cell_area_cm2.unwrap_or(280.0),
+            operating_temperature_c: req.operating_temperature_c.unwrap_or(75.0),
+            anode_pressure_bar: req.anode_pressure_bar.unwrap_or(2.20),
+            cathode_pressure_bar: req.cathode_pressure_bar.unwrap_or(2.00),
+            operating_current_density_a_cm2: req.operating_current_density_a_cm2.unwrap_or(1.20),
+            membrane_thickness_um: req.membrane_thickness_um.unwrap_or(25.0),
+            membrane_hydration_lambda: req.membrane_hydration_lambda.unwrap_or(14.0),
+        };
+        let res = atlas_simulation_core::pem_fuel_cell::solve_pem_fuel_cell(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_science_superconducting_magnet(
+        &mut self,
+        req: &SimSuperconductingMagnetRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::superconducting_magnet::CryoMagnetProblem {
+            problem_id: "superconducting_magnet_sim".to_string(),
+            material: req.material.unwrap_or(atlas_simulation_core::superconducting_magnet::SuperconductorMaterial::NbTi),
+            inner_radius_m: req.inner_radius_m.unwrap_or(0.35),
+            outer_radius_m: req.outer_radius_m.unwrap_or(0.48),
+            coil_length_m: req.coil_length_m.unwrap_or(1.25),
+            turns_count: req.turns_count.unwrap_or(2600),
+            operating_current_a: req.operating_current_a.unwrap_or(1400.0),
+            operating_temperature_k: req.operating_temperature_k.unwrap_or(4.20),
+            cu_sc_ratio: req.cu_sc_ratio.unwrap_or(2.0),
+            conductor_area_mm2: req.conductor_area_mm2.unwrap_or(14.0),
+            quench_detection_delay_s: req.quench_detection_delay_s.unwrap_or(0.030),
+            max_dump_voltage_v: req.max_dump_voltage_v.unwrap_or(1200.0),
+        };
+        let res = atlas_simulation_core::superconducting_magnet::solve_cryo_magnet(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_aerospace_reentry_aerothermodynamics(
+        &mut self,
+        req: &SimReentryRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::reentry_aerothermodynamics::ReentryProblem {
+            problem_id: "reentry_sim".to_string(),
+            freestream_velocity_m_s: req.freestream_velocity_m_s.unwrap_or(7400.0),
+            altitude_km: req.altitude_km.unwrap_or(62.0),
+            nose_radius_m: req.nose_radius_m.unwrap_or(1.15),
+            vehicle_mass_kg: req.vehicle_mass_kg.unwrap_or(5200.0),
+            nose_cone_half_angle_deg: req.nose_cone_half_angle_deg.unwrap_or(45.0),
+            tps_surface_emissivity: req.tps_surface_emissivity.unwrap_or(0.88),
+            max_allowable_tps_temperature_k: req.max_allowable_tps_temperature_k.unwrap_or(2300.0),
+        };
+        let res = atlas_simulation_core::reentry_aerothermodynamics::solve_reentry_aerothermodynamics(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_manufacturing_lpbf_meltpool(
+        &mut self,
+        req: &SimLpbfRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::lpbf_meltpool::LpbfProblem {
+            problem_id: "lpbf_meltpool_sim".to_string(),
+            material: req.material.unwrap_or(atlas_simulation_core::lpbf_meltpool::LpbfPowderMaterial::Ti6Al4V),
+            laser_power_w: req.laser_power_w.unwrap_or(250.0),
+            scan_speed_mm_s: req.scan_speed_mm_s.unwrap_or(950.0),
+            beam_diameter_um: req.beam_diameter_um.unwrap_or(80.0),
+            layer_thickness_um: req.layer_thickness_um.unwrap_or(40.0),
+            hatch_spacing_um: req.hatch_spacing_um.unwrap_or(100.0),
+            preheat_temperature_c: req.preheat_temperature_c.unwrap_or(100.0),
+        };
+        let res = atlas_simulation_core::lpbf_meltpool::solve_lpbf_meltpool(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_acoustics_phononic_bandgap(
+        &mut self,
+        req: &SimPhononicCrystalRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::phononic_bandgap::PhononicCrystalProblem {
+            problem_id: "phononic_bandgap_sim".to_string(),
+            layer_a: atlas_simulation_core::phononic_bandgap::PhononicLayer {
+                name: req.layer_a_name.clone().unwrap_or_else(|| "Steel".to_string()),
+                thickness_mm: req.layer_a_thickness_mm.unwrap_or(24.0),
+                density_kg_m3: req.layer_a_density_kg_m3.unwrap_or(7850.0),
+                sound_speed_m_s: req.layer_a_sound_speed_m_s.unwrap_or(5150.0),
+            },
+            layer_b: atlas_simulation_core::phononic_bandgap::PhononicLayer {
+                name: req.layer_b_name.clone().unwrap_or_else(|| "Polymer_Epoxy".to_string()),
+                thickness_mm: req.layer_b_thickness_mm.unwrap_or(16.0),
+                density_kg_m3: req.layer_b_density_kg_m3.unwrap_or(1180.0),
+                sound_speed_m_s: req.layer_b_sound_speed_m_s.unwrap_or(1450.0),
+            },
+            unit_cell_count: req.unit_cell_count.unwrap_or(8),
+            excitation_frequency_hz: req.excitation_frequency_hz.unwrap_or(24000.0),
+        };
+        let res = atlas_simulation_core::phononic_bandgap::solve_phononic_bandgap(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -8070,6 +8177,73 @@ namespace AtlasCAD.Unity
                     conductor_radius_mm: r1,
                     enclosure_radius_mm: r2,
                     gas_pressure_abs_bar: p_bar,
+                    ..Default::default()
+                })?
+            }
+            "sim.energy.pem_fuel_cell" => {
+                let n_c = req.arguments.get("cell_count").and_then(|v| v.as_u64()).map(|v| v as u32);
+                let a_cm2 = req.arguments.get("active_cell_area_cm2").and_then(|v| v.as_f64());
+                let t_c = req.arguments.get("operating_temperature_c").and_then(|v| v.as_f64());
+                let i_dens = req.arguments.get("operating_current_density_a_cm2").and_then(|v| v.as_f64());
+                self.sim_energy_pem_fuel_cell(&SimPemFuelCellRequest {
+                    cell_count: n_c,
+                    active_cell_area_cm2: a_cm2,
+                    operating_temperature_c: t_c,
+                    operating_current_density_a_cm2: i_dens,
+                    ..Default::default()
+                })?
+            }
+            "sim.science.superconducting_magnet" => {
+                let r1 = req.arguments.get("inner_radius_m").and_then(|v| v.as_f64());
+                let r2 = req.arguments.get("outer_radius_m").and_then(|v| v.as_f64());
+                let l_m = req.arguments.get("coil_length_m").and_then(|v| v.as_f64());
+                let n_t = req.arguments.get("turns_count").and_then(|v| v.as_u64()).map(|v| v as u32);
+                let i_op = req.arguments.get("operating_current_a").and_then(|v| v.as_f64());
+                self.sim_science_superconducting_magnet(&SimSuperconductingMagnetRequest {
+                    inner_radius_m: r1,
+                    outer_radius_m: r2,
+                    coil_length_m: l_m,
+                    turns_count: n_t,
+                    operating_current_a: i_op,
+                    ..Default::default()
+                })?
+            }
+            "sim.aerospace.reentry_aerothermodynamics" => {
+                let v_inf = req.arguments.get("freestream_velocity_m_s").and_then(|v| v.as_f64());
+                let alt = req.arguments.get("altitude_km").and_then(|v| v.as_f64());
+                let r_n = req.arguments.get("nose_radius_m").and_then(|v| v.as_f64());
+                let m_kg = req.arguments.get("vehicle_mass_kg").and_then(|v| v.as_f64());
+                self.sim_aerospace_reentry_aerothermodynamics(&SimReentryRequest {
+                    freestream_velocity_m_s: v_inf,
+                    altitude_km: alt,
+                    nose_radius_m: r_n,
+                    vehicle_mass_kg: m_kg,
+                    ..Default::default()
+                })?
+            }
+            "sim.manufacturing.lpbf_meltpool" => {
+                let p_w = req.arguments.get("laser_power_w").and_then(|v| v.as_f64());
+                let v_s = req.arguments.get("scan_speed_mm_s").and_then(|v| v.as_f64());
+                let d_b = req.arguments.get("beam_diameter_um").and_then(|v| v.as_f64());
+                let t_l = req.arguments.get("layer_thickness_um").and_then(|v| v.as_f64());
+                self.sim_manufacturing_lpbf_meltpool(&SimLpbfRequest {
+                    laser_power_w: p_w,
+                    scan_speed_mm_s: v_s,
+                    beam_diameter_um: d_b,
+                    layer_thickness_um: t_l,
+                    ..Default::default()
+                })?
+            }
+            "sim.acoustics.phononic_bandgap" => {
+                let n_c = req.arguments.get("unit_cell_count").and_then(|v| v.as_u64()).map(|v| v as u32);
+                let d_a = req.arguments.get("layer_a_thickness_mm").and_then(|v| v.as_f64());
+                let d_b = req.arguments.get("layer_b_thickness_mm").and_then(|v| v.as_f64());
+                let f_hz = req.arguments.get("excitation_frequency_hz").and_then(|v| v.as_f64());
+                self.sim_acoustics_phononic_bandgap(&SimPhononicCrystalRequest {
+                    unit_cell_count: n_c,
+                    layer_a_thickness_mm: d_a,
+                    layer_b_thickness_mm: d_b,
+                    excitation_frequency_hz: f_hz,
                     ..Default::default()
                 })?
             }
@@ -10306,6 +10480,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/electrical/gis_dielectric" => {
             match parse_body_or_default::<SimGisDielectricRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_electrical_gis_dielectric(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/energy/pem_fuel_cell" => {
+            match parse_body_or_default::<SimPemFuelCellRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_energy_pem_fuel_cell(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/science/superconducting_magnet" => {
+            match parse_body_or_default::<SimSuperconductingMagnetRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_science_superconducting_magnet(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/aerospace/reentry_aerothermodynamics" => {
+            match parse_body_or_default::<SimReentryRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_aerospace_reentry_aerothermodynamics(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/manufacturing/lpbf_meltpool" => {
+            match parse_body_or_default::<SimLpbfRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_manufacturing_lpbf_meltpool(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/acoustics/phononic_bandgap" => {
+            match parse_body_or_default::<SimPhononicCrystalRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_acoustics_phononic_bandgap(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -14068,4 +14287,110 @@ struct SimGisDielectricRequest {
     pub lightning_impulse_withstand_kv_pk: Option<f64>,
     #[serde(default)]
     pub surface_roughness_ra_um: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimPemFuelCellRequest {
+    #[serde(default)]
+    pub cell_count: Option<u32>,
+    #[serde(default)]
+    pub active_cell_area_cm2: Option<f64>,
+    #[serde(default)]
+    pub operating_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub anode_pressure_bar: Option<f64>,
+    #[serde(default)]
+    pub cathode_pressure_bar: Option<f64>,
+    #[serde(default)]
+    pub operating_current_density_a_cm2: Option<f64>,
+    #[serde(default)]
+    pub membrane_thickness_um: Option<f64>,
+    #[serde(default)]
+    pub membrane_hydration_lambda: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimSuperconductingMagnetRequest {
+    #[serde(default)]
+    pub material: Option<atlas_simulation_core::superconducting_magnet::SuperconductorMaterial>,
+    #[serde(default)]
+    pub inner_radius_m: Option<f64>,
+    #[serde(default)]
+    pub outer_radius_m: Option<f64>,
+    #[serde(default)]
+    pub coil_length_m: Option<f64>,
+    #[serde(default)]
+    pub turns_count: Option<u32>,
+    #[serde(default)]
+    pub operating_current_a: Option<f64>,
+    #[serde(default)]
+    pub operating_temperature_k: Option<f64>,
+    #[serde(default)]
+    pub cu_sc_ratio: Option<f64>,
+    #[serde(default)]
+    pub conductor_area_mm2: Option<f64>,
+    #[serde(default)]
+    pub quench_detection_delay_s: Option<f64>,
+    #[serde(default)]
+    pub max_dump_voltage_v: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimReentryRequest {
+    #[serde(default)]
+    pub freestream_velocity_m_s: Option<f64>,
+    #[serde(default)]
+    pub altitude_km: Option<f64>,
+    #[serde(default)]
+    pub nose_radius_m: Option<f64>,
+    #[serde(default)]
+    pub vehicle_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub nose_cone_half_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub tps_surface_emissivity: Option<f64>,
+    #[serde(default)]
+    pub max_allowable_tps_temperature_k: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimLpbfRequest {
+    #[serde(default)]
+    pub material: Option<atlas_simulation_core::lpbf_meltpool::LpbfPowderMaterial>,
+    #[serde(default)]
+    pub laser_power_w: Option<f64>,
+    #[serde(default)]
+    pub scan_speed_mm_s: Option<f64>,
+    #[serde(default)]
+    pub beam_diameter_um: Option<f64>,
+    #[serde(default)]
+    pub layer_thickness_um: Option<f64>,
+    #[serde(default)]
+    pub hatch_spacing_um: Option<f64>,
+    #[serde(default)]
+    pub preheat_temperature_c: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimPhononicCrystalRequest {
+    #[serde(default)]
+    pub layer_a_name: Option<String>,
+    #[serde(default)]
+    pub layer_a_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub layer_a_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub layer_a_sound_speed_m_s: Option<f64>,
+    #[serde(default)]
+    pub layer_b_name: Option<String>,
+    #[serde(default)]
+    pub layer_b_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub layer_b_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub layer_b_sound_speed_m_s: Option<f64>,
+    #[serde(default)]
+    pub unit_cell_count: Option<u32>,
+    #[serde(default)]
+    pub excitation_frequency_hz: Option<f64>,
 }

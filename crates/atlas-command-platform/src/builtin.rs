@@ -3932,5 +3932,223 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.energy.pem_fuel_cell",
+            "Proton Exchange Membrane Fuel Cell Polarization (Larminie / Barbir)",
+            "Evaluates Nernst thermodynamic potential, Tafel activation overpotential, Springer Nafion membrane ohmic losses, concentration polarization, stack power, and hydrogen fuel consumption.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "cell_count".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Number of series electrochemical cells in stack".into(),
+            required: true,
+            default_value: Some(serde_json::json!(360)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(2000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "active_cell_area_cm2".into(),
+            arg_type: ArgumentType::Number,
+            description: "Active geometric MEA cell area in cm²".into(),
+            required: true,
+            default_value: Some(serde_json::json!(280.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(2000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "operating_temperature_c".into(),
+            arg_type: ArgumentType::Number,
+            description: "Stack operating temperature in °C".into(),
+            required: false,
+            default_value: Some(serde_json::json!(75.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(120.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "operating_current_density_a_cm2".into(),
+            arg_type: ArgumentType::Number,
+            description: "Operating current density in A/cm²".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1.20)),
+            validation_rules: vec![ValidationRule::Min(0.05), ValidationRule::Max(5.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.science.superconducting_magnet",
+            "Superconducting Solenoid Magnet Field & Quench Protection (Wilson / CERN)",
+            "Evaluates finite solenoid Biot-Savart field, stored magnetic energy, field/temperature-dependent critical current margin, Lorentz hoop stress, and quench dump resistor sizing with adiabatic hot-spot temperature.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "inner_radius_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Inner bore radius in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(0.35)),
+            validation_rules: vec![ValidationRule::Min(0.05), ValidationRule::Max(5.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "outer_radius_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Outer winding radius in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(0.48)),
+            validation_rules: vec![ValidationRule::Min(0.06), ValidationRule::Max(6.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "coil_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Axial coil length in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1.25)),
+            validation_rules: vec![ValidationRule::Min(0.10), ValidationRule::Max(20.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "turns_count".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Total winding turns count".into(),
+            required: true,
+            default_value: Some(serde_json::json!(2600)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(50000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "operating_current_a".into(),
+            arg_type: ArgumentType::Number,
+            description: "Operating transport current in Amperes".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1400.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(50000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.aerospace.reentry_aerothermodynamics",
+            "Hypersonic Reentry Aerothermodynamics & Stagnation Heat Flux (Sutton-Graves / Fay-Riddell)",
+            "Evaluates hypersonic bow shock standoff distance, stagnation pressure and enthalpy, convective and shock-layer radiative heat flux, radiative equilibrium wall temperature, and TPS ablation thickness.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "freestream_velocity_m_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Freestream entry velocity in m/s".into(),
+            required: true,
+            default_value: Some(serde_json::json!(7400.0)),
+            validation_rules: vec![ValidationRule::Min(1000.0), ValidationRule::Max(15000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "altitude_km".into(),
+            arg_type: ArgumentType::Number,
+            description: "Entry altitude in kilometers".into(),
+            required: true,
+            default_value: Some(serde_json::json!(62.0)),
+            validation_rules: vec![ValidationRule::Min(15.0), ValidationRule::Max(110.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "nose_radius_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Nose cap spherical radius in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1.15)),
+            validation_rules: vec![ValidationRule::Min(0.05), ValidationRule::Max(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "vehicle_mass_kg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Vehicle entry mass in kilograms".into(),
+            required: false,
+            default_value: Some(serde_json::json!(5200.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(100000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.manufacturing.lpbf_meltpool",
+            "Laser Powder Bed Fusion Additive Manufacturing Melt Pool (King / Rosenthal)",
+            "Evaluates moving Gaussian laser thermals, Volumetric Energy Density (VED), King normalized enthalpy, melt pool dimensions, cooling rate, and conduction vs keyhole defect regimes.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "laser_power_w".into(),
+            arg_type: ArgumentType::Number,
+            description: "Laser beam optical power in Watts".into(),
+            required: true,
+            default_value: Some(serde_json::json!(250.0)),
+            validation_rules: vec![ValidationRule::Min(20.0), ValidationRule::Max(2000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "scan_speed_mm_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Laser scanning travel speed in mm/s".into(),
+            required: true,
+            default_value: Some(serde_json::json!(950.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(5000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "beam_diameter_um".into(),
+            arg_type: ArgumentType::Number,
+            description: "Laser beam spot diameter in micrometers".into(),
+            required: false,
+            default_value: Some(serde_json::json!(80.0)),
+            validation_rules: vec![ValidationRule::Min(20.0), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "layer_thickness_um".into(),
+            arg_type: ArgumentType::Number,
+            description: "Powder layer thickness in micrometers".into(),
+            required: false,
+            default_value: Some(serde_json::json!(40.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(200.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.acoustics.phononic_bandgap",
+            "Acoustic Metamaterial & Phononic Crystal Bandgap Mechanics (Mead / Brillouin)",
+            "Evaluates 1D periodic elastodynamic transfer matrix dispersion, Floquet-Bloch stopbands, Bragg bandgap frequency bounds, evanescent spatial attenuation, and transmission loss (TL) in dB.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "unit_cell_count".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Number of periodic unit cells in metamaterial stack".into(),
+            required: true,
+            default_value: Some(serde_json::json!(8)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "layer_a_thickness_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Thickness of Layer A in millimeters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(24.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "layer_b_thickness_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Thickness of Layer B in millimeters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(16.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "excitation_frequency_hz".into(),
+            arg_type: ArgumentType::Number,
+            description: "Operating excitation frequency in Hertz".into(),
+            required: false,
+            default_value: Some(serde_json::json!(24000.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(500000.0)],
+        }),
+    )?;
+
     Ok(())
 }

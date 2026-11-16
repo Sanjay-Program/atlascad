@@ -1845,6 +1845,93 @@ def simulation_section(studio: Studio) -> None:
     check(gis_data.get("continuous_safety_factor", 0.0) > 5.0, "continuous AC dielectric safety factor > 5.0")
     check(gis_data.get("impulse_safety_factor", 0.0) >= 1.25, "lightning impulse safety factor >= 1.25")
     check(gis_data.get("is_iec_compliant", False) is True, "GIS design compliant with IEC 62271-203")
+
+    # 70. Proton Exchange Membrane Fuel Cell (PEMFC) Polarization (Larminie / Barbir)
+    pem = studio.post("/api/sim/energy/pem_fuel_cell", {
+        "cell_count": 360,
+        "active_cell_area_cm2": 280.0,
+        "operating_temperature_c": 75.0,
+        "anode_pressure_bar": 2.20,
+        "cathode_pressure_bar": 2.00,
+        "operating_current_density_a_cm2": 1.20,
+    })
+    check(pem.status == 200, f"pem fuel cell returns 200 (got {pem.status})")
+    pem_data = pem.json()
+    check(pem_data.get("nernst_potential_v", 0.0) > 1.15, "PEMFC Nernst potential > 1.15 V")
+    check(pem_data.get("cell_voltage_v", 0.0) > 0.65, "PEMFC cell voltage > 0.65 V")
+    check(pem_data.get("stack_power_kw", 0.0) > 70.0, "PEMFC stack DC power > 70 kW")
+    check(pem_data.get("hydrogen_consumption_kg_h", 0.0) > 4.0, "PEMFC H2 consumption > 4.0 kg/h")
+    check(pem_data.get("electrical_efficiency_lhv_pct", 0.0) > 50.0, "PEMFC electrical efficiency LHV > 50%")
+    check(pem_data.get("is_operable", False) is True, "PEMFC operating point is stable and operable")
+
+    # 71. Cryogenic Superconducting Solenoid Magnet & Quench Protection (Wilson / CERN)
+    mag = studio.post("/api/sim/science/superconducting_magnet", {
+        "inner_radius_m": 0.35,
+        "outer_radius_m": 0.48,
+        "coil_length_m": 1.25,
+        "turns_count": 2600,
+        "operating_current_a": 1400.0,
+        "operating_temperature_k": 4.20,
+    })
+    check(mag.status == 200, f"superconducting magnet returns 200 (got {mag.status})")
+    mag_data = mag.json()
+    check(mag_data.get("central_field_t", 0.0) > 2.5, "central magnetic field B0 > 2.5 Tesla")
+    check(mag_data.get("peak_conductor_field_t", 0.0) > mag_data.get("central_field_t", 0.0), "peak conductor field > central field")
+    check(mag_data.get("stored_energy_mj", 0.0) > 1.8, "stored magnetic energy > 1.8 MJ")
+    check(mag_data.get("load_line_margin_pct", 0.0) < 75.0, "load-line current margin < 75%")
+    check(mag_data.get("adiabatic_hotspot_temperature_k", 0.0) < 180.0, "adiabatic quench hotspot temperature < 180 K")
+    check(mag_data.get("is_quench_safe", False) is True, "quench protection dump verified safe")
+
+    # 72. Spacecraft Hypersonic Reentry Aerothermodynamics (Sutton-Graves / NASA SP-8000)
+    reentry = studio.post("/api/sim/aerospace/reentry_aerothermodynamics", {
+        "freestream_velocity_m_s": 7400.0,
+        "altitude_km": 62.0,
+        "nose_radius_m": 1.15,
+        "vehicle_mass_kg": 5200.0,
+    })
+    check(reentry.status == 200, f"reentry aerothermodynamics returns 200 (got {reentry.status})")
+    reentry_data = reentry.json()
+    check(reentry_data.get("freestream_mach", 0.0) > 20.0, "freestream entry Mach > 20")
+    check(reentry_data.get("stagnation_pressure_kpa", 0.0) > 10.0, "post-shock stagnation pressure > 10 kPa")
+    check(reentry_data.get("stagnation_enthalpy_mj_kg", 0.0) > 25.0, "stagnation enthalpy > 25 MJ/kg")
+    check(reentry_data.get("total_stagnation_heat_flux_kw_m2", 0.0) > 800.0, "total stagnation heat flux > 800 kW/m²")
+    check(reentry_data.get("radiative_equilibrium_wall_temperature_k", 0.0) > 1700.0, "radiative equilibrium wall temp > 1700 K")
+    check(reentry_data.get("thermal_safety_factor", 0.0) >= 1.05, "TPS thermal safety factor >= 1.05")
+    check(reentry_data.get("is_tps_safe", False) is True, "TPS thermal protection shield safe against exceedance")
+
+    # 73. Laser Powder Bed Fusion (LPBF / DMLS) Melt Pool Thermals (King / Rosenthal)
+    lpbf = studio.post("/api/sim/manufacturing/lpbf_meltpool", {
+        "laser_power_w": 250.0,
+        "scan_speed_mm_s": 950.0,
+        "beam_diameter_um": 80.0,
+        "layer_thickness_um": 40.0,
+        "hatch_spacing_um": 100.0,
+    })
+    check(lpbf.status == 200, f"lpbf meltpool returns 200 (got {lpbf.status})")
+    lpbf_data = lpbf.json()
+    check(lpbf_data.get("volumetric_energy_density_j_mm3", 0.0) > 50.0, "volumetric energy density VED > 50 J/mm³")
+    check(lpbf_data.get("normalized_enthalpy", 0.0) > 2.5, "King normalized enthalpy > 2.5")
+    check(lpbf_data.get("meltpool_width_um", 0.0) > 100.0, "melt pool width > 100 μm")
+    check(lpbf_data.get("hatch_overlap_ratio", 0.0) > 1.10, "hatch overlap ratio > 1.10x")
+    check(lpbf_data.get("penetration_ratio", 0.0) > 1.30, "interlayer depth penetration ratio > 1.30x")
+    check(lpbf_data.get("is_acceptable", False) is True, "LPBF process parameters in stable defect-free window")
+
+    # 74. Acoustic Metamaterials & Phononic Crystal Bandgap (Mead / Brillouin)
+    phononic = studio.post("/api/sim/acoustics/phononic_bandgap", {
+        "unit_cell_count": 8,
+        "layer_a_thickness_mm": 24.0,
+        "layer_b_thickness_mm": 16.0,
+        "excitation_frequency_hz": 24000.0,
+    })
+    check(phononic.status == 200, f"phononic bandgap returns 200 (got {phononic.status})")
+    phononic_data = phononic.json()
+    check(phononic_data.get("lattice_constant_mm", 0.0) > 35.0, "unit cell lattice constant > 35 mm")
+    check(phononic_data.get("impedance_contrast_ratio", 0.0) > 15.0, "acoustic impedance contrast ratio > 15:1")
+    check(phononic_data.get("bragg_center_frequency_hz", 0.0) > 20000.0, "Bragg center frequency > 20 kHz")
+    check(phononic_data.get("relative_bandgap_width_pct", 0.0) > 30.0, "relative acoustic bandgap width > 30%")
+    check(phononic_data.get("is_in_bandgap", False) is True, "operating excitation frequency is inside stopband")
+    check(phononic_data.get("transmission_loss_db", 0.0) > 30.0, "acoustic transmission loss > 30 dB")
+    check(phononic_data.get("is_isolation_effective", False) is True, "metamaterial acoustic vibration isolation effective")
     report("simulation")
 
 

@@ -2926,6 +2926,126 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 28.7 Enterprise MCP Tool Calling: 5 Batch-13 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # -------------------------------------------------------------------------
+        # SECTION 29: ADVANCED MULTIPHYSICS & NOVEL MATERIAL SOLVERS (BATCH 14)
+        # -------------------------------------------------------------------------
+        print("\n--- SECTION 29: ADVANCED MULTIPHYSICS & NOVEL MATERIAL SOLVERS (BATCH 14) ---")
+
+        # 29.1 PEM Fuel Cell Electrochemistry (Larminie / Barbir)
+        pem_res = http_request(port, "POST", "/api/sim/energy/pem_fuel_cell", body={
+            "cell_count": 360,
+            "active_cell_area_cm2": 280.0,
+            "operating_temperature_c": 75.0,
+            "anode_pressure_bar": 2.20,
+            "cathode_pressure_bar": 2.00,
+            "operating_current_density_a_cm2": 1.20
+        })
+        check(pem_res.get("nernst_potential_v", 0.0) > 1.15, "PEMFC Nernst potential > 1.15 V")
+        check(pem_res.get("cell_voltage_v", 0.0) > 0.65, "Cell voltage > 0.65 V")
+        check(pem_res.get("stack_power_kw", 0.0) > 70.0, "Stack electrical power > 70 kW")
+        check(pem_res.get("hydrogen_consumption_kg_h", 0.0) > 4.0, "Hydrogen fuel consumption > 4.0 kg/h")
+        check(pem_res.get("electrical_efficiency_lhv_pct", 0.0) > 50.0, "LHV electrical efficiency > 50%")
+        check(pem_res.get("is_operable", False) is True, "PEMFC operating point operable")
+        print(f"  ✓ 29.1 PEM Fuel Cell (Barbir / Larminie): 360 cells @ 75°C, V_nernst = {pem_res['nernst_potential_v']:.3f} V, V_cell = {pem_res['cell_voltage_v']:.3f} V (act = {pem_res['activation_overpotential_v']:.3f} V, ohm = {pem_res['ohmic_overpotential_v']:.3f} V, conc = {pem_res['concentration_overpotential_v']:.3f} V), V_stack = {pem_res['stack_voltage_v']:.1f} V, I_stack = {pem_res['stack_current_a']:.1f} A, P_stack = {pem_res['stack_power_kw']:.1f} kW, H2 = {pem_res['hydrogen_consumption_kg_h']:.2f} kg/h ({pem_res['hydrogen_consumption_g_s']:.2f} g/s), Q_heat = {pem_res['heat_generation_kw']:.1f} kW, η_LHV = {pem_res['electrical_efficiency_lhv_pct']:.1f}%, Operable: {pem_res['is_operable']}")
+
+        # 29.2 Cryogenic Superconducting Solenoid Magnet & Quench Protection (Wilson / CERN)
+        mag_res = http_request(port, "POST", "/api/sim/science/superconducting_magnet", body={
+            "inner_radius_m": 0.35,
+            "outer_radius_m": 0.48,
+            "coil_length_m": 1.25,
+            "turns_count": 2600,
+            "operating_current_a": 1400.0,
+            "operating_temperature_k": 4.20
+        })
+        check(mag_res.get("central_field_t", 0.0) > 2.5, "Central magnetic field B0 > 2.5 T")
+        check(mag_res.get("peak_conductor_field_t", 0.0) > mag_res.get("central_field_t", 0.0), "Peak field > central field")
+        check(mag_res.get("stored_energy_mj", 0.0) > 1.8, "Stored magnetic energy > 1.8 MJ")
+        check(mag_res.get("load_line_margin_pct", 0.0) < 75.0, "Critical current load-line margin < 75%")
+        check(mag_res.get("adiabatic_hotspot_temperature_k", 0.0) < 180.0, "Hotspot temperature < 180 K")
+        check(mag_res.get("is_quench_safe", False) is True, "Quench protection safe")
+        check(mag_res.get("is_margin_adequate", False) is True, "Operating margin adequate")
+        print(f"  ✓ 29.2 Superconducting Magnet (Wilson / CERN): Solenoid r1 = 0.35m, r2 = 0.48m, L = 1.25m, N = 2600, B0 = {mag_res['central_field_t']:.2f} T, B_peak = {mag_res['peak_conductor_field_t']:.2f} T, L_coil = {mag_res['coil_inductance_h']:.3f} H, E_mag = {mag_res['stored_energy_mj']:.2f} MJ, Ic = {mag_res['critical_current_a']:.0f} A (Margin = {mag_res['load_line_margin_pct']:.1f}% <= 75%), P_mag = {mag_res['magnetic_pressure_mpa']:.1f} MPa, σ_hoop = {mag_res['hoop_stress_mpa']:.1f} MPa, R_dump = {mag_res['dump_resistor_ohm']:.2f} Ω (τ = {mag_res['dump_time_constant_s']:.2f} s, V_dump = {mag_res['dump_voltage_v']:.0f} V), T_hot = {mag_res['adiabatic_hotspot_temperature_k']:.1f} K (<= 180 K), Quench Safe: {mag_res['is_quench_safe']}")
+
+        # 29.3 Spacecraft Hypersonic Reentry Aerothermodynamics (Sutton-Graves / NASA SP-8000)
+        reentry_res = http_request(port, "POST", "/api/sim/aerospace/reentry_aerothermodynamics", body={
+            "freestream_velocity_m_s": 7400.0,
+            "altitude_km": 62.0,
+            "nose_radius_m": 1.15,
+            "vehicle_mass_kg": 5200.0
+        })
+        check(reentry_res.get("freestream_mach", 0.0) > 20.0, "Freestream entry Mach > 20")
+        check(reentry_res.get("stagnation_pressure_kpa", 0.0) > 10.0, "Post-shock stagnation pressure > 10 kPa")
+        check(reentry_res.get("stagnation_enthalpy_mj_kg", 0.0) > 25.0, "Stagnation specific enthalpy > 25 MJ/kg")
+        check(reentry_res.get("total_stagnation_heat_flux_kw_m2", 0.0) > 800.0, "Total heat flux > 800 kW/m²")
+        check(reentry_res.get("radiative_equilibrium_wall_temperature_k", 0.0) > 1700.0, "Radiative equilibrium wall temp > 1700 K")
+        check(reentry_res.get("thermal_safety_factor", 0.0) >= 1.05, "TPS safety factor >= 1.05")
+        check(reentry_res.get("is_tps_safe", False) is True, "TPS protection safe")
+        print(f"  ✓ 29.3 Reentry Aerothermodynamics (Sutton-Graves / NASA SP-8000): v_inf = 7400 m/s @ 62.0 km (Mach {reentry_res['freestream_mach']:.1f}), P_stag = {reentry_res['stagnation_pressure_kpa']:.1f} kPa, h0 = {reentry_res['stagnation_enthalpy_mj_kg']:.1f} MJ/kg, Δ_shock = {reentry_res['shock_standoff_distance_mm']:.1f} mm, q_tot = {reentry_res['total_stagnation_heat_flux_kw_m2']:.1f} kW/m² (conv = {reentry_res['convective_heat_flux_kw_m2']:.1f}, rad = {reentry_res['radiative_heat_flux_kw_m2']:.1f}), T_wall_eq = {reentry_res['radiative_equilibrium_wall_temperature_k']:.1f} K, SF_thermal = {reentry_res['thermal_safety_factor']:.2f}, TPS Sized = {reentry_res['recommended_tps_thickness_mm']:.1f} mm, TPS Safe: {reentry_res['is_tps_safe']}")
+
+        # 29.4 Laser Powder Bed Fusion (LPBF / DMLS) Melt Pool Thermals (King / Rosenthal)
+        lpbf_res = http_request(port, "POST", "/api/sim/manufacturing/lpbf_meltpool", body={
+            "laser_power_w": 250.0,
+            "scan_speed_mm_s": 950.0,
+            "beam_diameter_um": 80.0,
+            "layer_thickness_um": 40.0,
+            "hatch_spacing_um": 100.0
+        })
+        check(lpbf_res.get("volumetric_energy_density_j_mm3", 0.0) > 50.0, "Volumetric energy density VED > 50 J/mm³")
+        check(lpbf_res.get("normalized_enthalpy", 0.0) > 2.5, "Normalized enthalpy > 2.5")
+        check(lpbf_res.get("meltpool_width_um", 0.0) > 100.0, "Melt pool width > 100 μm")
+        check(lpbf_res.get("hatch_overlap_ratio", 0.0) > 1.10, "Hatch overlap > 1.10x")
+        check(lpbf_res.get("penetration_ratio", 0.0) > 1.30, "Penetration ratio > 1.30x")
+        check(lpbf_res.get("is_acceptable", False) is True, "LPBF parameters acceptable")
+        print(f"  ✓ 29.4 LPBF Melt Pool Thermals (King / Rosenthal / Eagar-Tsai): Ti6Al4V @ 250W / 950mm/s, VED = {lpbf_res['volumetric_energy_density_j_mm3']:.1f} J/mm³, ΔH/hs = {lpbf_res['normalized_enthalpy']:.2f} (keyhole onset = {lpbf_res['keyhole_threshold_enthalpy']:.2f}), W_mp = {lpbf_res['meltpool_width_um']:.1f} μm, D_mp = {lpbf_res['meltpool_depth_um']:.1f} μm, AR = {lpbf_res['aspect_ratio']:.2f}, Overlap = {lpbf_res['hatch_overlap_ratio']:.2f}x, Penetration = {lpbf_res['penetration_ratio']:.2f}x, Cooling = {lpbf_res['cooling_rate_k_s']:.2e} K/s, Regime: {lpbf_res['regime']}, Defect-Free: {lpbf_res['is_acceptable']}")
+
+        # 29.5 Acoustic Metamaterials & Phononic Crystal Bandgap (Mead / Brillouin)
+        phononic_res = http_request(port, "POST", "/api/sim/acoustics/phononic_bandgap", body={
+            "unit_cell_count": 8,
+            "layer_a_thickness_mm": 24.0,
+            "layer_b_thickness_mm": 16.0,
+            "excitation_frequency_hz": 24000.0
+        })
+        check(phononic_res.get("lattice_constant_mm", 0.0) > 35.0, "Lattice constant > 35 mm")
+        check(phononic_res.get("impedance_contrast_ratio", 0.0) > 15.0, "Impedance contrast > 15:1")
+        check(phononic_res.get("bragg_center_frequency_hz", 0.0) > 20000.0, "Bragg center frequency > 20 kHz")
+        check(phononic_res.get("relative_bandgap_width_pct", 0.0) > 30.0, "Relative bandgap width > 30%")
+        check(phononic_res.get("is_in_bandgap", False) is True, "Operating frequency in bandgap")
+        check(phononic_res.get("transmission_loss_db", 0.0) > 30.0, "Transmission loss > 30 dB")
+        check(phononic_res.get("is_isolation_effective", False) is True, "Vibration isolation effective")
+        print(f"  ✓ 29.5 Acoustic Metamaterial Bandgap (Mead / Brillouin): Steel (24mm) / Epoxy (16mm) 1D stack (a = {phononic_res['lattice_constant_mm']:.1f} mm, contrast = {phononic_res['impedance_contrast_ratio']:.1f}:1, c_eff = {phononic_res['effective_sound_speed_m_s']:.1f} m/s), Bragg f0 = {phononic_res['bragg_center_frequency_hz']:.1f} Hz, Bandgap = [{phononic_res['bandgap_lower_hz']:.1f}, {phononic_res['bandgap_upper_hz']:.1f}] Hz (width = {phononic_res['relative_bandgap_width_pct']:.1f}%), f_op = 24.0 kHz (in gap: {phononic_res['is_in_bandgap']}, cos(ka) = {phononic_res['bloch_cos_ka']:.2f}, κ = {phononic_res['spatial_decay_rate_1_m']:.1f} 1/m), Stack TL = {phononic_res['transmission_loss_db']:.1f} dB, High Isolation: {phononic_res['is_isolation_effective']}")
+
+        # 29.6 Universal Commands Execution Verification (Batch 14 Domains)
+        for cmd_id in [
+            "sim.energy.pem_fuel_cell",
+            "sim.science.superconducting_magnet",
+            "sim.aerospace.reentry_aerothermodynamics",
+            "sim.manufacturing.lpbf_meltpool",
+            "sim.acoustics.phononic_bandgap",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 29.6 Universal Commands: All 5 Batch-14 Engineering Commands verified via typed schema engine")
+
+        # 29.7 Enterprise MCP Tool Calling (Batch 14 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_energy_pem_fuel_cell",
+            "atlas_sim_science_superconducting_magnet",
+            "atlas_sim_aerospace_reentry_aerothermodynamics",
+            "atlas_sim_manufacturing_lpbf_meltpool",
+            "atlas_sim_acoustics_phononic_bandgap",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 833,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 29.7 Enterprise MCP Tool Calling: 5 Batch-14 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

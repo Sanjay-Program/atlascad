@@ -6688,5 +6688,146 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 148. Proton Exchange Membrane Fuel Cell (PEMFC) Polarization (Larminie / Barbir)
+    let res_pem = post(
+        addr,
+        "/api/sim/energy/pem_fuel_cell",
+        r#"{
+            "cell_count": 360,
+            "active_cell_area_cm2": 280.0,
+            "operating_temperature_c": 75.0,
+            "anode_pressure_bar": 2.20,
+            "cathode_pressure_bar": 2.00,
+            "operating_current_density_a_cm2": 1.20
+        }"#,
+    )?;
+    assert_eq!(res_pem.status, 200);
+    let pem_json = json(&res_pem)?;
+    assert!(pem_json["nernst_potential_v"].as_f64().unwrap() > 1.15);
+    assert!(pem_json["cell_voltage_v"].as_f64().unwrap() > 0.65);
+    assert!(pem_json["stack_power_kw"].as_f64().unwrap() > 70.0);
+    assert!(pem_json["hydrogen_consumption_kg_h"].as_f64().unwrap() > 4.0);
+    assert!(pem_json["electrical_efficiency_lhv_pct"].as_f64().unwrap() > 50.0);
+    assert!(pem_json["is_operable"].as_bool().unwrap());
+
+    // 149. Cryogenic Superconducting Solenoid Magnet & Quench Protection (Wilson / CERN)
+    let res_mag = post(
+        addr,
+        "/api/sim/science/superconducting_magnet",
+        r#"{
+            "inner_radius_m": 0.35,
+            "outer_radius_m": 0.48,
+            "coil_length_m": 1.25,
+            "turns_count": 2600,
+            "operating_current_a": 1400.0,
+            "operating_temperature_k": 4.20
+        }"#,
+    )?;
+    assert_eq!(res_mag.status, 200);
+    let mag_json = json(&res_mag)?;
+    assert!(mag_json["central_field_t"].as_f64().unwrap() > 2.5);
+    assert!(mag_json["peak_conductor_field_t"].as_f64().unwrap() > mag_json["central_field_t"].as_f64().unwrap());
+    assert!(mag_json["stored_energy_mj"].as_f64().unwrap() > 1.8);
+    assert!(mag_json["load_line_margin_pct"].as_f64().unwrap() < 75.0);
+    assert!(mag_json["adiabatic_hotspot_temperature_k"].as_f64().unwrap() < 180.0);
+    assert!(mag_json["is_quench_safe"].as_bool().unwrap());
+    assert!(mag_json["is_margin_adequate"].as_bool().unwrap());
+
+    // 150. Spacecraft Hypersonic Reentry Aerothermodynamics & Stagnation Heat Flux (Sutton-Graves / NASA SP-8000)
+    let res_reentry = post(
+        addr,
+        "/api/sim/aerospace/reentry_aerothermodynamics",
+        r#"{
+            "freestream_velocity_m_s": 7400.0,
+            "altitude_km": 62.0,
+            "nose_radius_m": 1.15,
+            "vehicle_mass_kg": 5200.0
+        }"#,
+    )?;
+    assert_eq!(res_reentry.status, 200);
+    let reentry_json = json(&res_reentry)?;
+    assert!(reentry_json["freestream_mach"].as_f64().unwrap() > 20.0);
+    assert!(reentry_json["stagnation_pressure_kpa"].as_f64().unwrap() > 10.0);
+    assert!(reentry_json["stagnation_enthalpy_mj_kg"].as_f64().unwrap() > 25.0);
+    assert!(reentry_json["total_stagnation_heat_flux_kw_m2"].as_f64().unwrap() > 800.0);
+    assert!(reentry_json["radiative_equilibrium_wall_temperature_k"].as_f64().unwrap() > 1700.0);
+    assert!(reentry_json["thermal_safety_factor"].as_f64().unwrap() >= 1.05);
+    assert!(reentry_json["is_tps_safe"].as_bool().unwrap());
+
+    // 151. Laser Powder Bed Fusion (LPBF / DMLS) Melt Pool Thermals & Conduction Mode (King / Rosenthal)
+    let res_lpbf = post(
+        addr,
+        "/api/sim/manufacturing/lpbf_meltpool",
+        r#"{
+            "laser_power_w": 250.0,
+            "scan_speed_mm_s": 950.0,
+            "beam_diameter_um": 80.0,
+            "layer_thickness_um": 40.0,
+            "hatch_spacing_um": 100.0
+        }"#,
+    )?;
+    assert_eq!(res_lpbf.status, 200);
+    let lpbf_json = json(&res_lpbf)?;
+    assert!(lpbf_json["volumetric_energy_density_j_mm3"].as_f64().unwrap() > 50.0);
+    assert!(lpbf_json["normalized_enthalpy"].as_f64().unwrap() > 2.5);
+    assert!(lpbf_json["meltpool_width_um"].as_f64().unwrap() > 100.0);
+    assert!(lpbf_json["hatch_overlap_ratio"].as_f64().unwrap() > 1.10);
+    assert!(lpbf_json["penetration_ratio"].as_f64().unwrap() > 1.30);
+    assert!(lpbf_json["is_acceptable"].as_bool().unwrap());
+
+    // 152. Acoustic Metamaterials & Phononic Crystal Bandgap Mechanics (Mead / Brillouin)
+    let res_phononic = post(
+        addr,
+        "/api/sim/acoustics/phononic_bandgap",
+        r#"{
+            "unit_cell_count": 8,
+            "layer_a_thickness_mm": 24.0,
+            "layer_b_thickness_mm": 16.0,
+            "excitation_frequency_hz": 24000.0
+        }"#,
+    )?;
+    assert_eq!(res_phononic.status, 200);
+    let phononic_json = json(&res_phononic)?;
+    assert!(phononic_json["lattice_constant_mm"].as_f64().unwrap() > 35.0);
+    assert!(phononic_json["impedance_contrast_ratio"].as_f64().unwrap() > 15.0);
+    assert!(phononic_json["bragg_center_frequency_hz"].as_f64().unwrap() > 20000.0);
+    assert!(phononic_json["relative_bandgap_width_pct"].as_f64().unwrap() > 30.0);
+    assert!(phononic_json["is_in_bandgap"].as_bool().unwrap());
+    assert!(phononic_json["transmission_loss_db"].as_f64().unwrap() > 30.0);
+    assert!(phononic_json["is_isolation_effective"].as_bool().unwrap());
+
+    // 153. Universal Commands Execution Verification (Batch 14 Domains)
+    for cmd_id in [
+        "sim.energy.pem_fuel_cell",
+        "sim.science.superconducting_magnet",
+        "sim.aerospace.reentry_aerothermodynamics",
+        "sim.manufacturing.lpbf_meltpool",
+        "sim.acoustics.phononic_bandgap",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 154. Enterprise MCP Tool Calling (Batch 14 Domains)
+    for tool_name in [
+        "atlas_sim_energy_pem_fuel_cell",
+        "atlas_sim_science_superconducting_magnet",
+        "atlas_sim_aerospace_reentry_aerothermodynamics",
+        "atlas_sim_manufacturing_lpbf_meltpool",
+        "atlas_sim_acoustics_phononic_bandgap",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 167, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }
