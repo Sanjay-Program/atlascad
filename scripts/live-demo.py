@@ -3320,6 +3320,139 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 31.7 Enterprise MCP Tool Calling: 5 Batch-16 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # =========================================================================
+        # DEMO 32: BATCH 17 HIGH-FIDELITY FIRST-PRINCIPLES SIMULATION SOLVERS
+        # =========================================================================
+        print("\n--- DEMO 32: BATCH 17 ADVANCED SIMULATION SOLVERS (NAVAL, CRASH, NUCLEAR, ADSORPTION, ROTORCRAFT) ---")
+
+        # 32.1 Ship Bow & Bottom Hydrodynamic Slamming (Wagner / Chuang / DNV-RU-SHIP)
+        slam_res = http_request(port, "POST", "/api/sim/marine/ship_slamming", body={
+            "deadrise_angle_deg": 18.0,
+            "relative_impact_velocity_m_s": 7.5,
+            "frame_spacing_m": 0.75,
+            "plate_length_m": 2.40,
+            "plate_thickness_mm": 16.0,
+            "steel_yield_strength_mpa": 355.0
+        })
+        check(slam_res.get("slamming_pressure_coefficient_cp", 0.0) > 10.0, "Cp > 10.0")
+        check(slam_res.get("peak_localized_pressure_kpa", 0.0) > 250.0, "Wagner peak > 250 kPa")
+        check(slam_res.get("space_averaged_pressure_kpa", 0.0) > 150.0, "Space average > 150 kPa")
+        check(slam_res.get("slamming_pulse_duration_ms", 0.0) > 5.0, "Pulse duration > 5 ms")
+        check(slam_res.get("dnv_required_thickness_mm", 0.0) > 8.0, "DNV req thickness > 8 mm")
+        check(slam_res.get("thickness_safety_factor", 0.0) >= 1.0, "Safety factor >= 1.0")
+        check(slam_res.get("is_plate_thickness_sufficient", False) is True, "Plating sufficient")
+        check(slam_res.get("is_air_cushioning_non_critical", False) is True, "Air cushioning safe")
+        print(f"  ✓ 32.1 Ship Bow Flare Wave Slamming Impact (Wagner / Chuang / DNV-RU-SHIP): β = {18.0:.1f}°, v_rel = {7.5:.1f} m/s, C_p = {slam_res['slamming_pressure_coefficient_cp']:.2f}, P_peak = {slam_res['peak_localized_pressure_kpa']:.1f} kPa, P_space = {slam_res['space_averaged_pressure_kpa']:.1f} kPa (P_stat = {slam_res['equivalent_static_pressure_kpa']:.1f} kPa), Pulse τ = {slam_res['slamming_pulse_duration_ms']:.2f} ms, Panel Force = {slam_res['panel_slamming_force_kn']:.1f} kN, Plate σ_b = {slam_res['plate_bending_stress_mpa']:.1f} MPa (Yield 355 MPa), DNV t_req = {slam_res['dnv_required_thickness_mm']:.2f} mm (Existing = 16.0 mm, Margin = {slam_res['thickness_safety_factor']:.2f}x, Adequate: {slam_res['is_plate_thickness_sufficient']})")
+
+        # 32.2 Vehicle Frontal Crash Deceleration & Occupant Severity (ECE R94 / FMVSS 208 / HIC15)
+        crash_res = http_request(port, "POST", "/api/sim/automotive/crash_deceleration", body={
+            "vehicle_mass_kg": 1650.0,
+            "impact_velocity_km_h": 64.0,
+            "crumple_zone_length_m": 0.75,
+            "crash_box_mean_force_kn": 340.0,
+            "structural_energy_efficiency": 0.78,
+            "occupant_mass_kg": 78.0
+        })
+        check(crash_res.get("initial_kinetic_energy_kj", 0.0) > 240.0, "Initial KE > 240 kJ")
+        check(crash_res.get("dynamic_crush_distance_mm", 0.0) > 500.0, "Crush distance > 500 mm")
+        check(crash_res.get("crash_pulse_duration_ms", 0.0) > 50.0, "Crash pulse > 50 ms")
+        check(crash_res.get("head_injury_criterion_hic15", 0.0) < 700.0, "HIC15 < 700")
+        check(crash_res.get("occupant_chest_deflection_mm", 0.0) < 42.0, "Chest deflection < 42 mm")
+        check(crash_res.get("is_crumple_zone_sufficient", False) is True, "Crumple zone sufficient")
+        check(crash_res.get("is_hic15_compliant", False) is True, "HIC15 compliant")
+        check(crash_res.get("is_chest_deflection_compliant", False) is True, "Chest deflection compliant")
+        print(f"  ✓ 32.2 Vehicle Frontal Offset Crash & Occupant Severity (ECE R94 / FMVSS 208): M = {1650.0:.0f} kg @ {64.0:.0f} km/h (E_k = {crash_res['initial_kinetic_energy_kj']:.1f} kJ), s_crush = {crash_res['dynamic_crush_distance_mm']:.1f} mm / 750 mm, Pulse T = {crash_res['crash_pulse_duration_ms']:.1f} ms, a_mean = {crash_res['mean_vehicle_deceleration_g']:.1f}g, a_peak = {crash_res['peak_vehicle_deceleration_g']:.1f}g, Seatbelt F_shoulder = {crash_res['peak_seatbelt_force_kn']:.2f} kN, Chest Deflection = {crash_res['occupant_chest_deflection_mm']:.1f} mm (Limit 42 mm), a_chest = {crash_res['occupant_chest_deceleration_3ms_g']:.1f}g, HIC15 = {crash_res['head_injury_criterion_hic15']:.1f} (FMVSS 208 Limit 700), Prasad-Mertz AIS 4+ Risk = {crash_res['ais4_plus_injury_probability_pct']:.2f}%, Compliant: {crash_res['is_hic15_compliant']})")
+
+        # 32.3 Nuclear Reactor Fuel Pin Radial Conduction & DNB Margin (Fourier / Dittus-Boelter / W-3)
+        fuel_res = http_request(port, "POST", "/api/sim/nuclear/fuel_pin", body={
+            "linear_heat_rate_kw_per_m": 32.0,
+            "pellet_radius_mm": 4.10,
+            "gap_thickness_um": 80.0,
+            "clad_thickness_mm": 0.60,
+            "clad_outer_diameter_mm": 9.50,
+            "rod_pitch_mm": 12.60,
+            "coolant_pressure_mpa": 15.50,
+            "bulk_coolant_temperature_c": 305.0,
+            "coolant_mass_flux_kg_m2_s": 3500.0
+        })
+        check(fuel_res.get("clad_surface_heat_flux_mw_m2", 0.0) > 0.8, "Surface heat flux > 0.8 MW/m²")
+        check(fuel_res.get("coolant_heat_transfer_coeff_w_m2_k", 0.0) > 20000.0, "h_c > 20000 W/m²·K")
+        check(fuel_res.get("clad_outer_temperature_c", 0.0) > 310.0, "Clad outer temp > 310 °C")
+        check(fuel_res.get("centerline_temperature_c", 0.0) > 1200.0, "Centerline temp > 1200 °C")
+        check(fuel_res.get("fuel_melting_margin_c", 0.0) > 600.0, "Melting margin > 600 °C")
+        check(fuel_res.get("departure_from_nucleate_boiling_ratio", 0.0) >= 1.30, "DNBR >= 1.30")
+        check(fuel_res.get("is_dnbr_acceptable", False) is True, "DNBR acceptable")
+        check(fuel_res.get("is_fuel_melting_prevented", False) is True, "Melting prevented")
+        print(f"  ✓ 32.3 Nuclear Reactor Core Fuel Pin Radial Conduction & DNBR Margin (Fourier / Dittus-Boelter / Tong W-3): 17x17 PWR Lattice, q' = {32.0:.1f} kW/m, q'' = {fuel_res['clad_surface_heat_flux_mw_m2']:.3f} MW/m², Dittus-Boelter h_coolant = {fuel_res['coolant_heat_transfer_coeff_w_m2_k']:.0f} W/(m²·K), Clad Outer T = {fuel_res['clad_outer_temperature_c']:.1f}°C, Clad Inner T = {fuel_res['clad_inner_temperature_c']:.1f}°C, Pellet Surf T = {fuel_res['pellet_surface_temperature_c']:.1f}°C, Centerline T_CL = {fuel_res['centerline_temperature_c']:.1f}°C (UO2 Melt Margin = {fuel_res['fuel_melting_margin_c']:.1f}°C), Tong W-3 CHF = {fuel_res['critical_heat_flux_chf_mw_m2']:.3f} MW/m², DNBR = {fuel_res['departure_from_nucleate_boiling_ratio']:.3f} (NRC Limit = {fuel_res['nrc_minimum_dnbr_limit']:.2f}, Safe: {fuel_res['is_dnbr_acceptable']})")
+
+        # 32.4 Pressure Swing Adsorption (PSA) Gas Separation & Breakthrough Dynamics (Langmuir / LDF / Thomas)
+        psa_res = http_request(port, "POST", "/api/sim/chemical/adsorption_psa", body={
+            "bed_diameter_m": 0.60,
+            "bed_length_m": 2.20,
+            "adsorption_pressure_bar": 5.50,
+            "desorption_pressure_bar": 1.10,
+            "operating_temperature_c": 25.0,
+            "feed_flow_rate_nm3_h": 85.0
+        })
+        check(psa_res.get("column_adsorbent_mass_kg", 0.0) > 400.0, "Bed mass > 400 kg")
+        check(psa_res.get("heavy_key_equilibrium_capacity_mol_kg", 0.0) > 1.0, "Eq capacity > 1 mol/kg")
+        check(psa_res.get("working_capacity_mol_kg", 0.0) > 0.4, "Working capacity > 0.4 mol/kg")
+        check(psa_res.get("mass_transfer_zone_length_m", 0.0) > 0.2, "MTZ length > 0.2 m")
+        check(psa_res.get("breakthrough_time_seconds", 0.0) > 60.0, "Breakthrough time > 60 s")
+        check(psa_res.get("product_purity_pct", 0.0) >= 93.0, "Product purity >= 93%")
+        check(psa_res.get("is_cycle_time_feasible", False) is True, "Cycle time feasible")
+        check(psa_res.get("is_purity_specification_met", False) is True, "Purity spec met")
+        print(f"  ✓ 32.4 Pressure Swing Adsorption (PSA) Gas Separation & Dynamics (Langmuir / Glueckauf LDF / Thomas): Zeolite 13X Bed D = {0.60:.2f} m, L = {2.20:.2f} m (M_bed = {psa_res['column_adsorbent_mass_kg']:.1f} kg), P_ads = {5.50:.1f} bar, Feed = {85.0:.1f} Nm³/h air, N2 q_eq = {psa_res['heavy_key_equilibrium_capacity_mol_kg']:.2f} mol/kg (Δq_work = {psa_res['working_capacity_mol_kg']:.2f} mol/kg), Glueckauf k_LDF = {psa_res['ldf_mass_transfer_coeff_per_s']:.3f} s⁻¹, L_MTZ = {psa_res['mass_transfer_zone_length_m']:.2f} m (η_bed = {psa_res['bed_utilization_factor']*100:.1f}%), Breakthrough t_b = {psa_res['breakthrough_time_seconds']:.1f} s (t_sat = {psa_res['stoichiometric_saturation_time_seconds']:.1f} s), O2 Purity = {psa_res['product_purity_pct']:.1f}%, Recovery = {psa_res['product_recovery_pct']:.1f}%, Product = {psa_res['product_flow_rate_nm3_h']:.2f} Nm³/h (Compliant: {psa_res['is_purity_specification_met']})")
+
+        # 32.5 Rotorcraft Helicopter Hover & Forward Flight Aerodynamics (Glauert / Leishman / Prouty)
+        rotor_res = http_request(port, "POST", "/api/sim/aerospace/rotorcraft_aerodynamics", body={
+            "gross_weight_kg": 4300.0,
+            "rotor_radius_m": 6.50,
+            "number_of_blades": 4,
+            "blade_chord_m": 0.38,
+            "rotor_speed_rpm": 345.0,
+            "forward_speed_knots": 0.0
+        })
+        check(rotor_res.get("blade_tip_speed_m_s", 0.0) > 220.0, "V_tip > 220 m/s")
+        check(rotor_res.get("induced_velocity_m_s", 0.0) > 10.0, "Induced velocity > 10 m/s")
+        check(rotor_res.get("figure_of_merit", 0.0) > 0.65, "FM > 0.65")
+        check(rotor_res.get("total_engine_shaft_power_kw", 0.0) > 600.0, "Shaft power > 600 kW")
+        check(rotor_res.get("is_blade_loading_within_limits", False) is True, "Blade loading within limits")
+        check(rotor_res.get("is_tip_mach_non_critical", False) is True, "Tip Mach non-critical")
+        print(f"  ✓ 32.5 Rotorcraft Helicopter Hover & Aerodynamics (Glauert Momentum / Blade Element / Leishman): Gross Weight = {4300.0:.0f} kg, 4-Blade Main Rotor R = {6.50:.2f} m (A = {rotor_res['rotor_disk_area_m2']:.1f} m², σ = {rotor_res['rotor_solidity']:.4f}), V_tip = {rotor_res['blade_tip_speed_m_s']:.1f} m/s (Ω = 345 RPM), C_T = {rotor_res['thrust_coefficient_ct']:.5f} (C_T/σ = {rotor_res['blade_loading_ct_over_sigma']:.4f} <= 0.12), Hover Inflow v_i0 = {rotor_res['induced_velocity_m_s']:.2f} m/s, Induced Power = {rotor_res['induced_power_kw']:.1f} kW, Profile Power = {rotor_res['profile_power_kw']:.1f} kW, Total Shaft Power = {rotor_res['total_engine_shaft_power_kw']:.1f} kW, Hover Figure of Merit FM = {rotor_res['figure_of_merit']:.3f}, Advancing Tip M_(1,90) = {rotor_res['advancing_tip_mach_number']:.3f} (FAR Part 29 Airworthiness: {rotor_res['is_blade_loading_within_limits']})")
+
+        # 32.6 Universal Commands Execution Verification (Batch 17 Domains)
+        for cmd_id in [
+            "sim.marine.ship_slamming",
+            "sim.automotive.crash_deceleration",
+            "sim.nuclear.fuel_pin",
+            "sim.chemical.adsorption_psa",
+            "sim.aerospace.rotorcraft_aerodynamics",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 32.6 Universal Commands: All 5 Batch-17 Engineering Commands verified via typed schema engine")
+
+        # 32.7 Enterprise MCP Tool Calling (Batch 17 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_marine_ship_slamming",
+            "atlas_sim_automotive_crash_deceleration",
+            "atlas_sim_nuclear_fuel_pin",
+            "atlas_sim_chemical_adsorption_psa",
+            "atlas_sim_aerospace_rotorcraft_aerodynamics",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 845,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 32.7 Enterprise MCP Tool Calling: 5 Batch-17 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

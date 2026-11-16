@@ -4578,5 +4578,303 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.marine.ship_slamming",
+            "Ship Bow & Bottom Hydrodynamic Slamming Impact (Wagner / Chuang / DNV-RU-SHIP)",
+            "Evaluates localized peak Wagner slamming pressure, space-averaged pulse, total panel impact force, dynamic bending stress, and DNV-RU-SHIP minimum shell plating thickness.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "deadrise_angle_deg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Section deadrise angle beta in degrees".into(),
+            required: false,
+            default_value: Some(serde_json::json!(18.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(85.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "relative_impact_velocity_m_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Relative normal water-entry impact velocity in m/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(7.5)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(30.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "frame_spacing_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Transverse stiffener / frame spacing in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.75)),
+            validation_rules: vec![ValidationRule::Min(0.2), ValidationRule::Max(2.5)],
+        })
+        .with_argument(CommandArgument {
+            name: "plate_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Longitudinal primary girder / floor spacing in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(2.40)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(6.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "plate_thickness_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Existing plate thickness in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(16.0)),
+            validation_rules: vec![ValidationRule::Min(4.0), ValidationRule::Max(60.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "steel_yield_strength_mpa".into(),
+            arg_type: ArgumentType::Number,
+            description: "Hull structural steel yield strength in MPa (e.g. 355 for NV-36)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(355.0)),
+            validation_rules: vec![ValidationRule::Min(150.0), ValidationRule::Max(800.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.automotive.crash_deceleration",
+            "Vehicle Frontal Crash Deceleration & Occupant Severity (ECE R94 / FMVSS 208 / HIC15)",
+            "Simulates dynamic structural crush distance, haversine deceleration pulse, seatbelt restraint tension, chest deflection, HIC15, and Prasad-Mertz AIS 4+ severe brain injury probability.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "vehicle_mass_kg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Vehicle total test mass in kg".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1650.0)),
+            validation_rules: vec![ValidationRule::Min(400.0), ValidationRule::Max(5000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "impact_velocity_km_h".into(),
+            arg_type: ArgumentType::Number,
+            description: "Initial collision velocity in km/h (e.g. 64 km/h for Euro NCAP 40% offset)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(64.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(140.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "crumple_zone_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Maximum available crumple crush space in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.72)),
+            validation_rules: vec![ValidationRule::Min(0.2), ValidationRule::Max(2.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "crash_box_mean_force_kn".into(),
+            arg_type: ArgumentType::Number,
+            description: "Front crash rail mean plastic collapse force in kN".into(),
+            required: false,
+            default_value: Some(serde_json::json!(310.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "structural_energy_efficiency".into(),
+            arg_type: ArgumentType::Number,
+            description: "Structural energy absorption efficiency factor (0.50 - 0.90)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.75)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(0.95)],
+        })
+        .with_argument(CommandArgument {
+            name: "occupant_mass_kg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Occupant dummy mass in kg (50th percentile male ~ 78 kg)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(78.0)),
+            validation_rules: vec![ValidationRule::Min(30.0), ValidationRule::Max(150.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.nuclear.fuel_pin",
+            "Nuclear Reactor Fuel Pin Radial Conduction & DNB Margin (Fourier / Dittus-Boelter / Tong W-3)",
+            "Evaluates UO2 fuel centerline temperature, helium gap conductance, Zircaloy cladding profile, Dittus-Boelter convection, Tong W-3 Critical Heat Flux, and US NRC DNBR thermal safety margin.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "linear_heat_rate_kw_per_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Peak linear heat generation rate q' in kW/m (typ. 15.0 - 45.0)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(32.0)),
+            validation_rules: vec![ValidationRule::Min(2.0), ValidationRule::Max(60.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "pellet_radius_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "UO2 fuel pellet radius in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(4.10)),
+            validation_rules: vec![ValidationRule::Min(2.0), ValidationRule::Max(8.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "gap_thickness_um".into(),
+            arg_type: ArgumentType::Number,
+            description: "Helium gas radial gap thickness in micrometers".into(),
+            required: false,
+            default_value: Some(serde_json::json!(80.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(250.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "clad_thickness_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Zircaloy cladding wall thickness in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.60)),
+            validation_rules: vec![ValidationRule::Min(0.2), ValidationRule::Max(1.5)],
+        })
+        .with_argument(CommandArgument {
+            name: "coolant_pressure_mpa".into(),
+            arg_type: ArgumentType::Number,
+            description: "Reactor primary system pressure in MPa (typ. 15.5 for PWR)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(15.50)),
+            validation_rules: vec![ValidationRule::Min(2.0), ValidationRule::Max(22.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "bulk_coolant_temperature_c".into(),
+            arg_type: ArgumentType::Number,
+            description: "Bulk subcooled coolant temperature in °C".into(),
+            required: false,
+            default_value: Some(serde_json::json!(305.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(340.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "coolant_mass_flux_kg_m2_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Core coolant mass flux G in kg/(m²·s)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(3500.0)),
+            validation_rules: vec![ValidationRule::Min(800.0), ValidationRule::Max(6000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.chemical.adsorption_psa",
+            "Pressure Swing Adsorption (PSA) Gas Separation & Breakthrough Dynamics (Langmuir / LDF / Thomas)",
+            "Calculates Langmuir multicomponent adsorption equilibrium, Glueckauf LDF mass transfer, Thomas breakthrough curve, Mass Transfer Zone length, product purity, and gas recovery.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "bed_diameter_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Adsorption column bed inner diameter in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.60)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(4.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "bed_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Packed adsorbent bed length in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(2.20)),
+            validation_rules: vec![ValidationRule::Min(0.3), ValidationRule::Max(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "adsorption_pressure_bar".into(),
+            arg_type: ArgumentType::Number,
+            description: "Adsorption cycle pressure in bar absolute".into(),
+            required: false,
+            default_value: Some(serde_json::json!(5.50)),
+            validation_rules: vec![ValidationRule::Min(1.5), ValidationRule::Max(40.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "desorption_pressure_bar".into(),
+            arg_type: ArgumentType::Number,
+            description: "Desorption/regeneration pressure in bar absolute".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1.10)),
+            validation_rules: vec![ValidationRule::Min(0.05), ValidationRule::Max(5.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "feed_flow_rate_nm3_h".into(),
+            arg_type: ArgumentType::Number,
+            description: "Feed gas flow rate at STP in Nm³/h".into(),
+            required: false,
+            default_value: Some(serde_json::json!(85.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(5000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "adsorbent_bulk_density_kg_m3".into(),
+            arg_type: ArgumentType::Number,
+            description: "Adsorbent packed bulk density in kg/m³".into(),
+            required: false,
+            default_value: Some(serde_json::json!(700.0)),
+            validation_rules: vec![ValidationRule::Min(300.0), ValidationRule::Max(1500.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.aerospace.rotorcraft_aerodynamics",
+            "Rotorcraft Helicopter Hover & Forward Flight Aerodynamics (Glauert / Leishman / Prouty)",
+            "Computes blade element momentum inflow, hover induced & profile power, Figure of Merit, Glauert forward flight power bucket, tip Mach number, and stall margin.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "gross_weight_kg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rotorcraft gross takeoff weight in kg".into(),
+            required: false,
+            default_value: Some(serde_json::json!(4300.0)),
+            validation_rules: vec![ValidationRule::Min(300.0), ValidationRule::Max(30000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rotor_radius_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Main rotor radius R in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(6.50)),
+            validation_rules: vec![ValidationRule::Min(1.5), ValidationRule::Max(16.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "number_of_blades".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Number of main rotor blades".into(),
+            required: false,
+            default_value: Some(serde_json::json!(4)),
+            validation_rules: vec![ValidationRule::Min(2.0), ValidationRule::Max(8.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "blade_chord_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Mean blade chord in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.38)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rotor_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rotor rotational speed in RPM".into(),
+            required: false,
+            default_value: Some(serde_json::json!(345.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(800.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "forward_speed_knots".into(),
+            arg_type: ArgumentType::Number,
+            description: "Forward flight airspeed in knots (0.0 for hover)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.0)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(250.0)],
+        }),
+    )?;
+
     Ok(())
 }

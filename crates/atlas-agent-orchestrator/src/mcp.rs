@@ -1687,6 +1687,84 @@ impl McpServer {
                     "required": ["package_width_mm", "solder_joint_height_um"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_marine_ship_slamming".into(),
+                description: "Evaluates ship bow and bottom hydrodynamic wave slamming impact, peak Wagner pressure, space-averaged pulse, and DNV-RU-SHIP minimum shell plating thickness.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "deadrise_angle_deg": { "type": "number", "default": 18.0 },
+                        "relative_impact_velocity_m_s": { "type": "number", "default": 7.5 },
+                        "frame_spacing_m": { "type": "number", "default": 0.75 },
+                        "plate_length_m": { "type": "number", "default": 2.40 },
+                        "plate_thickness_mm": { "type": "number", "default": 16.0 },
+                        "steel_yield_strength_mpa": { "type": "number", "default": 355.0 }
+                    },
+                    "required": ["deadrise_angle_deg", "relative_impact_velocity_m_s"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_automotive_crash_deceleration".into(),
+                description: "Simulates vehicle frontal offset crash deceleration, dynamic crush distance, occupant chest deflection, HIC15, and Prasad-Mertz AIS 4+ brain injury probability.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "vehicle_mass_kg": { "type": "number", "default": 1650.0 },
+                        "impact_velocity_km_h": { "type": "number", "default": 64.0 },
+                        "crumple_zone_length_m": { "type": "number", "default": 0.72 },
+                        "crash_box_mean_force_kn": { "type": "number", "default": 310.0 },
+                        "occupant_mass_kg": { "type": "number", "default": 78.0 }
+                    },
+                    "required": ["vehicle_mass_kg", "impact_velocity_km_h"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_nuclear_fuel_pin".into(),
+                description: "Evaluates nuclear reactor core fuel pin radial conduction (UO2, He gap, Zircaloy clad), Dittus-Boelter convection, Tong W-3 CHF, and NRC DNBR thermal safety margin.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "linear_heat_rate_kw_per_m": { "type": "number", "default": 32.0 },
+                        "pellet_radius_mm": { "type": "number", "default": 4.10 },
+                        "gap_thickness_um": { "type": "number", "default": 80.0 },
+                        "clad_thickness_mm": { "type": "number", "default": 0.60 },
+                        "coolant_pressure_mpa": { "type": "number", "default": 15.50 },
+                        "bulk_coolant_temperature_c": { "type": "number", "default": 305.0 }
+                    },
+                    "required": ["linear_heat_rate_kw_per_m", "coolant_pressure_mpa"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_chemical_adsorption_psa".into(),
+                description: "Calculates Pressure Swing Adsorption (PSA) Langmuir equilibrium, Glueckauf LDF kinetics, Thomas breakthrough dynamics, MTZ length, product purity, and gas recovery.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "bed_diameter_m": { "type": "number", "default": 0.60 },
+                        "bed_length_m": { "type": "number", "default": 2.20 },
+                        "adsorption_pressure_bar": { "type": "number", "default": 5.50 },
+                        "desorption_pressure_bar": { "type": "number", "default": 1.10 },
+                        "feed_flow_rate_nm3_h": { "type": "number", "default": 85.0 }
+                    },
+                    "required": ["adsorption_pressure_bar", "feed_flow_rate_nm3_h"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_aerospace_rotorcraft_aerodynamics".into(),
+                description: "Computes rotorcraft helicopter hover and forward flight blade element momentum aerodynamics, induced/profile power, Figure of Merit, and tip Mach number.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "gross_weight_kg": { "type": "number", "default": 4300.0 },
+                        "rotor_radius_m": { "type": "number", "default": 6.50 },
+                        "number_of_blades": { "type": "integer", "default": 4 },
+                        "blade_chord_m": { "type": "number", "default": 0.38 },
+                        "rotor_speed_rpm": { "type": "number", "default": 345.0 },
+                        "forward_speed_knots": { "type": "number", "default": 0.0 }
+                    },
+                    "required": ["gross_weight_kg", "rotor_radius_m"]
+                }),
+            },
         ]
     }
 

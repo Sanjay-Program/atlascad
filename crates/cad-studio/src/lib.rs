@@ -6185,6 +6185,113 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_marine_ship_slamming(
+        &mut self,
+        req: &SimShipSlammingRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::ship_slamming::ShipSlammingProblem {
+            problem_id: "ship_slamming_sim".to_string(),
+            location: req.location.unwrap_or(atlas_simulation_core::ship_slamming::SlammingLocation::BowFlare),
+            deadrise_angle_deg: req.deadrise_angle_deg.unwrap_or(18.0),
+            relative_impact_velocity_m_s: req.relative_impact_velocity_m_s.unwrap_or(7.5),
+            frame_spacing_m: req.frame_spacing_m.unwrap_or(0.75),
+            plate_length_m: req.plate_length_m.unwrap_or(2.40),
+            plate_thickness_mm: req.plate_thickness_mm.unwrap_or(16.0),
+            steel_yield_strength_mpa: req.steel_yield_strength_mpa.unwrap_or(355.0),
+            water_density_kg_m3: req.water_density_kg_m3.unwrap_or(1025.0),
+        };
+        let res = atlas_simulation_core::ship_slamming::solve_ship_slamming(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_automotive_crash_deceleration(
+        &mut self,
+        req: &SimCrashDecelerationRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::crash_deceleration::CrashDecelerationProblem {
+            problem_id: "crash_deceleration_sim".to_string(),
+            scenario: req.scenario.unwrap_or(atlas_simulation_core::crash_deceleration::CrashScenario::OffsetDeformableBarrier40Pct),
+            restraint: req.restraint.unwrap_or(atlas_simulation_core::crash_deceleration::RestraintSystemType::AdvancedAirbagAndAdaptiveBelt),
+            vehicle_mass_kg: req.vehicle_mass_kg.unwrap_or(1650.0),
+            impact_velocity_km_h: req.impact_velocity_km_h.unwrap_or(64.0),
+            crumple_zone_length_m: req.crumple_zone_length_m.unwrap_or(0.72),
+            crash_box_mean_force_kn: req.crash_box_mean_force_kn.unwrap_or(310.0),
+            structural_energy_efficiency: req.structural_energy_efficiency.unwrap_or(0.75),
+            occupant_mass_kg: req.occupant_mass_kg.unwrap_or(78.0),
+        };
+        let res = atlas_simulation_core::crash_deceleration::solve_crash_deceleration(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_nuclear_fuel_pin(
+        &mut self,
+        req: &SimNuclearFuelPinRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::nuclear_fuel_pin::NuclearFuelPinProblem {
+            problem_id: "nuclear_fuel_pin_sim".to_string(),
+            lattice: req.lattice.unwrap_or(atlas_simulation_core::nuclear_fuel_pin::LatticeGeometry::PwrSquarePitch17x17),
+            linear_heat_rate_kw_per_m: req.linear_heat_rate_kw_per_m.unwrap_or(32.0),
+            pellet_radius_mm: req.pellet_radius_mm.unwrap_or(4.10),
+            gap_thickness_um: req.gap_thickness_um.unwrap_or(80.0),
+            clad_thickness_mm: req.clad_thickness_mm.unwrap_or(0.60),
+            clad_outer_diameter_mm: req.clad_outer_diameter_mm.unwrap_or(9.50),
+            rod_pitch_mm: req.rod_pitch_mm.unwrap_or(12.60),
+            coolant_pressure_mpa: req.coolant_pressure_mpa.unwrap_or(15.50),
+            bulk_coolant_temperature_c: req.bulk_coolant_temperature_c.unwrap_or(305.0),
+            coolant_mass_flux_kg_m2_s: req.coolant_mass_flux_kg_m2_s.unwrap_or(3500.0),
+        };
+        let res = atlas_simulation_core::nuclear_fuel_pin::solve_nuclear_fuel_pin(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_chemical_adsorption_psa(
+        &mut self,
+        req: &SimAdsorptionPsaRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::adsorption_psa::AdsorptionPsaProblem {
+            problem_id: "adsorption_psa_sim".to_string(),
+            duty: req.duty.unwrap_or(atlas_simulation_core::adsorption_psa::PsaSeparationDuty::OxygenGenerationFromAir),
+            bed_diameter_m: req.bed_diameter_m.unwrap_or(0.60),
+            bed_length_m: req.bed_length_m.unwrap_or(2.20),
+            adsorption_pressure_bar: req.adsorption_pressure_bar.unwrap_or(5.50),
+            desorption_pressure_bar: req.desorption_pressure_bar.unwrap_or(1.10),
+            operating_temperature_c: req.operating_temperature_c.unwrap_or(25.0),
+            feed_flow_rate_nm3_h: req.feed_flow_rate_nm3_h.unwrap_or(85.0),
+            particle_diameter_mm: req.particle_diameter_mm.unwrap_or(2.0),
+            adsorbent_bulk_density_kg_m3: req.adsorbent_bulk_density_kg_m3.unwrap_or(700.0),
+            feed_heavy_fraction: req.feed_heavy_fraction.unwrap_or(0.78),
+        };
+        let res = atlas_simulation_core::adsorption_psa::solve_adsorption_psa(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_aerospace_rotorcraft_aerodynamics(
+        &mut self,
+        req: &SimRotorcraftAerodynamicsRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::rotorcraft_aerodynamics::RotorcraftAerodynamicsProblem {
+            problem_id: "rotorcraft_aerodynamics_sim".to_string(),
+            regime: req.regime.unwrap_or(atlas_simulation_core::rotorcraft_aerodynamics::RotorFlightRegime::HoverOge),
+            gross_weight_kg: req.gross_weight_kg.unwrap_or(4300.0),
+            rotor_radius_m: req.rotor_radius_m.unwrap_or(6.50),
+            number_of_blades: req.number_of_blades.unwrap_or(4),
+            blade_chord_m: req.blade_chord_m.unwrap_or(0.38),
+            rotor_speed_rpm: req.rotor_speed_rpm.unwrap_or(345.0),
+            forward_speed_knots: req.forward_speed_knots.unwrap_or(0.0),
+            air_density_kg_m3: req.air_density_kg_m3.unwrap_or(1.225),
+            speed_of_sound_m_s: req.speed_of_sound_m_s.unwrap_or(340.3),
+            blade_profile_cd0: req.blade_profile_cd0.unwrap_or(0.0095),
+            fuselage_flat_plate_area_m2: req.fuselage_flat_plate_area_m2.unwrap_or(1.65),
+        };
+        let res = atlas_simulation_core::rotorcraft_aerodynamics::solve_rotorcraft_aerodynamics(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -8593,6 +8700,93 @@ namespace AtlasCAD.Unity
                     ..Default::default()
                 })?
             }
+            "sim.marine.ship_slamming" => {
+                let beta = req.arguments.get("deadrise_angle_deg").and_then(|v| v.as_f64());
+                let v_rel = req.arguments.get("relative_impact_velocity_m_s").and_then(|v| v.as_f64());
+                let s_m = req.arguments.get("frame_spacing_m").and_then(|v| v.as_f64());
+                let l_m = req.arguments.get("plate_length_m").and_then(|v| v.as_f64());
+                let t_mm = req.arguments.get("plate_thickness_mm").and_then(|v| v.as_f64());
+                let f_y = req.arguments.get("steel_yield_strength_mpa").and_then(|v| v.as_f64());
+                self.sim_marine_ship_slamming(&SimShipSlammingRequest {
+                    deadrise_angle_deg: beta,
+                    relative_impact_velocity_m_s: v_rel,
+                    frame_spacing_m: s_m,
+                    plate_length_m: l_m,
+                    plate_thickness_mm: t_mm,
+                    steel_yield_strength_mpa: f_y,
+                    ..Default::default()
+                })?
+            }
+            "sim.automotive.crash_deceleration" => {
+                let m_veh = req.arguments.get("vehicle_mass_kg").and_then(|v| v.as_f64());
+                let v_kmh = req.arguments.get("impact_velocity_km_h").and_then(|v| v.as_f64());
+                let l_crush = req.arguments.get("crumple_zone_length_m").and_then(|v| v.as_f64());
+                let f_box = req.arguments.get("crash_box_mean_force_kn").and_then(|v| v.as_f64());
+                let eta = req.arguments.get("structural_energy_efficiency").and_then(|v| v.as_f64());
+                let m_occ = req.arguments.get("occupant_mass_kg").and_then(|v| v.as_f64());
+                self.sim_automotive_crash_deceleration(&SimCrashDecelerationRequest {
+                    vehicle_mass_kg: m_veh,
+                    impact_velocity_km_h: v_kmh,
+                    crumple_zone_length_m: l_crush,
+                    crash_box_mean_force_kn: f_box,
+                    structural_energy_efficiency: eta,
+                    occupant_mass_kg: m_occ,
+                    ..Default::default()
+                })?
+            }
+            "sim.nuclear.fuel_pin" => {
+                let q_prime = req.arguments.get("linear_heat_rate_kw_per_m").and_then(|v| v.as_f64());
+                let r_p = req.arguments.get("pellet_radius_mm").and_then(|v| v.as_f64());
+                let gap_um = req.arguments.get("gap_thickness_um").and_then(|v| v.as_f64());
+                let t_clad = req.arguments.get("clad_thickness_mm").and_then(|v| v.as_f64());
+                let p_sys = req.arguments.get("coolant_pressure_mpa").and_then(|v| v.as_f64());
+                let t_b = req.arguments.get("bulk_coolant_temperature_c").and_then(|v| v.as_f64());
+                let g_flux = req.arguments.get("coolant_mass_flux_kg_m2_s").and_then(|v| v.as_f64());
+                self.sim_nuclear_fuel_pin(&SimNuclearFuelPinRequest {
+                    linear_heat_rate_kw_per_m: q_prime,
+                    pellet_radius_mm: r_p,
+                    gap_thickness_um: gap_um,
+                    clad_thickness_mm: t_clad,
+                    coolant_pressure_mpa: p_sys,
+                    bulk_coolant_temperature_c: t_b,
+                    coolant_mass_flux_kg_m2_s: g_flux,
+                    ..Default::default()
+                })?
+            }
+            "sim.chemical.adsorption_psa" => {
+                let d_bed = req.arguments.get("bed_diameter_m").and_then(|v| v.as_f64());
+                let l_bed = req.arguments.get("bed_length_m").and_then(|v| v.as_f64());
+                let p_ads = req.arguments.get("adsorption_pressure_bar").and_then(|v| v.as_f64());
+                let p_des = req.arguments.get("desorption_pressure_bar").and_then(|v| v.as_f64());
+                let v_feed = req.arguments.get("feed_flow_rate_nm3_h").and_then(|v| v.as_f64());
+                let rho_bulk = req.arguments.get("adsorbent_bulk_density_kg_m3").and_then(|v| v.as_f64());
+                self.sim_chemical_adsorption_psa(&SimAdsorptionPsaRequest {
+                    bed_diameter_m: d_bed,
+                    bed_length_m: l_bed,
+                    adsorption_pressure_bar: p_ads,
+                    desorption_pressure_bar: p_des,
+                    feed_flow_rate_nm3_h: v_feed,
+                    adsorbent_bulk_density_kg_m3: rho_bulk,
+                    ..Default::default()
+                })?
+            }
+            "sim.aerospace.rotorcraft_aerodynamics" => {
+                let w_gross = req.arguments.get("gross_weight_kg").and_then(|v| v.as_f64());
+                let r_main = req.arguments.get("rotor_radius_m").and_then(|v| v.as_f64());
+                let n_b = req.arguments.get("number_of_blades").and_then(|v| v.as_u64()).map(|v| v as u32);
+                let c_blade = req.arguments.get("blade_chord_m").and_then(|v| v.as_f64());
+                let rpm = req.arguments.get("rotor_speed_rpm").and_then(|v| v.as_f64());
+                let v_kts = req.arguments.get("forward_speed_knots").and_then(|v| v.as_f64());
+                self.sim_aerospace_rotorcraft_aerodynamics(&SimRotorcraftAerodynamicsRequest {
+                    gross_weight_kg: w_gross,
+                    rotor_radius_m: r_main,
+                    number_of_blades: n_b,
+                    blade_chord_m: c_blade,
+                    rotor_speed_rpm: rpm,
+                    forward_speed_knots: v_kts,
+                    ..Default::default()
+                })?
+            }
             "system.deploy.status" => self.deploy_status()?,
             _ => serde_json::json!({
                 "status": "Executed",
@@ -10961,6 +11155,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/packaging/solder_thermal_fatigue" => {
             match parse_body_or_default::<SimSolderThermalFatigueRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_packaging_solder_thermal_fatigue(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/marine/ship_slamming" => {
+            match parse_body_or_default::<SimShipSlammingRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_marine_ship_slamming(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/automotive/crash_deceleration" => {
+            match parse_body_or_default::<SimCrashDecelerationRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_automotive_crash_deceleration(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/nuclear/fuel_pin" => {
+            match parse_body_or_default::<SimNuclearFuelPinRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_nuclear_fuel_pin(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/chemical/adsorption_psa" => {
+            match parse_body_or_default::<SimAdsorptionPsaRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_chemical_adsorption_psa(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/aerospace/rotorcraft_aerodynamics" => {
+            match parse_body_or_default::<SimRotorcraftAerodynamicsRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_aerospace_rotorcraft_aerodynamics(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -15065,4 +15304,118 @@ struct SimSolderThermalFatigueRequest {
     pub dwell_time_minutes: Option<f64>,
     #[serde(default)]
     pub ramp_rate_c_min: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimShipSlammingRequest {
+    #[serde(default)]
+    pub location: Option<atlas_simulation_core::ship_slamming::SlammingLocation>,
+    #[serde(default)]
+    pub deadrise_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub relative_impact_velocity_m_s: Option<f64>,
+    #[serde(default)]
+    pub frame_spacing_m: Option<f64>,
+    #[serde(default)]
+    pub plate_length_m: Option<f64>,
+    #[serde(default)]
+    pub plate_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub steel_yield_strength_mpa: Option<f64>,
+    #[serde(default)]
+    pub water_density_kg_m3: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimCrashDecelerationRequest {
+    #[serde(default)]
+    pub scenario: Option<atlas_simulation_core::crash_deceleration::CrashScenario>,
+    #[serde(default)]
+    pub restraint: Option<atlas_simulation_core::crash_deceleration::RestraintSystemType>,
+    #[serde(default)]
+    pub vehicle_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub impact_velocity_km_h: Option<f64>,
+    #[serde(default)]
+    pub crumple_zone_length_m: Option<f64>,
+    #[serde(default)]
+    pub crash_box_mean_force_kn: Option<f64>,
+    #[serde(default)]
+    pub structural_energy_efficiency: Option<f64>,
+    #[serde(default)]
+    pub occupant_mass_kg: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimNuclearFuelPinRequest {
+    #[serde(default)]
+    pub lattice: Option<atlas_simulation_core::nuclear_fuel_pin::LatticeGeometry>,
+    #[serde(default)]
+    pub linear_heat_rate_kw_per_m: Option<f64>,
+    #[serde(default)]
+    pub pellet_radius_mm: Option<f64>,
+    #[serde(default)]
+    pub gap_thickness_um: Option<f64>,
+    #[serde(default)]
+    pub clad_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub clad_outer_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub rod_pitch_mm: Option<f64>,
+    #[serde(default)]
+    pub coolant_pressure_mpa: Option<f64>,
+    #[serde(default)]
+    pub bulk_coolant_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub coolant_mass_flux_kg_m2_s: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimAdsorptionPsaRequest {
+    #[serde(default)]
+    pub duty: Option<atlas_simulation_core::adsorption_psa::PsaSeparationDuty>,
+    #[serde(default)]
+    pub bed_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub bed_length_m: Option<f64>,
+    #[serde(default)]
+    pub adsorption_pressure_bar: Option<f64>,
+    #[serde(default)]
+    pub desorption_pressure_bar: Option<f64>,
+    #[serde(default)]
+    pub operating_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub feed_flow_rate_nm3_h: Option<f64>,
+    #[serde(default)]
+    pub particle_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub adsorbent_bulk_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub feed_heavy_fraction: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimRotorcraftAerodynamicsRequest {
+    #[serde(default)]
+    pub regime: Option<atlas_simulation_core::rotorcraft_aerodynamics::RotorFlightRegime>,
+    #[serde(default)]
+    pub gross_weight_kg: Option<f64>,
+    #[serde(default)]
+    pub rotor_radius_m: Option<f64>,
+    #[serde(default)]
+    pub number_of_blades: Option<u32>,
+    #[serde(default)]
+    pub blade_chord_m: Option<f64>,
+    #[serde(default)]
+    pub rotor_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub forward_speed_knots: Option<f64>,
+    #[serde(default)]
+    pub air_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub speed_of_sound_m_s: Option<f64>,
+    #[serde(default)]
+    pub blade_profile_cd0: Option<f64>,
+    #[serde(default)]
+    pub fuselage_flat_plate_area_m2: Option<f64>,
 }

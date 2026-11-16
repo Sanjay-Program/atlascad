@@ -2102,6 +2102,99 @@ def simulation_section(studio: Studio) -> None:
     check(sol_data.get("median_cycles_to_failure_n50", 0.0) > 500.0, "Coffin-Manson median cycles to failure N50 > 500 cycles")
     check(sol_data.get("weibull_characteristic_life_eta", 0.0) > 500.0, "Weibull characteristic lifetime eta > 500 cycles")
     check(sol_data.get("is_ipc_9701_compliant", False) is True, "IPC-9701 thermal cycling qualification compliant")
+
+    # 85. Ship Bow & Bottom Hydrodynamic Wave Slamming (Wagner / Chuang / DNV-RU-SHIP)
+    slamming = studio.post("/api/sim/marine/ship_slamming", {
+        "deadrise_angle_deg": 18.0,
+        "relative_impact_velocity_m_s": 7.5,
+        "frame_spacing_m": 0.75,
+        "plate_length_m": 2.40,
+        "plate_thickness_mm": 16.0,
+        "steel_yield_strength_mpa": 355.0,
+    })
+    check(slamming.status == 200, f"ship slamming returns 200 (got {slamming.status})")
+    slam_data = slamming.json()
+    check(slam_data.get("slamming_pressure_coefficient_cp", 0.0) > 10.0, "hydrodynamic peak slamming pressure coefficient Cp > 10.0")
+    check(slam_data.get("peak_localized_pressure_kpa", 0.0) > 250.0, "Wagner localized peak slamming pressure > 250 kPa")
+    check(slam_data.get("space_averaged_pressure_kpa", 0.0) > 150.0, "space-averaged panel design slamming pressure > 150 kPa")
+    check(slam_data.get("slamming_pulse_duration_ms", 0.0) > 5.0, "slamming pressure pulse duration > 5.0 ms")
+    check(slam_data.get("dnv_required_thickness_mm", 0.0) > 8.0, "DNV-RU-SHIP minimum shell plate thickness > 8.0 mm")
+    check(slam_data.get("is_plate_thickness_sufficient", False) is True, "existing hull plating satisfies DNV slamming yield strength")
+
+    # 86. Vehicle Frontal Crash Deceleration & Occupant Severity (ECE R94 / FMVSS 208 / HIC15)
+    crash = studio.post("/api/sim/automotive/crash_deceleration", {
+        "vehicle_mass_kg": 1650.0,
+        "impact_velocity_km_h": 64.0,
+        "crumple_zone_length_m": 0.75,
+        "crash_box_mean_force_kn": 340.0,
+        "structural_energy_efficiency": 0.78,
+        "occupant_mass_kg": 78.0,
+    })
+    check(crash.status == 200, f"crash deceleration returns 200 (got {crash.status})")
+    crash_data = crash.json()
+    check(crash_data.get("initial_kinetic_energy_kj", 0.0) > 240.0, "initial vehicle kinetic energy > 240 kJ")
+    check(crash_data.get("dynamic_crush_distance_mm", 0.0) > 500.0, "dynamic crumple crush distance > 500 mm")
+    check(crash_data.get("head_injury_criterion_hic15", 0.0) < 700.0, "Head Injury Criterion HIC15 < 700")
+    check(crash_data.get("occupant_chest_deflection_mm", 0.0) < 42.0, "occupant chest deflection < 42 mm")
+    check(crash_data.get("is_crumple_zone_sufficient", False) is True, "crush contained within crumple zone without cabin intrusion")
+    check(crash_data.get("is_hic15_compliant", False) is True, "FMVSS 208 and Euro NCAP HIC15 biomechanical compliance verified")
+
+    # 87. Nuclear Reactor Fuel Pin Radial Conduction & DNB Margin (Fourier / Dittus-Boelter / W-3)
+    fuel_pin = studio.post("/api/sim/nuclear/fuel_pin", {
+        "linear_heat_rate_kw_per_m": 32.0,
+        "pellet_radius_mm": 4.10,
+        "gap_thickness_um": 80.0,
+        "clad_thickness_mm": 0.60,
+        "clad_outer_diameter_mm": 9.50,
+        "rod_pitch_mm": 12.60,
+        "coolant_pressure_mpa": 15.50,
+        "bulk_coolant_temperature_c": 305.0,
+        "coolant_mass_flux_kg_m2_s": 3500.0,
+    })
+    check(fuel_pin.status == 200, f"nuclear fuel pin returns 200 (got {fuel_pin.status})")
+    fuel_data = fuel_pin.json()
+    check(fuel_data.get("clad_surface_heat_flux_mw_m2", 0.0) > 0.8, "cladding outer heat flux > 0.8 MW/m²")
+    check(fuel_data.get("centerline_temperature_c", 0.0) > 1200.0, "UO2 fuel centerline peak temperature > 1200 °C")
+    check(fuel_data.get("fuel_melting_margin_c", 0.0) > 600.0, "safety margin to fuel melting > 600 °C")
+    check(fuel_data.get("departure_from_nucleate_boiling_ratio", 0.0) >= 1.30, "DNBR >= 1.30 per US NRC standard review plan")
+    check(fuel_data.get("is_dnbr_acceptable", False) is True, "thermal margin to DNB acceptable")
+    check(fuel_data.get("is_fuel_melting_prevented", False) is True, "fuel melting strictly prevented")
+
+    # 88. Pressure Swing Adsorption (PSA) Gas Separation & Breakthrough Dynamics (Langmuir / LDF / Thomas)
+    psa = studio.post("/api/sim/chemical/adsorption_psa", {
+        "bed_diameter_m": 0.60,
+        "bed_length_m": 2.20,
+        "adsorption_pressure_bar": 5.50,
+        "desorption_pressure_bar": 1.10,
+        "operating_temperature_c": 25.0,
+        "feed_flow_rate_nm3_h": 85.0,
+    })
+    check(psa.status == 200, f"adsorption PSA returns 200 (got {psa.status})")
+    psa_data = psa.json()
+    check(psa_data.get("column_adsorbent_mass_kg", 0.0) > 400.0, "packed adsorbent bed mass > 400 kg")
+    check(psa_data.get("heavy_key_equilibrium_capacity_mol_kg", 0.0) > 1.0, "equilibrium heavy component capacity > 1.0 mol/kg")
+    check(psa_data.get("breakthrough_time_seconds", 0.0) > 60.0, "column dynamic breakthrough time > 60 s")
+    check(psa_data.get("product_purity_pct", 0.0) >= 93.0, "purified product gas purity >= 93.0%")
+    check(psa_data.get("is_cycle_time_feasible", False) is True, "PSA cycle valve switching time feasible")
+    check(psa_data.get("is_purity_specification_met", False) is True, "product gas purity specification met")
+
+    # 89. Rotorcraft Helicopter Hover & Forward Flight Aerodynamics (Glauert / Leishman / Prouty)
+    rotor = studio.post("/api/sim/aerospace/rotorcraft_aerodynamics", {
+        "gross_weight_kg": 4300.0,
+        "rotor_radius_m": 6.50,
+        "number_of_blades": 4,
+        "blade_chord_m": 0.38,
+        "rotor_speed_rpm": 345.0,
+        "forward_speed_knots": 0.0,
+    })
+    check(rotor.status == 200, f"rotorcraft aerodynamics returns 200 (got {rotor.status})")
+    rotor_data = rotor.json()
+    check(rotor_data.get("blade_tip_speed_m_s", 0.0) > 220.0, "rotor blade tip speed Vtip > 220 m/s")
+    check(rotor_data.get("induced_velocity_m_s", 0.0) > 10.0, "momentum theory induced inflow velocity > 10 m/s")
+    check(rotor_data.get("figure_of_merit", 0.0) > 0.65, "hover aerodynamic Figure of Merit FM > 0.65")
+    check(rotor_data.get("total_engine_shaft_power_kw", 0.0) > 600.0, "total required engine shaft power > 600 kW")
+    check(rotor_data.get("is_blade_loading_within_limits", False) is True, "rotor blade loading safely within stall margin")
+    check(rotor_data.get("is_tip_mach_non_critical", False) is True, "advancing tip Mach number free from compressibility drag rise")
     report("simulation")
 
 

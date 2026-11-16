@@ -7139,5 +7139,159 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 169. Ship Bow & Bottom Hydrodynamic Wave Slamming Impact (Wagner / Chuang / DNV-RU-SHIP)
+    let res_slamming = post(
+        addr,
+        "/api/sim/marine/ship_slamming",
+        r#"{
+            "deadrise_angle_deg": 18.0,
+            "relative_impact_velocity_m_s": 7.5,
+            "frame_spacing_m": 0.75,
+            "plate_length_m": 2.40,
+            "plate_thickness_mm": 16.0,
+            "steel_yield_strength_mpa": 355.0
+        }"#,
+    )?;
+    assert_eq!(res_slamming.status, 200);
+    let slam_json = json(&res_slamming)?;
+    assert!(slam_json["slamming_pressure_coefficient_cp"].as_f64().unwrap() > 10.0);
+    assert!(slam_json["peak_localized_pressure_kpa"].as_f64().unwrap() > 250.0);
+    assert!(slam_json["space_averaged_pressure_kpa"].as_f64().unwrap() > 150.0);
+    assert!(slam_json["slamming_pulse_duration_ms"].as_f64().unwrap() > 5.0);
+    assert!(slam_json["dnv_required_thickness_mm"].as_f64().unwrap() > 8.0);
+    assert!(slam_json["thickness_safety_factor"].as_f64().unwrap() >= 1.0);
+    assert!(slam_json["is_plate_thickness_sufficient"].as_bool().unwrap());
+    assert!(slam_json["is_air_cushioning_non_critical"].as_bool().unwrap());
+
+    // 170. Vehicle Frontal Crash Deceleration & Occupant Severity (ECE R94 / FMVSS 208 / HIC15)
+    let res_crash = post(
+        addr,
+        "/api/sim/automotive/crash_deceleration",
+        r#"{
+            "vehicle_mass_kg": 1650.0,
+            "impact_velocity_km_h": 64.0,
+            "crumple_zone_length_m": 0.75,
+            "crash_box_mean_force_kn": 340.0,
+            "structural_energy_efficiency": 0.78,
+            "occupant_mass_kg": 78.0
+        }"#,
+    )?;
+    assert_eq!(res_crash.status, 200);
+    let crash_json = json(&res_crash)?;
+    assert!(crash_json["initial_kinetic_energy_kj"].as_f64().unwrap() > 240.0);
+    assert!(crash_json["dynamic_crush_distance_mm"].as_f64().unwrap() > 500.0);
+    assert!(crash_json["crash_pulse_duration_ms"].as_f64().unwrap() > 50.0);
+    assert!(crash_json["head_injury_criterion_hic15"].as_f64().unwrap() < 700.0);
+    assert!(crash_json["occupant_chest_deflection_mm"].as_f64().unwrap() < 42.0);
+    assert!(crash_json["is_crumple_zone_sufficient"].as_bool().unwrap());
+    assert!(crash_json["is_hic15_compliant"].as_bool().unwrap());
+    assert!(crash_json["is_chest_deflection_compliant"].as_bool().unwrap());
+
+    // 171. Nuclear Reactor Fuel Pin Radial Conduction & DNB Margin (Fourier / Dittus-Boelter / W-3)
+    let res_fuel = post(
+        addr,
+        "/api/sim/nuclear/fuel_pin",
+        r#"{
+            "linear_heat_rate_kw_per_m": 32.0,
+            "pellet_radius_mm": 4.10,
+            "gap_thickness_um": 80.0,
+            "clad_thickness_mm": 0.60,
+            "clad_outer_diameter_mm": 9.50,
+            "rod_pitch_mm": 12.60,
+            "coolant_pressure_mpa": 15.50,
+            "bulk_coolant_temperature_c": 305.0,
+            "coolant_mass_flux_kg_m2_s": 3500.0
+        }"#,
+    )?;
+    assert_eq!(res_fuel.status, 200);
+    let fuel_json = json(&res_fuel)?;
+    assert!(fuel_json["clad_surface_heat_flux_mw_m2"].as_f64().unwrap() > 0.8);
+    assert!(fuel_json["coolant_heat_transfer_coeff_w_m2_k"].as_f64().unwrap() > 20000.0);
+    assert!(fuel_json["clad_outer_temperature_c"].as_f64().unwrap() > 310.0);
+    assert!(fuel_json["centerline_temperature_c"].as_f64().unwrap() > 1200.0);
+    assert!(fuel_json["fuel_melting_margin_c"].as_f64().unwrap() > 600.0);
+    assert!(fuel_json["departure_from_nucleate_boiling_ratio"].as_f64().unwrap() >= 1.30);
+    assert!(fuel_json["is_dnbr_acceptable"].as_bool().unwrap());
+    assert!(fuel_json["is_fuel_melting_prevented"].as_bool().unwrap());
+
+    // 172. Pressure Swing Adsorption (PSA) Gas Separation & Breakthrough Dynamics (Langmuir / LDF / Thomas)
+    let res_psa = post(
+        addr,
+        "/api/sim/chemical/adsorption_psa",
+        r#"{
+            "bed_diameter_m": 0.60,
+            "bed_length_m": 2.20,
+            "adsorption_pressure_bar": 5.50,
+            "desorption_pressure_bar": 1.10,
+            "operating_temperature_c": 25.0,
+            "feed_flow_rate_nm3_h": 85.0
+        }"#,
+    )?;
+    assert_eq!(res_psa.status, 200);
+    let psa_json = json(&res_psa)?;
+    assert!(psa_json["column_adsorbent_mass_kg"].as_f64().unwrap() > 400.0);
+    assert!(psa_json["heavy_key_equilibrium_capacity_mol_kg"].as_f64().unwrap() > 1.0);
+    assert!(psa_json["working_capacity_mol_kg"].as_f64().unwrap() > 0.4);
+    assert!(psa_json["mass_transfer_zone_length_m"].as_f64().unwrap() > 0.2);
+    assert!(psa_json["breakthrough_time_seconds"].as_f64().unwrap() > 60.0);
+    assert!(psa_json["product_purity_pct"].as_f64().unwrap() >= 93.0);
+    assert!(psa_json["is_cycle_time_feasible"].as_bool().unwrap());
+    assert!(psa_json["is_purity_specification_met"].as_bool().unwrap());
+
+    // 173. Rotorcraft Helicopter Hover & Forward Flight Aerodynamics (Glauert / Leishman / Prouty)
+    let res_rotor = post(
+        addr,
+        "/api/sim/aerospace/rotorcraft_aerodynamics",
+        r#"{
+            "gross_weight_kg": 4300.0,
+            "rotor_radius_m": 6.50,
+            "number_of_blades": 4,
+            "blade_chord_m": 0.38,
+            "rotor_speed_rpm": 345.0,
+            "forward_speed_knots": 0.0
+        }"#,
+    )?;
+    assert_eq!(res_rotor.status, 200);
+    let rotor_json = json(&res_rotor)?;
+    assert!(rotor_json["blade_tip_speed_m_s"].as_f64().unwrap() > 220.0);
+    assert!(rotor_json["induced_velocity_m_s"].as_f64().unwrap() > 10.0);
+    assert!(rotor_json["figure_of_merit"].as_f64().unwrap() > 0.65);
+    assert!(rotor_json["total_engine_shaft_power_kw"].as_f64().unwrap() > 600.0);
+    assert!(rotor_json["is_blade_loading_within_limits"].as_bool().unwrap());
+    assert!(rotor_json["is_tip_mach_non_critical"].as_bool().unwrap());
+
+    // 174. Universal Commands Execution Verification (Batch 17 Domains)
+    for cmd_id in [
+        "sim.marine.ship_slamming",
+        "sim.automotive.crash_deceleration",
+        "sim.nuclear.fuel_pin",
+        "sim.chemical.adsorption_psa",
+        "sim.aerospace.rotorcraft_aerodynamics",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 175. Enterprise MCP Tool Calling (Batch 17 Domains)
+    for tool_name in [
+        "atlas_sim_marine_ship_slamming",
+        "atlas_sim_automotive_crash_deceleration",
+        "atlas_sim_nuclear_fuel_pin",
+        "atlas_sim_chemical_adsorption_psa",
+        "atlas_sim_aerospace_rotorcraft_aerodynamics",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 176, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

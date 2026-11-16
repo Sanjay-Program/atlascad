@@ -121,6 +121,11 @@ pub mod ev_powertrain;
 pub mod seismic_base_isolation;
 pub mod terminal_ballistics;
 pub mod solder_thermal_fatigue;
+pub mod ship_slamming;
+pub mod crash_deceleration;
+pub mod nuclear_fuel_pin;
+pub mod adsorption_psa;
+pub mod rotorcraft_aerodynamics;
 
 pub mod prelude {
     pub use crate::acoustics::{
@@ -546,5 +551,25 @@ pub mod prelude {
     pub use crate::solder_thermal_fatigue::{
         SolderAlloyType, SolderThermalFatigueProblem, SolderThermalFatigueResult,
         solve_solder_thermal_fatigue,
+    };
+    pub use crate::ship_slamming::{
+        ShipSlammingProblem, ShipSlammingResult, SlammingLocation,
+        solve_ship_slamming,
+    };
+    pub use crate::crash_deceleration::{
+        CrashDecelerationProblem, CrashDecelerationResult, CrashScenario, RestraintSystemType,
+        solve_crash_deceleration,
+    };
+    pub use crate::nuclear_fuel_pin::{
+        LatticeGeometry, NuclearFuelPinProblem, NuclearFuelPinResult,
+        solve_nuclear_fuel_pin,
+    };
+    pub use crate::adsorption_psa::{
+        AdsorptionPsaProblem, AdsorptionPsaResult, PsaSeparationDuty,
+        solve_adsorption_psa,
+    };
+    pub use crate::rotorcraft_aerodynamics::{
+        RotorFlightRegime, RotorcraftAerodynamicsProblem, RotorcraftAerodynamicsResult,
+        solve_rotorcraft_aerodynamics,
     };
 }
