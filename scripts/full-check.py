@@ -2013,6 +2013,95 @@ def simulation_section(studio: Studio) -> None:
     check(irrig_data.get("christiansen_uniformity_pct", 0.0) > 92.0, "Christiansen Uniformity Coefficient CU > 92%")
     check(irrig_data.get("emission_uniformity_pct", 0.0) > 90.0, "Keller-Bliesner Emission Uniformity EU > 90%")
     check(irrig_data.get("is_uniformity_excellent", False) is True, "precision micro-irrigation distribution uniformity excellent")
+
+    # 80. Activated Sludge Aeration & Secondary Clarifier Sedimentation (ASCE / WEF / Takacs)
+    wwtp = studio.post("/api/sim/environmental/wastewater_treatment", {
+        "influent_flow_m3_day": 20000.0,
+        "influent_bod_mg_l": 220.0,
+        "target_effluent_bod_mg_l": 15.0,
+        "mlss_mg_l": 3000.0,
+        "sludge_retention_time_days": 8.0,
+    })
+    check(wwtp.status == 200, f"wastewater treatment returns 200 (got {wwtp.status})")
+    wwtp_data = wwtp.json()
+    check(wwtp_data.get("aeration_basin_volume_m3", 0.0) > 4000.0, "aeration basin biological volume > 4000 m³")
+    check(wwtp_data.get("hydraulic_retention_time_hours", 0.0) > 5.0, "aeration hydraulic retention time HRT > 5.0 h")
+    check(wwtp_data.get("food_to_microorganism_ratio", 0.0) > 0.20, "food-to-microorganism ratio F/M > 0.20 kg BOD/kg MLVSS·d")
+    check(wwtp_data.get("daily_sludge_production_kg_day", 0.0) > 1500.0, "daily waste biomass production > 1500 kg TSS/d")
+    check(wwtp_data.get("surface_overflow_rate_m3_m2_day", 0.0) <= 32.0, "clarifier surface overflow rate SOR <= 32 m/d")
+    check(wwtp_data.get("solids_loading_rate_kg_m2_h", 0.0) <= 6.0, "clarifier solids loading rate SLR <= 6.0 kg/m²·h")
+    check(wwtp_data.get("is_effluent_compliant", False) is True, "effluent discharge standards fully compliant")
+
+    # 81. EV Longitudinal Dynamics & Regenerative Braking (SAE J2452 / UNECE R13-H)
+    ev_pwtr = studio.post("/api/sim/automotive/ev_powertrain", {
+        "vehicle_mass_kg": 1850.0,
+        "rolling_resistance_coeff": 0.009,
+        "drag_coefficient": 0.24,
+        "frontal_area_m2": 2.25,
+        "motor_peak_torque_nm": 350.0,
+        "battery_capacity_kwh": 75.0,
+        "cruising_speed_km_h": 100.0,
+    })
+    check(ev_pwtr.status == 200, f"EV powertrain returns 200 (got {ev_pwtr.status})")
+    ev_data = ev_pwtr.json()
+    check(ev_data.get("total_road_load_force_n", 0.0) > 300.0, "total steady road load force > 300 N")
+    check(ev_data.get("cruising_range_km", 0.0) > 350.0, "steady-state battery cruising range > 350 km")
+    check(ev_data.get("max_wheel_tractive_force_n", 0.0) > 8000.0, "maximum wheel tractive force > 8000 N")
+    check(ev_data.get("acceleration_0_to_100_km_h_s", 0.0) < 7.5, "0 to 100 km/h acceleration time < 7.5 s")
+    check(ev_data.get("regen_braking_power_kw", 0.0) > 15.0, "regenerative braking recovery power > 15 kW")
+    check(ev_data.get("is_regen_braking_compliant", False) is True, "UNECE R13-H braking energy recovery compliant")
+
+    # 82. Lead-Rubber Bearing (LRB) Seismic Base Isolation (ASCE 7-22 / FEMA P-751)
+    seismic_iso = studio.post("/api/sim/civil/seismic_base_isolation", {
+        "superstructure_mass_tonnes": 4500.0,
+        "bearing_count": 16,
+        "bearing_outer_diameter_mm": 800.0,
+        "lead_core_diameter_mm": 160.0,
+        "total_rubber_thickness_mm": 200.0,
+        "mapped_spectral_accel_s1_g": 0.60,
+    })
+    check(seismic_iso.status == 200, f"seismic base isolation returns 200 (got {seismic_iso.status})")
+    iso_data = seismic_iso.json()
+    check(iso_data.get("total_system_yield_force_qd_kn", 0.0) > 2500.0, "total isolation system characteristic yield strength > 2500 kN")
+    check(iso_data.get("effective_isolated_period_s", 0.0) > 2.0, "effective isolated fundamental period > 2.0 s")
+    check(iso_data.get("effective_damping_ratio_pct", 0.0) > 15.0, "equivalent viscous damping ratio > 15%")
+    check(iso_data.get("design_horizontal_displacement_dd_mm", 0.0) > 100.0, "design horizontal displacement DD > 100 mm")
+    check(iso_data.get("base_shear_reduction_ratio", 0.0) < 0.35, "base shear reduction ratio < 0.35 (forces attenuated by > 65%)")
+    check(iso_data.get("is_base_isolation_effective", False) is True, "seismic base isolation structural protection effective")
+
+    # 83. Terminal Ballistics & Armor Hydrodynamic Penetration (Tate-Alekseevskii / STANAG 4569)
+    ballistics = studio.post("/api/sim/defense/terminal_ballistics", {
+        "projectile_mass_kg": 0.180,
+        "projectile_diameter_mm": 12.0,
+        "projectile_length_mm": 90.0,
+        "impact_velocity_m_s": 1450.0,
+        "obliquity_angle_deg": 30.0,
+        "armor_thickness_mm": 75.0,
+    })
+    check(ballistics.status == 200, f"terminal ballistics returns 200 (got {ballistics.status})")
+    bal_data = ballistics.json()
+    check(bal_data.get("normal_impact_velocity_m_s", 0.0) > 1200.0, "normal impact velocity component > 1200 m/s")
+    check(bal_data.get("penetration_interface_velocity_m_s", 0.0) > 500.0, "Tate hydrodynamic penetration interface velocity > 500 m/s")
+    check(bal_data.get("total_penetration_depth_mm", 0.0) > 50.0, "total hydrodynamic penetration depth > 50 mm")
+    check(bal_data.get("ballistic_limit_v50_m_s", 0.0) > 800.0, "Recht-Ipson ballistic limit V50 > 800 m/s")
+    check(bal_data.get("is_armor_defeating_projectile", False) is True, "armor successfully defeats projectile without perforation")
+    check(bal_data.get("stanag_4569_defeated_level", 0) >= 4, "STANAG 4569 Level 4+ heavy kinetic defeat verified")
+
+    # 84. BGA Solder Joint Thermal Fatigue & Creep Lifetime (Engelmaier / IPC-9701)
+    solder_fatigue = studio.post("/api/sim/packaging/solder_thermal_fatigue", {
+        "package_width_mm": 35.0,
+        "package_length_mm": 35.0,
+        "solder_joint_height_um": 400.0,
+        "cycle_min_temp_c": -40.0,
+        "cycle_max_temp_c": 125.0,
+    })
+    check(solder_fatigue.status == 200, f"solder thermal fatigue returns 200 (got {solder_fatigue.status})")
+    sol_data = solder_fatigue.json()
+    check(sol_data.get("distance_to_neutral_point_dnp_mm", 0.0) > 20.0, "distance to neutral point DNP > 20 mm")
+    check(sol_data.get("cyclic_shear_strain_pct", 0.0) > 1.5, "cyclic thermal shear strain range > 1.5%")
+    check(sol_data.get("median_cycles_to_failure_n50", 0.0) > 500.0, "Coffin-Manson median cycles to failure N50 > 500 cycles")
+    check(sol_data.get("weibull_characteristic_life_eta", 0.0) > 500.0, "Weibull characteristic lifetime eta > 500 cycles")
+    check(sol_data.get("is_ipc_9701_compliant", False) is True, "IPC-9701 thermal cycling qualification compliant")
     report("simulation")
 
 

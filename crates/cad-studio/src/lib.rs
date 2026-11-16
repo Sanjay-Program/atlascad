@@ -6071,6 +6071,120 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_environmental_wastewater_treatment(
+        &mut self,
+        req: &SimWastewaterTreatmentRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::wastewater_treatment::WastewaterTreatmentProblem {
+            problem_id: "wastewater_treatment_sim".to_string(),
+            diffuser_type: req.diffuser_type.unwrap_or(atlas_simulation_core::wastewater_treatment::AerationDiffuserType::FineBubbleMembrane),
+            influent_flow_m3_day: req.influent_flow_m3_day.unwrap_or(20000.0),
+            influent_bod_mg_l: req.influent_bod_mg_l.unwrap_or(220.0),
+            target_effluent_bod_mg_l: req.target_effluent_bod_mg_l.unwrap_or(15.0),
+            mlss_mg_l: req.mlss_mg_l.unwrap_or(3000.0),
+            sludge_retention_time_days: req.sludge_retention_time_days.unwrap_or(8.0),
+            basin_depth_m: req.basin_depth_m.unwrap_or(4.5),
+            clarifier_diameter_m: req.clarifier_diameter_m.unwrap_or(28.0),
+            clarifier_count: req.clarifier_count.unwrap_or(2),
+            wastewater_temp_c: req.wastewater_temp_c.unwrap_or(20.0),
+        };
+        let res = atlas_simulation_core::wastewater_treatment::solve_wastewater_treatment(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_automotive_ev_powertrain(
+        &mut self,
+        req: &SimEvPowertrainRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::ev_powertrain::EvPowertrainProblem {
+            problem_id: "ev_powertrain_sim".to_string(),
+            layout: req.layout.unwrap_or(atlas_simulation_core::ev_powertrain::EvDrivetrainLayout::RearWheelDrive),
+            vehicle_mass_kg: req.vehicle_mass_kg.unwrap_or(1850.0),
+            rolling_resistance_coeff: req.rolling_resistance_coeff.unwrap_or(0.009),
+            drag_coefficient: req.drag_coefficient.unwrap_or(0.24),
+            frontal_area_m2: req.frontal_area_m2.unwrap_or(2.25),
+            tire_radius_m: req.tire_radius_m.unwrap_or(0.330),
+            gear_ratio: req.gear_ratio.unwrap_or(9.0),
+            driveline_efficiency: req.driveline_efficiency.unwrap_or(0.95),
+            motor_peak_torque_nm: req.motor_peak_torque_nm.unwrap_or(350.0),
+            motor_base_speed_rpm: req.motor_base_speed_rpm.unwrap_or(4500.0),
+            motor_max_speed_rpm: req.motor_max_speed_rpm.unwrap_or(16000.0),
+            battery_capacity_kwh: req.battery_capacity_kwh.unwrap_or(75.0),
+            battery_voltage_v: req.battery_voltage_v.unwrap_or(400.0),
+            cruising_speed_km_h: req.cruising_speed_km_h.unwrap_or(100.0),
+            braking_deceleration_m_s2: req.braking_deceleration_m_s2.unwrap_or(2.5),
+        };
+        let res = atlas_simulation_core::ev_powertrain::solve_ev_powertrain(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_civil_seismic_base_isolation(
+        &mut self,
+        req: &SimSeismicBaseIsolationRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::seismic_base_isolation::SeismicBaseIsolationProblem {
+            problem_id: "seismic_base_isolation_sim".to_string(),
+            rubber_grade: req.rubber_grade.unwrap_or(atlas_simulation_core::seismic_base_isolation::RubberCompoundGrade::StandardNaturalRubber),
+            superstructure_mass_tonnes: req.superstructure_mass_tonnes.unwrap_or(4500.0),
+            bearing_count: req.bearing_count.unwrap_or(16),
+            bearing_outer_diameter_mm: req.bearing_outer_diameter_mm.unwrap_or(800.0),
+            lead_core_diameter_mm: req.lead_core_diameter_mm.unwrap_or(160.0),
+            total_rubber_thickness_mm: req.total_rubber_thickness_mm.unwrap_or(200.0),
+            lead_yield_strength_mpa: req.lead_yield_strength_mpa.unwrap_or(10.5),
+            mapped_spectral_accel_s1_g: req.mapped_spectral_accel_s1_g.unwrap_or(0.60),
+            site_coefficient_fv: req.site_coefficient_fv.unwrap_or(1.20),
+            fixed_base_period_s: req.fixed_base_period_s.unwrap_or(0.55),
+        };
+        let res = atlas_simulation_core::seismic_base_isolation::solve_seismic_base_isolation(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_defense_terminal_ballistics(
+        &mut self,
+        req: &SimTerminalBallisticsRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::terminal_ballistics::TerminalBallisticsProblem {
+            problem_id: "terminal_ballistics_sim".to_string(),
+            projectile_type: req.projectile_type.unwrap_or(atlas_simulation_core::terminal_ballistics::ProjectileType::TungstenLongRod),
+            armor_type: req.armor_type.unwrap_or(atlas_simulation_core::terminal_ballistics::TargetArmorType::RolledHomogeneousArmor),
+            projectile_mass_kg: req.projectile_mass_kg.unwrap_or(0.180),
+            projectile_diameter_mm: req.projectile_diameter_mm.unwrap_or(12.0),
+            projectile_length_mm: req.projectile_length_mm.unwrap_or(90.0),
+            impact_velocity_m_s: req.impact_velocity_m_s.unwrap_or(1450.0),
+            obliquity_angle_deg: req.obliquity_angle_deg.unwrap_or(30.0),
+            armor_thickness_mm: req.armor_thickness_mm.unwrap_or(75.0),
+        };
+        let res = atlas_simulation_core::terminal_ballistics::solve_terminal_ballistics(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_packaging_solder_thermal_fatigue(
+        &mut self,
+        req: &SimSolderThermalFatigueRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::solder_thermal_fatigue::SolderThermalFatigueProblem {
+            problem_id: "solder_thermal_fatigue_sim".to_string(),
+            alloy_type: req.alloy_type.unwrap_or(atlas_simulation_core::solder_thermal_fatigue::SolderAlloyType::Sac305),
+            package_width_mm: req.package_width_mm.unwrap_or(35.0),
+            package_length_mm: req.package_length_mm.unwrap_or(35.0),
+            solder_joint_height_um: req.solder_joint_height_um.unwrap_or(400.0),
+            solder_ball_pitch_mm: req.solder_ball_pitch_mm.unwrap_or(1.0),
+            package_cte_ppm_k: req.package_cte_ppm_k.unwrap_or(6.5),
+            pcb_cte_ppm_k: req.pcb_cte_ppm_k.unwrap_or(16.0),
+            cycle_min_temp_c: req.cycle_min_temp_c.unwrap_or(-40.0),
+            cycle_max_temp_c: req.cycle_max_temp_c.unwrap_or(125.0),
+            dwell_time_minutes: req.dwell_time_minutes.unwrap_or(15.0),
+            ramp_rate_c_min: req.ramp_rate_c_min.unwrap_or(15.0),
+        };
+        let res = atlas_simulation_core::solder_thermal_fatigue::solve_solder_thermal_fatigue(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -8414,6 +8528,71 @@ namespace AtlasCAD.Unity
                     ..Default::default()
                 })?
             }
+            "sim.environmental.wastewater_treatment" => {
+                let q_m3d = req.arguments.get("influent_flow_m3_day").and_then(|v| v.as_f64());
+                let bod_in = req.arguments.get("influent_bod_mg_l").and_then(|v| v.as_f64());
+                let bod_out = req.arguments.get("target_effluent_bod_mg_l").and_then(|v| v.as_f64());
+                let mlss = req.arguments.get("mlss_mg_l").and_then(|v| v.as_f64());
+                self.sim_environmental_wastewater_treatment(&SimWastewaterTreatmentRequest {
+                    influent_flow_m3_day: q_m3d,
+                    influent_bod_mg_l: bod_in,
+                    target_effluent_bod_mg_l: bod_out,
+                    mlss_mg_l: mlss,
+                    ..Default::default()
+                })?
+            }
+            "sim.automotive.ev_powertrain" => {
+                let mass = req.arguments.get("vehicle_mass_kg").and_then(|v| v.as_f64());
+                let torque = req.arguments.get("motor_peak_torque_nm").and_then(|v| v.as_f64());
+                let batt = req.arguments.get("battery_capacity_kwh").and_then(|v| v.as_f64());
+                let speed = req.arguments.get("cruising_speed_km_h").and_then(|v| v.as_f64());
+                self.sim_automotive_ev_powertrain(&SimEvPowertrainRequest {
+                    vehicle_mass_kg: mass,
+                    motor_peak_torque_nm: torque,
+                    battery_capacity_kwh: batt,
+                    cruising_speed_km_h: speed,
+                    ..Default::default()
+                })?
+            }
+            "sim.civil.seismic_base_isolation" => {
+                let mass_t = req.arguments.get("superstructure_mass_tonnes").and_then(|v| v.as_f64());
+                let n_bearings = req.arguments.get("bearing_count").and_then(|v| v.as_u64()).map(|v| v as u32);
+                let d_outer = req.arguments.get("bearing_outer_diameter_mm").and_then(|v| v.as_f64());
+                let d_lead = req.arguments.get("lead_core_diameter_mm").and_then(|v| v.as_f64());
+                self.sim_civil_seismic_base_isolation(&SimSeismicBaseIsolationRequest {
+                    superstructure_mass_tonnes: mass_t,
+                    bearing_count: n_bearings,
+                    bearing_outer_diameter_mm: d_outer,
+                    lead_core_diameter_mm: d_lead,
+                    ..Default::default()
+                })?
+            }
+            "sim.defense.terminal_ballistics" => {
+                let l_p = req.arguments.get("projectile_length_mm").and_then(|v| v.as_f64());
+                let v_0 = req.arguments.get("impact_velocity_m_s").and_then(|v| v.as_f64());
+                let theta = req.arguments.get("obliquity_angle_deg").and_then(|v| v.as_f64());
+                let t_arm = req.arguments.get("armor_thickness_mm").and_then(|v| v.as_f64());
+                self.sim_defense_terminal_ballistics(&SimTerminalBallisticsRequest {
+                    projectile_length_mm: l_p,
+                    impact_velocity_m_s: v_0,
+                    obliquity_angle_deg: theta,
+                    armor_thickness_mm: t_arm,
+                    ..Default::default()
+                })?
+            }
+            "sim.packaging.solder_thermal_fatigue" => {
+                let w_pkg = req.arguments.get("package_width_mm").and_then(|v| v.as_f64());
+                let h_solder = req.arguments.get("solder_joint_height_um").and_then(|v| v.as_f64());
+                let t_min = req.arguments.get("cycle_min_temp_c").and_then(|v| v.as_f64());
+                let t_max = req.arguments.get("cycle_max_temp_c").and_then(|v| v.as_f64());
+                self.sim_packaging_solder_thermal_fatigue(&SimSolderThermalFatigueRequest {
+                    package_width_mm: w_pkg,
+                    solder_joint_height_um: h_solder,
+                    cycle_min_temp_c: t_min,
+                    cycle_max_temp_c: t_max,
+                    ..Default::default()
+                })?
+            }
             "system.deploy.status" => self.deploy_status()?,
             _ => serde_json::json!({
                 "status": "Executed",
@@ -10737,6 +10916,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/agri/irrigation_hydraulics" => {
             match parse_body_or_default::<SimIrrigationHydraulicsRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_agri_irrigation_hydraulics(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/environmental/wastewater_treatment" => {
+            match parse_body_or_default::<SimWastewaterTreatmentRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_environmental_wastewater_treatment(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/automotive/ev_powertrain" => {
+            match parse_body_or_default::<SimEvPowertrainRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_automotive_ev_powertrain(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/civil/seismic_base_isolation" => {
+            match parse_body_or_default::<SimSeismicBaseIsolationRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_civil_seismic_base_isolation(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/defense/terminal_ballistics" => {
+            match parse_body_or_default::<SimTerminalBallisticsRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_defense_terminal_ballistics(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/packaging/solder_thermal_fatigue" => {
+            match parse_body_or_default::<SimSolderThermalFatigueRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_packaging_solder_thermal_fatigue(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -14713,4 +14937,132 @@ struct SimIrrigationHydraulicsRequest {
     pub hazen_williams_c: Option<f64>,
     #[serde(default)]
     pub emitter_coefficient_of_variation: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimWastewaterTreatmentRequest {
+    #[serde(default)]
+    pub diffuser_type: Option<atlas_simulation_core::wastewater_treatment::AerationDiffuserType>,
+    #[serde(default)]
+    pub influent_flow_m3_day: Option<f64>,
+    #[serde(default)]
+    pub influent_bod_mg_l: Option<f64>,
+    #[serde(default)]
+    pub target_effluent_bod_mg_l: Option<f64>,
+    #[serde(default)]
+    pub mlss_mg_l: Option<f64>,
+    #[serde(default)]
+    pub sludge_retention_time_days: Option<f64>,
+    #[serde(default)]
+    pub basin_depth_m: Option<f64>,
+    #[serde(default)]
+    pub clarifier_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub clarifier_count: Option<u32>,
+    #[serde(default)]
+    pub wastewater_temp_c: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimEvPowertrainRequest {
+    #[serde(default)]
+    pub layout: Option<atlas_simulation_core::ev_powertrain::EvDrivetrainLayout>,
+    #[serde(default)]
+    pub vehicle_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub rolling_resistance_coeff: Option<f64>,
+    #[serde(default)]
+    pub drag_coefficient: Option<f64>,
+    #[serde(default)]
+    pub frontal_area_m2: Option<f64>,
+    #[serde(default)]
+    pub tire_radius_m: Option<f64>,
+    #[serde(default)]
+    pub gear_ratio: Option<f64>,
+    #[serde(default)]
+    pub driveline_efficiency: Option<f64>,
+    #[serde(default)]
+    pub motor_peak_torque_nm: Option<f64>,
+    #[serde(default)]
+    pub motor_base_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub motor_max_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub battery_capacity_kwh: Option<f64>,
+    #[serde(default)]
+    pub battery_voltage_v: Option<f64>,
+    #[serde(default)]
+    pub cruising_speed_km_h: Option<f64>,
+    #[serde(default)]
+    pub braking_deceleration_m_s2: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimSeismicBaseIsolationRequest {
+    #[serde(default)]
+    pub rubber_grade: Option<atlas_simulation_core::seismic_base_isolation::RubberCompoundGrade>,
+    #[serde(default)]
+    pub superstructure_mass_tonnes: Option<f64>,
+    #[serde(default)]
+    pub bearing_count: Option<u32>,
+    #[serde(default)]
+    pub bearing_outer_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub lead_core_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub total_rubber_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub lead_yield_strength_mpa: Option<f64>,
+    #[serde(default)]
+    pub mapped_spectral_accel_s1_g: Option<f64>,
+    #[serde(default)]
+    pub site_coefficient_fv: Option<f64>,
+    #[serde(default)]
+    pub fixed_base_period_s: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimTerminalBallisticsRequest {
+    #[serde(default)]
+    pub projectile_type: Option<atlas_simulation_core::terminal_ballistics::ProjectileType>,
+    #[serde(default)]
+    pub armor_type: Option<atlas_simulation_core::terminal_ballistics::TargetArmorType>,
+    #[serde(default)]
+    pub projectile_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub projectile_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub projectile_length_mm: Option<f64>,
+    #[serde(default)]
+    pub impact_velocity_m_s: Option<f64>,
+    #[serde(default)]
+    pub obliquity_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub armor_thickness_mm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimSolderThermalFatigueRequest {
+    #[serde(default)]
+    pub alloy_type: Option<atlas_simulation_core::solder_thermal_fatigue::SolderAlloyType>,
+    #[serde(default)]
+    pub package_width_mm: Option<f64>,
+    #[serde(default)]
+    pub package_length_mm: Option<f64>,
+    #[serde(default)]
+    pub solder_joint_height_um: Option<f64>,
+    #[serde(default)]
+    pub solder_ball_pitch_mm: Option<f64>,
+    #[serde(default)]
+    pub package_cte_ppm_k: Option<f64>,
+    #[serde(default)]
+    pub pcb_cte_ppm_k: Option<f64>,
+    #[serde(default)]
+    pub cycle_min_temp_c: Option<f64>,
+    #[serde(default)]
+    pub cycle_max_temp_c: Option<f64>,
+    #[serde(default)]
+    pub dwell_time_minutes: Option<f64>,
+    #[serde(default)]
+    pub ramp_rate_c_min: Option<f64>,
 }

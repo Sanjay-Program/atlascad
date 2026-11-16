@@ -6976,5 +6976,168 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 162. Activated Sludge Aeration & Secondary Clarifier Sedimentation (ASCE / WEF / Takacs)
+    let res_wwtp = post(
+        addr,
+        "/api/sim/environmental/wastewater_treatment",
+        r#"{
+            "influent_flow_m3_day": 20000.0,
+            "influent_bod_mg_l": 220.0,
+            "target_effluent_bod_mg_l": 15.0,
+            "mlss_mg_l": 3000.0,
+            "sludge_retention_time_days": 8.0,
+            "basin_depth_m": 4.5,
+            "clarifier_diameter_m": 28.0,
+            "clarifier_count": 2,
+            "wastewater_temp_c": 20.0
+        }"#,
+    )?;
+    assert_eq!(res_wwtp.status, 200);
+    let wwtp_json = json(&res_wwtp)?;
+    assert!(wwtp_json["aeration_basin_volume_m3"].as_f64().unwrap() > 4000.0);
+    assert!(wwtp_json["hydraulic_retention_time_hours"].as_f64().unwrap() > 5.0);
+    assert!(wwtp_json["food_to_microorganism_ratio"].as_f64().unwrap() > 0.20);
+    assert!(wwtp_json["daily_sludge_production_kg_day"].as_f64().unwrap() > 1500.0);
+    assert!(wwtp_json["surface_overflow_rate_m3_m2_day"].as_f64().unwrap() <= 32.0);
+    assert!(wwtp_json["solids_loading_rate_kg_m2_h"].as_f64().unwrap() <= 6.0);
+    assert!(wwtp_json["is_clarifier_sor_acceptable"].as_bool().unwrap());
+    assert!(wwtp_json["is_clarifier_slr_acceptable"].as_bool().unwrap());
+    assert!(wwtp_json["is_effluent_compliant"].as_bool().unwrap());
+
+    // 163. EV Longitudinal Dynamics & Regenerative Braking (SAE J2452 / UNECE R13-H)
+    let res_ev = post(
+        addr,
+        "/api/sim/automotive/ev_powertrain",
+        r#"{
+            "vehicle_mass_kg": 1850.0,
+            "rolling_resistance_coeff": 0.009,
+            "drag_coefficient": 0.24,
+            "frontal_area_m2": 2.25,
+            "tire_radius_m": 0.330,
+            "gear_ratio": 9.0,
+            "motor_peak_torque_nm": 350.0,
+            "battery_capacity_kwh": 75.0,
+            "cruising_speed_km_h": 100.0
+        }"#,
+    )?;
+    assert_eq!(res_ev.status, 200);
+    let ev_json = json(&res_ev)?;
+    assert!(ev_json["total_road_load_force_n"].as_f64().unwrap() > 300.0);
+    assert!(ev_json["wheel_power_at_cruise_kw"].as_f64().unwrap() > 8.0);
+    assert!(ev_json["cruising_range_km"].as_f64().unwrap() > 350.0);
+    assert!(ev_json["max_wheel_tractive_force_n"].as_f64().unwrap() > 8000.0);
+    assert!(ev_json["acceleration_0_to_100_km_h_s"].as_f64().unwrap() < 7.5);
+    assert!(ev_json["regen_braking_power_kw"].as_f64().unwrap() > 15.0);
+    assert!(ev_json["is_cruising_speed_attainable"].as_bool().unwrap());
+    assert!(ev_json["is_regen_braking_compliant"].as_bool().unwrap());
+
+    // 164. Lead-Rubber Bearing (LRB) Seismic Base Isolation (ASCE 7-22 / FEMA P-751)
+    let res_lrb = post(
+        addr,
+        "/api/sim/civil/seismic_base_isolation",
+        r#"{
+            "superstructure_mass_tonnes": 4500.0,
+            "bearing_count": 16,
+            "bearing_outer_diameter_mm": 800.0,
+            "lead_core_diameter_mm": 160.0,
+            "total_rubber_thickness_mm": 200.0,
+            "lead_yield_strength_mpa": 10.5,
+            "mapped_spectral_accel_s1_g": 0.60,
+            "site_coefficient_fv": 1.20,
+            "fixed_base_period_s": 0.55
+        }"#,
+    )?;
+    assert_eq!(res_lrb.status, 200);
+    let lrb_json = json(&res_lrb)?;
+    assert!(lrb_json["total_seismic_weight_kn"].as_f64().unwrap() > 40000.0);
+    assert!(lrb_json["total_system_yield_force_qd_kn"].as_f64().unwrap() > 2500.0);
+    assert!(lrb_json["effective_isolated_period_s"].as_f64().unwrap() > 2.0);
+    assert!(lrb_json["effective_damping_ratio_pct"].as_f64().unwrap() > 15.0);
+    assert!(lrb_json["design_horizontal_displacement_dd_mm"].as_f64().unwrap() > 100.0);
+    assert!(lrb_json["base_shear_reduction_ratio"].as_f64().unwrap() < 0.35);
+    assert!(lrb_json["seismic_force_attenuation_pct"].as_f64().unwrap() > 50.0);
+    assert!(lrb_json["is_rubber_strain_safe"].as_bool().unwrap());
+    assert!(lrb_json["is_base_isolation_effective"].as_bool().unwrap());
+
+    // 165. Terminal Ballistics & Armor Hydrodynamic Penetration (Tate-Alekseevskii / STANAG 4569)
+    let res_ballistics = post(
+        addr,
+        "/api/sim/defense/terminal_ballistics",
+        r#"{
+            "projectile_mass_kg": 0.180,
+            "projectile_diameter_mm": 12.0,
+            "projectile_length_mm": 90.0,
+            "impact_velocity_m_s": 1450.0,
+            "obliquity_angle_deg": 30.0,
+            "armor_thickness_mm": 75.0
+        }"#,
+    )?;
+    assert_eq!(res_ballistics.status, 200);
+    let bal_json = json(&res_ballistics)?;
+    assert!(bal_json["normal_impact_velocity_m_s"].as_f64().unwrap() > 1200.0);
+    assert!(bal_json["line_of_sight_thickness_mm"].as_f64().unwrap() > 80.0);
+    assert!(bal_json["penetration_interface_velocity_m_s"].as_f64().unwrap() > 500.0);
+    assert!(bal_json["total_penetration_depth_mm"].as_f64().unwrap() > 50.0);
+    assert!(bal_json["ballistic_limit_v50_m_s"].as_f64().unwrap() > 800.0);
+    assert!(bal_json["armor_protection_margin_factor"].as_f64().unwrap() > 1.05);
+    assert!(bal_json["is_armor_defeating_projectile"].as_bool().unwrap());
+    assert!(bal_json["stanag_4569_defeated_level"].as_u64().unwrap() >= 4);
+
+    // 166. BGA Solder Joint Thermal Fatigue & Creep Lifetime (Engelmaier / IPC-9701)
+    let res_solder = post(
+        addr,
+        "/api/sim/packaging/solder_thermal_fatigue",
+        r#"{
+            "package_width_mm": 35.0,
+            "package_length_mm": 35.0,
+            "solder_joint_height_um": 400.0,
+            "solder_ball_pitch_mm": 1.0,
+            "package_cte_ppm_k": 6.5,
+            "pcb_cte_ppm_k": 16.0,
+            "cycle_min_temp_c": -40.0,
+            "cycle_max_temp_c": 125.0
+        }"#,
+    )?;
+    assert_eq!(res_solder.status, 200);
+    let sol_json = json(&res_solder)?;
+    assert!(sol_json["distance_to_neutral_point_dnp_mm"].as_f64().unwrap() > 20.0);
+    assert!(sol_json["cyclic_shear_strain_pct"].as_f64().unwrap() > 1.5);
+    assert!(sol_json["median_cycles_to_failure_n50"].as_f64().unwrap() > 500.0);
+    assert!(sol_json["weibull_characteristic_life_eta"].as_f64().unwrap() > 500.0);
+    assert!(sol_json["is_ipc_9701_compliant"].as_bool().unwrap());
+
+    // 167. Universal Commands Execution Verification (Batch 16 Domains)
+    for cmd_id in [
+        "sim.environmental.wastewater_treatment",
+        "sim.automotive.ev_powertrain",
+        "sim.civil.seismic_base_isolation",
+        "sim.defense.terminal_ballistics",
+        "sim.packaging.solder_thermal_fatigue",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 168. Enterprise MCP Tool Calling (Batch 16 Domains)
+    for tool_name in [
+        "atlas_sim_environmental_wastewater_treatment",
+        "atlas_sim_automotive_ev_powertrain",
+        "atlas_sim_civil_seismic_base_isolation",
+        "atlas_sim_defense_terminal_ballistics",
+        "atlas_sim_packaging_solder_thermal_fatigue",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 169, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

@@ -4368,5 +4368,215 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.environmental.wastewater_treatment",
+            "Activated Sludge Aeration & Secondary Clarifier Sedimentation (ASCE / WEF / Takacs)",
+            "Evaluates biological basin volume, HRT, F/M ratio, daily biomass production, SOTR clean water oxygen demand, blower power, and clarifier SOR/SLR solids flux.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "influent_flow_m3_day".into(),
+            arg_type: ArgumentType::Number,
+            description: "Daily wastewater influent flow rate in m³/day".into(),
+            required: false,
+            default_value: Some(serde_json::json!(20000.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(1000000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "influent_bod_mg_l".into(),
+            arg_type: ArgumentType::Number,
+            description: "Influent 5-day Biochemical Oxygen Demand in mg/L".into(),
+            required: false,
+            default_value: Some(serde_json::json!(220.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(2000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "target_effluent_bod_mg_l".into(),
+            arg_type: ArgumentType::Number,
+            description: "Target discharge effluent BOD5 in mg/L".into(),
+            required: false,
+            default_value: Some(serde_json::json!(15.0)),
+            validation_rules: vec![ValidationRule::Min(2.0), ValidationRule::Max(50.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "mlss_mg_l".into(),
+            arg_type: ArgumentType::Number,
+            description: "Aeration basin Mixed Liquor Suspended Solids in mg/L".into(),
+            required: false,
+            default_value: Some(serde_json::json!(3000.0)),
+            validation_rules: vec![ValidationRule::Min(1000.0), ValidationRule::Max(10000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.automotive.ev_powertrain",
+            "EV Longitudinal Dynamics, Traction Envelope & Regenerative Braking (SAE J2452 / UNECE R13-H)",
+            "Calculates aerodynamic and rolling road load forces, wheel and battery cruising power, driving range, 0-100 km/h acceleration, top speed, and regen energy recovery.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "vehicle_mass_kg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Total vehicle mass in kilograms".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1850.0)),
+            validation_rules: vec![ValidationRule::Min(500.0), ValidationRule::Max(10000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "motor_peak_torque_nm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Traction electric motor peak torque in Nm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(350.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(2000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "battery_capacity_kwh".into(),
+            arg_type: ArgumentType::Number,
+            description: "Traction battery usable energy capacity in kWh".into(),
+            required: false,
+            default_value: Some(serde_json::json!(75.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(300.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "cruising_speed_km_h".into(),
+            arg_type: ArgumentType::Number,
+            description: "Steady cruising evaluation speed in km/h".into(),
+            required: false,
+            default_value: Some(serde_json::json!(100.0)),
+            validation_rules: vec![ValidationRule::Min(30.0), ValidationRule::Max(300.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.civil.seismic_base_isolation",
+            "Lead-Rubber Bearing (LRB) Seismic Base Isolation Mechanics (ASCE 7-22 / FEMA P-751)",
+            "Evaluates characteristic yield force, post-yield stiffness, effective period, equivalent viscous damping ratio, design displacement, and structural base shear attenuation.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "superstructure_mass_tonnes".into(),
+            arg_type: ArgumentType::Number,
+            description: "Superstructure seismic mass in metric tonnes".into(),
+            required: false,
+            default_value: Some(serde_json::json!(4500.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(100000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "bearing_count".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Total number of supporting LRBs".into(),
+            required: false,
+            default_value: Some(serde_json::json!(16)),
+            validation_rules: vec![ValidationRule::Min(4.0), ValidationRule::Max(256.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "bearing_outer_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Bearing outer diameter in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(800.0)),
+            validation_rules: vec![ValidationRule::Min(300.0), ValidationRule::Max(2000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "lead_core_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Lead plug core diameter in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(160.0)),
+            validation_rules: vec![ValidationRule::Min(30.0), ValidationRule::Max(500.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.defense.terminal_ballistics",
+            "Terminal Ballistics & Armor Hydrodynamic Penetration (Tate-Alekseevskii / STANAG 4569)",
+            "Solves modified Bernoulli hydrodynamic long-rod penetration, interface velocity, erosion rate, depth of penetration, ballistic limit V50, and NATO STANAG protection level.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "projectile_length_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Kinetic penetrator active core length in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(90.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "impact_velocity_m_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Projectile impact velocity in m/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1450.0)),
+            validation_rules: vec![ValidationRule::Min(300.0), ValidationRule::Max(3000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "obliquity_angle_deg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Impact NATO obliquity angle from plate normal in degrees".into(),
+            required: false,
+            default_value: Some(serde_json::json!(30.0)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(80.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "armor_thickness_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Armor physical plate thickness in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(75.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(500.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.packaging.solder_thermal_fatigue",
+            "BGA Solder Joint Thermal Fatigue & Creep Lifetime (Engelmaier / IPC-9701)",
+            "Evaluates DNP thermal shear strain, Engelmaier creep ductility exponent, Coffin-Manson low-cycle fatigue life, Weibull characteristic life, and IPC/AEC qualification compliance.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "package_width_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Package substrate width in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(35.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(150.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "solder_joint_height_um".into(),
+            arg_type: ArgumentType::Number,
+            description: "Solder joint standoff height in micrometers".into(),
+            required: false,
+            default_value: Some(serde_json::json!(400.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(1500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "cycle_min_temp_c".into(),
+            arg_type: ArgumentType::Number,
+            description: "Thermal cycle minimum temperature in °C".into(),
+            required: false,
+            default_value: Some(serde_json::json!(-40.0)),
+            validation_rules: vec![ValidationRule::Min(-65.0), ValidationRule::Max(50.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "cycle_max_temp_c".into(),
+            arg_type: ArgumentType::Number,
+            description: "Thermal cycle maximum temperature in °C".into(),
+            required: false,
+            default_value: Some(serde_json::json!(125.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(200.0)],
+        }),
+    )?;
+
     Ok(())
 }

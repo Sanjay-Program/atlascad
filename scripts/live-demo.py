@@ -3176,6 +3176,150 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 30.7 Enterprise MCP Tool Calling: 5 Batch-15 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # -------------------------------------------------------------------------
+        # SECTION 31: MULTIDISCIPLINARY SIMULATION SOLVERS — BATCH 16
+        # -------------------------------------------------------------------------
+        print("\n" + "=" * 78)
+        print("  SECTION 31: MULTIDISCIPLINARY SIMULATION SOLVERS — BATCH 16")
+        print("=" * 78)
+
+        # 31.1 Activated Sludge Aeration & Secondary Clarifier Sedimentation (ASCE / WEF / Takacs)
+        wwtp_res = http_request(port, "POST", "/api/sim/environmental/wastewater_treatment", body={
+            "influent_flow_m3_day": 20000.0,
+            "influent_bod_mg_l": 220.0,
+            "target_effluent_bod_mg_l": 15.0,
+            "mlss_mg_l": 3000.0,
+            "sludge_retention_time_days": 8.0,
+            "basin_depth_m": 4.5,
+            "clarifier_diameter_m": 28.0,
+            "clarifier_count": 2,
+            "wastewater_temp_c": 20.0
+        })
+        check(wwtp_res.get("aeration_basin_volume_m3", 0.0) > 4000.0, "Aeration basin volume > 4000 m³")
+        check(wwtp_res.get("hydraulic_retention_time_hours", 0.0) > 5.0, "HRT > 5.0 h")
+        check(wwtp_res.get("food_to_microorganism_ratio", 0.0) > 0.20, "F/M > 0.20")
+        check(wwtp_res.get("daily_sludge_production_kg_day", 0.0) > 1500.0, "Sludge production > 1500 kg/d")
+        check(wwtp_res.get("surface_overflow_rate_m3_m2_day", 0.0) <= 32.0, "SOR <= 32 m/d")
+        check(wwtp_res.get("solids_loading_rate_kg_m2_h", 0.0) <= 6.0, "SLR <= 6.0 kg/m²·h")
+        check(wwtp_res.get("is_clarifier_sor_acceptable", False) is True, "SOR acceptable")
+        check(wwtp_res.get("is_clarifier_slr_acceptable", False) is True, "SLR acceptable")
+        check(wwtp_res.get("is_effluent_compliant", False) is True, "Effluent compliant")
+        print(f"  ✓ 31.1 Wastewater Activated Sludge & Clarifier (Metcalf & Eddy / ASCE / WEF): Q = 20,000 m³/d @ 220 mg/L BOD5, V_aero = {wwtp_res['aeration_basin_volume_m3']:.1f} m³ (HRT = {wwtp_res['hydraulic_retention_time_hours']:.2f} h, F/M = {wwtp_res['food_to_microorganism_ratio']:.3f}), Sludge WAS = {wwtp_res['daily_sludge_production_kg_day']:.1f} kg TSS/d, AOTR = {wwtp_res['actual_oxygen_demand_kg_day']:.1f} kg/d, SOTR = {wwtp_res['standard_oxygen_rate_kg_h']:.1f} kg O2/h, Blower = {wwtp_res['blower_power_kw']:.1f} kW, 2x Clarifiers (D=28m): SOR = {wwtp_res['surface_overflow_rate_m3_m2_day']:.1f} m/d (limit <= 32), SLR = {wwtp_res['solids_loading_rate_kg_m2_h']:.2f} kg/m²·h (limit <= 6.0), Effluent BOD = {wwtp_res['effluent_bod_achieved_mg_l']:.1f} mg/L ({wwtp_res['bod_removal_efficiency_pct']:.1f}% removal, Compliant: {wwtp_res['is_effluent_compliant']})")
+
+        # 31.2 EV Longitudinal Dynamics & Regenerative Braking (SAE J2452 / UNECE R13-H)
+        ev_res = http_request(port, "POST", "/api/sim/automotive/ev_powertrain", body={
+            "vehicle_mass_kg": 1850.0,
+            "rolling_resistance_coeff": 0.009,
+            "drag_coefficient": 0.24,
+            "frontal_area_m2": 2.25,
+            "tire_radius_m": 0.330,
+            "gear_ratio": 9.0,
+            "motor_peak_torque_nm": 350.0,
+            "battery_capacity_kwh": 75.0,
+            "cruising_speed_km_h": 100.0,
+            "braking_deceleration_m_s2": 2.5
+        })
+        check(ev_res.get("total_road_load_force_n", 0.0) > 300.0, "Total road load > 300 N")
+        check(ev_res.get("cruising_range_km", 0.0) > 350.0, "Range > 350 km")
+        check(ev_res.get("max_wheel_tractive_force_n", 0.0) > 8000.0, "Tractive force > 8000 N")
+        check(ev_res.get("acceleration_0_to_100_km_h_s", 0.0) < 7.5, "0-100 km/h < 7.5s")
+        check(ev_res.get("regen_braking_power_kw", 0.0) > 15.0, "Regen power > 15 kW")
+        check(ev_res.get("is_cruising_speed_attainable", False) is True, "Cruise attainable")
+        check(ev_res.get("is_regen_braking_compliant", False) is True, "Regen compliant")
+        print(f"  ✓ 31.2 EV Longitudinal Dynamics & Regenerative Braking (SAE J2452 / UNECE R13-H): M = 1850 kg, Cd = 0.24, Crr = 0.009 @ 100 km/h: F_roll = {ev_res['rolling_resistance_force_n']:.1f} N, F_aero = {ev_res['aerodynamic_drag_force_n']:.1f} N, F_road = {ev_res['total_road_load_force_n']:.1f} N, P_wheel = {ev_res['wheel_power_at_cruise_kw']:.2f} kW, P_batt = {ev_res['battery_power_at_cruise_kw']:.2f} kW, Consumption = {ev_res['specific_energy_wh_km']:.1f} Wh/km, Range = {ev_res['cruising_range_km']:.1f} km, 0-100 km/h = {ev_res['acceleration_0_to_100_km_h_s']:.2f} s, V_max = {ev_res['max_vehicle_speed_km_h']:.1f} km/h, Regen (0.25g): P_regen = {ev_res['regen_braking_power_kw']:.1f} kW ({ev_res['regen_capture_efficiency_pct']:.1f}% recovery, UNECE Safe: {ev_res['is_regen_braking_compliant']})")
+
+        # 31.3 Lead-Rubber Bearing (LRB) Seismic Base Isolation (ASCE 7-22 / FEMA P-751)
+        lrb_res = http_request(port, "POST", "/api/sim/civil/seismic_base_isolation", body={
+            "superstructure_mass_tonnes": 4500.0,
+            "bearing_count": 16,
+            "bearing_outer_diameter_mm": 800.0,
+            "lead_core_diameter_mm": 160.0,
+            "total_rubber_thickness_mm": 200.0,
+            "lead_yield_strength_mpa": 10.5,
+            "mapped_spectral_accel_s1_g": 0.60,
+            "site_coefficient_fv": 1.20,
+            "fixed_base_period_s": 0.55
+        })
+        check(lrb_res.get("total_seismic_weight_kn", 0.0) > 40000.0, "Weight > 40,000 kN")
+        check(lrb_res.get("total_system_yield_force_qd_kn", 0.0) > 2500.0, "Yield force > 2500 kN")
+        check(lrb_res.get("effective_isolated_period_s", 0.0) > 2.0, "Isolated period > 2.0s")
+        check(lrb_res.get("effective_damping_ratio_pct", 0.0) > 15.0, "Effective damping > 15%")
+        check(lrb_res.get("design_horizontal_displacement_dd_mm", 0.0) > 100.0, "Displacement > 100 mm")
+        check(lrb_res.get("base_shear_reduction_ratio", 0.0) < 0.35, "Base shear reduction < 0.35")
+        check(lrb_res.get("seismic_force_attenuation_pct", 0.0) > 50.0, "Attenuation > 50%")
+        check(lrb_res.get("is_rubber_strain_safe", False) is True, "Rubber strain safe")
+        check(lrb_res.get("is_base_isolation_effective", False) is True, "Base isolation effective")
+        print(f"  ✓ 31.3 Lead-Rubber Bearing (LRB) Seismic Base Isolation (ASCE 7-22 / FEMA P-751): W = {lrb_res['total_seismic_weight_kn']:.1f} kN (16x 800mm LRBs w/ 160mm lead plugs), Qd_total = {lrb_res['total_system_yield_force_qd_kn']:.1f} kN, Kd_total = {lrb_res['total_system_post_yield_stiffness_kd_kn_m']:.1f} kN/m, S_D1 = {lrb_res['design_spectral_accel_sd1_g']:.2f}g, Period Shift: {0.55:.2f}s -> {lrb_res['effective_isolated_period_s']:.2f}s, beta_eff = {lrb_res['effective_damping_ratio_pct']:.1f}%, D_D = {lrb_res['design_horizontal_displacement_dd_mm']:.1f} mm (gamma_rubber = {lrb_res['rubber_total_shear_strain_pct']:.1f}%), Base Shear: V_fixed = {lrb_res['fixed_base_shear_force_kn']:.1f} kN -> V_b = {lrb_res['isolated_base_shear_force_kn']:.1f} kN (Reduction = {lrb_res['base_shear_reduction_ratio']:.3f}, {lrb_res['seismic_force_attenuation_pct']:.1f}% Attenuated, High Protection: {lrb_res['is_base_isolation_effective']})")
+
+        # 31.4 Terminal Ballistics & Armor Hydrodynamic Penetration (Tate-Alekseevskii / STANAG 4569)
+        bal_res = http_request(port, "POST", "/api/sim/defense/terminal_ballistics", body={
+            "projectile_mass_kg": 0.180,
+            "projectile_diameter_mm": 12.0,
+            "projectile_length_mm": 90.0,
+            "impact_velocity_m_s": 1450.0,
+            "obliquity_angle_deg": 30.0,
+            "armor_thickness_mm": 75.0
+        })
+        check(bal_res.get("normal_impact_velocity_m_s", 0.0) > 1200.0, "Normal velocity > 1200 m/s")
+        check(bal_res.get("line_of_sight_thickness_mm", 0.0) > 80.0, "LOS thickness > 80 mm")
+        check(bal_res.get("penetration_interface_velocity_m_s", 0.0) > 500.0, "Interface velocity > 500 m/s")
+        check(bal_res.get("total_penetration_depth_mm", 0.0) > 50.0, "Penetration depth > 50 mm")
+        check(bal_res.get("ballistic_limit_v50_m_s", 0.0) > 800.0, "V50 > 800 m/s")
+        check(bal_res.get("armor_protection_margin_factor", 0.0) > 1.05, "Margin factor > 1.05")
+        check(bal_res.get("is_armor_defeating_projectile", False) is True, "Armor defeats penetrator")
+        check(bal_res.get("stanag_4569_defeated_level", 0) >= 4, "STANAG Level 4+")
+        print(f"  ✓ 31.4 Terminal Ballistics Hydrodynamic Penetration (Tate-Alekseevskii / STANAG 4569): 90mm Tungsten Rod (17,600 kg/m³, 1850 MPa) vs 75mm RHA @ 30° obliquity (T_los = {bal_res['line_of_sight_thickness_mm']:.1f} mm), v0 = 1450 m/s (v_n = {bal_res['normal_impact_velocity_m_s']:.1f} m/s, gamma = {bal_res['hydrodynamic_density_ratio']:.2f}), Tate interface u = {bal_res['penetration_interface_velocity_m_s']:.1f} m/s, P_depth = {bal_res['total_penetration_depth_mm']:.1f} mm, V50 = {bal_res['ballistic_limit_v50_m_s']:.1f} m/s, Residual v = {bal_res['residual_velocity_m_s']:.1f} m/s, Armor Margin = {bal_res['armor_protection_margin_factor']:.2f}x (STANAG 4569 Level {bal_res['stanag_4569_defeated_level']}, Defeated: {bal_res['is_armor_defeating_projectile']})")
+
+        # 31.5 BGA Solder Joint Thermal Fatigue & Creep Lifetime (Engelmaier / IPC-9701)
+        sol_res = http_request(port, "POST", "/api/sim/packaging/solder_thermal_fatigue", body={
+            "package_width_mm": 35.0,
+            "package_length_mm": 35.0,
+            "solder_joint_height_um": 400.0,
+            "solder_ball_pitch_mm": 1.0,
+            "package_cte_ppm_k": 6.5,
+            "pcb_cte_ppm_k": 16.0,
+            "cycle_min_temp_c": -40.0,
+            "cycle_max_temp_c": 125.0
+        })
+        check(sol_res.get("distance_to_neutral_point_dnp_mm", 0.0) > 20.0, "DNP > 20 mm")
+        check(sol_res.get("cyclic_shear_strain_pct", 0.0) > 1.5, "Shear strain > 1.5%")
+        check(sol_res.get("median_cycles_to_failure_n50", 0.0) > 500.0, "N50 > 500 cycles")
+        check(sol_res.get("weibull_characteristic_life_eta", 0.0) > 500.0, "Weibull eta > 500 cycles")
+        check(sol_res.get("is_ipc_9701_compliant", False) is True, "IPC-9701 compliant")
+        print(f"  ✓ 31.5 BGA Solder Joint Thermal Fatigue & Creep Life (Engelmaier / Coffin-Manson / IPC-9701): 35x35mm PBGA on FR-4 (DNP = {sol_res['distance_to_neutral_point_dnp_mm']:.2f} mm, Δα = {sol_res['cte_mismatch_ppm_k']:.1f} ppm/K), Cycle [-40°C, +125°C] (ΔT = {sol_res['temperature_swing_delta_t_c']:.0f}°C, T_mean = {sol_res['mean_cycle_temperature_c']:.1f}°C), Joint Δu = {sol_res['cyclic_shear_displacement_um']:.2f} μm, Δγ = {sol_res['cyclic_shear_strain_pct']:.2f}%, Engelmaier c = {sol_res['engelmaier_fatigue_exponent']:.4f}, Coffin-Manson N_50% = {sol_res['median_cycles_to_failure_n50']:.0f} cycles, Weibull η = {sol_res['weibull_characteristic_life_eta']:.0f} cycles, N_0.1% = {sol_res['first_failure_cycles_n001']:.0f} cycles, 1 cycle/day Field Life = {sol_res['field_life_years_at_1_cycle_per_day']:.1f} years, Damage@1000 = {sol_res['damage_fraction_at_1000_cycles']:.2f} (IPC-9701 Qualified: {sol_res['is_ipc_9701_compliant']})")
+
+        # 31.6 Universal Commands Execution Verification (Batch 16 Domains)
+        for cmd_id in [
+            "sim.environmental.wastewater_treatment",
+            "sim.automotive.ev_powertrain",
+            "sim.civil.seismic_base_isolation",
+            "sim.defense.terminal_ballistics",
+            "sim.packaging.solder_thermal_fatigue",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 31.6 Universal Commands: All 5 Batch-16 Engineering Commands verified via typed schema engine")
+
+        # 31.7 Enterprise MCP Tool Calling (Batch 16 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_environmental_wastewater_treatment",
+            "atlas_sim_automotive_ev_powertrain",
+            "atlas_sim_civil_seismic_base_isolation",
+            "atlas_sim_defense_terminal_ballistics",
+            "atlas_sim_packaging_solder_thermal_fatigue",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 835,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 31.7 Enterprise MCP Tool Calling: 5 Batch-16 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

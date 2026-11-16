@@ -1615,6 +1615,78 @@ impl McpServer {
                     "required": ["pipe_inside_diameter_mm", "lateral_length_m", "emitter_spacing_m", "nominal_discharge_l_h"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_environmental_wastewater_treatment".into(),
+                description: "Activated Sludge Aeration & Clarifier Sedimentation (ASCE / WEF / Takacs / Metcalf & Eddy) biological basin volume, HRT, F/M, WAS sludge production, SOTR oxygen transfer rate, blower power, and clarifier SOR/SLR solids flux".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "influent_flow_m3_day": { "type": "number", "default": 20000.0 },
+                        "influent_bod_mg_l": { "type": "number", "default": 220.0 },
+                        "target_effluent_bod_mg_l": { "type": "number", "default": 15.0 },
+                        "mlss_mg_l": { "type": "number", "default": 3000.0 },
+                        "sludge_retention_time_days": { "type": "number", "default": 8.0 }
+                    },
+                    "required": ["influent_flow_m3_day", "influent_bod_mg_l", "mlss_mg_l"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_automotive_ev_powertrain".into(),
+                description: "EV Longitudinal Dynamics, Traction Motor Envelope & Regenerative Braking (SAE J2452 / UNECE R13-H) aerodynamic and rolling road load, wheel/battery power, cruising range, 0-100 km/h acceleration, top speed, and regen energy recovery".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "vehicle_mass_kg": { "type": "number", "default": 1850.0 },
+                        "motor_peak_torque_nm": { "type": "number", "default": 350.0 },
+                        "battery_capacity_kwh": { "type": "number", "default": 75.0 },
+                        "cruising_speed_km_h": { "type": "number", "default": 100.0 }
+                    },
+                    "required": ["vehicle_mass_kg", "motor_peak_torque_nm", "battery_capacity_kwh"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_civil_seismic_base_isolation".into(),
+                description: "Lead-Rubber Bearing (LRB) Seismic Base Isolation Mechanics (ASCE 7-22 / FEMA P-751) characteristic yield strength, post-yield stiffness, effective period, equivalent viscous damping ratio, design displacement, and structural base shear attenuation".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "superstructure_mass_tonnes": { "type": "number", "default": 4500.0 },
+                        "bearing_count": { "type": "integer", "default": 16 },
+                        "bearing_outer_diameter_mm": { "type": "number", "default": 800.0 },
+                        "lead_core_diameter_mm": { "type": "number", "default": 160.0 },
+                        "total_rubber_thickness_mm": { "type": "number", "default": 200.0 }
+                    },
+                    "required": ["superstructure_mass_tonnes", "bearing_count", "bearing_outer_diameter_mm", "lead_core_diameter_mm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_defense_terminal_ballistics".into(),
+                description: "Terminal Ballistics & Armor Hydrodynamic Penetration (Tate-Alekseevskii / Recht-Ipson / NATO STANAG 4569) modified Bernoulli penetration, erosion velocity, depth of penetration, ballistic limit V50, and armor protection level".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "projectile_length_mm": { "type": "number", "default": 90.0 },
+                        "impact_velocity_m_s": { "type": "number", "default": 1450.0 },
+                        "obliquity_angle_deg": { "type": "number", "default": 30.0 },
+                        "armor_thickness_mm": { "type": "number", "default": 75.0 }
+                    },
+                    "required": ["projectile_length_mm", "impact_velocity_m_s", "armor_thickness_mm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_packaging_solder_thermal_fatigue".into(),
+                description: "BGA Solder Joint Thermal Fatigue & Creep Lifetime (Engelmaier / Coffin-Manson / IPC-9701 / JEDEC JESD22-A104) DNP thermal shear strain, creep ductility exponent, thermal cycles to failure, Weibull characteristic life, and qualification compliance".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "package_width_mm": { "type": "number", "default": 35.0 },
+                        "solder_joint_height_um": { "type": "number", "default": 400.0 },
+                        "cycle_min_temp_c": { "type": "number", "default": -40.0 },
+                        "cycle_max_temp_c": { "type": "number", "default": 125.0 }
+                    },
+                    "required": ["package_width_mm", "solder_joint_height_um"]
+                }),
+            },
         ]
     }
 

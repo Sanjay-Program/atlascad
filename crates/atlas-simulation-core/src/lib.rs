@@ -116,6 +116,11 @@ pub mod mine_ventilation;
 pub mod reflector_antenna;
 pub mod semiconductor_gaa_fet;
 pub mod irrigation_hydraulics;
+pub mod wastewater_treatment;
+pub mod ev_powertrain;
+pub mod seismic_base_isolation;
+pub mod terminal_ballistics;
+pub mod solder_thermal_fatigue;
 
 pub mod prelude {
     pub use crate::acoustics::{
@@ -521,5 +526,25 @@ pub mod prelude {
     pub use crate::irrigation_hydraulics::{
         EmitterType, IrrigationHydraulicsProblem, IrrigationHydraulicsResult,
         solve_irrigation_hydraulics, solve_irrigation_hydraulics_sim,
+    };
+    pub use crate::wastewater_treatment::{
+        AerationDiffuserType, WastewaterTreatmentProblem, WastewaterTreatmentResult,
+        solve_wastewater_treatment,
+    };
+    pub use crate::ev_powertrain::{
+        EvDrivetrainLayout, EvPowertrainProblem, EvPowertrainResult,
+        solve_ev_powertrain,
+    };
+    pub use crate::seismic_base_isolation::{
+        RubberCompoundGrade, SeismicBaseIsolationProblem, SeismicBaseIsolationResult,
+        solve_seismic_base_isolation,
+    };
+    pub use crate::terminal_ballistics::{
+        ProjectileType, TargetArmorType, TerminalBallisticsProblem, TerminalBallisticsResult,
+        solve_terminal_ballistics,
+    };
+    pub use crate::solder_thermal_fatigue::{
+        SolderAlloyType, SolderThermalFatigueProblem, SolderThermalFatigueResult,
+        solve_solder_thermal_fatigue,
     };
 }
