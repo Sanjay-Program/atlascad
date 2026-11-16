@@ -5852,5 +5852,247 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.nuclear.containment_loca",
+            "Nuclear Reactor Containment Post-LOCA Pressure & Temperature Dynamics (10 CFR 50 App A / Tagami / Uchida)",
+            "Calculates post-LOCA mass and energy discharge, Dalton air-steam partial pressures, Tagami and Uchida passive heat sink condensation coefficients, and active spray depressurization margins.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "containment_free_volume_m3".into(),
+            arg_type: ArgumentType::Number,
+            description: "Net internal free air volume of containment in cubic meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(65000.0)),
+            validation_rules: vec![ValidationRule::Min(1000.0), ValidationRule::Max(150000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "design_pressure_bar_a".into(),
+            arg_type: ArgumentType::Number,
+            description: "Containment structural design internal pressure in bar absolute".into(),
+            required: false,
+            default_value: Some(serde_json::json!(4.80)),
+            validation_rules: vec![ValidationRule::Min(1.5), ValidationRule::Max(12.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "blowdown_enthalpy_gj".into(),
+            arg_type: ArgumentType::Number,
+            description: "Total primary coolant blowdown enthalpy discharged in GigaJoules".into(),
+            required: false,
+            default_value: Some(serde_json::json!(380.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(2000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "spray_flow_rate_l_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Containment spray cooling active delivery rate in L/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(650.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(3000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.environmental.atmospheric_dispersion",
+            "Atmospheric Pollutant Gaussian Plume Dispersion (EPA AERMOD / Pasquill-Gifford / Briggs)",
+            "Calculates thermal buoyancy and momentum plume rise, Pasquill-Gifford dispersion coefficients, ground-level centerline concentrations, and US EPA NAAQS ambient limit compliance.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "emission_rate_g_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Pollutant mass emission rate in grams per second".into(),
+            required: false,
+            default_value: Some(serde_json::json!(85.0)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(2000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "stack_height_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Physical chimney stack height in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(80.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(350.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "stack_gas_temperature_c".into(),
+            arg_type: ArgumentType::Number,
+            description: "Flue gas exit temperature in degrees Celsius".into(),
+            required: false,
+            default_value: Some(serde_json::json!(140.0)),
+            validation_rules: vec![ValidationRule::Min(20.0), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "wind_speed_at_stack_height_m_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Mean wind speed at stack release height in m/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(5.50)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(40.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "receptor_downwind_distance_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Receptor evaluation downwind distance in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(2500.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(100000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.aerospace.rocket_ascent_trajectory",
+            "Multistage Rocket Ascent Trajectory & Orbital Injection (Tsiolkovsky / NASA SP-8010)",
+            "Calculates multistage Tsiolkovsky staging delta-V, gravity/aerodynamic/steering losses, Max Q dynamic pressure, Earth rotation assist, and circular LEO injection velocity.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "gross_liftoff_mass_kg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Total launch vehicle gross liftoff mass (GLOW) in kg".into(),
+            required: false,
+            default_value: Some(serde_json::json!(549054.0)),
+            validation_rules: vec![ValidationRule::Min(1000.0), ValidationRule::Max(4000000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "payload_mass_kg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Orbital payload mass in kilograms".into(),
+            required: false,
+            default_value: Some(serde_json::json!(15600.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(150000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "stage1_thrust_sl_kn".into(),
+            arg_type: ArgumentType::Number,
+            description: "Stage 1 sea-level total thrust in kiloNewtons".into(),
+            required: false,
+            default_value: Some(serde_json::json!(7607.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(50000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "stage2_thrust_vac_kn".into(),
+            arg_type: ArgumentType::Number,
+            description: "Stage 2 vacuum thrust in kiloNewtons".into(),
+            required: false,
+            default_value: Some(serde_json::json!(981.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(10000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "target_orbit_altitude_km".into(),
+            arg_type: ArgumentType::Number,
+            description: "Target circular LEO injection altitude in kilometers".into(),
+            required: false,
+            default_value: Some(serde_json::json!(300.0)),
+            validation_rules: vec![ValidationRule::Min(150.0), ValidationRule::Max(2000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.civil.gravity_dam_stability",
+            "Concrete Gravity Dam Overturning, Sliding & Seepage Uplift Stability (USACE EM 1110-2-2200 / FERC)",
+            "Calculates hydrostatic water thrust, USACE trapezoidal foundation drainage seepage uplift, Westergaard seismic hydrodynamic forces, shear-friction sliding SFF, and middle-third Kern bearing stresses.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "dam_height_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Concrete gravity dam structural height in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(85.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(300.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "crest_width_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Dam crest roadway width in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(8.50)),
+            validation_rules: vec![ValidationRule::Min(3.0), ValidationRule::Max(40.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "base_width_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Dam foundation base footprint width in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(68.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(250.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "upstream_water_depth_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Upstream reservoir operating water depth in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(80.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(300.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "horizontal_seismic_coef_kh".into(),
+            arg_type: ArgumentType::Number,
+            description: "Pseudostatic horizontal peak ground acceleration coefficient k_h in g's".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.05)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(0.50)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.energy.electrolyzer_hydrogen",
+            "Water Electrolyzer Hydrogen Production & Cell Polarization (Faraday / Butler-Volmer / ISO 22734)",
+            "Calculates Nernst reversible potential, thermoneutral voltage, anode/cathode Butler-Volmer activation overpotentials, membrane protonic ohmic losses, Faraday efficiency, and specific energy consumption.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "cell_temperature_c".into(),
+            arg_type: ArgumentType::Number,
+            description: "Cell operating temperature in degrees Celsius".into(),
+            required: false,
+            default_value: Some(serde_json::json!(70.0)),
+            validation_rules: vec![ValidationRule::Min(20.0), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "hydrogen_operating_pressure_bar_a".into(),
+            arg_type: ArgumentType::Number,
+            description: "Hydrogen delivery operating pressure in bar absolute".into(),
+            required: false,
+            default_value: Some(serde_json::json!(30.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(50.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "current_density_a_per_cm2".into(),
+            arg_type: ArgumentType::Number,
+            description: "Operating current density in A/cm²".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1.80)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(4.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "active_cell_area_cm2".into(),
+            arg_type: ArgumentType::Number,
+            description: "Active cell geometric membrane area in cm²".into(),
+            required: false,
+            default_value: Some(serde_json::json!(600.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(2000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "cell_count".into(),
+            arg_type: ArgumentType::Number,
+            description: "Number of series-connected cells in the stack".into(),
+            required: false,
+            default_value: Some(serde_json::json!(120.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(500.0)],
+        }),
+    )?;
+
     Ok(())
 }

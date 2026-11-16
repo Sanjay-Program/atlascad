@@ -6773,6 +6773,130 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_nuclear_containment_loca(
+        &mut self,
+        req: &SimContainmentLocaRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::containment_loca::ContainmentLocaProblem {
+            problem_id: "containment_loca_sim".to_string(),
+            containment_type: req.containment_type.unwrap_or(atlas_simulation_core::containment_loca::ContainmentStructureType::PrestressedConcreteLiner),
+            containment_free_volume_m3: req.containment_free_volume_m3.unwrap_or(65000.0),
+            design_pressure_bar_a: req.design_pressure_bar_a.unwrap_or(4.80),
+            design_temperature_c: req.design_temperature_c.unwrap_or(150.0),
+            initial_pressure_bar_a: req.initial_pressure_bar_a.unwrap_or(1.013),
+            initial_temperature_c: req.initial_temperature_c.unwrap_or(40.0),
+            initial_relative_humidity_pct: req.initial_relative_humidity_pct.unwrap_or(50.0),
+            blowdown_coolant_mass_tonnes: req.blowdown_coolant_mass_tonnes.unwrap_or(260.0),
+            blowdown_enthalpy_gj: req.blowdown_enthalpy_gj.unwrap_or(380.0),
+            blowdown_duration_seconds: req.blowdown_duration_seconds.unwrap_or(32.0),
+            heat_sink_surface_area_m2: req.heat_sink_surface_area_m2.unwrap_or(32000.0),
+            spray_flow_rate_l_s: req.spray_flow_rate_l_s.unwrap_or(650.0),
+            spray_temperature_c: req.spray_temperature_c.unwrap_or(32.0),
+        };
+        let res = atlas_simulation_core::containment_loca::solve_containment_loca(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_environmental_atmospheric_dispersion(
+        &mut self,
+        req: &SimAtmosphericDispersionRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::atmospheric_dispersion::AtmosphericDispersionProblem {
+            problem_id: "atmospheric_dispersion_sim".to_string(),
+            stability_class: req.stability_class.unwrap_or(atlas_simulation_core::atmospheric_dispersion::AtmosphericStabilityClass::ClassDNeutral),
+            pollutant: req.pollutant.unwrap_or(atlas_simulation_core::atmospheric_dispersion::AirPollutantType::SulfurDioxideSO2),
+            emission_rate_g_s: req.emission_rate_g_s.unwrap_or(85.0),
+            stack_height_m: req.stack_height_m.unwrap_or(80.0),
+            stack_inside_diameter_m: req.stack_inside_diameter_m.unwrap_or(2.80),
+            stack_gas_velocity_m_s: req.stack_gas_velocity_m_s.unwrap_or(18.5),
+            stack_gas_temperature_c: req.stack_gas_temperature_c.unwrap_or(140.0),
+            ambient_air_temperature_c: req.ambient_air_temperature_c.unwrap_or(20.0),
+            wind_speed_at_stack_height_m_s: req.wind_speed_at_stack_height_m_s.unwrap_or(5.50),
+            receptor_downwind_distance_m: req.receptor_downwind_distance_m.unwrap_or(8400.0),
+            receptor_crosswind_distance_m: req.receptor_crosswind_distance_m.unwrap_or(0.0),
+        };
+        let res = atlas_simulation_core::atmospheric_dispersion::solve_atmospheric_dispersion(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_aerospace_rocket_ascent_trajectory(
+        &mut self,
+        req: &SimRocketAscentRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::rocket_ascent_trajectory::RocketAscentProblem {
+            problem_id: "rocket_ascent_sim".to_string(),
+            staging_type: req.staging_type.unwrap_or(atlas_simulation_core::rocket_ascent_trajectory::RocketStagingArchitecture::TwoStageToOrbit),
+            gross_liftoff_mass_kg: req.gross_liftoff_mass_kg.unwrap_or(549054.0),
+            payload_mass_kg: req.payload_mass_kg.unwrap_or(15600.0),
+            stage1_propellant_mass_kg: req.stage1_propellant_mass_kg.unwrap_or(411000.0),
+            stage1_dry_mass_kg: req.stage1_dry_mass_kg.unwrap_or(25600.0),
+            stage1_thrust_sl_kn: req.stage1_thrust_sl_kn.unwrap_or(7607.0),
+            stage1_isp_vac_s: req.stage1_isp_vac_s.unwrap_or(311.0),
+            stage1_burn_time_s: req.stage1_burn_time_s.unwrap_or(162.0),
+            stage2_propellant_mass_kg: req.stage2_propellant_mass_kg.unwrap_or(92670.0),
+            stage2_dry_mass_kg: req.stage2_dry_mass_kg.unwrap_or(4000.0),
+            stage2_thrust_vac_kn: req.stage2_thrust_vac_kn.unwrap_or(934.0),
+            stage2_isp_vac_s: req.stage2_isp_vac_s.unwrap_or(348.0),
+            aerodynamic_reference_area_m2: req.aerodynamic_reference_area_m2.unwrap_or(10.52),
+            drag_coefficient_cd: req.drag_coefficient_cd.unwrap_or(0.32),
+            target_orbit_altitude_km: req.target_orbit_altitude_km.unwrap_or(300.0),
+            launch_latitude_deg: req.launch_latitude_deg.unwrap_or(28.5),
+        };
+        let res = atlas_simulation_core::rocket_ascent_trajectory::solve_rocket_ascent(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_civil_gravity_dam_stability(
+        &mut self,
+        req: &SimGravityDamRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::gravity_dam_stability::GravityDamProblem {
+            problem_id: "gravity_dam_stability_sim".to_string(),
+            load_combination: req.load_combination.unwrap_or(atlas_simulation_core::gravity_dam_stability::DamLoadCombination::UsualNormalOperating),
+            foundation_rock: req.foundation_rock.unwrap_or(atlas_simulation_core::gravity_dam_stability::FoundationRockClass::MassiveGraniteGneiss),
+            dam_height_m: req.dam_height_m.unwrap_or(85.0),
+            crest_width_m: req.crest_width_m.unwrap_or(8.50),
+            base_width_m: req.base_width_m.unwrap_or(68.0),
+            upstream_water_depth_m: req.upstream_water_depth_m.unwrap_or(80.0),
+            downstream_tailwater_depth_m: req.downstream_tailwater_depth_m.unwrap_or(6.0),
+            silt_deposit_depth_m: req.silt_deposit_depth_m.unwrap_or(12.0),
+            drainage_gallery_distance_from_heel_m: req.drainage_gallery_distance_from_heel_m.unwrap_or(10.0),
+            drainage_efficiency_factor: req.drainage_efficiency_factor.unwrap_or(0.67),
+            horizontal_seismic_coef_kh: req.horizontal_seismic_coef_kh.unwrap_or(0.05),
+            concrete_unit_weight_kn_m3: req.concrete_unit_weight_kn_m3.unwrap_or(24.0),
+            allowable_bearing_capacity_mpa: req.allowable_bearing_capacity_mpa.unwrap_or(8.0),
+        };
+        let res = atlas_simulation_core::gravity_dam_stability::solve_gravity_dam(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_energy_electrolyzer_hydrogen(
+        &mut self,
+        req: &SimElectrolyzerHydrogenRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::electrolyzer_hydrogen::ElectrolyzerHydrogenProblem {
+            problem_id: "electrolyzer_hydrogen_sim".to_string(),
+            technology: req.technology.unwrap_or(atlas_simulation_core::electrolyzer_hydrogen::ElectrolyzerTechnology::ProtonExchangeMembranePEM),
+            cell_temperature_c: req.cell_temperature_c.unwrap_or(70.0),
+            hydrogen_operating_pressure_bar_a: req.hydrogen_operating_pressure_bar_a.unwrap_or(30.0),
+            current_density_a_per_cm2: req.current_density_a_per_cm2.unwrap_or(1.80),
+            active_cell_area_cm2: req.active_cell_area_cm2.unwrap_or(600.0),
+            cell_count: req.cell_count.unwrap_or(120),
+            membrane_thickness_um: req.membrane_thickness_um.unwrap_or(90.0),
+            membrane_water_content_lambda: req.membrane_water_content_lambda.unwrap_or(18.0),
+            anode_exchange_current_density_a_cm2: req.anode_exchange_current_density_a_cm2.unwrap_or(1.5e-3),
+            cathode_exchange_current_density_a_cm2: req.cathode_exchange_current_density_a_cm2.unwrap_or(1.5e-2),
+            limiting_current_density_a_cm2: req.limiting_current_density_a_cm2.unwrap_or(3.80),
+        };
+        let res = atlas_simulation_core::electrolyzer_hydrogen::solve_electrolyzer_hydrogen(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -9562,6 +9686,71 @@ namespace AtlasCAD.Unity
                     ..Default::default()
                 })?
             }
+            "sim.nuclear.containment_loca" => {
+                let vol = req.arguments.get("containment_free_volume_m3").and_then(|v| v.as_f64());
+                let p_des = req.arguments.get("design_pressure_bar_a").and_then(|v| v.as_f64());
+                let h_blow = req.arguments.get("blowdown_enthalpy_gj").and_then(|v| v.as_f64());
+                let q_spray = req.arguments.get("spray_flow_rate_l_s").and_then(|v| v.as_f64());
+                self.sim_nuclear_containment_loca(&SimContainmentLocaRequest {
+                    containment_free_volume_m3: vol,
+                    design_pressure_bar_a: p_des,
+                    blowdown_enthalpy_gj: h_blow,
+                    spray_flow_rate_l_s: q_spray,
+                    ..Default::default()
+                })?
+            }
+            "sim.environmental.atmospheric_dispersion" => {
+                let q = req.arguments.get("emission_rate_g_s").and_then(|v| v.as_f64());
+                let hs = req.arguments.get("stack_height_m").and_then(|v| v.as_f64());
+                let ts = req.arguments.get("stack_gas_temperature_c").and_then(|v| v.as_f64());
+                let u = req.arguments.get("wind_speed_at_stack_height_m_s").and_then(|v| v.as_f64());
+                self.sim_environmental_atmospheric_dispersion(&SimAtmosphericDispersionRequest {
+                    emission_rate_g_s: q,
+                    stack_height_m: hs,
+                    stack_gas_temperature_c: ts,
+                    wind_speed_at_stack_height_m_s: u,
+                    ..Default::default()
+                })?
+            }
+            "sim.aerospace.rocket_ascent_trajectory" => {
+                let m0 = req.arguments.get("gross_liftoff_mass_kg").and_then(|v| v.as_f64());
+                let mpl = req.arguments.get("payload_mass_kg").and_then(|v| v.as_f64());
+                let f1 = req.arguments.get("stage1_thrust_sl_kn").and_then(|v| v.as_f64());
+                let alt = req.arguments.get("target_orbit_altitude_km").and_then(|v| v.as_f64());
+                self.sim_aerospace_rocket_ascent_trajectory(&SimRocketAscentRequest {
+                    gross_liftoff_mass_kg: m0,
+                    payload_mass_kg: mpl,
+                    stage1_thrust_sl_kn: f1,
+                    target_orbit_altitude_km: alt,
+                    ..Default::default()
+                })?
+            }
+            "sim.civil.gravity_dam_stability" => {
+                let h = req.arguments.get("dam_height_m").and_then(|v| v.as_f64());
+                let b = req.arguments.get("base_width_m").and_then(|v| v.as_f64());
+                let h_w = req.arguments.get("upstream_water_depth_m").and_then(|v| v.as_f64());
+                let b_crest = req.arguments.get("crest_width_m").and_then(|v| v.as_f64());
+                self.sim_civil_gravity_dam_stability(&SimGravityDamRequest {
+                    dam_height_m: h,
+                    crest_width_m: b_crest,
+                    base_width_m: b,
+                    upstream_water_depth_m: h_w,
+                    ..Default::default()
+                })?
+            }
+            "sim.energy.electrolyzer_hydrogen" => {
+                let t_cell = req.arguments.get("cell_temperature_c").and_then(|v| v.as_f64());
+                let p_h2 = req.arguments.get("hydrogen_operating_pressure_bar_a").and_then(|v| v.as_f64());
+                let j = req.arguments.get("current_density_a_per_cm2").and_then(|v| v.as_f64());
+                let n_cells = req.arguments.get("cell_count").and_then(|v| v.as_u64()).map(|n| n as u32);
+                self.sim_energy_electrolyzer_hydrogen(&SimElectrolyzerHydrogenRequest {
+                    cell_temperature_c: t_cell,
+                    hydrogen_operating_pressure_bar_a: p_h2,
+                    current_density_a_per_cm2: j,
+                    cell_count: n_cells,
+                    ..Default::default()
+                })?
+            }
             "system.deploy.status" => self.deploy_status()?,
             _ => serde_json::json!({
                 "status": "Executed",
@@ -12155,6 +12344,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/energy/thermoelectric_rtg" => {
             match parse_body_or_default::<SimThermoelectricRtgRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_energy_thermoelectric_rtg(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/nuclear/containment_loca" => {
+            match parse_body_or_default::<SimContainmentLocaRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_nuclear_containment_loca(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/environmental/atmospheric_dispersion" => {
+            match parse_body_or_default::<SimAtmosphericDispersionRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_environmental_atmospheric_dispersion(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/aerospace/rocket_ascent_trajectory" => {
+            match parse_body_or_default::<SimRocketAscentRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_aerospace_rocket_ascent_trajectory(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/civil/gravity_dam_stability" => {
+            match parse_body_or_default::<SimGravityDamRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_civil_gravity_dam_stability(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/energy/electrolyzer_hydrogen" => {
+            match parse_body_or_default::<SimElectrolyzerHydrogenRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_energy_electrolyzer_hydrogen(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -16923,4 +17157,152 @@ struct SimThermoelectricRtgRequest {
     pub fuel_half_life_years: Option<f64>,
     #[serde(default)]
     pub annual_junction_degradation_pct: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimContainmentLocaRequest {
+    #[serde(default)]
+    pub containment_type: Option<atlas_simulation_core::containment_loca::ContainmentStructureType>,
+    #[serde(default)]
+    pub containment_free_volume_m3: Option<f64>,
+    #[serde(default)]
+    pub design_pressure_bar_a: Option<f64>,
+    #[serde(default)]
+    pub design_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub initial_pressure_bar_a: Option<f64>,
+    #[serde(default)]
+    pub initial_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub initial_relative_humidity_pct: Option<f64>,
+    #[serde(default)]
+    pub blowdown_coolant_mass_tonnes: Option<f64>,
+    #[serde(default)]
+    pub blowdown_enthalpy_gj: Option<f64>,
+    #[serde(default)]
+    pub blowdown_duration_seconds: Option<f64>,
+    #[serde(default)]
+    pub heat_sink_surface_area_m2: Option<f64>,
+    #[serde(default)]
+    pub spray_flow_rate_l_s: Option<f64>,
+    #[serde(default)]
+    pub spray_temperature_c: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimAtmosphericDispersionRequest {
+    #[serde(default)]
+    pub stability_class: Option<atlas_simulation_core::atmospheric_dispersion::AtmosphericStabilityClass>,
+    #[serde(default)]
+    pub pollutant: Option<atlas_simulation_core::atmospheric_dispersion::AirPollutantType>,
+    #[serde(default)]
+    pub emission_rate_g_s: Option<f64>,
+    #[serde(default)]
+    pub stack_height_m: Option<f64>,
+    #[serde(default)]
+    pub stack_inside_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub stack_gas_velocity_m_s: Option<f64>,
+    #[serde(default)]
+    pub stack_gas_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub ambient_air_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub wind_speed_at_stack_height_m_s: Option<f64>,
+    #[serde(default)]
+    pub receptor_downwind_distance_m: Option<f64>,
+    #[serde(default)]
+    pub receptor_crosswind_distance_m: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimRocketAscentRequest {
+    #[serde(default)]
+    pub staging_type: Option<atlas_simulation_core::rocket_ascent_trajectory::RocketStagingArchitecture>,
+    #[serde(default)]
+    pub gross_liftoff_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub payload_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub stage1_propellant_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub stage1_dry_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub stage1_thrust_sl_kn: Option<f64>,
+    #[serde(default)]
+    pub stage1_isp_vac_s: Option<f64>,
+    #[serde(default)]
+    pub stage1_burn_time_s: Option<f64>,
+    #[serde(default)]
+    pub stage2_propellant_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub stage2_dry_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub stage2_thrust_vac_kn: Option<f64>,
+    #[serde(default)]
+    pub stage2_isp_vac_s: Option<f64>,
+    #[serde(default)]
+    pub aerodynamic_reference_area_m2: Option<f64>,
+    #[serde(default)]
+    pub drag_coefficient_cd: Option<f64>,
+    #[serde(default)]
+    pub target_orbit_altitude_km: Option<f64>,
+    #[serde(default)]
+    pub launch_latitude_deg: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimGravityDamRequest {
+    #[serde(default)]
+    pub load_combination: Option<atlas_simulation_core::gravity_dam_stability::DamLoadCombination>,
+    #[serde(default)]
+    pub foundation_rock: Option<atlas_simulation_core::gravity_dam_stability::FoundationRockClass>,
+    #[serde(default)]
+    pub dam_height_m: Option<f64>,
+    #[serde(default)]
+    pub crest_width_m: Option<f64>,
+    #[serde(default)]
+    pub base_width_m: Option<f64>,
+    #[serde(default)]
+    pub upstream_water_depth_m: Option<f64>,
+    #[serde(default)]
+    pub downstream_tailwater_depth_m: Option<f64>,
+    #[serde(default)]
+    pub silt_deposit_depth_m: Option<f64>,
+    #[serde(default)]
+    pub drainage_gallery_distance_from_heel_m: Option<f64>,
+    #[serde(default)]
+    pub drainage_efficiency_factor: Option<f64>,
+    #[serde(default)]
+    pub horizontal_seismic_coef_kh: Option<f64>,
+    #[serde(default)]
+    pub concrete_unit_weight_kn_m3: Option<f64>,
+    #[serde(default)]
+    pub allowable_bearing_capacity_mpa: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimElectrolyzerHydrogenRequest {
+    #[serde(default)]
+    pub technology: Option<atlas_simulation_core::electrolyzer_hydrogen::ElectrolyzerTechnology>,
+    #[serde(default)]
+    pub cell_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub hydrogen_operating_pressure_bar_a: Option<f64>,
+    #[serde(default)]
+    pub current_density_a_per_cm2: Option<f64>,
+    #[serde(default)]
+    pub active_cell_area_cm2: Option<f64>,
+    #[serde(default)]
+    pub cell_count: Option<u32>,
+    #[serde(default)]
+    pub membrane_thickness_um: Option<f64>,
+    #[serde(default)]
+    pub membrane_water_content_lambda: Option<f64>,
+    #[serde(default)]
+    pub anode_exchange_current_density_a_cm2: Option<f64>,
+    #[serde(default)]
+    pub cathode_exchange_current_density_a_cm2: Option<f64>,
+    #[serde(default)]
+    pub limiting_current_density_a_cm2: Option<f64>,
 }

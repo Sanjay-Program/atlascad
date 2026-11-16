@@ -2040,6 +2040,76 @@ impl McpServer {
                     "required": ["initial_thermal_power_w_th", "couple_count"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_nuclear_containment_loca".into(),
+                description: "Calculates post-LOCA mass and energy discharge, Dalton air-steam partial pressures, Tagami and Uchida passive heat sink condensation coefficients, and active spray depressurization margins.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "containment_free_volume_m3": { "type": "number", "default": 65000.0 },
+                        "design_pressure_bar_a": { "type": "number", "default": 4.80 },
+                        "blowdown_enthalpy_gj": { "type": "number", "default": 380.0 },
+                        "spray_flow_rate_l_s": { "type": "number", "default": 650.0 }
+                    },
+                    "required": ["containment_free_volume_m3", "design_pressure_bar_a"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_environmental_atmospheric_dispersion".into(),
+                description: "Calculates thermal buoyancy and momentum plume rise, Pasquill-Gifford dispersion coefficients, ground-level centerline concentrations, and US EPA NAAQS ambient limit compliance.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "emission_rate_g_s": { "type": "number", "default": 85.0 },
+                        "stack_height_m": { "type": "number", "default": 80.0 },
+                        "stack_gas_temperature_c": { "type": "number", "default": 140.0 },
+                        "wind_speed_at_stack_height_m_s": { "type": "number", "default": 5.50 }
+                    },
+                    "required": ["emission_rate_g_s", "stack_height_m"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_aerospace_rocket_ascent_trajectory".into(),
+                description: "Calculates multistage Tsiolkovsky staging delta-V, gravity/aerodynamic/steering losses, Max Q dynamic pressure, Earth rotation assist, and circular LEO injection velocity.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "gross_liftoff_mass_kg": { "type": "number", "default": 549054.0 },
+                        "payload_mass_kg": { "type": "number", "default": 15600.0 },
+                        "stage1_thrust_sl_kn": { "type": "number", "default": 7607.0 },
+                        "target_orbit_altitude_km": { "type": "number", "default": 300.0 }
+                    },
+                    "required": ["gross_liftoff_mass_kg", "payload_mass_kg"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_civil_gravity_dam_stability".into(),
+                description: "Calculates hydrostatic water thrust, USACE trapezoidal foundation drainage seepage uplift, Westergaard seismic hydrodynamic forces, shear-friction sliding SFF, and middle-third Kern bearing stresses.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "dam_height_m": { "type": "number", "default": 85.0 },
+                        "crest_width_m": { "type": "number", "default": 8.50 },
+                        "base_width_m": { "type": "number", "default": 68.0 },
+                        "upstream_water_depth_m": { "type": "number", "default": 80.0 }
+                    },
+                    "required": ["dam_height_m", "base_width_m", "upstream_water_depth_m"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_energy_electrolyzer_hydrogen".into(),
+                description: "Calculates Nernst reversible potential, thermoneutral voltage, anode/cathode Butler-Volmer activation overpotentials, membrane protonic ohmic losses, Faraday efficiency, and specific energy consumption.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "cell_temperature_c": { "type": "number", "default": 70.0 },
+                        "hydrogen_operating_pressure_bar_a": { "type": "number", "default": 30.0 },
+                        "current_density_a_per_cm2": { "type": "number", "default": 1.80 },
+                        "cell_count": { "type": "integer", "default": 120 }
+                    },
+                    "required": ["current_density_a_per_cm2", "cell_count"]
+                }),
+            },
         ]
     }
 

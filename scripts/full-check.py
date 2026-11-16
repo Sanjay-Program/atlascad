@@ -2624,6 +2624,138 @@ def simulation_section(studio: Studio) -> None:
     check(rtg_data.get("conversion_efficiency_pct", 0.0) > 5.0, "solid-state conversion efficiency > 5.0%")
     check(rtg_data.get("is_eol_power_sufficient", False) is True, "end of mission electrical power sufficient")
     check(rtg_data.get("is_conversion_efficiency_acceptable", False) is True, "conversion efficiency acceptable")
+
+    # 110. Nuclear Reactor Containment Post-LOCA Dynamics (10 CFR 50 / Tagami / Uchida)
+    loca = studio.post("/api/sim/nuclear/containment_loca", {
+        "containment_type": "PrestressedConcreteLiner",
+        "containment_free_volume_m3": 65000.0,
+        "design_pressure_bar_a": 4.80,
+        "design_temperature_c": 150.0,
+        "initial_pressure_bar_a": 1.013,
+        "initial_temperature_c": 40.0,
+        "initial_relative_humidity_pct": 50.0,
+        "blowdown_coolant_mass_tonnes": 260.0,
+        "blowdown_enthalpy_gj": 380.0,
+        "blowdown_duration_seconds": 32.0,
+        "heat_sink_surface_area_m2": 32000.0,
+        "spray_flow_rate_l_s": 650.0,
+        "spray_temperature_c": 32.0
+    })
+    check(loca.status == 200, f"containment loca returns 200 (got {loca.status})")
+    loca_data = loca.json()
+    check(loca_data.get("volumetric_energy_release_rate_kw_per_m3", 0.0) > 100.0, "blowdown energy release rate > 100 kW/m³")
+    check(loca_data.get("tagami_condensing_htc_w_m2_k", 0.0) > 500.0, "Tagami condensing HTC > 500 W/(m²·K)")
+    check(loca_data.get("peak_containment_pressure_bar_a", 0.0) < 4.80, "peak post-LOCA pressure within design limit")
+    check(loca_data.get("pressure_margin_pct", 0.0) >= 5.0, "containment pressure safety margin >= 5%")
+    check(loca_data.get("spray_heat_removal_mw_th", 0.0) > 50.0, "active spray cooling heat removal > 50 MWth")
+    check(loca_data.get("is_pressure_margin_acceptable", False) is True, "pressure margin satisfies 10 CFR 50")
+    check(loca_data.get("is_temperature_within_design", False) is True, "peak containment temperature within design limit")
+    check(loca_data.get("is_24h_depressurization_compliant", False) is True, "24h depressurization criterion met")
+    check(loca_data.get("is_containment_integrity_verified", False) is True, "containment integrity verified")
+
+    # 111. Atmospheric Pollutant Gaussian Plume Dispersion (EPA AERMOD / Pasquill-Gifford / Briggs)
+    plume = studio.post("/api/sim/environmental/atmospheric_dispersion", {
+        "stability_class": "ClassDNeutral",
+        "pollutant": "SulfurDioxideSO2",
+        "emission_rate_g_s": 85.0,
+        "stack_height_m": 80.0,
+        "stack_inside_diameter_m": 2.80,
+        "stack_gas_velocity_m_s": 18.5,
+        "stack_gas_temperature_c": 140.0,
+        "ambient_air_temperature_c": 20.0,
+        "wind_speed_at_stack_height_m_s": 5.50,
+        "receptor_downwind_distance_m": 8400.0,
+        "receptor_crosswind_distance_m": 0.0
+    })
+    check(plume.status == 200, f"atmospheric dispersion returns 200 (got {plume.status})")
+    plume_data = plume.json()
+    check(plume_data.get("buoyancy_flux_m4_per_s3", 0.0) > 50.0, "buoyancy flux > 50 m⁴/s³")
+    check(plume_data.get("plume_rise_delta_h_m", 0.0) > 50.0, "Briggs plume rise > 50 m")
+    check(plume_data.get("effective_stack_height_m", 0.0) > 130.0, "effective stack height > 130 m")
+    check(plume_data.get("peak_max_ground_concentration_ug_per_m3", 0.0) < 196.0, "peak ground SO2 within NAAQS standard")
+    check(plume_data.get("is_naaqs_compliant", False) is True, "EPA NAAQS clean air limit satisfied")
+    check(plume_data.get("is_plume_rise_adequate", False) is True, "plume rise adequate without downwash")
+
+    # 112. Multistage Rocket Ascent Trajectory & Orbital Injection (Tsiolkovsky / NASA SP-8010)
+    rocket = studio.post("/api/sim/aerospace/rocket_ascent_trajectory", {
+        "staging_type": "TwoStageToOrbit",
+        "gross_liftoff_mass_kg": 549054.0,
+        "payload_mass_kg": 15600.0,
+        "stage1_propellant_mass_kg": 411000.0,
+        "stage1_dry_mass_kg": 25600.0,
+        "stage1_thrust_sl_kn": 7607.0,
+        "stage1_isp_vac_s": 311.0,
+        "stage1_burn_time_s": 162.0,
+        "stage2_propellant_mass_kg": 92670.0,
+        "stage2_dry_mass_kg": 4000.0,
+        "stage2_thrust_vac_kn": 981.0,
+        "stage2_isp_vac_s": 348.0,
+        "aerodynamic_reference_area_m2": 10.52,
+        "drag_coefficient_cd": 0.32,
+        "target_orbit_altitude_km": 300.0,
+        "launch_latitude_deg": 28.5
+    })
+    check(rocket.status == 200, f"rocket ascent trajectory returns 200 (got {rocket.status})")
+    rocket_data = rocket.json()
+    check(rocket_data.get("liftoff_thrust_to_weight_ratio", 0.0) > 1.20, "liftoff TWR > 1.20")
+    check(rocket_data.get("total_ideal_delta_v_m_s", 0.0) > 9000.0, "total ideal delta-V > 9000 m/s")
+    check(rocket_data.get("achieved_orbital_velocity_m_s", 0.0) > 7700.0, "orbital velocity achieved > 7700 m/s")
+    check(rocket_data.get("max_q_dynamic_pressure_kpa", 0.0) < 45.0, "Max Q dynamic pressure < 45 kPa")
+    check(rocket_data.get("is_liftoff_thrust_adequate", False) is True, "liftoff thrust adequate")
+    check(rocket_data.get("is_orbit_injection_achieved", False) is True, "LEO circular orbital injection achieved")
+    check(rocket_data.get("is_max_q_within_structural_limits", False) is True, "Max Q within structural limits")
+
+    # 113. Concrete Gravity Dam Overturning & Sliding Stability (USACE EM 1110-2-2200 / FERC)
+    dam = studio.post("/api/sim/civil/gravity_dam_stability", {
+        "load_combination": "UsualNormalOperating",
+        "foundation_rock": "CompetentSedimentary",
+        "dam_height_m": 85.0,
+        "crest_width_m": 8.50,
+        "base_width_m": 68.0,
+        "upstream_water_depth_m": 80.0,
+        "downstream_tailwater_depth_m": 6.0,
+        "silt_deposit_depth_m": 12.0,
+        "drainage_gallery_distance_from_heel_m": 10.0,
+        "drainage_efficiency_factor": 0.67,
+        "horizontal_seismic_coef_kh": 0.05,
+        "concrete_unit_weight_kn_m3": 24.0,
+        "allowable_bearing_capacity_mpa": 8.0
+    })
+    check(dam.status == 200, f"gravity dam stability returns 200 (got {dam.status})")
+    dam_data = dam.json()
+    check(dam_data.get("total_concrete_weight_kn_per_m", 0.0) > 70000.0, "dam self-weight > 70000 kN/m")
+    check(dam_data.get("overturning_safety_factor", 0.0) >= 1.75, "overturning safety factor >= 1.75")
+    check(dam_data.get("sliding_shear_friction_factor", 0.0) >= 1.50, "sliding shear friction factor >= 1.50")
+    check(dam_data.get("toe_bearing_stress_mpa", 0.0) < 8.0, "toe bearing stress within allowable limit")
+    check(dam_data.get("is_sliding_stable", False) is True, "dam sliding stable")
+    check(dam_data.get("is_overturning_stable", False) is True, "dam overturning stable")
+    check(dam_data.get("is_no_tension_kern_rule_satisfied", False) is True, "zero heel tension kern rule satisfied")
+    check(dam_data.get("is_dam_stability_verified", False) is True, "gravity dam overall stability verified")
+
+    # 114. Water Electrolyzer Hydrogen Production & Cell Polarization (Butler-Volmer / ISO 22734)
+    h2 = studio.post("/api/sim/energy/electrolyzer_hydrogen", {
+        "technology": "ProtonExchangeMembranePEM",
+        "cell_temperature_c": 70.0,
+        "hydrogen_operating_pressure_bar_a": 30.0,
+        "current_density_a_per_cm2": 1.80,
+        "active_cell_area_cm2": 600.0,
+        "cell_count": 120,
+        "membrane_thickness_um": 90.0,
+        "membrane_water_content_lambda": 18.0,
+        "anode_exchange_current_density_a_cm2": 0.0015,
+        "cathode_exchange_current_density_a_cm2": 0.015,
+        "limiting_current_density_a_cm2": 3.80
+    })
+    check(h2.status == 200, f"electrolyzer hydrogen returns 200 (got {h2.status})")
+    h2_data = h2.json()
+    check(1.80 < h2_data.get("operating_cell_voltage_v", 0.0) < 2.30, "PEM cell voltage within 1.80 - 2.30 V range")
+    check(h2_data.get("hydrogen_production_rate_kg_per_h", 0.0) > 4.5, "hydrogen generation rate > 4.5 kg/h")
+    check(h2_data.get("specific_energy_consumption_kwh_per_kg", 0.0) < 58.0, "specific energy consumption < 58 kWh/kg H2")
+    check(h2_data.get("stack_hhv_efficiency_pct", 0.0) > 65.0, "stack HHV efficiency > 65.0%")
+    check(h2_data.get("is_cell_voltage_acceptable", False) is True, "cell voltage within durable operating range")
+    check(h2_data.get("is_specific_energy_acceptable", False) is True, "specific energy consumption acceptable")
+    check(h2_data.get("is_stack_efficiency_acceptable", False) is True, "stack energy efficiency acceptable")
+    check(h2_data.get("is_electrolyzer_viable", False) is True, "electrolyzer operation viable and safe")
     report("simulation")
 
 

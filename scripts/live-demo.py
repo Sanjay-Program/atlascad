@@ -4052,6 +4052,170 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 36.7 Enterprise MCP Tool Calling: 5 Batch-21 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # ------------------------------------------------------------------
+        # 37. BATCH 22: NUCLEAR CONTAINMENT, ATMOSPHERIC PLUME, ROCKET ASCENT, GRAVITY DAM & HYDROGEN ELECTROLYZER
+        # ------------------------------------------------------------------
+        print("\n[37/37] Multi-Disciplinary Solvers: Batch 22 Advanced Nuclear, Environmental, Aerospace, Civil & Energy Systems...")
+
+        # 37.1 Nuclear Reactor Containment Post-LOCA Dynamics (10 CFR 50 / Tagami / Uchida)
+        loca_res = http_request(port, "POST", "/api/sim/nuclear/containment_loca", body={
+            "containment_type": "PrestressedConcreteLiner",
+            "containment_free_volume_m3": 65000.0,
+            "design_pressure_bar_a": 4.80,
+            "design_temperature_c": 150.0,
+            "initial_pressure_bar_a": 1.013,
+            "initial_temperature_c": 40.0,
+            "initial_relative_humidity_pct": 50.0,
+            "blowdown_coolant_mass_tonnes": 260.0,
+            "blowdown_enthalpy_gj": 380.0,
+            "blowdown_duration_seconds": 32.0,
+            "heat_sink_surface_area_m2": 32000.0,
+            "spray_flow_rate_l_s": 650.0,
+            "spray_temperature_c": 32.0
+        })
+        check(loca_res.get("volumetric_energy_release_rate_kw_per_m3", 0.0) > 100.0, "Blowdown energy release > 100 kW/m³")
+        check(loca_res.get("tagami_condensing_htc_w_m2_k", 0.0) > 500.0, "Tagami HTC > 500 W/(m²·K)")
+        check(loca_res.get("peak_containment_pressure_bar_a", 0.0) < 4.80, "Peak post-LOCA pressure < design limit")
+        check(loca_res.get("pressure_margin_pct", 0.0) >= 5.0, "Pressure safety margin >= 5%")
+        check(loca_res.get("spray_heat_removal_mw_th", 0.0) > 50.0, "Spray heat removal > 50 MWth")
+        check(loca_res.get("is_pressure_margin_acceptable", False) is True, "Pressure margin acceptable")
+        check(loca_res.get("is_temperature_within_design", False) is True, "Temperature within design limit")
+        check(loca_res.get("is_24h_depressurization_compliant", False) is True, "24h depressurization compliant")
+        check(loca_res.get("is_containment_integrity_verified", False) is True, "Containment integrity verified")
+        print(f"  ✓ 37.1 Nuclear Containment Post-LOCA Dynamics (10 CFR 50 / Tagami / Uchida): 1000 MWe PWR Dry Containment 65,000 m³, 260 t / 380 GJ RCS Blowdown ({loca_res['volumetric_energy_release_rate_kw_per_m3']:.1f} kW/m³), Tagami Peak Condensing HTC = {loca_res['tagami_condensing_htc_w_m2_k']:.1f} W/(m²·K), Uchida Post-Blowdown HTC = {loca_res['uchida_condensing_htc_w_m2_k']:.1f} W/(m²·K), Peak Atmosphere Temp = {loca_res['peak_containment_temperature_c']:.1f}°C (Limit 150°C), Peak Pressure = {loca_res['peak_containment_pressure_bar_a']:.2f} bar_a (Design {loca_res['pressure_margin_pct']:.1f}% Margin to 4.80 bar_a: {loca_res['is_pressure_margin_acceptable']}), CSS Spray Cooling = {loca_res['spray_heat_removal_mw_th']:.1f} MW_th, 24h Depressurization = {loca_res['pressure_24h_post_loca_bar_a']:.2f} bar_a (<50% Gage: {loca_res['is_24h_depressurization_compliant']}))")
+
+        # 37.2 Atmospheric Pollutant Gaussian Plume Dispersion (EPA AERMOD / Pasquill-Gifford / Briggs)
+        plume_res = http_request(port, "POST", "/api/sim/environmental/atmospheric_dispersion", body={
+            "stability_class": "ClassDNeutral",
+            "pollutant": "SulfurDioxideSO2",
+            "emission_rate_g_s": 85.0,
+            "stack_height_m": 80.0,
+            "stack_inside_diameter_m": 2.80,
+            "stack_gas_velocity_m_s": 18.5,
+            "stack_gas_temperature_c": 140.0,
+            "ambient_air_temperature_c": 20.0,
+            "wind_speed_at_stack_height_m_s": 5.50,
+            "receptor_downwind_distance_m": 8400.0,
+            "receptor_crosswind_distance_m": 0.0
+        })
+        check(plume_res.get("buoyancy_flux_m4_per_s3", 0.0) > 50.0, "Buoyancy flux > 50 m⁴/s³")
+        check(plume_res.get("plume_rise_delta_h_m", 0.0) > 50.0, "Plume rise > 50 m")
+        check(plume_res.get("effective_stack_height_m", 0.0) > 130.0, "Effective stack height > 130 m")
+        check(plume_res.get("peak_max_ground_concentration_ug_per_m3", 0.0) < 196.0, "Ground concentration < NAAQS limit")
+        check(plume_res.get("is_naaqs_compliant", False) is True, "NAAQS compliant")
+        check(plume_res.get("is_plume_rise_adequate", False) is True, "Plume rise adequate")
+        print(f"  ✓ 37.2 Atmospheric Plume Dispersion (EPA AERMOD / Briggs): Industrial Stack 80 m (Ø2.8 m, 18.5 m/s @ 140°C), Class D Neutral Wind (5.5 m/s), Buoyancy Flux F_b = {plume_res['buoyancy_flux_m4_per_s3']:.1f} m⁴/s³, Briggs Buoyant Plume Rise Δh = {plume_res['plume_rise_delta_h_m']:.1f} m, Effective Release Height H_eff = {plume_res['effective_stack_height_m']:.1f} m, Max Ground Impact Distance x_max = {plume_res['distance_to_max_concentration_m']/1000.0:.2f} km, Peak Ground Concentration C_max = {plume_res['peak_max_ground_concentration_ug_per_m3']:.2f} µg/m³ (1-hr SO2 NAAQS 196.0 µg/m³, Ratio = {plume_res['naaqs_compliance_ratio']:.3f}: {plume_res['is_naaqs_compliant']}))")
+
+        # 37.3 Multistage Rocket Ascent Trajectory & Orbital Injection (Tsiolkovsky / NASA SP-8010)
+        rocket_res = http_request(port, "POST", "/api/sim/aerospace/rocket_ascent_trajectory", body={
+            "staging_type": "TwoStageToOrbit",
+            "gross_liftoff_mass_kg": 549054.0,
+            "payload_mass_kg": 15600.0,
+            "stage1_propellant_mass_kg": 411000.0,
+            "stage1_dry_mass_kg": 25600.0,
+            "stage1_thrust_sl_kn": 7607.0,
+            "stage1_isp_vac_s": 311.0,
+            "stage1_burn_time_s": 162.0,
+            "stage2_propellant_mass_kg": 92670.0,
+            "stage2_dry_mass_kg": 4000.0,
+            "stage2_thrust_vac_kn": 981.0,
+            "stage2_isp_vac_s": 348.0,
+            "aerodynamic_reference_area_m2": 10.52,
+            "drag_coefficient_cd": 0.32,
+            "target_orbit_altitude_km": 300.0,
+            "launch_latitude_deg": 28.5
+        })
+        check(rocket_res.get("liftoff_thrust_to_weight_ratio", 0.0) > 1.20, "TWR > 1.20")
+        check(rocket_res.get("total_ideal_delta_v_m_s", 0.0) > 9000.0, "Total delta-V > 9000 m/s")
+        check(rocket_res.get("achieved_orbital_velocity_m_s", 0.0) > 7700.0, "Orbital velocity > 7700 m/s")
+        check(rocket_res.get("max_q_dynamic_pressure_kpa", 0.0) < 45.0, "Max Q < 45 kPa")
+        check(rocket_res.get("is_liftoff_thrust_adequate", False) is True, "Liftoff thrust adequate")
+        check(rocket_res.get("is_orbit_injection_achieved", False) is True, "Orbit injection achieved")
+        check(rocket_res.get("is_max_q_within_structural_limits", False) is True, "Max Q within structural limits")
+        print(f"  ✓ 37.3 Multistage Rocket Ascent Trajectory (Tsiolkovsky / NASA SP-8010): GLOW 549 t Orbital Launcher, Stage 1 Δv = {rocket_res['stage1_ideal_delta_v_m_s']:.0f} m/s (TWR = {rocket_res['liftoff_thrust_to_weight_ratio']:.2f}), Stage 2 Δv = {rocket_res['stage2_ideal_delta_v_m_s']:.0f} m/s, Total Ideal Δv = {rocket_res['total_ideal_delta_v_m_s']:.0f} m/s, Losses (Gravity = {rocket_res['gravity_loss_delta_v_m_s']:.0f} m/s, Drag = {rocket_res['aerodynamic_drag_loss_m_s']:.0f} m/s, Steering = {rocket_res['steering_loss_delta_v_m_s']:.0f} m/s, Earth Rotation = +{rocket_res['earth_rotation_assist_m_s']:.0f} m/s), Net Orbital Injection Velocity = {rocket_res['achieved_orbital_velocity_m_s']:.0f} m/s (Target {rocket_res['target_circular_velocity_m_s']:.0f} m/s, Margin = +{rocket_res['orbital_injection_velocity_margin_m_s']:.0f} m/s: {rocket_res['is_orbit_injection_achieved']}), Max Q = {rocket_res['max_q_dynamic_pressure_kpa']:.1f} kPa @ {rocket_res['altitude_at_max_q_km']:.1f} km (<= 45 kPa: {rocket_res['is_max_q_within_structural_limits']}))")
+
+        # 37.4 Concrete Gravity Dam Overturning & Sliding Stability (USACE EM 1110-2-2200 / FERC)
+        dam_res = http_request(port, "POST", "/api/sim/civil/gravity_dam_stability", body={
+            "load_combination": "UsualNormalOperating",
+            "foundation_rock": "CompetentSedimentary",
+            "dam_height_m": 85.0,
+            "crest_width_m": 8.50,
+            "base_width_m": 68.0,
+            "upstream_water_depth_m": 80.0,
+            "downstream_tailwater_depth_m": 6.0,
+            "silt_deposit_depth_m": 12.0,
+            "drainage_gallery_distance_from_heel_m": 10.0,
+            "drainage_efficiency_factor": 0.67,
+            "horizontal_seismic_coef_kh": 0.05,
+            "concrete_unit_weight_kn_m3": 24.0,
+            "allowable_bearing_capacity_mpa": 8.0
+        })
+        check(dam_res.get("total_concrete_weight_kn_per_m", 0.0) > 70000.0, "Dam self-weight > 70000 kN/m")
+        check(dam_res.get("overturning_safety_factor", 0.0) >= 1.75, "Overturning safety factor >= 1.75")
+        check(dam_res.get("sliding_shear_friction_factor", 0.0) >= 1.50, "Sliding SFF >= 1.50")
+        check(dam_res.get("toe_bearing_stress_mpa", 0.0) < 8.0, "Toe bearing stress within allowable limit")
+        check(dam_res.get("is_sliding_stable", False) is True, "Dam sliding stable")
+        check(dam_res.get("is_overturning_stable", False) is True, "Dam overturning stable")
+        check(dam_res.get("is_no_tension_kern_rule_satisfied", False) is True, "Zero heel tension kern rule satisfied")
+        check(dam_res.get("is_dam_stability_verified", False) is True, "Dam overall stability verified")
+        print(f"  ✓ 37.4 Concrete Gravity Dam Stability (USACE EM 1110-2-2200 / FERC): Dam Height 85 m (Base Width 68 m, Head 80 m), Self-Weight = {dam_res['total_concrete_weight_kn_per_m']:.0f} kN/m, Hydrostatic Thrust = {dam_res['hydrostatic_thrust_upstream_kn_per_m']:.0f} kN/m, Foundation Uplift = {dam_res['total_seepage_uplift_force_kn_per_m']:.0f} kN/m, Overturning Safety Factor FS = {dam_res['overturning_safety_factor']:.2f} (>= 1.75: {dam_res['is_overturning_stable']}), Foundation Sliding SFF = {dam_res['sliding_shear_friction_factor']:.2f} (>= 1.50: {dam_res['is_sliding_stable']}), Eccentricity e = {dam_res['base_eccentricity_m']:.2f} m (<= B/6 = {dam_res['middle_third_kern_limit_m']:.2f} m Kern: {dam_res['is_no_tension_kern_rule_satisfied']}), Toe Stress = {dam_res['toe_bearing_stress_mpa']:.2f} MPa (<= 8.0 MPa: {dam_res['is_toe_bearing_stress_safe']}))")
+
+        # 37.5 Water Electrolyzer Hydrogen Production & Cell Polarization (Butler-Volmer / ISO 22734)
+        h2_res = http_request(port, "POST", "/api/sim/energy/electrolyzer_hydrogen", body={
+            "technology": "ProtonExchangeMembranePEM",
+            "cell_temperature_c": 70.0,
+            "hydrogen_operating_pressure_bar_a": 30.0,
+            "current_density_a_per_cm2": 1.80,
+            "active_cell_area_cm2": 600.0,
+            "cell_count": 120,
+            "membrane_thickness_um": 90.0,
+            "membrane_water_content_lambda": 18.0,
+            "anode_exchange_current_density_a_cm2": 0.0015,
+            "cathode_exchange_current_density_a_cm2": 0.015,
+            "limiting_current_density_a_cm2": 3.80
+        })
+        check(1.80 < h2_res.get("operating_cell_voltage_v", 0.0) < 2.30, "PEM cell voltage within 1.80 - 2.30 V range")
+        check(h2_res.get("hydrogen_production_rate_kg_per_h", 0.0) > 4.5, "Hydrogen generation rate > 4.5 kg/h")
+        check(h2_res.get("specific_energy_consumption_kwh_per_kg", 0.0) < 58.0, "Specific energy consumption < 58 kWh/kg H2")
+        check(h2_res.get("stack_hhv_efficiency_pct", 0.0) > 65.0, "Stack HHV efficiency > 65.0%")
+        check(h2_res.get("is_cell_voltage_acceptable", False) is True, "Cell voltage acceptable")
+        check(h2_res.get("is_specific_energy_acceptable", False) is True, "Specific energy acceptable")
+        check(h2_res.get("is_stack_efficiency_acceptable", False) is True, "Stack efficiency acceptable")
+        check(h2_res.get("is_electrolyzer_viable", False) is True, "Electrolyzer viable")
+        print(f"  ✓ 37.5 Water Electrolyzer Hydrogen Production (Butler-Volmer / ISO 22734): 120-Cell PEM Stack @ 70°C, 30 bar Direct Electrochemical Compression (1.80 A/cm² @ 600 cm² MEA), Reversible Nernst = {h2_res['reversible_nernst_voltage_v']:.3f} V, Thermoneutral = {h2_res['thermoneutral_voltage_v']:.3f} V, Overpotentials (Anode = {h2_res['anode_activation_overpotential_v']:.3f} V, Cathode = {h2_res['cathode_activation_overpotential_v']:.3f} V, Membrane Ohmic = {h2_res['ohmic_overpotential_v']:.3f} V), Cell Voltage = {h2_res['operating_cell_voltage_v']:.3f} V (Stack = {h2_res['stack_terminal_voltage_v']:.1f} V, Power = {h2_res['stack_electric_power_kw_e']:.1f} kW_e), Faraday Eff = {h2_res['faraday_efficiency_pct']:.1f}%, H2 Generation = {h2_res['hydrogen_production_rate_kg_per_h']:.2f} kg/h ({h2_res['hydrogen_volumetric_rate_nm3_per_h']:.1f} Nm³/h), Specific Energy SEC = {h2_res['specific_energy_consumption_kwh_per_kg']:.1f} kWh/kg H2 (HHV Efficiency = {h2_res['stack_hhv_efficiency_pct']:.1f}% >= 65%: {h2_res['is_stack_efficiency_acceptable']}))")
+
+        # 37.6 Universal Commands Execution Verification (Batch 22 Domains)
+        for cmd_id in [
+            "sim.nuclear.containment_loca",
+            "sim.environmental.atmospheric_dispersion",
+            "sim.aerospace.rocket_ascent_trajectory",
+            "sim.civil.gravity_dam_stability",
+            "sim.energy.electrolyzer_hydrogen",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 37.6 Universal Commands: All 5 Batch-22 Engineering Commands verified via typed schema engine")
+
+        # 37.7 Enterprise MCP Tool Calling (Batch 22 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_nuclear_containment_loca",
+            "atlas_sim_environmental_atmospheric_dispersion",
+            "atlas_sim_aerospace_rocket_ascent_trajectory",
+            "atlas_sim_civil_gravity_dam_stability",
+            "atlas_sim_energy_electrolyzer_hydrogen",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 991,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 37.7 Enterprise MCP Tool Calling: 5 Batch-22 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

@@ -146,6 +146,11 @@ pub mod multiphase_pipe_flow;
 pub mod geothermal_reservoir;
 pub mod spray_drying_kinetics;
 pub mod thermoelectric_rtg;
+pub mod containment_loca;
+pub mod atmospheric_dispersion;
+pub mod rocket_ascent_trajectory;
+pub mod gravity_dam_stability;
+pub mod electrolyzer_hydrogen;
 
 pub mod prelude {
     pub use crate::acoustics::{
@@ -671,5 +676,25 @@ pub mod prelude {
     pub use crate::thermoelectric_rtg::{
         ThermoelectricMaterialType, ThermoelectricRtgProblem, ThermoelectricRtgResult,
         solve_thermoelectric_rtg,
+    };
+    pub use crate::containment_loca::{
+        ContainmentLocaProblem, ContainmentLocaResult, ContainmentStructureType,
+        solve_containment_loca,
+    };
+    pub use crate::atmospheric_dispersion::{
+        AirPollutantType, AtmosphericDispersionProblem, AtmosphericDispersionResult,
+        AtmosphericStabilityClass as DispersionStabilityClass, solve_atmospheric_dispersion,
+    };
+    pub use crate::rocket_ascent_trajectory::{
+        RocketAscentProblem, RocketAscentResult, RocketStagingArchitecture,
+        solve_rocket_ascent,
+    };
+    pub use crate::gravity_dam_stability::{
+        DamLoadCombination, FoundationRockClass, GravityDamProblem, GravityDamResult,
+        solve_gravity_dam,
+    };
+    pub use crate::electrolyzer_hydrogen::{
+        ElectrolyzerHydrogenProblem, ElectrolyzerHydrogenResult, ElectrolyzerTechnology,
+        solve_electrolyzer_hydrogen,
     };
 }

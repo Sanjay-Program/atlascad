@@ -7965,5 +7965,191 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 204. Nuclear Reactor Containment Post-LOCA Dynamics (10 CFR 50 / Tagami / Uchida)
+    let loca_res = post(
+        addr,
+        "/api/sim/nuclear/containment_loca",
+        r#"{
+            "containment_type": "PrestressedConcreteLiner",
+            "containment_free_volume_m3": 65000.0,
+            "design_pressure_bar_a": 4.80,
+            "design_temperature_c": 150.0,
+            "initial_pressure_bar_a": 1.013,
+            "initial_temperature_c": 40.0,
+            "initial_relative_humidity_pct": 50.0,
+            "blowdown_coolant_mass_tonnes": 260.0,
+            "blowdown_enthalpy_gj": 380.0,
+            "blowdown_duration_seconds": 32.0,
+            "heat_sink_surface_area_m2": 32000.0,
+            "spray_flow_rate_l_s": 650.0,
+            "spray_temperature_c": 32.0
+        }"#,
+    )?;
+    assert_eq!(loca_res.status, 200);
+    let loca_json = json(&loca_res)?;
+    assert!(loca_json["volumetric_energy_release_rate_kw_per_m3"].as_f64().unwrap() > 100.0);
+    assert!(loca_json["tagami_condensing_htc_w_m2_k"].as_f64().unwrap() > 500.0);
+    assert!(loca_json["peak_containment_pressure_bar_a"].as_f64().unwrap() < 4.80);
+    assert!(loca_json["pressure_margin_pct"].as_f64().unwrap() >= 5.0);
+    assert!(loca_json["spray_heat_removal_mw_th"].as_f64().unwrap() > 50.0);
+    assert!(loca_json["is_pressure_margin_acceptable"].as_bool().unwrap());
+    assert!(loca_json["is_temperature_within_design"].as_bool().unwrap());
+    assert!(loca_json["is_24h_depressurization_compliant"].as_bool().unwrap());
+    assert!(loca_json["is_containment_integrity_verified"].as_bool().unwrap());
+
+    // 205. Atmospheric Pollutant Gaussian Plume Dispersion (EPA AERMOD / Pasquill-Gifford / Briggs)
+    let plume_res = post(
+        addr,
+        "/api/sim/environmental/atmospheric_dispersion",
+        r#"{
+            "stability_class": "ClassDNeutral",
+            "pollutant": "SulfurDioxideSO2",
+            "emission_rate_g_s": 85.0,
+            "stack_height_m": 80.0,
+            "stack_inside_diameter_m": 2.80,
+            "stack_gas_velocity_m_s": 18.5,
+            "stack_gas_temperature_c": 140.0,
+            "ambient_air_temperature_c": 20.0,
+            "wind_speed_at_stack_height_m_s": 5.50,
+            "receptor_downwind_distance_m": 8400.0,
+            "receptor_crosswind_distance_m": 0.0
+        }"#,
+    )?;
+    assert_eq!(plume_res.status, 200);
+    let plume_json = json(&plume_res)?;
+    assert!(plume_json["buoyancy_flux_m4_per_s3"].as_f64().unwrap() > 50.0);
+    assert!(plume_json["plume_rise_delta_h_m"].as_f64().unwrap() > 50.0);
+    assert!(plume_json["effective_stack_height_m"].as_f64().unwrap() > 130.0);
+    assert!(plume_json["peak_max_ground_concentration_ug_per_m3"].as_f64().unwrap() < 196.0);
+    assert!(plume_json["is_naaqs_compliant"].as_bool().unwrap());
+    assert!(plume_json["is_plume_rise_adequate"].as_bool().unwrap());
+
+    // 206. Multistage Rocket Ascent Trajectory & Orbital Injection (Tsiolkovsky / NASA SP-8010)
+    let rocket_res = post(
+        addr,
+        "/api/sim/aerospace/rocket_ascent_trajectory",
+        r#"{
+            "staging_type": "TwoStageToOrbit",
+            "gross_liftoff_mass_kg": 549054.0,
+            "payload_mass_kg": 15600.0,
+            "stage1_propellant_mass_kg": 411000.0,
+            "stage1_dry_mass_kg": 25600.0,
+            "stage1_thrust_sl_kn": 7607.0,
+            "stage1_isp_vac_s": 311.0,
+            "stage1_burn_time_s": 162.0,
+            "stage2_propellant_mass_kg": 92670.0,
+            "stage2_dry_mass_kg": 4000.0,
+            "stage2_thrust_vac_kn": 981.0,
+            "stage2_isp_vac_s": 348.0,
+            "aerodynamic_reference_area_m2": 10.52,
+            "drag_coefficient_cd": 0.32,
+            "target_orbit_altitude_km": 300.0,
+            "launch_latitude_deg": 28.5
+        }"#,
+    )?;
+    assert_eq!(rocket_res.status, 200);
+    let rocket_json = json(&rocket_res)?;
+    assert!(rocket_json["liftoff_thrust_to_weight_ratio"].as_f64().unwrap() > 1.20);
+    assert!(rocket_json["total_ideal_delta_v_m_s"].as_f64().unwrap() > 9000.0);
+    assert!(rocket_json["achieved_orbital_velocity_m_s"].as_f64().unwrap() > 7700.0);
+    assert!(rocket_json["max_q_dynamic_pressure_kpa"].as_f64().unwrap() < 45.0);
+    assert!(rocket_json["is_liftoff_thrust_adequate"].as_bool().unwrap());
+    assert!(rocket_json["is_orbit_injection_achieved"].as_bool().unwrap());
+    assert!(rocket_json["is_max_q_within_structural_limits"].as_bool().unwrap());
+
+    // 207. Concrete Gravity Dam Overturning & Sliding Stability (USACE EM 1110-2-2200 / FERC)
+    let dam_res = post(
+        addr,
+        "/api/sim/civil/gravity_dam_stability",
+        r#"{
+            "load_combination": "UsualNormalOperating",
+            "foundation_rock": "CompetentSedimentary",
+            "dam_height_m": 85.0,
+            "crest_width_m": 8.50,
+            "base_width_m": 68.0,
+            "upstream_water_depth_m": 80.0,
+            "downstream_tailwater_depth_m": 6.0,
+            "silt_deposit_depth_m": 12.0,
+            "drainage_gallery_distance_from_heel_m": 10.0,
+            "drainage_efficiency_factor": 0.67,
+            "horizontal_seismic_coef_kh": 0.05,
+            "concrete_unit_weight_kn_m3": 24.0,
+            "allowable_bearing_capacity_mpa": 8.0
+        }"#,
+    )?;
+    assert_eq!(dam_res.status, 200);
+    let dam_json = json(&dam_res)?;
+    assert!(dam_json["total_concrete_weight_kn_per_m"].as_f64().unwrap() > 70000.0);
+    assert!(dam_json["overturning_safety_factor"].as_f64().unwrap() >= 1.75);
+    assert!(dam_json["sliding_shear_friction_factor"].as_f64().unwrap() >= 1.50);
+    assert!(dam_json["toe_bearing_stress_mpa"].as_f64().unwrap() < 8.0);
+    assert!(dam_json["is_sliding_stable"].as_bool().unwrap());
+    assert!(dam_json["is_overturning_stable"].as_bool().unwrap());
+    assert!(dam_json["is_no_tension_kern_rule_satisfied"].as_bool().unwrap());
+    assert!(dam_json["is_dam_stability_verified"].as_bool().unwrap());
+
+    // 208. Water Electrolyzer Hydrogen Production & Cell Polarization (Butler-Volmer / ISO 22734)
+    let h2_res = post(
+        addr,
+        "/api/sim/energy/electrolyzer_hydrogen",
+        r#"{
+            "technology": "ProtonExchangeMembranePEM",
+            "cell_temperature_c": 70.0,
+            "hydrogen_operating_pressure_bar_a": 30.0,
+            "current_density_a_per_cm2": 1.80,
+            "active_cell_area_cm2": 600.0,
+            "cell_count": 120,
+            "membrane_thickness_um": 90.0,
+            "membrane_water_content_lambda": 18.0,
+            "anode_exchange_current_density_a_cm2": 0.0015,
+            "cathode_exchange_current_density_a_cm2": 0.015,
+            "limiting_current_density_a_cm2": 3.80
+        }"#,
+    )?;
+    assert_eq!(h2_res.status, 200);
+    let h2_json = json(&h2_res)?;
+    assert!(h2_json["operating_cell_voltage_v"].as_f64().unwrap() > 1.80);
+    assert!(h2_json["operating_cell_voltage_v"].as_f64().unwrap() < 2.30);
+    assert!(h2_json["hydrogen_production_rate_kg_per_h"].as_f64().unwrap() > 4.5);
+    assert!(h2_json["specific_energy_consumption_kwh_per_kg"].as_f64().unwrap() < 58.0);
+    assert!(h2_json["stack_hhv_efficiency_pct"].as_f64().unwrap() > 65.0);
+    assert!(h2_json["is_cell_voltage_acceptable"].as_bool().unwrap());
+    assert!(h2_json["is_specific_energy_acceptable"].as_bool().unwrap());
+    assert!(h2_json["is_stack_efficiency_acceptable"].as_bool().unwrap());
+    assert!(h2_json["is_electrolyzer_viable"].as_bool().unwrap());
+
+    // 209. Universal Commands Execution Verification (Batch 22 Domains)
+    for cmd_id in [
+        "sim.nuclear.containment_loca",
+        "sim.environmental.atmospheric_dispersion",
+        "sim.aerospace.rocket_ascent_trajectory",
+        "sim.civil.gravity_dam_stability",
+        "sim.energy.electrolyzer_hydrogen",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 210. Enterprise MCP Tool Calling (Batch 22 Domains)
+    for tool_name in [
+        "atlas_sim_nuclear_containment_loca",
+        "atlas_sim_environmental_atmospheric_dispersion",
+        "atlas_sim_aerospace_rocket_ascent_trajectory",
+        "atlas_sim_civil_gravity_dam_stability",
+        "atlas_sim_energy_electrolyzer_hydrogen",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 210, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }
