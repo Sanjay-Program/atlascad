@@ -2756,6 +2756,127 @@ def simulation_section(studio: Studio) -> None:
     check(h2_data.get("is_specific_energy_acceptable", False) is True, "specific energy consumption acceptable")
     check(h2_data.get("is_stack_efficiency_acceptable", False) is True, "stack energy efficiency acceptable")
     check(h2_data.get("is_electrolyzer_viable", False) is True, "electrolyzer operation viable and safe")
+
+    # 115. Optical Thin-Film Multilayer Coating (Fresnel / TMM / ISO 9211)
+    optics = studio.post("/api/sim/optical/thin_film_optics", {
+        "coating_type": "DistributedBraggReflector",
+        "polarization": "UnpolarizedAverage",
+        "wavelength_nm": 632.8,
+        "angle_of_incidence_deg": 0.0,
+        "incident_medium_index": 1.000,
+        "substrate_index": 1.52
+    })
+    check(optics.status == 200, f"thin film optics returns 200 (got {optics.status})")
+    optics_data = optics.json()
+    check(optics_data.get("reflectance_pct", 0.0) > 95.0, "DBR mirror reflectance > 95%")
+    check(optics_data.get("transmittance_pct", 0.0) < 5.0, "DBR transmittance < 5%")
+    check(optics_data.get("dbr_stopband_bandwidth_nm", 0.0) > 50.0, "stopband bandwidth > 50 nm")
+    check(optics_data.get("is_energy_conserved", False) is True, "optical energy conserved (R+T+A = 100%)")
+    check(optics_data.get("is_target_reflectance_achieved", False) is True, "DBR high-reflectance target met")
+    check(optics_data.get("is_thickness_manufacturable", False) is True, "coating thickness within ALD limits")
+    check(optics_data.get("is_optical_design_viable", False) is True, "optical coating viable")
+
+    # 116. Cryogenic Linde-Hampson Liquefaction & Joule-Thomson (ISO 21009 / Barron)
+    cryo = studio.post("/api/sim/energy/cryogenic_liquefaction", {
+        "fluid_type": "NitrogenN2",
+        "feed_gas_flow_rate_kg_h": 1200.0,
+        "suction_pressure_bar_a": 1.05,
+        "discharge_pressure_bar_a": 200.0,
+        "ambient_aftercooler_temp_c": 20.0,
+        "heat_exchanger_pinch_k": 4.0,
+        "compressor_isothermal_efficiency": 0.72,
+        "heat_exchanger_effectiveness": 0.97,
+        "ambient_heat_leak_w": 180.0
+    })
+    check(cryo.status == 200, f"cryogenic liquefaction returns 200 (got {cryo.status})")
+    cryo_data = cryo.json()
+    check(cryo_data.get("liquid_yield_fraction", 0.0) >= 0.05, "liquid yield fraction >= 5%")
+    check(cryo_data.get("liquid_production_rate_kg_h", 0.0) > 60.0, "liquid N2 production > 60 kg/h")
+    check(cryo_data.get("compressor_power_kw_e", 0.0) > 100.0, "compressor power > 100 kWe")
+    check(cryo_data.get("specific_energy_consumption_kwh_per_kg", 0.0) < 3.20, "specific energy < 3.20 kWh/kg")
+    check(cryo_data.get("is_below_inversion_pressure", False) is True, "below Joule-Thomson inversion pressure")
+    check(cryo_data.get("is_liquid_yield_viable", False) is True, "liquid yield viable")
+    check(cryo_data.get("is_specific_power_acceptable", False) is True, "specific power acceptable")
+    check(cryo_data.get("is_liquefaction_cycle_viable", False) is True, "liquefaction cycle viable")
+
+    # 117. Hydrocyclone Solid-Liquid Mineral Classification (Plitt / Lynch-Rao / ISO 13320)
+    cyclone = studio.post("/api/sim/process/hydrocyclone_separation", {
+        "application": "HardRockGrindingCircuit",
+        "cyclone_diameter_mm": 350.0,
+        "inlet_diameter_mm": 75.0,
+        "vortex_finder_diameter_mm": 115.0,
+        "apex_diameter_mm": 55.0,
+        "free_vortex_height_mm": 1400.0,
+        "feed_flow_rate_m3_h": 120.0,
+        "solids_volumetric_concentration_pct": 18.0,
+        "solid_density_kg_m3": 2800.0,
+        "liquid_density_kg_m3": 1000.0,
+        "target_evaluation_size_um": 75.0
+    })
+    check(cyclone.status == 200, f"hydrocyclone separation returns 200 (got {cyclone.status})")
+    cyclone_data = cyclone.json()
+    check(cyclone_data.get("inlet_slurry_velocity_m_s", 0.0) >= 4.0, "inlet velocity >= 4.0 m/s")
+    check(cyclone_data.get("pressure_drop_kpa", 0.0) >= 50.0, "cyclone pressure drop >= 50 kPa")
+    check(cyclone_data.get("corrected_cut_size_d50c_um", 0.0) > 20.0, "cut size d50c > 20 µm")
+    check(cyclone_data.get("sharpness_index_m", 0.0) >= 1.5, "sharpness index m >= 1.5")
+    check(cyclone_data.get("is_discharge_in_spray_regime", False) is True, "spray discharge regime maintained")
+    check(cyclone_data.get("is_pressure_drop_acceptable", False) is True, "pressure drop acceptable")
+    check(cyclone_data.get("is_inlet_velocity_optimal", False) is True, "inlet velocity optimal")
+    check(cyclone_data.get("is_classification_viable", False) is True, "hydrocyclone classification viable")
+
+    # 118. Active Magnetic Bearing (AMB) Electrodynamic Levitation (ISO 14839 / Schweitzer)
+    amb = studio.post("/api/sim/mechanical/magnetic_bearing", {
+        "topology": "Heteropolar8Pole",
+        "rotor_supported_mass_kg": 85.0,
+        "max_rotational_speed_rpm": 36000.0,
+        "nominal_air_gap_mm": 0.60,
+        "pole_face_area_mm2": 850.0,
+        "coil_turns_per_pole": 140,
+        "bias_current_a": 5.0,
+        "max_control_current_a": 12.0,
+        "amplifier_bus_voltage_v": 180.0,
+        "controller_proportional_gain_a_per_mm": 18.0,
+        "controller_derivative_gain_a_s_per_m": 35.0,
+        "rotor_unbalance_eccentricity_um": 0.50
+    })
+    check(amb.status == 200, f"magnetic bearing returns 200 (got {amb.status})")
+    amb_data = amb.json()
+    check(amb_data.get("current_gain_ki_n_per_a", 0.0) > 100.0, "actuator current gain > 100 N/A")
+    check(amb_data.get("open_loop_negative_stiffness_kx_kn_per_m", 0.0) > 500.0, "open-loop stiffness > 500 kN/m")
+    check(amb_data.get("closed_loop_stiffness_k_net_kn_per_m", 0.0) > 500.0, "closed-loop stiffness > 500 kN/m")
+    check(amb_data.get("suspension_natural_frequency_hz", 0.0) > 25.0, "suspension natural frequency > 25 Hz")
+    check(amb_data.get("dynamic_load_safety_factor", 0.0) >= 2.0, "dynamic load safety factor >= 2.0")
+    check(amb_data.get("air_gap_displacement_ratio", 0.0) <= 0.30, "orbit displacement <= 30% air gap")
+    check(amb_data.get("is_stiffness_positive_and_stable", False) is True, "stiffness positive and stable")
+    check(amb_data.get("is_damping_ratio_adequate", False) is True, "damping ratio adequate")
+    check(amb_data.get("is_air_gap_clearance_safe", False) is True, "air gap clearance safe")
+    check(amb_data.get("is_load_capacity_sufficient", False) is True, "load capacity sufficient")
+    check(amb_data.get("is_amb_system_viable", False) is True, "AMB system viable")
+
+    # 119. Underwater Acoustic Sonar Propagation & Active Detection (Urick / Thorpe)
+    sonar = studio.post("/api/sim/marine/sonar_propagation", {
+        "acoustic_regime": "ShallowWaterWaveguide",
+        "target_class": "SubmarineLargeFleet",
+        "operating_frequency_khz": 7.5,
+        "transmitter_acoustic_power_w": 4500.0,
+        "array_directivity_index_db": 22.0,
+        "ocean_depth_m": 180.0,
+        "target_range_m": 8500.0,
+        "sea_state_code": 3,
+        "shipping_traffic_index": 2,
+        "detection_threshold_db": 14.0
+    })
+    check(sonar.status == 200, f"sonar propagation returns 200 (got {sonar.status})")
+    sonar_data = sonar.json()
+    check(sonar_data.get("source_level_db_re_upa", 0.0) > 210.0, "source level > 210 dB re 1 µPa")
+    check(sonar_data.get("absorption_coefficient_db_per_km", 0.0) > 0.1, "seawater absorption > 0.1 dB/km")
+    check(sonar_data.get("one_way_transmission_loss_db", 0.0) > 40.0, "transmission loss > 40 dB")
+    check(sonar_data.get("signal_excess_se_db", 0.0) >= 0.0, "positive signal excess SE >= 0 dB")
+    check(sonar_data.get("figure_of_merit_fom_db", 0.0) > 100.0, "active sonar FOM > 100 dB")
+    check(sonar_data.get("is_target_detected", False) is True, "underwater target detected")
+    check(sonar_data.get("is_cavitation_limit_satisfied", False) is True, "cavitation limit satisfied")
+    check(sonar_data.get("is_absorption_loss_favorable", False) is True, "absorption loss favorable")
+    check(sonar_data.get("is_sonar_detection_viable", False) is True, "sonar detection viable")
     report("simulation")
 
 

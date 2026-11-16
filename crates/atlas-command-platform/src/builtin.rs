@@ -6094,5 +6094,175 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.optical.thin_film_optics",
+            "Optical Thin-Film Multilayer Coating & Dielectric Filter (Fresnel / Transfer Matrix Method TMM)",
+            "Calculates multi-layer dielectric phase thickness, transfer matrix characteristic admittances, TE/TM Fresnel reflectance, and DBR stopband bandwidth.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "wavelength_nm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Optical evaluation wavelength in nanometers".into(),
+            required: false,
+            default_value: Some(serde_json::json!(632.8)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(10000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "angle_of_incidence_deg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Angle of incidence in degrees".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.0)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(89.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "substrate_index".into(),
+            arg_type: ArgumentType::Number,
+            description: "Substrate refractive index".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1.52)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(5.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.energy.cryogenic_liquefaction",
+            "Cryogenic Linde-Hampson Liquefaction & Joule-Thomson Expansion (ISO 21009 / Barron)",
+            "Calculates real-gas Joule-Thomson enthalpy departures, recuperator heat exchanger balance, cryogenic liquid yield fraction, compression power, and specific energy consumption.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "feed_gas_flow_rate_kg_h".into(),
+            arg_type: ArgumentType::Number,
+            description: "Feed gas flow rate in kg/h".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1200.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(50000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "suction_pressure_bar_a".into(),
+            arg_type: ArgumentType::Number,
+            description: "Compressor suction low pressure in bar absolute".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1.05)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "discharge_pressure_bar_a".into(),
+            arg_type: ArgumentType::Number,
+            description: "Compressor discharge high pressure in bar absolute".into(),
+            required: false,
+            default_value: Some(serde_json::json!(200.0)),
+            validation_rules: vec![ValidationRule::Min(20.0), ValidationRule::Max(350.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.process.hydrocyclone_separation",
+            "Hydrocyclone Solid-Liquid Mineral Classification (Plitt / Lynch-Rao / ISO 13320)",
+            "Calculates centrifugal slurry pressure drop, corrected cut size d50c, water split bypass to underflow, Rosin-Rammler partition sharpness, and spigot spray regime.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "cyclone_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Hydrocyclone cylindrical internal diameter in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(350.0)),
+            validation_rules: vec![ValidationRule::Min(25.0), ValidationRule::Max(1200.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "feed_flow_rate_m3_h".into(),
+            arg_type: ArgumentType::Number,
+            description: "Slurry feed volumetric flow rate in m³/h".into(),
+            required: false,
+            default_value: Some(serde_json::json!(120.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(2000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "solids_volumetric_concentration_pct".into(),
+            arg_type: ArgumentType::Number,
+            description: "Feed solids volumetric concentration in percent".into(),
+            required: false,
+            default_value: Some(serde_json::json!(18.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(50.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.mechanical.magnetic_bearing",
+            "Active Magnetic Bearing (AMB) Electrodynamic Levitation (ISO 14839 / Schweitzer)",
+            "Calculates electromagnetic actuator current gain, open-loop negative stiffness, closed-loop PID suspension stiffness and damping, natural frequency, and ISO 14839 orbit clearance.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "rotor_supported_mass_kg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rotor mass supported by this magnetic bearing in kg".into(),
+            required: false,
+            default_value: Some(serde_json::json!(85.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(10000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "nominal_air_gap_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Nominal radial magnetic air gap in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.60)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(3.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "max_rotational_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Maximum operating rotational speed in RPM".into(),
+            required: false,
+            default_value: Some(serde_json::json!(36000.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(150000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.marine.sonar_propagation",
+            "Underwater Acoustic Sonar Propagation & Active Detection (Urick / Thorpe / US Navy SWOP)",
+            "Calculates transducer source level, Thorpe seawater absorption, spherical/cylindrical waveguide transmission loss, Wenz ambient noise, active sonar SNR, and target detection.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "operating_frequency_khz".into(),
+            arg_type: ArgumentType::Number,
+            description: "Sonar operating acoustic frequency in kHz".into(),
+            required: false,
+            default_value: Some(serde_json::json!(7.5)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(150.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "transmitter_acoustic_power_w".into(),
+            arg_type: ArgumentType::Number,
+            description: "Transmitter acoustic emitted power in Watts".into(),
+            required: false,
+            default_value: Some(serde_json::json!(4500.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(50000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "target_range_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Distance to underwater target in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(8500.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(100000.0)],
+        }),
+    )?;
+
     Ok(())
 }

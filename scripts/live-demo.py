@@ -4216,6 +4216,159 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 37.7 Enterprise MCP Tool Calling: 5 Batch-22 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # ------------------------------------------------------------------
+        # 38. BATCH 23: OPTICAL THIN FILMS, CRYOGENIC LIQUEFACTION, HYDROCYCLONE, MAGNETIC BEARINGS & SONAR
+        # ------------------------------------------------------------------
+        print("\n[38/38] Multi-Disciplinary Solvers: Batch 23 Optics, Cryogenics, Mineral Processing, Mechatronics & Marine Acoustics...")
+
+        # 38.1 Optical Thin-Film Multilayer Coating (Fresnel / TMM / ISO 9211)
+        optics_res = http_request(port, "POST", "/api/sim/optical/thin_film_optics", body={
+            "coating_type": "DistributedBraggReflector",
+            "polarization": "UnpolarizedAverage",
+            "wavelength_nm": 632.8,
+            "angle_of_incidence_deg": 0.0,
+            "incident_medium_index": 1.000,
+            "substrate_index": 1.52
+        })
+        check(optics_res.get("reflectance_pct", 0.0) > 95.0, "DBR mirror reflectance > 95%")
+        check(optics_res.get("transmittance_pct", 0.0) < 5.0, "DBR transmittance < 5%")
+        check(optics_res.get("dbr_stopband_bandwidth_nm", 0.0) > 50.0, "Stopband bandwidth > 50 nm")
+        check(optics_res.get("is_energy_conserved", False) is True, "Energy conserved")
+        check(optics_res.get("is_target_reflectance_achieved", False) is True, "Target reflectance achieved")
+        check(optics_res.get("is_thickness_manufacturable", False) is True, "Thickness manufacturable")
+        check(optics_res.get("is_optical_design_viable", False) is True, "Optical design viable")
+        print(f"  ✓ 38.1 Optical Thin-Film Multilayer Coating (Fresnel / TMM / ISO 9211): 10-Layer TiO2/SiO2 DBR Mirror @ 632.8 nm (Air/BK7, Normal Incidence), Reflectance R = {optics_res['reflectance_pct']:.2f}% (Bare Substrate {optics_res['bare_substrate_reflectance_pct']:.2f}%, Modulation = {optics_res['reflectance_modulation_ratio']:.1f}x), Transmittance T = {optics_res['transmittance_pct']:.2f}%, Optical Bandwidth Δλ_stop = {optics_res['dbr_stopband_bandwidth_nm']:.1f} nm, Equivalent Admittance Y = {optics_res['equivalent_admittance']:.2f}, Physical Thickness = {optics_res['total_coating_thickness_nm']:.1f} nm (Optical = {optics_res['total_optical_thickness_nm']:.1f} nm: {optics_res['is_thickness_manufacturable']}))")
+
+        # 38.2 Cryogenic Linde-Hampson Liquefaction & Joule-Thomson (ISO 21009 / Barron)
+        cryo_res = http_request(port, "POST", "/api/sim/energy/cryogenic_liquefaction", body={
+            "fluid_type": "NitrogenN2",
+            "feed_gas_flow_rate_kg_h": 1200.0,
+            "suction_pressure_bar_a": 1.05,
+            "discharge_pressure_bar_a": 200.0,
+            "ambient_aftercooler_temp_c": 20.0,
+            "heat_exchanger_pinch_k": 4.0,
+            "compressor_isothermal_efficiency": 0.72,
+            "heat_exchanger_effectiveness": 0.97,
+            "ambient_heat_leak_w": 180.0
+        })
+        check(cryo_res.get("liquid_yield_fraction", 0.0) >= 0.05, "Liquid yield fraction >= 5%")
+        check(cryo_res.get("liquid_production_rate_kg_h", 0.0) > 60.0, "Liquid production > 60 kg/h")
+        check(cryo_res.get("compressor_power_kw_e", 0.0) > 100.0, "Compressor power > 100 kWe")
+        check(cryo_res.get("specific_energy_consumption_kwh_per_kg", 0.0) < 3.20, "Specific energy < 3.20 kWh/kg")
+        check(cryo_res.get("is_below_inversion_pressure", False) is True, "Below inversion pressure")
+        check(cryo_res.get("is_liquid_yield_viable", False) is True, "Yield viable")
+        check(cryo_res.get("is_specific_power_acceptable", False) is True, "Specific power acceptable")
+        check(cryo_res.get("is_liquefaction_cycle_viable", False) is True, "Liquefaction cycle viable")
+        print(f"  ✓ 38.2 Cryogenic Linde-Hampson Liquefaction (ISO 21009 / Barron): Nitrogen N2 (T_nbp = {cryo_res['normal_boiling_point_k']:.2f} K, h_fg = {cryo_res['latent_heat_vaporization_kj_per_kg']:.1f} kJ/kg), Loop 1.05 -> 200 bar_a (1200 kg/h), Joule-Thomson ΔT_jt = {cryo_res['joule_thomson_temp_drop_k']:.1f} K, Liquid Yield y = {cryo_res['liquid_yield_fraction']*100.0:.2f}%, LN2 Output = {cryo_res['liquid_production_rate_kg_h']:.1f} kg/h ({cryo_res['liquid_volumetric_rate_l_h']:.1f} L/h), Compressor Power = {cryo_res['compressor_power_kw_e']:.1f} kW_e, SEC = {cryo_res['specific_energy_consumption_kwh_per_kg']:.2f} kWh/kg ({cryo_res['specific_energy_kwh_per_liter']:.2f} kWh/L, Exergy FOM = {cryo_res['figure_of_merit']*100.0:.1f}%: {cryo_res['is_specific_power_acceptable']}))")
+
+        # 38.3 Hydrocyclone Solid-Liquid Mineral Classification (Plitt / Lynch-Rao / ISO 13320)
+        cyclone_res = http_request(port, "POST", "/api/sim/process/hydrocyclone_separation", body={
+            "application": "HardRockGrindingCircuit",
+            "cyclone_diameter_mm": 350.0,
+            "inlet_diameter_mm": 75.0,
+            "vortex_finder_diameter_mm": 115.0,
+            "apex_diameter_mm": 55.0,
+            "free_vortex_height_mm": 1400.0,
+            "feed_flow_rate_m3_h": 120.0,
+            "solids_volumetric_concentration_pct": 18.0,
+            "solid_density_kg_m3": 2800.0,
+            "liquid_density_kg_m3": 1000.0,
+            "target_evaluation_size_um": 75.0
+        })
+        check(cyclone_res.get("inlet_slurry_velocity_m_s", 0.0) >= 4.0, "Inlet velocity >= 4.0 m/s")
+        check(cyclone_res.get("pressure_drop_kpa", 0.0) >= 50.0, "Pressure drop >= 50 kPa")
+        check(cyclone_res.get("corrected_cut_size_d50c_um", 0.0) > 20.0, "Cut size d50c > 20 µm")
+        check(cyclone_res.get("sharpness_index_m", 0.0) >= 1.5, "Sharpness index >= 1.5")
+        check(cyclone_res.get("is_discharge_in_spray_regime", False) is True, "Spray regime")
+        check(cyclone_res.get("is_pressure_drop_acceptable", False) is True, "Pressure drop acceptable")
+        check(cyclone_res.get("is_inlet_velocity_optimal", False) is True, "Inlet velocity optimal")
+        check(cyclone_res.get("is_classification_viable", False) is True, "Classification viable")
+        print(f"  ✓ 38.3 Hydrocyclone Mineral Classification (Plitt / Lynch-Rao): Ø350 mm Grinding Cyclone (Inlet Ø75 mm, Vortex Ø115 mm, Apex Ø55 mm), Slurry Feed 120 m³/h (18% vol ore @ 2800 kg/m³), Inlet Velocity = {cyclone_res['inlet_slurry_velocity_m_s']:.2f} m/s, Plitt ΔP = {cyclone_res['pressure_drop_kpa']:.1f} kPa, Corrected Cut Size d_50c = {cyclone_res['corrected_cut_size_d50c_um']:.1f} µm, Plitt Sharpness m = {cyclone_res['sharpness_index_m']:.2f}, Water Split Rf = {cyclone_res['liquid_recovery_to_underflow_pct']:.1f}%, Underflow Output = {cyclone_res['underflow_flow_rate_m3_h']:.1f} m³/h ({cyclone_res['underflow_solids_volumetric_pct']:.1f}% vol solids: Spray Discharge {cyclone_res['is_discharge_in_spray_regime']}), Target 75 µm Recovery = {cyclone_res['actual_recovery_at_target_size_pct']:.1f}%)")
+
+        # 38.4 Active Magnetic Bearing (AMB) Electrodynamic Levitation (ISO 14839 / Schweitzer)
+        amb_res = http_request(port, "POST", "/api/sim/mechanical/magnetic_bearing", body={
+            "topology": "Heteropolar8Pole",
+            "rotor_supported_mass_kg": 85.0,
+            "max_rotational_speed_rpm": 36000.0,
+            "nominal_air_gap_mm": 0.60,
+            "pole_face_area_mm2": 850.0,
+            "coil_turns_per_pole": 140,
+            "bias_current_a": 5.0,
+            "max_control_current_a": 12.0,
+            "amplifier_bus_voltage_v": 180.0,
+            "controller_proportional_gain_a_per_mm": 18.0,
+            "controller_derivative_gain_a_s_per_m": 35.0,
+            "rotor_unbalance_eccentricity_um": 0.50
+        })
+        check(amb_res.get("current_gain_ki_n_per_a", 0.0) > 100.0, "Current gain > 100 N/A")
+        check(amb_res.get("open_loop_negative_stiffness_kx_kn_per_m", 0.0) > 500.0, "Open-loop stiffness > 500 kN/m")
+        check(amb_res.get("closed_loop_stiffness_k_net_kn_per_m", 0.0) > 500.0, "Closed-loop stiffness > 500 kN/m")
+        check(amb_res.get("suspension_natural_frequency_hz", 0.0) > 25.0, "Natural frequency > 25 Hz")
+        check(amb_res.get("dynamic_load_safety_factor", 0.0) >= 2.0, "Load safety factor >= 2.0")
+        check(amb_res.get("air_gap_displacement_ratio", 0.0) <= 0.30, "Orbit displacement <= 30% air gap")
+        check(amb_res.get("is_stiffness_positive_and_stable", False) is True, "Stiffness stable")
+        check(amb_res.get("is_damping_ratio_adequate", False) is True, "Damping ratio adequate")
+        check(amb_res.get("is_air_gap_clearance_safe", False) is True, "Air gap clearance safe")
+        check(amb_res.get("is_load_capacity_sufficient", False) is True, "Load capacity sufficient")
+        check(amb_res.get("is_amb_system_viable", False) is True, "AMB viable")
+        print(f"  ✓ 38.4 Active Magnetic Bearing Levitation (ISO 14839 / Schweitzer): 8-Pole Radial AMB supporting 85 kg Rotor @ 36,000 RPM (g_0 = 0.60 mm, i_0 = 5.0 A, i_max = 12.0 A), Actuator Current Gain k_i = {amb_res['current_gain_ki_n_per_a']:.1f} N/A, Negative Stiffness k_x = -{amb_res['open_loop_negative_stiffness_kx_kn_per_m']:.0f} kN/m, Active PID Closed-Loop k_net = +{amb_res['closed_loop_stiffness_k_net_kn_per_m']:.0f} kN/m, Damping c_net = {amb_res['closed_loop_damping_c_net_n_s_per_m']:.0f} N·s/m (Damping Ratio ζ = {amb_res['damping_ratio_zeta']:.2f}, Natural Freq f_n = {amb_res['suspension_natural_frequency_hz']:.1f} Hz), Max Dynamic Load F_max = {amb_res['max_dynamic_load_capacity_n']:.0f} N (Unbalance F_unb = {amb_res['unbalance_dynamic_force_n']:.0f} N, Load Margin = {amb_res['dynamic_load_safety_factor']:.2f}x >= 2.0: {amb_res['is_load_capacity_sufficient']}), Peak Rotor Orbit x_max = {amb_res['peak_rotor_orbit_displacement_um']:.1f} µm ({amb_res['air_gap_displacement_ratio']*100.0:.1f}% g_0 <= 30%: {amb_res['is_air_gap_clearance_safe']}))")
+
+        # 38.5 Underwater Acoustic Sonar Propagation & Active Detection (Urick / Thorpe)
+        sonar_res = http_request(port, "POST", "/api/sim/marine/sonar_propagation", body={
+            "acoustic_regime": "ShallowWaterWaveguide",
+            "target_class": "SubmarineLargeFleet",
+            "operating_frequency_khz": 7.5,
+            "transmitter_acoustic_power_w": 4500.0,
+            "array_directivity_index_db": 22.0,
+            "ocean_depth_m": 180.0,
+            "target_range_m": 8500.0,
+            "sea_state_code": 3,
+            "shipping_traffic_index": 2,
+            "detection_threshold_db": 14.0
+        })
+        check(sonar_res.get("source_level_db_re_upa", 0.0) > 210.0, "Source level > 210 dB")
+        check(sonar_res.get("absorption_coefficient_db_per_km", 0.0) > 0.1, "Absorption > 0.1 dB/km")
+        check(sonar_res.get("one_way_transmission_loss_db", 0.0) > 40.0, "TL > 40 dB")
+        check(sonar_res.get("signal_excess_se_db", 0.0) >= 0.0, "Signal excess >= 0 dB")
+        check(sonar_res.get("figure_of_merit_fom_db", 0.0) > 100.0, "FOM > 100 dB")
+        check(sonar_res.get("is_target_detected", False) is True, "Target detected")
+        check(sonar_res.get("is_cavitation_limit_satisfied", False) is True, "Cavitation limit satisfied")
+        check(sonar_res.get("is_absorption_loss_favorable", False) is True, "Absorption loss favorable")
+        check(sonar_res.get("is_sonar_detection_viable", False) is True, "Sonar viable")
+        print(f"  ✓ 38.5 Underwater Acoustic Sonar Propagation (Urick / Thorpe / Navy SWOP): 7.5 kHz Mid-Frequency Active Sonar (4.5 kW Acoustic Power, DI = 22.0 dB) in 180 m Shallow Water, Source Level SL = {sonar_res['source_level_db_re_upa']:.1f} dB re 1 µPa @ 1 m, Thorpe Absorption α = {sonar_res['absorption_coefficient_db_per_km']:.3f} dB/km, Target @ 8.5 km (Fleet Submarine TS = +{sonar_res['target_strength_ts_db']:.0f} dB): Waveguide Transmission Loss TL = {sonar_res['one_way_transmission_loss_db']:.1f} dB (2-Way 2TL = {sonar_res['two_way_transmission_loss_db']:.1f} dB), Wenz Ambient Noise NL = {sonar_res['ambient_noise_level_nl_db']:.1f} dB (Sea State 3 + Moderate Shipping), Array Noise (NL - DI) = {sonar_res['array_effective_noise_db']:.1f} dB, Received SNR = {sonar_res['signal_to_noise_ratio_snr_db']:.1f} dB, Signal Excess SE = +{sonar_res['signal_excess_se_db']:.1f} dB (DT = 14.0 dB: Detected = {sonar_res['is_target_detected']}), Figure of Merit FOM = {sonar_res['figure_of_merit_fom_db']:.1f} dB, Two-Way Travel Time = {sonar_res['two_way_travel_time_seconds']:.2f} s)")
+
+        # 38.6 Universal Commands Execution Verification (Batch 23 Domains)
+        for cmd_id in [
+            "sim.optical.thin_film_optics",
+            "sim.energy.cryogenic_liquefaction",
+            "sim.process.hydrocyclone_separation",
+            "sim.mechanical.magnetic_bearing",
+            "sim.marine.sonar_propagation",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 38.6 Universal Commands: All 5 Batch-23 Engineering Commands verified via typed schema engine")
+
+        # 38.7 Enterprise MCP Tool Calling (Batch 23 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_optical_thin_film_optics",
+            "atlas_sim_energy_cryogenic_liquefaction",
+            "atlas_sim_process_hydrocyclone_separation",
+            "atlas_sim_mechanical_magnetic_bearing",
+            "atlas_sim_marine_sonar_propagation",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 992,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 38.7 Enterprise MCP Tool Calling: 5 Batch-23 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

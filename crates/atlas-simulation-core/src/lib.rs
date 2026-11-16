@@ -151,6 +151,11 @@ pub mod atmospheric_dispersion;
 pub mod rocket_ascent_trajectory;
 pub mod gravity_dam_stability;
 pub mod electrolyzer_hydrogen;
+pub mod thin_film_optics;
+pub mod cryogenic_liquefaction;
+pub mod hydrocyclone_separation;
+pub mod magnetic_bearing;
+pub mod sonar_propagation;
 
 pub mod prelude {
     pub use crate::acoustics::{
@@ -696,5 +701,25 @@ pub mod prelude {
     pub use crate::electrolyzer_hydrogen::{
         ElectrolyzerHydrogenProblem, ElectrolyzerHydrogenResult, ElectrolyzerTechnology,
         solve_electrolyzer_hydrogen,
+    };
+    pub use crate::thin_film_optics::{
+        DielectricLayer, OpticalCoatingType, OpticalPolarization, ThinFilmOpticsProblem,
+        ThinFilmOpticsResult, solve_thin_film_optics,
+    };
+    pub use crate::cryogenic_liquefaction::{
+        CryogenicFluidType, CryogenicLiquefactionProblem, CryogenicLiquefactionResult,
+        solve_cryogenic_liquefaction,
+    };
+    pub use crate::hydrocyclone_separation::{
+        HydrocycloneProblem, HydrocycloneResult, SlurryApplicationType,
+        solve_hydrocyclone_separation,
+    };
+    pub use crate::magnetic_bearing::{
+        MagneticBearingProblem, MagneticBearingResult, MagneticBearingTopology,
+        solve_magnetic_bearing,
+    };
+    pub use crate::sonar_propagation::{
+        OceanAcousticRegime, SonarPropagationProblem, SonarPropagationResult,
+        SonarTargetClass, solve_sonar_propagation,
     };
 }

@@ -6897,6 +6897,135 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_optical_thin_film_optics(
+        &mut self,
+        req: &SimThinFilmOpticsRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::thin_film_optics::ThinFilmOpticsProblem {
+            problem_id: "thin_film_optics_sim".to_string(),
+            coating_type: req.coating_type.unwrap_or(atlas_simulation_core::thin_film_optics::OpticalCoatingType::DistributedBraggReflector),
+            polarization: req.polarization.unwrap_or(atlas_simulation_core::thin_film_optics::OpticalPolarization::UnpolarizedAverage),
+            wavelength_nm: req.wavelength_nm.unwrap_or(632.8),
+            angle_of_incidence_deg: req.angle_of_incidence_deg.unwrap_or(0.0),
+            incident_medium_index: req.incident_medium_index.unwrap_or(1.000),
+            substrate_index: req.substrate_index.unwrap_or(1.52),
+            layers: req.layers.clone().unwrap_or_else(|| {
+                let lambda_0 = 632.8;
+                let n_h = 2.35;
+                let n_l = 1.46;
+                let d_h = lambda_0 / (4.0 * n_h);
+                let d_l = lambda_0 / (4.0 * n_l);
+                let mut layers = Vec::new();
+                for i in 0..5 {
+                    layers.push(atlas_simulation_core::thin_film_optics::DielectricLayer {
+                        layer_name: format!("TiO2_{}", i + 1),
+                        refractive_index: n_h,
+                        physical_thickness_nm: d_h,
+                    });
+                    layers.push(atlas_simulation_core::thin_film_optics::DielectricLayer {
+                        layer_name: format!("SiO2_{}", i + 1),
+                        refractive_index: n_l,
+                        physical_thickness_nm: d_l,
+                    });
+                }
+                layers
+            }),
+        };
+        let res = atlas_simulation_core::thin_film_optics::solve_thin_film_optics(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_energy_cryogenic_liquefaction(
+        &mut self,
+        req: &SimCryogenicLiquefactionRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::cryogenic_liquefaction::CryogenicLiquefactionProblem {
+            problem_id: "cryogenic_liquefaction_sim".to_string(),
+            fluid_type: req.fluid_type.unwrap_or(atlas_simulation_core::cryogenic_liquefaction::CryogenicFluidType::NitrogenN2),
+            feed_gas_flow_rate_kg_h: req.feed_gas_flow_rate_kg_h.unwrap_or(1200.0),
+            suction_pressure_bar_a: req.suction_pressure_bar_a.unwrap_or(1.05),
+            discharge_pressure_bar_a: req.discharge_pressure_bar_a.unwrap_or(200.0),
+            ambient_aftercooler_temp_c: req.ambient_aftercooler_temp_c.unwrap_or(20.0),
+            heat_exchanger_pinch_k: req.heat_exchanger_pinch_k.unwrap_or(4.0),
+            compressor_isothermal_efficiency: req.compressor_isothermal_efficiency.unwrap_or(0.72),
+            heat_exchanger_effectiveness: req.heat_exchanger_effectiveness.unwrap_or(0.97),
+            ambient_heat_leak_w: req.ambient_heat_leak_w.unwrap_or(180.0),
+        };
+        let res = atlas_simulation_core::cryogenic_liquefaction::solve_cryogenic_liquefaction(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_process_hydrocyclone_separation(
+        &mut self,
+        req: &SimHydrocycloneRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::hydrocyclone_separation::HydrocycloneProblem {
+            problem_id: "hydrocyclone_separation_sim".to_string(),
+            application: req.application.unwrap_or(atlas_simulation_core::hydrocyclone_separation::SlurryApplicationType::HardRockGrindingCircuit),
+            cyclone_diameter_mm: req.cyclone_diameter_mm.unwrap_or(350.0),
+            inlet_diameter_mm: req.inlet_diameter_mm.unwrap_or(75.0),
+            vortex_finder_diameter_mm: req.vortex_finder_diameter_mm.unwrap_or(115.0),
+            apex_diameter_mm: req.apex_diameter_mm.unwrap_or(55.0),
+            free_vortex_height_mm: req.free_vortex_height_mm.unwrap_or(1400.0),
+            feed_flow_rate_m3_h: req.feed_flow_rate_m3_h.unwrap_or(120.0),
+            solids_volumetric_concentration_pct: req.solids_volumetric_concentration_pct.unwrap_or(18.0),
+            solid_density_kg_m3: req.solid_density_kg_m3.unwrap_or(2800.0),
+            liquid_density_kg_m3: req.liquid_density_kg_m3.unwrap_or(1000.0),
+            target_evaluation_size_um: req.target_evaluation_size_um.unwrap_or(75.0),
+        };
+        let res = atlas_simulation_core::hydrocyclone_separation::solve_hydrocyclone_separation(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_mechanical_magnetic_bearing(
+        &mut self,
+        req: &SimMagneticBearingRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::magnetic_bearing::MagneticBearingProblem {
+            problem_id: "magnetic_bearing_sim".to_string(),
+            topology: req.topology.unwrap_or(atlas_simulation_core::magnetic_bearing::MagneticBearingTopology::Heteropolar8Pole),
+            rotor_supported_mass_kg: req.rotor_supported_mass_kg.unwrap_or(85.0),
+            max_rotational_speed_rpm: req.max_rotational_speed_rpm.unwrap_or(36000.0),
+            nominal_air_gap_mm: req.nominal_air_gap_mm.unwrap_or(0.60),
+            pole_face_area_mm2: req.pole_face_area_mm2.unwrap_or(850.0),
+            coil_turns_per_pole: req.coil_turns_per_pole.unwrap_or(140),
+            bias_current_a: req.bias_current_a.unwrap_or(5.0),
+            max_control_current_a: req.max_control_current_a.unwrap_or(12.0),
+            amplifier_bus_voltage_v: req.amplifier_bus_voltage_v.unwrap_or(180.0),
+            controller_proportional_gain_a_per_mm: req.controller_proportional_gain_a_per_mm.unwrap_or(18.0),
+            controller_derivative_gain_a_s_per_m: req.controller_derivative_gain_a_s_per_m.unwrap_or(35.0),
+            rotor_unbalance_eccentricity_um: req.rotor_unbalance_eccentricity_um.unwrap_or(0.50),
+        };
+        let res = atlas_simulation_core::magnetic_bearing::solve_magnetic_bearing(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_marine_sonar_propagation(
+        &mut self,
+        req: &SimSonarPropagationRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::sonar_propagation::SonarPropagationProblem {
+            problem_id: "sonar_propagation_sim".to_string(),
+            acoustic_regime: req.acoustic_regime.unwrap_or(atlas_simulation_core::sonar_propagation::OceanAcousticRegime::ShallowWaterWaveguide),
+            target_class: req.target_class.unwrap_or(atlas_simulation_core::sonar_propagation::SonarTargetClass::SubmarineLargeFleet),
+            operating_frequency_khz: req.operating_frequency_khz.unwrap_or(7.5),
+            transmitter_acoustic_power_w: req.transmitter_acoustic_power_w.unwrap_or(4500.0),
+            array_directivity_index_db: req.array_directivity_index_db.unwrap_or(22.0),
+            ocean_depth_m: req.ocean_depth_m.unwrap_or(180.0),
+            target_range_m: req.target_range_m.unwrap_or(8500.0),
+            sea_state_code: req.sea_state_code.unwrap_or(3),
+            shipping_traffic_index: req.shipping_traffic_index.unwrap_or(2),
+            detection_threshold_db: req.detection_threshold_db.unwrap_or(14.0),
+        };
+        let res = atlas_simulation_core::sonar_propagation::solve_sonar_propagation(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -9751,6 +9880,61 @@ namespace AtlasCAD.Unity
                     ..Default::default()
                 })?
             }
+            "sim.optical.thin_film_optics" => {
+                let wl = req.arguments.get("wavelength_nm").and_then(|v| v.as_f64());
+                let aoi = req.arguments.get("angle_of_incidence_deg").and_then(|v| v.as_f64());
+                let n_sub = req.arguments.get("substrate_index").and_then(|v| v.as_f64());
+                self.sim_optical_thin_film_optics(&SimThinFilmOpticsRequest {
+                    wavelength_nm: wl,
+                    angle_of_incidence_deg: aoi,
+                    substrate_index: n_sub,
+                    ..Default::default()
+                })?
+            }
+            "sim.energy.cryogenic_liquefaction" => {
+                let m_feed = req.arguments.get("feed_gas_flow_rate_kg_h").and_then(|v| v.as_f64());
+                let p1 = req.arguments.get("suction_pressure_bar_a").and_then(|v| v.as_f64());
+                let p2 = req.arguments.get("discharge_pressure_bar_a").and_then(|v| v.as_f64());
+                self.sim_energy_cryogenic_liquefaction(&SimCryogenicLiquefactionRequest {
+                    feed_gas_flow_rate_kg_h: m_feed,
+                    suction_pressure_bar_a: p1,
+                    discharge_pressure_bar_a: p2,
+                    ..Default::default()
+                })?
+            }
+            "sim.process.hydrocyclone_separation" => {
+                let dc = req.arguments.get("cyclone_diameter_mm").and_then(|v| v.as_f64());
+                let q = req.arguments.get("feed_flow_rate_m3_h").and_then(|v| v.as_f64());
+                let cv = req.arguments.get("solids_volumetric_concentration_pct").and_then(|v| v.as_f64());
+                self.sim_process_hydrocyclone_separation(&SimHydrocycloneRequest {
+                    cyclone_diameter_mm: dc,
+                    feed_flow_rate_m3_h: q,
+                    solids_volumetric_concentration_pct: cv,
+                    ..Default::default()
+                })?
+            }
+            "sim.mechanical.magnetic_bearing" => {
+                let m = req.arguments.get("rotor_supported_mass_kg").and_then(|v| v.as_f64());
+                let g = req.arguments.get("nominal_air_gap_mm").and_then(|v| v.as_f64());
+                let rpm = req.arguments.get("max_rotational_speed_rpm").and_then(|v| v.as_f64());
+                self.sim_mechanical_magnetic_bearing(&SimMagneticBearingRequest {
+                    rotor_supported_mass_kg: m,
+                    nominal_air_gap_mm: g,
+                    max_rotational_speed_rpm: rpm,
+                    ..Default::default()
+                })?
+            }
+            "sim.marine.sonar_propagation" => {
+                let f = req.arguments.get("operating_frequency_khz").and_then(|v| v.as_f64());
+                let p = req.arguments.get("transmitter_acoustic_power_w").and_then(|v| v.as_f64());
+                let r = req.arguments.get("target_range_m").and_then(|v| v.as_f64());
+                self.sim_marine_sonar_propagation(&SimSonarPropagationRequest {
+                    operating_frequency_khz: f,
+                    transmitter_acoustic_power_w: p,
+                    target_range_m: r,
+                    ..Default::default()
+                })?
+            }
             "system.deploy.status" => self.deploy_status()?,
             _ => serde_json::json!({
                 "status": "Executed",
@@ -12389,6 +12573,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/energy/electrolyzer_hydrogen" => {
             match parse_body_or_default::<SimElectrolyzerHydrogenRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_energy_electrolyzer_hydrogen(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/optical/thin_film_optics" => {
+            match parse_body_or_default::<SimThinFilmOpticsRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_optical_thin_film_optics(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/energy/cryogenic_liquefaction" => {
+            match parse_body_or_default::<SimCryogenicLiquefactionRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_energy_cryogenic_liquefaction(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/process/hydrocyclone_separation" => {
+            match parse_body_or_default::<SimHydrocycloneRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_process_hydrocyclone_separation(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/mechanical/magnetic_bearing" => {
+            match parse_body_or_default::<SimMagneticBearingRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_mechanical_magnetic_bearing(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/marine/sonar_propagation" => {
+            match parse_body_or_default::<SimSonarPropagationRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_marine_sonar_propagation(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -17305,4 +17534,122 @@ struct SimElectrolyzerHydrogenRequest {
     pub cathode_exchange_current_density_a_cm2: Option<f64>,
     #[serde(default)]
     pub limiting_current_density_a_cm2: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimThinFilmOpticsRequest {
+    #[serde(default)]
+    pub coating_type: Option<atlas_simulation_core::thin_film_optics::OpticalCoatingType>,
+    #[serde(default)]
+    pub polarization: Option<atlas_simulation_core::thin_film_optics::OpticalPolarization>,
+    #[serde(default)]
+    pub wavelength_nm: Option<f64>,
+    #[serde(default)]
+    pub angle_of_incidence_deg: Option<f64>,
+    #[serde(default)]
+    pub incident_medium_index: Option<f64>,
+    #[serde(default)]
+    pub substrate_index: Option<f64>,
+    #[serde(default)]
+    pub layers: Option<Vec<atlas_simulation_core::thin_film_optics::DielectricLayer>>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimCryogenicLiquefactionRequest {
+    #[serde(default)]
+    pub fluid_type: Option<atlas_simulation_core::cryogenic_liquefaction::CryogenicFluidType>,
+    #[serde(default)]
+    pub feed_gas_flow_rate_kg_h: Option<f64>,
+    #[serde(default)]
+    pub suction_pressure_bar_a: Option<f64>,
+    #[serde(default)]
+    pub discharge_pressure_bar_a: Option<f64>,
+    #[serde(default)]
+    pub ambient_aftercooler_temp_c: Option<f64>,
+    #[serde(default)]
+    pub heat_exchanger_pinch_k: Option<f64>,
+    #[serde(default)]
+    pub compressor_isothermal_efficiency: Option<f64>,
+    #[serde(default)]
+    pub heat_exchanger_effectiveness: Option<f64>,
+    #[serde(default)]
+    pub ambient_heat_leak_w: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimHydrocycloneRequest {
+    #[serde(default)]
+    pub application: Option<atlas_simulation_core::hydrocyclone_separation::SlurryApplicationType>,
+    #[serde(default)]
+    pub cyclone_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub inlet_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub vortex_finder_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub apex_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub free_vortex_height_mm: Option<f64>,
+    #[serde(default)]
+    pub feed_flow_rate_m3_h: Option<f64>,
+    #[serde(default)]
+    pub solids_volumetric_concentration_pct: Option<f64>,
+    #[serde(default)]
+    pub solid_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub liquid_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub target_evaluation_size_um: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimMagneticBearingRequest {
+    #[serde(default)]
+    pub topology: Option<atlas_simulation_core::magnetic_bearing::MagneticBearingTopology>,
+    #[serde(default)]
+    pub rotor_supported_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub max_rotational_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub nominal_air_gap_mm: Option<f64>,
+    #[serde(default)]
+    pub pole_face_area_mm2: Option<f64>,
+    #[serde(default)]
+    pub coil_turns_per_pole: Option<u32>,
+    #[serde(default)]
+    pub bias_current_a: Option<f64>,
+    #[serde(default)]
+    pub max_control_current_a: Option<f64>,
+    #[serde(default)]
+    pub amplifier_bus_voltage_v: Option<f64>,
+    #[serde(default)]
+    pub controller_proportional_gain_a_per_mm: Option<f64>,
+    #[serde(default)]
+    pub controller_derivative_gain_a_s_per_m: Option<f64>,
+    #[serde(default)]
+    pub rotor_unbalance_eccentricity_um: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimSonarPropagationRequest {
+    #[serde(default)]
+    pub acoustic_regime: Option<atlas_simulation_core::sonar_propagation::OceanAcousticRegime>,
+    #[serde(default)]
+    pub target_class: Option<atlas_simulation_core::sonar_propagation::SonarTargetClass>,
+    #[serde(default)]
+    pub operating_frequency_khz: Option<f64>,
+    #[serde(default)]
+    pub transmitter_acoustic_power_w: Option<f64>,
+    #[serde(default)]
+    pub array_directivity_index_db: Option<f64>,
+    #[serde(default)]
+    pub ocean_depth_m: Option<f64>,
+    #[serde(default)]
+    pub target_range_m: Option<f64>,
+    #[serde(default)]
+    pub sea_state_code: Option<u32>,
+    #[serde(default)]
+    pub shipping_traffic_index: Option<u32>,
+    #[serde(default)]
+    pub detection_threshold_db: Option<f64>,
 }

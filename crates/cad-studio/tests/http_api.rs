@@ -8151,5 +8151,179 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 211. Optical Thin-Film Multilayer Coating (Fresnel / TMM / ISO 9211)
+    let optics_res = post(
+        addr,
+        "/api/sim/optical/thin_film_optics",
+        r#"{
+            "coating_type": "DistributedBraggReflector",
+            "polarization": "UnpolarizedAverage",
+            "wavelength_nm": 632.8,
+            "angle_of_incidence_deg": 0.0,
+            "incident_medium_index": 1.000,
+            "substrate_index": 1.52
+        }"#,
+    )?;
+    assert_eq!(optics_res.status, 200);
+    let optics_json = json(&optics_res)?;
+    assert!(optics_json["reflectance_pct"].as_f64().unwrap() > 95.0);
+    assert!(optics_json["transmittance_pct"].as_f64().unwrap() < 5.0);
+    assert!(optics_json["dbr_stopband_bandwidth_nm"].as_f64().unwrap() > 50.0);
+    assert!(optics_json["is_energy_conserved"].as_bool().unwrap());
+    assert!(optics_json["is_target_reflectance_achieved"].as_bool().unwrap());
+    assert!(optics_json["is_thickness_manufacturable"].as_bool().unwrap());
+    assert!(optics_json["is_optical_design_viable"].as_bool().unwrap());
+
+    // 212. Cryogenic Linde-Hampson Liquefaction & Joule-Thomson (ISO 21009 / Barron)
+    let cryo_res = post(
+        addr,
+        "/api/sim/energy/cryogenic_liquefaction",
+        r#"{
+            "fluid_type": "NitrogenN2",
+            "feed_gas_flow_rate_kg_h": 1200.0,
+            "suction_pressure_bar_a": 1.05,
+            "discharge_pressure_bar_a": 200.0,
+            "ambient_aftercooler_temp_c": 20.0,
+            "heat_exchanger_pinch_k": 4.0,
+            "compressor_isothermal_efficiency": 0.72,
+            "heat_exchanger_effectiveness": 0.97,
+            "ambient_heat_leak_w": 180.0
+        }"#,
+    )?;
+    assert_eq!(cryo_res.status, 200);
+    let cryo_json = json(&cryo_res)?;
+    assert!(cryo_json["liquid_yield_fraction"].as_f64().unwrap() >= 0.05);
+    assert!(cryo_json["liquid_production_rate_kg_h"].as_f64().unwrap() > 60.0);
+    assert!(cryo_json["compressor_power_kw_e"].as_f64().unwrap() > 100.0);
+    assert!(cryo_json["specific_energy_consumption_kwh_per_kg"].as_f64().unwrap() < 3.20);
+    assert!(cryo_json["is_below_inversion_pressure"].as_bool().unwrap());
+    assert!(cryo_json["is_liquid_yield_viable"].as_bool().unwrap());
+    assert!(cryo_json["is_specific_power_acceptable"].as_bool().unwrap());
+    assert!(cryo_json["is_liquefaction_cycle_viable"].as_bool().unwrap());
+
+    // 213. Hydrocyclone Solid-Liquid Mineral Classification (Plitt / Lynch-Rao / ISO 13320)
+    let cyclone_res = post(
+        addr,
+        "/api/sim/process/hydrocyclone_separation",
+        r#"{
+            "application": "HardRockGrindingCircuit",
+            "cyclone_diameter_mm": 350.0,
+            "inlet_diameter_mm": 75.0,
+            "vortex_finder_diameter_mm": 115.0,
+            "apex_diameter_mm": 55.0,
+            "free_vortex_height_mm": 1400.0,
+            "feed_flow_rate_m3_h": 120.0,
+            "solids_volumetric_concentration_pct": 18.0,
+            "solid_density_kg_m3": 2800.0,
+            "liquid_density_kg_m3": 1000.0,
+            "target_evaluation_size_um": 75.0
+        }"#,
+    )?;
+    assert_eq!(cyclone_res.status, 200);
+    let cyclone_json = json(&cyclone_res)?;
+    assert!(cyclone_json["inlet_slurry_velocity_m_s"].as_f64().unwrap() >= 4.0);
+    assert!(cyclone_json["pressure_drop_kpa"].as_f64().unwrap() >= 50.0);
+    assert!(cyclone_json["corrected_cut_size_d50c_um"].as_f64().unwrap() > 20.0);
+    assert!(cyclone_json["sharpness_index_m"].as_f64().unwrap() >= 1.5);
+    assert!(cyclone_json["is_discharge_in_spray_regime"].as_bool().unwrap());
+    assert!(cyclone_json["is_pressure_drop_acceptable"].as_bool().unwrap());
+    assert!(cyclone_json["is_inlet_velocity_optimal"].as_bool().unwrap());
+    assert!(cyclone_json["is_classification_viable"].as_bool().unwrap());
+
+    // 214. Active Magnetic Bearing (AMB) Electrodynamic Levitation (ISO 14839 / Schweitzer)
+    let amb_res = post(
+        addr,
+        "/api/sim/mechanical/magnetic_bearing",
+        r#"{
+            "topology": "Heteropolar8Pole",
+            "rotor_supported_mass_kg": 85.0,
+            "max_rotational_speed_rpm": 36000.0,
+            "nominal_air_gap_mm": 0.60,
+            "pole_face_area_mm2": 850.0,
+            "coil_turns_per_pole": 140,
+            "bias_current_a": 5.0,
+            "max_control_current_a": 12.0,
+            "amplifier_bus_voltage_v": 180.0,
+            "controller_proportional_gain_a_per_mm": 18.0,
+            "controller_derivative_gain_a_s_per_m": 35.0,
+            "rotor_unbalance_eccentricity_um": 0.50
+        }"#,
+    )?;
+    assert_eq!(amb_res.status, 200);
+    let amb_json = json(&amb_res)?;
+    assert!(amb_json["current_gain_ki_n_per_a"].as_f64().unwrap() > 100.0);
+    assert!(amb_json["open_loop_negative_stiffness_kx_kn_per_m"].as_f64().unwrap() > 500.0);
+    assert!(amb_json["closed_loop_stiffness_k_net_kn_per_m"].as_f64().unwrap() > 500.0);
+    assert!(amb_json["suspension_natural_frequency_hz"].as_f64().unwrap() > 25.0);
+    assert!(amb_json["dynamic_load_safety_factor"].as_f64().unwrap() >= 2.0);
+    assert!(amb_json["air_gap_displacement_ratio"].as_f64().unwrap() <= 0.30);
+    assert!(amb_json["is_stiffness_positive_and_stable"].as_bool().unwrap());
+    assert!(amb_json["is_damping_ratio_adequate"].as_bool().unwrap());
+    assert!(amb_json["is_air_gap_clearance_safe"].as_bool().unwrap());
+    assert!(amb_json["is_load_capacity_sufficient"].as_bool().unwrap());
+    assert!(amb_json["is_amb_system_viable"].as_bool().unwrap());
+
+    // 215. Underwater Acoustic Sonar Propagation & Active Detection (Urick / Thorpe)
+    let sonar_res = post(
+        addr,
+        "/api/sim/marine/sonar_propagation",
+        r#"{
+            "acoustic_regime": "ShallowWaterWaveguide",
+            "target_class": "SubmarineLargeFleet",
+            "operating_frequency_khz": 7.5,
+            "transmitter_acoustic_power_w": 4500.0,
+            "array_directivity_index_db": 22.0,
+            "ocean_depth_m": 180.0,
+            "target_range_m": 8500.0,
+            "sea_state_code": 3,
+            "shipping_traffic_index": 2,
+            "detection_threshold_db": 14.0
+        }"#,
+    )?;
+    assert_eq!(sonar_res.status, 200);
+    let sonar_json = json(&sonar_res)?;
+    assert!(sonar_json["source_level_db_re_upa"].as_f64().unwrap() > 210.0);
+    assert!(sonar_json["absorption_coefficient_db_per_km"].as_f64().unwrap() > 0.1);
+    assert!(sonar_json["one_way_transmission_loss_db"].as_f64().unwrap() > 40.0);
+    assert!(sonar_json["signal_excess_se_db"].as_f64().unwrap() >= 0.0);
+    assert!(sonar_json["figure_of_merit_fom_db"].as_f64().unwrap() > 100.0);
+    assert!(sonar_json["is_target_detected"].as_bool().unwrap());
+    assert!(sonar_json["is_cavitation_limit_satisfied"].as_bool().unwrap());
+    assert!(sonar_json["is_absorption_loss_favorable"].as_bool().unwrap());
+    assert!(sonar_json["is_sonar_detection_viable"].as_bool().unwrap());
+
+    // 216. Universal Commands Execution Verification (Batch 23 Domains)
+    for cmd_id in [
+        "sim.optical.thin_film_optics",
+        "sim.energy.cryogenic_liquefaction",
+        "sim.process.hydrocyclone_separation",
+        "sim.mechanical.magnetic_bearing",
+        "sim.marine.sonar_propagation",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 217. Enterprise MCP Tool Calling (Batch 23 Domains)
+    for tool_name in [
+        "atlas_sim_optical_thin_film_optics",
+        "atlas_sim_energy_cryogenic_liquefaction",
+        "atlas_sim_process_hydrocyclone_separation",
+        "atlas_sim_mechanical_magnetic_bearing",
+        "atlas_sim_marine_sonar_propagation",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 217, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

@@ -2110,6 +2110,71 @@ impl McpServer {
                     "required": ["current_density_a_per_cm2", "cell_count"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_optical_thin_film_optics".into(),
+                description: "Calculates multi-layer dielectric phase thickness, transfer matrix characteristic admittances, TE/TM Fresnel reflectance, and DBR stopband bandwidth.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "wavelength_nm": { "type": "number", "default": 632.8 },
+                        "angle_of_incidence_deg": { "type": "number", "default": 0.0 },
+                        "substrate_index": { "type": "number", "default": 1.52 }
+                    },
+                    "required": ["wavelength_nm", "substrate_index"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_energy_cryogenic_liquefaction".into(),
+                description: "Calculates real-gas Joule-Thomson enthalpy departures, recuperator heat exchanger balance, cryogenic liquid yield fraction, compression power, and specific energy consumption.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "feed_gas_flow_rate_kg_h": { "type": "number", "default": 1200.0 },
+                        "suction_pressure_bar_a": { "type": "number", "default": 1.05 },
+                        "discharge_pressure_bar_a": { "type": "number", "default": 200.0 }
+                    },
+                    "required": ["feed_gas_flow_rate_kg_h", "discharge_pressure_bar_a"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_process_hydrocyclone_separation".into(),
+                description: "Calculates centrifugal slurry pressure drop, corrected cut size d50c, water split bypass to underflow, Rosin-Rammler partition sharpness, and spigot spray regime.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "cyclone_diameter_mm": { "type": "number", "default": 350.0 },
+                        "feed_flow_rate_m3_h": { "type": "number", "default": 120.0 },
+                        "solids_volumetric_concentration_pct": { "type": "number", "default": 18.0 }
+                    },
+                    "required": ["cyclone_diameter_mm", "feed_flow_rate_m3_h"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_mechanical_magnetic_bearing".into(),
+                description: "Calculates electromagnetic actuator current gain, open-loop negative stiffness, closed-loop PID suspension stiffness and damping, natural frequency, and ISO 14839 orbit clearance.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "rotor_supported_mass_kg": { "type": "number", "default": 85.0 },
+                        "nominal_air_gap_mm": { "type": "number", "default": 0.60 },
+                        "max_rotational_speed_rpm": { "type": "number", "default": 36000.0 }
+                    },
+                    "required": ["rotor_supported_mass_kg", "nominal_air_gap_mm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_marine_sonar_propagation".into(),
+                description: "Calculates transducer source level, Thorpe seawater absorption, spherical/cylindrical waveguide transmission loss, Wenz ambient noise, active sonar SNR, and target detection.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "operating_frequency_khz": { "type": "number", "default": 7.5 },
+                        "transmitter_acoustic_power_w": { "type": "number", "default": 4500.0 },
+                        "target_range_m": { "type": "number", "default": 8500.0 }
+                    },
+                    "required": ["operating_frequency_khz", "target_range_m"]
+                }),
+            },
         ]
     }
 
