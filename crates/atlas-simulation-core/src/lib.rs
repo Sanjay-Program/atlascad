@@ -96,6 +96,11 @@ pub mod validation;
 pub mod water_hammer;
 pub mod welding;
 pub mod wind_turbine;
+pub mod wire_edm;
+pub mod wind_blade_aeroelastic;
+pub mod subsea_pipeline;
+pub mod combustor_aerothermal;
+pub mod bess_grid;
 
 pub mod prelude {
     pub use crate::acoustics::{
@@ -421,5 +426,25 @@ pub mod prelude {
     pub use crate::seismic_analysis::{
         SeismicAnalysisProblem, SeismicAnalysisResult, SeismicFramingSystem,
         SeismicSiteClass, StoryForceRecord, solve_seismic_analysis, solve_seismic_analysis_sim,
+    };
+    pub use crate::wire_edm::{
+        EdmWorkpieceMaterial, WireEdmProblem, WireEdmResult,
+        solve_wire_edm, solve_wire_edm_sim,
+    };
+    pub use crate::wind_blade_aeroelastic::{
+        WindBladeProblem, WindBladeResult,
+        solve_wind_blade_aeroelastic, solve_wind_blade_aeroelastic_sim,
+    };
+    pub use crate::subsea_pipeline::{
+        SubseaPipelineProblem, SubseaPipelineResult,
+        solve_subsea_pipeline, solve_subsea_pipeline_sim,
+    };
+    pub use crate::combustor_aerothermal::{
+        CombustorProblem, CombustorResult,
+        solve_combustor, solve_combustor_sim,
+    };
+    pub use crate::bess_grid::{
+        BessChemistry, BessGridProblem, BessGridResult,
+        solve_bess_grid, solve_bess_grid_sim,
     };
 }

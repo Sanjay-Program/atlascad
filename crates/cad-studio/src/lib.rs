@@ -5644,6 +5644,117 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_manufacturing_wire_edm(
+        &mut self,
+        req: &SimWireEdmRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::wire_edm::WireEdmProblem {
+            problem_id: "wire_edm_sim".to_string(),
+            workpiece_material: req.workpiece_material.unwrap_or(atlas_simulation_core::wire_edm::EdmWorkpieceMaterial::ToolSteelD2),
+            workpiece_thickness_mm: req.workpiece_thickness_mm.unwrap_or(50.0),
+            wire_diameter_mm: req.wire_diameter_mm.unwrap_or(0.25),
+            open_circuit_voltage_v: req.open_circuit_voltage_v.unwrap_or(95.0),
+            discharge_current_a: req.discharge_current_a.unwrap_or(16.0),
+            pulse_on_time_us: req.pulse_on_time_us.unwrap_or(4.5),
+            pulse_off_time_us: req.pulse_off_time_us.unwrap_or(12.0),
+            wire_feed_speed_m_min: req.wire_feed_speed_m_min.unwrap_or(9.0),
+            wire_tension_n: req.wire_tension_n.unwrap_or(14.0),
+        };
+        let res = atlas_simulation_core::wire_edm::solve_wire_edm(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_renewable_wind_blade_aeroelastic(
+        &mut self,
+        req: &SimWindBladeRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::wind_blade_aeroelastic::WindBladeProblem {
+            problem_id: "wind_blade_aeroelastic_sim".to_string(),
+            blade_length_m: req.blade_length_m.unwrap_or(80.0),
+            rotor_radius_m: req.rotor_radius_m.unwrap_or(82.5),
+            rated_rotor_speed_rpm: req.rated_rotor_speed_rpm.unwrap_or(10.5),
+            rated_wind_speed_m_s: req.rated_wind_speed_m_s.unwrap_or(11.4),
+            extreme_gust_speed_m_s: req.extreme_gust_speed_m_s.unwrap_or(52.5),
+            blade_mass_kg: req.blade_mass_kg.unwrap_or(19500.0),
+            root_chord_m: req.root_chord_m.unwrap_or(4.60),
+            tip_chord_m: req.tip_chord_m.unwrap_or(1.15),
+            flapwise_rigidity_ei_nm2: req.flapwise_rigidity_ei_nm2.unwrap_or(1.45e10),
+            torsional_rigidity_gj_nm2: req.torsional_rigidity_gj_nm2.unwrap_or(5.20e8),
+            polar_moment_inertia_kg_m: req.polar_moment_inertia_kg_m.unwrap_or(140.0),
+            cg_ea_offset_m: req.cg_ea_offset_m.unwrap_or(0.075),
+            air_density_kg_m3: req.air_density_kg_m3.unwrap_or(1.225),
+        };
+        let res = atlas_simulation_core::wind_blade_aeroelastic::solve_wind_blade_aeroelastic(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_marine_subsea_pipeline(
+        &mut self,
+        req: &SimSubseaPipelineRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::subsea_pipeline::SubseaPipelineProblem {
+            problem_id: "subsea_pipeline_sim".to_string(),
+            outside_diameter_mm: req.outside_diameter_mm.unwrap_or(508.0),
+            nominal_wall_thickness_mm: req.nominal_wall_thickness_mm.unwrap_or(25.4),
+            corrosion_allowance_mm: req.corrosion_allowance_mm.unwrap_or(3.0),
+            fabrication_ovality_pct: req.fabrication_ovality_pct.unwrap_or(0.50),
+            water_depth_m: req.water_depth_m.unwrap_or(1500.0),
+            seawater_density_kg_m3: req.seawater_density_kg_m3.unwrap_or(1025.0),
+            internal_design_pressure_mpa: req.internal_design_pressure_mpa.unwrap_or(22.0),
+            steel_smys_mpa: req.steel_smys_mpa.unwrap_or(450.0),
+            steel_smts_mpa: req.steel_smts_mpa.unwrap_or(535.0),
+            steel_youngs_modulus_gpa: req.steel_youngs_modulus_gpa.unwrap_or(207.0),
+            steel_poissons_ratio: req.steel_poissons_ratio.unwrap_or(0.30),
+        };
+        let res = atlas_simulation_core::subsea_pipeline::solve_subsea_pipeline(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_aerospace_combustor_aerothermal(
+        &mut self,
+        req: &SimCombustorRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::combustor_aerothermal::CombustorProblem {
+            problem_id: "combustor_aerothermal_sim".to_string(),
+            inlet_total_pressure_mpa: req.inlet_total_pressure_mpa.unwrap_or(2.40),
+            inlet_total_temperature_k: req.inlet_total_temperature_k.unwrap_or(780.0),
+            air_mass_flow_kg_s: req.air_mass_flow_kg_s.unwrap_or(38.0),
+            fuel_mass_flow_kg_s: req.fuel_mass_flow_kg_s.unwrap_or(0.76),
+            fuel_lhv_mj_kg: req.fuel_lhv_mj_kg.unwrap_or(43.1),
+            combustor_volume_m3: req.combustor_volume_m3.unwrap_or(0.065),
+            combustor_length_m: req.combustor_length_m.unwrap_or(0.42),
+            liner_reference_area_m2: req.liner_reference_area_m2.unwrap_or(0.160),
+        };
+        let res = atlas_simulation_core::combustor_aerothermal::solve_combustor(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_energy_bess_grid(
+        &mut self,
+        req: &SimBessGridRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::bess_grid::BessGridProblem {
+            problem_id: "bess_grid_sim".to_string(),
+            chemistry: req.chemistry.unwrap_or(atlas_simulation_core::bess_grid::BessChemistry::Lfp),
+            nominal_capacity_mwh: req.nominal_capacity_mwh.unwrap_or(10.0),
+            rated_power_mw: req.rated_power_mw.unwrap_or(2.50),
+            dc_bus_voltage_v: req.dc_bus_voltage_v.unwrap_or(1250.0),
+            c_rate: req.c_rate.unwrap_or(0.25),
+            pcs_rated_mva: req.pcs_rated_mva.unwrap_or(2.75),
+            transformer_rated_mva: req.transformer_rated_mva.unwrap_or(2.80),
+            ambient_temperature_c: req.ambient_temperature_c.unwrap_or(28.0),
+            auxiliary_base_power_kw: req.auxiliary_base_power_kw.unwrap_or(16.0),
+            chiller_cop: req.chiller_cop.unwrap_or(3.2),
+        };
+        let res = atlas_simulation_core::bess_grid::solve_bess_grid(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -7738,6 +7849,67 @@ namespace AtlasCAD.Unity
                     minor_radius_a_m: a,
                     toroidal_magnetic_field_t: bt,
                     plasma_current_ma: ip,
+                    ..Default::default()
+                })?
+            }
+            "sim.manufacturing.wire_edm" => {
+                let thick = req.arguments.get("workpiece_thickness_mm").and_then(|v| v.as_f64());
+                let dw = req.arguments.get("wire_diameter_mm").and_then(|v| v.as_f64());
+                let u0 = req.arguments.get("open_circuit_voltage_v").and_then(|v| v.as_f64());
+                let ie = req.arguments.get("discharge_current_a").and_then(|v| v.as_f64());
+                self.sim_manufacturing_wire_edm(&SimWireEdmRequest {
+                    workpiece_thickness_mm: thick,
+                    wire_diameter_mm: dw,
+                    open_circuit_voltage_v: u0,
+                    discharge_current_a: ie,
+                    ..Default::default()
+                })?
+            }
+            "sim.renewable.wind_blade_aeroelastic" => {
+                let l = req.arguments.get("blade_length_m").and_then(|v| v.as_f64());
+                let rpm = req.arguments.get("rated_rotor_speed_rpm").and_then(|v| v.as_f64());
+                let vgust = req.arguments.get("extreme_gust_speed_m_s").and_then(|v| v.as_f64());
+                self.sim_renewable_wind_blade_aeroelastic(&SimWindBladeRequest {
+                    blade_length_m: l,
+                    rated_rotor_speed_rpm: rpm,
+                    extreme_gust_speed_m_s: vgust,
+                    ..Default::default()
+                })?
+            }
+            "sim.marine.subsea_pipeline" => {
+                let do_mm = req.arguments.get("outside_diameter_mm").and_then(|v| v.as_f64());
+                let t_mm = req.arguments.get("nominal_wall_thickness_mm").and_then(|v| v.as_f64());
+                let depth = req.arguments.get("water_depth_m").and_then(|v| v.as_f64());
+                let pi = req.arguments.get("internal_design_pressure_mpa").and_then(|v| v.as_f64());
+                self.sim_marine_subsea_pipeline(&SimSubseaPipelineRequest {
+                    outside_diameter_mm: do_mm,
+                    nominal_wall_thickness_mm: t_mm,
+                    water_depth_m: depth,
+                    internal_design_pressure_mpa: pi,
+                    ..Default::default()
+                })?
+            }
+            "sim.aerospace.combustor_aerothermal" => {
+                let p3 = req.arguments.get("inlet_total_pressure_mpa").and_then(|v| v.as_f64());
+                let t3 = req.arguments.get("inlet_total_temperature_k").and_then(|v| v.as_f64());
+                let m_a = req.arguments.get("air_mass_flow_kg_s").and_then(|v| v.as_f64());
+                let m_f = req.arguments.get("fuel_mass_flow_kg_s").and_then(|v| v.as_f64());
+                self.sim_aerospace_combustor_aerothermal(&SimCombustorRequest {
+                    inlet_total_pressure_mpa: p3,
+                    inlet_total_temperature_k: t3,
+                    air_mass_flow_kg_s: m_a,
+                    fuel_mass_flow_kg_s: m_f,
+                    ..Default::default()
+                })?
+            }
+            "sim.energy.bess_grid" => {
+                let cap = req.arguments.get("nominal_capacity_mwh").and_then(|v| v.as_f64());
+                let p_mw = req.arguments.get("rated_power_mw").and_then(|v| v.as_f64());
+                let c_rt = req.arguments.get("c_rate").and_then(|v| v.as_f64());
+                self.sim_energy_bess_grid(&SimBessGridRequest {
+                    nominal_capacity_mwh: cap,
+                    rated_power_mw: p_mw,
+                    c_rate: c_rt,
                     ..Default::default()
                 })?
             }
@@ -9884,6 +10056,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/science/fusion_tokamak" => {
             match parse_body_or_default::<SimFusionTokamakRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_science_fusion_tokamak(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/manufacturing/wire_edm" => {
+            match parse_body_or_default::<SimWireEdmRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_manufacturing_wire_edm(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/renewable/wind_blade_aeroelastic" => {
+            match parse_body_or_default::<SimWindBladeRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_renewable_wind_blade_aeroelastic(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/marine/subsea_pipeline" => {
+            match parse_body_or_default::<SimSubseaPipelineRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_marine_subsea_pipeline(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/aerospace/combustor_aerothermal" => {
+            match parse_body_or_default::<SimCombustorRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_aerospace_combustor_aerothermal(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/energy/bess_grid" => {
+            match parse_body_or_default::<SimBessGridRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_energy_bess_grid(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -13414,4 +13631,126 @@ struct SimFusionTokamakRequest {
     pub auxiliary_heating_power_mw: Option<f64>,
     #[serde(default)]
     pub average_ion_mass_amu: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimWireEdmRequest {
+    #[serde(default)]
+    pub workpiece_material: Option<atlas_simulation_core::wire_edm::EdmWorkpieceMaterial>,
+    #[serde(default)]
+    pub workpiece_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub wire_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub open_circuit_voltage_v: Option<f64>,
+    #[serde(default)]
+    pub discharge_current_a: Option<f64>,
+    #[serde(default)]
+    pub pulse_on_time_us: Option<f64>,
+    #[serde(default)]
+    pub pulse_off_time_us: Option<f64>,
+    #[serde(default)]
+    pub wire_feed_speed_m_min: Option<f64>,
+    #[serde(default)]
+    pub wire_tension_n: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimWindBladeRequest {
+    #[serde(default)]
+    pub blade_length_m: Option<f64>,
+    #[serde(default)]
+    pub rotor_radius_m: Option<f64>,
+    #[serde(default)]
+    pub rated_rotor_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub rated_wind_speed_m_s: Option<f64>,
+    #[serde(default)]
+    pub extreme_gust_speed_m_s: Option<f64>,
+    #[serde(default)]
+    pub blade_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub root_chord_m: Option<f64>,
+    #[serde(default)]
+    pub tip_chord_m: Option<f64>,
+    #[serde(default)]
+    pub flapwise_rigidity_ei_nm2: Option<f64>,
+    #[serde(default)]
+    pub torsional_rigidity_gj_nm2: Option<f64>,
+    #[serde(default)]
+    pub polar_moment_inertia_kg_m: Option<f64>,
+    #[serde(default)]
+    pub cg_ea_offset_m: Option<f64>,
+    #[serde(default)]
+    pub air_density_kg_m3: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimSubseaPipelineRequest {
+    #[serde(default)]
+    pub outside_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub nominal_wall_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub corrosion_allowance_mm: Option<f64>,
+    #[serde(default)]
+    pub fabrication_ovality_pct: Option<f64>,
+    #[serde(default)]
+    pub water_depth_m: Option<f64>,
+    #[serde(default)]
+    pub seawater_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub internal_design_pressure_mpa: Option<f64>,
+    #[serde(default)]
+    pub steel_smys_mpa: Option<f64>,
+    #[serde(default)]
+    pub steel_smts_mpa: Option<f64>,
+    #[serde(default)]
+    pub steel_youngs_modulus_gpa: Option<f64>,
+    #[serde(default)]
+    pub steel_poissons_ratio: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimCombustorRequest {
+    #[serde(default)]
+    pub inlet_total_pressure_mpa: Option<f64>,
+    #[serde(default)]
+    pub inlet_total_temperature_k: Option<f64>,
+    #[serde(default)]
+    pub air_mass_flow_kg_s: Option<f64>,
+    #[serde(default)]
+    pub fuel_mass_flow_kg_s: Option<f64>,
+    #[serde(default)]
+    pub fuel_lhv_mj_kg: Option<f64>,
+    #[serde(default)]
+    pub combustor_volume_m3: Option<f64>,
+    #[serde(default)]
+    pub combustor_length_m: Option<f64>,
+    #[serde(default)]
+    pub liner_reference_area_m2: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimBessGridRequest {
+    #[serde(default)]
+    pub chemistry: Option<atlas_simulation_core::bess_grid::BessChemistry>,
+    #[serde(default)]
+    pub nominal_capacity_mwh: Option<f64>,
+    #[serde(default)]
+    pub rated_power_mw: Option<f64>,
+    #[serde(default)]
+    pub dc_bus_voltage_v: Option<f64>,
+    #[serde(default)]
+    pub c_rate: Option<f64>,
+    #[serde(default)]
+    pub pcs_rated_mva: Option<f64>,
+    #[serde(default)]
+    pub transformer_rated_mva: Option<f64>,
+    #[serde(default)]
+    pub ambient_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub auxiliary_base_power_kw: Option<f64>,
+    #[serde(default)]
+    pub chiller_cop: Option<f64>,
 }

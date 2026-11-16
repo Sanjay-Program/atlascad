@@ -2676,6 +2676,128 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 26.7 Enterprise MCP Tool Calling: 5 Batch-11 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # ---------------------------------------------------------------------
+        # 27. MULTIDISCIPLINARY DEEP PHYSICS & ADVANCED SYSTEMS (BATCH 12)
+        # ---------------------------------------------------------------------
+        print("\n--- 27. ADVANCED MANUFACTURING, OFFSHORE, ENERGY & AEROELASTIC PHYSICS ---")
+
+        # 27.1 Wire Electrical Discharge Machining (Wire EDM) Spark Erosion Physics (ISO 230 / CIRP)
+        edm_res = http_request(port, "POST", "/api/sim/manufacturing/wire_edm", body={
+            "workpiece_thickness_mm": 50.0,
+            "wire_diameter_mm": 0.25,
+            "open_circuit_voltage_v": 95.0,
+            "discharge_current_a": 16.0,
+            "pulse_on_time_us": 4.5,
+            "pulse_off_time_us": 12.0
+        })
+        check(edm_res.get("single_pulse_energy_mj", 0.0) > 1.0, "Wire EDM pulse energy > 1.0 mJ")
+        check(edm_res.get("cutting_speed_mm_min", 0.0) > 1.0, "Wire EDM cutting speed > 1.0 mm/min")
+        check(edm_res.get("volumetric_mrr_mm3_min", 0.0) > 20.0, "Wire EDM volumetric MRR > 20 mm3/min")
+        check(edm_res.get("kerf_width_mm", 0.0) > 0.28, "Wire EDM kerf width > 0.28 mm")
+        check(edm_res.get("surface_roughness_ra_um", 0.0) > 1.0, "Wire EDM surface roughness Ra > 1.0 um")
+        check(edm_res.get("max_wire_deflection_um", 0.0) < 35.0, "Wire EDM max wire deflection < 35 um")
+        check(edm_res.get("is_safe", False) is True, "Wire EDM operating within safe envelope")
+        print(f"  ✓ 27.1 Wire EDM (ISO 230 / CIRP): Material = ToolSteelD2, vc = {edm_res['cutting_speed_mm_min']:.2f} mm/min, MRR = {edm_res['volumetric_mrr_mm3_min']:.1f} mm³/min, Kerf = {edm_res['kerf_width_mm']:.3f} mm (gap = {edm_res['spark_gap_um']:.1f} μm), Ra = {edm_res['surface_roughness_ra_um']:.2f} μm, White Layer = {edm_res['recast_layer_thickness_um']:.1f} μm, Deflection = {edm_res['max_wire_deflection_um']:.1f} μm, Flush = {edm_res['dielectric_flushing_pressure_mpa']:.2f} MPa")
+
+        # 27.2 Wind Turbine Blade Aerodynamic Bending & Flutter Stability (IEC 61400-1 / Theodorsen)
+        wind_res = http_request(port, "POST", "/api/sim/renewable/wind_blade_aeroelastic", body={
+            "blade_length_m": 80.0,
+            "rotor_radius_m": 82.5,
+            "rated_rotor_speed_rpm": 10.5,
+            "rated_wind_speed_m_s": 11.4,
+            "extreme_gust_speed_m_s": 52.5
+        })
+        check(wind_res.get("standstill_flap_freq_hz", 0.0) > 0.40, "Blade standstill flap frequency > 0.40 Hz")
+        check(wind_res.get("rotating_flap_freq_hz", 0.0) > wind_res.get("standstill_flap_freq_hz", 0.0), "Centrifugal stiffening increases flap frequency")
+        check(wind_res.get("centrifugal_stiffening_ratio", 0.0) > 1.05, "Southwell centrifugal ratio > 1.05")
+        check(wind_res.get("torsional_freq_hz", 0.0) > 2.0, "Blade torsional frequency > 2.0 Hz")
+        check(wind_res.get("flutter_speed_m_s", 0.0) > 100.0, "Coupled flutter speed > 100 m/s")
+        check(wind_res.get("flutter_safety_margin", 0.0) > 1.25, "Flutter safety margin > 1.25")
+        check(wind_res.get("tip_gust_deflection_m", 0.0) > 1.5, "50-year gust tip deflection > 1.5 m")
+        check(wind_res.get("is_stable", False) is True, "Blade aeroelastic stability verified")
+        print(f"  ✓ 27.2 Wind Turbine Blade Aeroelasticity (IEC 61400-1): L = 80m, f_flap_static = {wind_res['standstill_flap_freq_hz']:.3f} Hz, f_flap_rot = {wind_res['rotating_flap_freq_hz']:.3f} Hz (stiffening = {wind_res['centrifugal_stiffening_ratio']:.2f}x), f_tor = {wind_res['torsional_freq_hz']:.2f} Hz (sep = {wind_res['frequency_separation_ratio']:.2f}x), v_flutter = {wind_res['flutter_speed_m_s']:.1f} m/s (margin = {wind_res['flutter_safety_margin']:.2f}x), v_div = {wind_res['divergence_speed_m_s']:.1f} m/s, y_gust = {wind_res['tip_gust_deflection_m']:.2f} m ({wind_res['tip_deflection_ratio_pct']:.1f}%)")
+
+        # 27.3 Subsea Offshore Pipeline Wall Thickness & Hydrostatic Collapse (DNV-ST-F101 / API 5L)
+        pipe_res = http_request(port, "POST", "/api/sim/marine/subsea_pipeline", body={
+            "outside_diameter_mm": 508.0,
+            "nominal_wall_thickness_mm": 25.4,
+            "corrosion_allowance_mm": 3.0,
+            "fabrication_ovality_pct": 0.50,
+            "water_depth_m": 1500.0,
+            "internal_design_pressure_mpa": 22.0
+        })
+        check(pipe_res.get("hydrostatic_pressure_mpa", 0.0) > 14.0, "Seawater hydrostatic pressure at 1500m > 14 MPa")
+        check(pipe_res.get("characteristic_collapse_pressure_mpa", 0.0) > 20.0, "Timoshenko collapse pressure > 20 MPa")
+        check(pipe_res.get("design_collapse_resistance_mpa", 0.0) > 14.0, "Factored design resistance > 14 MPa")
+        check(pipe_res.get("collapse_safety_factor", 0.0) > 1.30, "Collapse safety factor > 1.30")
+        check(pipe_res.get("internal_burst_pressure_mpa", 0.0) > 35.0, "Internal burst yield pressure > 35 MPa")
+        check(pipe_res.get("burst_safety_factor", 0.0) > 1.50, "Burst safety factor > 1.50")
+        check(pipe_res.get("is_compliant", False) is True, "Pipeline complies with DNV-ST-F101 criteria")
+        print(f"  ✓ 27.3 Subsea Pipeline (DNV-ST-F101 / API 5L): 20\" OD (508mm), t_net = {pipe_res['net_wall_thickness_mm']:.1f} mm (D/t = {pipe_res['diameter_to_thickness_ratio']:.1f}), Depth = 1500m (Pe = {pipe_res['hydrostatic_pressure_mpa']:.2f} MPa), P_el = {pipe_res['elastic_collapse_pressure_mpa']:.1f} MPa, P_p = {pipe_res['plastic_collapse_pressure_mpa']:.1f} MPa, Pc = {pipe_res['characteristic_collapse_pressure_mpa']:.2f} MPa (SF = {pipe_res['collapse_safety_factor']:.2f}), Pburst = {pipe_res['internal_burst_pressure_mpa']:.1f} MPa (SF = {pipe_res['burst_safety_factor']:.2f}), Ppr = {pipe_res['buckle_propagation_pressure_mpa']:.2f} MPa (Arrestors: {pipe_res['buckle_arrestor_required']})")
+
+        # 27.4 Gas Turbine Combustor Aerothermal Performance & NOx Emissions (Lefebvre / ICAO)
+        comb_res = http_request(port, "POST", "/api/sim/aerospace/combustor_aerothermal", body={
+            "inlet_total_pressure_mpa": 2.40,
+            "inlet_total_temperature_k": 780.0,
+            "air_mass_flow_kg_s": 38.0,
+            "fuel_mass_flow_kg_s": 0.76
+        })
+        check(comb_res.get("combustion_efficiency_pct", 0.0) > 99.0, "Combustion efficiency > 99.0%")
+        check(comb_res.get("total_pressure_loss_pct", 0.0) > 3.0, "Total pressure loss > 3.0%")
+        check(comb_res.get("total_pressure_loss_pct", 0.0) < 6.0, "Total pressure loss < 6.0%")
+        check(comb_res.get("turbine_inlet_temperature_k", 0.0) > 1450.0, "Turbine inlet temperature > 1450 K")
+        check(comb_res.get("pattern_factor", 0.0) < 0.25, "Temperature pattern factor < 0.25")
+        check(comb_res.get("nox_emissions_index_g_kg", 0.0) > 5.0, "Thermal NOx emissions index > 5 g/kg")
+        check(comb_res.get("is_acceptable", False) is True, "Combustor satisfies ICAO aerothermal criteria")
+        print(f"  ✓ 27.4 Combustor Aerothermal (Lefebvre / ICAO): P3 = 2.40 MPa, T3 = 780 K, TIT = {comb_res['turbine_inlet_temperature_k']:.1f} K, eta_comb = {comb_res['combustion_efficiency_pct']:.2f}%, dP/P = {comb_res['total_pressure_loss_pct']:.2f}% (fric={comb_res['friction_pressure_drop_pct']:.2f}%, mom={comb_res['momentum_pressure_drop_pct']:.2f}%), PF = {comb_res['pattern_factor']:.3f} (<= 0.25), tau = {comb_res['residence_time_ms']:.2f} ms, EI_NOx = {comb_res['nox_emissions_index_g_kg']:.1f} g/kg, EI_CO = {comb_res['co_emissions_index_g_kg']:.2f} g/kg")
+
+        # 27.5 Battery Energy Storage System Container & Grid RTE (IEC 62933 / IEEE 2030.2.1)
+        bess_res = http_request(port, "POST", "/api/sim/energy/bess_grid", body={
+            "nominal_capacity_mwh": 10.0,
+            "rated_power_mw": 2.50,
+            "c_rate": 0.25,
+            "ambient_temperature_c": 28.0
+        })
+        check(bess_res.get("discharge_duration_hours", 0.0) == 4.0, "BESS discharge duration == 4.0 h")
+        check(bess_res.get("battery_dc_efficiency_pct", 0.0) > 93.0, "Cell DC round-trip efficiency > 93.0%")
+        check(bess_res.get("pcs_efficiency_pct", 0.0) > 97.0, "PCS bidirectional inverter efficiency > 97.0%")
+        check(bess_res.get("transformer_efficiency_pct", 0.0) > 98.5, "MV step-up transformer efficiency > 98.5%")
+        check(bess_res.get("ac_to_ac_rte_pct", 0.0) > 83.0, "Utility AC-to-AC round-trip efficiency > 83.0%")
+        check(bess_res.get("is_grid_compliant", False) is True, "BESS complies with grid interconnection standards")
+        print(f"  ✓ 27.5 BESS Container (IEC 62933 / IEEE 2030.2.1): 10 MWh / 2.5 MW (4h LFP), DC eta = {bess_res['battery_dc_efficiency_pct']:.2f}%, PCS eta = {bess_res['pcs_efficiency_pct']:.2f}%, XFR eta = {bess_res['transformer_efficiency_pct']:.2f}%, AC-AC RTE = {bess_res['ac_to_ac_rte_pct']:.2f}% (>= 83.0%), Heat = {bess_res['total_thermal_heat_mwh']:.2f} MWh, Aux = {bess_res['average_parasitic_load_kw']:.1f} kW, In = {bess_res['ac_energy_input_mwh']:.2f} MWh, Out = {bess_res['ac_energy_output_mwh']:.2f} MWh")
+
+        # 27.6 Universal Commands Execution Verification (Batch 12 Domains)
+        for cmd_id in [
+            "sim.manufacturing.wire_edm",
+            "sim.renewable.wind_blade_aeroelastic",
+            "sim.marine.subsea_pipeline",
+            "sim.aerospace.combustor_aerothermal",
+            "sim.energy.bess_grid",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 27.6 Universal Commands: All 5 Batch-12 Engineering Commands verified via typed schema engine")
+
+        # 27.7 Enterprise MCP Tool Calling (Batch 12 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_manufacturing_wire_edm",
+            "atlas_sim_renewable_wind_blade_aeroelastic",
+            "atlas_sim_marine_subsea_pipeline",
+            "atlas_sim_aerospace_combustor_aerothermal",
+            "atlas_sim_energy_bess_grid",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 831,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 27.7 Enterprise MCP Tool Calling: 5 Batch-12 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

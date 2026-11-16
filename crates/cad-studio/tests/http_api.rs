@@ -6396,5 +6396,148 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 134. Wire Electrical Discharge Machining (Wire EDM) Spark Erosion Physics (ISO 230 / CIRP)
+    let res_edm = post(
+        addr,
+        "/api/sim/manufacturing/wire_edm",
+        r#"{
+            "workpiece_thickness_mm": 50.0,
+            "wire_diameter_mm": 0.25,
+            "open_circuit_voltage_v": 95.0,
+            "discharge_current_a": 16.0,
+            "pulse_on_time_us": 4.5,
+            "pulse_off_time_us": 12.0
+        }"#,
+    )?;
+    assert_eq!(res_edm.status, 200);
+    let edm_json = json(&res_edm)?;
+    assert!(edm_json["single_pulse_energy_mj"].as_f64().unwrap() > 1.0);
+    assert!(edm_json["cutting_speed_mm_min"].as_f64().unwrap() > 1.0);
+    assert!(edm_json["volumetric_mrr_mm3_min"].as_f64().unwrap() > 20.0);
+    assert!(edm_json["kerf_width_mm"].as_f64().unwrap() > 0.28);
+    assert!(edm_json["surface_roughness_ra_um"].as_f64().unwrap() > 1.0);
+    assert!(edm_json["max_wire_deflection_um"].as_f64().unwrap() < 35.0);
+    assert!(edm_json["is_safe"].as_bool().unwrap());
+
+    // 135. Wind Turbine Blade Aerodynamic Bending & Flutter (IEC 61400-1 / Theodorsen)
+    let res_wind = post(
+        addr,
+        "/api/sim/renewable/wind_blade_aeroelastic",
+        r#"{
+            "blade_length_m": 80.0,
+            "rotor_radius_m": 82.5,
+            "rated_rotor_speed_rpm": 10.5,
+            "rated_wind_speed_m_s": 11.4,
+            "extreme_gust_speed_m_s": 52.5
+        }"#,
+    )?;
+    assert_eq!(res_wind.status, 200);
+    let wind_json = json(&res_wind)?;
+    assert!(wind_json["standstill_flap_freq_hz"].as_f64().unwrap() > 0.40);
+    assert!(wind_json["rotating_flap_freq_hz"].as_f64().unwrap() > wind_json["standstill_flap_freq_hz"].as_f64().unwrap());
+    assert!(wind_json["centrifugal_stiffening_ratio"].as_f64().unwrap() > 1.05);
+    assert!(wind_json["torsional_freq_hz"].as_f64().unwrap() > 2.0);
+    assert!(wind_json["flutter_speed_m_s"].as_f64().unwrap() > 100.0);
+    assert!(wind_json["flutter_safety_margin"].as_f64().unwrap() > 1.25);
+    assert!(wind_json["tip_gust_deflection_m"].as_f64().unwrap() > 1.5);
+    assert!(wind_json["is_stable"].as_bool().unwrap());
+
+    // 136. Subsea Offshore Pipeline Wall Thickness & Hydrostatic Collapse (DNV-ST-F101 / API 5L)
+    let res_pipeline = post(
+        addr,
+        "/api/sim/marine/subsea_pipeline",
+        r#"{
+            "outside_diameter_mm": 508.0,
+            "nominal_wall_thickness_mm": 25.4,
+            "corrosion_allowance_mm": 3.0,
+            "fabrication_ovality_pct": 0.50,
+            "water_depth_m": 1500.0,
+            "internal_design_pressure_mpa": 22.0
+        }"#,
+    )?;
+    assert_eq!(res_pipeline.status, 200);
+    let pipe_json = json(&res_pipeline)?;
+    assert!(pipe_json["hydrostatic_pressure_mpa"].as_f64().unwrap() > 14.0);
+    assert!(pipe_json["characteristic_collapse_pressure_mpa"].as_f64().unwrap() > 20.0);
+    assert!(pipe_json["design_collapse_resistance_mpa"].as_f64().unwrap() > 14.0);
+    assert!(pipe_json["collapse_safety_factor"].as_f64().unwrap() > 1.30);
+    assert!(pipe_json["internal_burst_pressure_mpa"].as_f64().unwrap() > 35.0);
+    assert!(pipe_json["burst_safety_factor"].as_f64().unwrap() > 1.50);
+    assert!(pipe_json["is_compliant"].as_bool().unwrap());
+
+    // 137. Gas Turbine Combustor Aerothermal Performance & NOx Emissions (Lefebvre / ICAO)
+    let res_combustor = post(
+        addr,
+        "/api/sim/aerospace/combustor_aerothermal",
+        r#"{
+            "inlet_total_pressure_mpa": 2.40,
+            "inlet_total_temperature_k": 780.0,
+            "air_mass_flow_kg_s": 38.0,
+            "fuel_mass_flow_kg_s": 0.76
+        }"#,
+    )?;
+    assert_eq!(res_combustor.status, 200);
+    let comb_json = json(&res_combustor)?;
+    assert!(comb_json["combustion_efficiency_pct"].as_f64().unwrap() > 99.0);
+    assert!(comb_json["total_pressure_loss_pct"].as_f64().unwrap() > 3.0);
+    assert!(comb_json["total_pressure_loss_pct"].as_f64().unwrap() < 6.0);
+    assert!(comb_json["turbine_inlet_temperature_k"].as_f64().unwrap() > 1450.0);
+    assert!(comb_json["pattern_factor"].as_f64().unwrap() < 0.25);
+    assert!(comb_json["nox_emissions_index_g_kg"].as_f64().unwrap() > 5.0);
+    assert!(comb_json["is_acceptable"].as_bool().unwrap());
+
+    // 138. Battery Energy Storage System Container & Grid RTE (IEC 62933 / IEEE 2030.2.1)
+    let res_bess = post(
+        addr,
+        "/api/sim/energy/bess_grid",
+        r#"{
+            "nominal_capacity_mwh": 10.0,
+            "rated_power_mw": 2.50,
+            "c_rate": 0.25,
+            "ambient_temperature_c": 28.0
+        }"#,
+    )?;
+    assert_eq!(res_bess.status, 200);
+    let bess_json = json(&res_bess)?;
+    assert_eq!(bess_json["discharge_duration_hours"].as_f64().unwrap(), 4.0);
+    assert!(bess_json["battery_dc_efficiency_pct"].as_f64().unwrap() > 93.0);
+    assert!(bess_json["pcs_efficiency_pct"].as_f64().unwrap() > 97.0);
+    assert!(bess_json["transformer_efficiency_pct"].as_f64().unwrap() > 98.5);
+    assert!(bess_json["ac_to_ac_rte_pct"].as_f64().unwrap() > 83.0);
+    assert!(bess_json["is_grid_compliant"].as_bool().unwrap());
+
+    // 139. Universal Commands Execution Verification (Batch 12 Domains)
+    for cmd_id in [
+        "sim.manufacturing.wire_edm",
+        "sim.renewable.wind_blade_aeroelastic",
+        "sim.marine.subsea_pipeline",
+        "sim.aerospace.combustor_aerothermal",
+        "sim.energy.bess_grid",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 140. Enterprise MCP Tool Calling (Batch 12 Domains)
+    for tool_name in [
+        "atlas_sim_manufacturing_wire_edm",
+        "atlas_sim_renewable_wind_blade_aeroelastic",
+        "atlas_sim_marine_subsea_pipeline",
+        "atlas_sim_aerospace_combustor_aerothermal",
+        "atlas_sim_energy_bess_grid",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 165, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

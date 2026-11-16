@@ -1336,6 +1336,78 @@ impl McpServer {
                     "required": ["major_radius_r0_m", "minor_radius_a_m", "toroidal_magnetic_field_t", "plasma_current_ma"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_manufacturing_wire_edm".into(),
+                description: "ISO 230 / CIRP Wire EDM spark erosion physics, single-pulse energy, Snoeys electro-thermal removal rate, linear cutting speed, kerf width, Ra roughness, and wire deflection".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "workpiece_thickness_mm": { "type": "number", "default": 50.0 },
+                        "wire_diameter_mm": { "type": "number", "default": 0.25 },
+                        "open_circuit_voltage_v": { "type": "number", "default": 95.0 },
+                        "discharge_current_a": { "type": "number", "default": 16.0 },
+                        "pulse_on_time_us": { "type": "number", "default": 4.5 },
+                        "pulse_off_time_us": { "type": "number", "default": 12.0 }
+                    },
+                    "required": ["workpiece_thickness_mm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_renewable_wind_blade_aeroelastic".into(),
+                description: "IEC 61400-1 / Theodorsen wind turbine blade aeroelasticity, centrifugal stiffening, coupled flap-torsion flutter velocity, aerodynamic divergence, and extreme gust tip deflection".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "blade_length_m": { "type": "number", "default": 80.0 },
+                        "rotor_radius_m": { "type": "number", "default": 82.5 },
+                        "rated_rotor_speed_rpm": { "type": "number", "default": 10.5 },
+                        "extreme_gust_speed_m_s": { "type": "number", "default": 52.5 }
+                    },
+                    "required": ["blade_length_m", "rated_rotor_speed_rpm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_marine_subsea_pipeline".into(),
+                description: "DNV-ST-F101 / API 5L subsea pipeline wall thickness, hydrostatic collapse resistance, Timoshenko ovality interaction, burst yield pressure, and propagating buckling arrestors".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "outside_diameter_mm": { "type": "number", "default": 508.0 },
+                        "nominal_wall_thickness_mm": { "type": "number", "default": 25.4 },
+                        "water_depth_m": { "type": "number", "default": 1500.0 },
+                        "internal_design_pressure_mpa": { "type": "number", "default": 22.0 }
+                    },
+                    "required": ["outside_diameter_mm", "nominal_wall_thickness_mm", "water_depth_m"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_aerospace_combustor_aerothermal".into(),
+                description: "Lefebvre / ICAO gas turbine combustor aerothermal performance, combustion efficiency, Rayleigh momentum and friction pressure drop, turbine inlet temperature, and thermal NOx/CO emissions".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "inlet_total_pressure_mpa": { "type": "number", "default": 2.40 },
+                        "inlet_total_temperature_k": { "type": "number", "default": 780.0 },
+                        "air_mass_flow_kg_s": { "type": "number", "default": 38.0 },
+                        "fuel_mass_flow_kg_s": { "type": "number", "default": 0.76 }
+                    },
+                    "required": ["inlet_total_pressure_mpa", "inlet_total_temperature_k", "air_mass_flow_kg_s", "fuel_mass_flow_kg_s"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_energy_bess_grid".into(),
+                description: "IEC 62933 / IEEE 2030.2.1 battery energy storage system grid interconnection, cell DC efficiency, PCS inverter losses, medium-voltage transformer efficiency, and AC-to-AC Round-Trip Efficiency".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "nominal_capacity_mwh": { "type": "number", "default": 10.0 },
+                        "rated_power_mw": { "type": "number", "default": 2.50 },
+                        "c_rate": { "type": "number", "default": 0.25 },
+                        "ambient_temperature_c": { "type": "number", "default": 28.0 }
+                    },
+                    "required": ["nominal_capacity_mwh", "rated_power_mw"]
+                }),
+            },
         ]
     }
 

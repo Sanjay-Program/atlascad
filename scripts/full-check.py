@@ -1659,6 +1659,96 @@ def simulation_section(studio: Studio) -> None:
     check(fusion_data.get("fusion_power_mw", 0.0) > 300.0, "D-T fusion power > 300 MW")
     check(fusion_data.get("fusion_gain_factor_q", 0.0) > 5.0, "fusion energy gain Q > 5.0")
     check(fusion_data.get("is_safe", False) is True, "tokamak plasma satisfies disruption limits")
+
+    # 60. Wire Electrical Discharge Machining Process Physics (ISO 230 / CIRP)
+    edm = studio.post("/api/sim/manufacturing/wire_edm", {
+        "workpiece_thickness_mm": 50.0,
+        "wire_diameter_mm": 0.25,
+        "open_circuit_voltage_v": 95.0,
+        "discharge_current_a": 16.0,
+        "pulse_on_time_us": 4.5,
+        "pulse_off_time_us": 12.0
+    })
+    check(edm.status == 200, f"wire edm returns 200 (got {edm.status})")
+    edm_data = edm.json()
+    check(edm_data.get("single_pulse_energy_mj", 0.0) > 1.0, "single pulse discharge energy > 1.0 mJ")
+    check(edm_data.get("cutting_speed_mm_min", 0.0) > 1.0, "linear cutting speed > 1.0 mm/min")
+    check(edm_data.get("volumetric_mrr_mm3_min", 0.0) > 20.0, "volumetric MRR > 20 mm3/min")
+    check(edm_data.get("kerf_width_mm", 0.0) > 0.28, "kerf width > 0.28 mm")
+    check(edm_data.get("surface_roughness_ra_um", 0.0) > 1.0, "surface roughness Ra > 1.0 um")
+    check(edm_data.get("max_wire_deflection_um", 0.0) < 35.0, "wire deflection < 35 um")
+    check(edm_data.get("is_safe", False) is True, "wire edm operating within safe envelope")
+
+    # 61. Wind Turbine Blade Aerodynamic Bending & Flutter (IEC 61400-1 / Theodorsen)
+    wind = studio.post("/api/sim/renewable/wind_blade_aeroelastic", {
+        "blade_length_m": 80.0,
+        "rotor_radius_m": 82.5,
+        "rated_rotor_speed_rpm": 10.5,
+        "rated_wind_speed_m_s": 11.4,
+        "extreme_gust_speed_m_s": 52.5
+    })
+    check(wind.status == 200, f"wind blade aeroelastic returns 200 (got {wind.status})")
+    wind_data = wind.json()
+    check(wind_data.get("standstill_flap_freq_hz", 0.0) > 0.40, "standstill flapwise frequency > 0.40 Hz")
+    check(wind_data.get("rotating_flap_freq_hz", 0.0) > wind_data.get("standstill_flap_freq_hz", 0.0), "centrifugal stiffening increases flap frequency")
+    check(wind_data.get("centrifugal_stiffening_ratio", 0.0) > 1.05, "Southwell stiffening ratio > 1.05")
+    check(wind_data.get("torsional_freq_hz", 0.0) > 2.0, "first torsional frequency > 2.0 Hz")
+    check(wind_data.get("flutter_speed_m_s", 0.0) > 100.0, "coupled flutter speed > 100 m/s")
+    check(wind_data.get("flutter_safety_margin", 0.0) > 1.25, "flutter safety margin > 1.25")
+    check(wind_data.get("tip_gust_deflection_m", 0.0) > 1.5, "50-year gust tip deflection > 1.5 m")
+    check(wind_data.get("is_stable", False) is True, "wind turbine blade aeroelastically stable")
+
+    # 62. Subsea Offshore Pipeline Wall Thickness & Hydrostatic Collapse (DNV-ST-F101 / API 5L)
+    pipe = studio.post("/api/sim/marine/subsea_pipeline", {
+        "outside_diameter_mm": 508.0,
+        "nominal_wall_thickness_mm": 25.4,
+        "corrosion_allowance_mm": 3.0,
+        "fabrication_ovality_pct": 0.50,
+        "water_depth_m": 1500.0,
+        "internal_design_pressure_mpa": 22.0
+    })
+    check(pipe.status == 200, f"subsea pipeline returns 200 (got {pipe.status})")
+    pipe_data = pipe.json()
+    check(pipe_data.get("hydrostatic_pressure_mpa", 0.0) > 14.0, "hydrostatic seawater pressure at 1500m > 14 MPa")
+    check(pipe_data.get("characteristic_collapse_pressure_mpa", 0.0) > 20.0, "characteristic collapse pressure > 20 MPa")
+    check(pipe_data.get("design_collapse_resistance_mpa", 0.0) > 14.0, "factored design collapse resistance > 14 MPa")
+    check(pipe_data.get("collapse_safety_factor", 0.0) > 1.30, "collapse safety factor > 1.30")
+    check(pipe_data.get("internal_burst_pressure_mpa", 0.0) > 35.0, "internal burst yield pressure > 35 MPa")
+    check(pipe_data.get("burst_safety_factor", 0.0) > 1.50, "burst safety factor > 1.50")
+    check(pipe_data.get("is_compliant", False) is True, "subsea pipeline DNV-ST-F101 compliant")
+
+    # 63. Gas Turbine Combustor Aerothermal Performance & NOx Emissions (Lefebvre / ICAO)
+    comb = studio.post("/api/sim/aerospace/combustor_aerothermal", {
+        "inlet_total_pressure_mpa": 2.40,
+        "inlet_total_temperature_k": 780.0,
+        "air_mass_flow_kg_s": 38.0,
+        "fuel_mass_flow_kg_s": 0.76
+    })
+    check(comb.status == 200, f"gas turbine combustor returns 200 (got {comb.status})")
+    comb_data = comb.json()
+    check(comb_data.get("combustion_efficiency_pct", 0.0) > 99.0, "combustion efficiency > 99.0%")
+    check(comb_data.get("total_pressure_loss_pct", 0.0) > 3.0, "total pressure loss > 3.0%")
+    check(comb_data.get("total_pressure_loss_pct", 0.0) < 6.0, "total pressure loss < 6.0%")
+    check(comb_data.get("turbine_inlet_temperature_k", 0.0) > 1450.0, "turbine inlet temperature > 1450 K")
+    check(comb_data.get("pattern_factor", 0.0) < 0.25, "temperature pattern factor < 0.25")
+    check(comb_data.get("nox_emissions_index_g_kg", 0.0) > 5.0, "thermal NOx emissions index > 5 g/kg")
+    check(comb_data.get("is_acceptable", False) is True, "combustor meets ICAO aerothermal criteria")
+
+    # 64. Battery Energy Storage System Container & Grid RTE (IEC 62933 / IEEE 2030.2.1)
+    bess = studio.post("/api/sim/energy/bess_grid", {
+        "nominal_capacity_mwh": 10.0,
+        "rated_power_mw": 2.50,
+        "c_rate": 0.25,
+        "ambient_temperature_c": 28.0
+    })
+    check(bess.status == 200, f"bess grid returns 200 (got {bess.status})")
+    bess_data = bess.json()
+    check(bess_data.get("discharge_duration_hours", 0.0) == 4.0, "discharge duration == 4.0 hours")
+    check(bess_data.get("battery_dc_efficiency_pct", 0.0) > 93.0, "battery DC efficiency > 93.0%")
+    check(bess_data.get("pcs_efficiency_pct", 0.0) > 97.0, "PCS bidirectional inverter efficiency > 97.0%")
+    check(bess_data.get("transformer_efficiency_pct", 0.0) > 98.5, "MV step-up transformer efficiency > 98.5%")
+    check(bess_data.get("ac_to_ac_rte_pct", 0.0) > 83.0, "utility AC-to-AC round-trip efficiency > 83.0%")
+    check(bess_data.get("is_grid_compliant", False) is True, "BESS complies with grid interconnection standards")
     report("simulation")
 
 

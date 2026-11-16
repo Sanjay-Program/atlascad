@@ -3568,5 +3568,199 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.manufacturing.wire_edm",
+            "Wire Electrical Discharge Machining Process Physics (ISO 230 / CIRP)",
+            "Evaluates single-pulse discharge energy, Snoeys electro-thermal removal rate, linear cutting speed, kerf width, Ra surface roughness, recast layer, and wire deflection.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "workpiece_thickness_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Workpiece thickness along wire axis in millimeters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(50.0)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "wire_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Wire electrode nominal diameter in millimeters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.25)),
+            validation_rules: vec![ValidationRule::Min(0.05), ValidationRule::Max(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "open_circuit_voltage_v".into(),
+            arg_type: ArgumentType::Number,
+            description: "Open-circuit discharge pulse voltage in Volts".into(),
+            required: false,
+            default_value: Some(serde_json::json!(95.0)),
+            validation_rules: vec![ValidationRule::Min(20.0), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "discharge_current_a".into(),
+            arg_type: ArgumentType::Number,
+            description: "Average discharge pulse current in Amperes".into(),
+            required: false,
+            default_value: Some(serde_json::json!(16.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(100.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.renewable.wind_blade_aeroelastic",
+            "Wind Turbine Blade Aerodynamic Bending & Flutter (IEC 61400-1 / Theodorsen)",
+            "Evaluates centrifugal Southwell frequency stiffening, coupled flap-torsion flutter velocity, aerodynamic divergence, and 50-year extreme gust tip deflection.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "blade_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Blade structural length in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(80.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(200.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rated_rotor_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rated rotor rotational speed in RPM".into(),
+            required: true,
+            default_value: Some(serde_json::json!(10.5)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "extreme_gust_speed_m_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "50-year extreme gust speed in m/s (IEC 61400-1 DLC 6.1)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(52.5)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(120.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.marine.subsea_pipeline",
+            "Subsea Offshore Pipeline Wall Thickness & Hydrostatic Collapse (DNV-ST-F101)",
+            "Evaluates hydrostatic seawater pressure at depth, elastic and plastic collapse, Timoshenko ovality interaction, burst yield pressure, and propagating buckling arrestors.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "outside_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Pipe nominal outside diameter in millimeters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(508.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(2500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "nominal_wall_thickness_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Nominal steel wall thickness in millimeters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(25.4)),
+            validation_rules: vec![ValidationRule::Min(2.0), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "water_depth_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Seabed installation water depth in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1500.0)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(11000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "internal_design_pressure_mpa".into(),
+            arg_type: ArgumentType::Number,
+            description: "Internal design operating pressure in MegaPascals".into(),
+            required: false,
+            default_value: Some(serde_json::json!(22.0)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(200.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.aerospace.combustor_aerothermal",
+            "Gas Turbine Combustor Aerothermal Performance & NOx (Lefebvre / ICAO)",
+            "Evaluates combustion efficiency, Rayleigh momentum and liner friction pressure loss, turbine inlet temperature, pattern factor, and thermal NOx/CO emissions indices.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "inlet_total_pressure_mpa".into(),
+            arg_type: ArgumentType::Number,
+            description: "Combustor inlet total pressure P3 in MegaPascals".into(),
+            required: true,
+            default_value: Some(serde_json::json!(2.40)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "inlet_total_temperature_k".into(),
+            arg_type: ArgumentType::Number,
+            description: "Combustor inlet total temperature T3 in Kelvin".into(),
+            required: true,
+            default_value: Some(serde_json::json!(780.0)),
+            validation_rules: vec![ValidationRule::Min(200.0), ValidationRule::Max(1500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "air_mass_flow_kg_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Air mass flow rate through combustor in kg/s".into(),
+            required: true,
+            default_value: Some(serde_json::json!(38.0)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "fuel_mass_flow_kg_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Fuel mass flow rate in kg/s".into(),
+            required: true,
+            default_value: Some(serde_json::json!(0.76)),
+            validation_rules: vec![ValidationRule::Min(0.001), ValidationRule::Max(50.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.energy.bess_grid",
+            "Battery Energy Storage System Container & Grid RTE (IEC 62933 / IEEE 2030.2.1)",
+            "Evaluates electrochemical cell DC efficiency, PCS inverter losses, medium-voltage transformer efficiency, chiller/HVAC auxiliary loads, and AC-to-AC Round-Trip Efficiency.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "nominal_capacity_mwh".into(),
+            arg_type: ArgumentType::Number,
+            description: "Installed DC nameplate energy storage capacity in MegaWatt-hours".into(),
+            required: true,
+            default_value: Some(serde_json::json!(10.0)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rated_power_mw".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rated continuous active power at Point of Interconnection in MegaWatts".into(),
+            required: true,
+            default_value: Some(serde_json::json!(2.50)),
+            validation_rules: vec![ValidationRule::Min(0.01), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "c_rate".into(),
+            arg_type: ArgumentType::Number,
+            description: "Continuous operational charge/discharge C-rate".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.25)),
+            validation_rules: vec![ValidationRule::Min(0.05), ValidationRule::Max(5.0)],
+        }),
+    )?;
+
     Ok(())
 }
