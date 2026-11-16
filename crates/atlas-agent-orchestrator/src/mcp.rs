@@ -1765,6 +1765,75 @@ impl McpServer {
                     "required": ["gross_weight_kg", "rotor_radius_m"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_thermal_heat_exchanger_delaware".into(),
+                description: "Evaluates shell-and-tube heat exchanger Bell-Delaware crossflow coefficients, LMTD F-factor, overall U-value, required area, and shell pressure drop.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "shell_inside_diameter_m": { "type": "number", "default": 0.60 },
+                        "number_of_tubes": { "type": "integer", "default": 360 },
+                        "tube_length_m": { "type": "number", "default": 4.80 },
+                        "baffle_spacing_m": { "type": "number", "default": 0.30 },
+                        "hot_mass_flow_kg_s": { "type": "number", "default": 18.5 }
+                    },
+                    "required": ["shell_inside_diameter_m", "number_of_tubes"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_geotechnical_drilled_shaft".into(),
+                description: "Calculates deep foundation drilled shaft and bored pile O'Neill-Reese side shear, base resistance, AASHTO LRFD factored capacity, and elastic settlement.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "shaft_diameter_m": { "type": "number", "default": 1.20 },
+                        "embedded_length_m": { "type": "number", "default": 18.0 },
+                        "factored_load_demand_kn": { "type": "number", "default": 3200.0 },
+                        "service_load_demand_kn": { "type": "number", "default": 2200.0 }
+                    },
+                    "required": ["shaft_diameter_m", "embedded_length_m"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_biomedical_heart_valve".into(),
+                description: "Computes prosthetic heart valve Gorlin Effective Orifice Area (EOA), indexed iEOA, Patient-Prosthesis Mismatch (PPM) grade, and ISO 5840 compliance.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "nominal_size_mm": { "type": "number", "default": 23.0 },
+                        "heart_rate_bpm": { "type": "number", "default": 70.0 },
+                        "stroke_volume_ml": { "type": "number", "default": 75.0 },
+                        "patient_bsa_m2": { "type": "number", "default": 1.85 }
+                    },
+                    "required": ["nominal_size_mm", "stroke_volume_ml"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_aerospace_centrifugal_compressor".into(),
+                description: "Evaluates gas turbine centrifugal compressor stage aerodynamics, Stanitz slip factor, Euler work, total pressure ratio, surge margin, and disk hoop stress.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "mass_flow_rate_kg_s": { "type": "number", "default": 3.80 },
+                        "rotational_speed_rpm": { "type": "number", "default": 38000.0 },
+                        "impeller_tip_diameter_m": { "type": "number", "default": 0.285 }
+                    },
+                    "required": ["mass_flow_rate_kg_s", "rotational_speed_rpm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_rail_pantograph".into(),
+                description: "Calculates high-speed railway pantograph-catenary mean contact force, wave velocity, contact force standard deviation, arcing loss, and wire uplift per EN 50367.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "train_speed_km_h": { "type": "number", "default": 300.0 },
+                        "static_contact_force_n": { "type": "number", "default": 80.0 },
+                        "contact_wire_tension_kn": { "type": "number", "default": 22.0 }
+                    },
+                    "required": ["train_speed_km_h", "static_contact_force_n"]
+                }),
+            },
         ]
     }
 

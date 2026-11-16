@@ -6292,6 +6292,130 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_thermal_heat_exchanger_delaware(
+        &mut self,
+        req: &SimHeatExchangerDelawareRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::heat_exchanger_delaware::HeatExchangerDelawareProblem {
+            problem_id: "heat_exchanger_delaware_sim".to_string(),
+            shell_type: req.shell_type.unwrap_or(atlas_simulation_core::heat_exchanger_delaware::TemaShellType::EOnePassShell),
+            tube_layout: req.tube_layout.unwrap_or(atlas_simulation_core::heat_exchanger_delaware::TemaTubeLayout::Triangular30Deg),
+            shell_inside_diameter_m: req.shell_inside_diameter_m.unwrap_or(0.60),
+            number_of_tubes: req.number_of_tubes.unwrap_or(360),
+            tube_outer_diameter_mm: req.tube_outer_diameter_mm.unwrap_or(19.05),
+            tube_wall_thickness_mm: req.tube_wall_thickness_mm.unwrap_or(1.65),
+            tube_length_m: req.tube_length_m.unwrap_or(4.80),
+            tube_pitch_mm: req.tube_pitch_mm.unwrap_or(23.81),
+            baffle_cut_pct: req.baffle_cut_pct.unwrap_or(25.0),
+            baffle_spacing_m: req.baffle_spacing_m.unwrap_or(0.30),
+            hot_inlet_temp_c: req.hot_inlet_temp_c.unwrap_or(120.0),
+            hot_outlet_temp_c: req.hot_outlet_temp_c.unwrap_or(65.0),
+            hot_mass_flow_kg_s: req.hot_mass_flow_kg_s.unwrap_or(18.5),
+            cold_inlet_temp_c: req.cold_inlet_temp_c.unwrap_or(25.0),
+            cold_outlet_temp_c: req.cold_outlet_temp_c.unwrap_or(50.0),
+            cold_mass_flow_kg_s: req.cold_mass_flow_kg_s.unwrap_or(32.0),
+            shell_fluid_cp_j_kg_k: req.shell_fluid_cp_j_kg_k.unwrap_or(2450.0),
+            shell_fluid_viscosity_pa_s: req.shell_fluid_viscosity_pa_s.unwrap_or(0.00085),
+            shell_fluid_conductivity_w_m_k: req.shell_fluid_conductivity_w_m_k.unwrap_or(0.165),
+            shell_fluid_density_kg_m3: req.shell_fluid_density_kg_m3.unwrap_or(840.0),
+            tube_side_htc_w_m2_k: req.tube_side_htc_w_m2_k.unwrap_or(1850.0),
+            fouling_resistance_m2_k_w: req.fouling_resistance_m2_k_w.unwrap_or(0.00035),
+        };
+        let res = atlas_simulation_core::heat_exchanger_delaware::solve_heat_exchanger_delaware(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_geotechnical_drilled_shaft(
+        &mut self,
+        req: &SimDrilledShaftRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::drilled_shaft_foundation::DrilledShaftProblem {
+            problem_id: "drilled_shaft_sim".to_string(),
+            geomaterial: req.geomaterial.unwrap_or(atlas_simulation_core::drilled_shaft_foundation::GeomaterialType::CohesiveClay),
+            shaft_diameter_m: req.shaft_diameter_m.unwrap_or(1.20),
+            embedded_length_m: req.embedded_length_m.unwrap_or(18.0),
+            factored_load_demand_kn: req.factored_load_demand_kn.unwrap_or(3200.0),
+            service_load_demand_kn: req.service_load_demand_kn.unwrap_or(2200.0),
+            undrained_shear_strength_kpa: req.undrained_shear_strength_kpa.unwrap_or(120.0),
+            effective_friction_angle_deg: req.effective_friction_angle_deg.unwrap_or(32.0),
+            soil_unit_weight_kn_m3: req.soil_unit_weight_kn_m3.unwrap_or(18.5),
+            concrete_compressive_strength_mpa: req.concrete_compressive_strength_mpa.unwrap_or(35.0),
+            steel_reinforcement_ratio_pct: req.steel_reinforcement_ratio_pct.unwrap_or(1.50),
+        };
+        let res = atlas_simulation_core::drilled_shaft_foundation::solve_drilled_shaft(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_biomedical_heart_valve(
+        &mut self,
+        req: &SimHeartValveRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::heart_valve_hemodynamics::HeartValveProblem {
+            problem_id: "heart_valve_sim".to_string(),
+            valve_type: req.valve_type.unwrap_or(atlas_simulation_core::heart_valve_hemodynamics::ValveProsthesisType::MechanicalBileaflet),
+            nominal_size_mm: req.nominal_size_mm.unwrap_or(23.0),
+            heart_rate_bpm: req.heart_rate_bpm.unwrap_or(70.0),
+            stroke_volume_ml: req.stroke_volume_ml.unwrap_or(75.0),
+            systolic_ejection_period_s: req.systolic_ejection_period_s.unwrap_or(0.30),
+            patient_bsa_m2: req.patient_bsa_m2.unwrap_or(1.85),
+            mean_pressure_gradient_mmhg: req.mean_pressure_gradient_mmhg.unwrap_or(10.5),
+            peak_jet_velocity_m_s: req.peak_jet_velocity_m_s.unwrap_or(2.15),
+            dynamic_closing_volume_ml: req.dynamic_closing_volume_ml.unwrap_or(2.8),
+            static_leakage_volume_ml: req.static_leakage_volume_ml.unwrap_or(3.2),
+        };
+        let res = atlas_simulation_core::heart_valve_hemodynamics::solve_heart_valve_hemodynamics(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_aerospace_centrifugal_compressor(
+        &mut self,
+        req: &SimCentrifugalCompressorRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::centrifugal_compressor::CentrifugalCompressorProblem {
+            problem_id: "centrifugal_compressor_sim".to_string(),
+            blade_style: req.blade_style.unwrap_or(atlas_simulation_core::centrifugal_compressor::ImpellerBladeStyle::BacksweptBlades),
+            mass_flow_rate_kg_s: req.mass_flow_rate_kg_s.unwrap_or(3.80),
+            rotational_speed_rpm: req.rotational_speed_rpm.unwrap_or(38000.0),
+            impeller_tip_diameter_m: req.impeller_tip_diameter_m.unwrap_or(0.285),
+            inducer_hub_diameter_m: req.inducer_hub_diameter_m.unwrap_or(0.075),
+            inducer_shroud_diameter_m: req.inducer_shroud_diameter_m.unwrap_or(0.165),
+            number_of_blades: req.number_of_blades.unwrap_or(18),
+            blade_backsweep_deg: req.blade_backsweep_deg.unwrap_or(35.0),
+            inlet_total_temperature_k: req.inlet_total_temperature_k.unwrap_or(288.15),
+            inlet_total_pressure_kpa: req.inlet_total_pressure_kpa.unwrap_or(101.325),
+            isentropic_efficiency_tt: req.isentropic_efficiency_tt.unwrap_or(0.825),
+            impeller_material_density_kg_m3: req.impeller_material_density_kg_m3.unwrap_or(4430.0),
+            impeller_yield_strength_mpa: req.impeller_yield_strength_mpa.unwrap_or(880.0),
+        };
+        let res = atlas_simulation_core::centrifugal_compressor::solve_centrifugal_compressor(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_rail_pantograph(
+        &mut self,
+        req: &SimRailPantographRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::rail_pantograph::RailPantographProblem {
+            problem_id: "rail_pantograph_sim".to_string(),
+            system: req.system.unwrap_or(atlas_simulation_core::rail_pantograph::CatenaryVoltageSystem::Ac25kV),
+            train_speed_km_h: req.train_speed_km_h.unwrap_or(300.0),
+            static_contact_force_n: req.static_contact_force_n.unwrap_or(80.0),
+            aerodynamic_uplift_coeff: req.aerodynamic_uplift_coeff.unwrap_or(0.00095),
+            contact_wire_tension_kn: req.contact_wire_tension_kn.unwrap_or(22.0),
+            contact_wire_mass_kg_per_m: req.contact_wire_mass_kg_per_m.unwrap_or(1.07),
+            catenary_span_length_m: req.catenary_span_length_m.unwrap_or(55.0),
+            catenary_midspan_elasticity_mm_per_n: req.catenary_midspan_elasticity_mm_per_n.unwrap_or(0.75),
+            catenary_support_elasticity_mm_per_n: req.catenary_support_elasticity_mm_per_n.unwrap_or(0.35),
+        };
+        let res = atlas_simulation_core::rail_pantograph::solve_rail_pantograph(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -8787,6 +8911,81 @@ namespace AtlasCAD.Unity
                     ..Default::default()
                 })?
             }
+            "sim.thermal.heat_exchanger_delaware" => {
+                let d_s = req.arguments.get("shell_inside_diameter_m").and_then(|v| v.as_f64());
+                let n_t = req.arguments.get("number_of_tubes").and_then(|v| v.as_u64()).map(|v| v as u32);
+                let l_t = req.arguments.get("tube_length_m").and_then(|v| v.as_f64());
+                let b_s = req.arguments.get("baffle_spacing_m").and_then(|v| v.as_f64());
+                let m_h = req.arguments.get("hot_mass_flow_kg_s").and_then(|v| v.as_f64());
+                self.sim_thermal_heat_exchanger_delaware(&SimHeatExchangerDelawareRequest {
+                    shell_inside_diameter_m: d_s,
+                    number_of_tubes: n_t,
+                    tube_length_m: l_t,
+                    baffle_spacing_m: b_s,
+                    hot_mass_flow_kg_s: m_h,
+                    ..Default::default()
+                })?
+            }
+            "sim.geotechnical.drilled_shaft" => {
+                let b_shaft = req.arguments.get("shaft_diameter_m").and_then(|v| v.as_f64());
+                let l_shaft = req.arguments.get("embedded_length_m").and_then(|v| v.as_f64());
+                let q_fact = req.arguments.get("factored_load_demand_kn").and_then(|v| v.as_f64());
+                let q_serv = req.arguments.get("service_load_demand_kn").and_then(|v| v.as_f64());
+                let s_u = req.arguments.get("undrained_shear_strength_kpa").and_then(|v| v.as_f64());
+                self.sim_geotechnical_drilled_shaft(&SimDrilledShaftRequest {
+                    shaft_diameter_m: b_shaft,
+                    embedded_length_m: l_shaft,
+                    factored_load_demand_kn: q_fact,
+                    service_load_demand_kn: q_serv,
+                    undrained_shear_strength_kpa: s_u,
+                    ..Default::default()
+                })?
+            }
+            "sim.biomedical.heart_valve" => {
+                let size = req.arguments.get("nominal_size_mm").and_then(|v| v.as_f64());
+                let hr = req.arguments.get("heart_rate_bpm").and_then(|v| v.as_f64());
+                let sv = req.arguments.get("stroke_volume_ml").and_then(|v| v.as_f64());
+                let bsa = req.arguments.get("patient_bsa_m2").and_then(|v| v.as_f64());
+                let mean_dp = req.arguments.get("mean_pressure_gradient_mmhg").and_then(|v| v.as_f64());
+                self.sim_biomedical_heart_valve(&SimHeartValveRequest {
+                    nominal_size_mm: size,
+                    heart_rate_bpm: hr,
+                    stroke_volume_ml: sv,
+                    patient_bsa_m2: bsa,
+                    mean_pressure_gradient_mmhg: mean_dp,
+                    ..Default::default()
+                })?
+            }
+            "sim.aerospace.centrifugal_compressor" => {
+                let m_air = req.arguments.get("mass_flow_rate_kg_s").and_then(|v| v.as_f64());
+                let rpm = req.arguments.get("rotational_speed_rpm").and_then(|v| v.as_f64());
+                let d_tip = req.arguments.get("impeller_tip_diameter_m").and_then(|v| v.as_f64());
+                let n_blades = req.arguments.get("number_of_blades").and_then(|v| v.as_u64()).map(|v| v as u32);
+                let beta_bs = req.arguments.get("blade_backsweep_deg").and_then(|v| v.as_f64());
+                self.sim_aerospace_centrifugal_compressor(&SimCentrifugalCompressorRequest {
+                    mass_flow_rate_kg_s: m_air,
+                    rotational_speed_rpm: rpm,
+                    impeller_tip_diameter_m: d_tip,
+                    number_of_blades: n_blades,
+                    blade_backsweep_deg: beta_bs,
+                    ..Default::default()
+                })?
+            }
+            "sim.rail.pantograph" => {
+                let v_train = req.arguments.get("train_speed_km_h").and_then(|v| v.as_f64());
+                let f_0 = req.arguments.get("static_contact_force_n").and_then(|v| v.as_f64());
+                let t_wire = req.arguments.get("contact_wire_tension_kn").and_then(|v| v.as_f64());
+                let mu_wire = req.arguments.get("contact_wire_mass_kg_per_m").and_then(|v| v.as_f64());
+                let l_span = req.arguments.get("catenary_span_length_m").and_then(|v| v.as_f64());
+                self.sim_rail_pantograph(&SimRailPantographRequest {
+                    train_speed_km_h: v_train,
+                    static_contact_force_n: f_0,
+                    contact_wire_tension_kn: t_wire,
+                    contact_wire_mass_kg_per_m: mu_wire,
+                    catenary_span_length_m: l_span,
+                    ..Default::default()
+                })?
+            }
             "system.deploy.status" => self.deploy_status()?,
             _ => serde_json::json!({
                 "status": "Executed",
@@ -11200,6 +11399,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/aerospace/rotorcraft_aerodynamics" => {
             match parse_body_or_default::<SimRotorcraftAerodynamicsRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_aerospace_rotorcraft_aerodynamics(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/thermal/heat_exchanger_delaware" => {
+            match parse_body_or_default::<SimHeatExchangerDelawareRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_thermal_heat_exchanger_delaware(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/geotechnical/drilled_shaft" => {
+            match parse_body_or_default::<SimDrilledShaftRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_geotechnical_drilled_shaft(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/biomedical/heart_valve" => {
+            match parse_body_or_default::<SimHeartValveRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_biomedical_heart_valve(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/aerospace/centrifugal_compressor" => {
+            match parse_body_or_default::<SimCentrifugalCompressorRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_aerospace_centrifugal_compressor(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/rail/pantograph" => {
+            match parse_body_or_default::<SimRailPantographRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_rail_pantograph(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -15418,4 +15662,152 @@ struct SimRotorcraftAerodynamicsRequest {
     pub blade_profile_cd0: Option<f64>,
     #[serde(default)]
     pub fuselage_flat_plate_area_m2: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimHeatExchangerDelawareRequest {
+    #[serde(default)]
+    pub shell_type: Option<atlas_simulation_core::heat_exchanger_delaware::TemaShellType>,
+    #[serde(default)]
+    pub tube_layout: Option<atlas_simulation_core::heat_exchanger_delaware::TemaTubeLayout>,
+    #[serde(default)]
+    pub shell_inside_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub number_of_tubes: Option<u32>,
+    #[serde(default)]
+    pub tube_outer_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub tube_wall_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub tube_length_m: Option<f64>,
+    #[serde(default)]
+    pub tube_pitch_mm: Option<f64>,
+    #[serde(default)]
+    pub baffle_cut_pct: Option<f64>,
+    #[serde(default)]
+    pub baffle_spacing_m: Option<f64>,
+    #[serde(default)]
+    pub hot_inlet_temp_c: Option<f64>,
+    #[serde(default)]
+    pub hot_outlet_temp_c: Option<f64>,
+    #[serde(default)]
+    pub hot_mass_flow_kg_s: Option<f64>,
+    #[serde(default)]
+    pub cold_inlet_temp_c: Option<f64>,
+    #[serde(default)]
+    pub cold_outlet_temp_c: Option<f64>,
+    #[serde(default)]
+    pub cold_mass_flow_kg_s: Option<f64>,
+    #[serde(default)]
+    pub shell_fluid_cp_j_kg_k: Option<f64>,
+    #[serde(default)]
+    pub shell_fluid_viscosity_pa_s: Option<f64>,
+    #[serde(default)]
+    pub shell_fluid_conductivity_w_m_k: Option<f64>,
+    #[serde(default)]
+    pub shell_fluid_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub tube_side_htc_w_m2_k: Option<f64>,
+    #[serde(default)]
+    pub fouling_resistance_m2_k_w: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimDrilledShaftRequest {
+    #[serde(default)]
+    pub geomaterial: Option<atlas_simulation_core::drilled_shaft_foundation::GeomaterialType>,
+    #[serde(default)]
+    pub shaft_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub embedded_length_m: Option<f64>,
+    #[serde(default)]
+    pub factored_load_demand_kn: Option<f64>,
+    #[serde(default)]
+    pub service_load_demand_kn: Option<f64>,
+    #[serde(default)]
+    pub undrained_shear_strength_kpa: Option<f64>,
+    #[serde(default)]
+    pub effective_friction_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub soil_unit_weight_kn_m3: Option<f64>,
+    #[serde(default)]
+    pub concrete_compressive_strength_mpa: Option<f64>,
+    #[serde(default)]
+    pub steel_reinforcement_ratio_pct: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimHeartValveRequest {
+    #[serde(default)]
+    pub valve_type: Option<atlas_simulation_core::heart_valve_hemodynamics::ValveProsthesisType>,
+    #[serde(default)]
+    pub nominal_size_mm: Option<f64>,
+    #[serde(default)]
+    pub heart_rate_bpm: Option<f64>,
+    #[serde(default)]
+    pub stroke_volume_ml: Option<f64>,
+    #[serde(default)]
+    pub systolic_ejection_period_s: Option<f64>,
+    #[serde(default)]
+    pub patient_bsa_m2: Option<f64>,
+    #[serde(default)]
+    pub mean_pressure_gradient_mmhg: Option<f64>,
+    #[serde(default)]
+    pub peak_jet_velocity_m_s: Option<f64>,
+    #[serde(default)]
+    pub dynamic_closing_volume_ml: Option<f64>,
+    #[serde(default)]
+    pub static_leakage_volume_ml: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimCentrifugalCompressorRequest {
+    #[serde(default)]
+    pub blade_style: Option<atlas_simulation_core::centrifugal_compressor::ImpellerBladeStyle>,
+    #[serde(default)]
+    pub mass_flow_rate_kg_s: Option<f64>,
+    #[serde(default)]
+    pub rotational_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub impeller_tip_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub inducer_hub_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub inducer_shroud_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub number_of_blades: Option<u32>,
+    #[serde(default)]
+    pub blade_backsweep_deg: Option<f64>,
+    #[serde(default)]
+    pub inlet_total_temperature_k: Option<f64>,
+    #[serde(default)]
+    pub inlet_total_pressure_kpa: Option<f64>,
+    #[serde(default)]
+    pub isentropic_efficiency_tt: Option<f64>,
+    #[serde(default)]
+    pub impeller_material_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub impeller_yield_strength_mpa: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimRailPantographRequest {
+    #[serde(default)]
+    pub system: Option<atlas_simulation_core::rail_pantograph::CatenaryVoltageSystem>,
+    #[serde(default)]
+    pub train_speed_km_h: Option<f64>,
+    #[serde(default)]
+    pub static_contact_force_n: Option<f64>,
+    #[serde(default)]
+    pub aerodynamic_uplift_coeff: Option<f64>,
+    #[serde(default)]
+    pub contact_wire_tension_kn: Option<f64>,
+    #[serde(default)]
+    pub contact_wire_mass_kg_per_m: Option<f64>,
+    #[serde(default)]
+    pub catenary_span_length_m: Option<f64>,
+    #[serde(default)]
+    pub catenary_midspan_elasticity_mm_per_n: Option<f64>,
+    #[serde(default)]
+    pub catenary_support_elasticity_mm_per_n: Option<f64>,
 }

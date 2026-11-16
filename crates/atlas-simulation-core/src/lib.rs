@@ -126,6 +126,11 @@ pub mod crash_deceleration;
 pub mod nuclear_fuel_pin;
 pub mod adsorption_psa;
 pub mod rotorcraft_aerodynamics;
+pub mod heat_exchanger_delaware;
+pub mod drilled_shaft_foundation;
+pub mod heart_valve_hemodynamics;
+pub mod centrifugal_compressor;
+pub mod rail_pantograph;
 
 pub mod prelude {
     pub use crate::acoustics::{
@@ -571,5 +576,25 @@ pub mod prelude {
     pub use crate::rotorcraft_aerodynamics::{
         RotorFlightRegime, RotorcraftAerodynamicsProblem, RotorcraftAerodynamicsResult,
         solve_rotorcraft_aerodynamics,
+    };
+    pub use crate::heat_exchanger_delaware::{
+        HeatExchangerDelawareProblem, HeatExchangerDelawareResult, TemaShellType, TemaTubeLayout,
+        solve_heat_exchanger_delaware,
+    };
+    pub use crate::drilled_shaft_foundation::{
+        DrilledShaftProblem, DrilledShaftResult, GeomaterialType,
+        solve_drilled_shaft,
+    };
+    pub use crate::heart_valve_hemodynamics::{
+        HeartValveProblem, HeartValveResult, PatientProsthesisMismatchGrade, ValveProsthesisType,
+        solve_heart_valve_hemodynamics,
+    };
+    pub use crate::centrifugal_compressor::{
+        CentrifugalCompressorProblem, CentrifugalCompressorResult, ImpellerBladeStyle,
+        solve_centrifugal_compressor,
+    };
+    pub use crate::rail_pantograph::{
+        CatenaryVoltageSystem, RailPantographProblem, RailPantographResult,
+        solve_rail_pantograph,
     };
 }

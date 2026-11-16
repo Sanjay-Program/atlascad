@@ -3453,6 +3453,152 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 32.7 Enterprise MCP Tool Calling: 5 Batch-17 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # =========================================================================
+        # DEMO 33: BATCH 18 HIGH-FIDELITY FIRST-PRINCIPLES SIMULATION SOLVERS
+        # =========================================================================
+        print("\n--- DEMO 33: BATCH 18 ADVANCED SIMULATION SOLVERS (HEAT EXCHANGER, DRILLED SHAFT, HEART VALVE, COMPRESSOR, PANTOGRAPH) ---")
+
+        # 33.1 Shell-and-Tube Heat Exchanger Rating & Pressure Drop (Bell-Delaware / TEMA Class R, C, B)
+        hx_res = http_request(port, "POST", "/api/sim/thermal/heat_exchanger_delaware", body={
+            "shell_inside_diameter_m": 0.60,
+            "number_of_tubes": 360,
+            "tube_outer_diameter_mm": 19.05,
+            "tube_wall_thickness_mm": 1.65,
+            "tube_length_m": 4.80,
+            "tube_pitch_mm": 23.81,
+            "baffle_cut_pct": 25.0,
+            "baffle_spacing_m": 0.30,
+            "hot_inlet_temp_c": 120.0,
+            "hot_outlet_temp_c": 65.0,
+            "hot_mass_flow_kg_s": 18.5,
+            "cold_inlet_temp_c": 25.0,
+            "cold_outlet_temp_c": 50.0,
+            "cold_mass_flow_kg_s": 32.0,
+        })
+        check(hx_res.get("thermal_duty_kw", 0.0) > 2000.0, "Thermal duty > 2000 kW")
+        check(hx_res.get("counterflow_lmtd_c", 0.0) > 45.0, "LMTD > 45 °C")
+        check(hx_res.get("lmtd_correction_factor_f", 0.0) >= 0.80, "LMTD F factor >= 0.80")
+        check(hx_res.get("shell_side_corrected_htc_w_m2_k", 0.0) > 400.0, "Shell corrected HTC > 400 W/m²·K")
+        check(hx_res.get("overall_htc_w_m2_k", 0.0) > 200.0, "Overall U > 200 W/m²·K")
+        check(hx_res.get("surface_area_overdesign_pct", 0.0) >= 10.0, "Area overdesign >= 10%")
+        check(hx_res.get("is_pressure_drop_acceptable", False) is True, "Shell ΔP within TEMA allowable")
+        check(hx_res.get("is_surface_area_adequate", False) is True, "Exchanger surface area adequate")
+        print(f"  ✓ 33.1 Shell-and-Tube Heat Exchanger Rating & ΔP (Bell-Delaware / TEMA Class R): D_shell = {0.60:.2f} m, N_tubes = 360 (L = {4.80:.2f} m, OD = {19.05:.2f} mm), Q = {hx_res['thermal_duty_kw']:.1f} kW, LMTD = {hx_res['counterflow_lmtd_c']:.1f}°C (F = {hx_res['lmtd_correction_factor_f']:.3f}), Bell Factor = {hx_res['bell_combined_correction_factor']:.3f}, Corrected h_shell = {hx_res['shell_side_corrected_htc_w_m2_k']:.1f} W/(m²·K), Overall U = {hx_res['overall_htc_w_m2_k']:.1f} W/(m²·K), Shell ΔP = {hx_res['shell_side_pressure_drop_kpa']:.2f} kPa (< 70 kPa), Overdesign = {hx_res['surface_area_overdesign_pct']:.1f}%, TEMA Compliant: {hx_res['is_pressure_drop_acceptable']})")
+
+        # 33.2 Deep Foundation Drilled Shaft / Bored Pile Axial Resistance & Settlement (FHWA GEC-010 / AASHTO LRFD)
+        shaft_res = http_request(port, "POST", "/api/sim/geotechnical/drilled_shaft", body={
+            "shaft_diameter_m": 1.20,
+            "embedded_length_m": 18.0,
+            "factored_load_demand_kn": 2500.0,
+            "service_load_demand_kn": 1700.0,
+            "undrained_shear_strength_kpa": 120.0,
+            "effective_friction_angle_deg": 32.0,
+            "soil_unit_weight_kn_m3": 18.5,
+            "concrete_compressive_strength_mpa": 35.0,
+            "steel_reinforcement_ratio_pct": 1.50,
+        })
+        check(shaft_res.get("base_cross_sectional_area_m2", 0.0) > 1.0, "Base area > 1.0 m²")
+        check(shaft_res.get("unit_side_resistance_kpa", 0.0) > 50.0, "Unit side resistance > 50 kPa")
+        check(shaft_res.get("nominal_side_resistance_kn", 0.0) > 3000.0, "Nominal side resistance > 3000 kN")
+        check(shaft_res.get("nominal_total_resistance_kn", 0.0) > 4500.0, "Nominal total resistance > 4500 kN")
+        check(shaft_res.get("factored_geotechnical_resistance_kn", 0.0) > 2500.0, "Factored resistance > 2500 kN")
+        check(shaft_res.get("elastic_service_settlement_mm", 0.0) < 25.0, "Elastic settlement < 25 mm")
+        check(shaft_res.get("is_geotechnical_capacity_adequate", False) is True, "Geotechnical capacity adequate")
+        check(shaft_res.get("is_settlement_acceptable", False) is True, "Settlement acceptable (< 25 mm)")
+        print(f"  ✓ 33.2 Drilled Shaft & Bored Pile Axial Resistance & Settlement (FHWA GEC-010 / AASHTO LRFD): D = {1.20:.2f} m, L = {18.0:.1f} m (A_base = {shaft_res['base_cross_sectional_area_m2']:.2f} m²), Side Resistance f_s = {shaft_res['unit_side_resistance_kpa']:.1f} kPa (R_sn = {shaft_res['nominal_side_resistance_kn']:.1f} kN), Tip Resistance q_p = {shaft_res['unit_base_resistance_mpa']:.2f} MPa (R_pn = {shaft_res['nominal_base_resistance_kn']:.1f} kN), Total Nominal R_n = {shaft_res['nominal_total_resistance_kn']:.1f} kN, AASHTO Factored R_r = {shaft_res['factored_geotechnical_resistance_kn']:.1f} kN (Demand = {2500.0:.0f} kN, DCR = {shaft_res['geotechnical_demand_capacity_ratio']:.2f}), Elastic Settlement w_serv = {shaft_res['elastic_service_settlement_mm']:.2f} mm (Allowable 25.0 mm), Structural Axial P_r = {shaft_res['factored_structural_resistance_kn']:.1f} kN, Bridge Compliant: {shaft_res['is_settlement_acceptable']})")
+
+        # 33.3 Prosthetic Heart Valve Hemodynamics & Effective Orifice Area (ISO 5840 / Gorlin Equation)
+        valve_res = http_request(port, "POST", "/api/sim/biomedical/heart_valve", body={
+            "nominal_size_mm": 23.0,
+            "heart_rate_bpm": 70.0,
+            "stroke_volume_ml": 75.0,
+            "systolic_ejection_period_s": 0.30,
+            "patient_bsa_m2": 1.85,
+            "mean_pressure_gradient_mmhg": 10.5,
+            "peak_jet_velocity_m_s": 2.15,
+            "dynamic_closing_volume_ml": 2.8,
+            "static_leakage_volume_ml": 3.2,
+        })
+        check(valve_res.get("cardiac_output_l_min", 0.0) > 4.5, "Cardiac output > 4.5 L/min")
+        check(valve_res.get("peak_pressure_gradient_mmhg", 0.0) > 15.0, "Peak pressure gradient > 15 mmHg")
+        check(valve_res.get("effective_orifice_area_cm2", 0.0) > 1.30, "EOA > 1.30 cm²")
+        check(valve_res.get("indexed_eoa_cm2_per_m2", 0.0) > 0.75, "Indexed EOA > 0.75 cm²/m²")
+        check(valve_res.get("regurgitant_fraction_pct", 0.0) < 15.0, "Regurgitant fraction < 15%")
+        check(valve_res.get("is_hemodynamic_eoa_acceptable", False) is True, "EOA acceptable (ISO 5840)")
+        check(valve_res.get("is_regurgitation_safe", False) is True, "Regurgitation safe (< 15%)")
+        print(f"  ✓ 33.3 Prosthetic Heart Valve Hemodynamics & EOA (ISO 5840 / Gorlin / FDA): Size = {23.0:.0f} mm (Aortic), CO = {valve_res['cardiac_output_l_min']:.2f} L/min, Q_rms = {valve_res['rms_systolic_flow_rate_ml_s']:.1f} mL/s, Mean ΔP = {10.5:.1f} mmHg, Peak ΔP = {valve_res['peak_pressure_gradient_mmhg']:.1f} mmHg (v_peak = {2.15:.2f} m/s), Gorlin EOA = {valve_res['effective_orifice_area_cm2']:.2f} cm², Indexed EOA = {valve_res['indexed_eoa_cm2_per_m2']:.2f} cm²/m² (PPM Risk: {valve_res['mismatch_grade']}), Regurgitant Vol = {valve_res['total_regurgitant_volume_ml']:.1f} mL (Fraction = {valve_res['regurgitant_fraction_pct']:.1f}%), FDA / ISO 5840 Compliant: {valve_res['is_hemodynamic_eoa_acceptable']})")
+
+        # 33.4 Centrifugal Compressor Stage Aerodynamics & Surge Margin (Stanitz / Eckardt / Dixon)
+        comp_res = http_request(port, "POST", "/api/sim/aerospace/centrifugal_compressor", body={
+            "mass_flow_rate_kg_s": 3.80,
+            "rotational_speed_rpm": 38000.0,
+            "impeller_tip_diameter_m": 0.285,
+            "inducer_hub_diameter_m": 0.075,
+            "inducer_shroud_diameter_m": 0.165,
+            "number_of_blades": 18,
+            "blade_backsweep_deg": 35.0,
+        })
+        check(comp_res.get("tip_speed_m_s", 0.0) > 500.0, "Tip speed > 500 m/s")
+        check(comp_res.get("stanitz_slip_factor", 0.0) > 0.85, "Stanitz slip factor > 0.85")
+        check(comp_res.get("specific_work_kj_kg", 0.0) > 200.0, "Specific work > 200 kJ/kg")
+        check(comp_res.get("total_pressure_ratio_tt", 0.0) > 4.0, "Pressure ratio > 4.0")
+        check(comp_res.get("surge_margin_pct", 0.0) >= 12.0, "Surge margin >= 12%")
+        check(comp_res.get("is_surge_margin_adequate", False) is True, "Surge margin adequate (>= 12%)")
+        check(comp_res.get("is_disk_stress_acceptable", False) is True, "Impeller disk stress acceptable")
+        print(f"  ✓ 33.4 Centrifugal Compressor Aerodynamics & Surge (Stanitz / Eckardt / Dixon): N = {38000.0:.0f} RPM, D_tip = {0.285:.3f} m, U_tip = {comp_res['tip_speed_m_s']:.1f} m/s (M_tip = {comp_res['tip_speed_mach_number']:.2f}), Stanitz μ = {comp_res['stanitz_slip_factor']:.3f}, Euler Work = {comp_res['specific_work_kj_kg']:.1f} kJ/kg (Shaft P = {comp_res['required_shaft_power_kw']:.1f} kW), Stage Π_tt = {comp_res['total_pressure_ratio_tt']:.2f}, Surge Margin = {comp_res['surge_margin_pct']:.1f}% (Margin >= 12%), Disk Centrifugal σ = {comp_res['peak_disk_hoop_stress_mpa']:.1f} MPa (Yield 880 MPa, SF = {comp_res['disk_mechanical_safety_factor']:.2f}), Safe: {comp_res['is_surge_margin_adequate']})")
+
+        # 33.5 High-Speed Rail Pantograph-Catenary Dynamic Interaction (EN 50367 / EN 50119)
+        panto_res = http_request(port, "POST", "/api/sim/rail/pantograph", body={
+            "train_speed_km_h": 300.0,
+            "static_contact_force_n": 80.0,
+            "aerodynamic_uplift_coeff": 0.00095,
+            "contact_wire_tension_kn": 22.0,
+            "contact_wire_mass_kg_per_m": 1.07,
+            "catenary_span_length_m": 55.0,
+            "catenary_midspan_elasticity_mm_per_n": 0.75,
+            "catenary_support_elasticity_mm_per_n": 0.35,
+        })
+        check(panto_res.get("mean_contact_force_n", 0.0) > 140.0, "Mean contact force > 140 N")
+        check(panto_res.get("contact_force_std_dev_n", 0.0) > 20.0, "Force standard deviation > 20 N")
+        check(panto_res.get("contact_wire_wave_speed_m_s", 0.0) > 130.0, "Wave speed > 130 m/s")
+        check(panto_res.get("doppler_speed_ratio_alpha", 0.0) <= 0.70, "Doppler speed ratio <= 0.70")
+        check(panto_res.get("loss_of_contact_percentage_nq", 0.0) <= 0.20, "Arcing percentage NQ <= 0.20%")
+        check(panto_res.get("is_mean_contact_force_compliant", False) is True, "Mean contact force compliant (EN 50367)")
+        check(panto_res.get("is_arcing_rate_acceptable", False) is True, "Arcing rate acceptable (NQ <= 0.2%)")
+        print(f"  ✓ 33.5 High-Speed Rail Pantograph-Catenary Interaction (EN 50367 / EN 50119): V = {300.0:.0f} km/h, Wire Wave c = {panto_res['contact_wire_wave_speed_m_s']:.1f} m/s (Doppler α = {panto_res['doppler_speed_ratio_alpha']:.3f} <= 0.70), Mean Contact F_m = {panto_res['mean_contact_force_n']:.1f} N (Target Limit {panto_res['en50367_max_mean_force_n']:.1f} N), Dynamic σ_F = {panto_res['contact_force_std_dev_n']:.1f} N (F_max = {panto_res['statistical_max_contact_force_n']:.1f} N), Wire Uplift = {panto_res['contact_wire_uplift_mm']:.1f} mm, Loss of Contact NQ = {panto_res['loss_of_contact_percentage_nq']:.3f}% (Limit 0.20%), TSI Compliant: {panto_res['is_arcing_rate_acceptable']})")
+
+        # 33.6 Universal Commands Execution Verification (Batch 18 Domains)
+        for cmd_id in [
+            "sim.thermal.heat_exchanger_delaware",
+            "sim.geotechnical.drilled_shaft",
+            "sim.biomedical.heart_valve",
+            "sim.aerospace.centrifugal_compressor",
+            "sim.rail.pantograph",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 33.6 Universal Commands: All 5 Batch-18 Engineering Commands verified via typed schema engine")
+
+        # 33.7 Enterprise MCP Tool Calling (Batch 18 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_thermal_heat_exchanger_delaware",
+            "atlas_sim_geotechnical_drilled_shaft",
+            "atlas_sim_biomedical_heart_valve",
+            "atlas_sim_aerospace_centrifugal_compressor",
+            "atlas_sim_rail_pantograph",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 855,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 33.7 Enterprise MCP Tool Calling: 5 Batch-18 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

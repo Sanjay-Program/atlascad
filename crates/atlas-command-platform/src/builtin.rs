@@ -4876,5 +4876,255 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.thermal.heat_exchanger_delaware",
+            "Shell-and-Tube Heat Exchanger Rating & Pressure Drop (Bell-Delaware / TEMA)",
+            "Evaluates shell-side crossflow velocity, Bell correction factors (Jc, Jl, Jb, Js), LMTD F-factor, overall U-value, required area overdesign, and shell pressure drop.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "shell_inside_diameter_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Shell inside diameter in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.60)),
+            validation_rules: vec![ValidationRule::Min(0.15), ValidationRule::Max(2.5)],
+        })
+        .with_argument(CommandArgument {
+            name: "number_of_tubes".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Total tube count in bundle".into(),
+            required: false,
+            default_value: Some(serde_json::json!(360)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(10000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "tube_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Tube effective length in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(4.80)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(12.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "baffle_spacing_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Central baffle spacing in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.30)),
+            validation_rules: vec![ValidationRule::Min(0.05), ValidationRule::Max(1.5)],
+        })
+        .with_argument(CommandArgument {
+            name: "hot_mass_flow_kg_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Hot fluid mass flow rate in kg/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(18.5)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(500.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.geotechnical.drilled_shaft",
+            "Drilled Shaft & Bored Pile Axial Resistance & Settlement (FHWA GEC-010 / AASHTO LRFD)",
+            "Calculates O'Neill-Reese alpha/beta side shear, base resistance, AASHTO LRFD factored geotechnical and structural capacities, and elastic service settlement.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "shaft_diameter_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Shaft diameter in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1.20)),
+            validation_rules: vec![ValidationRule::Min(0.40), ValidationRule::Max(4.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "embedded_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Total embedded shaft length in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(18.0)),
+            validation_rules: vec![ValidationRule::Min(3.0), ValidationRule::Max(70.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "factored_load_demand_kn".into(),
+            arg_type: ArgumentType::Number,
+            description: "Factored design axial compressive load in kN".into(),
+            required: false,
+            default_value: Some(serde_json::json!(3200.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(50000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "service_load_demand_kn".into(),
+            arg_type: ArgumentType::Number,
+            description: "Service unfactored axial compressive load in kN".into(),
+            required: false,
+            default_value: Some(serde_json::json!(2200.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(35000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "undrained_shear_strength_kpa".into(),
+            arg_type: ArgumentType::Number,
+            description: "Undrained shear strength in kPa for cohesive soils".into(),
+            required: false,
+            default_value: Some(serde_json::json!(120.0)),
+            validation_rules: vec![ValidationRule::Min(20.0), ValidationRule::Max(600.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.biomedical.heart_valve",
+            "Prosthetic Heart Valve Hemodynamics & Effective Orifice Area (ISO 5840 / Gorlin Formula)",
+            "Computes Gorlin hydraulic Effective Orifice Area (EOA), indexed iEOA, Patient-Prosthesis Mismatch (PPM) severity, Bernoulli peak gradient, regurgitant fraction, and ISO 5840 safety compliance.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "nominal_size_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Nominal tissue annulus size in mm (e.g. 23 mm)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(23.0)),
+            validation_rules: vec![ValidationRule::Min(17.0), ValidationRule::Max(33.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "heart_rate_bpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Heart rate in beats per minute".into(),
+            required: false,
+            default_value: Some(serde_json::json!(70.0)),
+            validation_rules: vec![ValidationRule::Min(40.0), ValidationRule::Max(180.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "stroke_volume_ml".into(),
+            arg_type: ArgumentType::Number,
+            description: "Stroke volume in mL per beat".into(),
+            required: false,
+            default_value: Some(serde_json::json!(75.0)),
+            validation_rules: vec![ValidationRule::Min(25.0), ValidationRule::Max(150.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "patient_bsa_m2".into(),
+            arg_type: ArgumentType::Number,
+            description: "Patient body surface area BSA in m²".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1.85)),
+            validation_rules: vec![ValidationRule::Min(0.8), ValidationRule::Max(3.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "mean_pressure_gradient_mmhg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Mean systolic transvalvular gradient in mmHg".into(),
+            required: false,
+            default_value: Some(serde_json::json!(10.5)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(40.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.aerospace.centrifugal_compressor",
+            "Centrifugal Compressor Stage Aerodynamics & Surge Margin (Stanitz / Eckardt / Dixon)",
+            "Evaluates Stanitz slip factor, Euler work, total-to-total pressure ratio, Eckardt de-Haller diffusion, aerodynamic surge margin, and impeller disk centrifugal hoop stress.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "mass_flow_rate_kg_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Air mass flow rate in kg/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(3.80)),
+            validation_rules: vec![ValidationRule::Min(0.2), ValidationRule::Max(50.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rotational_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Impeller shaft speed in RPM".into(),
+            required: false,
+            default_value: Some(serde_json::json!(38000.0)),
+            validation_rules: vec![ValidationRule::Min(5000.0), ValidationRule::Max(120000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "impeller_tip_diameter_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Impeller tip diameter D2 in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.285)),
+            validation_rules: vec![ValidationRule::Min(0.08), ValidationRule::Max(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "number_of_blades".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Number of full and splitter blades".into(),
+            required: false,
+            default_value: Some(serde_json::json!(18)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(32.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "blade_backsweep_deg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Blade backsweep angle from radial in degrees".into(),
+            required: false,
+            default_value: Some(serde_json::json!(35.0)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(50.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.rail.pantograph",
+            "High-Speed Rail Pantograph-Catenary Interaction (EN 50367 / EN 50119 / TSI)",
+            "Calculates mean contact force Fm, contact force standard deviation, Doppler speed ratio alpha, arcing loss percentage NQ, and dynamic contact wire uplift.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "train_speed_km_h".into(),
+            arg_type: ArgumentType::Number,
+            description: "Train operating speed in km/h (e.g. 300 km/h)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(300.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(450.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "static_contact_force_n".into(),
+            arg_type: ArgumentType::Number,
+            description: "Static contact force in Newtons".into(),
+            required: false,
+            default_value: Some(serde_json::json!(80.0)),
+            validation_rules: vec![ValidationRule::Min(40.0), ValidationRule::Max(200.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "contact_wire_tension_kn".into(),
+            arg_type: ArgumentType::Number,
+            description: "Contact wire tension in kN".into(),
+            required: false,
+            default_value: Some(serde_json::json!(22.0)),
+            validation_rules: vec![ValidationRule::Min(8.0), ValidationRule::Max(40.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "contact_wire_mass_kg_per_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Contact wire mass density in kg/m".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1.07)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(2.5)],
+        })
+        .with_argument(CommandArgument {
+            name: "catenary_span_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Catenary span length in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(55.0)),
+            validation_rules: vec![ValidationRule::Min(30.0), ValidationRule::Max(85.0)],
+        }),
+    )?;
+
     Ok(())
 }

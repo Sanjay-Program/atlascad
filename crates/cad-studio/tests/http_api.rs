@@ -7293,5 +7293,179 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 176. Shell-and-Tube Heat Exchanger Rating & Pressure Drop (Bell-Delaware / TEMA)
+    let res_hx = post(
+        addr,
+        "/api/sim/thermal/heat_exchanger_delaware",
+        r#"{
+            "shell_inside_diameter_m": 0.60,
+            "number_of_tubes": 360,
+            "tube_outer_diameter_mm": 19.05,
+            "tube_wall_thickness_mm": 1.65,
+            "tube_length_m": 4.80,
+            "tube_pitch_mm": 23.81,
+            "baffle_cut_pct": 25.0,
+            "baffle_spacing_m": 0.30,
+            "hot_inlet_temp_c": 120.0,
+            "hot_outlet_temp_c": 65.0,
+            "hot_mass_flow_kg_s": 18.5,
+            "cold_inlet_temp_c": 25.0,
+            "cold_outlet_temp_c": 50.0,
+            "cold_mass_flow_kg_s": 32.0
+        }"#,
+    )?;
+    assert_eq!(res_hx.status, 200);
+    let hx_json = json(&res_hx)?;
+    assert!(hx_json["thermal_duty_kw"].as_f64().unwrap() > 2000.0);
+    assert!(hx_json["counterflow_lmtd_c"].as_f64().unwrap() > 45.0);
+    assert!(hx_json["lmtd_correction_factor_f"].as_f64().unwrap() >= 0.80);
+    assert!(hx_json["shell_side_corrected_htc_w_m2_k"].as_f64().unwrap() > 400.0);
+    assert!(hx_json["overall_htc_w_m2_k"].as_f64().unwrap() > 200.0);
+    assert!(hx_json["surface_area_overdesign_pct"].as_f64().unwrap() >= 10.0);
+    assert!(hx_json["shell_side_pressure_drop_kpa"].as_f64().unwrap() < 70.0);
+    assert!(hx_json["is_f_factor_acceptable"].as_bool().unwrap());
+    assert!(hx_json["is_surface_area_adequate"].as_bool().unwrap());
+    assert!(hx_json["is_pressure_drop_acceptable"].as_bool().unwrap());
+
+    // 177. Drilled Shaft & Bored Pile Axial Resistance & Settlement (FHWA GEC-010 / AASHTO LRFD)
+    let res_shaft = post(
+        addr,
+        "/api/sim/geotechnical/drilled_shaft",
+        r#"{
+            "shaft_diameter_m": 1.20,
+            "embedded_length_m": 18.0,
+            "factored_load_demand_kn": 3200.0,
+            "service_load_demand_kn": 2200.0,
+            "undrained_shear_strength_kpa": 120.0,
+            "effective_friction_angle_deg": 32.0,
+            "soil_unit_weight_kn_m3": 18.5,
+            "concrete_compressive_strength_mpa": 35.0,
+            "steel_reinforcement_ratio_pct": 1.50
+        }"#,
+    )?;
+    assert_eq!(res_shaft.status, 200);
+    let shaft_json = json(&res_shaft)?;
+    assert!(shaft_json["base_cross_sectional_area_m2"].as_f64().unwrap() > 1.0);
+    assert!(shaft_json["unit_side_resistance_kpa"].as_f64().unwrap() > 50.0);
+    assert!(shaft_json["nominal_side_resistance_kn"].as_f64().unwrap() > 3000.0);
+    assert!(shaft_json["nominal_total_resistance_kn"].as_f64().unwrap() > 4500.0);
+    assert!(shaft_json["factored_geotechnical_resistance_kn"].as_f64().unwrap() > 2500.0);
+    assert!(shaft_json["elastic_service_settlement_mm"].as_f64().unwrap() < 25.0);
+    assert!(shaft_json["is_settlement_acceptable"].as_bool().unwrap());
+
+    // 178. Prosthetic Heart Valve Hemodynamics & Effective Orifice Area (ISO 5840 / Gorlin)
+    let res_valve = post(
+        addr,
+        "/api/sim/biomedical/heart_valve",
+        r#"{
+            "nominal_size_mm": 23.0,
+            "heart_rate_bpm": 70.0,
+            "stroke_volume_ml": 75.0,
+            "systolic_ejection_period_s": 0.30,
+            "patient_bsa_m2": 1.85,
+            "mean_pressure_gradient_mmhg": 10.5,
+            "peak_jet_velocity_m_s": 2.15,
+            "dynamic_closing_volume_ml": 2.8,
+            "static_leakage_volume_ml": 3.2
+        }"#,
+    )?;
+    assert_eq!(res_valve.status, 200);
+    let valve_json = json(&res_valve)?;
+    assert!(valve_json["cardiac_output_l_min"].as_f64().unwrap() > 4.5);
+    assert!(valve_json["rms_systolic_flow_rate_ml_s"].as_f64().unwrap() > 200.0);
+    assert!(valve_json["peak_pressure_gradient_mmhg"].as_f64().unwrap() > 15.0);
+    assert!(valve_json["effective_orifice_area_cm2"].as_f64().unwrap() > 1.30);
+    assert!(valve_json["indexed_eoa_cm2_per_m2"].as_f64().unwrap() > 0.75);
+    assert!(valve_json["regurgitant_fraction_pct"].as_f64().unwrap() < 12.0);
+    assert!(valve_json["is_hemodynamic_eoa_acceptable"].as_bool().unwrap());
+    assert!(valve_json["is_regurgitation_safe"].as_bool().unwrap());
+    assert!(valve_json["is_severe_mismatch_prevented"].as_bool().unwrap());
+
+    // 179. Centrifugal Compressor Stage Aerodynamics & Surge Margin (Stanitz / Eckardt / Dixon)
+    let res_comp = post(
+        addr,
+        "/api/sim/aerospace/centrifugal_compressor",
+        r#"{
+            "mass_flow_rate_kg_s": 3.80,
+            "rotational_speed_rpm": 38000.0,
+            "impeller_tip_diameter_m": 0.285,
+            "inducer_hub_diameter_m": 0.075,
+            "inducer_shroud_diameter_m": 0.165,
+            "number_of_blades": 18,
+            "blade_backsweep_deg": 35.0
+        }"#,
+    )?;
+    assert_eq!(res_comp.status, 200);
+    let comp_json = json(&res_comp)?;
+    assert!(comp_json["tip_speed_m_s"].as_f64().unwrap() > 500.0);
+    assert!(comp_json["stanitz_slip_factor"].as_f64().unwrap() > 0.85);
+    assert!(comp_json["specific_work_kj_kg"].as_f64().unwrap() > 200.0);
+    assert!(comp_json["total_pressure_ratio_tt"].as_f64().unwrap() > 4.0);
+    assert!(comp_json["surge_margin_pct"].as_f64().unwrap() >= 12.0);
+    assert!(comp_json["disk_mechanical_safety_factor"].as_f64().unwrap() >= 1.25);
+    assert!(comp_json["is_surge_margin_adequate"].as_bool().unwrap());
+    assert!(comp_json["is_disk_stress_acceptable"].as_bool().unwrap());
+
+    // 180. High-Speed Rail Pantograph-Catenary Dynamic Interaction (EN 50367 / EN 50119)
+    let res_panto = post(
+        addr,
+        "/api/sim/rail/pantograph",
+        r#"{
+            "train_speed_km_h": 300.0,
+            "static_contact_force_n": 80.0,
+            "aerodynamic_uplift_coeff": 0.00095,
+            "contact_wire_tension_kn": 22.0,
+            "contact_wire_mass_kg_per_m": 1.07,
+            "catenary_span_length_m": 55.0,
+            "catenary_midspan_elasticity_mm_per_n": 0.75,
+            "catenary_support_elasticity_mm_per_n": 0.35
+        }"#,
+    )?;
+    assert_eq!(res_panto.status, 200);
+    let panto_json = json(&res_panto)?;
+    assert!(panto_json["mean_contact_force_n"].as_f64().unwrap() > 140.0);
+    assert!(panto_json["contact_force_std_dev_n"].as_f64().unwrap() > 20.0);
+    assert!(panto_json["contact_wire_wave_speed_m_s"].as_f64().unwrap() > 130.0);
+    assert!(panto_json["doppler_speed_ratio_alpha"].as_f64().unwrap() <= 0.70);
+    assert!(panto_json["contact_wire_uplift_mm"].as_f64().unwrap() < 100.0);
+    assert!(panto_json["loss_of_contact_percentage_nq"].as_f64().unwrap() <= 0.20);
+    assert!(panto_json["is_mean_contact_force_compliant"].as_bool().unwrap());
+    assert!(panto_json["is_arcing_rate_acceptable"].as_bool().unwrap());
+    assert!(panto_json["is_doppler_speed_non_critical"].as_bool().unwrap());
+    assert!(panto_json["is_uplift_acceptable"].as_bool().unwrap());
+
+    // 181. Universal Commands Execution Verification (Batch 18 Domains)
+    for cmd_id in [
+        "sim.thermal.heat_exchanger_delaware",
+        "sim.geotechnical.drilled_shaft",
+        "sim.biomedical.heart_valve",
+        "sim.aerospace.centrifugal_compressor",
+        "sim.rail.pantograph",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 182. Enterprise MCP Tool Calling (Batch 18 Domains)
+    for tool_name in [
+        "atlas_sim_thermal_heat_exchanger_delaware",
+        "atlas_sim_geotechnical_drilled_shaft",
+        "atlas_sim_biomedical_heart_valve",
+        "atlas_sim_aerospace_centrifugal_compressor",
+        "atlas_sim_rail_pantograph",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 183, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

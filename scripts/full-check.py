@@ -2195,6 +2195,113 @@ def simulation_section(studio: Studio) -> None:
     check(rotor_data.get("total_engine_shaft_power_kw", 0.0) > 600.0, "total required engine shaft power > 600 kW")
     check(rotor_data.get("is_blade_loading_within_limits", False) is True, "rotor blade loading safely within stall margin")
     check(rotor_data.get("is_tip_mach_non_critical", False) is True, "advancing tip Mach number free from compressibility drag rise")
+
+    # 90. Shell-and-Tube Heat Exchanger Rating & Pressure Drop (Bell-Delaware / TEMA)
+    hx = studio.post("/api/sim/thermal/heat_exchanger_delaware", {
+        "shell_inside_diameter_m": 0.60,
+        "number_of_tubes": 360,
+        "tube_outer_diameter_mm": 19.05,
+        "tube_wall_thickness_mm": 1.65,
+        "tube_length_m": 4.80,
+        "tube_pitch_mm": 23.81,
+        "baffle_cut_pct": 25.0,
+        "baffle_spacing_m": 0.30,
+        "hot_inlet_temp_c": 120.0,
+        "hot_outlet_temp_c": 65.0,
+        "hot_mass_flow_kg_s": 18.5,
+        "cold_inlet_temp_c": 25.0,
+        "cold_outlet_temp_c": 50.0,
+        "cold_mass_flow_kg_s": 32.0,
+    })
+    check(hx.status == 200, f"heat exchanger delaware returns 200 (got {hx.status})")
+    hx_data = hx.json()
+    check(hx_data.get("thermal_duty_kw", 0.0) > 2000.0, "thermal duty > 2000 kW")
+    check(hx_data.get("counterflow_lmtd_c", 0.0) > 45.0, "LMTD > 45 C")
+    check(hx_data.get("lmtd_correction_factor_f", 0.0) >= 0.80, "LMTD F factor >= 0.80")
+    check(hx_data.get("shell_side_corrected_htc_w_m2_k", 0.0) > 400.0, "shell side corrected HTC > 400 W/m2K")
+    check(hx_data.get("surface_area_overdesign_pct", 0.0) >= 10.0, "surface area overdesign >= 10%")
+    check(hx_data.get("is_pressure_drop_acceptable", False) is True, "shell pressure drop within limits")
+
+    # 91. Drilled Shaft & Bored Pile Axial Resistance & Settlement (FHWA GEC-010 / AASHTO LRFD)
+    shaft = studio.post("/api/sim/geotechnical/drilled_shaft", {
+        "shaft_diameter_m": 1.20,
+        "embedded_length_m": 18.0,
+        "factored_load_demand_kn": 3200.0,
+        "service_load_demand_kn": 2200.0,
+        "undrained_shear_strength_kpa": 120.0,
+        "effective_friction_angle_deg": 32.0,
+        "soil_unit_weight_kn_m3": 18.5,
+        "concrete_compressive_strength_mpa": 35.0,
+        "steel_reinforcement_ratio_pct": 1.50,
+    })
+    check(shaft.status == 200, f"drilled shaft returns 200 (got {shaft.status})")
+    shaft_data = shaft.json()
+    check(shaft_data.get("base_cross_sectional_area_m2", 0.0) > 1.0, "base cross section area > 1.0 m2")
+    check(shaft_data.get("unit_side_resistance_kpa", 0.0) > 50.0, "O'Neill-Reese side resistance > 50 kPa")
+    check(shaft_data.get("nominal_total_resistance_kn", 0.0) > 4500.0, "nominal total axial capacity > 4500 kN")
+    check(shaft_data.get("factored_geotechnical_resistance_kn", 0.0) > 2500.0, "AASHTO LRFD factored capacity > 2500 kN")
+    check(shaft_data.get("elastic_service_settlement_mm", 0.0) < 25.0, "elastic service settlement < 25 mm")
+    check(shaft_data.get("is_settlement_acceptable", False) is True, "settlement within bridge design tolerances")
+
+    # 92. Prosthetic Heart Valve Hemodynamics & Effective Orifice Area (ISO 5840 / Gorlin)
+    valve = studio.post("/api/sim/biomedical/heart_valve", {
+        "nominal_size_mm": 23.0,
+        "heart_rate_bpm": 70.0,
+        "stroke_volume_ml": 75.0,
+        "systolic_ejection_period_s": 0.30,
+        "patient_bsa_m2": 1.85,
+        "mean_pressure_gradient_mmhg": 10.5,
+        "peak_jet_velocity_m_s": 2.15,
+        "dynamic_closing_volume_ml": 2.8,
+        "static_leakage_volume_ml": 3.2,
+    })
+    check(valve.status == 200, f"heart valve returns 200 (got {valve.status})")
+    valve_data = valve.json()
+    check(valve_data.get("cardiac_output_l_min", 0.0) > 4.5, "cardiac output > 4.5 L/min")
+    check(valve_data.get("peak_pressure_gradient_mmhg", 0.0) > 15.0, "peak transvalvular gradient > 15 mmHg")
+    check(valve_data.get("effective_orifice_area_cm2", 0.0) > 1.30, "Gorlin effective orifice area EOA > 1.30 cm2")
+    check(valve_data.get("indexed_eoa_cm2_per_m2", 0.0) > 0.75, "indexed EOA > 0.75 cm2/m2")
+    check(valve_data.get("is_hemodynamic_eoa_acceptable", False) is True, "EOA meets ISO 5840 requirement")
+    check(valve_data.get("is_regurgitation_safe", False) is True, "regurgitant fraction <= 15% safe")
+
+    # 93. Centrifugal Compressor Stage Aerodynamics & Surge Margin (Stanitz / Eckardt / Dixon)
+    comp = studio.post("/api/sim/aerospace/centrifugal_compressor", {
+        "mass_flow_rate_kg_s": 3.80,
+        "rotational_speed_rpm": 38000.0,
+        "impeller_tip_diameter_m": 0.285,
+        "inducer_hub_diameter_m": 0.075,
+        "inducer_shroud_diameter_m": 0.165,
+        "number_of_blades": 18,
+        "blade_backsweep_deg": 35.0,
+    })
+    check(comp.status == 200, f"centrifugal compressor returns 200 (got {comp.status})")
+    comp_data = comp.json()
+    check(comp_data.get("tip_speed_m_s", 0.0) > 500.0, "impeller tip speed > 500 m/s")
+    check(comp_data.get("stanitz_slip_factor", 0.0) > 0.85, "Stanitz slip factor > 0.85")
+    check(comp_data.get("specific_work_kj_kg", 0.0) > 200.0, "Euler specific work > 200 kJ/kg")
+    check(comp_data.get("total_pressure_ratio_tt", 0.0) > 4.0, "total-to-total pressure ratio > 4.0")
+    check(comp_data.get("surge_margin_pct", 0.0) >= 12.0, "aerodynamic surge margin >= 12%")
+    check(comp_data.get("is_disk_stress_acceptable", False) is True, "impeller disk centrifugal stress safe")
+
+    # 94. High-Speed Rail Pantograph-Catenary Dynamic Interaction (EN 50367 / EN 50119)
+    panto = studio.post("/api/sim/rail/pantograph", {
+        "train_speed_km_h": 300.0,
+        "static_contact_force_n": 80.0,
+        "aerodynamic_uplift_coeff": 0.00095,
+        "contact_wire_tension_kn": 22.0,
+        "contact_wire_mass_kg_per_m": 1.07,
+        "catenary_span_length_m": 55.0,
+        "catenary_midspan_elasticity_mm_per_n": 0.75,
+        "catenary_support_elasticity_mm_per_n": 0.35,
+    })
+    check(panto.status == 200, f"rail pantograph returns 200 (got {panto.status})")
+    panto_data = panto.json()
+    check(panto_data.get("mean_contact_force_n", 0.0) > 140.0, "mean contact force > 140 N")
+    check(panto_data.get("contact_force_std_dev_n", 0.0) > 20.0, "contact force standard deviation > 20 N")
+    check(panto_data.get("contact_wire_wave_speed_m_s", 0.0) > 130.0, "wire wave propagation velocity > 130 m/s")
+    check(panto_data.get("doppler_speed_ratio_alpha", 0.0) <= 0.70, "Doppler speed ratio alpha <= 0.70")
+    check(panto_data.get("loss_of_contact_percentage_nq", 0.0) <= 0.20, "loss of contact percentage NQ <= 0.20%")
+    check(panto_data.get("is_mean_contact_force_compliant", False) is True, "mean contact force compliant with EN 50367")
     report("simulation")
 
 
