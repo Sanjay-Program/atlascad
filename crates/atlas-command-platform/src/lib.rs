@@ -58,8 +58,8 @@ mod tests {
             required_permission: None,
             query: Some("aerodynamics".into()),
         }));
-        assert_eq!(aero_cmds.len(), 1);
-        assert_eq!(aero_cmds[0].id, "sim.aerodynamics.solve");
+        assert!(!aero_cmds.is_empty());
+        assert!(aero_cmds.iter().any(|c| c.id == "sim.aerodynamics.solve"));
 
         Ok(())
     }

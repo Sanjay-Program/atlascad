@@ -8325,5 +8325,175 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 218. Electron Beam Welding (EBW) & Thermal Keyhole Fusion (Goldak 3D / ISO 13919-1)
+    let ebw_res = post(
+        addr,
+        "/api/sim/manufacturing/electron_beam_welding",
+        r#"{
+            "alloy_grade": "Ti6Al4V",
+            "acceleration_voltage_kv": 120.0,
+            "beam_current_ma": 50.0,
+            "travel_speed_mm_s": 15.0,
+            "plate_thickness_mm": 25.0,
+            "beam_focal_diameter_mm": 0.45,
+            "ambient_temperature_c": 25.0
+        }"#,
+    )?;
+    assert_eq!(ebw_res.status, 200);
+    let ebw_json = json(&ebw_res)?;
+    assert!(ebw_json["gross_beam_power_kw"].as_f64().unwrap() >= 5.0);
+    assert!(ebw_json["net_absorbed_power_kw"].as_f64().unwrap() > 4.5);
+    assert!(ebw_json["linear_heat_input_j_per_mm"].as_f64().unwrap() >= 250.0);
+    assert!(ebw_json["penetration_depth_mm"].as_f64().unwrap() >= 15.0);
+    assert!(ebw_json["weld_aspect_ratio"].as_f64().unwrap() >= 4.0);
+    assert!(ebw_json["cooling_time_t8_5_seconds"].as_f64().unwrap() > 0.10);
+    assert!(ebw_json["is_narrow_keyhole_achieved"].as_bool().unwrap());
+    assert!(ebw_json["is_cooling_time_acceptable"].as_bool().unwrap());
+    assert!(ebw_json["is_iso_13919_class_b_compliant"].as_bool().unwrap());
+    assert!(ebw_json["is_ebw_process_viable"].as_bool().unwrap());
+
+    // 219. Industrial Crystallization Kinetics & Crystal Size Distribution (MSMPR / Mersmann)
+    let crys_res = post(
+        addr,
+        "/api/sim/process/crystallization_kinetics",
+        r#"{
+            "solute": "PotassiumChloride",
+            "operating_temperature_c": 35.0,
+            "feed_volumetric_flow_m3_h": 25.0,
+            "crystallizer_active_volume_m3": 50.0,
+            "solution_concentration_kg_m3": 395.0,
+            "crystal_volumetric_shape_factor": 0.85,
+            "target_median_size_um": 350.0
+        }"#,
+    )?;
+    assert_eq!(crys_res.status, 200);
+    let crys_json = json(&crys_res)?;
+    assert!(crys_json["saturation_concentration_kg_m3"].as_f64().unwrap() > 350.0);
+    assert!(crys_json["supersaturation_delta_c_kg_m3"].as_f64().unwrap() > 5.0);
+    assert!(crys_json["relative_supersaturation_sigma"].as_f64().unwrap() > 0.01);
+    assert!(crys_json["residence_time_tau_hours"].as_f64().unwrap() >= 1.5);
+    assert!(crys_json["median_crystal_size_l50_um"].as_f64().unwrap() >= 300.0);
+    assert!(crys_json["crystal_production_rate_kg_h"].as_f64().unwrap() > 200.0);
+    assert!(crys_json["is_supersaturation_controlled"].as_bool().unwrap());
+    assert!(crys_json["is_target_crystal_size_achieved"].as_bool().unwrap());
+    assert!(crys_json["is_crystallization_viable"].as_bool().unwrap());
+
+    // 220. Thermoelectric Peltier Heat Pump Cooler (Ioffe / Thomson / ISO 9001)
+    let tec_res = post(
+        addr,
+        "/api/sim/thermal/thermoelectric_cooler",
+        r#"{
+            "material": "BismuthTelluride",
+            "couple_count_n": 127,
+            "pellet_area_mm2": 2.25,
+            "pellet_length_mm": 1.80,
+            "cold_junction_temp_c": 25.0,
+            "hot_junction_temp_c": 50.0,
+            "operating_current_a": 4.5,
+            "heat_load_qc_target_w": 35.0
+        }"#,
+    )?;
+    assert_eq!(tec_res.status, 200);
+    let tec_json = json(&tec_res)?;
+    assert_eq!(tec_json["temperature_lift_k"].as_f64().unwrap(), 25.0);
+    assert!(tec_json["figure_of_merit_zt"].as_f64().unwrap() >= 0.70);
+    assert!(tec_json["net_cooling_capacity_w"].as_f64().unwrap() > 25.0);
+    assert!(tec_json["electrical_input_power_w"].as_f64().unwrap() > 30.0);
+    assert!(tec_json["coefficient_of_performance_cop"].as_f64().unwrap() > 0.30);
+    assert!(tec_json["is_target_heat_load_met"].as_bool().unwrap());
+    assert!(tec_json["is_operating_below_thermal_runaway"].as_bool().unwrap());
+    assert!(tec_json["is_temperature_lift_achievable"].as_bool().unwrap());
+    assert!(tec_json["is_tec_cooling_viable"].as_bool().unwrap());
+
+    // 221. Centrifugal Slurry Pump Hydraulic De-Rating & Wear Life (ANSI/HI 12.1-12.6 / Cave)
+    let pump_res = post(
+        addr,
+        "/api/sim/mechanical/slurry_pump_derating",
+        r#"{
+            "abrasiveness_class": "Class3Severe",
+            "slurry_flow_rate_m3_h": 650.0,
+            "clear_water_head_m": 45.0,
+            "clear_water_efficiency": 0.78,
+            "solid_specific_gravity": 2.75,
+            "solids_concentration_wt_pct": 35.0,
+            "median_particle_size_d50_um": 110.0,
+            "impeller_diameter_mm": 680.0,
+            "pump_rotational_speed_rpm": 850.0,
+            "allowable_wear_thickness_mm": 25.0
+        }"#,
+    )?;
+    assert_eq!(pump_res.status, 200);
+    let pump_json = json(&pump_res)?;
+    assert!(pump_json["slurry_mixture_specific_gravity"].as_f64().unwrap() > 1.20);
+    assert!(pump_json["head_derating_ratio_hr"].as_f64().unwrap() >= 0.85);
+    assert!(pump_json["derated_slurry_head_m"].as_f64().unwrap() >= 38.0);
+    assert!(pump_json["shaft_power_kw"].as_f64().unwrap() > 100.0);
+    assert!(pump_json["impeller_tip_speed_m_s"].as_f64().unwrap() <= 32.0);
+    assert!(pump_json["estimated_wear_life_hours"].as_f64().unwrap() >= 3000.0);
+    assert!(pump_json["is_head_derating_acceptable"].as_bool().unwrap());
+    assert!(pump_json["is_tip_speed_within_limits"].as_bool().unwrap());
+    assert!(pump_json["is_wear_life_satisfactory"].as_bool().unwrap());
+    assert!(pump_json["is_slurry_pump_viable"].as_bool().unwrap());
+
+    // 222. Optical Single-Mode Fiber Chromatic Dispersion & Pulse Broadening (ITU-T G.652 / Sellmeier)
+    let fiber_res = post(
+        addr,
+        "/api/sim/optical/fiber_dispersion",
+        r#"{
+            "fiber_standard": "ItuG652dStandard",
+            "wavelength_nm": 1550.0,
+            "fiber_length_km": 80.0,
+            "laser_linewidth_fwhm_nm": 0.015,
+            "initial_pulse_width_ps": 25.0,
+            "launch_power_mw": 5.0,
+            "target_bit_rate_gbps": 10.0
+        }"#,
+    )?;
+    assert_eq!(fiber_res.status, 200);
+    let fiber_json = json(&fiber_res)?;
+    assert!(fiber_json["core_refractive_index"].as_f64().unwrap() > 1.44);
+    assert!(fiber_json["chromatic_dispersion_ps_per_nm_km"].as_f64().unwrap() >= 15.0);
+    assert!(fiber_json["total_accumulated_dispersion_ps_per_nm"].as_f64().unwrap() > 1200.0);
+    assert!(fiber_json["total_link_attenuation_db"].as_f64().unwrap() >= 14.0);
+    assert!(fiber_json["received_optical_power_mw"].as_f64().unwrap() > 0.05);
+    assert!(fiber_json["pulse_broadening_delta_tau_ps"].as_f64().unwrap() > 15.0);
+    assert!(fiber_json["is_inter_symbol_interference_acceptable"].as_bool().unwrap());
+    assert!(fiber_json["is_received_optical_power_adequate"].as_bool().unwrap());
+    assert!(fiber_json["is_dispersion_penalty_tolerable"].as_bool().unwrap());
+    assert!(fiber_json["is_fiber_link_viable"].as_bool().unwrap());
+
+    // 223. Universal Commands Execution Verification (Batch 24 Domains)
+    for cmd_id in [
+        "sim.manufacturing.electron_beam_welding",
+        "sim.process.crystallization_kinetics",
+        "sim.thermal.thermoelectric_cooler",
+        "sim.mechanical.slurry_pump_derating",
+        "sim.optical.fiber_dispersion",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 224. Enterprise MCP Tool Calling (Batch 24 Domains)
+    for tool_name in [
+        "atlas_sim_manufacturing_electron_beam_welding",
+        "atlas_sim_process_crystallization_kinetics",
+        "atlas_sim_thermal_thermoelectric_cooler",
+        "atlas_sim_mechanical_slurry_pump_derating",
+        "atlas_sim_optical_fiber_dispersion",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 224, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

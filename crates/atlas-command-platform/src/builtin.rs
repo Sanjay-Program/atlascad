@@ -6264,5 +6264,175 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.manufacturing.electron_beam_welding",
+            "Electron Beam Welding (EBW) & Thermal Keyhole Fusion (Goldak 3D / ISO 13919-1)",
+            "Calculates Goldak double-ellipsoid moving volumetric heat flux, vacuum keyhole penetration depth, cooling time t8/5, and ISO 13919-1 Class B quality compliance.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "acceleration_voltage_kv".into(),
+            arg_type: ArgumentType::Number,
+            description: "Electron gun acceleration voltage in kV".into(),
+            required: false,
+            default_value: Some(serde_json::json!(120.0)),
+            validation_rules: vec![ValidationRule::Min(20.0), ValidationRule::Max(200.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "beam_current_ma".into(),
+            arg_type: ArgumentType::Number,
+            description: "Electron beam current in mA".into(),
+            required: false,
+            default_value: Some(serde_json::json!(50.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "travel_speed_mm_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Welding seam travel speed in mm/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(15.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(100.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.process.crystallization_kinetics",
+            "Industrial Evaporative & Cooling Crystallization Kinetics (Mersmann / MSMPR / ISO 13320)",
+            "Calculates supersaturation driving force, crystal growth and nucleation rates, MSMPR population density distribution, median size L50, and magma density.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "feed_volumetric_flow_m3_h".into(),
+            arg_type: ArgumentType::Number,
+            description: "Feed solution volumetric flow rate in m³/h".into(),
+            required: false,
+            default_value: Some(serde_json::json!(25.0)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(200.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "crystallizer_active_volume_m3".into(),
+            arg_type: ArgumentType::Number,
+            description: "Active magma liquid volume in m³".into(),
+            required: false,
+            default_value: Some(serde_json::json!(50.0)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "target_median_size_um".into(),
+            arg_type: ArgumentType::Number,
+            description: "Target median crystal diameter L50 in µm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(350.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(2000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.thermal.thermoelectric_cooler",
+            "Thermoelectric Peltier Heat Pump Cooler (TEC) for Electronics (Ioffe / Thomson / ISO 9001)",
+            "Calculates coupled Peltier-Seebeck-Joule cooling capacity, input power, COP, maximum temperature lift Delta T_max, and optimal drive currents.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "couple_count_n".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Number of thermocouple pairs (couples N)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(127)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "operating_current_a".into(),
+            arg_type: ArgumentType::Number,
+            description: "Drive current in Amperes".into(),
+            required: false,
+            default_value: Some(serde_json::json!(4.5)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(30.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "heat_load_qc_target_w".into(),
+            arg_type: ArgumentType::Number,
+            description: "Cold-side electronic heat dissipation load in Watts".into(),
+            required: false,
+            default_value: Some(serde_json::json!(35.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(500.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.mechanical.slurry_pump_derating",
+            "Centrifugal Slurry Pump Hydraulic De-Rating & Wear Life (ANSI/HI 12.1-12.6 / Cave / ISO 9906)",
+            "Calculates slurry mixture specific gravity, ANSI/HI 12.1-12.6 head de-rating ratio HR, shaft brake power, impeller tip peripheral speed, and abrasive wear life.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "slurry_flow_rate_m3_h".into(),
+            arg_type: ArgumentType::Number,
+            description: "Slurry volumetric flow rate in m³/h".into(),
+            required: false,
+            default_value: Some(serde_json::json!(650.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(10000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "clear_water_head_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Clean water head at duty point in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(45.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(150.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "solids_concentration_wt_pct".into(),
+            arg_type: ArgumentType::Number,
+            description: "Solids concentration by weight in percentage (wt%)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(35.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(75.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.optical.fiber_dispersion",
+            "Optical Single-Mode Fiber Chromatic Dispersion & Pulse Broadening (ITU-T G.652 / Sellmeier)",
+            "Calculates Sellmeier refractive index, ITU-T G.652 chromatic dispersion parameter D(lambda), link accumulated dispersion, Gaussian pulse temporal broadening, and bit-rate limits.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "wavelength_nm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Carrier optical wavelength in nm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1550.0)),
+            validation_rules: vec![ValidationRule::Min(1200.0), ValidationRule::Max(1700.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "fiber_length_km".into(),
+            arg_type: ArgumentType::Number,
+            description: "Fiber link span length in km".into(),
+            required: false,
+            default_value: Some(serde_json::json!(80.0)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "target_bit_rate_gbps".into(),
+            arg_type: ArgumentType::Number,
+            description: "Target transmission bit rate in Gbit/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(10.0)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(400.0)],
+        }),
+    )?;
+
     Ok(())
 }

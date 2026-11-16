@@ -2175,6 +2175,71 @@ impl McpServer {
                     "required": ["operating_frequency_khz", "target_range_m"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_manufacturing_electron_beam_welding".into(),
+                description: "Calculates Goldak double-ellipsoid moving volumetric heat flux, vacuum keyhole penetration depth, cooling time t8/5, and ISO 13919-1 Class B quality compliance.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "acceleration_voltage_kv": { "type": "number", "default": 120.0 },
+                        "beam_current_ma": { "type": "number", "default": 50.0 },
+                        "travel_speed_mm_s": { "type": "number", "default": 15.0 }
+                    },
+                    "required": ["acceleration_voltage_kv", "beam_current_ma"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_process_crystallization_kinetics".into(),
+                description: "Calculates supersaturation driving force, crystal growth and nucleation rates, MSMPR population density distribution, median size L50, and magma density.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "feed_volumetric_flow_m3_h": { "type": "number", "default": 25.0 },
+                        "crystallizer_active_volume_m3": { "type": "number", "default": 50.0 },
+                        "target_median_size_um": { "type": "number", "default": 350.0 }
+                    },
+                    "required": ["feed_volumetric_flow_m3_h", "crystallizer_active_volume_m3"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_thermal_thermoelectric_cooler".into(),
+                description: "Calculates coupled Peltier-Seebeck-Joule cooling capacity, input power, COP, maximum temperature lift Delta T_max, and optimal drive currents.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "couple_count_n": { "type": "integer", "default": 127 },
+                        "operating_current_a": { "type": "number", "default": 4.5 },
+                        "heat_load_qc_target_w": { "type": "number", "default": 35.0 }
+                    },
+                    "required": ["couple_count_n", "operating_current_a"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_mechanical_slurry_pump_derating".into(),
+                description: "Calculates slurry mixture specific gravity, ANSI/HI 12.1-12.6 head de-rating ratio HR, shaft brake power, impeller tip peripheral speed, and abrasive wear life.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "slurry_flow_rate_m3_h": { "type": "number", "default": 650.0 },
+                        "clear_water_head_m": { "type": "number", "default": 45.0 },
+                        "solids_concentration_wt_pct": { "type": "number", "default": 35.0 }
+                    },
+                    "required": ["slurry_flow_rate_m3_h", "clear_water_head_m"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_optical_fiber_dispersion".into(),
+                description: "Calculates Sellmeier refractive index, ITU-T G.652 chromatic dispersion parameter D(lambda), link accumulated dispersion, Gaussian pulse temporal broadening, and bit-rate limits.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "wavelength_nm": { "type": "number", "default": 1550.0 },
+                        "fiber_length_km": { "type": "number", "default": 80.0 },
+                        "target_bit_rate_gbps": { "type": "number", "default": 10.0 }
+                    },
+                    "required": ["wavelength_nm", "fiber_length_km"]
+                }),
+            },
         ]
     }
 

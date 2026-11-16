@@ -156,6 +156,11 @@ pub mod cryogenic_liquefaction;
 pub mod hydrocyclone_separation;
 pub mod magnetic_bearing;
 pub mod sonar_propagation;
+pub mod electron_beam_welding;
+pub mod crystallization_kinetics;
+pub mod thermoelectric_cooler;
+pub mod slurry_pump_derating;
+pub mod fiber_dispersion;
 
 pub mod prelude {
     pub use crate::acoustics::{
@@ -721,5 +726,23 @@ pub mod prelude {
     pub use crate::sonar_propagation::{
         OceanAcousticRegime, SonarPropagationProblem, SonarPropagationResult,
         SonarTargetClass, solve_sonar_propagation,
+    };
+    pub use crate::electron_beam_welding::{
+        EbwAlloyGrade, EbwWeldingProblem, EbwWeldingResult, solve_ebw_welding,
+    };
+    pub use crate::crystallization_kinetics::{
+        CrystallineSolute, CrystallizationProblem, CrystallizationResult,
+        solve_crystallization_kinetics,
+    };
+    pub use crate::thermoelectric_cooler::{
+        TecCoolerProblem, TecCoolerResult, TecMaterialType, solve_thermoelectric_cooler,
+    };
+    pub use crate::slurry_pump_derating::{
+        SlurryAbrasivenessClass, SlurryPumpProblem, SlurryPumpResult,
+        solve_slurry_pump_derating,
+    };
+    pub use crate::fiber_dispersion::{
+        FiberDispersionProblem, FiberDispersionResult, FiberStandardType,
+        solve_fiber_dispersion,
     };
 }

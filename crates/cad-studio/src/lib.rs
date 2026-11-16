@@ -7026,6 +7026,105 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_manufacturing_electron_beam_welding(
+        &mut self,
+        req: &SimEbwWeldingRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::electron_beam_welding::EbwWeldingProblem {
+            problem_id: "ebw_welding_sim".to_string(),
+            alloy_grade: req.alloy_grade.unwrap_or(atlas_simulation_core::electron_beam_welding::EbwAlloyGrade::Ti6Al4V),
+            acceleration_voltage_kv: req.acceleration_voltage_kv.unwrap_or(120.0),
+            beam_current_ma: req.beam_current_ma.unwrap_or(50.0),
+            travel_speed_mm_s: req.travel_speed_mm_s.unwrap_or(15.0),
+            plate_thickness_mm: req.plate_thickness_mm.unwrap_or(25.0),
+            beam_focal_diameter_mm: req.beam_focal_diameter_mm.unwrap_or(0.45),
+            ambient_temperature_c: req.ambient_temperature_c.unwrap_or(25.0),
+        };
+        let res = atlas_simulation_core::electron_beam_welding::solve_ebw_welding(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_process_crystallization_kinetics(
+        &mut self,
+        req: &SimCrystallizationRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::crystallization_kinetics::CrystallizationProblem {
+            problem_id: "crystallization_sim".to_string(),
+            solute: req.solute.unwrap_or(atlas_simulation_core::crystallization_kinetics::CrystallineSolute::PotassiumChloride),
+            operating_temperature_c: req.operating_temperature_c.unwrap_or(35.0),
+            feed_volumetric_flow_m3_h: req.feed_volumetric_flow_m3_h.unwrap_or(25.0),
+            crystallizer_active_volume_m3: req.crystallizer_active_volume_m3.unwrap_or(50.0),
+            solution_concentration_kg_m3: req.solution_concentration_kg_m3.unwrap_or(395.0),
+            crystal_volumetric_shape_factor: req.crystal_volumetric_shape_factor.unwrap_or(0.85),
+            target_median_size_um: req.target_median_size_um.unwrap_or(350.0),
+        };
+        let res = atlas_simulation_core::crystallization_kinetics::solve_crystallization_kinetics(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_thermal_thermoelectric_cooler(
+        &mut self,
+        req: &SimTecCoolerRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::thermoelectric_cooler::TecCoolerProblem {
+            problem_id: "tec_cooler_sim".to_string(),
+            material: req.material.unwrap_or(atlas_simulation_core::thermoelectric_cooler::TecMaterialType::BismuthTelluride),
+            couple_count_n: req.couple_count_n.unwrap_or(127),
+            pellet_area_mm2: req.pellet_area_mm2.unwrap_or(2.25),
+            pellet_length_mm: req.pellet_length_mm.unwrap_or(1.80),
+            cold_junction_temp_c: req.cold_junction_temp_c.unwrap_or(25.0),
+            hot_junction_temp_c: req.hot_junction_temp_c.unwrap_or(50.0),
+            operating_current_a: req.operating_current_a.unwrap_or(4.5),
+            heat_load_qc_target_w: req.heat_load_qc_target_w.unwrap_or(35.0),
+        };
+        let res = atlas_simulation_core::thermoelectric_cooler::solve_thermoelectric_cooler(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_mechanical_slurry_pump_derating(
+        &mut self,
+        req: &SimSlurryPumpRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::slurry_pump_derating::SlurryPumpProblem {
+            problem_id: "slurry_pump_sim".to_string(),
+            abrasiveness_class: req.abrasiveness_class.unwrap_or(atlas_simulation_core::slurry_pump_derating::SlurryAbrasivenessClass::Class3Severe),
+            slurry_flow_rate_m3_h: req.slurry_flow_rate_m3_h.unwrap_or(650.0),
+            clear_water_head_m: req.clear_water_head_m.unwrap_or(45.0),
+            clear_water_efficiency: req.clear_water_efficiency.unwrap_or(0.78),
+            solid_specific_gravity: req.solid_specific_gravity.unwrap_or(2.75),
+            solids_concentration_wt_pct: req.solids_concentration_wt_pct.unwrap_or(35.0),
+            median_particle_size_d50_um: req.median_particle_size_d50_um.unwrap_or(110.0),
+            impeller_diameter_mm: req.impeller_diameter_mm.unwrap_or(680.0),
+            pump_rotational_speed_rpm: req.pump_rotational_speed_rpm.unwrap_or(850.0),
+            allowable_wear_thickness_mm: req.allowable_wear_thickness_mm.unwrap_or(25.0),
+        };
+        let res = atlas_simulation_core::slurry_pump_derating::solve_slurry_pump_derating(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_optical_fiber_dispersion(
+        &mut self,
+        req: &SimFiberDispersionRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::fiber_dispersion::FiberDispersionProblem {
+            problem_id: "fiber_dispersion_sim".to_string(),
+            fiber_standard: req.fiber_standard.unwrap_or(atlas_simulation_core::fiber_dispersion::FiberStandardType::ItuG652dStandard),
+            wavelength_nm: req.wavelength_nm.unwrap_or(1550.0),
+            fiber_length_km: req.fiber_length_km.unwrap_or(80.0),
+            laser_linewidth_fwhm_nm: req.laser_linewidth_fwhm_nm.unwrap_or(0.015),
+            initial_pulse_width_ps: req.initial_pulse_width_ps.unwrap_or(25.0),
+            launch_power_mw: req.launch_power_mw.unwrap_or(5.0),
+            target_bit_rate_gbps: req.target_bit_rate_gbps.unwrap_or(10.0),
+        };
+        let res = atlas_simulation_core::fiber_dispersion::solve_fiber_dispersion(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -9935,6 +10034,61 @@ namespace AtlasCAD.Unity
                     ..Default::default()
                 })?
             }
+            "sim.manufacturing.electron_beam_welding" => {
+                let v = req.arguments.get("acceleration_voltage_kv").and_then(|v| v.as_f64());
+                let i = req.arguments.get("beam_current_ma").and_then(|v| v.as_f64());
+                let s = req.arguments.get("travel_speed_mm_s").and_then(|v| v.as_f64());
+                self.sim_manufacturing_electron_beam_welding(&SimEbwWeldingRequest {
+                    acceleration_voltage_kv: v,
+                    beam_current_ma: i,
+                    travel_speed_mm_s: s,
+                    ..Default::default()
+                })?
+            }
+            "sim.process.crystallization_kinetics" => {
+                let q = req.arguments.get("feed_volumetric_flow_m3_h").and_then(|v| v.as_f64());
+                let vol = req.arguments.get("crystallizer_active_volume_m3").and_then(|v| v.as_f64());
+                let d = req.arguments.get("target_median_size_um").and_then(|v| v.as_f64());
+                self.sim_process_crystallization_kinetics(&SimCrystallizationRequest {
+                    feed_volumetric_flow_m3_h: q,
+                    crystallizer_active_volume_m3: vol,
+                    target_median_size_um: d,
+                    ..Default::default()
+                })?
+            }
+            "sim.thermal.thermoelectric_cooler" => {
+                let n = req.arguments.get("couple_count_n").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let i = req.arguments.get("operating_current_a").and_then(|v| v.as_f64());
+                let q = req.arguments.get("heat_load_qc_target_w").and_then(|v| v.as_f64());
+                self.sim_thermal_thermoelectric_cooler(&SimTecCoolerRequest {
+                    couple_count_n: n,
+                    operating_current_a: i,
+                    heat_load_qc_target_w: q,
+                    ..Default::default()
+                })?
+            }
+            "sim.mechanical.slurry_pump_derating" => {
+                let q = req.arguments.get("slurry_flow_rate_m3_h").and_then(|v| v.as_f64());
+                let h = req.arguments.get("clear_water_head_m").and_then(|v| v.as_f64());
+                let cw = req.arguments.get("solids_concentration_wt_pct").and_then(|v| v.as_f64());
+                self.sim_mechanical_slurry_pump_derating(&SimSlurryPumpRequest {
+                    slurry_flow_rate_m3_h: q,
+                    clear_water_head_m: h,
+                    solids_concentration_wt_pct: cw,
+                    ..Default::default()
+                })?
+            }
+            "sim.optical.fiber_dispersion" => {
+                let w = req.arguments.get("wavelength_nm").and_then(|v| v.as_f64());
+                let l = req.arguments.get("fiber_length_km").and_then(|v| v.as_f64());
+                let b = req.arguments.get("target_bit_rate_gbps").and_then(|v| v.as_f64());
+                self.sim_optical_fiber_dispersion(&SimFiberDispersionRequest {
+                    wavelength_nm: w,
+                    fiber_length_km: l,
+                    target_bit_rate_gbps: b,
+                    ..Default::default()
+                })?
+            }
             "system.deploy.status" => self.deploy_status()?,
             _ => serde_json::json!({
                 "status": "Executed",
@@ -12618,6 +12772,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/marine/sonar_propagation" => {
             match parse_body_or_default::<SimSonarPropagationRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_marine_sonar_propagation(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/manufacturing/electron_beam_welding" => {
+            match parse_body_or_default::<SimEbwWeldingRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_manufacturing_electron_beam_welding(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/process/crystallization_kinetics" => {
+            match parse_body_or_default::<SimCrystallizationRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_process_crystallization_kinetics(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/thermal/thermoelectric_cooler" => {
+            match parse_body_or_default::<SimTecCoolerRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_thermal_thermoelectric_cooler(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/mechanical/slurry_pump_derating" => {
+            match parse_body_or_default::<SimSlurryPumpRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_mechanical_slurry_pump_derating(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/optical/fiber_dispersion" => {
+            match parse_body_or_default::<SimFiberDispersionRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_optical_fiber_dispersion(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -17652,4 +17851,102 @@ struct SimSonarPropagationRequest {
     pub shipping_traffic_index: Option<u32>,
     #[serde(default)]
     pub detection_threshold_db: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimEbwWeldingRequest {
+    #[serde(default)]
+    pub alloy_grade: Option<atlas_simulation_core::electron_beam_welding::EbwAlloyGrade>,
+    #[serde(default)]
+    pub acceleration_voltage_kv: Option<f64>,
+    #[serde(default)]
+    pub beam_current_ma: Option<f64>,
+    #[serde(default)]
+    pub travel_speed_mm_s: Option<f64>,
+    #[serde(default)]
+    pub plate_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub beam_focal_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub ambient_temperature_c: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimCrystallizationRequest {
+    #[serde(default)]
+    pub solute: Option<atlas_simulation_core::crystallization_kinetics::CrystallineSolute>,
+    #[serde(default)]
+    pub operating_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub feed_volumetric_flow_m3_h: Option<f64>,
+    #[serde(default)]
+    pub crystallizer_active_volume_m3: Option<f64>,
+    #[serde(default)]
+    pub solution_concentration_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub crystal_volumetric_shape_factor: Option<f64>,
+    #[serde(default)]
+    pub target_median_size_um: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimTecCoolerRequest {
+    #[serde(default)]
+    pub material: Option<atlas_simulation_core::thermoelectric_cooler::TecMaterialType>,
+    #[serde(default)]
+    pub couple_count_n: Option<usize>,
+    #[serde(default)]
+    pub pellet_area_mm2: Option<f64>,
+    #[serde(default)]
+    pub pellet_length_mm: Option<f64>,
+    #[serde(default)]
+    pub cold_junction_temp_c: Option<f64>,
+    #[serde(default)]
+    pub hot_junction_temp_c: Option<f64>,
+    #[serde(default)]
+    pub operating_current_a: Option<f64>,
+    #[serde(default)]
+    pub heat_load_qc_target_w: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimSlurryPumpRequest {
+    #[serde(default)]
+    pub abrasiveness_class: Option<atlas_simulation_core::slurry_pump_derating::SlurryAbrasivenessClass>,
+    #[serde(default)]
+    pub slurry_flow_rate_m3_h: Option<f64>,
+    #[serde(default)]
+    pub clear_water_head_m: Option<f64>,
+    #[serde(default)]
+    pub clear_water_efficiency: Option<f64>,
+    #[serde(default)]
+    pub solid_specific_gravity: Option<f64>,
+    #[serde(default)]
+    pub solids_concentration_wt_pct: Option<f64>,
+    #[serde(default)]
+    pub median_particle_size_d50_um: Option<f64>,
+    #[serde(default)]
+    pub impeller_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub pump_rotational_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub allowable_wear_thickness_mm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimFiberDispersionRequest {
+    #[serde(default)]
+    pub fiber_standard: Option<atlas_simulation_core::fiber_dispersion::FiberStandardType>,
+    #[serde(default)]
+    pub wavelength_nm: Option<f64>,
+    #[serde(default)]
+    pub fiber_length_km: Option<f64>,
+    #[serde(default)]
+    pub laser_linewidth_fwhm_nm: Option<f64>,
+    #[serde(default)]
+    pub initial_pulse_width_ps: Option<f64>,
+    #[serde(default)]
+    pub launch_power_mw: Option<f64>,
+    #[serde(default)]
+    pub target_bit_rate_gbps: Option<f64>,
 }

@@ -2877,6 +2877,123 @@ def simulation_section(studio: Studio) -> None:
     check(sonar_data.get("is_cavitation_limit_satisfied", False) is True, "cavitation limit satisfied")
     check(sonar_data.get("is_absorption_loss_favorable", False) is True, "absorption loss favorable")
     check(sonar_data.get("is_sonar_detection_viable", False) is True, "sonar detection viable")
+
+    # 120. Electron Beam Welding (EBW) & Thermal Keyhole Fusion (Goldak 3D / ISO 13919-1)
+    ebw = studio.post("/api/sim/manufacturing/electron_beam_welding", {
+        "alloy_grade": "Ti6Al4V",
+        "acceleration_voltage_kv": 120.0,
+        "beam_current_ma": 50.0,
+        "travel_speed_mm_s": 15.0,
+        "plate_thickness_mm": 25.0,
+        "beam_focal_diameter_mm": 0.45,
+        "ambient_temperature_c": 25.0
+    })
+    check(ebw.status == 200, f"electron beam welding returns 200 (got {ebw.status})")
+    ebw_data = ebw.json()
+    check(ebw_data.get("gross_beam_power_kw", 0.0) >= 5.0, "gross beam power >= 5 kW")
+    check(ebw_data.get("net_absorbed_power_kw", 0.0) > 4.5, "net absorbed power > 4.5 kW")
+    check(ebw_data.get("linear_heat_input_j_per_mm", 0.0) >= 250.0, "linear heat input >= 250 J/mm")
+    check(ebw_data.get("penetration_depth_mm", 0.0) >= 15.0, "penetration depth >= 15 mm")
+    check(ebw_data.get("weld_aspect_ratio", 0.0) >= 4.0, "deep narrow aspect ratio >= 4.0")
+    check(ebw_data.get("cooling_time_t8_5_seconds", 0.0) > 0.10, "cooling time t8/5 > 0.10 s")
+    check(ebw_data.get("is_narrow_keyhole_achieved", False) is True, "narrow keyhole achieved")
+    check(ebw_data.get("is_cooling_time_acceptable", False) is True, "cooling rate acceptable")
+    check(ebw_data.get("is_iso_13919_class_b_compliant", False) is True, "ISO 13919-1 Class B quality achieved")
+    check(ebw_data.get("is_ebw_process_viable", False) is True, "EBW process viable")
+
+    # 121. Industrial Crystallization Kinetics & Crystal Size Distribution (MSMPR / Mersmann)
+    crys = studio.post("/api/sim/process/crystallization_kinetics", {
+        "solute": "PotassiumChloride",
+        "operating_temperature_c": 35.0,
+        "feed_volumetric_flow_m3_h": 25.0,
+        "crystallizer_active_volume_m3": 50.0,
+        "solution_concentration_kg_m3": 395.0,
+        "crystal_volumetric_shape_factor": 0.85,
+        "target_median_size_um": 350.0
+    })
+    check(crys.status == 200, f"crystallization kinetics returns 200 (got {crys.status})")
+    crys_data = crys.json()
+    check(crys_data.get("saturation_concentration_kg_m3", 0.0) > 350.0, "saturation concentration > 350 kg/m³")
+    check(crys_data.get("supersaturation_delta_c_kg_m3", 0.0) > 5.0, "supersaturation Delta C > 5 kg/m³")
+    check(crys_data.get("relative_supersaturation_sigma", 0.0) > 0.01, "relative supersaturation sigma > 0.01")
+    check(crys_data.get("residence_time_tau_hours", 0.0) >= 1.5, "crystallizer residence time >= 1.5 h")
+    check(crys_data.get("median_crystal_size_l50_um", 0.0) >= 300.0, "median crystal size L50 >= 300 µm")
+    check(crys_data.get("crystal_production_rate_kg_h", 0.0) > 200.0, "crystal production rate > 200 kg/h")
+    check(crys_data.get("is_supersaturation_controlled", False) is True, "metastable supersaturation controlled")
+    check(crys_data.get("is_target_crystal_size_achieved", False) is True, "target crystal size achieved")
+    check(crys_data.get("is_crystallization_viable", False) is True, "crystallization viable")
+
+    # 122. Thermoelectric Peltier Heat Pump Cooler (Ioffe / Thomson / ISO 9001)
+    tec = studio.post("/api/sim/thermal/thermoelectric_cooler", {
+        "material": "BismuthTelluride",
+        "couple_count_n": 127,
+        "pellet_area_mm2": 2.25,
+        "pellet_length_mm": 1.80,
+        "cold_junction_temp_c": 25.0,
+        "hot_junction_temp_c": 50.0,
+        "operating_current_a": 4.5,
+        "heat_load_qc_target_w": 35.0
+    })
+    check(tec.status == 200, f"thermoelectric cooler returns 200 (got {tec.status})")
+    tec_data = tec.json()
+    check(tec_data.get("temperature_lift_k", 0.0) == 25.0, "temperature lift Delta T = 25 K")
+    check(tec_data.get("figure_of_merit_zt", 0.0) >= 0.70, "thermoelectric ZT >= 0.70")
+    check(tec_data.get("net_cooling_capacity_w", 0.0) > 25.0, "net cooling capacity > 25 W")
+    check(tec_data.get("electrical_input_power_w", 0.0) > 30.0, "electrical input power > 30 W")
+    check(tec_data.get("coefficient_of_performance_cop", 0.0) > 0.30, "cooling COP > 0.30")
+    check(tec_data.get("is_target_heat_load_met", False) is True, "target heat load met")
+    check(tec_data.get("is_operating_below_thermal_runaway", False) is True, "operating below thermal runaway")
+    check(tec_data.get("is_temperature_lift_achievable", False) is True, "temperature lift achievable")
+    check(tec_data.get("is_tec_cooling_viable", False) is True, "TEC cooling viable")
+
+    # 123. Centrifugal Slurry Pump Hydraulic De-Rating & Wear Life (ANSI/HI 12.1-12.6 / Cave)
+    pump = studio.post("/api/sim/mechanical/slurry_pump_derating", {
+        "abrasiveness_class": "Class3Severe",
+        "slurry_flow_rate_m3_h": 650.0,
+        "clear_water_head_m": 45.0,
+        "clear_water_efficiency": 0.78,
+        "solid_specific_gravity": 2.75,
+        "solids_concentration_wt_pct": 35.0,
+        "median_particle_size_d50_um": 110.0,
+        "impeller_diameter_mm": 680.0,
+        "pump_rotational_speed_rpm": 850.0,
+        "allowable_wear_thickness_mm": 25.0
+    })
+    check(pump.status == 200, f"slurry pump returns 200 (got {pump.status})")
+    pump_data = pump.json()
+    check(pump_data.get("slurry_mixture_specific_gravity", 0.0) > 1.20, "slurry specific gravity > 1.20")
+    check(pump_data.get("head_derating_ratio_hr", 0.0) >= 0.85, "head de-rating HR >= 0.85")
+    check(pump_data.get("derated_slurry_head_m", 0.0) >= 38.0, "derated slurry head >= 38 m")
+    check(pump_data.get("shaft_power_kw", 0.0) > 100.0, "shaft brake power > 100 kW")
+    check(pump_data.get("impeller_tip_speed_m_s", 0.0) <= 32.0, "impeller tip speed <= 32 m/s")
+    check(pump_data.get("estimated_wear_life_hours", 0.0) >= 3000.0, "estimated wear life >= 3000 h")
+    check(pump_data.get("is_head_derating_acceptable", False) is True, "head de-rating acceptable")
+    check(pump_data.get("is_tip_speed_within_limits", False) is True, "tip speed within limits")
+    check(pump_data.get("is_wear_life_satisfactory", False) is True, "wear life satisfactory")
+    check(pump_data.get("is_slurry_pump_viable", False) is True, "slurry pump viable")
+
+    # 124. Optical Single-Mode Fiber Chromatic Dispersion & Pulse Broadening (ITU-T G.652 / Sellmeier)
+    fiber = studio.post("/api/sim/optical/fiber_dispersion", {
+        "fiber_standard": "ItuG652dStandard",
+        "wavelength_nm": 1550.0,
+        "fiber_length_km": 80.0,
+        "laser_linewidth_fwhm_nm": 0.015,
+        "initial_pulse_width_ps": 25.0,
+        "launch_power_mw": 5.0,
+        "target_bit_rate_gbps": 10.0
+    })
+    check(fiber.status == 200, f"fiber dispersion returns 200 (got {fiber.status})")
+    fiber_data = fiber.json()
+    check(fiber_data.get("core_refractive_index", 0.0) > 1.44, "core refractive index > 1.44")
+    check(fiber_data.get("chromatic_dispersion_ps_per_nm_km", 0.0) >= 15.0, "chromatic dispersion >= 15 ps/(nm·km)")
+    check(fiber_data.get("total_accumulated_dispersion_ps_per_nm", 0.0) > 1200.0, "total dispersion > 1200 ps/nm")
+    check(fiber_data.get("total_link_attenuation_db", 0.0) >= 14.0, "link attenuation >= 14 dB")
+    check(fiber_data.get("received_optical_power_mw", 0.0) > 0.05, "received power > 0.05 mW")
+    check(fiber_data.get("pulse_broadening_delta_tau_ps", 0.0) > 15.0, "pulse broadening > 15 ps")
+    check(fiber_data.get("is_inter_symbol_interference_acceptable", False) is True, "ISI acceptable")
+    check(fiber_data.get("is_received_optical_power_adequate", False) is True, "optical power adequate")
+    check(fiber_data.get("is_dispersion_penalty_tolerable", False) is True, "dispersion penalty tolerable")
+    check(fiber_data.get("is_fiber_link_viable", False) is True, "optical fiber link viable")
     report("simulation")
 
 

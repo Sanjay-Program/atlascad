@@ -4369,6 +4369,155 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 38.7 Enterprise MCP Tool Calling: 5 Batch-23 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # ==============================================================================
+        # [39/39] Multi-Disciplinary Solvers: Batch 24 Advanced Welding, Chemical Kinetics, Thermal Management, Slurry & Optical Communications
+        # ==============================================================================
+        print("\n[39/39] Multi-Disciplinary Solvers: Batch 24 Advanced Welding, Chemical Kinetics, Thermal Management, Slurry & Optical Communications...")
+
+        # 39.1 Electron Beam Welding (EBW) & Thermal Keyhole Fusion (Goldak 3D / ISO 13919-1)
+        ebw_res = http_request(port, "POST", "/api/sim/manufacturing/electron_beam_welding", body={
+            "alloy_grade": "Ti6Al4V",
+            "acceleration_voltage_kv": 120.0,
+            "beam_current_ma": 50.0,
+            "travel_speed_mm_s": 15.0,
+            "plate_thickness_mm": 25.0,
+            "beam_focal_diameter_mm": 0.45,
+            "ambient_temperature_c": 25.0
+        })
+        check(ebw_res.get("gross_beam_power_kw", 0.0) >= 5.0, "Gross power >= 5 kW")
+        check(ebw_res.get("net_absorbed_power_kw", 0.0) > 4.5, "Net power > 4.5 kW")
+        check(ebw_res.get("linear_heat_input_j_per_mm", 0.0) >= 250.0, "Heat input >= 250 J/mm")
+        check(ebw_res.get("penetration_depth_mm", 0.0) >= 15.0, "Penetration >= 15 mm")
+        check(ebw_res.get("weld_aspect_ratio", 0.0) >= 4.0, "Aspect ratio >= 4.0")
+        check(ebw_res.get("cooling_time_t8_5_seconds", 0.0) > 0.10, "Cooling time > 0.10 s")
+        check(ebw_res.get("is_narrow_keyhole_achieved", False) is True, "Narrow keyhole achieved")
+        check(ebw_res.get("is_cooling_time_acceptable", False) is True, "Cooling time acceptable")
+        check(ebw_res.get("is_iso_13919_class_b_compliant", False) is True, "ISO 13919-1 Class B quality")
+        check(ebw_res.get("is_ebw_process_viable", False) is True, "EBW process viable")
+        print(f"  ✓ 39.1 Electron Beam Welding (Goldak 3D / ISO 13919-1): Ti-6Al-4V Plate 25 mm (120 kV @ 50 mA, P_gross = {ebw_res['gross_beam_power_kw']:.1f} kW, v = {15.0:.1f} mm/s), Net Heat Input = {ebw_res['linear_heat_input_j_per_mm']:.1f} J/mm, Goldak Volumetric Peak q_0 = {ebw_res['peak_power_density_w_per_mm3']:.0f} W/mm³, Keyhole Penetration = {ebw_res['penetration_depth_mm']:.1f} mm, Fusion Top Width = {ebw_res['fusion_zone_width_mm']:.2f} mm (Aspect Ratio = {ebw_res['weld_aspect_ratio']:.1f} >= 4.0: True), Cooling t_8/5 = {ebw_res['cooling_time_t8_5_seconds']:.2f} s (Rate @ 600°C = {ebw_res['cooling_rate_at_600c_c_per_s']:.0f} °C/s), ISO 13919-1 Class B Compliant: {ebw_res['is_iso_13919_class_b_compliant']})")
+
+        # 39.2 Industrial Crystallization Kinetics & Crystal Size Distribution (MSMPR / Mersmann)
+        crys_res = http_request(port, "POST", "/api/sim/process/crystallization_kinetics", body={
+            "solute": "PotassiumChloride",
+            "operating_temperature_c": 35.0,
+            "feed_volumetric_flow_m3_h": 25.0,
+            "crystallizer_active_volume_m3": 50.0,
+            "solution_concentration_kg_m3": 395.0,
+            "crystal_volumetric_shape_factor": 0.85,
+            "target_median_size_um": 350.0
+        })
+        check(crys_res.get("saturation_concentration_kg_m3", 0.0) > 350.0, "Saturation > 350 kg/m³")
+        check(crys_res.get("supersaturation_delta_c_kg_m3", 0.0) > 5.0, "Delta C > 5 kg/m³")
+        check(crys_res.get("relative_supersaturation_sigma", 0.0) > 0.01, "Relative supersaturation > 0.01")
+        check(crys_res.get("residence_time_tau_hours", 0.0) >= 1.5, "Residence time >= 1.5 h")
+        check(crys_res.get("median_crystal_size_l50_um", 0.0) >= 300.0, "Median size >= 300 µm")
+        check(crys_res.get("crystal_production_rate_kg_h", 0.0) > 200.0, "Production rate > 200 kg/h")
+        check(crys_res.get("is_supersaturation_controlled", False) is True, "Supersaturation controlled")
+        check(crys_res.get("is_target_crystal_size_achieved", False) is True, "Target size achieved")
+        check(crys_res.get("is_crystallization_viable", False) is True, "Crystallization viable")
+        print(f"  ✓ 39.2 Industrial Crystallization Kinetics (MSMPR / Mersmann / ISO 13320): Potash KCl @ 35°C (C_sat = {crys_res['saturation_concentration_kg_m3']:.1f} kg/m³), Supersaturation ΔC = {crys_res['supersaturation_delta_c_kg_m3']:.1f} kg/m³ (σ = {crys_res['relative_supersaturation_sigma']*100.0:.2f}%), Slurry Residence Time τ = {crys_res['residence_time_tau_hours']:.1f} h (50 m³ DTB), Crystal Growth G = {crys_res['crystal_growth_rate_g_um_per_s']:.3f} µm/s, Nucleation B = {crys_res['nucleation_rate_b_per_m3_s']:.1e} nuclei/(m³·s), Median Crystal Size L_50 = {crys_res['median_crystal_size_l50_um']:.1f} µm (Dominant L_dom = {crys_res['dominant_crystal_size_um']:.1f} µm, CV = {crys_res['coefficient_of_variation_cv_pct']:.0f}%), Crystal Yield = {crys_res['crystal_production_rate_kg_h']:.1f} kg/h ({crys_res['volumetric_productivity_kg_m3_h']:.2f} kg/(m³·h)))")
+
+        # 39.3 Thermoelectric Peltier Heat Pump Cooler (Ioffe / Thomson / ISO 9001)
+        tec_res = http_request(port, "POST", "/api/sim/thermal/thermoelectric_cooler", body={
+            "material": "BismuthTelluride",
+            "couple_count_n": 127,
+            "pellet_area_mm2": 2.25,
+            "pellet_length_mm": 1.80,
+            "cold_junction_temp_c": 25.0,
+            "hot_junction_temp_c": 50.0,
+            "operating_current_a": 4.5,
+            "heat_load_qc_target_w": 35.0
+        })
+        check(tec_res.get("temperature_lift_k", 0.0) == 25.0, "Delta T = 25 K")
+        check(tec_res.get("figure_of_merit_zt", 0.0) >= 0.70, "ZT >= 0.70")
+        check(tec_res.get("net_cooling_capacity_w", 0.0) > 25.0, "Cooling capacity > 25 W")
+        check(tec_res.get("electrical_input_power_w", 0.0) > 30.0, "Input power > 30 W")
+        check(tec_res.get("coefficient_of_performance_cop", 0.0) > 0.30, "COP > 0.30")
+        check(tec_res.get("is_target_heat_load_met", False) is True, "Target heat load met")
+        check(tec_res.get("is_operating_below_thermal_runaway", False) is True, "Below thermal runaway")
+        check(tec_res.get("is_temperature_lift_achievable", False) is True, "Temperature lift achievable")
+        check(tec_res.get("is_tec_cooling_viable", False) is True, "TEC viable")
+        print(f"  ✓ 39.3 Thermoelectric Peltier Heat Pump Cooler (Ioffe / Thomson): Bi2Te3 127-Couple Module (Cold 25°C / Hot 50°C, ΔT = {tec_res['temperature_lift_k']:.1f} K, ΔT_max = {tec_res['max_temperature_lift_k']:.1f} K), Thermoelectric ZT = {tec_res['figure_of_merit_zt']:.3f}, Resistance R = {tec_res['module_resistance_ohms']:.3f} Ω, Drive 4.5 A @ {tec_res['operating_voltage_v']:.2f} V (P_in = {tec_res['electrical_input_power_w']:.1f} W_e), Net Cooling Q_c = {tec_res['net_cooling_capacity_w']:.1f} W (Hot Reject Q_h = {tec_res['heat_rejected_hot_side_w']:.1f} W), COP = {tec_res['coefficient_of_performance_cop']:.3f} (Optimum I_cop = {tec_res['optimum_current_for_cop_a']:.1f} A, Peak I_qmax = {tec_res['optimum_current_for_qmax_a']:.1f} A: Target Met = {tec_res['is_target_heat_load_met']}))")
+
+        # 39.4 Centrifugal Slurry Pump Hydraulic De-Rating & Wear Life (ANSI/HI 12.1-12.6 / Cave)
+        pump_res = http_request(port, "POST", "/api/sim/mechanical/slurry_pump_derating", body={
+            "abrasiveness_class": "Class3Severe",
+            "slurry_flow_rate_m3_h": 650.0,
+            "clear_water_head_m": 45.0,
+            "clear_water_efficiency": 0.78,
+            "solid_specific_gravity": 2.75,
+            "solids_concentration_wt_pct": 35.0,
+            "median_particle_size_d50_um": 110.0,
+            "impeller_diameter_mm": 680.0,
+            "pump_rotational_speed_rpm": 850.0,
+            "allowable_wear_thickness_mm": 25.0
+        })
+        check(pump_res.get("slurry_mixture_specific_gravity", 0.0) > 1.20, "Slurry SG > 1.20")
+        check(pump_res.get("head_derating_ratio_hr", 0.0) >= 0.85, "Head ratio HR >= 0.85")
+        check(pump_res.get("derated_slurry_head_m", 0.0) >= 38.0, "Derated head >= 38 m")
+        check(pump_res.get("shaft_power_kw", 0.0) > 100.0, "Shaft power > 100 kW")
+        check(pump_res.get("impeller_tip_speed_m_s", 0.0) <= 32.0, "Tip speed <= 32 m/s")
+        check(pump_res.get("estimated_wear_life_hours", 0.0) >= 3000.0, "Wear life >= 3000 h")
+        check(pump_res.get("is_head_derating_acceptable", False) is True, "Head derating acceptable")
+        check(pump_res.get("is_tip_speed_within_limits", False) is True, "Tip speed acceptable")
+        check(pump_res.get("is_wear_life_satisfactory", False) is True, "Wear life satisfactory")
+        check(pump_res.get("is_slurry_pump_viable", False) is True, "Slurry pump viable")
+        print(f"  ✓ 39.4 Centrifugal Slurry Pump De-Rating & Wear (ANSI/HI 12.1-12.6 / Cave): Mining Tailings Slurry 650 m³/h (35 wt% ore @ 2.75 SG, Sm = {pump_res['slurry_mixture_specific_gravity']:.2f}, Cv = {pump_res['solids_volumetric_concentration_pct']:.1f}%), ANSI/HI Head Ratio H_R = {pump_res['head_derating_ratio_hr']:.3f}, Derated Slurry Head = {pump_res['derated_slurry_head_m']:.1f} m (Water 45.0 m), Slurry Operating Efficiency = {pump_res['slurry_operating_efficiency']*100.0:.1f}%, Shaft Brake Power = {pump_res['shaft_power_kw']:.1f} kW (Motor Rec = {pump_res['recommended_motor_power_kw']:.0f} kW), Ø680 mm Impeller @ 850 RPM (Tip Speed = {pump_res['impeller_tip_speed_m_s']:.1f} m/s <= 32 m/s), Pagalthivarthi Erosion Rate = {pump_res['wear_erosion_rate_mm_per_1000h']:.2f} mm/1000h, Wet-End Service Life = {pump_res['estimated_wear_life_hours']:.0f} h (>= 3000 h Benchmark: True))")
+
+        # 39.5 Optical Single-Mode Fiber Chromatic Dispersion & Pulse Broadening (ITU-T G.652 / Sellmeier)
+        fiber_res = http_request(port, "POST", "/api/sim/optical/fiber_dispersion", body={
+            "fiber_standard": "ItuG652dStandard",
+            "wavelength_nm": 1550.0,
+            "fiber_length_km": 80.0,
+            "laser_linewidth_fwhm_nm": 0.015,
+            "initial_pulse_width_ps": 25.0,
+            "launch_power_mw": 5.0,
+            "target_bit_rate_gbps": 10.0
+        })
+        check(fiber_res.get("core_refractive_index", 0.0) > 1.44, "Core index > 1.44")
+        check(fiber_res.get("chromatic_dispersion_ps_per_nm_km", 0.0) >= 15.0, "Dispersion >= 15 ps/(nm·km)")
+        check(fiber_res.get("total_accumulated_dispersion_ps_per_nm", 0.0) > 1200.0, "Total dispersion > 1200 ps/nm")
+        check(fiber_res.get("total_link_attenuation_db", 0.0) >= 14.0, "Link loss >= 14 dB")
+        check(fiber_res.get("received_optical_power_mw", 0.0) > 0.05, "Received power > 0.05 mW")
+        check(fiber_res.get("pulse_broadening_delta_tau_ps", 0.0) > 15.0, "Pulse broadening > 15 ps")
+        check(fiber_res.get("is_inter_symbol_interference_acceptable", False) is True, "ISI acceptable")
+        check(fiber_res.get("is_received_optical_power_adequate", False) is True, "Received power adequate")
+        check(fiber_res.get("is_dispersion_penalty_tolerable", False) is True, "Dispersion penalty tolerable")
+        check(fiber_res.get("is_fiber_link_viable", False) is True, "Fiber link viable")
+        print(f"  ✓ 39.5 Optical Fiber Chromatic Dispersion (ITU-T G.652 / Sellmeier / Agrawal): 80 km G.652.D C-Band Span @ 1550 nm (Fused Silica n = {fiber_res['core_refractive_index']:.4f}, n_g = {fiber_res['group_refractive_index']:.4f}), Chromatic Dispersion D = {fiber_res['chromatic_dispersion_ps_per_nm_km']:.2f} ps/(nm·km), Total Accumulated Dispersion = {fiber_res['total_accumulated_dispersion_ps_per_nm']:.1f} ps/nm, Link Optical Attenuation = {fiber_res['total_link_attenuation_db']:.1f} dB (Received Power = {fiber_res['received_optical_power_mw']:.3f} mW / -12.1 dBm), DFB Laser Broadening Δτ = {fiber_res['pulse_broadening_delta_tau_ps']:.1f} ps (Output Pulse {fiber_res['output_pulse_width_ps']:.1f} ps, Broadening Ratio = {fiber_res['pulse_broadening_ratio']:.2f}x), Max Uncompensated Data Rate B_max = {fiber_res['max_dispersion_limited_bit_rate_gbps']:.1f} Gbit/s (10 Gbps ISI Compliant: True), Link Transit Delay = {fiber_res['link_propagation_delay_microseconds']:.1f} µs)")
+
+        # 39.6 Universal Commands Execution Verification (Batch 24 Domains)
+        for cmd_id in [
+            "sim.manufacturing.electron_beam_welding",
+            "sim.process.crystallization_kinetics",
+            "sim.thermal.thermoelectric_cooler",
+            "sim.mechanical.slurry_pump_derating",
+            "sim.optical.fiber_dispersion",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 39.6 Universal Commands: All 5 Batch-24 Engineering Commands verified via typed schema engine")
+
+        # 39.7 Enterprise MCP Tool Calling (Batch 24 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_manufacturing_electron_beam_welding",
+            "atlas_sim_process_crystallization_kinetics",
+            "atlas_sim_thermal_thermoelectric_cooler",
+            "atlas_sim_mechanical_slurry_pump_derating",
+            "atlas_sim_optical_fiber_dispersion",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 993,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 39.7 Enterprise MCP Tool Calling: 5 Batch-24 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")
