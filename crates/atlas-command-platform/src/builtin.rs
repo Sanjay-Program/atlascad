@@ -4150,5 +4150,223 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.rail.wheel_rail_contact",
+            "Wheel-Rail Contact Mechanics & Track Hunting (Kalker / Hertz / Nadal)",
+            "Evaluates 3D Hertzian contact patch, peak normal pressure, Kalker linear longitudinal/lateral creep coefficients, Klingel hunting frequency, and Nadal derailment safety quotient.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "wheel_vertical_load_kn".into(),
+            arg_type: ArgumentType::Number,
+            description: "Wheel normal vertical load in kN".into(),
+            required: true,
+            default_value: Some(serde_json::json!(100.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "wheel_radius_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Wheel nominal rolling radius in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(460.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(1500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rail_crown_radius_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rail crown transverse radius in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(300.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "train_speed_km_h".into(),
+            arg_type: ArgumentType::Number,
+            description: "Train forward travel speed in km/h".into(),
+            required: false,
+            default_value: Some(serde_json::json!(200.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(600.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.mining.mine_ventilation",
+            "Subsurface Mine Ventilation Aerodynamics & Fan Duty (Atkinson / MSHA)",
+            "Evaluates Atkinson airway friction resistance, shock head losses, natural ventilation buoyancy (NVE), required fan total pressure, motor electrical power, and methane gas dilution compliance.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "airway_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Airway segment length in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1400.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(20000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "airway_area_m2".into(),
+            arg_type: ArgumentType::Number,
+            description: "Airway cross-sectional area in m²".into(),
+            required: true,
+            default_value: Some(serde_json::json!(20.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(200.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "airway_perimeter_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Airway wetted perimeter in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(18.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "airflow_rate_m3_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Required volumetric airflow rate in m³/s".into(),
+            required: true,
+            default_value: Some(serde_json::json!(85.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(1000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.telecom.reflector_antenna",
+            "Parabolic Reflector Antenna Electromagnetics & Gain (Silver / ITU-R S.580)",
+            "Evaluates parabolic dish geometry, Ruze surface tolerance efficiency, aperture illumination and spillover efficiencies, bore-sight gain in dBi, beamwidths, and ITU-R S.580 envelope compliance.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "dish_diameter_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Parabolic aperture diameter in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(2.40)),
+            validation_rules: vec![ValidationRule::Min(0.20), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "focal_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Reflector focal length in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(0.96)),
+            validation_rules: vec![ValidationRule::Min(0.10), ValidationRule::Max(50.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "operating_frequency_ghz".into(),
+            arg_type: ArgumentType::Number,
+            description: "Microwave frequency in GigaHertz".into(),
+            required: true,
+            default_value: Some(serde_json::json!(14.25)),
+            validation_rules: vec![ValidationRule::Min(0.10), ValidationRule::Max(300.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.semiconductor.gaa_fet",
+            "Gate-All-Around (GAA) Nanosheet Transistor Electrostatics (Taur / BSIM-CMG)",
+            "Evaluates 3D natural electrostatic scaling length, Drain-Induced Barrier Lowering (DIBL), subthreshold swing against thermal limit, threshold voltage, quasi-ballistic drive current, and Ion/Ioff ratio.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "nanosheet_count".into(),
+            arg_type: ArgumentType::Integer,
+            description: "Number of vertically stacked nanosheets".into(),
+            required: true,
+            default_value: Some(serde_json::json!(3)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "gate_length_nm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Physical gate length Lg in nanometers".into(),
+            required: true,
+            default_value: Some(serde_json::json!(12.0)),
+            validation_rules: vec![ValidationRule::Min(3.0), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "nanosheet_width_nm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Individual nanosheet width in nanometers".into(),
+            required: true,
+            default_value: Some(serde_json::json!(30.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(200.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "nanosheet_thickness_nm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Individual nanosheet thickness in nanometers".into(),
+            required: true,
+            default_value: Some(serde_json::json!(5.0)),
+            validation_rules: vec![ValidationRule::Min(2.0), ValidationRule::Max(50.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "equivalent_oxide_thickness_nm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Equivalent oxide thickness EOT in nanometers".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.75)),
+            validation_rules: vec![ValidationRule::Min(0.30), ValidationRule::Max(5.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.agri.irrigation_hydraulics",
+            "Precision Agricultural Irrigation Lateral Hydraulics (Christiansen / ISO 9261)",
+            "Evaluates multi-outlet friction reduction factors, head loss distribution, pressure and flow variation, Christiansen Uniformity Coefficient (CU), and Keller-Bliesner Emission Uniformity (EU).",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "pipe_inside_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Lateral pipe inside diameter in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(16.0)),
+            validation_rules: vec![ValidationRule::Min(4.0), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "lateral_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Total lateral length in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(120.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "emitter_spacing_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Distance between consecutive emitters in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(0.40)),
+            validation_rules: vec![ValidationRule::Min(0.10), ValidationRule::Max(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "nominal_discharge_l_h".into(),
+            arg_type: ArgumentType::Number,
+            description: "Nominal emitter flow rate in L/h".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1.60)),
+            validation_rules: vec![ValidationRule::Min(0.20), ValidationRule::Max(50.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "inlet_pressure_head_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Lateral inlet pressure head in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(11.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(100.0)],
+        }),
+    )?;
+
     Ok(())
 }

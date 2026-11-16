@@ -3046,6 +3046,136 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 29.7 Enterprise MCP Tool Calling: 5 Batch-14 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # -------------------------------------------------------------------------
+        # SECTION 30: MULTIDISCIPLINARY SIMULATION SOLVERS — BATCH 15
+        # -------------------------------------------------------------------------
+        print("\n" + "=" * 78)
+        print("  SECTION 30: MULTIDISCIPLINARY SIMULATION SOLVERS — BATCH 15")
+        print("=" * 78)
+
+        # 30.1 Wheel-Rail Contact Mechanics & Track Hunting Stability (Kalker / Hertz / Nadal / UIC 518)
+        wr_res = http_request(port, "POST", "/api/sim/rail/wheel_rail_contact", body={
+            "wheel_vertical_load_kn": 100.0,
+            "wheel_radius_mm": 460.0,
+            "rail_crown_radius_mm": 300.0,
+            "train_speed_km_h": 200.0,
+            "effective_conicity_rad": 0.025,
+            "track_gauge_half_m": 0.750,
+            "flange_contact_angle_deg": 70.0,
+            "friction_coefficient": 0.35,
+            "applied_lateral_force_kn": 35.0
+        })
+        check(wr_res.get("contact_patch_area_mm2", 0.0) > 100.0, "Contact patch area > 100 mm²")
+        check(wr_res.get("max_hertz_pressure_mpa", 0.0) > 800.0, "Max Hertz pressure > 800 MPa")
+        check(wr_res.get("kalker_f11_mn", 0.0) > 10.0, "Kalker longitudinal creep f11 > 10 MN")
+        check(wr_res.get("klingel_hunting_frequency_hz", 0.0) > 1.5, "Klingel hunting frequency > 1.5 Hz")
+        check(wr_res.get("derailment_safety_factor", 0.0) > 1.20, "Nadal derailment safety factor > 1.20")
+        check(wr_res.get("is_derailment_safe", False) is True, "Wheel-rail interface derailment safe")
+        check(wr_res.get("is_contact_stress_safe", False) is True, "Contact stress within shakedown limit")
+        print(f"  ✓ 30.1 Wheel-Rail Contact Mechanics (Kalker / Hertz / Nadal): UIC-60 / 460mm wheel @ 100kN / 200km/h, Patch = {wr_res['contact_patch_area_mm2']:.1f} mm² (a = {wr_res['contact_semi_axis_a_mm']:.2f} mm, b = {wr_res['contact_semi_axis_b_mm']:.2f} mm), p0 = {wr_res['max_hertz_pressure_mpa']:.1f} MPa (shakedown safe: {wr_res['is_contact_stress_safe']}), Kalker f11 = {wr_res['kalker_f11_mn']:.2f} MN, f22 = {wr_res['kalker_f22_mn']:.2f} MN, Klingel f_h = {wr_res['klingel_hunting_frequency_hz']:.2f} Hz (λ = {wr_res['hunting_wavelength_m']:.1f} m), (Y/Q)_app = {wr_res['applied_y_q_ratio']:.2f}, Nadal (Y/Q)_lim = {wr_res['nadal_limit_y_q']:.2f}, SF = {wr_res['derailment_safety_factor']:.2f} (Derailment Safe: {wr_res['is_derailment_safe']})")
+
+        # 30.2 Subsurface Mine Ventilation Aerodynamics & Fan Duty (Atkinson / MSHA / McPherson)
+        mine_res = http_request(port, "POST", "/api/sim/mining/mine_ventilation", body={
+            "airway_length_m": 1400.0,
+            "airway_area_m2": 20.0,
+            "airway_perimeter_m": 18.0,
+            "airflow_rate_m3_s": 85.0,
+            "vertical_depth_m": 400.0,
+            "methane_emission_m3_s": 0.12
+        })
+        check(mine_res.get("atkinson_resistance_ns2_m8", 0.0) > 0.01, "Atkinson resistance > 0.01 N·s²/m⁸")
+        check(mine_res.get("total_airway_pressure_drop_pa", 0.0) > 150.0, "Airway pressure drop > 150 Pa")
+        check(mine_res.get("required_fan_pressure_pa", 0.0) > 100.0, "Required fan pressure > 100 Pa")
+        check(mine_res.get("fan_shaft_power_kw", 0.0) > 10.0, "Fan shaft power > 10 kW")
+        check(mine_res.get("return_methane_pct", 0.0) < 1.0, "Return methane < 1.0%")
+        check(mine_res.get("is_methane_safe", False) is True, "MSHA methane compliant")
+        check(mine_res.get("is_velocity_acceptable", False) is True, "Comfort velocity acceptable")
+        print(f"  ✓ 30.2 Subsurface Mine Ventilation Aerodynamics (Atkinson / MSHA): L = 1400m blasted rock airway @ 85 m³/s (v = {mine_res['air_velocity_m_s']:.2f} m/s), R_atk = {mine_res['atkinson_resistance_ns2_m8']:.5f} N·s²/m⁸, ΔP_fric = {mine_res['friction_pressure_drop_pa']:.1f} Pa, ΔP_shock = {mine_res['shock_pressure_drop_pa']:.1f} Pa, ΔP_total = {mine_res['total_airway_pressure_drop_pa']:.1f} Pa, NVE Buoyancy = {mine_res['natural_ventilation_pressure_pa']:.1f} Pa, Fan Duty: ΔP_fan = {mine_res['required_fan_pressure_pa']:.1f} Pa, Shaft Power = {mine_res['fan_shaft_power_kw']:.1f} kW, Return CH4 = {mine_res['return_methane_pct']:.2f}% (MSHA Safe: {mine_res['is_methane_safe']})")
+
+        # 30.3 Parabolic Reflector Antenna Electromagnetics & Gain (Silver / Stutzman / ITU-R S.580)
+        ant_res = http_request(port, "POST", "/api/sim/telecom/reflector_antenna", body={
+            "dish_diameter_m": 2.40,
+            "focal_length_m": 0.96,
+            "operating_frequency_ghz": 14.25,
+            "surface_rms_error_mm": 0.35,
+            "aperture_blockage_fraction": 0.04
+        })
+        check(ant_res.get("boresight_gain_dbi", 0.0) > 45.0, "Gain > 45 dBi")
+        check(ant_res.get("half_power_beamwidth_deg", 0.0) < 1.0, "HPBW < 1.0 deg")
+        check(ant_res.get("ruze_efficiency", 0.0) > 0.85, "Ruze efficiency > 85%")
+        check(ant_res.get("aperture_efficiency_pct", 0.0) > 65.0, "Aperture efficiency > 65%")
+        check(ant_res.get("first_sidelobe_level_db", 0.0) < -20.0, "First sidelobe < -20 dB")
+        check(ant_res.get("is_itu_compliant", False) is True, "ITU-R S.580 compliant")
+        print(f"  ✓ 30.3 Reflector Antenna Electromagnetics (Silver / Stutzman / Ruze): D = 2.40m, F/D = {ant_res['focal_ratio']:.2f} @ 14.25 GHz (λ = {ant_res['wavelength_mm']:.2f} mm, D/λ = {ant_res['electrical_diameter_wavelengths']:.0f}), Ruze η = {ant_res['ruze_efficiency']*100.0:.1f}%, Total Aperture η = {ant_res['aperture_efficiency_pct']:.1f}%, G_peak = {ant_res['boresight_gain_dbi']:.2f} dBi, HPBW = {ant_res['half_power_beamwidth_deg']:.2f}°, FNBW = {ant_res['first_null_beamwidth_deg']:.2f}°, SLL = {ant_res['first_sidelobe_level_db']:.1f} dB, ITU @ 2° = {ant_res['actual_pattern_level_at_2deg_dbi']:.1f} dBi vs Mask {ant_res['itu_s580_limit_at_2deg_dbi']:.1f} dBi (Margin = {ant_res['itu_mask_margin_db']:.1f} dB, Compliant: {ant_res['is_itu_compliant']})")
+
+        # 30.4 Sub-3nm Gate-All-Around (GAA) Nanosheet FET Electrostatics (Taur / BSIM-CMG / IEEE IRDS)
+        gaa_res = http_request(port, "POST", "/api/sim/semiconductor/gaa_fet", body={
+            "nanosheet_count": 3,
+            "gate_length_nm": 12.0,
+            "nanosheet_width_nm": 30.0,
+            "nanosheet_thickness_nm": 5.0,
+            "equivalent_oxide_thickness_nm": 0.75,
+            "supply_voltage_v": 0.70
+        })
+        check(gaa_res.get("effective_gate_width_nm", 0.0) == 210.0, "Effective width == 210 nm")
+        check(gaa_res.get("natural_scaling_length_nm", 0.0) < 2.0, "Scaling length < 2.0 nm")
+        check(gaa_res.get("subthreshold_swing_mv_dec", 0.0) < 70.0, "Subthreshold swing < 70 mV/dec")
+        check(gaa_res.get("dibl_mv_v", 0.0) < 40.0, "DIBL < 40 mV/V")
+        check(gaa_res.get("on_current_ua", 0.0) > 150.0, "ON current > 150 μA")
+        check(gaa_res.get("is_channel_control_adequate", False) is True, "Channel control adequate")
+        check(gaa_res.get("is_subthreshold_swing_acceptable", False) is True, "SS acceptable")
+        print(f"  ✓ 30.4 Sub-3nm GAA Nanosheet FET Electrostatics (Taur / Ning / BSIM-CMG): 3-stack Si nanosheet (W = 30nm, T = 5nm, L_g = 12nm, EOT = 0.75nm), W_eff = {gaa_res['effective_gate_width_nm']:.1f} nm, Natural Length λ = {gaa_res['natural_scaling_length_nm']:.2f} nm (L_g/λ = {gaa_res['channel_control_ratio']:.2f} >= 3.0), DIBL = {gaa_res['dibl_mv_v']:.1f} mV/V, SS = {gaa_res['subthreshold_swing_mv_dec']:.1f} mV/dec (thermal limit = {gaa_res['thermal_limit_ss_mv_dec']:.1f} mV/dec), V_th = {gaa_res['threshold_voltage_v']:.3f} V, I_on = {gaa_res['on_current_ua']:.1f} μA ({gaa_res['on_current_ua'] / (gaa_res['effective_gate_width_nm'] / 1000.0):.2f} mA/μm), I_off = {gaa_res['off_current_pa']:.2f} pA, Ion/Ioff = {gaa_res['on_off_ratio']:.2e}, Robust Scaling: {gaa_res['is_channel_control_adequate']}")
+
+        # 30.5 Precision Agricultural Irrigation Lateral Hydraulics (Christiansen / Keller-Bliesner / ISO 9261)
+        irrig_res = http_request(port, "POST", "/api/sim/agri/irrigation_hydraulics", body={
+            "pipe_inside_diameter_mm": 16.0,
+            "lateral_length_m": 120.0,
+            "emitter_spacing_m": 0.40,
+            "nominal_discharge_l_h": 1.60,
+            "nominal_pressure_head_m": 10.0,
+            "inlet_pressure_head_m": 11.0
+        })
+        check(irrig_res.get("total_emitter_count", 0) == 300, "Emitter count == 300")
+        check(irrig_res.get("total_inlet_flow_l_h", 0.0) == 480.0, "Total flow == 480 L/h")
+        check(irrig_res.get("friction_head_loss_m", 0.0) > 1.0, "Friction head loss > 1.0 m")
+        check(irrig_res.get("christiansen_uniformity_pct", 0.0) > 92.0, "CU > 92%")
+        check(irrig_res.get("emission_uniformity_pct", 0.0) > 90.0, "EU > 90%")
+        check(irrig_res.get("is_discharge_variation_acceptable", False) is True, "Discharge variation acceptable")
+        check(irrig_res.get("is_uniformity_excellent", False) is True, "Uniformity excellent")
+        print(f"  ✓ 30.5 Agricultural Irrigation Lateral Hydraulics (Christiansen / ISO 9261): L = 120m, D = 16mm (300 emitters @ 0.4m, 1.6 L/h), Q_total = {irrig_res['total_inlet_flow_l_h']:.1f} L/h (v_in = {irrig_res['inlet_velocity_m_s']:.2f} m/s), Christiansen F_m = {irrig_res['christiansen_factor_fm']:.3f}, ΔH_fric = {irrig_res['friction_head_loss_m']:.2f} m, Head Range = [{irrig_res['min_pressure_head_m']:.2f}, {irrig_res['max_pressure_head_m']:.2f}] m, Flow Range = [{irrig_res['min_emitter_discharge_l_h']:.2f}, {irrig_res['max_emitter_discharge_l_h']:.2f}] L/h (variation = {irrig_res['discharge_variation_pct']:.1f}% <= 15%), CU = {irrig_res['christiansen_uniformity_pct']:.1f}%, EU = {irrig_res['emission_uniformity_pct']:.1f}%, High Uniformity: {irrig_res['is_uniformity_excellent']}")
+
+        # 30.6 Universal Commands Execution Verification (Batch 15 Domains)
+        for cmd_id in [
+            "sim.rail.wheel_rail_contact",
+            "sim.mining.mine_ventilation",
+            "sim.telecom.reflector_antenna",
+            "sim.semiconductor.gaa_fet",
+            "sim.agri.irrigation_hydraulics",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 30.6 Universal Commands: All 5 Batch-15 Engineering Commands verified via typed schema engine")
+
+        # 30.7 Enterprise MCP Tool Calling (Batch 15 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_rail_wheel_rail_contact",
+            "atlas_sim_mining_mine_ventilation",
+            "atlas_sim_telecom_reflector_antenna",
+            "atlas_sim_semiconductor_gaa_fet",
+            "atlas_sim_agri_irrigation_hydraulics",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 834,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 30.7 Enterprise MCP Tool Calling: 5 Batch-15 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

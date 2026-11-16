@@ -1932,6 +1932,87 @@ def simulation_section(studio: Studio) -> None:
     check(phononic_data.get("is_in_bandgap", False) is True, "operating excitation frequency is inside stopband")
     check(phononic_data.get("transmission_loss_db", 0.0) > 30.0, "acoustic transmission loss > 30 dB")
     check(phononic_data.get("is_isolation_effective", False) is True, "metamaterial acoustic vibration isolation effective")
+
+    # 75. Wheel-Rail Contact Mechanics & Track Hunting (Kalker / Hertz / Nadal / UIC 518)
+    wheel_rail = studio.post("/api/sim/rail/wheel_rail_contact", {
+        "wheel_vertical_load_kn": 100.0,
+        "wheel_radius_mm": 460.0,
+        "rail_crown_radius_mm": 300.0,
+        "train_speed_km_h": 200.0,
+    })
+    check(wheel_rail.status == 200, f"wheel-rail contact returns 200 (got {wheel_rail.status})")
+    wr_data = wheel_rail.json()
+    check(wr_data.get("contact_patch_area_mm2", 0.0) > 100.0, "Hertzian contact patch area > 100 mm²")
+    check(wr_data.get("max_hertz_pressure_mpa", 0.0) > 800.0, "peak Hertzian normal contact pressure > 800 MPa")
+    check(wr_data.get("kalker_f11_mn", 0.0) > 10.0, "Kalker longitudinal linear creep coefficient f11 > 10 MN")
+    check(wr_data.get("klingel_hunting_frequency_hz", 0.0) > 1.5, "Klingel kinematic hunting frequency > 1.5 Hz")
+    check(wr_data.get("derailment_safety_factor", 0.0) > 1.20, "Nadal wheel-climb derailment safety factor > 1.20")
+    check(wr_data.get("is_derailment_safe", False) is True, "wheel-rail interface safe against flange-climb derailment")
+
+    # 76. Subsurface Mine Ventilation Aerodynamics & Fan Duty (Atkinson / MSHA / McPherson)
+    mine_vent = studio.post("/api/sim/mining/mine_ventilation", {
+        "airway_length_m": 1400.0,
+        "airway_area_m2": 20.0,
+        "airflow_rate_m3_s": 85.0,
+        "vertical_depth_m": 400.0,
+    })
+    check(mine_vent.status == 200, f"mine ventilation returns 200 (got {mine_vent.status})")
+    mine_data = mine_vent.json()
+    check(mine_data.get("atkinson_resistance_ns2_m8", 0.0) > 0.01, "Atkinson aerodynamic airway resistance > 0.01 N·s²/m⁸")
+    check(mine_data.get("total_airway_pressure_drop_pa", 0.0) > 150.0, "total circuit airway pressure drop > 150 Pa")
+    check(mine_data.get("required_fan_pressure_pa", 0.0) > 100.0, "required main mechanical fan operating pressure > 100 Pa")
+    check(mine_data.get("fan_shaft_power_kw", 0.0) > 10.0, "ventilation fan drive shaft power > 10 kW")
+    check(mine_data.get("return_methane_pct", 0.0) < 1.0, "return airway diluted methane concentration < 1.0%")
+    check(mine_data.get("is_methane_safe", False) is True, "MSHA statutory methane dilution compliance achieved")
+
+    # 77. Parabolic Reflector Antenna Electromagnetics & Gain (Silver / Stutzman / ITU-R S.580)
+    reflector = studio.post("/api/sim/telecom/reflector_antenna", {
+        "dish_diameter_m": 2.40,
+        "operating_frequency_ghz": 14.25,
+        "surface_rms_error_mm": 0.35,
+    })
+    check(reflector.status == 200, f"reflector antenna returns 200 (got {reflector.status})")
+    ant_data = reflector.json()
+    check(ant_data.get("boresight_gain_dbi", 0.0) > 45.0, "reflector bore-sight directive gain > 45 dBi")
+    check(ant_data.get("half_power_beamwidth_deg", 0.0) < 1.0, "half-power beamwidth HPBW < 1.0 deg")
+    check(ant_data.get("ruze_efficiency", 0.0) > 0.85, "Ruze surface tolerance efficiency factor > 85%")
+    check(ant_data.get("aperture_efficiency_pct", 0.0) > 65.0, "total combined aperture efficiency > 65%")
+    check(ant_data.get("first_sidelobe_level_db", 0.0) < -20.0, "first side-lobe level suppression < -20 dB")
+    check(ant_data.get("is_itu_compliant", False) is True, "ITU-R S.580 co-polar sidelobe mask compliance verified")
+
+    # 78. Sub-3nm Gate-All-Around (GAA) Nanosheet FET Electrostatics (Taur / BSIM-CMG / IEEE IRDS)
+    gaa_fet = studio.post("/api/sim/semiconductor/gaa_fet", {
+        "nanosheet_count": 3,
+        "gate_length_nm": 12.0,
+        "nanosheet_width_nm": 30.0,
+        "nanosheet_thickness_nm": 5.0,
+        "equivalent_oxide_thickness_nm": 0.75,
+        "supply_voltage_v": 0.70,
+    })
+    check(gaa_fet.status == 200, f"GAA FET returns 200 (got {gaa_fet.status})")
+    gaa_data = gaa_fet.json()
+    check(gaa_data.get("effective_gate_width_nm", 0.0) == 210.0, "effective gate conduction perimeter Weff = 210 nm")
+    check(gaa_data.get("natural_scaling_length_nm", 0.0) < 2.0, "3D natural electrostatic scaling length lambda < 2.0 nm")
+    check(gaa_data.get("subthreshold_swing_mv_dec", 0.0) < 70.0, "subthreshold swing SS < 70 mV/dec near thermal limit")
+    check(gaa_data.get("dibl_mv_v", 0.0) < 40.0, "drain-induced barrier lowering DIBL < 40 mV/V")
+    check(gaa_data.get("on_current_ua", 0.0) > 150.0, "quasi-ballistic saturation ON current > 150 μA")
+    check(gaa_data.get("is_channel_control_adequate", False) is True, "GAA 3D electrostatic gate control integrity adequate")
+
+    # 79. Precision Agricultural Irrigation Lateral Hydraulics (Christiansen / Keller-Bliesner / ISO 9261)
+    irrig = studio.post("/api/sim/agri/irrigation_hydraulics", {
+        "pipe_inside_diameter_mm": 16.0,
+        "lateral_length_m": 120.0,
+        "emitter_spacing_m": 0.40,
+        "nominal_discharge_l_h": 1.60,
+    })
+    check(irrig.status == 200, f"irrigation hydraulics returns 200 (got {irrig.status})")
+    irrig_data = irrig.json()
+    check(irrig_data.get("total_emitter_count", 0) == 300, "total lateral emitter count = 300")
+    check(irrig_data.get("total_inlet_flow_l_h", 0.0) == 480.0, "total lateral inlet flow = 480 L/h")
+    check(irrig_data.get("friction_head_loss_m", 0.0) > 1.0, "multi-outlet frictional continuous head loss > 1.0 m")
+    check(irrig_data.get("christiansen_uniformity_pct", 0.0) > 92.0, "Christiansen Uniformity Coefficient CU > 92%")
+    check(irrig_data.get("emission_uniformity_pct", 0.0) > 90.0, "Keller-Bliesner Emission Uniformity EU > 90%")
+    check(irrig_data.get("is_uniformity_excellent", False) is True, "precision micro-irrigation distribution uniformity excellent")
     report("simulation")
 
 

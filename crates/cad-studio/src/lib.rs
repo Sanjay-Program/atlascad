@@ -5967,6 +5967,110 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_rail_wheel_rail_contact(
+        &mut self,
+        req: &SimWheelRailRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::wheel_rail_contact::WheelRailProblem {
+            problem_id: "wheel_rail_sim".to_string(),
+            wheel_vertical_load_kn: req.wheel_vertical_load_kn.unwrap_or(100.0),
+            wheel_radius_mm: req.wheel_radius_mm.unwrap_or(460.0),
+            rail_crown_radius_mm: req.rail_crown_radius_mm.unwrap_or(300.0),
+            train_speed_km_h: req.train_speed_km_h.unwrap_or(200.0),
+            effective_conicity_rad: req.effective_conicity_rad.unwrap_or(0.025),
+            track_gauge_half_m: req.track_gauge_half_m.unwrap_or(0.750),
+            flange_contact_angle_deg: req.flange_contact_angle_deg.unwrap_or(70.0),
+            friction_coefficient: req.friction_coefficient.unwrap_or(0.35),
+            applied_lateral_force_kn: req.applied_lateral_force_kn.unwrap_or(35.0),
+        };
+        let res = atlas_simulation_core::wheel_rail_contact::solve_wheel_rail_contact(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_mining_mine_ventilation(
+        &mut self,
+        req: &SimMineVentilationRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::mine_ventilation::MineVentilationProblem {
+            problem_id: "mine_ventilation_sim".to_string(),
+            lining_type: req.lining_type.unwrap_or(atlas_simulation_core::mine_ventilation::AirwayLiningType::RoughBlastedRock),
+            airway_length_m: req.airway_length_m.unwrap_or(1400.0),
+            airway_area_m2: req.airway_area_m2.unwrap_or(20.0),
+            airway_perimeter_m: req.airway_perimeter_m.unwrap_or(18.0),
+            airflow_rate_m3_s: req.airflow_rate_m3_s.unwrap_or(85.0),
+            air_density_kg_m3: req.air_density_kg_m3.unwrap_or(1.22),
+            shock_loss_factor: req.shock_loss_factor.unwrap_or(1.50),
+            vertical_depth_m: req.vertical_depth_m.unwrap_or(400.0),
+            downcast_upcast_delta_temp_c: req.downcast_upcast_delta_temp_c.unwrap_or(5.0),
+            fan_efficiency: req.fan_efficiency.unwrap_or(0.78),
+            methane_emission_m3_s: req.methane_emission_m3_s.unwrap_or(0.12),
+        };
+        let res = atlas_simulation_core::mine_ventilation::solve_mine_ventilation(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_telecom_reflector_antenna(
+        &mut self,
+        req: &SimReflectorAntennaRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::reflector_antenna::ReflectorAntennaProblem {
+            problem_id: "reflector_antenna_sim".to_string(),
+            feed_pattern: req.feed_pattern.unwrap_or(atlas_simulation_core::reflector_antenna::FeedIlluminationPattern::TaperMinus10dB),
+            dish_diameter_m: req.dish_diameter_m.unwrap_or(2.40),
+            focal_length_m: req.focal_length_m.unwrap_or(0.96),
+            operating_frequency_ghz: req.operating_frequency_ghz.unwrap_or(14.25),
+            surface_rms_error_mm: req.surface_rms_error_mm.unwrap_or(0.35),
+            aperture_blockage_fraction: req.aperture_blockage_fraction.unwrap_or(0.04),
+        };
+        let res = atlas_simulation_core::reflector_antenna::solve_reflector_antenna(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_semiconductor_gaa_fet(
+        &mut self,
+        req: &SimGaaFetRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::semiconductor_gaa_fet::GaaFetProblem {
+            problem_id: "gaa_fet_sim".to_string(),
+            channel_material: req.channel_material.unwrap_or(atlas_simulation_core::semiconductor_gaa_fet::GaaChannelMaterial::Silicon),
+            nanosheet_count: req.nanosheet_count.unwrap_or(3),
+            gate_length_nm: req.gate_length_nm.unwrap_or(12.0),
+            nanosheet_width_nm: req.nanosheet_width_nm.unwrap_or(30.0),
+            nanosheet_thickness_nm: req.nanosheet_thickness_nm.unwrap_or(5.0),
+            equivalent_oxide_thickness_nm: req.equivalent_oxide_thickness_nm.unwrap_or(0.75),
+            supply_voltage_v: req.supply_voltage_v.unwrap_or(0.70),
+            operating_temperature_k: req.operating_temperature_k.unwrap_or(300.0),
+        };
+        let res = atlas_simulation_core::semiconductor_gaa_fet::solve_gaa_fet(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_agri_irrigation_hydraulics(
+        &mut self,
+        req: &SimIrrigationHydraulicsRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::irrigation_hydraulics::IrrigationHydraulicsProblem {
+            problem_id: "irrigation_hydraulics_sim".to_string(),
+            emitter_type: req.emitter_type.unwrap_or(atlas_simulation_core::irrigation_hydraulics::EmitterType::NonCompensatingOrifice),
+            pipe_inside_diameter_mm: req.pipe_inside_diameter_mm.unwrap_or(16.0),
+            lateral_length_m: req.lateral_length_m.unwrap_or(120.0),
+            emitter_spacing_m: req.emitter_spacing_m.unwrap_or(0.40),
+            nominal_discharge_l_h: req.nominal_discharge_l_h.unwrap_or(1.60),
+            nominal_pressure_head_m: req.nominal_pressure_head_m.unwrap_or(10.0),
+            inlet_pressure_head_m: req.inlet_pressure_head_m.unwrap_or(11.0),
+            ground_slope_pct: req.ground_slope_pct.unwrap_or(0.0),
+            hazen_williams_c: req.hazen_williams_c.unwrap_or(150.0),
+            emitter_coefficient_of_variation: req.emitter_coefficient_of_variation.unwrap_or(0.035),
+        };
+        let res = atlas_simulation_core::irrigation_hydraulics::solve_irrigation_hydraulics(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -8244,6 +8348,69 @@ namespace AtlasCAD.Unity
                     layer_a_thickness_mm: d_a,
                     layer_b_thickness_mm: d_b,
                     excitation_frequency_hz: f_hz,
+                    ..Default::default()
+                })?
+            }
+            "sim.rail.wheel_rail_contact" => {
+                let load_kn = req.arguments.get("wheel_vertical_load_kn").and_then(|v| v.as_f64());
+                let r_w = req.arguments.get("wheel_radius_mm").and_then(|v| v.as_f64());
+                let r_r = req.arguments.get("rail_crown_radius_mm").and_then(|v| v.as_f64());
+                let v_kmh = req.arguments.get("train_speed_km_h").and_then(|v| v.as_f64());
+                self.sim_rail_wheel_rail_contact(&SimWheelRailRequest {
+                    wheel_vertical_load_kn: load_kn,
+                    wheel_radius_mm: r_w,
+                    rail_crown_radius_mm: r_r,
+                    train_speed_km_h: v_kmh,
+                    ..Default::default()
+                })?
+            }
+            "sim.mining.mine_ventilation" => {
+                let l_m = req.arguments.get("airway_length_m").and_then(|v| v.as_f64());
+                let a_m2 = req.arguments.get("airway_area_m2").and_then(|v| v.as_f64());
+                let q_m3s = req.arguments.get("airflow_rate_m3_s").and_then(|v| v.as_f64());
+                let d_m = req.arguments.get("vertical_depth_m").and_then(|v| v.as_f64());
+                self.sim_mining_mine_ventilation(&SimMineVentilationRequest {
+                    airway_length_m: l_m,
+                    airway_area_m2: a_m2,
+                    airflow_rate_m3_s: q_m3s,
+                    vertical_depth_m: d_m,
+                    ..Default::default()
+                })?
+            }
+            "sim.telecom.reflector_antenna" => {
+                let d_m = req.arguments.get("dish_diameter_m").and_then(|v| v.as_f64());
+                let f_ghz = req.arguments.get("operating_frequency_ghz").and_then(|v| v.as_f64());
+                let err_mm = req.arguments.get("surface_rms_error_mm").and_then(|v| v.as_f64());
+                self.sim_telecom_reflector_antenna(&SimReflectorAntennaRequest {
+                    dish_diameter_m: d_m,
+                    operating_frequency_ghz: f_ghz,
+                    surface_rms_error_mm: err_mm,
+                    ..Default::default()
+                })?
+            }
+            "sim.semiconductor.gaa_fet" => {
+                let n_sheets = req.arguments.get("nanosheet_count").and_then(|v| v.as_u64()).map(|v| v as u32);
+                let l_g = req.arguments.get("gate_length_nm").and_then(|v| v.as_f64());
+                let w_ns = req.arguments.get("nanosheet_width_nm").and_then(|v| v.as_f64());
+                let t_ns = req.arguments.get("nanosheet_thickness_nm").and_then(|v| v.as_f64());
+                self.sim_semiconductor_gaa_fet(&SimGaaFetRequest {
+                    nanosheet_count: n_sheets,
+                    gate_length_nm: l_g,
+                    nanosheet_width_nm: w_ns,
+                    nanosheet_thickness_nm: t_ns,
+                    ..Default::default()
+                })?
+            }
+            "sim.agri.irrigation_hydraulics" => {
+                let d_mm = req.arguments.get("pipe_inside_diameter_mm").and_then(|v| v.as_f64());
+                let l_m = req.arguments.get("lateral_length_m").and_then(|v| v.as_f64());
+                let s_m = req.arguments.get("emitter_spacing_m").and_then(|v| v.as_f64());
+                let q_lh = req.arguments.get("nominal_discharge_l_h").and_then(|v| v.as_f64());
+                self.sim_agri_irrigation_hydraulics(&SimIrrigationHydraulicsRequest {
+                    pipe_inside_diameter_mm: d_mm,
+                    lateral_length_m: l_m,
+                    emitter_spacing_m: s_m,
+                    nominal_discharge_l_h: q_lh,
                     ..Default::default()
                 })?
             }
@@ -10525,6 +10692,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/acoustics/phononic_bandgap" => {
             match parse_body_or_default::<SimPhononicCrystalRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_acoustics_phononic_bandgap(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/rail/wheel_rail_contact" => {
+            match parse_body_or_default::<SimWheelRailRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_rail_wheel_rail_contact(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/mining/mine_ventilation" => {
+            match parse_body_or_default::<SimMineVentilationRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_mining_mine_ventilation(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/telecom/reflector_antenna" => {
+            match parse_body_or_default::<SimReflectorAntennaRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_telecom_reflector_antenna(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/semiconductor/gaa_fet" => {
+            match parse_body_or_default::<SimGaaFetRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_semiconductor_gaa_fet(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/agri/irrigation_hydraulics" => {
+            match parse_body_or_default::<SimIrrigationHydraulicsRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_agri_irrigation_hydraulics(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -14393,4 +14605,112 @@ struct SimPhononicCrystalRequest {
     pub unit_cell_count: Option<u32>,
     #[serde(default)]
     pub excitation_frequency_hz: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimWheelRailRequest {
+    #[serde(default)]
+    pub wheel_vertical_load_kn: Option<f64>,
+    #[serde(default)]
+    pub wheel_radius_mm: Option<f64>,
+    #[serde(default)]
+    pub rail_crown_radius_mm: Option<f64>,
+    #[serde(default)]
+    pub train_speed_km_h: Option<f64>,
+    #[serde(default)]
+    pub effective_conicity_rad: Option<f64>,
+    #[serde(default)]
+    pub track_gauge_half_m: Option<f64>,
+    #[serde(default)]
+    pub flange_contact_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub friction_coefficient: Option<f64>,
+    #[serde(default)]
+    pub applied_lateral_force_kn: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimMineVentilationRequest {
+    #[serde(default)]
+    pub lining_type: Option<atlas_simulation_core::mine_ventilation::AirwayLiningType>,
+    #[serde(default)]
+    pub airway_length_m: Option<f64>,
+    #[serde(default)]
+    pub airway_area_m2: Option<f64>,
+    #[serde(default)]
+    pub airway_perimeter_m: Option<f64>,
+    #[serde(default)]
+    pub airflow_rate_m3_s: Option<f64>,
+    #[serde(default)]
+    pub air_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub shock_loss_factor: Option<f64>,
+    #[serde(default)]
+    pub vertical_depth_m: Option<f64>,
+    #[serde(default)]
+    pub downcast_upcast_delta_temp_c: Option<f64>,
+    #[serde(default)]
+    pub fan_efficiency: Option<f64>,
+    #[serde(default)]
+    pub methane_emission_m3_s: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimReflectorAntennaRequest {
+    #[serde(default)]
+    pub feed_pattern: Option<atlas_simulation_core::reflector_antenna::FeedIlluminationPattern>,
+    #[serde(default)]
+    pub dish_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub focal_length_m: Option<f64>,
+    #[serde(default)]
+    pub operating_frequency_ghz: Option<f64>,
+    #[serde(default)]
+    pub surface_rms_error_mm: Option<f64>,
+    #[serde(default)]
+    pub aperture_blockage_fraction: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimGaaFetRequest {
+    #[serde(default)]
+    pub channel_material: Option<atlas_simulation_core::semiconductor_gaa_fet::GaaChannelMaterial>,
+    #[serde(default)]
+    pub nanosheet_count: Option<u32>,
+    #[serde(default)]
+    pub gate_length_nm: Option<f64>,
+    #[serde(default)]
+    pub nanosheet_width_nm: Option<f64>,
+    #[serde(default)]
+    pub nanosheet_thickness_nm: Option<f64>,
+    #[serde(default)]
+    pub equivalent_oxide_thickness_nm: Option<f64>,
+    #[serde(default)]
+    pub supply_voltage_v: Option<f64>,
+    #[serde(default)]
+    pub operating_temperature_k: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimIrrigationHydraulicsRequest {
+    #[serde(default)]
+    pub emitter_type: Option<atlas_simulation_core::irrigation_hydraulics::EmitterType>,
+    #[serde(default)]
+    pub pipe_inside_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub lateral_length_m: Option<f64>,
+    #[serde(default)]
+    pub emitter_spacing_m: Option<f64>,
+    #[serde(default)]
+    pub nominal_discharge_l_h: Option<f64>,
+    #[serde(default)]
+    pub nominal_pressure_head_m: Option<f64>,
+    #[serde(default)]
+    pub inlet_pressure_head_m: Option<f64>,
+    #[serde(default)]
+    pub ground_slope_pct: Option<f64>,
+    #[serde(default)]
+    pub hazen_williams_c: Option<f64>,
+    #[serde(default)]
+    pub emitter_coefficient_of_variation: Option<f64>,
 }

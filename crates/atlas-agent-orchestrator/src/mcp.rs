@@ -1544,6 +1544,77 @@ impl McpServer {
                     "required": ["unit_cell_count"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_rail_wheel_rail_contact".into(),
+                description: "Kalker / Hertz / Nadal wheel-rail 3D elliptical contact mechanics, peak normal pressure, longitudinal/lateral creep coefficients, Klingel hunting frequency, and Nadal derailment quotient".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "wheel_vertical_load_kn": { "type": "number", "default": 100.0 },
+                        "wheel_radius_mm": { "type": "number", "default": 460.0 },
+                        "rail_crown_radius_mm": { "type": "number", "default": 300.0 },
+                        "train_speed_km_h": { "type": "number", "default": 200.0 }
+                    },
+                    "required": ["wheel_vertical_load_kn", "wheel_radius_mm", "rail_crown_radius_mm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_mining_mine_ventilation".into(),
+                description: "Atkinson / MSHA subsurface mine ventilation aerodynamics, airway friction resistance, natural ventilation buoyancy (NVE), required fan operating pressure, air power, and methane gas dilution".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "airway_length_m": { "type": "number", "default": 1400.0 },
+                        "airway_area_m2": { "type": "number", "default": 20.0 },
+                        "airway_perimeter_m": { "type": "number", "default": 18.0 },
+                        "airflow_rate_m3_s": { "type": "number", "default": 85.0 }
+                    },
+                    "required": ["airway_length_m", "airway_area_m2", "airway_perimeter_m", "airflow_rate_m3_s"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_telecom_reflector_antenna".into(),
+                description: "Silver / Stutzman / ITU-R S.580 parabolic reflector dish antenna electromagnetics, Ruze surface tolerance efficiency, aperture illumination efficiency, bore-sight gain in dBi, beamwidths, and ITU-R envelope mask".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "dish_diameter_m": { "type": "number", "default": 2.40 },
+                        "focal_length_m": { "type": "number", "default": 0.96 },
+                        "operating_frequency_ghz": { "type": "number", "default": 14.25 }
+                    },
+                    "required": ["dish_diameter_m", "focal_length_m", "operating_frequency_ghz"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_semiconductor_gaa_fet".into(),
+                description: "Taur / BSIM-CMG / IRDS sub-3nm Gate-All-Around (GAA) nanosheet transistor 3D natural electrostatic scaling length, DIBL, subthreshold swing, threshold voltage, quasi-ballistic drive current, and Ion/Ioff ratio".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "nanosheet_count": { "type": "integer", "default": 3 },
+                        "gate_length_nm": { "type": "number", "default": 12.0 },
+                        "nanosheet_width_nm": { "type": "number", "default": 30.0 },
+                        "nanosheet_thickness_nm": { "type": "number", "default": 5.0 },
+                        "equivalent_oxide_thickness_nm": { "type": "number", "default": 0.75 }
+                    },
+                    "required": ["nanosheet_count", "gate_length_nm", "nanosheet_width_nm", "nanosheet_thickness_nm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_agri_irrigation_hydraulics".into(),
+                description: "Christiansen / Hazen-Williams / ISO 9261 precision agricultural irrigation lateral line multi-outlet friction head loss, pressure and discharge variation, Christiansen Uniformity (CU), and Emission Uniformity (EU)".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "pipe_inside_diameter_mm": { "type": "number", "default": 16.0 },
+                        "lateral_length_m": { "type": "number", "default": 120.0 },
+                        "emitter_spacing_m": { "type": "number", "default": 0.40 },
+                        "nominal_discharge_l_h": { "type": "number", "default": 1.60 },
+                        "inlet_pressure_head_m": { "type": "number", "default": 11.0 }
+                    },
+                    "required": ["pipe_inside_diameter_mm", "lateral_length_m", "emitter_spacing_m", "nominal_discharge_l_h"]
+                }),
+            },
         ]
     }
 

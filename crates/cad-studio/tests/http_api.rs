@@ -6829,5 +6829,152 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 155. Wheel-Rail Contact Mechanics & Track Hunting Stability (Kalker / Hertz / Nadal / UIC 518)
+    let res_wheel_rail = post(
+        addr,
+        "/api/sim/rail/wheel_rail_contact",
+        r#"{
+            "wheel_vertical_load_kn": 100.0,
+            "wheel_radius_mm": 460.0,
+            "rail_crown_radius_mm": 300.0,
+            "train_speed_km_h": 200.0,
+            "effective_conicity_rad": 0.025,
+            "track_gauge_half_m": 0.750,
+            "flange_contact_angle_deg": 70.0,
+            "friction_coefficient": 0.35,
+            "applied_lateral_force_kn": 35.0
+        }"#,
+    )?;
+    assert_eq!(res_wheel_rail.status, 200);
+    let wr_json = json(&res_wheel_rail)?;
+    assert!(wr_json["contact_patch_area_mm2"].as_f64().unwrap() > 100.0);
+    assert!(wr_json["max_hertz_pressure_mpa"].as_f64().unwrap() > 800.0);
+    assert!(wr_json["kalker_f11_mn"].as_f64().unwrap() > 10.0);
+    assert!(wr_json["klingel_hunting_frequency_hz"].as_f64().unwrap() > 1.5);
+    assert!(wr_json["derailment_safety_factor"].as_f64().unwrap() > 1.2);
+    assert!(wr_json["is_contact_stress_safe"].as_bool().unwrap());
+    assert!(wr_json["is_derailment_safe"].as_bool().unwrap());
+
+    // 156. Subsurface Mine Ventilation Aerodynamics & Fan Duty (Atkinson / MSHA / McPherson)
+    let res_mine = post(
+        addr,
+        "/api/sim/mining/mine_ventilation",
+        r#"{
+            "airway_length_m": 1400.0,
+            "airway_area_m2": 20.0,
+            "airway_perimeter_m": 18.0,
+            "airflow_rate_m3_s": 85.0,
+            "vertical_depth_m": 400.0,
+            "methane_emission_m3_s": 0.12
+        }"#,
+    )?;
+    assert_eq!(res_mine.status, 200);
+    let mine_json = json(&res_mine)?;
+    assert!(mine_json["atkinson_resistance_ns2_m8"].as_f64().unwrap() > 0.01);
+    assert!(mine_json["total_airway_pressure_drop_pa"].as_f64().unwrap() > 150.0);
+    assert!(mine_json["air_velocity_m_s"].as_f64().unwrap() > 3.0);
+    assert!(mine_json["required_fan_pressure_pa"].as_f64().unwrap() > 100.0);
+    assert!(mine_json["fan_shaft_power_kw"].as_f64().unwrap() > 10.0);
+    assert!(mine_json["return_methane_pct"].as_f64().unwrap() < 1.0);
+    assert!(mine_json["is_methane_safe"].as_bool().unwrap());
+
+    // 157. Parabolic Reflector Antenna Electromagnetics & Gain (Silver / Stutzman / ITU-R S.580)
+    let res_antenna = post(
+        addr,
+        "/api/sim/telecom/reflector_antenna",
+        r#"{
+            "dish_diameter_m": 2.40,
+            "focal_length_m": 0.96,
+            "operating_frequency_ghz": 14.25,
+            "surface_rms_error_mm": 0.35,
+            "aperture_blockage_fraction": 0.04
+        }"#,
+    )?;
+    assert_eq!(res_antenna.status, 200);
+    let ant_json = json(&res_antenna)?;
+    assert!(ant_json["boresight_gain_dbi"].as_f64().unwrap() > 45.0);
+    assert!(ant_json["half_power_beamwidth_deg"].as_f64().unwrap() < 1.0);
+    assert!(ant_json["ruze_efficiency"].as_f64().unwrap() > 0.85);
+    assert!(ant_json["aperture_efficiency_pct"].as_f64().unwrap() > 65.0);
+    assert!(ant_json["first_sidelobe_level_db"].as_f64().unwrap() < -20.0);
+    assert!(ant_json["is_itu_compliant"].as_bool().unwrap());
+
+    // 158. Sub-3nm Gate-All-Around (GAA) Nanosheet FET Electrostatics (Taur / BSIM-CMG / IEEE IRDS)
+    let res_gaa = post(
+        addr,
+        "/api/sim/semiconductor/gaa_fet",
+        r#"{
+            "nanosheet_count": 3,
+            "gate_length_nm": 12.0,
+            "nanosheet_width_nm": 30.0,
+            "nanosheet_thickness_nm": 5.0,
+            "equivalent_oxide_thickness_nm": 0.75,
+            "supply_voltage_v": 0.70
+        }"#,
+    )?;
+    assert_eq!(res_gaa.status, 200);
+    let gaa_json = json(&res_gaa)?;
+    assert_eq!(gaa_json["effective_gate_width_nm"].as_f64().unwrap(), 210.0);
+    assert!(gaa_json["natural_scaling_length_nm"].as_f64().unwrap() < 2.0);
+    assert!(gaa_json["subthreshold_swing_mv_dec"].as_f64().unwrap() < 70.0);
+    assert!(gaa_json["dibl_mv_v"].as_f64().unwrap() < 40.0);
+    assert!(gaa_json["on_current_ua"].as_f64().unwrap() > 150.0);
+    assert!(gaa_json["is_channel_control_adequate"].as_bool().unwrap());
+
+    // 159. Precision Agricultural Irrigation Lateral Hydraulics (Christiansen / Keller-Bliesner / ISO 9261)
+    let res_irrig = post(
+        addr,
+        "/api/sim/agri/irrigation_hydraulics",
+        r#"{
+            "pipe_inside_diameter_mm": 16.0,
+            "lateral_length_m": 120.0,
+            "emitter_spacing_m": 0.40,
+            "nominal_discharge_l_h": 1.60,
+            "nominal_pressure_head_m": 10.0,
+            "inlet_pressure_head_m": 11.0
+        }"#,
+    )?;
+    assert_eq!(res_irrig.status, 200);
+    let irrig_json = json(&res_irrig)?;
+    assert_eq!(irrig_json["total_emitter_count"].as_u64().unwrap(), 300);
+    assert_eq!(irrig_json["total_inlet_flow_l_h"].as_f64().unwrap(), 480.0);
+    assert!(irrig_json["friction_head_loss_m"].as_f64().unwrap() > 1.0);
+    assert!(irrig_json["christiansen_uniformity_pct"].as_f64().unwrap() > 92.0);
+    assert!(irrig_json["emission_uniformity_pct"].as_f64().unwrap() > 90.0);
+    assert!(irrig_json["is_uniformity_excellent"].as_bool().unwrap());
+
+    // 160. Universal Commands Execution Verification (Batch 15 Domains)
+    for cmd_id in [
+        "sim.rail.wheel_rail_contact",
+        "sim.mining.mine_ventilation",
+        "sim.telecom.reflector_antenna",
+        "sim.semiconductor.gaa_fet",
+        "sim.agri.irrigation_hydraulics",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 161. Enterprise MCP Tool Calling (Batch 15 Domains)
+    for tool_name in [
+        "atlas_sim_rail_wheel_rail_contact",
+        "atlas_sim_mining_mine_ventilation",
+        "atlas_sim_telecom_reflector_antenna",
+        "atlas_sim_semiconductor_gaa_fet",
+        "atlas_sim_agri_irrigation_hydraulics",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 168, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

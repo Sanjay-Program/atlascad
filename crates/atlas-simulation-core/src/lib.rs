@@ -111,6 +111,11 @@ pub mod superconducting_magnet;
 pub mod reentry_aerothermodynamics;
 pub mod lpbf_meltpool;
 pub mod phononic_bandgap;
+pub mod wheel_rail_contact;
+pub mod mine_ventilation;
+pub mod reflector_antenna;
+pub mod semiconductor_gaa_fet;
+pub mod irrigation_hydraulics;
 
 pub mod prelude {
     pub use crate::acoustics::{
@@ -496,5 +501,25 @@ pub mod prelude {
     pub use crate::phononic_bandgap::{
         PhononicCrystalProblem, PhononicCrystalResult, PhononicLayer,
         solve_phononic_bandgap, solve_phononic_bandgap_sim,
+    };
+    pub use crate::wheel_rail_contact::{
+        WheelRailProblem, WheelRailResult,
+        solve_wheel_rail_contact, solve_wheel_rail_contact_sim,
+    };
+    pub use crate::mine_ventilation::{
+        AirwayLiningType, MineVentilationProblem, MineVentilationResult,
+        solve_mine_ventilation, solve_mine_ventilation_sim,
+    };
+    pub use crate::reflector_antenna::{
+        FeedIlluminationPattern, ReflectorAntennaProblem, ReflectorAntennaResult,
+        solve_reflector_antenna, solve_reflector_antenna_sim,
+    };
+    pub use crate::semiconductor_gaa_fet::{
+        GaaChannelMaterial, GaaFetProblem, GaaFetResult,
+        solve_gaa_fet, solve_gaa_fet_sim,
+    };
+    pub use crate::irrigation_hydraulics::{
+        EmitterType, IrrigationHydraulicsProblem, IrrigationHydraulicsResult,
+        solve_irrigation_hydraulics, solve_irrigation_hydraulics_sim,
     };
 }
