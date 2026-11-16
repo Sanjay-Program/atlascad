@@ -1834,6 +1834,71 @@ impl McpServer {
                     "required": ["train_speed_km_h", "static_contact_force_n"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_geotechnical_tbm_tunneling".into(),
+                description: "Calculates TBM earth pressure balance (EPB) face support pressure, advance thrust, cutting and muck torque, and specific excavation energy per ITA/Herzog.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "tunnel_outer_diameter_m": { "type": "number", "default": 6.60 },
+                        "tunnel_depth_to_axis_m": { "type": "number", "default": 22.0 },
+                        "water_table_depth_m": { "type": "number", "default": 4.0 }
+                    },
+                    "required": ["tunnel_outer_diameter_m", "tunnel_depth_to_axis_m"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_structural_prestressed_concrete".into(),
+                description: "Calculates post-tensioned beam parabolic tendon friction/wobble losses, anchorage draw-in seating, long-term losses, and extreme fiber flexural stresses per ACI 318 / AASHTO.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "span_length_m": { "type": "number", "default": 32.0 },
+                        "concrete_f_c_mpa": { "type": "number", "default": 45.0 },
+                        "tendon_steel_area_mm2": { "type": "number", "default": 2800.0 }
+                    },
+                    "required": ["span_length_m", "concrete_f_c_mpa"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_aerospace_spacecraft_jitter".into(),
+                description: "Calculates reaction wheel assembly (RWA) static/dynamic unbalance disturbances, bearing harmonic frequencies (BPFO/BPFI), and optical payload line-of-sight jitter per NASA-HDBK-7005.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "wheel_speed_rpm": { "type": "number", "default": 3600.0 },
+                        "static_imbalance_g_mm": { "type": "number", "default": 1.80 },
+                        "structural_resonance_freq_hz": { "type": "number", "default": 85.0 }
+                    },
+                    "required": ["wheel_speed_rpm", "structural_resonance_freq_hz"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_automotive_radar_lidar_sensor".into(),
+                description: "Calculates automotive 77 GHz radar range equation with rain attenuation, ToF pulsed LiDAR optical link budget with Kruse extinction, and sensor fusion detection margins.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "target_range_m": { "type": "number", "default": 120.0 },
+                        "target_rcs_m2": { "type": "number", "default": 5.0 },
+                        "radar_tx_power_w": { "type": "number", "default": 0.10 }
+                    },
+                    "required": ["target_range_m", "target_rcs_m2"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_marine_auv_propulsion".into(),
+                description: "Calculates AUV hydrodynamic resistance via ITTC-78 and Gertler-Myring form factor, propeller thrust power, and battery mission endurance/range.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "cruising_speed_knots": { "type": "number", "default": 3.50 },
+                        "vehicle_length_m": { "type": "number", "default": 4.80 },
+                        "battery_capacity_kwh": { "type": "number", "default": 24.0 }
+                    },
+                    "required": ["cruising_speed_knots", "vehicle_length_m"]
+                }),
+            },
         ]
     }
 

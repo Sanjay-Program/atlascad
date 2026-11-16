@@ -6416,6 +6416,135 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_geotechnical_tbm_tunneling(
+        &mut self,
+        req: &SimTbmTunnelingRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::tbm_tunneling::TbmTunnelingProblem {
+            problem_id: "tbm_tunneling_sim".to_string(),
+            ground_condition: req.ground_condition.unwrap_or(atlas_simulation_core::tbm_tunneling::GroundConditionType::CohesionlessSandGravel),
+            tunnel_outer_diameter_m: req.tunnel_outer_diameter_m.unwrap_or(6.60),
+            tunnel_depth_to_axis_m: req.tunnel_depth_to_axis_m.unwrap_or(22.0),
+            water_table_depth_m: req.water_table_depth_m.unwrap_or(4.0),
+            soil_bulk_unit_weight_kn_m3: req.soil_bulk_unit_weight_kn_m3.unwrap_or(19.5),
+            soil_effective_cohesion_kpa: req.soil_effective_cohesion_kpa.unwrap_or(12.0),
+            soil_effective_friction_angle_deg: req.soil_effective_friction_angle_deg.unwrap_or(32.0),
+            soil_compressive_strength_mpa: req.soil_compressive_strength_mpa.unwrap_or(0.85),
+            cutterhead_opening_ratio_pct: req.cutterhead_opening_ratio_pct.unwrap_or(35.0),
+            cutterhead_rotational_speed_rpm: req.cutterhead_rotational_speed_rpm.unwrap_or(2.5),
+            penetration_rate_mm_per_rev: req.penetration_rate_mm_per_rev.unwrap_or(12.0),
+            shield_length_m: req.shield_length_m.unwrap_or(9.50),
+            machine_rated_torque_kn_m: req.machine_rated_torque_kn_m.unwrap_or(5500.0),
+            machine_rated_thrust_kn: req.machine_rated_thrust_kn.unwrap_or(42000.0),
+        };
+        let res = atlas_simulation_core::tbm_tunneling::solve_tbm_tunneling(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_structural_prestressed_concrete(
+        &mut self,
+        req: &SimPrestressedConcreteRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::prestressed_concrete::PrestressedConcreteProblem {
+            problem_id: "prestressed_concrete_sim".to_string(),
+            strand_type: req.strand_type.unwrap_or(atlas_simulation_core::prestressed_concrete::PrestressingStrandType::LowRelaxationStrand270),
+            span_length_m: req.span_length_m.unwrap_or(32.0),
+            concrete_area_m2: req.concrete_area_m2.unwrap_or(0.525),
+            concrete_moment_of_inertia_m4: req.concrete_moment_of_inertia_m4.unwrap_or(0.0785),
+            distance_to_top_fiber_m: req.distance_to_top_fiber_m.unwrap_or(0.75),
+            distance_to_bottom_fiber_m: req.distance_to_bottom_fiber_m.unwrap_or(0.65),
+            concrete_f_c_mpa: req.concrete_f_c_mpa.unwrap_or(45.0),
+            concrete_f_ci_mpa: req.concrete_f_ci_mpa.unwrap_or(32.0),
+            tendon_steel_area_mm2: req.tendon_steel_area_mm2.unwrap_or(2800.0),
+            tendon_modulus_mpa: req.tendon_modulus_mpa.unwrap_or(195000.0),
+            jacking_stress_ratio_of_fpu: req.jacking_stress_ratio_of_fpu.unwrap_or(0.75),
+            midspan_eccentricity_m: req.midspan_eccentricity_m.unwrap_or(0.48),
+            end_eccentricity_m: req.end_eccentricity_m.unwrap_or(0.08),
+            friction_curvature_coeff_mu: req.friction_curvature_coeff_mu.unwrap_or(0.20),
+            friction_wobble_coeff_k: req.friction_wobble_coeff_k.unwrap_or(0.00065),
+            anchorage_draw_in_mm: req.anchorage_draw_in_mm.unwrap_or(6.0),
+            ambient_relative_humidity_pct: req.ambient_relative_humidity_pct.unwrap_or(70.0),
+            service_moment_midspan_kn_m: req.service_moment_midspan_kn_m.unwrap_or(2150.0),
+        };
+        let res = atlas_simulation_core::prestressed_concrete::solve_prestressed_concrete(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_aerospace_spacecraft_jitter(
+        &mut self,
+        req: &SimSpacecraftJitterRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::spacecraft_jitter::SpacecraftJitterProblem {
+            problem_id: "spacecraft_jitter_sim".to_string(),
+            wheel_speed_rpm: req.wheel_speed_rpm.unwrap_or(3600.0),
+            rotor_inertia_kg_m2: req.rotor_inertia_kg_m2.unwrap_or(0.045),
+            rotor_mass_kg: req.rotor_mass_kg.unwrap_or(5.50),
+            static_imbalance_g_mm: req.static_imbalance_g_mm.unwrap_or(1.80),
+            dynamic_imbalance_g_mm2: req.dynamic_imbalance_g_mm2.unwrap_or(35.0),
+            number_of_bearing_balls: req.number_of_bearing_balls.unwrap_or(8),
+            ball_diameter_mm: req.ball_diameter_mm.unwrap_or(7.14),
+            bearing_pitch_diameter_mm: req.bearing_pitch_diameter_mm.unwrap_or(38.0),
+            bearing_contact_angle_deg: req.bearing_contact_angle_deg.unwrap_or(15.0),
+            structural_resonance_freq_hz: req.structural_resonance_freq_hz.unwrap_or(85.0),
+            structural_damping_ratio: req.structural_damping_ratio.unwrap_or(0.015),
+            satellite_inertia_kg_m2: req.satellite_inertia_kg_m2.unwrap_or(320.0),
+            allowable_pointing_jitter_urad: req.allowable_pointing_jitter_urad.unwrap_or(2.50),
+        };
+        let res = atlas_simulation_core::spacecraft_jitter::solve_spacecraft_jitter(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_automotive_radar_lidar_sensor(
+        &mut self,
+        req: &SimRadarLidarSensorRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::radar_lidar_sensor::RadarLidarSensorProblem {
+            problem_id: "radar_lidar_sensor_sim".to_string(),
+            weather_condition: req.weather_condition.unwrap_or(atlas_simulation_core::radar_lidar_sensor::WeatherConditionType::ModerateRain),
+            target_range_m: req.target_range_m.unwrap_or(120.0),
+            target_rcs_m2: req.target_rcs_m2.unwrap_or(5.0),
+            target_optical_reflectivity: req.target_optical_reflectivity.unwrap_or(0.18),
+            radar_tx_power_w: req.radar_tx_power_w.unwrap_or(0.10),
+            radar_antenna_gain_dbi: req.radar_antenna_gain_dbi.unwrap_or(26.0),
+            radar_chirp_bandwidth_mhz: req.radar_chirp_bandwidth_mhz.unwrap_or(1000.0),
+            radar_noise_figure_db: req.radar_noise_figure_db.unwrap_or(11.0),
+            lidar_wavelength_nm: req.lidar_wavelength_nm.unwrap_or(905.0),
+            lidar_pulse_power_w: req.lidar_pulse_power_w.unwrap_or(75.0),
+            lidar_aperture_diameter_mm: req.lidar_aperture_diameter_mm.unwrap_or(35.0),
+            required_snr_threshold_db: req.required_snr_threshold_db.unwrap_or(12.0),
+        };
+        let res = atlas_simulation_core::radar_lidar_sensor::solve_radar_lidar_sensor(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_marine_auv_propulsion(
+        &mut self,
+        req: &SimAuvPropulsionRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::auv_propulsion::AuvPropulsionProblem {
+            problem_id: "auv_propulsion_sim".to_string(),
+            mission_regime: req.mission_regime.unwrap_or(atlas_simulation_core::auv_propulsion::AuvMissionRegime::StandardTransit),
+            cruising_speed_knots: req.cruising_speed_knots.unwrap_or(3.50),
+            vehicle_length_m: req.vehicle_length_m.unwrap_or(4.80),
+            vehicle_diameter_m: req.vehicle_diameter_m.unwrap_or(0.533),
+            wetted_surface_area_m2: req.wetted_surface_area_m2.unwrap_or(7.20),
+            seawater_density_kg_m3: req.seawater_density_kg_m3.unwrap_or(1025.0),
+            seawater_viscosity_pa_s: req.seawater_viscosity_pa_s.unwrap_or(0.00115),
+            propeller_open_water_efficiency: req.propeller_open_water_efficiency.unwrap_or(0.68),
+            hotel_power_draw_w: req.hotel_power_draw_w.unwrap_or(120.0),
+            battery_capacity_kwh: req.battery_capacity_kwh.unwrap_or(24.0),
+            battery_depth_of_discharge_pct: req.battery_depth_of_discharge_pct.unwrap_or(85.0),
+            motor_drive_efficiency: req.motor_drive_efficiency.unwrap_or(0.90),
+        };
+        let res = atlas_simulation_core::auv_propulsion::solve_auv_propulsion(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -8986,6 +9115,81 @@ namespace AtlasCAD.Unity
                     ..Default::default()
                 })?
             }
+            "sim.geotechnical.tbm_tunneling" => {
+                let d_tunnel = req.arguments.get("tunnel_outer_diameter_m").and_then(|v| v.as_f64());
+                let h_depth = req.arguments.get("tunnel_depth_to_axis_m").and_then(|v| v.as_f64());
+                let h_water = req.arguments.get("water_table_depth_m").and_then(|v| v.as_f64());
+                let rpm = req.arguments.get("cutterhead_rotational_speed_rpm").and_then(|v| v.as_f64());
+                let pr = req.arguments.get("penetration_rate_mm_per_rev").and_then(|v| v.as_f64());
+                self.sim_geotechnical_tbm_tunneling(&SimTbmTunnelingRequest {
+                    tunnel_outer_diameter_m: d_tunnel,
+                    tunnel_depth_to_axis_m: h_depth,
+                    water_table_depth_m: h_water,
+                    cutterhead_rotational_speed_rpm: rpm,
+                    penetration_rate_mm_per_rev: pr,
+                    ..Default::default()
+                })?
+            }
+            "sim.structural.prestressed_concrete" => {
+                let l_span = req.arguments.get("span_length_m").and_then(|v| v.as_f64());
+                let fc = req.arguments.get("concrete_f_c_mpa").and_then(|v| v.as_f64());
+                let aps = req.arguments.get("tendon_steel_area_mm2").and_then(|v| v.as_f64());
+                let e_mid = req.arguments.get("midspan_eccentricity_m").and_then(|v| v.as_f64());
+                let m_serv = req.arguments.get("service_moment_midspan_kn_m").and_then(|v| v.as_f64());
+                self.sim_structural_prestressed_concrete(&SimPrestressedConcreteRequest {
+                    span_length_m: l_span,
+                    concrete_f_c_mpa: fc,
+                    tendon_steel_area_mm2: aps,
+                    midspan_eccentricity_m: e_mid,
+                    service_moment_midspan_kn_m: m_serv,
+                    ..Default::default()
+                })?
+            }
+            "sim.aerospace.spacecraft_jitter" => {
+                let rpm = req.arguments.get("wheel_speed_rpm").and_then(|v| v.as_f64());
+                let u_stat = req.arguments.get("static_imbalance_g_mm").and_then(|v| v.as_f64());
+                let u_dyn = req.arguments.get("dynamic_imbalance_g_mm2").and_then(|v| v.as_f64());
+                let f_res = req.arguments.get("structural_resonance_freq_hz").and_then(|v| v.as_f64());
+                let j_sat = req.arguments.get("satellite_inertia_kg_m2").and_then(|v| v.as_f64());
+                self.sim_aerospace_spacecraft_jitter(&SimSpacecraftJitterRequest {
+                    wheel_speed_rpm: rpm,
+                    static_imbalance_g_mm: u_stat,
+                    dynamic_imbalance_g_mm2: u_dyn,
+                    structural_resonance_freq_hz: f_res,
+                    satellite_inertia_kg_m2: j_sat,
+                    ..Default::default()
+                })?
+            }
+            "sim.automotive.radar_lidar_sensor" => {
+                let r_tgt = req.arguments.get("target_range_m").and_then(|v| v.as_f64());
+                let rcs = req.arguments.get("target_rcs_m2").and_then(|v| v.as_f64());
+                let rho = req.arguments.get("target_optical_reflectivity").and_then(|v| v.as_f64());
+                let p_rad = req.arguments.get("radar_tx_power_w").and_then(|v| v.as_f64());
+                let p_lid = req.arguments.get("lidar_pulse_power_w").and_then(|v| v.as_f64());
+                self.sim_automotive_radar_lidar_sensor(&SimRadarLidarSensorRequest {
+                    target_range_m: r_tgt,
+                    target_rcs_m2: rcs,
+                    target_optical_reflectivity: rho,
+                    radar_tx_power_w: p_rad,
+                    lidar_pulse_power_w: p_lid,
+                    ..Default::default()
+                })?
+            }
+            "sim.marine.auv_propulsion" => {
+                let v_kts = req.arguments.get("cruising_speed_knots").and_then(|v| v.as_f64());
+                let l_auv = req.arguments.get("vehicle_length_m").and_then(|v| v.as_f64());
+                let d_auv = req.arguments.get("vehicle_diameter_m").and_then(|v| v.as_f64());
+                let e_bat = req.arguments.get("battery_capacity_kwh").and_then(|v| v.as_f64());
+                let p_hot = req.arguments.get("hotel_power_draw_w").and_then(|v| v.as_f64());
+                self.sim_marine_auv_propulsion(&SimAuvPropulsionRequest {
+                    cruising_speed_knots: v_kts,
+                    vehicle_length_m: l_auv,
+                    vehicle_diameter_m: d_auv,
+                    battery_capacity_kwh: e_bat,
+                    hotel_power_draw_w: p_hot,
+                    ..Default::default()
+                })?
+            }
             "system.deploy.status" => self.deploy_status()?,
             _ => serde_json::json!({
                 "status": "Executed",
@@ -11444,6 +11648,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/rail/pantograph" => {
             match parse_body_or_default::<SimRailPantographRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_rail_pantograph(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/geotechnical/tbm_tunneling" => {
+            match parse_body_or_default::<SimTbmTunnelingRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_geotechnical_tbm_tunneling(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/structural/prestressed_concrete" => {
+            match parse_body_or_default::<SimPrestressedConcreteRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_structural_prestressed_concrete(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/aerospace/spacecraft_jitter" => {
+            match parse_body_or_default::<SimSpacecraftJitterRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_aerospace_spacecraft_jitter(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/automotive/radar_lidar_sensor" => {
+            match parse_body_or_default::<SimRadarLidarSensorRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_automotive_radar_lidar_sensor(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/marine/auv_propulsion" => {
+            match parse_body_or_default::<SimAuvPropulsionRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_marine_auv_propulsion(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -15810,4 +16059,162 @@ struct SimRailPantographRequest {
     pub catenary_midspan_elasticity_mm_per_n: Option<f64>,
     #[serde(default)]
     pub catenary_support_elasticity_mm_per_n: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimTbmTunnelingRequest {
+    #[serde(default)]
+    pub ground_condition: Option<atlas_simulation_core::tbm_tunneling::GroundConditionType>,
+    #[serde(default)]
+    pub tunnel_outer_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub tunnel_depth_to_axis_m: Option<f64>,
+    #[serde(default)]
+    pub water_table_depth_m: Option<f64>,
+    #[serde(default)]
+    pub soil_bulk_unit_weight_kn_m3: Option<f64>,
+    #[serde(default)]
+    pub soil_effective_cohesion_kpa: Option<f64>,
+    #[serde(default)]
+    pub soil_effective_friction_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub soil_compressive_strength_mpa: Option<f64>,
+    #[serde(default)]
+    pub cutterhead_opening_ratio_pct: Option<f64>,
+    #[serde(default)]
+    pub cutterhead_rotational_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub penetration_rate_mm_per_rev: Option<f64>,
+    #[serde(default)]
+    pub shield_length_m: Option<f64>,
+    #[serde(default)]
+    pub machine_rated_torque_kn_m: Option<f64>,
+    #[serde(default)]
+    pub machine_rated_thrust_kn: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimPrestressedConcreteRequest {
+    #[serde(default)]
+    pub strand_type: Option<atlas_simulation_core::prestressed_concrete::PrestressingStrandType>,
+    #[serde(default)]
+    pub span_length_m: Option<f64>,
+    #[serde(default)]
+    pub concrete_area_m2: Option<f64>,
+    #[serde(default)]
+    pub concrete_moment_of_inertia_m4: Option<f64>,
+    #[serde(default)]
+    pub distance_to_top_fiber_m: Option<f64>,
+    #[serde(default)]
+    pub distance_to_bottom_fiber_m: Option<f64>,
+    #[serde(default)]
+    pub concrete_f_c_mpa: Option<f64>,
+    #[serde(default)]
+    pub concrete_f_ci_mpa: Option<f64>,
+    #[serde(default)]
+    pub tendon_steel_area_mm2: Option<f64>,
+    #[serde(default)]
+    pub tendon_modulus_mpa: Option<f64>,
+    #[serde(default)]
+    pub jacking_stress_ratio_of_fpu: Option<f64>,
+    #[serde(default)]
+    pub midspan_eccentricity_m: Option<f64>,
+    #[serde(default)]
+    pub end_eccentricity_m: Option<f64>,
+    #[serde(default)]
+    pub friction_curvature_coeff_mu: Option<f64>,
+    #[serde(default)]
+    pub friction_wobble_coeff_k: Option<f64>,
+    #[serde(default)]
+    pub anchorage_draw_in_mm: Option<f64>,
+    #[serde(default)]
+    pub ambient_relative_humidity_pct: Option<f64>,
+    #[serde(default)]
+    pub service_moment_midspan_kn_m: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimSpacecraftJitterRequest {
+    #[serde(default)]
+    pub wheel_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub rotor_inertia_kg_m2: Option<f64>,
+    #[serde(default)]
+    pub rotor_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub static_imbalance_g_mm: Option<f64>,
+    #[serde(default)]
+    pub dynamic_imbalance_g_mm2: Option<f64>,
+    #[serde(default)]
+    pub number_of_bearing_balls: Option<u32>,
+    #[serde(default)]
+    pub ball_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub bearing_pitch_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub bearing_contact_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub structural_resonance_freq_hz: Option<f64>,
+    #[serde(default)]
+    pub structural_damping_ratio: Option<f64>,
+    #[serde(default)]
+    pub satellite_inertia_kg_m2: Option<f64>,
+    #[serde(default)]
+    pub allowable_pointing_jitter_urad: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimRadarLidarSensorRequest {
+    #[serde(default)]
+    pub weather_condition: Option<atlas_simulation_core::radar_lidar_sensor::WeatherConditionType>,
+    #[serde(default)]
+    pub target_range_m: Option<f64>,
+    #[serde(default)]
+    pub target_rcs_m2: Option<f64>,
+    #[serde(default)]
+    pub target_optical_reflectivity: Option<f64>,
+    #[serde(default)]
+    pub radar_tx_power_w: Option<f64>,
+    #[serde(default)]
+    pub radar_antenna_gain_dbi: Option<f64>,
+    #[serde(default)]
+    pub radar_chirp_bandwidth_mhz: Option<f64>,
+    #[serde(default)]
+    pub radar_noise_figure_db: Option<f64>,
+    #[serde(default)]
+    pub lidar_wavelength_nm: Option<f64>,
+    #[serde(default)]
+    pub lidar_pulse_power_w: Option<f64>,
+    #[serde(default)]
+    pub lidar_aperture_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub required_snr_threshold_db: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimAuvPropulsionRequest {
+    #[serde(default)]
+    pub mission_regime: Option<atlas_simulation_core::auv_propulsion::AuvMissionRegime>,
+    #[serde(default)]
+    pub cruising_speed_knots: Option<f64>,
+    #[serde(default)]
+    pub vehicle_length_m: Option<f64>,
+    #[serde(default)]
+    pub vehicle_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub wetted_surface_area_m2: Option<f64>,
+    #[serde(default)]
+    pub seawater_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub seawater_viscosity_pa_s: Option<f64>,
+    #[serde(default)]
+    pub propeller_open_water_efficiency: Option<f64>,
+    #[serde(default)]
+    pub hotel_power_draw_w: Option<f64>,
+    #[serde(default)]
+    pub battery_capacity_kwh: Option<f64>,
+    #[serde(default)]
+    pub battery_depth_of_discharge_pct: Option<f64>,
+    #[serde(default)]
+    pub motor_drive_efficiency: Option<f64>,
 }

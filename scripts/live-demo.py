@@ -3599,6 +3599,174 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 33.7 Enterprise MCP Tool Calling: 5 Batch-18 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # =========================================================================
+        # DEMO 34: BATCH 19 HIGH-FIDELITY FIRST-PRINCIPLES SIMULATION SOLVERS
+        # =========================================================================
+        print("\n--- DEMO 34: BATCH 19 ADVANCED SIMULATION SOLVERS (TBM, PRESTRESSED CONCRETE, SPACECRAFT JITTER, RADAR/LIDAR, AUV) ---")
+
+        # 34.1 Tunnel Boring Machine (TBM) Earth Pressure Balance Mechanics & Face Stability (ITA / Herzog / Eirich)
+        tbm_res = http_request(port, "POST", "/api/sim/geotechnical/tbm_tunneling", body={
+            "tunnel_outer_diameter_m": 6.60,
+            "tunnel_depth_to_axis_m": 22.0,
+            "water_table_depth_m": 4.0,
+            "soil_bulk_unit_weight_kn_m3": 19.5,
+            "soil_effective_cohesion_kpa": 12.0,
+            "soil_effective_friction_angle_deg": 32.0,
+            "soil_compressive_strength_mpa": 0.85,
+            "cutterhead_opening_ratio_pct": 35.0,
+            "cutterhead_rotational_speed_rpm": 2.5,
+            "penetration_rate_mm_per_rev": 12.0,
+            "shield_length_m": 9.50,
+            "machine_rated_torque_kn_m": 5500.0,
+            "machine_rated_thrust_kn": 42000.0,
+        })
+        check(tbm_res.get("face_area_m2", 0.0) > 33.0, "Face area > 33 m²")
+        check(tbm_res.get("hydrostatic_water_pressure_kpa", 0.0) > 150.0, "Hydrostatic water pressure > 150 kPa")
+        check(tbm_res.get("min_face_support_pressure_kpa", 0.0) > 180.0, "Min face support pressure > 180 kPa")
+        check(tbm_res.get("target_face_support_pressure_kpa", 0.0) > 220.0, "Target face support pressure > 220 kPa")
+        check(tbm_res.get("face_stability_safety_factor", 0.0) >= 1.20, "Face stability safety factor >= 1.20")
+        check(tbm_res.get("total_required_thrust_kn", 0.0) > 15000.0, "Total required advance thrust > 15000 kN")
+        check(tbm_res.get("total_cutterhead_torque_kn_m", 0.0) > 2000.0, "Total cutterhead torque > 2000 kN·m")
+        check(tbm_res.get("cutterhead_drive_power_kw", 0.0) > 500.0, "Cutterhead drive power > 500 kW")
+        check(tbm_res.get("specific_energy_mj_m3", 0.0) > 25.0, "Specific energy > 25 MJ/m³")
+        check(tbm_res.get("is_face_stable", False) is True, "Tunnel face stable against active collapse")
+        check(tbm_res.get("is_torque_within_machine_capacity", False) is True, "Torque within machine rated capacity")
+        check(tbm_res.get("is_thrust_within_machine_capacity", False) is True, "Thrust within machine cylinder capacity")
+        print(f"  ✓ 34.1 TBM Earth Pressure Balance (EPB) Mechanics (ITA / Herzog / Eirich): D = {6.60:.2f} m (A_face = {tbm_res['face_area_m2']:.2f} m²), Axis Depth = {22.0:.1f} m, Water Head = {tbm_res['hydrostatic_water_pressure_kpa']:.1f} kPa, Min Support P_min = {tbm_res['min_face_support_pressure_kpa']:.1f} kPa, Target P_target = {tbm_res['target_face_support_pressure_kpa']:.1f} kPa (FS = {tbm_res['face_stability_safety_factor']:.2f} >= 1.20), Advance Rate = {tbm_res['penetration_speed_mm_min']:.1f} mm/min ({tbm_res['volumetric_excavation_rate_m3_h']:.1f} m³/h), Total Thrust = {tbm_res['total_required_thrust_kn']:.1f} kN (Rated 42,000 kN), Torque = {tbm_res['total_cutterhead_torque_kn_m']:.1f} kN·m (Rated 5,500 kN·m, P_drive = {tbm_res['cutterhead_drive_power_kw']:.1f} kW), Specific Energy SE = {tbm_res['specific_energy_mj_m3']:.1f} MJ/m³, Face Stable: {tbm_res['is_face_stable']})")
+
+        # 34.2 Prestressed Post-Tensioned Concrete Girder Friction & Losses (ACI 318-19 / AASHTO LRFD / PTI)
+        prestress_res = http_request(port, "POST", "/api/sim/structural/prestressed_concrete", body={
+            "span_length_m": 32.0,
+            "concrete_area_m2": 0.525,
+            "concrete_moment_of_inertia_m4": 0.0785,
+            "distance_to_top_fiber_m": 0.75,
+            "distance_to_bottom_fiber_m": 0.65,
+            "concrete_f_c_mpa": 45.0,
+            "concrete_f_ci_mpa": 32.0,
+            "tendon_steel_area_mm2": 2800.0,
+            "tendon_modulus_mpa": 195000.0,
+            "jacking_stress_ratio_of_fpu": 0.75,
+            "midspan_eccentricity_m": 0.48,
+            "end_eccentricity_m": 0.08,
+            "friction_curvature_coeff_mu": 0.20,
+            "friction_wobble_coeff_k": 0.00065,
+            "anchorage_draw_in_mm": 6.0,
+            "ambient_relative_humidity_pct": 70.0,
+            "service_moment_midspan_kn_m": 2150.0,
+        })
+        check(prestress_res.get("initial_jacking_force_kn", 0.0) > 3800.0, "Initial jacking force > 3800 kN")
+        check(prestress_res.get("friction_loss_pct", 0.0) > 1.0, "Friction loss > 1%")
+        check(prestress_res.get("anchorage_seating_length_m", 0.0) > 8.0, "Seating length > 8 m")
+        check(prestress_res.get("total_final_prestress_loss_pct", 0.0) > 10.0, "Total final loss > 10%")
+        check(prestress_res.get("final_effective_midspan_force_kn", 0.0) > 3000.0, "Final effective midspan force > 3000 kN")
+        check(prestress_res.get("is_service_tension_compliant", False) is True, "Service tension compliant")
+        check(prestress_res.get("is_service_compression_compliant", False) is True, "Service compression compliant")
+        check(prestress_res.get("is_jacking_stress_compliant", False) is True, "Jacking stress compliant (<= 0.80 f_pu)")
+        print(f"  ✓ 34.2 Prestressed Post-Tensioned Concrete Girder Losses & Stresses (ACI 318 / AASHTO LRFD / PTI): L = {32.0:.1f} m, P_jack = {prestress_res['initial_jacking_force_kn']:.1f} kN (0.75 f_pu), Friction ΔP_fric = {prestress_res['friction_loss_pct']:.2f}% (θ = {prestress_res['tendon_angular_change_rad']:.3f} rad), Wedge Draw-in l_set = {prestress_res['anchorage_seating_length_m']:.2f} m, Long-term Losses: ES = {prestress_res['elastic_shortening_loss_mpa']:.1f} MPa, CR = {prestress_res['concrete_creep_loss_mpa']:.1f} MPa, SH = {prestress_res['concrete_shrinkage_loss_mpa']:.1f} MPa, RE = {prestress_res['steel_relaxation_loss_mpa']:.1f} MPa (Total Loss = {prestress_res['total_final_prestress_loss_pct']:.1f}%), Final Effective P_eff = {prestress_res['final_effective_midspan_force_kn']:.1f} kN, Service Stresses: Top σ_top = {prestress_res['midspan_top_fiber_stress_mpa']:.2f} MPa (Limit {prestress_res['aashto_allowable_compression_mpa']:.1f} MPa), Bottom σ_bot = {prestress_res['midspan_bottom_fiber_stress_mpa']:.2f} MPa (Limit {prestress_res['aashto_allowable_tension_mpa']:.2f} MPa), AASHTO Compliant: {prestress_res['is_service_tension_compliant']})")
+
+        # 34.3 Spacecraft Reaction Wheel Dynamic Jitter & Micro-Vibration (NASA-HDBK-7005 / ECSS-E-HB-32-26A)
+        jitter_res = http_request(port, "POST", "/api/sim/aerospace/spacecraft_jitter", body={
+            "wheel_speed_rpm": 3600.0,
+            "rotor_inertia_kg_m2": 0.045,
+            "rotor_mass_kg": 5.50,
+            "static_imbalance_g_mm": 1.80,
+            "dynamic_imbalance_g_mm2": 35.0,
+            "number_of_bearing_balls": 8,
+            "ball_diameter_mm": 7.14,
+            "bearing_pitch_diameter_mm": 38.0,
+            "bearing_contact_angle_deg": 15.0,
+            "structural_resonance_freq_hz": 85.0,
+            "structural_damping_ratio": 0.015,
+            "satellite_inertia_kg_m2": 320.0,
+            "allowable_pointing_jitter_urad": 2.50,
+        })
+        check(jitter_res.get("spin_frequency_hz", 0.0) == 60.0, "Spin frequency == 60 Hz")
+        check(jitter_res.get("static_disturbance_force_n", 0.0) > 0.20, "Static disturbance force > 0.20 N")
+        check(jitter_res.get("dynamic_disturbance_torque_mn_m", 0.0) > 4.0, "Dynamic disturbance torque > 4.0 mN·m")
+        check(jitter_res.get("bearing_bpfo_frequency_hz", 0.0) > 180.0, "BPFO > 180 Hz")
+        check(jitter_res.get("bearing_bpfi_frequency_hz", 0.0) > 260.0, "BPFI > 260 Hz")
+        check(jitter_res.get("payload_pointing_jitter_urad", 0.0) < 2.50, "Pointing jitter < 2.50 µrad")
+        check(jitter_res.get("is_jitter_compliant", False) is True, "Jitter compliant")
+        check(jitter_res.get("is_resonance_avoided", False) is True, "Resonance avoided")
+        print(f"  ✓ 34.3 Spacecraft Reaction Wheel Jitter & Micro-Vibrations (NASA-HDBK-7005 / ECSS): Speed = {3600.0:.0f} RPM (f_spin = {jitter_res['spin_frequency_hz']:.1f} Hz, ω = {jitter_res['rotor_angular_velocity_rad_s']:.1f} rad/s), Static Unbalance F_s = {jitter_res['static_disturbance_force_n']:.3f} N, Dynamic Rocking M_d = {jitter_res['dynamic_disturbance_torque_mn_m']:.2f} mN·m, Bearing Harmonics: BPFO = {jitter_res['bearing_bpfo_frequency_hz']:.1f} Hz, BPFI = {jitter_res['bearing_bpfi_frequency_hz']:.1f} Hz, Bus Transmissibility |H(ω)| = {jitter_res['structural_transmissibility_at_spin']:.3f} (f_bus = {85.0:.1f} Hz), Transmitted a_payload = {jitter_res['transmitted_payload_accel_mg']:.2f} mg, Payload LOS Pointing Jitter = {jitter_res['payload_pointing_jitter_urad']:.3f} µrad ({jitter_res['payload_pointing_jitter_arcsec']:.4f} arcsec, Budget 2.50 µrad, Margin = {jitter_res['jitter_margin_ratio']:.2f}), ECSS / NASA Compliant: {jitter_res['is_jitter_compliant']})")
+
+        # 34.4 Autonomous Vehicle 77 GHz FMCW Radar & ToF LiDAR (ITU-R P.838 / Kruse / ISO 26262)
+        sensor_res = http_request(port, "POST", "/api/sim/automotive/radar_lidar_sensor", body={
+            "weather_condition": "ModerateRain",
+            "target_range_m": 120.0,
+            "target_rcs_m2": 5.0,
+            "target_optical_reflectivity": 0.18,
+            "radar_tx_power_w": 0.10,
+            "radar_antenna_gain_dbi": 26.0,
+            "radar_chirp_bandwidth_mhz": 1000.0,
+            "radar_noise_figure_db": 11.0,
+            "lidar_wavelength_nm": 905.0,
+            "lidar_pulse_power_w": 75.0,
+            "lidar_aperture_diameter_mm": 35.0,
+            "required_snr_threshold_db": 12.0,
+        })
+        check(sensor_res.get("radar_wavelength_mm", 0.0) > 3.80, "Radar wavelength > 3.80 mm")
+        check(abs(sensor_res.get("radar_range_resolution_m", 0.0) - 0.15) < 0.02, "Range resolution ~ 0.15 m")
+        check(sensor_res.get("radar_snr_at_target_db", 0.0) > 15.0, "Radar SNR > 15 dB")
+        check(sensor_res.get("radar_max_detection_range_m", 0.0) > 180.0, "Radar max range > 180 m")
+        check(sensor_res.get("is_radar_target_detected", False) is True, "Radar target detected")
+        check(sensor_res.get("is_sensor_fusion_redundancy_achieved", False) is True, "Fusion redundancy achieved")
+        print(f"  ✓ 34.4 Autonomous Vehicle 77 GHz Radar & ToF LiDAR in Adverse Weather (ITU-R P.838 / Kruse / ISO 26262): Moderate Rain (12.5 mm/h, Vis 5 km), Target @ {120.0:.0f} m (RCS = {5.0:.1f} m², ρ = {0.18:.2f}), 77 GHz Radar (λ = {sensor_res['radar_wavelength_mm']:.2f} mm, B = 1 GHz, ΔR = {sensor_res['radar_range_resolution_m']:.2f} m): Atm Loss = {sensor_res['radar_atm_attenuation_db_per_km']:.2f} dB/km, P_rx = {sensor_res['radar_received_power_dbm']:.1f} dBm, SNR = {sensor_res['radar_snr_at_target_db']:.1f} dB (Threshold 12.0 dB), R_max = {sensor_res['radar_max_detection_range_m']:.1f} m, 905 nm ToF LiDAR (P_pulse = 75 W, D_lens = 35 mm): Kruse α_atm = {sensor_res['optical_extinction_coeff_per_km']:.2f} km⁻¹, P_rx = {sensor_res['lidar_received_power_uw']:.4f} µW, SNR = {sensor_res['lidar_snr_at_target_db']:.1f} dB, R_max = {sensor_res['lidar_max_detection_range_m']:.1f} m, SOTIF Redundancy: {sensor_res['is_sensor_fusion_redundancy_achieved']})")
+
+        # 34.5 Autonomous Underwater Vehicle (AUV) Hydrodynamics & Battery Endurance (ITTC-78 / Hoerner)
+        auv_res = http_request(port, "POST", "/api/sim/marine/auv_propulsion", body={
+            "cruising_speed_knots": 3.50,
+            "vehicle_length_m": 4.80,
+            "vehicle_diameter_m": 0.533,
+            "wetted_surface_area_m2": 7.20,
+            "battery_capacity_kwh": 24.0,
+            "battery_depth_of_discharge_pct": 85.0,
+            "hotel_power_draw_w": 120.0,
+            "propeller_open_water_efficiency": 0.68,
+            "motor_drive_efficiency": 0.90,
+        })
+        check(auv_res.get("cruising_speed_m_s", 0.0) > 1.70, "Cruising speed > 1.70 m/s")
+        check(auv_res.get("reynolds_number", 0.0) > 7.0e6, "Re > 7.0e6")
+        check(auv_res.get("total_resistance_force_n", 0.0) > 40.0, "Drag > 40 N")
+        check(auv_res.get("total_electrical_power_w", 0.0) > 180.0, "Electrical power > 180 W")
+        check(auv_res.get("mission_endurance_hours", 0.0) > 40.0, "Endurance > 40 h")
+        check(auv_res.get("mission_range_km", 0.0) > 250.0, "Range > 250 km")
+        check(auv_res.get("is_diurnal_endurance_achieved", False) is True, "Diurnal endurance achieved")
+        check(auv_res.get("is_propulsion_power_safe", False) is True, "Propulsion power safe")
+        print(f"  ✓ 34.5 Autonomous Underwater Vehicle (AUV) Resistance & Endurance (ITTC-78 / Hoerner): L = {4.80:.2f} m, D = {0.533:.3f} m (S_wetted = {7.20:.2f} m²), V = {3.50:.1f} kts ({auv_res['cruising_speed_m_s']:.2f} m/s, Re = {auv_res['reynolds_number']:.2e}), ITTC C_F = {auv_res['ittc_friction_coeff_cf']:.5f}, Gertler (1+k) = {auv_res['hull_form_factor']:.3f}, Total C_T = {auv_res['total_drag_coeff_ct']:.5f}, Hydrodynamic Drag R_T = {auv_res['total_resistance_force_n']:.1f} N, Towing P_E = {auv_res['effective_towing_power_w']:.1f} W (QPC = {auv_res['quasi_propulsive_coefficient']:.3f}), Propeller Shaft P_shaft = {auv_res['required_shaft_power_w']:.1f} W, Total Electrical Power = {auv_res['total_electrical_power_w']:.1f} W (P_hotel = 120 W), Battery = 24 kWh (Usable = {auv_res['usable_battery_energy_kwh']:.1f} kWh @ 85% DoD), Endurance = {auv_res['mission_endurance_hours']:.1f} h ({auv_res['mission_range_km']:.1f} km / {auv_res['mission_range_nmi']:.1f} nmi), Specific Consumption = {auv_res['specific_energy_consumption_wh_per_km']:.1f} Wh/km, Diurnal Certified: {auv_res['is_diurnal_endurance_achieved']})")
+
+        # 34.6 Universal Commands Execution Verification (Batch 19 Domains)
+        for cmd_id in [
+            "sim.geotechnical.tbm_tunneling",
+            "sim.structural.prestressed_concrete",
+            "sim.aerospace.spacecraft_jitter",
+            "sim.automotive.radar_lidar_sensor",
+            "sim.marine.auv_propulsion",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 34.6 Universal Commands: All 5 Batch-19 Engineering Commands verified via typed schema engine")
+
+        # 34.7 Enterprise MCP Tool Calling (Batch 19 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_geotechnical_tbm_tunneling",
+            "atlas_sim_structural_prestressed_concrete",
+            "atlas_sim_aerospace_spacecraft_jitter",
+            "atlas_sim_automotive_radar_lidar_sensor",
+            "atlas_sim_marine_auv_propulsion",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 865,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 34.7 Enterprise MCP Tool Calling: 5 Batch-19 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

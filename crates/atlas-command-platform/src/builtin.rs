@@ -5126,5 +5126,255 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.geotechnical.tbm_tunneling",
+            "Tunnel Boring Machine (TBM) Earth Pressure Balance (EPB) Mechanics & Face Stability (ITA / Herzog / Eirich)",
+            "Calculates tunnel face support pressure, cutterhead advance thrust, cutting and muck mixing torque, drive power, and specific excavation energy.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "tunnel_outer_diameter_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Tunnel outer diameter / cutterhead bore diameter in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(6.60)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(18.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "tunnel_depth_to_axis_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Depth from surface to tunnel axis in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(22.0)),
+            validation_rules: vec![ValidationRule::Min(3.0), ValidationRule::Max(150.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "water_table_depth_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Depth to groundwater table in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(4.0)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "cutterhead_rotational_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Cutterhead rotational speed in RPM".into(),
+            required: false,
+            default_value: Some(serde_json::json!(2.5)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "penetration_rate_mm_per_rev".into(),
+            arg_type: ArgumentType::Number,
+            description: "Cutterhead penetration per revolution in mm/rev".into(),
+            required: false,
+            default_value: Some(serde_json::json!(12.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(35.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.structural.prestressed_concrete",
+            "Post-Tensioned Prestressed Concrete Girder Loss & Flexural Stress (ACI 318-19 / AASHTO LRFD / PTI)",
+            "Calculates parabolic tendon friction and wobble losses, anchorage wedge seating draw-in, AASHTO refined time-dependent creep/shrinkage/relaxation losses, and extreme fiber service stresses.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "span_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Girder clear span length in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(32.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(120.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "concrete_f_c_mpa".into(),
+            arg_type: ArgumentType::Number,
+            description: "28-day concrete compressive strength f'c in MPa".into(),
+            required: false,
+            default_value: Some(serde_json::json!(45.0)),
+            validation_rules: vec![ValidationRule::Min(20.0), ValidationRule::Max(120.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "tendon_steel_area_mm2".into(),
+            arg_type: ArgumentType::Number,
+            description: "Total cross-sectional area of prestressing steel in mm²".into(),
+            required: false,
+            default_value: Some(serde_json::json!(2800.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(20000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "midspan_eccentricity_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Tendon drape eccentricity at midspan in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.48)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(3.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "service_moment_midspan_kn_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Service load bending moment at midspan in kN·m".into(),
+            required: false,
+            default_value: Some(serde_json::json!(2150.0)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(50000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.aerospace.spacecraft_jitter",
+            "Spacecraft Reaction Wheel Micro-Vibration & Payload Pointing Jitter (NASA-HDBK-7005 / ECSS-E-HB-32-26A)",
+            "Calculates reaction wheel static/dynamic unbalance forces/torques, bearing kinematic pass frequencies (BPFO/BPFI), structural modal amplification, and payload line-of-sight pointing jitter.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "wheel_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Reaction wheel spin speed in RPM".into(),
+            required: false,
+            default_value: Some(serde_json::json!(3600.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(15000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "static_imbalance_g_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rotor static mass unbalance in g·mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1.80)),
+            validation_rules: vec![ValidationRule::Min(0.01), ValidationRule::Max(50.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "dynamic_imbalance_g_mm2".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rotor dynamic rocking unbalance in g·mm²".into(),
+            required: false,
+            default_value: Some(serde_json::json!(35.0)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "structural_resonance_freq_hz".into(),
+            arg_type: ArgumentType::Number,
+            description: "Spacecraft structural bus resonance frequency in Hz".into(),
+            required: false,
+            default_value: Some(serde_json::json!(85.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "satellite_inertia_kg_m2".into(),
+            arg_type: ArgumentType::Number,
+            description: "Spacecraft moment of inertia about optical axis in kg·m²".into(),
+            required: false,
+            default_value: Some(serde_json::json!(320.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(50000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.automotive.radar_lidar_sensor",
+            "Autonomous Vehicle 77 GHz Radar & ToF LiDAR Perception in Adverse Weather (ITU-R P.838 / Kruse / ISO 26262)",
+            "Calculates 77 GHz FMCW radar range equation with rain attenuation, ToF pulsed LiDAR optical link budget with Kruse atmospheric aerosol extinction, and sensor fusion detection margins.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "target_range_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Target distance in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(120.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(400.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "target_rcs_m2".into(),
+            arg_type: ArgumentType::Number,
+            description: "Target Radar Cross Section in m²".into(),
+            required: false,
+            default_value: Some(serde_json::json!(5.0)),
+            validation_rules: vec![ValidationRule::Min(0.01), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "target_optical_reflectivity".into(),
+            arg_type: ArgumentType::Number,
+            description: "Target optical Lambertian reflectivity (0.0 to 1.0)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.18)),
+            validation_rules: vec![ValidationRule::Min(0.01), ValidationRule::Max(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "radar_tx_power_w".into(),
+            arg_type: ArgumentType::Number,
+            description: "Radar RF transmit power in Watts".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.10)),
+            validation_rules: vec![ValidationRule::Min(0.001), ValidationRule::Max(5.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "lidar_pulse_power_w".into(),
+            arg_type: ArgumentType::Number,
+            description: "LiDAR laser pulse peak optical power in Watts".into(),
+            required: false,
+            default_value: Some(serde_json::json!(75.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(2000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.marine.auv_propulsion",
+            "Autonomous Underwater Vehicle (AUV) Hydrodynamic Resistance & Mission Battery Endurance (ITTC-78 / Hoerner)",
+            "Calculates ITTC-78 friction, Gertler-Myring streamlined hull form factor, total hydrodynamic drag, propeller thrust/QPC power, and battery mission endurance/range.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "cruising_speed_knots".into(),
+            arg_type: ArgumentType::Number,
+            description: "AUV cruising speed in knots".into(),
+            required: false,
+            default_value: Some(serde_json::json!(3.50)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(15.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "vehicle_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "AUV hull length overall in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(4.80)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(25.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "vehicle_diameter_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "AUV hull body outer diameter in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.533)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(3.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "battery_capacity_kwh".into(),
+            arg_type: ArgumentType::Number,
+            description: "Onboard Lithium-ion battery capacity in kWh".into(),
+            required: false,
+            default_value: Some(serde_json::json!(24.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "hotel_power_draw_w".into(),
+            arg_type: ArgumentType::Number,
+            description: "Electrical hotel load (compute, sensors, INS) in Watts".into(),
+            required: false,
+            default_value: Some(serde_json::json!(120.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(5000.0)],
+        }),
+    )?;
+
     Ok(())
 }

@@ -2302,6 +2302,113 @@ def simulation_section(studio: Studio) -> None:
     check(panto_data.get("doppler_speed_ratio_alpha", 0.0) <= 0.70, "Doppler speed ratio alpha <= 0.70")
     check(panto_data.get("loss_of_contact_percentage_nq", 0.0) <= 0.20, "loss of contact percentage NQ <= 0.20%")
     check(panto_data.get("is_mean_contact_force_compliant", False) is True, "mean contact force compliant with EN 50367")
+
+    # 95. Tunnel Boring Machine Earth Pressure Balance (ITA / Herzog / Eirich)
+    tbm = studio.post("/api/sim/geotechnical/tbm_tunneling", {
+        "tunnel_outer_diameter_m": 6.60,
+        "tunnel_depth_to_axis_m": 22.0,
+        "water_table_depth_m": 4.0,
+        "soil_bulk_unit_weight_kn_m3": 19.5,
+        "soil_effective_cohesion_kpa": 12.0,
+        "soil_effective_friction_angle_deg": 32.0,
+        "soil_compressive_strength_mpa": 0.85,
+        "cutterhead_opening_ratio_pct": 35.0,
+        "cutterhead_rotational_speed_rpm": 2.5,
+        "penetration_rate_mm_per_rev": 12.0,
+    })
+    check(tbm.status == 200, f"tbm tunneling returns 200 (got {tbm.status})")
+    tbm_data = tbm.json()
+    check(tbm_data.get("face_area_m2", 0.0) > 33.0, "face area > 33 m2")
+    check(tbm_data.get("hydrostatic_water_pressure_kpa", 0.0) > 150.0, "hydrostatic water pressure > 150 kPa")
+    check(tbm_data.get("min_face_support_pressure_kpa", 0.0) > 180.0, "min face support pressure > 180 kPa")
+    check(tbm_data.get("target_face_support_pressure_kpa", 0.0) > 220.0, "target EPB face support pressure > 220 kPa")
+    check(tbm_data.get("total_required_thrust_kn", 0.0) > 15000.0, "total advance thrust > 15000 kN")
+    check(tbm_data.get("total_cutterhead_torque_kn_m", 0.0) > 2000.0, "total cutterhead torque > 2000 kNm")
+    check(tbm_data.get("is_face_stable", False) is True, "tunnel face stability guaranteed against active collapse")
+
+    # 96. Prestressed Post-Tensioned Concrete Girder Friction & Losses (ACI 318 / AASHTO)
+    prestress = studio.post("/api/sim/structural/prestressed_concrete", {
+        "span_length_m": 32.0,
+        "concrete_area_m2": 0.525,
+        "concrete_moment_of_inertia_m4": 0.0785,
+        "distance_to_top_fiber_m": 0.75,
+        "distance_to_bottom_fiber_m": 0.65,
+        "concrete_f_c_mpa": 45.0,
+        "concrete_f_ci_mpa": 32.0,
+        "tendon_steel_area_mm2": 2800.0,
+        "tendon_modulus_mpa": 195000.0,
+        "jacking_stress_ratio_of_fpu": 0.75,
+        "midspan_eccentricity_m": 0.48,
+        "end_eccentricity_m": 0.08,
+        "service_moment_midspan_kn_m": 2150.0,
+    })
+    check(prestress.status == 200, f"prestressed concrete returns 200 (got {prestress.status})")
+    prestress_data = prestress.json()
+    check(prestress_data.get("initial_jacking_force_kn", 0.0) > 3800.0, "initial jacking force > 3800 kN")
+    check(prestress_data.get("friction_loss_pct", 0.0) > 1.0, "curvature and wobble friction loss > 1%")
+    check(prestress_data.get("anchorage_seating_length_m", 0.0) > 8.0, "wedge seating draw-in influence length > 8 m")
+    check(prestress_data.get("final_effective_midspan_force_kn", 0.0) > 3000.0, "final effective midspan prestress force > 3000 kN")
+    check(prestress_data.get("is_service_tension_compliant", False) is True, "bottom fiber service tension compliant with AASHTO")
+    check(prestress_data.get("is_service_compression_compliant", False) is True, "top fiber service compression compliant with AASHTO")
+
+    # 97. Spacecraft Reaction Wheel Dynamic Jitter & Micro-Vibration (NASA-HDBK-7005 / ECSS)
+    jitter = studio.post("/api/sim/aerospace/spacecraft_jitter", {
+        "wheel_speed_rpm": 3600.0,
+        "rotor_inertia_kg_m2": 0.045,
+        "rotor_mass_kg": 5.50,
+        "static_imbalance_g_mm": 1.80,
+        "dynamic_imbalance_g_mm2": 35.0,
+        "number_of_bearing_balls": 8,
+        "structural_resonance_freq_hz": 85.0,
+        "satellite_inertia_kg_m2": 320.0,
+        "allowable_pointing_jitter_urad": 2.50,
+    })
+    check(jitter.status == 200, f"spacecraft jitter returns 200 (got {jitter.status})")
+    jitter_data = jitter.json()
+    check(jitter_data.get("spin_frequency_hz", 0.0) == 60.0, "rotor spin frequency == 60 Hz")
+    check(jitter_data.get("static_disturbance_force_n", 0.0) > 0.20, "static unbalance radial disturbance force > 0.20 N")
+    check(jitter_data.get("dynamic_disturbance_torque_mn_m", 0.0) > 4.0, "dynamic unbalance rocking torque > 4.0 mNm")
+    check(jitter_data.get("bearing_bpfo_frequency_hz", 0.0) > 180.0, "bearing outer race pass frequency BPFO > 180 Hz")
+    check(jitter_data.get("payload_pointing_jitter_urad", 0.0) < 2.50, "payload optical pointing jitter < 2.50 urad")
+    check(jitter_data.get("is_jitter_compliant", False) is True, "pointing jitter compliant with mission stability budget")
+
+    # 98. Autonomous Vehicle 77 GHz FMCW Radar & ToF LiDAR (ITU-R P.838 / Kruse / ISO 26262)
+    sensor = studio.post("/api/sim/automotive/radar_lidar_sensor", {
+        "target_range_m": 120.0,
+        "target_rcs_m2": 5.0,
+        "target_optical_reflectivity": 0.18,
+        "radar_tx_power_w": 0.10,
+        "radar_antenna_gain_dbi": 26.0,
+        "lidar_pulse_power_w": 75.0,
+        "required_snr_threshold_db": 12.0,
+    })
+    check(sensor.status == 200, f"radar lidar sensor returns 200 (got {sensor.status})")
+    sensor_data = sensor.json()
+    check(sensor_data.get("radar_wavelength_mm", 0.0) > 3.80, "77 GHz radar wavelength > 3.80 mm")
+    check(abs(sensor_data.get("radar_range_resolution_m", 0.0) - 0.15) < 0.02, "radar range resolution ~ 0.15 m")
+    check(sensor_data.get("radar_snr_at_target_db", 0.0) > 15.0, "radar SNR in rain > 15 dB")
+    check(sensor_data.get("radar_max_detection_range_m", 0.0) > 180.0, "radar max detection range > 180 m")
+    check(sensor_data.get("is_radar_target_detected", False) is True, "target reliably detected by 77 GHz FMCW radar")
+    check(sensor_data.get("is_sensor_fusion_redundancy_achieved", False) is True, "sensor fusion redundancy achieved in adverse weather")
+
+    # 99. Autonomous Underwater Vehicle (AUV) Hydrodynamics & Endurance (ITTC-78 / Hoerner)
+    auv = studio.post("/api/sim/marine/auv_propulsion", {
+        "cruising_speed_knots": 3.50,
+        "vehicle_length_m": 4.80,
+        "vehicle_diameter_m": 0.533,
+        "wetted_surface_area_m2": 7.20,
+        "battery_capacity_kwh": 24.0,
+        "hotel_power_draw_w": 120.0,
+    })
+    check(auv.status == 200, f"auv propulsion returns 200 (got {auv.status})")
+    auv_data = auv.json()
+    check(auv_data.get("cruising_speed_m_s", 0.0) > 1.70, "AUV cruising speed > 1.70 m/s")
+    check(auv_data.get("reynolds_number", 0.0) > 7.0e6, "length Reynolds number > 7.0e6")
+    check(auv_data.get("total_resistance_force_n", 0.0) > 40.0, "total hydrodynamic drag > 40 N")
+    check(auv_data.get("total_electrical_power_w", 0.0) > 180.0, "total electrical power > 180 W")
+    check(auv_data.get("mission_endurance_hours", 0.0) > 40.0, "mission endurance > 40 hours")
+    check(auv_data.get("mission_range_km", 0.0) > 250.0, "mission survey range > 250 km")
+    check(auv_data.get("is_diurnal_endurance_achieved", False) is True, "24h diurnal mission endurance achieved")
     report("simulation")
 
 

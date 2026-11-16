@@ -7467,5 +7467,174 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 183. Tunnel Boring Machine Earth Pressure Balance (ITA / Herzog / Eirich)
+    let res_tbm = post(
+        addr,
+        "/api/sim/geotechnical/tbm_tunneling",
+        r#"{
+            "tunnel_outer_diameter_m": 6.60,
+            "tunnel_depth_to_axis_m": 22.0,
+            "water_table_depth_m": 4.0,
+            "soil_bulk_unit_weight_kn_m3": 19.5,
+            "soil_effective_cohesion_kpa": 12.0,
+            "soil_effective_friction_angle_deg": 32.0,
+            "soil_compressive_strength_mpa": 0.85,
+            "cutterhead_opening_ratio_pct": 35.0,
+            "cutterhead_rotational_speed_rpm": 2.5,
+            "penetration_rate_mm_per_rev": 12.0
+        }"#,
+    )?;
+    assert_eq!(res_tbm.status, 200);
+    let tbm_json = json(&res_tbm)?;
+    assert!(tbm_json["face_area_m2"].as_f64().unwrap() > 33.0);
+    assert!(tbm_json["hydrostatic_water_pressure_kpa"].as_f64().unwrap() > 150.0);
+    assert!(tbm_json["min_face_support_pressure_kpa"].as_f64().unwrap() > 180.0);
+    assert!(tbm_json["target_face_support_pressure_kpa"].as_f64().unwrap() > 220.0);
+    assert!(tbm_json["face_stability_safety_factor"].as_f64().unwrap() >= 1.20);
+    assert!(tbm_json["total_required_thrust_kn"].as_f64().unwrap() > 15000.0);
+    assert!(tbm_json["total_cutterhead_torque_kn_m"].as_f64().unwrap() > 2000.0);
+    assert!(tbm_json["cutterhead_drive_power_kw"].as_f64().unwrap() > 500.0);
+    assert!(tbm_json["is_face_stable"].as_bool().unwrap());
+    assert!(tbm_json["is_torque_within_machine_capacity"].as_bool().unwrap());
+    assert!(tbm_json["is_thrust_within_machine_capacity"].as_bool().unwrap());
+
+    // 184. Prestressed Post-Tensioned Concrete Girder Friction & Losses (ACI 318 / AASHTO)
+    let res_prestress = post(
+        addr,
+        "/api/sim/structural/prestressed_concrete",
+        r#"{
+            "span_length_m": 32.0,
+            "concrete_area_m2": 0.525,
+            "concrete_moment_of_inertia_m4": 0.0785,
+            "distance_to_top_fiber_m": 0.75,
+            "distance_to_bottom_fiber_m": 0.65,
+            "concrete_f_c_mpa": 45.0,
+            "concrete_f_ci_mpa": 32.0,
+            "tendon_steel_area_mm2": 2800.0,
+            "tendon_modulus_mpa": 195000.0,
+            "jacking_stress_ratio_of_fpu": 0.75,
+            "midspan_eccentricity_m": 0.48,
+            "end_eccentricity_m": 0.08,
+            "service_moment_midspan_kn_m": 2150.0
+        }"#,
+    )?;
+    assert_eq!(res_prestress.status, 200);
+    let prestress_json = json(&res_prestress)?;
+    assert!(prestress_json["initial_jacking_force_kn"].as_f64().unwrap() > 3800.0);
+    assert!(prestress_json["friction_loss_pct"].as_f64().unwrap() > 1.0);
+    assert!(prestress_json["anchorage_seating_length_m"].as_f64().unwrap() > 8.0);
+    assert!(prestress_json["total_final_prestress_loss_pct"].as_f64().unwrap() > 10.0);
+    assert!(prestress_json["final_effective_midspan_force_kn"].as_f64().unwrap() > 3000.0);
+    assert!(prestress_json["is_service_tension_compliant"].as_bool().unwrap());
+    assert!(prestress_json["is_service_compression_compliant"].as_bool().unwrap());
+    assert!(prestress_json["is_jacking_stress_compliant"].as_bool().unwrap());
+
+    // 185. Spacecraft Reaction Wheel Dynamic Jitter & Micro-Vibration (NASA-HDBK-7005 / ECSS)
+    let res_jitter = post(
+        addr,
+        "/api/sim/aerospace/spacecraft_jitter",
+        r#"{
+            "wheel_speed_rpm": 3600.0,
+            "rotor_inertia_kg_m2": 0.045,
+            "rotor_mass_kg": 5.50,
+            "static_imbalance_g_mm": 1.80,
+            "dynamic_imbalance_g_mm2": 35.0,
+            "number_of_bearing_balls": 8,
+            "structural_resonance_freq_hz": 85.0,
+            "satellite_inertia_kg_m2": 320.0,
+            "allowable_pointing_jitter_urad": 2.50
+        }"#,
+    )?;
+    assert_eq!(res_jitter.status, 200);
+    let jitter_json = json(&res_jitter)?;
+    assert_eq!(jitter_json["spin_frequency_hz"].as_f64().unwrap(), 60.0);
+    assert!(jitter_json["static_disturbance_force_n"].as_f64().unwrap() > 0.20);
+    assert!(jitter_json["dynamic_disturbance_torque_mn_m"].as_f64().unwrap() > 4.0);
+    assert!(jitter_json["bearing_bpfo_frequency_hz"].as_f64().unwrap() > 180.0);
+    assert!(jitter_json["bearing_bpfi_frequency_hz"].as_f64().unwrap() > 260.0);
+    assert!(jitter_json["payload_pointing_jitter_urad"].as_f64().unwrap() < 2.50);
+    assert!(jitter_json["is_jitter_compliant"].as_bool().unwrap());
+    assert!(jitter_json["is_resonance_avoided"].as_bool().unwrap());
+
+    // 186. Autonomous Vehicle 77 GHz FMCW Radar & ToF LiDAR (ITU-R P.838 / Kruse / ISO 26262)
+    let res_radar = post(
+        addr,
+        "/api/sim/automotive/radar_lidar_sensor",
+        r#"{
+            "target_range_m": 120.0,
+            "target_rcs_m2": 5.0,
+            "target_optical_reflectivity": 0.18,
+            "radar_tx_power_w": 0.10,
+            "radar_antenna_gain_dbi": 26.0,
+            "lidar_pulse_power_w": 75.0,
+            "required_snr_threshold_db": 12.0
+        }"#,
+    )?;
+    assert_eq!(res_radar.status, 200);
+    let radar_json = json(&res_radar)?;
+    assert!(radar_json["radar_wavelength_mm"].as_f64().unwrap() > 3.80);
+    assert!((radar_json["radar_range_resolution_m"].as_f64().unwrap() - 0.15).abs() < 0.02);
+    assert!(radar_json["radar_snr_at_target_db"].as_f64().unwrap() > 15.0);
+    assert!(radar_json["radar_max_detection_range_m"].as_f64().unwrap() > 180.0);
+    assert!(radar_json["is_radar_target_detected"].as_bool().unwrap());
+    assert!(radar_json["is_sensor_fusion_redundancy_achieved"].as_bool().unwrap());
+
+    // 187. Autonomous Underwater Vehicle (AUV) Hydrodynamics & Endurance (ITTC-78 / Hoerner)
+    let res_auv = post(
+        addr,
+        "/api/sim/marine/auv_propulsion",
+        r#"{
+            "cruising_speed_knots": 3.50,
+            "vehicle_length_m": 4.80,
+            "vehicle_diameter_m": 0.533,
+            "wetted_surface_area_m2": 7.20,
+            "battery_capacity_kwh": 24.0,
+            "hotel_power_draw_w": 120.0
+        }"#,
+    )?;
+    assert_eq!(res_auv.status, 200);
+    let auv_json = json(&res_auv)?;
+    assert!(auv_json["cruising_speed_m_s"].as_f64().unwrap() > 1.70);
+    assert!(auv_json["reynolds_number"].as_f64().unwrap() > 7.0e6);
+    assert!(auv_json["total_resistance_force_n"].as_f64().unwrap() > 40.0);
+    assert!(auv_json["total_electrical_power_w"].as_f64().unwrap() > 180.0);
+    assert!(auv_json["mission_endurance_hours"].as_f64().unwrap() > 40.0);
+    assert!(auv_json["mission_range_km"].as_f64().unwrap() > 250.0);
+    assert!(auv_json["is_diurnal_endurance_achieved"].as_bool().unwrap());
+    assert!(auv_json["is_propulsion_power_safe"].as_bool().unwrap());
+
+    // 188. Universal Commands Execution Verification (Batch 19 Domains)
+    for cmd_id in [
+        "sim.geotechnical.tbm_tunneling",
+        "sim.structural.prestressed_concrete",
+        "sim.aerospace.spacecraft_jitter",
+        "sim.automotive.radar_lidar_sensor",
+        "sim.marine.auv_propulsion",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 189. Enterprise MCP Tool Calling (Batch 19 Domains)
+    for tool_name in [
+        "atlas_sim_geotechnical_tbm_tunneling",
+        "atlas_sim_structural_prestressed_concrete",
+        "atlas_sim_aerospace_spacecraft_jitter",
+        "atlas_sim_automotive_radar_lidar_sensor",
+        "atlas_sim_marine_auv_propulsion",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 189, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

@@ -131,6 +131,11 @@ pub mod drilled_shaft_foundation;
 pub mod heart_valve_hemodynamics;
 pub mod centrifugal_compressor;
 pub mod rail_pantograph;
+pub mod tbm_tunneling;
+pub mod prestressed_concrete;
+pub mod spacecraft_jitter;
+pub mod radar_lidar_sensor;
+pub mod auv_propulsion;
 
 pub mod prelude {
     pub use crate::acoustics::{
@@ -596,5 +601,25 @@ pub mod prelude {
     pub use crate::rail_pantograph::{
         CatenaryVoltageSystem, RailPantographProblem, RailPantographResult,
         solve_rail_pantograph,
+    };
+    pub use crate::tbm_tunneling::{
+        GroundConditionType, TbmTunnelingProblem, TbmTunnelingResult,
+        solve_tbm_tunneling,
+    };
+    pub use crate::prestressed_concrete::{
+        PrestressingStrandType, PrestressedConcreteProblem, PrestressedConcreteResult,
+        solve_prestressed_concrete,
+    };
+    pub use crate::spacecraft_jitter::{
+        SpacecraftJitterProblem, SpacecraftJitterResult,
+        solve_spacecraft_jitter,
+    };
+    pub use crate::radar_lidar_sensor::{
+        RadarLidarSensorProblem, RadarLidarSensorResult, WeatherConditionType,
+        solve_radar_lidar_sensor,
+    };
+    pub use crate::auv_propulsion::{
+        AuvMissionRegime, AuvPropulsionProblem, AuvPropulsionResult,
+        solve_auv_propulsion,
     };
 }
