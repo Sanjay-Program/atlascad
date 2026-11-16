@@ -136,6 +136,11 @@ pub mod prestressed_concrete;
 pub mod spacecraft_jitter;
 pub mod radar_lidar_sensor;
 pub mod auv_propulsion;
+pub mod hydro_governor;
+pub mod semiconductor_cmp;
+pub mod pavement_mepdg;
+pub mod biomaterial_scaffold;
+pub mod satellite_orbital_decay;
 
 pub mod prelude {
     pub use crate::acoustics::{
@@ -621,5 +626,25 @@ pub mod prelude {
     pub use crate::auv_propulsion::{
         AuvMissionRegime, AuvPropulsionProblem, AuvPropulsionResult,
         solve_auv_propulsion,
+    };
+    pub use crate::hydro_governor::{
+        HydroGovernorProblem, HydroGovernorResult, HydroTurbineType,
+        solve_hydro_governor,
+    };
+    pub use crate::semiconductor_cmp::{
+        CmpLayerType, SemiconductorCmpProblem, SemiconductorCmpResult,
+        solve_semiconductor_cmp,
+    };
+    pub use crate::pavement_mepdg::{
+        AsphaltBinderGrade, PavementMepdgProblem, PavementMepdgResult,
+        solve_pavement_mepdg,
+    };
+    pub use crate::biomaterial_scaffold::{
+        BiomaterialScaffoldProblem, BiomaterialScaffoldResult, ScaffoldBiomaterialType,
+        solve_biomaterial_scaffold,
+    };
+    pub use crate::satellite_orbital_decay::{
+        SatelliteOrbitalDecayProblem, SatelliteOrbitalDecayResult, SolarActivityLevel,
+        solve_satellite_orbital_decay,
     };
 }

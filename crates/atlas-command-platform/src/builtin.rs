@@ -5376,5 +5376,231 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.energy.hydro_governor",
+            "Hydroelectric Turbine Governor, Penstock Water Hammer Surge & Wicket Gate Dynamics (Allievi / IEEE Std 1207)",
+            "Calculates elastic water hammer wave speed, Allievi transient head rise, mechanical/water starting times, full load rejection runaway overspeed, and IEEE 1207 isolated governor tuning parameters.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "rated_net_head_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rated net water head in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(145.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(1500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rated_discharge_m3_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rated volumetric discharge flow rate in m³/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(24.0)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rated_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rated synchronous rotational speed in RPM".into(),
+            required: false,
+            default_value: Some(serde_json::json!(500.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(3600.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "penstock_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Penstock conduit total length in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(420.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(5000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "wicket_gate_closure_time_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Full emergency wicket gate closure duration in seconds".into(),
+            required: false,
+            default_value: Some(serde_json::json!(6.50)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(60.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.semiconductor.cmp_planarization",
+            "Semiconductor Chemical-Mechanical Planarization (CMP) Removal Rate, Dishing & Erosion (SEMI / Preston)",
+            "Calculates Preston/Runnels material removal rate, Stribeck lubrication hydrodynamic regime, pad conditioning decay, and pattern-dependent dielectric dishing/erosion.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "wafer_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Wafer diameter in millimeters (e.g. 300 mm)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(300.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(450.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "down_force_pressure_kpa".into(),
+            arg_type: ArgumentType::Number,
+            description: "Applied carrier down-force polishing pressure in kPa".into(),
+            required: false,
+            default_value: Some(serde_json::json!(21.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "relative_velocity_m_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Relative platen-to-wafer linear velocity in m/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1.25)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "polish_time_seconds".into(),
+            arg_type: ArgumentType::Number,
+            description: "CMP polishing duration in seconds".into(),
+            required: false,
+            default_value: Some(serde_json::json!(60.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(600.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.transportation.pavement_mepdg",
+            "Flexible Asphalt Pavement Structural Response, Fatigue & Rutting (AASHTO MEPDG / Asphalt Institute MS-1)",
+            "Calculates multi-layer Odemark equivalent thickness, asphalt tensile bottom strain, subgrade compressive strain, and AI cumulative fatigue cracking and subgrade rutting life.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "asphalt_thickness_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Asphalt concrete surface layer thickness in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(150.0)),
+            validation_rules: vec![ValidationRule::Min(25.0), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "base_thickness_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Crushed aggregate base course thickness in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(200.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(600.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "subbase_thickness_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Granular subbase course thickness in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(250.0)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(800.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "design_traffic_millions_esal".into(),
+            arg_type: ArgumentType::Number,
+            description: "Design service traffic in millions of 80 kN ESALs".into(),
+            required: false,
+            default_value: Some(serde_json::json!(8.50)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(200.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.biomedical.scaffold_degradation",
+            "Biomaterial Tissue Engineering Scaffold Porosity, Permeability & Degradation (Darcy / Kozeny-Carman / Pitt / ISO 13781)",
+            "Calculates cellular interconnected porosity, Darcy Kozeny-Carman nutrient fluid permeability, Gibson-Ashby porous modulus, and hydrolytic degradation kinetics.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "scaffold_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Cylindrical scaffold outer diameter in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(10.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "scaffold_height_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Cylindrical scaffold height in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(15.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "target_porosity_pct".into(),
+            arg_type: ArgumentType::Number,
+            description: "Target open interconnected cellular porosity percentage (%)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(75.0)),
+            validation_rules: vec![ValidationRule::Min(30.0), ValidationRule::Max(95.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "degradation_evaluation_weeks".into(),
+            arg_type: ArgumentType::Number,
+            description: "In vitro degradation duration in weeks".into(),
+            required: false,
+            default_value: Some(serde_json::json!(12.0)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(156.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.aerospace.satellite_orbital_decay",
+            "Satellite Orbital Decay & Atmospheric Re-entry Lifetime (King-Hele / Jacchia-Roberts / NASA DAS / ISO 27852)",
+            "Calculates solar flux thermospheric density, King-Hele semi-major axis altitude decay rate, total re-entry lifetime, and IADC 25-year / FCC 5-year space debris disposal compliance.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "satellite_mass_kg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Satellite wet mass at end of mission in kg".into(),
+            required: false,
+            default_value: Some(serde_json::json!(12.0)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(50000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "drag_cross_section_area_m2".into(),
+            arg_type: ArgumentType::Number,
+            description: "Effective ram aerodynamic cross-sectional drag area in m²".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.045)),
+            validation_rules: vec![ValidationRule::Min(0.001), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "drag_coefficient_cd".into(),
+            arg_type: ArgumentType::Number,
+            description: "Free molecular aerodynamic drag coefficient C_D (standard ~2.2)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(2.20)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(4.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "initial_perigee_altitude_km".into(),
+            arg_type: ArgumentType::Number,
+            description: "Initial orbit perigee altitude in km".into(),
+            required: false,
+            default_value: Some(serde_json::json!(420.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(2000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "initial_apogee_altitude_km".into(),
+            arg_type: ArgumentType::Number,
+            description: "Initial orbit apogee altitude in km".into(),
+            required: false,
+            default_value: Some(serde_json::json!(440.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(2000.0)],
+        }),
+    )?;
+
     Ok(())
 }

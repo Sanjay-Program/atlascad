@@ -1899,6 +1899,77 @@ impl McpServer {
                     "required": ["cruising_speed_knots", "vehicle_length_m"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_energy_hydro_governor".into(),
+                description: "Calculates elastic water hammer wave speed, Allievi transient head rise, mechanical/water starting times, full load rejection runaway overspeed, and IEEE 1207 isolated governor tuning parameters.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "rated_net_head_m": { "type": "number", "default": 145.0 },
+                        "rated_discharge_m3_s": { "type": "number", "default": 24.0 },
+                        "rated_speed_rpm": { "type": "number", "default": 500.0 },
+                        "wicket_gate_closure_time_s": { "type": "number", "default": 6.50 }
+                    },
+                    "required": ["rated_net_head_m", "rated_discharge_m3_s"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_semiconductor_cmp_planarization".into(),
+                description: "Calculates Preston/Runnels material removal rate, Stribeck lubrication hydrodynamic regime, pad conditioning decay, and pattern-dependent dielectric dishing/erosion.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "wafer_diameter_mm": { "type": "number", "default": 300.0 },
+                        "down_force_pressure_kpa": { "type": "number", "default": 21.0 },
+                        "relative_velocity_m_s": { "type": "number", "default": 1.25 },
+                        "polish_time_seconds": { "type": "number", "default": 60.0 }
+                    },
+                    "required": ["down_force_pressure_kpa", "relative_velocity_m_s"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_transportation_pavement_mepdg".into(),
+                description: "Calculates multi-layer Odemark equivalent thickness, asphalt tensile bottom strain, subgrade compressive strain, and AI cumulative fatigue cracking and subgrade rutting life.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "asphalt_thickness_mm": { "type": "number", "default": 150.0 },
+                        "base_thickness_mm": { "type": "number", "default": 200.0 },
+                        "subbase_thickness_mm": { "type": "number", "default": 250.0 },
+                        "design_traffic_millions_esal": { "type": "number", "default": 8.50 }
+                    },
+                    "required": ["asphalt_thickness_mm", "base_thickness_mm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_biomedical_scaffold_degradation".into(),
+                description: "Calculates cellular interconnected porosity, Darcy Kozeny-Carman nutrient fluid permeability, Gibson-Ashby porous modulus, and hydrolytic degradation kinetics.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "scaffold_diameter_mm": { "type": "number", "default": 10.0 },
+                        "scaffold_height_mm": { "type": "number", "default": 15.0 },
+                        "target_porosity_pct": { "type": "number", "default": 75.0 },
+                        "degradation_evaluation_weeks": { "type": "number", "default": 12.0 }
+                    },
+                    "required": ["target_porosity_pct", "degradation_evaluation_weeks"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_aerospace_satellite_orbital_decay".into(),
+                description: "Calculates solar flux thermospheric density, King-Hele semi-major axis altitude decay rate, total re-entry lifetime, and IADC 25-year / FCC 5-year space debris disposal compliance.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "satellite_mass_kg": { "type": "number", "default": 12.0 },
+                        "drag_cross_section_area_m2": { "type": "number", "default": 0.045 },
+                        "drag_coefficient_cd": { "type": "number", "default": 2.20 },
+                        "initial_perigee_altitude_km": { "type": "number", "default": 420.0 },
+                        "initial_apogee_altitude_km": { "type": "number", "default": 440.0 }
+                    },
+                    "required": ["satellite_mass_kg", "drag_cross_section_area_m2"]
+                }),
+            },
         ]
     }
 

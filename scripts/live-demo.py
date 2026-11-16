@@ -3767,6 +3767,137 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 34.7 Enterprise MCP Tool Calling: 5 Batch-19 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # =====================================================================
+        print("\n--- 35. Batch 20 Advanced Engineering Solvers (Hydro Governor, CMP, Pavement MEPDG, Tissue Scaffold, Satellite Orbit) ---")
+
+        # 35.1 Hydroelectric Turbine Governor, Penstock Water Hammer Surge & Wicket Gate Dynamics (Allievi / IEEE Std 1207)
+        hydro_res = http_request(port, "POST", "/api/sim/energy/hydro_governor", body={
+            "rated_net_head_m": 145.0,
+            "rated_discharge_m3_s": 24.0,
+            "rated_speed_rpm": 500.0,
+            "rotor_inertia_kg_m2": 125000.0,
+            "penstock_length_m": 420.0,
+            "penstock_diameter_m": 2.20,
+            "penstock_wall_thickness_mm": 22.0,
+            "wicket_gate_closure_time_s": 6.50
+        })
+        check(hydro_res.get("rated_mechanical_power_mw", 0.0) > 30.0, "Turbine power > 30 MW")
+        check(hydro_res.get("water_hammer_wave_speed_m_s", 0.0) > 1000.0, "Acoustic wave speed > 1000 m/s")
+        check(hydro_res.get("water_starting_time_tw_s", 0.0) > 1.5, "Tw > 1.5 s")
+        check(hydro_res.get("max_head_rise_m", 0.0) > 30.0, "Head rise > 30 m")
+        check(hydro_res.get("max_head_rise_pct", 100.0) < 40.0, "Head rise < 40%")
+        check(hydro_res.get("max_overspeed_pct", 100.0) < 55.0, "Overspeed < 55%")
+        check(hydro_res.get("penstock_stress_safety_factor", 0.0) >= 1.50, "Penstock FS >= 1.50")
+        check(hydro_res.get("is_water_hammer_pressure_acceptable", False) is True, "Surge acceptable")
+        check(hydro_res.get("is_overspeed_acceptable", False) is True, "Overspeed acceptable")
+        check(hydro_res.get("is_penstock_stress_acceptable", False) is True, "Stress acceptable")
+        print(f"  ✓ 35.1 Hydroelectric Turbine Governor & Penstock Surge (Allievi / IEEE 1207): P_0 = {hydro_res['rated_mechanical_power_mw']:.2f} MW (Q_0 = 24.0 m³/s @ H_0 = 145.0 m, N_0 = 500 RPM), Penstock a = {hydro_res['water_hammer_wave_speed_m_s']:.1f} m/s (2L/a = {hydro_res['reflection_time_seconds']:.2f} s), Tw = {hydro_res['water_starting_time_tw_s']:.2f} s, Tm = {hydro_res['mechanical_starting_time_tm_s']:.2f} s (Tw/Tm = {hydro_res['inertia_ratio_tw_over_tm']:.3f}), Allievi Surge ΔH_max = +{hydro_res['max_head_rise_m']:.1f} m (+{hydro_res['max_head_rise_pct']:.1f}%, Peak = {hydro_res['peak_turbine_inlet_head_m']:.1f} m), Full Load Rejection Overspeed = +{hydro_res['max_overspeed_pct']:.1f}% ({hydro_res['peak_transient_speed_rpm']:.0f} RPM), Hoop Stress σ_hoop = {hydro_res['peak_penstock_hoop_stress_mpa']:.1f} MPa (FS = {hydro_res['penstock_stress_safety_factor']:.2f} >= 1.50), IEEE 1207 Isolated Droop rt = {hydro_res['ieee1207_recommended_droop_rt']:.2f}, Reset Tr = {hydro_res['ieee1207_recommended_reset_time_tr_s']:.2f} s)")
+
+        # 35.2 Semiconductor Chemical-Mechanical Planarization (CMP) Removal Rate, Dishing & Erosion (SEMI / Preston)
+        cmp_res = http_request(port, "POST", "/api/sim/semiconductor/cmp_planarization", body={
+            "wafer_diameter_mm": 300.0,
+            "down_force_pressure_kpa": 20.68,
+            "relative_velocity_m_s": 1.25,
+            "polish_time_seconds": 60.0,
+            "initial_step_height_nm": 450.0,
+            "pattern_line_width_um": 2.50,
+            "pattern_metal_density_pct": 50.0
+        })
+        check(cmp_res.get("preston_mrr_nm_per_min", 0.0) > 300.0, "Preston MRR > 300 nm/min")
+        check(cmp_res.get("total_material_removed_nm", 0.0) > 350.0, "Removed > 350 nm")
+        check(cmp_res.get("planarization_efficiency_pct", 0.0) > 80.0, "PE > 80%")
+        check(cmp_res.get("oxide_dishing_nm", 100.0) < 50.0, "Dishing < 50 nm")
+        check(cmp_res.get("is_dishing_acceptable", False) is True, "Dishing acceptable")
+        check(cmp_res.get("is_erosion_acceptable", False) is True, "Erosion acceptable")
+        check(cmp_res.get("is_uniformity_acceptable", False) is True, "Uniformity acceptable")
+        print(f"  ✓ 35.2 Semiconductor CMP Planarization (SEMI / Preston): 300 mm Cu Damascene, P = {20.68:.2f} kPa (3.0 psi), v = {1.25:.2f} m/s, Sommerfeld So = {cmp_res['sommerfeld_number']:.2e} ({cmp_res['lubrication_regime']}), Preston MRR = {cmp_res['preston_mrr_nm_per_min']:.1f} nm/min, Removed = {cmp_res['total_material_removed_nm']:.1f} nm (t = 60s), Step Height: 450.0 -> {cmp_res['final_residual_step_height_nm']:.1f} nm (PE = {cmp_res['planarization_efficiency_pct']:.1f}%), Cu Dishing = {cmp_res['oxide_dishing_nm']:.1f} nm (SEMI <= 35 nm), Array Erosion = {cmp_res['array_erosion_nm']:.1f} nm (SEMI <= 30 nm), WIWNU (1σ) = {cmp_res['within_wafer_non_uniformity_pct']:.2f}% (<= 5.0%))")
+
+        # 35.3 Flexible Asphalt Pavement Structural Response, Fatigue & Rutting (AASHTO MEPDG)
+        pave_res = http_request(port, "POST", "/api/sim/transportation/pavement_mepdg", body={
+            "asphalt_thickness_mm": 150.0,
+            "base_thickness_mm": 200.0,
+            "subbase_thickness_mm": 250.0,
+            "asphalt_dynamic_modulus_mpa": 3200.0,
+            "base_resilient_modulus_mpa": 280.0,
+            "subgrade_resilient_modulus_mpa": 65.0,
+            "design_traffic_millions_esal": 8.50
+        })
+        check(pave_res.get("total_structure_thickness_mm", 0.0) == 600.0, "Thickness == 600 mm")
+        check(pave_res.get("asphalt_bottom_tensile_strain_ue", 0.0) > 50.0, "Tensile strain > 50 uE")
+        check(pave_res.get("subgrade_top_compressive_strain_ue", 0.0) > 100.0, "Compressive strain > 100 uE")
+        check(pave_res.get("fatigue_damage_ratio", 2.0) <= 1.0, "Fatigue ratio <= 1.0")
+        check(pave_res.get("rutting_damage_ratio", 2.0) <= 1.0, "Rutting ratio <= 1.0")
+        check(pave_res.get("predicted_total_rut_depth_mm", 50.0) <= 12.5, "Rut depth <= 12.5 mm")
+        check(pave_res.get("is_fatigue_life_adequate", False) is True, "Fatigue life adequate")
+        check(pave_res.get("is_rutting_life_adequate", False) is True, "Rutting life adequate")
+        check(pave_res.get("is_pavement_structure_adequate", False) is True, "Structure adequate")
+        print(f"  ✓ 35.3 Flexible Asphalt Pavement MEPDG (AASHTO / Asphalt Institute): H_total = {pave_res['total_structure_thickness_mm']:.0f} mm (AC 150 mm, Base 200 mm, Subbase 250 mm, Odemark h_e = {pave_res['equivalent_thickness_subgrade_mm']:.0f} mm), Traffic = 8.50M ESAL, AC Bottom Tensile Strain ε_t = {pave_res['asphalt_bottom_tensile_strain_ue']:.1f} µε (Allowable Nf = {pave_res['allowable_fatigue_repetitions_millions']:.2f}M, D_fatigue = {pave_res['fatigue_damage_ratio']:.3f}, Alligator Cracking = {pave_res['predicted_alligator_cracking_pct']:.1f}%), Subgrade Compressive Strain ε_v = {pave_res['subgrade_top_compressive_strain_ue']:.1f} µε (Allowable Nd = {pave_res['allowable_rutting_repetitions_millions']:.2f}M, D_rutting = {pave_res['rutting_damage_ratio']:.3f}, Rut Depth = {pave_res['predicted_total_rut_depth_mm']:.1f} mm <= 12.5 mm))")
+
+        # 35.4 Biomaterial Tissue Engineering Scaffold Porosity, Permeability & Degradation (ISO 13781)
+        scaf_res = http_request(port, "POST", "/api/sim/biomedical/scaffold_degradation", body={
+            "scaffold_diameter_mm": 10.0,
+            "scaffold_height_mm": 15.0,
+            "target_porosity_pct": 75.0,
+            "mean_pore_size_um": 350.0,
+            "degradation_evaluation_weeks": 12.0
+        })
+        check(scaf_res.get("darcy_permeability_m2", 0.0) > 1e-11, "Permeability > 1e-11 m2")
+        check(scaf_res.get("initial_compressive_modulus_mpa", 0.0) > 150.0, "Initial modulus > 150 MPa")
+        check(scaf_res.get("degraded_compressive_modulus_mpa", 0.0) > 80.0, "Degraded modulus > 80 MPa")
+        check(scaf_res.get("is_osteoconductive_architecture_favorable", False) is True, "Architecture favorable")
+        check(scaf_res.get("is_shear_stress_osteogenic", False) is True, "Shear stress osteogenic")
+        check(scaf_res.get("is_initial_modulus_sufficient", False) is True, "Initial modulus sufficient")
+        check(scaf_res.get("is_degradation_profile_biocompatible", False) is True, "Degradation profile biocompatible")
+        print(f"  ✓ 35.4 Biomaterial Scaffold Permeability & Degradation (ISO 13781): Porous PLLA Cylinder Ø10x15 mm (V = {scaf_res['bulk_volume_mm3']:.1f} mm³, M = {scaf_res['scaffold_dry_mass_mg']:.1f} mg, ε = 75.0%, d_pore = 350 µm, Sv = {scaf_res['specific_surface_area_mm2_per_mm3']:.2f} mm²/mm³), Darcy Permeability k = {scaf_res['darcy_permeability_m2']:.2e} m² ({scaf_res['darcy_permeability_darcy']:.1f} Darcy), Wall Shear Stress τ_w = {scaf_res['interstitial_fluid_shear_stress_pa']:.3f} Pa (0.01-0.15 Pa osteogenic window), Gibson-Ashby Modulus E_0 = {scaf_res['initial_compressive_modulus_mpa']:.1f} MPa (>= 50 MPa cancellous), 12-Wk Hydrolytic Degradation: Mn 120 -> {scaf_res['retained_molecular_weight_kda']:.1f} kDa (-{scaf_res['molecular_weight_loss_pct']:.1f}%), Degraded Modulus E(t) = {scaf_res['degraded_compressive_modulus_mpa']:.1f} MPa, Mass Loss = {scaf_res['scaffold_mass_loss_pct']:.2f}%)")
+
+        # 35.5 Satellite Orbital Decay & Atmospheric Re-entry Lifetime (King-Hele / ISO 27852)
+        decay_res = http_request(port, "POST", "/api/sim/aerospace/satellite_orbital_decay", body={
+            "satellite_mass_kg": 12.0,
+            "drag_cross_section_area_m2": 0.045,
+            "drag_coefficient_cd": 2.20,
+            "initial_perigee_altitude_km": 420.0,
+            "initial_apogee_altitude_km": 440.0,
+            "orbit_inclination_deg": 51.6
+        })
+        check(decay_res.get("ballistic_coefficient_m2_per_kg", 0.0) > 0.006, "Ballistic coefficient > 0.006")
+        check(decay_res.get("initial_orbital_period_minutes", 0.0) > 90.0, "Period > 90 min")
+        check(decay_res.get("initial_decay_rate_m_per_day", 0.0) > 10.0, "Decay rate > 10 m/day")
+        check(decay_res.get("orbital_lifetime_years", 100.0) < 10.0, "Lifetime < 10 years")
+        check(decay_res.get("is_iadc_25yr_compliant", False) is True, "IADC 25yr compliant")
+        print(f"  ✓ 35.5 Satellite Orbital Decay & Atmospheric Lifetime (King-Hele / ISO 27852): 12 kg LEO CubeSat (h = {decay_res['initial_mean_altitude_km']:.1f} km, e = {decay_res['initial_eccentricity']:.4f}, i = 51.6°), T_orb = {decay_res['initial_orbital_period_minutes']:.2f} min, Ballistic B = {decay_res['ballistic_coefficient_m2_per_kg']:.5f} m²/kg (B_inv = {decay_res['inverse_ballistic_coefficient_kg_per_m2']:.1f} kg/m²), Thermospheric ρ = {decay_res['atmospheric_density_kg_m3']:.2e} kg/m³ (Scale H = {decay_res['density_scale_height_km']:.1f} km), Altitude Loss = {decay_res['initial_decay_rate_m_per_day']:.1f} m/day, Closed-Form Atmospheric Lifetime = {decay_res['orbital_lifetime_years']:.2f} years ({decay_res['orbital_lifetime_days']:.0f} days), Space Debris Compliance: IADC 25-Year Rule: {decay_res['is_iadc_25yr_compliant']}, FCC 5-Year Rule: {decay_res['is_fcc_5yr_compliant']})")
+
+        # 35.6 Universal Commands Execution Verification (Batch 20 Domains)
+        for cmd_id in [
+            "sim.energy.hydro_governor",
+            "sim.semiconductor.cmp_planarization",
+            "sim.transportation.pavement_mepdg",
+            "sim.biomedical.scaffold_degradation",
+            "sim.aerospace.satellite_orbital_decay",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 35.6 Universal Commands: All 5 Batch-20 Engineering Commands verified via typed schema engine")
+
+        # 35.7 Enterprise MCP Tool Calling (Batch 20 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_energy_hydro_governor",
+            "atlas_sim_semiconductor_cmp_planarization",
+            "atlas_sim_transportation_pavement_mepdg",
+            "atlas_sim_biomedical_scaffold_degradation",
+            "atlas_sim_aerospace_satellite_orbital_decay",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 890,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 35.7 Enterprise MCP Tool Calling: 5 Batch-20 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

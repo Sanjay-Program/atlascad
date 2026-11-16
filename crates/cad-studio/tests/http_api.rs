@@ -7636,5 +7636,159 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 190. Hydroelectric Turbine Governor, Penstock Surge & Wicket Gate Dynamics (Allievi / IEEE Std 1207)
+    let hydro_res = post(
+        addr,
+        "/api/sim/energy/hydro_governor",
+        r#"{
+            "rated_net_head_m": 145.0,
+            "rated_discharge_m3_s": 24.0,
+            "rated_speed_rpm": 500.0,
+            "rotor_inertia_kg_m2": 125000.0,
+            "penstock_length_m": 420.0,
+            "penstock_diameter_m": 2.20,
+            "penstock_wall_thickness_mm": 22.0,
+            "wicket_gate_closure_time_s": 6.50
+        }"#,
+    )?;
+    assert_eq!(hydro_res.status, 200);
+    let hydro_json = json(&hydro_res)?;
+    assert!(hydro_json["rated_mechanical_power_mw"].as_f64().unwrap() > 30.0);
+    assert!(hydro_json["water_hammer_wave_speed_m_s"].as_f64().unwrap() > 1000.0);
+    assert!(hydro_json["water_starting_time_tw_s"].as_f64().unwrap() > 1.5);
+    assert!(hydro_json["max_head_rise_m"].as_f64().unwrap() > 30.0);
+    assert!(hydro_json["max_head_rise_pct"].as_f64().unwrap() < 40.0);
+    assert!(hydro_json["max_overspeed_pct"].as_f64().unwrap() < 55.0);
+    assert!(hydro_json["penstock_stress_safety_factor"].as_f64().unwrap() >= 1.50);
+    assert!(hydro_json["is_water_hammer_pressure_acceptable"].as_bool().unwrap());
+    assert!(hydro_json["is_overspeed_acceptable"].as_bool().unwrap());
+    assert!(hydro_json["is_penstock_stress_acceptable"].as_bool().unwrap());
+
+    // 191. Semiconductor CMP Removal Rate, Dishing & Erosion (SEMI / Preston)
+    let cmp_res = post(
+        addr,
+        "/api/sim/semiconductor/cmp_planarization",
+        r#"{
+            "wafer_diameter_mm": 300.0,
+            "down_force_pressure_kpa": 20.68,
+            "relative_velocity_m_s": 1.25,
+            "polish_time_seconds": 60.0,
+            "initial_step_height_nm": 450.0,
+            "pattern_line_width_um": 2.50,
+            "pattern_metal_density_pct": 50.0
+        }"#,
+    )?;
+    assert_eq!(cmp_res.status, 200);
+    let cmp_json = json(&cmp_res)?;
+    assert!(cmp_json["preston_mrr_nm_per_min"].as_f64().unwrap() > 300.0);
+    assert!(cmp_json["total_material_removed_nm"].as_f64().unwrap() > 350.0);
+    assert!(cmp_json["planarization_efficiency_pct"].as_f64().unwrap() > 80.0);
+    assert!(cmp_json["oxide_dishing_nm"].as_f64().unwrap() < 50.0);
+    assert!(cmp_json["is_dishing_acceptable"].as_bool().unwrap());
+    assert!(cmp_json["is_erosion_acceptable"].as_bool().unwrap());
+    assert!(cmp_json["is_uniformity_acceptable"].as_bool().unwrap());
+
+    // 192. Flexible Asphalt Pavement Structural Response, Fatigue & Rutting (AASHTO MEPDG)
+    let pave_res = post(
+        addr,
+        "/api/sim/transportation/pavement_mepdg",
+        r#"{
+            "asphalt_thickness_mm": 150.0,
+            "base_thickness_mm": 200.0,
+            "subbase_thickness_mm": 250.0,
+            "asphalt_dynamic_modulus_mpa": 3200.0,
+            "base_resilient_modulus_mpa": 280.0,
+            "subgrade_resilient_modulus_mpa": 65.0,
+            "design_traffic_millions_esal": 8.50
+        }"#,
+    )?;
+    assert_eq!(pave_res.status, 200);
+    let pave_json = json(&pave_res)?;
+    assert_eq!(pave_json["total_structure_thickness_mm"].as_f64().unwrap(), 600.0);
+    assert!(pave_json["asphalt_bottom_tensile_strain_ue"].as_f64().unwrap() > 50.0);
+    assert!(pave_json["subgrade_top_compressive_strain_ue"].as_f64().unwrap() > 100.0);
+    assert!(pave_json["fatigue_damage_ratio"].as_f64().unwrap() <= 1.0);
+    assert!(pave_json["rutting_damage_ratio"].as_f64().unwrap() <= 1.0);
+    assert!(pave_json["predicted_total_rut_depth_mm"].as_f64().unwrap() <= 12.5);
+    assert!(pave_json["is_fatigue_life_adequate"].as_bool().unwrap());
+    assert!(pave_json["is_rutting_life_adequate"].as_bool().unwrap());
+    assert!(pave_json["is_pavement_structure_adequate"].as_bool().unwrap());
+
+    // 193. Biomaterial Tissue Engineering Scaffold Porosity, Permeability & Degradation (ISO 13781)
+    let scaf_res = post(
+        addr,
+        "/api/sim/biomedical/scaffold_degradation",
+        r#"{
+            "scaffold_diameter_mm": 10.0,
+            "scaffold_height_mm": 15.0,
+            "target_porosity_pct": 75.0,
+            "mean_pore_size_um": 350.0,
+            "degradation_evaluation_weeks": 12.0
+        }"#,
+    )?;
+    assert_eq!(scaf_res.status, 200);
+    let scaf_json = json(&scaf_res)?;
+    assert!(scaf_json["darcy_permeability_m2"].as_f64().unwrap() > 1e-11);
+    assert!(scaf_json["initial_compressive_modulus_mpa"].as_f64().unwrap() > 150.0);
+    assert!(scaf_json["degraded_compressive_modulus_mpa"].as_f64().unwrap() > 80.0);
+    assert!(scaf_json["is_osteoconductive_architecture_favorable"].as_bool().unwrap());
+    assert!(scaf_json["is_shear_stress_osteogenic"].as_bool().unwrap());
+    assert!(scaf_json["is_initial_modulus_sufficient"].as_bool().unwrap());
+    assert!(scaf_json["is_degradation_profile_biocompatible"].as_bool().unwrap());
+
+    // 194. Satellite Orbital Decay & Atmospheric Re-entry Lifetime (King-Hele / ISO 27852)
+    let decay_res = post(
+        addr,
+        "/api/sim/aerospace/satellite_orbital_decay",
+        r#"{
+            "satellite_mass_kg": 12.0,
+            "drag_cross_section_area_m2": 0.045,
+            "drag_coefficient_cd": 2.20,
+            "initial_perigee_altitude_km": 420.0,
+            "initial_apogee_altitude_km": 440.0,
+            "orbit_inclination_deg": 51.6
+        }"#,
+    )?;
+    assert_eq!(decay_res.status, 200);
+    let decay_json = json(&decay_res)?;
+    assert!(decay_json["ballistic_coefficient_m2_per_kg"].as_f64().unwrap() > 0.006);
+    assert!(decay_json["initial_orbital_period_minutes"].as_f64().unwrap() > 90.0);
+    assert!(decay_json["initial_decay_rate_m_per_day"].as_f64().unwrap() > 10.0);
+    assert!(decay_json["orbital_lifetime_years"].as_f64().unwrap() < 10.0);
+    assert!(decay_json["is_iadc_25yr_compliant"].as_bool().unwrap());
+
+    // 195. Universal Commands Execution Verification (Batch 20 Domains)
+    for cmd_id in [
+        "sim.energy.hydro_governor",
+        "sim.semiconductor.cmp_planarization",
+        "sim.transportation.pavement_mepdg",
+        "sim.biomedical.scaffold_degradation",
+        "sim.aerospace.satellite_orbital_decay",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 196. Enterprise MCP Tool Calling (Batch 20 Domains)
+    for tool_name in [
+        "atlas_sim_energy_hydro_governor",
+        "atlas_sim_semiconductor_cmp_planarization",
+        "atlas_sim_transportation_pavement_mepdg",
+        "atlas_sim_biomedical_scaffold_degradation",
+        "atlas_sim_aerospace_satellite_orbital_decay",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 196, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

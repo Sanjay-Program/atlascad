@@ -6545,6 +6545,117 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_energy_hydro_governor(
+        &mut self,
+        req: &SimHydroGovernorRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::hydro_governor::HydroGovernorProblem {
+            problem_id: "hydro_governor_sim".to_string(),
+            turbine_type: req.turbine_type.unwrap_or(atlas_simulation_core::hydro_governor::HydroTurbineType::FrancisReaction),
+            rated_net_head_m: req.rated_net_head_m.unwrap_or(145.0),
+            rated_discharge_m3_s: req.rated_discharge_m3_s.unwrap_or(24.0),
+            rated_speed_rpm: req.rated_speed_rpm.unwrap_or(500.0),
+            rotor_inertia_kg_m2: req.rotor_inertia_kg_m2.unwrap_or(125000.0),
+            penstock_length_m: req.penstock_length_m.unwrap_or(420.0),
+            penstock_diameter_m: req.penstock_diameter_m.unwrap_or(2.20),
+            penstock_wall_thickness_mm: req.penstock_wall_thickness_mm.unwrap_or(22.0),
+            steel_elastic_modulus_gpa: req.steel_elastic_modulus_gpa.unwrap_or(206.0),
+            steel_yield_strength_mpa: req.steel_yield_strength_mpa.unwrap_or(355.0),
+            wicket_gate_closure_time_s: req.wicket_gate_closure_time_s.unwrap_or(6.50),
+            turbine_efficiency: req.turbine_efficiency.unwrap_or(0.935),
+        };
+        let res = atlas_simulation_core::hydro_governor::solve_hydro_governor(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_semiconductor_cmp(
+        &mut self,
+        req: &SimSemiconductorCmpRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::semiconductor_cmp::SemiconductorCmpProblem {
+            problem_id: "semiconductor_cmp_sim".to_string(),
+            layer_type: req.layer_type.unwrap_or(atlas_simulation_core::semiconductor_cmp::CmpLayerType::CopperDamascene),
+            wafer_diameter_mm: req.wafer_diameter_mm.unwrap_or(300.0),
+            down_force_pressure_kpa: req.down_force_pressure_kpa.unwrap_or(20.68),
+            relative_velocity_m_s: req.relative_velocity_m_s.unwrap_or(1.25),
+            polish_time_s: req.polish_time_seconds.unwrap_or(60.0),
+            overpolish_pct: 15.0,
+            initial_step_height_nm: req.initial_step_height_nm.unwrap_or(450.0),
+            interconnect_line_width_um: req.pattern_line_width_um.unwrap_or(2.50),
+            local_pattern_density: req.pattern_metal_density_pct.unwrap_or(50.0) / 100.0,
+            slurry_viscosity_mpa_s: req.slurry_viscosity_pa_s.unwrap_or(0.0025) * 1000.0,
+            pad_roughness_um: 4.5,
+            abrasive_concentration_pct: 12.0,
+        };
+        let res = atlas_simulation_core::semiconductor_cmp::solve_semiconductor_cmp(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_transportation_pavement_mepdg(
+        &mut self,
+        req: &SimPavementMepdgRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::pavement_mepdg::PavementMepdgProblem {
+            problem_id: "pavement_mepdg_sim".to_string(),
+            binder_grade: req.binder_grade.unwrap_or(atlas_simulation_core::pavement_mepdg::AsphaltBinderGrade::Pg70_22),
+            asphalt_thickness_mm: req.asphalt_thickness_mm.unwrap_or(150.0),
+            base_thickness_mm: req.base_thickness_mm.unwrap_or(200.0),
+            subbase_thickness_mm: req.subbase_thickness_mm.unwrap_or(250.0),
+            asphalt_dynamic_modulus_mpa: req.asphalt_dynamic_modulus_mpa.unwrap_or(3200.0),
+            base_resilient_modulus_mpa: req.base_resilient_modulus_mpa.unwrap_or(280.0),
+            subgrade_resilient_modulus_mpa: req.subgrade_resilient_modulus_mpa.unwrap_or(65.0),
+            design_traffic_millions_esal: req.design_traffic_millions_esal.unwrap_or(8.50),
+            effective_binder_volume_pct: req.effective_binder_volume_pct.unwrap_or(11.5),
+            air_voids_pct: req.air_voids_pct.unwrap_or(4.5),
+        };
+        let res = atlas_simulation_core::pavement_mepdg::solve_pavement_mepdg(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_biomedical_scaffold_degradation(
+        &mut self,
+        req: &SimBiomaterialScaffoldRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::biomaterial_scaffold::BiomaterialScaffoldProblem {
+            problem_id: "biomaterial_scaffold_sim".to_string(),
+            biomaterial_type: req.biomaterial_type.unwrap_or(atlas_simulation_core::biomaterial_scaffold::ScaffoldBiomaterialType::PllaPolymer),
+            scaffold_diameter_mm: req.scaffold_diameter_mm.unwrap_or(10.0),
+            scaffold_height_mm: req.scaffold_height_mm.unwrap_or(15.0),
+            target_porosity_pct: req.target_porosity_pct.unwrap_or(75.0),
+            mean_pore_size_um: req.mean_pore_size_um.unwrap_or(350.0),
+            solid_material_modulus_mpa: 3200.0,
+            solid_material_density_g_cm3: 1.25,
+            initial_molecular_weight_kda: 120.0,
+            incubation_time_weeks: req.degradation_evaluation_weeks.unwrap_or(12.0),
+            perfusion_velocity_mm_s: req.perfusion_velocity_mm_s.unwrap_or(0.50),
+        };
+        let res = atlas_simulation_core::biomaterial_scaffold::solve_biomaterial_scaffold(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_aerospace_satellite_orbital_decay(
+        &mut self,
+        req: &SimSatelliteOrbitalDecayRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::satellite_orbital_decay::SatelliteOrbitalDecayProblem {
+            problem_id: "satellite_orbital_decay_sim".to_string(),
+            solar_activity: req.solar_activity.unwrap_or(atlas_simulation_core::satellite_orbital_decay::SolarActivityLevel::ModerateMean),
+            satellite_mass_kg: req.satellite_mass_kg.unwrap_or(12.0),
+            drag_cross_section_area_m2: req.drag_cross_section_area_m2.unwrap_or(0.045),
+            drag_coefficient_cd: req.drag_coefficient_cd.unwrap_or(2.20),
+            initial_perigee_altitude_km: req.initial_perigee_altitude_km.unwrap_or(420.0),
+            initial_apogee_altitude_km: req.initial_apogee_altitude_km.unwrap_or(440.0),
+            orbit_inclination_deg: req.orbit_inclination_deg.unwrap_or(51.6),
+        };
+        let res = atlas_simulation_core::satellite_orbital_decay::solve_satellite_orbital_decay(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -9190,6 +9301,75 @@ namespace AtlasCAD.Unity
                     ..Default::default()
                 })?
             }
+            "sim.energy.hydro_governor" => {
+                let h0 = req.arguments.get("rated_net_head_m").and_then(|v| v.as_f64());
+                let q0 = req.arguments.get("rated_discharge_m3_s").and_then(|v| v.as_f64());
+                let n0 = req.arguments.get("rated_speed_rpm").and_then(|v| v.as_f64());
+                let l_pen = req.arguments.get("penstock_length_m").and_then(|v| v.as_f64());
+                let tc = req.arguments.get("wicket_gate_closure_time_s").and_then(|v| v.as_f64());
+                self.sim_energy_hydro_governor(&SimHydroGovernorRequest {
+                    rated_net_head_m: h0,
+                    rated_discharge_m3_s: q0,
+                    rated_speed_rpm: n0,
+                    penstock_length_m: l_pen,
+                    wicket_gate_closure_time_s: tc,
+                    ..Default::default()
+                })?
+            }
+            "sim.semiconductor.cmp_planarization" => {
+                let d_waf = req.arguments.get("wafer_diameter_mm").and_then(|v| v.as_f64());
+                let p_down = req.arguments.get("down_force_pressure_kpa").and_then(|v| v.as_f64());
+                let v_rel = req.arguments.get("relative_velocity_m_s").and_then(|v| v.as_f64());
+                let t_pol = req.arguments.get("polish_time_seconds").and_then(|v| v.as_f64());
+                self.sim_semiconductor_cmp(&SimSemiconductorCmpRequest {
+                    wafer_diameter_mm: d_waf,
+                    down_force_pressure_kpa: p_down,
+                    relative_velocity_m_s: v_rel,
+                    polish_time_seconds: t_pol,
+                    ..Default::default()
+                })?
+            }
+            "sim.transportation.pavement_mepdg" => {
+                let h_ac = req.arguments.get("asphalt_thickness_mm").and_then(|v| v.as_f64());
+                let h_base = req.arguments.get("base_thickness_mm").and_then(|v| v.as_f64());
+                let h_sub = req.arguments.get("subbase_thickness_mm").and_then(|v| v.as_f64());
+                let esal = req.arguments.get("design_traffic_millions_esal").and_then(|v| v.as_f64());
+                self.sim_transportation_pavement_mepdg(&SimPavementMepdgRequest {
+                    asphalt_thickness_mm: h_ac,
+                    base_thickness_mm: h_base,
+                    subbase_thickness_mm: h_sub,
+                    design_traffic_millions_esal: esal,
+                    ..Default::default()
+                })?
+            }
+            "sim.biomedical.scaffold_degradation" => {
+                let d_scaf = req.arguments.get("scaffold_diameter_mm").and_then(|v| v.as_f64());
+                let h_scaf = req.arguments.get("scaffold_height_mm").and_then(|v| v.as_f64());
+                let eps = req.arguments.get("target_porosity_pct").and_then(|v| v.as_f64());
+                let t_deg = req.arguments.get("degradation_evaluation_weeks").and_then(|v| v.as_f64());
+                self.sim_biomedical_scaffold_degradation(&SimBiomaterialScaffoldRequest {
+                    scaffold_diameter_mm: d_scaf,
+                    scaffold_height_mm: h_scaf,
+                    target_porosity_pct: eps,
+                    degradation_evaluation_weeks: t_deg,
+                    ..Default::default()
+                })?
+            }
+            "sim.aerospace.satellite_orbital_decay" => {
+                let m_sat = req.arguments.get("satellite_mass_kg").and_then(|v| v.as_f64());
+                let a_drag = req.arguments.get("drag_cross_section_area_m2").and_then(|v| v.as_f64());
+                let cd = req.arguments.get("drag_coefficient_cd").and_then(|v| v.as_f64());
+                let hp = req.arguments.get("initial_perigee_altitude_km").and_then(|v| v.as_f64());
+                let ha = req.arguments.get("initial_apogee_altitude_km").and_then(|v| v.as_f64());
+                self.sim_aerospace_satellite_orbital_decay(&SimSatelliteOrbitalDecayRequest {
+                    satellite_mass_kg: m_sat,
+                    drag_cross_section_area_m2: a_drag,
+                    drag_coefficient_cd: cd,
+                    initial_perigee_altitude_km: hp,
+                    initial_apogee_altitude_km: ha,
+                    ..Default::default()
+                })?
+            }
             "system.deploy.status" => self.deploy_status()?,
             _ => serde_json::json!({
                 "status": "Executed",
@@ -11693,6 +11873,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/marine/auv_propulsion" => {
             match parse_body_or_default::<SimAuvPropulsionRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_marine_auv_propulsion(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/energy/hydro_governor" => {
+            match parse_body_or_default::<SimHydroGovernorRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_energy_hydro_governor(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/semiconductor/cmp_planarization" => {
+            match parse_body_or_default::<SimSemiconductorCmpRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_semiconductor_cmp(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/transportation/pavement_mepdg" => {
+            match parse_body_or_default::<SimPavementMepdgRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_transportation_pavement_mepdg(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/biomedical/scaffold_degradation" => {
+            match parse_body_or_default::<SimBiomaterialScaffoldRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_biomedical_scaffold_degradation(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/aerospace/satellite_orbital_decay" => {
+            match parse_body_or_default::<SimSatelliteOrbitalDecayRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_aerospace_satellite_orbital_decay(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -16217,4 +16442,114 @@ struct SimAuvPropulsionRequest {
     pub battery_depth_of_discharge_pct: Option<f64>,
     #[serde(default)]
     pub motor_drive_efficiency: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimHydroGovernorRequest {
+    #[serde(default)]
+    pub turbine_type: Option<atlas_simulation_core::hydro_governor::HydroTurbineType>,
+    #[serde(default)]
+    pub rated_net_head_m: Option<f64>,
+    #[serde(default)]
+    pub rated_discharge_m3_s: Option<f64>,
+    #[serde(default)]
+    pub rated_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub rotor_inertia_kg_m2: Option<f64>,
+    #[serde(default)]
+    pub penstock_length_m: Option<f64>,
+    #[serde(default)]
+    pub penstock_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub penstock_wall_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub steel_elastic_modulus_gpa: Option<f64>,
+    #[serde(default)]
+    pub steel_yield_strength_mpa: Option<f64>,
+    #[serde(default)]
+    pub wicket_gate_closure_time_s: Option<f64>,
+    #[serde(default)]
+    pub turbine_efficiency: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimSemiconductorCmpRequest {
+    #[serde(default)]
+    pub layer_type: Option<atlas_simulation_core::semiconductor_cmp::CmpLayerType>,
+    #[serde(default)]
+    pub wafer_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub down_force_pressure_kpa: Option<f64>,
+    #[serde(default)]
+    pub relative_velocity_m_s: Option<f64>,
+    #[serde(default)]
+    pub polish_time_seconds: Option<f64>,
+    #[serde(default)]
+    pub slurry_viscosity_pa_s: Option<f64>,
+    #[serde(default)]
+    pub initial_step_height_nm: Option<f64>,
+    #[serde(default)]
+    pub pattern_metal_density_pct: Option<f64>,
+    #[serde(default)]
+    pub pattern_line_width_um: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimPavementMepdgRequest {
+    #[serde(default)]
+    pub binder_grade: Option<atlas_simulation_core::pavement_mepdg::AsphaltBinderGrade>,
+    #[serde(default)]
+    pub asphalt_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub base_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub subbase_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub asphalt_dynamic_modulus_mpa: Option<f64>,
+    #[serde(default)]
+    pub base_resilient_modulus_mpa: Option<f64>,
+    #[serde(default)]
+    pub subgrade_resilient_modulus_mpa: Option<f64>,
+    #[serde(default)]
+    pub design_traffic_millions_esal: Option<f64>,
+    #[serde(default)]
+    pub effective_binder_volume_pct: Option<f64>,
+    #[serde(default)]
+    pub air_voids_pct: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimBiomaterialScaffoldRequest {
+    #[serde(default)]
+    pub biomaterial_type: Option<atlas_simulation_core::biomaterial_scaffold::ScaffoldBiomaterialType>,
+    #[serde(default)]
+    pub scaffold_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub scaffold_height_mm: Option<f64>,
+    #[serde(default)]
+    pub target_porosity_pct: Option<f64>,
+    #[serde(default)]
+    pub mean_pore_size_um: Option<f64>,
+    #[serde(default)]
+    pub perfusion_velocity_mm_s: Option<f64>,
+    #[serde(default)]
+    pub degradation_evaluation_weeks: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimSatelliteOrbitalDecayRequest {
+    #[serde(default)]
+    pub solar_activity: Option<atlas_simulation_core::satellite_orbital_decay::SolarActivityLevel>,
+    #[serde(default)]
+    pub satellite_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub drag_cross_section_area_m2: Option<f64>,
+    #[serde(default)]
+    pub drag_coefficient_cd: Option<f64>,
+    #[serde(default)]
+    pub initial_perigee_altitude_km: Option<f64>,
+    #[serde(default)]
+    pub initial_apogee_altitude_km: Option<f64>,
+    #[serde(default)]
+    pub orbit_inclination_deg: Option<f64>,
 }

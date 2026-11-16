@@ -2409,6 +2409,107 @@ def simulation_section(studio: Studio) -> None:
     check(auv_data.get("mission_endurance_hours", 0.0) > 40.0, "mission endurance > 40 hours")
     check(auv_data.get("mission_range_km", 0.0) > 250.0, "mission survey range > 250 km")
     check(auv_data.get("is_diurnal_endurance_achieved", False) is True, "24h diurnal mission endurance achieved")
+
+    # 100. Hydroelectric Turbine Governor, Penstock Surge & Wicket Gate Dynamics (Allievi / IEEE Std 1207)
+    hydro = studio.post("/api/sim/energy/hydro_governor", {
+        "rated_net_head_m": 145.0,
+        "rated_discharge_m3_s": 24.0,
+        "rated_speed_rpm": 500.0,
+        "rotor_inertia_kg_m2": 125000.0,
+        "penstock_length_m": 420.0,
+        "penstock_diameter_m": 2.20,
+        "penstock_wall_thickness_mm": 22.0,
+        "wicket_gate_closure_time_s": 6.50
+    })
+    check(hydro.status == 200, f"hydro governor returns 200 (got {hydro.status})")
+    hydro_data = hydro.json()
+    check(hydro_data.get("rated_mechanical_power_mw", 0.0) > 30.0, "rated turbine power > 30 MW")
+    check(hydro_data.get("water_hammer_wave_speed_m_s", 0.0) > 1000.0, "penstock acoustic wave speed > 1000 m/s")
+    check(hydro_data.get("water_starting_time_tw_s", 0.0) > 1.5, "water starting time Tw > 1.5 s")
+    check(hydro_data.get("max_head_rise_m", 0.0) > 30.0, "Allievi dynamic head rise > 30 m")
+    check(hydro_data.get("max_head_rise_pct", 100.0) < 40.0, "head rise percentage < 40%")
+    check(hydro_data.get("max_overspeed_pct", 100.0) < 55.0, "load rejection overspeed < 55%")
+    check(hydro_data.get("penstock_stress_safety_factor", 0.0) >= 1.50, "penstock hoop stress safety factor >= 1.50")
+    check(hydro_data.get("is_water_hammer_pressure_acceptable", False) is True, "water hammer pressure rise acceptable")
+    check(hydro_data.get("is_overspeed_acceptable", False) is True, "turbine transient overspeed acceptable")
+    check(hydro_data.get("is_penstock_stress_acceptable", False) is True, "penstock steel hoop stress acceptable")
+
+    # 101. Semiconductor Chemical-Mechanical Planarization (CMP) Removal Rate, Dishing & Erosion (SEMI / Preston)
+    cmp_proc = studio.post("/api/sim/semiconductor/cmp_planarization", {
+        "wafer_diameter_mm": 300.0,
+        "down_force_pressure_kpa": 20.68,
+        "relative_velocity_m_s": 1.25,
+        "polish_time_seconds": 60.0,
+        "initial_step_height_nm": 450.0,
+        "pattern_line_width_um": 2.50,
+        "pattern_metal_density_pct": 50.0
+    })
+    check(cmp_proc.status == 200, f"semiconductor cmp returns 200 (got {cmp_proc.status})")
+    cmp_data = cmp_proc.json()
+    check(cmp_data.get("preston_mrr_nm_per_min", 0.0) > 300.0, "Preston removal rate > 300 nm/min")
+    check(cmp_data.get("total_material_removed_nm", 0.0) > 350.0, "total copper removed > 350 nm")
+    check(cmp_data.get("planarization_efficiency_pct", 0.0) > 80.0, "planarization efficiency > 80%")
+    check(cmp_data.get("oxide_dishing_nm", 100.0) < 50.0, "copper line dishing < 50 nm")
+    check(cmp_data.get("is_dishing_acceptable", False) is True, "copper dishing within SEMI specification")
+    check(cmp_data.get("is_erosion_acceptable", False) is True, "dielectric erosion within SEMI specification")
+    check(cmp_data.get("is_uniformity_acceptable", False) is True, "within-wafer non-uniformity acceptable")
+
+    # 102. Flexible Asphalt Pavement Structural Response, Fatigue & Rutting (AASHTO MEPDG)
+    pave = studio.post("/api/sim/transportation/pavement_mepdg", {
+        "asphalt_thickness_mm": 150.0,
+        "base_thickness_mm": 200.0,
+        "subbase_thickness_mm": 250.0,
+        "asphalt_dynamic_modulus_mpa": 3200.0,
+        "base_resilient_modulus_mpa": 280.0,
+        "subgrade_resilient_modulus_mpa": 65.0,
+        "design_traffic_millions_esal": 8.50
+    })
+    check(pave.status == 200, f"pavement mepdg returns 200 (got {pave.status})")
+    pave_data = pave.json()
+    check(pave_data.get("total_structure_thickness_mm", 0.0) == 600.0, "total pavement thickness == 600 mm")
+    check(pave_data.get("asphalt_bottom_tensile_strain_ue", 0.0) > 50.0, "bottom tensile strain > 50 uE")
+    check(pave_data.get("subgrade_top_compressive_strain_ue", 0.0) > 100.0, "subgrade compressive strain > 100 uE")
+    check(pave_data.get("fatigue_damage_ratio", 2.0) <= 1.0, "AI fatigue cracking damage ratio <= 1.0")
+    check(pave_data.get("rutting_damage_ratio", 2.0) <= 1.0, "AI subgrade rutting damage ratio <= 1.0")
+    check(pave_data.get("predicted_total_rut_depth_mm", 50.0) <= 12.5, "total rut depth <= 12.5 mm")
+    check(pave_data.get("is_fatigue_life_adequate", False) is True, "asphalt fatigue cracking life adequate")
+    check(pave_data.get("is_rutting_life_adequate", False) is True, "subgrade rutting life adequate")
+    check(pave_data.get("is_pavement_structure_adequate", False) is True, "pavement structural capacity adequate")
+
+    # 103. Biomaterial Tissue Engineering Scaffold Porosity, Permeability & Degradation (ISO 13781)
+    scaf = studio.post("/api/sim/biomedical/scaffold_degradation", {
+        "scaffold_diameter_mm": 10.0,
+        "scaffold_height_mm": 15.0,
+        "target_porosity_pct": 75.0,
+        "mean_pore_size_um": 350.0,
+        "degradation_evaluation_weeks": 12.0
+    })
+    check(scaf.status == 200, f"scaffold degradation returns 200 (got {scaf.status})")
+    scaf_data = scaf.json()
+    check(scaf_data.get("darcy_permeability_m2", 0.0) > 1e-11, "Kozeny-Carman Darcy permeability > 1e-11 m2")
+    check(scaf_data.get("initial_compressive_modulus_mpa", 0.0) > 150.0, "initial scaffold modulus > 150 MPa")
+    check(scaf_data.get("degraded_compressive_modulus_mpa", 0.0) > 80.0, "retained degraded modulus > 80 MPa")
+    check(scaf_data.get("is_osteoconductive_architecture_favorable", False) is True, "osteoconductive architecture favorable")
+    check(scaf_data.get("is_shear_stress_osteogenic", False) is True, "perfusion fluid shear stress within osteogenic window")
+    check(scaf_data.get("is_initial_modulus_sufficient", False) is True, "initial porous modulus exceeds cancellous bone requirement")
+    check(scaf_data.get("is_degradation_profile_biocompatible", False) is True, "hydrolytic degradation profile biocompatible")
+
+    # 104. Satellite Orbital Decay & Atmospheric Re-entry Lifetime (King-Hele / ISO 27852)
+    decay = studio.post("/api/sim/aerospace/satellite_orbital_decay", {
+        "satellite_mass_kg": 12.0,
+        "drag_cross_section_area_m2": 0.045,
+        "drag_coefficient_cd": 2.20,
+        "initial_perigee_altitude_km": 420.0,
+        "initial_apogee_altitude_km": 440.0,
+        "orbit_inclination_deg": 51.6
+    })
+    check(decay.status == 200, f"satellite orbital decay returns 200 (got {decay.status})")
+    decay_data = decay.json()
+    check(decay_data.get("ballistic_coefficient_m2_per_kg", 0.0) > 0.006, "ballistic coefficient > 0.006 m2/kg")
+    check(decay_data.get("initial_orbital_period_minutes", 0.0) > 90.0, "orbital period > 90 minutes")
+    check(decay_data.get("initial_decay_rate_m_per_day", 0.0) > 10.0, "King-Hele decay rate > 10 m/day")
+    check(decay_data.get("orbital_lifetime_years", 100.0) < 10.0, "atmospheric lifetime < 10 years")
+    check(decay_data.get("is_iadc_25yr_compliant", False) is True, "satisfies international IADC 25-year space debris guideline")
     report("simulation")
 
 
