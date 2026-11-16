@@ -7790,5 +7790,180 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 197. Mining Bucket Wheel Excavator Digging Mechanics (ISO 5048 / Krause)
+    let excavator_res = post(
+        addr,
+        "/api/sim/mining/bucket_wheel_excavator",
+        r#"{
+            "material_class": "ClaySiltOverburden",
+            "wheel_diameter_m": 12.50,
+            "bucket_count": 14,
+            "bucket_nominal_volume_m3": 1.80,
+            "wheel_speed_rpm": 4.80,
+            "bucket_fill_factor": 1.05,
+            "total_cutting_lip_length_m": 2.40,
+            "lineal_cutting_resistance_kn_m": 110.0,
+            "boom_length_m": 42.0,
+            "slewing_speed_deg_s": 0.25,
+            "upperstructure_mass_tons": 2400.0,
+            "stabilizing_moment_kn_m": 650000.0,
+            "mechanical_efficiency": 0.88
+        }"#,
+    )?;
+    assert_eq!(excavator_res.status, 200);
+    let excavator_json = json(&excavator_res)?;
+    assert!(excavator_json["theoretical_capacity_m3_per_h"].as_f64().unwrap() > 7000.0);
+    assert!(excavator_json["tangential_digging_force_kn"].as_f64().unwrap() > 200.0);
+    assert!(excavator_json["required_drive_power_kw"].as_f64().unwrap() > 800.0);
+    assert!(excavator_json["stability_safety_factor"].as_f64().unwrap() > 1.30);
+    assert!(excavator_json["is_cutting_speed_acceptable"].as_bool().unwrap());
+    assert!(excavator_json["is_drive_power_feasible"].as_bool().unwrap());
+    assert!(excavator_json["is_machine_stable"].as_bool().unwrap());
+
+    // 198. Two-Phase Gas-Liquid Pipe Flow Assurance (Lockhart-Martinelli / API RP 14E)
+    let multiphase_res = post(
+        addr,
+        "/api/sim/process/multiphase_pipe_flow",
+        r#"{
+            "pipe_length_m": 8500.0,
+            "pipe_inner_diameter_mm": 254.0,
+            "elevation_change_m": 120.0,
+            "liquid_mass_flow_kg_s": 35.0,
+            "gas_mass_flow_kg_s": 4.50,
+            "liquid_density_kg_m3": 840.0,
+            "gas_density_kg_m3": 42.0,
+            "liquid_viscosity_mpa_s": 2.80,
+            "gas_viscosity_mpa_s": 0.016,
+            "pipe_roughness_mm": 0.045,
+            "api_erosion_constant_c": 122.0
+        }"#,
+    )?;
+    assert_eq!(multiphase_res.status, 200);
+    let multiphase_json = json(&multiphase_res)?;
+    assert!(multiphase_json["mixture_density_kg_m3"].as_f64().unwrap() > 100.0);
+    assert!(multiphase_json["mixture_velocity_m_s"].as_f64().unwrap() > 1.0);
+    assert!(multiphase_json["lockhart_martinelli_param_x"].as_f64().unwrap() > 0.5);
+    assert!(multiphase_json["in_situ_liquid_holdup_hl"].as_f64().unwrap() > 0.1);
+    assert!(multiphase_json["total_pressure_drop_bar"].as_f64().unwrap() > 1.0);
+    assert!(multiphase_json["is_erosion_velocity_acceptable"].as_bool().unwrap());
+    assert!(multiphase_json["is_pressure_drop_acceptable"].as_bool().unwrap());
+
+    // 199. Geothermal Reservoir Doublet Well Heat Extraction (Gringarten / Bodvarsson)
+    let geothermal_res = post(
+        addr,
+        "/api/sim/energy/geothermal_reservoir",
+        r#"{
+            "rock_type": "SandstoneAquifer",
+            "reservoir_temperature_c": 160.0,
+            "reinjection_temperature_c": 65.0,
+            "brine_flow_rate_l_s": 75.0,
+            "reservoir_thickness_m": 80.0,
+            "well_spacing_distance_m": 1200.0,
+            "wellbore_radius_m": 0.108,
+            "reservoir_permeability_md": 450.0,
+            "reservoir_porosity": 0.12,
+            "pump_system_efficiency": 0.72,
+            "project_lifespan_years": 30.0
+        }"#,
+    )?;
+    assert_eq!(geothermal_res.status, 200);
+    let geothermal_json = json(&geothermal_res)?;
+    assert!(geothermal_json["initial_thermal_power_mw_th"].as_f64().unwrap() > 25.0);
+    assert!(geothermal_json["parasitic_pump_power_kw_e"].as_f64().unwrap() > 50.0);
+    assert!(geothermal_json["thermal_cop"].as_f64().unwrap() > 100.0);
+    assert!(geothermal_json["thermal_breakthrough_years"].as_f64().unwrap() > 20.0);
+    assert!(geothermal_json["is_breakthrough_delayed_acceptable"].as_bool().unwrap());
+    assert!(geothermal_json["is_pumping_power_viable"].as_bool().unwrap());
+    assert!(geothermal_json["is_thermal_cop_sustainable"].as_bool().unwrap());
+
+    // 200. Spray Drying Atomization, Droplet Evaporation & Powder Moisture (Masters / ASABE)
+    let spray_res = post(
+        addr,
+        "/api/sim/process/spray_drying_kinetics",
+        r#"{
+            "product_type": "DairyMilkPowder",
+            "feed_rate_kg_h": 1200.0,
+            "feed_solids_fraction": 0.45,
+            "feed_viscosity_mpa_s": 18.0,
+            "feed_surface_tension_mn_m": 48.0,
+            "atomizer_wheel_diameter_mm": 210.0,
+            "atomizer_speed_rpm": 16000.0,
+            "inlet_air_temperature_c": 195.0,
+            "outlet_air_temperature_c": 88.0,
+            "ambient_air_temperature_c": 20.0,
+            "ambient_air_rh_pct": 50.0,
+            "target_product_moisture_pct": 3.50
+        }"#,
+    )?;
+    assert_eq!(spray_res.status, 200);
+    let spray_json = json(&spray_res)?;
+    assert!(spray_json["sauter_mean_diameter_d32_um"].as_f64().unwrap() > 20.0);
+    assert!(spray_json["droplet_drying_time_seconds"].as_f64().unwrap() < 5.0);
+    assert!(spray_json["water_evaporation_rate_kg_h"].as_f64().unwrap() > 600.0);
+    assert!(spray_json["dry_powder_production_rate_kg_h"].as_f64().unwrap() > 500.0);
+    assert!(spray_json["is_drying_time_adequate"].as_bool().unwrap());
+    assert!(spray_json["is_stickiness_risk_acceptable"].as_bool().unwrap());
+    assert!(spray_json["is_thermal_efficiency_acceptable"].as_bool().unwrap());
+
+    // 201. Radioisotope Thermoelectric Generator (RTG) (NASA SP-8000 / Ioffe)
+    let rtg_res = post(
+        addr,
+        "/api/sim/energy/thermoelectric_rtg",
+        r#"{
+            "material_type": "SiliconGermaniumSiGe",
+            "initial_thermal_power_w_th": 4400.0,
+            "hot_junction_temp_k": 1273.15,
+            "cold_junction_temp_k": 573.15,
+            "couple_count": 572,
+            "leg_length_mm": 20.0,
+            "leg_area_mm2": 9.0,
+            "mission_elapsed_years": 17.0,
+            "fuel_half_life_years": 87.7,
+            "annual_junction_degradation_pct": 0.70
+        }"#,
+    )?;
+    assert_eq!(rtg_res.status, 200);
+    let rtg_json = json(&rtg_res)?;
+    assert!(rtg_json["zt_figure_of_merit"].as_f64().unwrap() > 0.7);
+    assert!(rtg_json["conversion_efficiency_pct"].as_f64().unwrap() > 5.0);
+    assert!(rtg_json["bol_electric_power_w_e"].as_f64().unwrap() > 250.0);
+    assert!(rtg_json["eol_electric_power_w_e"].as_f64().unwrap() > 180.0);
+    assert!(rtg_json["is_bus_voltage_adequate"].as_bool().unwrap());
+    assert!(rtg_json["is_eol_power_sufficient"].as_bool().unwrap());
+    assert!(rtg_json["is_conversion_efficiency_acceptable"].as_bool().unwrap());
+
+    // 202. Universal Commands Execution Verification (Batch 21 Domains)
+    for cmd_id in [
+        "sim.mining.bucket_wheel_excavator",
+        "sim.process.multiphase_pipe_flow",
+        "sim.energy.geothermal_reservoir",
+        "sim.process.spray_drying_kinetics",
+        "sim.energy.thermoelectric_rtg",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 203. Enterprise MCP Tool Calling (Batch 21 Domains)
+    for tool_name in [
+        "atlas_sim_mining_bucket_wheel_excavator",
+        "atlas_sim_process_multiphase_pipe_flow",
+        "atlas_sim_energy_geothermal_reservoir",
+        "atlas_sim_process_spray_drying_kinetics",
+        "atlas_sim_energy_thermoelectric_rtg",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 203, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

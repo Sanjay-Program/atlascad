@@ -1970,6 +1970,76 @@ impl McpServer {
                     "required": ["satellite_mass_kg", "drag_cross_section_area_m2"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_mining_bucket_wheel_excavator".into(),
+                description: "Calculates hourly theoretical excavation volume, cutting lip tangential digging force, wheel shaft drive torque/power, specific cutting energy, and ISO 5048 machine tipping stability.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "wheel_diameter_m": { "type": "number", "default": 12.50 },
+                        "bucket_nominal_volume_m3": { "type": "number", "default": 1.80 },
+                        "wheel_speed_rpm": { "type": "number", "default": 4.80 },
+                        "boom_length_m": { "type": "number", "default": 42.0 }
+                    },
+                    "required": ["wheel_diameter_m", "bucket_nominal_volume_m3"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_process_multiphase_pipe_flow".into(),
+                description: "Calculates Lockhart-Martinelli parameter, Chisholm two-phase frictional pressure gradient, in-situ liquid holdup, flow regime, and API RP 14E erosional velocity thresholds.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "pipe_length_m": { "type": "number", "default": 8500.0 },
+                        "pipe_inner_diameter_mm": { "type": "number", "default": 254.0 },
+                        "liquid_mass_flow_kg_s": { "type": "number", "default": 35.0 },
+                        "gas_mass_flow_kg_s": { "type": "number", "default": 4.50 }
+                    },
+                    "required": ["pipe_length_m", "pipe_inner_diameter_mm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_energy_geothermal_reservoir".into(),
+                description: "Calculates steady-state doublet hydrodynamic pressure drop, circulation pumping power, Gringarten thermal breakthrough arrival time, 30-year wellhead temperature decline, and thermal COP.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "reservoir_temperature_c": { "type": "number", "default": 160.0 },
+                        "reinjection_temperature_c": { "type": "number", "default": 65.0 },
+                        "brine_flow_rate_l_s": { "type": "number", "default": 75.0 },
+                        "well_spacing_distance_m": { "type": "number", "default": 1200.0 }
+                    },
+                    "required": ["reservoir_temperature_c", "brine_flow_rate_l_s"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_process_spray_drying_kinetics".into(),
+                description: "Calculates rotary atomizer tip speed, Sauter Mean Diameter D32, D2-law droplet evaporation drying time, process air heater thermal duty, and Gordon-Taylor powder glass transition stickiness margin.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "feed_rate_kg_h": { "type": "number", "default": 2500.0 },
+                        "feed_solids_fraction": { "type": "number", "default": 0.48 },
+                        "atomizer_speed_rpm": { "type": "number", "default": 18000.0 },
+                        "inlet_air_temperature_c": { "type": "number", "default": 200.0 }
+                    },
+                    "required": ["feed_rate_kg_h", "feed_solids_fraction"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_energy_thermoelectric_rtg".into(),
+                description: "Calculates Pu-238 alpha decay heat, thermoelectric figure of merit ZT, Seebeck open-circuit voltage, matched load electrical power, and 15-year deep space mission power degradation profile.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "initial_thermal_power_w_th": { "type": "number", "default": 4400.0 },
+                        "hot_junction_temp_k": { "type": "number", "default": 1273.15 },
+                        "cold_junction_temp_k": { "type": "number", "default": 566.15 },
+                        "couple_count": { "type": "integer", "default": 572 }
+                    },
+                    "required": ["initial_thermal_power_w_th", "couple_count"]
+                }),
+            },
         ]
     }
 

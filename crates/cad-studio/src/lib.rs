@@ -6656,6 +6656,123 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_mining_bucket_wheel_excavator(
+        &mut self,
+        req: &SimMiningExcavatorRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::mining_excavator::MiningExcavatorProblem {
+            problem_id: "mining_excavator_sim".to_string(),
+            material_class: req.material_class.unwrap_or(atlas_simulation_core::mining_excavator::MiningMaterialClass::ClaySiltOverburden),
+            wheel_diameter_m: req.wheel_diameter_m.unwrap_or(12.50),
+            bucket_count: req.bucket_count.unwrap_or(14),
+            bucket_nominal_volume_m3: req.bucket_nominal_volume_m3.unwrap_or(1.80),
+            wheel_speed_rpm: req.wheel_speed_rpm.unwrap_or(4.80),
+            bucket_fill_factor: req.bucket_fill_factor.unwrap_or(1.05),
+            total_cutting_lip_length_m: req.total_cutting_lip_length_m.unwrap_or(2.40),
+            lineal_cutting_resistance_kn_m: req.lineal_cutting_resistance_kn_m.unwrap_or(110.0),
+            boom_length_m: req.boom_length_m.unwrap_or(42.0),
+            slewing_speed_deg_s: req.slewing_speed_deg_s.unwrap_or(0.25),
+            upperstructure_mass_tons: req.upperstructure_mass_tons.unwrap_or(2400.0),
+            stabilizing_moment_kn_m: req.stabilizing_moment_kn_m.unwrap_or(650000.0),
+            mechanical_efficiency: req.mechanical_efficiency.unwrap_or(0.88),
+        };
+        let res = atlas_simulation_core::mining_excavator::solve_mining_excavator(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_process_multiphase_pipe_flow(
+        &mut self,
+        req: &SimMultiphasePipeFlowRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::multiphase_pipe_flow::MultiphasePipeFlowProblem {
+            problem_id: "multiphase_pipe_flow_sim".to_string(),
+            pipe_length_m: req.pipe_length_m.unwrap_or(8500.0),
+            pipe_inner_diameter_mm: req.pipe_inner_diameter_mm.unwrap_or(254.0),
+            elevation_change_m: req.elevation_change_m.unwrap_or(120.0),
+            liquid_mass_flow_kg_s: req.liquid_mass_flow_kg_s.unwrap_or(35.0),
+            gas_mass_flow_kg_s: req.gas_mass_flow_kg_s.unwrap_or(4.50),
+            liquid_density_kg_m3: req.liquid_density_kg_m3.unwrap_or(840.0),
+            gas_density_kg_m3: req.gas_density_kg_m3.unwrap_or(42.0),
+            liquid_viscosity_mpa_s: req.liquid_viscosity_mpa_s.unwrap_or(2.80),
+            gas_viscosity_mpa_s: req.gas_viscosity_mpa_s.unwrap_or(0.016),
+            pipe_roughness_mm: req.pipe_roughness_mm.unwrap_or(0.045),
+            api_erosion_constant_c: req.api_erosion_constant_c.unwrap_or(122.0),
+        };
+        let res = atlas_simulation_core::multiphase_pipe_flow::solve_multiphase_pipe_flow(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_energy_geothermal_reservoir(
+        &mut self,
+        req: &SimGeothermalReservoirRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::geothermal_reservoir::GeothermalReservoirProblem {
+            problem_id: "geothermal_reservoir_sim".to_string(),
+            rock_type: req.rock_type.unwrap_or(atlas_simulation_core::geothermal_reservoir::GeothermalRockType::SandstoneAquifer),
+            reservoir_temperature_c: req.reservoir_temperature_c.unwrap_or(160.0),
+            reinjection_temperature_c: req.reinjection_temperature_c.unwrap_or(65.0),
+            brine_flow_rate_l_s: req.brine_flow_rate_l_s.unwrap_or(75.0),
+            reservoir_thickness_m: req.reservoir_thickness_m.unwrap_or(80.0),
+            well_spacing_distance_m: req.well_spacing_distance_m.unwrap_or(1200.0),
+            wellbore_radius_m: req.wellbore_radius_m.unwrap_or(0.108),
+            reservoir_permeability_md: req.reservoir_permeability_md.unwrap_or(450.0),
+            reservoir_porosity: req.reservoir_porosity.unwrap_or(0.12),
+            pump_system_efficiency: req.pump_system_efficiency.unwrap_or(0.72),
+            project_lifespan_years: req.project_lifespan_years.unwrap_or(30.0),
+        };
+        let res = atlas_simulation_core::geothermal_reservoir::solve_geothermal_reservoir(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_process_spray_drying_kinetics(
+        &mut self,
+        req: &SimSprayDryingKineticsRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::spray_drying_kinetics::SprayDryingKineticsProblem {
+            problem_id: "spray_drying_kinetics_sim".to_string(),
+            product_type: req.product_type.unwrap_or(atlas_simulation_core::spray_drying_kinetics::SprayDryingProductType::DairyMilkPowder),
+            feed_rate_kg_h: req.feed_rate_kg_h.unwrap_or(2500.0),
+            feed_solids_fraction: req.feed_solids_fraction.unwrap_or(0.48),
+            feed_viscosity_mpa_s: req.feed_viscosity_mpa_s.unwrap_or(35.0),
+            feed_surface_tension_mn_m: req.feed_surface_tension_mn_m.unwrap_or(48.0),
+            atomizer_wheel_diameter_mm: req.atomizer_wheel_diameter_mm.unwrap_or(210.0),
+            atomizer_speed_rpm: req.atomizer_speed_rpm.unwrap_or(18000.0),
+            inlet_air_temperature_c: req.inlet_air_temperature_c.unwrap_or(200.0),
+            outlet_air_temperature_c: req.outlet_air_temperature_c.unwrap_or(88.0),
+            ambient_air_temperature_c: req.ambient_air_temperature_c.unwrap_or(20.0),
+            ambient_air_rh_pct: req.ambient_air_rh_pct.unwrap_or(50.0),
+            target_product_moisture_pct: req.target_product_moisture_pct.unwrap_or(3.50),
+        };
+        let res = atlas_simulation_core::spray_drying_kinetics::solve_spray_drying_kinetics(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_energy_thermoelectric_rtg(
+        &mut self,
+        req: &SimThermoelectricRtgRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::thermoelectric_rtg::ThermoelectricRtgProblem {
+            problem_id: "thermoelectric_rtg_sim".to_string(),
+            material_type: req.material_type.unwrap_or(atlas_simulation_core::thermoelectric_rtg::ThermoelectricMaterialType::SiliconGermaniumSiGe),
+            initial_thermal_power_w_th: req.initial_thermal_power_w_th.unwrap_or(4400.0),
+            hot_junction_temp_k: req.hot_junction_temp_k.unwrap_or(1273.15),
+            cold_junction_temp_k: req.cold_junction_temp_k.unwrap_or(566.15),
+            couple_count: req.couple_count.unwrap_or(572),
+            leg_length_mm: req.leg_length_mm.unwrap_or(20.0),
+            leg_area_mm2: req.leg_area_mm2.unwrap_or(9.0),
+            mission_elapsed_years: req.mission_elapsed_years.unwrap_or(15.0),
+            fuel_half_life_years: req.fuel_half_life_years.unwrap_or(87.7),
+            annual_junction_degradation_pct: req.annual_junction_degradation_pct.unwrap_or(0.75),
+        };
+        let res = atlas_simulation_core::thermoelectric_rtg::solve_thermoelectric_rtg(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -9370,6 +9487,81 @@ namespace AtlasCAD.Unity
                     ..Default::default()
                 })?
             }
+            "sim.mining.bucket_wheel_excavator" => {
+                let d_w = req.arguments.get("wheel_diameter_m").and_then(|v| v.as_f64());
+                let v_b = req.arguments.get("bucket_nominal_volume_m3").and_then(|v| v.as_f64());
+                let rpm = req.arguments.get("wheel_speed_rpm").and_then(|v| v.as_f64());
+                let kl = req.arguments.get("lineal_cutting_resistance_kn_m").and_then(|v| v.as_f64());
+                let l_b = req.arguments.get("boom_length_m").and_then(|v| v.as_f64());
+                self.sim_mining_bucket_wheel_excavator(&SimMiningExcavatorRequest {
+                    wheel_diameter_m: d_w,
+                    bucket_nominal_volume_m3: v_b,
+                    wheel_speed_rpm: rpm,
+                    lineal_cutting_resistance_kn_m: kl,
+                    boom_length_m: l_b,
+                    ..Default::default()
+                })?
+            }
+            "sim.process.multiphase_pipe_flow" => {
+                let l_p = req.arguments.get("pipe_length_m").and_then(|v| v.as_f64());
+                let d_p = req.arguments.get("pipe_inner_diameter_mm").and_then(|v| v.as_f64());
+                let m_l = req.arguments.get("liquid_mass_flow_kg_s").and_then(|v| v.as_f64());
+                let m_g = req.arguments.get("gas_mass_flow_kg_s").and_then(|v| v.as_f64());
+                let dz = req.arguments.get("elevation_change_m").and_then(|v| v.as_f64());
+                self.sim_process_multiphase_pipe_flow(&SimMultiphasePipeFlowRequest {
+                    pipe_length_m: l_p,
+                    pipe_inner_diameter_mm: d_p,
+                    liquid_mass_flow_kg_s: m_l,
+                    gas_mass_flow_kg_s: m_g,
+                    elevation_change_m: dz,
+                    ..Default::default()
+                })?
+            }
+            "sim.energy.geothermal_reservoir" => {
+                let t_res = req.arguments.get("reservoir_temperature_c").and_then(|v| v.as_f64());
+                let t_inj = req.arguments.get("reinjection_temperature_c").and_then(|v| v.as_f64());
+                let q_w = req.arguments.get("brine_flow_rate_l_s").and_then(|v| v.as_f64());
+                let d_w = req.arguments.get("well_spacing_distance_m").and_then(|v| v.as_f64());
+                let k_md = req.arguments.get("reservoir_permeability_md").and_then(|v| v.as_f64());
+                self.sim_energy_geothermal_reservoir(&SimGeothermalReservoirRequest {
+                    reservoir_temperature_c: t_res,
+                    reinjection_temperature_c: t_inj,
+                    brine_flow_rate_l_s: q_w,
+                    well_spacing_distance_m: d_w,
+                    reservoir_permeability_md: k_md,
+                    ..Default::default()
+                })?
+            }
+            "sim.process.spray_drying_kinetics" => {
+                let m_f = req.arguments.get("feed_rate_kg_h").and_then(|v| v.as_f64());
+                let s_f = req.arguments.get("feed_solids_fraction").and_then(|v| v.as_f64());
+                let rpm = req.arguments.get("atomizer_speed_rpm").and_then(|v| v.as_f64());
+                let t_in = req.arguments.get("inlet_air_temperature_c").and_then(|v| v.as_f64());
+                let t_out = req.arguments.get("outlet_air_temperature_c").and_then(|v| v.as_f64());
+                self.sim_process_spray_drying_kinetics(&SimSprayDryingKineticsRequest {
+                    feed_rate_kg_h: m_f,
+                    feed_solids_fraction: s_f,
+                    atomizer_speed_rpm: rpm,
+                    inlet_air_temperature_c: t_in,
+                    outlet_air_temperature_c: t_out,
+                    ..Default::default()
+                })?
+            }
+            "sim.energy.thermoelectric_rtg" => {
+                let q0 = req.arguments.get("initial_thermal_power_w_th").and_then(|v| v.as_f64());
+                let th = req.arguments.get("hot_junction_temp_k").and_then(|v| v.as_f64());
+                let tc = req.arguments.get("cold_junction_temp_k").and_then(|v| v.as_f64());
+                let n_c = req.arguments.get("couple_count").and_then(|v| v.as_u64()).map(|n| n as u32);
+                let t_yr = req.arguments.get("mission_elapsed_years").and_then(|v| v.as_f64());
+                self.sim_energy_thermoelectric_rtg(&SimThermoelectricRtgRequest {
+                    initial_thermal_power_w_th: q0,
+                    hot_junction_temp_k: th,
+                    cold_junction_temp_k: tc,
+                    couple_count: n_c,
+                    mission_elapsed_years: t_yr,
+                    ..Default::default()
+                })?
+            }
             "system.deploy.status" => self.deploy_status()?,
             _ => serde_json::json!({
                 "status": "Executed",
@@ -11918,6 +12110,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/aerospace/satellite_orbital_decay" => {
             match parse_body_or_default::<SimSatelliteOrbitalDecayRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_aerospace_satellite_orbital_decay(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/mining/bucket_wheel_excavator" => {
+            match parse_body_or_default::<SimMiningExcavatorRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_mining_bucket_wheel_excavator(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/process/multiphase_pipe_flow" => {
+            match parse_body_or_default::<SimMultiphasePipeFlowRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_process_multiphase_pipe_flow(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/energy/geothermal_reservoir" => {
+            match parse_body_or_default::<SimGeothermalReservoirRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_energy_geothermal_reservoir(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/process/spray_drying_kinetics" => {
+            match parse_body_or_default::<SimSprayDryingKineticsRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_process_spray_drying_kinetics(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/energy/thermoelectric_rtg" => {
+            match parse_body_or_default::<SimThermoelectricRtgRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_energy_thermoelectric_rtg(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -16552,4 +16789,138 @@ struct SimSatelliteOrbitalDecayRequest {
     pub initial_apogee_altitude_km: Option<f64>,
     #[serde(default)]
     pub orbit_inclination_deg: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimMiningExcavatorRequest {
+    #[serde(default)]
+    pub material_class: Option<atlas_simulation_core::mining_excavator::MiningMaterialClass>,
+    #[serde(default)]
+    pub wheel_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub bucket_count: Option<u32>,
+    #[serde(default)]
+    pub bucket_nominal_volume_m3: Option<f64>,
+    #[serde(default)]
+    pub wheel_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub bucket_fill_factor: Option<f64>,
+    #[serde(default)]
+    pub total_cutting_lip_length_m: Option<f64>,
+    #[serde(default)]
+    pub lineal_cutting_resistance_kn_m: Option<f64>,
+    #[serde(default)]
+    pub boom_length_m: Option<f64>,
+    #[serde(default)]
+    pub slewing_speed_deg_s: Option<f64>,
+    #[serde(default)]
+    pub upperstructure_mass_tons: Option<f64>,
+    #[serde(default)]
+    pub stabilizing_moment_kn_m: Option<f64>,
+    #[serde(default)]
+    pub mechanical_efficiency: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimMultiphasePipeFlowRequest {
+    #[serde(default)]
+    pub pipe_length_m: Option<f64>,
+    #[serde(default)]
+    pub pipe_inner_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub elevation_change_m: Option<f64>,
+    #[serde(default)]
+    pub liquid_mass_flow_kg_s: Option<f64>,
+    #[serde(default)]
+    pub gas_mass_flow_kg_s: Option<f64>,
+    #[serde(default)]
+    pub liquid_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub gas_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub liquid_viscosity_mpa_s: Option<f64>,
+    #[serde(default)]
+    pub gas_viscosity_mpa_s: Option<f64>,
+    #[serde(default)]
+    pub pipe_roughness_mm: Option<f64>,
+    #[serde(default)]
+    pub api_erosion_constant_c: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimGeothermalReservoirRequest {
+    #[serde(default)]
+    pub rock_type: Option<atlas_simulation_core::geothermal_reservoir::GeothermalRockType>,
+    #[serde(default)]
+    pub reservoir_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub reinjection_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub brine_flow_rate_l_s: Option<f64>,
+    #[serde(default)]
+    pub reservoir_thickness_m: Option<f64>,
+    #[serde(default)]
+    pub well_spacing_distance_m: Option<f64>,
+    #[serde(default)]
+    pub wellbore_radius_m: Option<f64>,
+    #[serde(default)]
+    pub reservoir_permeability_md: Option<f64>,
+    #[serde(default)]
+    pub reservoir_porosity: Option<f64>,
+    #[serde(default)]
+    pub pump_system_efficiency: Option<f64>,
+    #[serde(default)]
+    pub project_lifespan_years: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimSprayDryingKineticsRequest {
+    #[serde(default)]
+    pub product_type: Option<atlas_simulation_core::spray_drying_kinetics::SprayDryingProductType>,
+    #[serde(default)]
+    pub feed_rate_kg_h: Option<f64>,
+    #[serde(default)]
+    pub feed_solids_fraction: Option<f64>,
+    #[serde(default)]
+    pub feed_viscosity_mpa_s: Option<f64>,
+    #[serde(default)]
+    pub feed_surface_tension_mn_m: Option<f64>,
+    #[serde(default)]
+    pub atomizer_wheel_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub atomizer_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub inlet_air_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub outlet_air_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub ambient_air_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub ambient_air_rh_pct: Option<f64>,
+    #[serde(default)]
+    pub target_product_moisture_pct: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimThermoelectricRtgRequest {
+    #[serde(default)]
+    pub material_type: Option<atlas_simulation_core::thermoelectric_rtg::ThermoelectricMaterialType>,
+    #[serde(default)]
+    pub initial_thermal_power_w_th: Option<f64>,
+    #[serde(default)]
+    pub hot_junction_temp_k: Option<f64>,
+    #[serde(default)]
+    pub cold_junction_temp_k: Option<f64>,
+    #[serde(default)]
+    pub couple_count: Option<u32>,
+    #[serde(default)]
+    pub leg_length_mm: Option<f64>,
+    #[serde(default)]
+    pub leg_area_mm2: Option<f64>,
+    #[serde(default)]
+    pub mission_elapsed_years: Option<f64>,
+    #[serde(default)]
+    pub fuel_half_life_years: Option<f64>,
+    #[serde(default)]
+    pub annual_junction_degradation_pct: Option<f64>,
 }

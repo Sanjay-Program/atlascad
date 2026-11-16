@@ -3898,6 +3898,160 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 35.7 Enterprise MCP Tool Calling: 5 Batch-20 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # ---------------------------------------------------------------------
+        # SECTION 36: BATCH 21 MULTI-DISCIPLINARY SOLVERS, UNIVERSAL COMMANDS & MCP TOOLS
+        # ---------------------------------------------------------------------
+        print("\n--- Section 36: Continuous Mining Excavator, Multiphase Pipe Flow, Geothermal Reservoir, Spray Drying & Thermoelectric RTG ---")
+
+        # 36.1 Bucket Wheel Excavator & Continuous Surface Mining Mechanics (ISO 5048 / Krause)
+        bwe_res = http_request(port, "POST", "/api/sim/mining/bucket_wheel_excavator", body={
+            "material_class": "ClaySiltOverburden",
+            "wheel_diameter_m": 12.50,
+            "bucket_count": 14,
+            "bucket_nominal_volume_m3": 1.80,
+            "wheel_speed_rpm": 4.80,
+            "bucket_fill_factor": 1.05,
+            "total_cutting_lip_length_m": 2.40,
+            "lineal_cutting_resistance_kn_m": 110.0,
+            "boom_length_m": 42.0,
+            "slewing_speed_deg_s": 0.25,
+            "upperstructure_mass_tons": 2400.0,
+            "stabilizing_moment_kn_m": 650000.0,
+            "mechanical_efficiency": 0.88
+        })
+        check(bwe_res.get("theoretical_capacity_m3_per_h", 0.0) > 7000.0, "BWE theoretical capacity > 7000 m3/h")
+        check(bwe_res.get("tangential_digging_force_kn", 0.0) > 200.0, "BWE tangential digging force > 200 kN")
+        check(bwe_res.get("required_drive_power_kw", 0.0) > 800.0, "BWE required drive power > 800 kW")
+        check(bwe_res.get("stability_safety_factor", 0.0) > 1.30, "BWE stability factor > 1.30")
+        check(bwe_res.get("is_cutting_speed_acceptable", False) is True, "Cutting speed acceptable")
+        check(bwe_res.get("is_drive_power_feasible", False) is True, "Drive power feasible")
+        check(bwe_res.get("is_machine_stable", False) is True, "Stability factor acceptable")
+        print(f"  ✓ 36.1 Bucket Wheel Excavator Digging Mechanics (ISO 5048 / Krause): D_wheel = {12.5:.1f} m, 14 Buckets (1.80 m³), n = 4.80 RPM, Cutting Speed v_c = {bwe_res['circumferential_cutting_speed_m_s']:.2f} m/s, Theoretical Capacity Q_th = {bwe_res['theoretical_capacity_m3_per_h']:.0f} m³/h, Tangential Digging Force F_t = {bwe_res['tangential_digging_force_kn']:.1f} kN (k_L = 110 kN/m), Slewing Force F_s = {bwe_res['lateral_slewing_force_kn']:.1f} kN, Shaft Torque T = {bwe_res['wheel_drive_torque_kn_m']:.1f} kN·m, Drive Power P_wheel = {bwe_res['required_drive_power_kw']:.1f} kW, Specific Energy E_s = {bwe_res['specific_excavation_energy_mj_per_m3']:.2f} MJ/m³, Tipping Overturning Moment M_over = {bwe_res['overturning_moment_kn_m']:.0f} kN·m, Stability FS = {bwe_res['stability_safety_factor']:.2f} (ISO 5048 >= 1.30: {bwe_res['is_machine_stable']}))")
+
+        # 36.2 Two-Phase Gas-Liquid Pipe Flow Assurance (Lockhart-Martinelli / API RP 14E)
+        flow_res = http_request(port, "POST", "/api/sim/process/multiphase_pipe_flow", body={
+            "pipe_length_m": 8500.0,
+            "pipe_inner_diameter_mm": 254.0,
+            "elevation_change_m": 120.0,
+            "liquid_mass_flow_kg_s": 35.0,
+            "gas_mass_flow_kg_s": 4.50,
+            "liquid_density_kg_m3": 840.0,
+            "gas_density_kg_m3": 42.0,
+            "liquid_viscosity_mpa_s": 2.80,
+            "gas_viscosity_mpa_s": 0.016,
+            "pipe_roughness_mm": 0.045,
+            "api_erosion_constant_c": 122.0
+        })
+        check(flow_res.get("mixture_density_kg_m3", 0.0) > 100.0, "Mixture density > 100 kg/m3")
+        check(flow_res.get("mixture_velocity_m_s", 0.0) > 1.0, "Mixture velocity > 1.0 m/s")
+        check(flow_res.get("lockhart_martinelli_param_x", 0.0) > 0.5, "LM parameter X > 0.5")
+        check(flow_res.get("in_situ_liquid_holdup_hl", 0.0) > 0.1, "Liquid holdup > 0.1")
+        check(flow_res.get("total_pressure_drop_bar", 0.0) > 1.0, "Total pressure drop > 1.0 bar")
+        check(flow_res.get("is_erosion_velocity_acceptable", False) is True, "Erosion velocity acceptable")
+        check(flow_res.get("is_pressure_drop_acceptable", False) is True, "Pressure drop acceptable")
+        print(f"  ✓ 36.2 Multiphase Pipe Flow Assurance (Lockhart-Martinelli / API RP 14E): L = 8.5 km, Ø254 mm (10-in), Δz = +120 m, Liquid 35 kg/s, Gas 4.5 kg/s, Superficial v_sl = {flow_res['liquid_superficial_velocity_m_s']:.2f} m/s, v_sg = {flow_res['gas_superficial_velocity_m_s']:.2f} m/s, v_m = {flow_res['mixture_velocity_m_s']:.2f} m/s, Flow Regime = {flow_res['flow_regime']}, No-Slip λ_L = {flow_res['input_liquid_fraction_lambda_l']:.3f}, In-Situ Holdup H_L = {flow_res['in_situ_liquid_holdup_hl']:.3f}, LM Param X = {flow_res['lockhart_martinelli_param_x']:.2f}, Chisholm Multiplier Φ_L² = {flow_res['chisholm_two_phase_multiplier']:.2f}, Frictional ΔP = {flow_res['frictional_pressure_drop_bar']:.2f} bar, Gravitational ΔP = {flow_res['hydrostatic_head_loss_bar']:.2f} bar, Total ΔP = {flow_res['total_pressure_drop_bar']:.2f} bar, API 14E Erosional Limit v_e = {flow_res['api_erosional_velocity_limit_m_s']:.1f} m/s (Ratio = {flow_res['erosional_velocity_ratio']:.3f} <= 1.0: {flow_res['is_erosion_velocity_acceptable']}))")
+
+        # 36.3 Geothermal Reservoir Doublet Well Heat Extraction (Gringarten / Bodvarsson)
+        geo_res = http_request(port, "POST", "/api/sim/energy/geothermal_reservoir", body={
+            "rock_type": "SandstoneAquifer",
+            "reservoir_temperature_c": 160.0,
+            "reinjection_temperature_c": 65.0,
+            "brine_flow_rate_l_s": 75.0,
+            "reservoir_thickness_m": 80.0,
+            "well_spacing_distance_m": 1200.0,
+            "wellbore_radius_m": 0.108,
+            "reservoir_permeability_md": 450.0,
+            "reservoir_porosity": 0.12,
+            "pump_system_efficiency": 0.72,
+            "project_lifespan_years": 30.0
+        })
+        check(geo_res.get("initial_thermal_power_mw_th", 0.0) > 25.0, "Thermal power > 25 MWth")
+        check(geo_res.get("parasitic_pump_power_kw_e", 0.0) > 50.0, "Pump power > 50 kWe")
+        check(geo_res.get("thermal_cop", 0.0) > 100.0, "Thermal COP > 100")
+        check(geo_res.get("thermal_breakthrough_years", 0.0) > 20.0, "Breakthrough > 20 years")
+        check(geo_res.get("is_breakthrough_delayed_acceptable", False) is True, "Breakthrough acceptable")
+        check(geo_res.get("is_pumping_power_viable", False) is True, "Pumping power viable")
+        check(geo_res.get("is_thermal_cop_sustainable", False) is True, "Thermal COP sustainable")
+        print(f"  ✓ 36.3 Geothermal Reservoir Doublet Heat Extraction (Gringarten / Bodvarsson): Sandstone Aquifer (H = 80 m, D = 1200 m, k = 450 mD, φ = 12%), Brine 75 L/s (160°C -> 65°C), Initial Power = {geo_res['initial_thermal_power_mw_th']:.2f} MW_th, Doublet Hydraulic ΔP = {geo_res['doublet_pressure_drop_bar']:.2f} bar, Parasitic Pumping Power = {geo_res['parasitic_pump_power_kw_e']:.1f} kW_e, Net Thermal COP = {geo_res['thermal_cop']:.1f}, Thermal Breakthrough = {geo_res['thermal_breakthrough_years']:.1f} years (>= 20 yr: {geo_res['is_breakthrough_delayed_acceptable']}), 30-Yr Production Temp = {geo_res['final_production_temperature_c']:.1f}°C (Cooling Rate = {geo_res['reservoir_cooling_rate_c_per_decade']:.2f}°C/decade), Cumulative Energy Extracted = {geo_res['cumulative_energy_extracted_gwh_th']:.0f} GWh_th)")
+
+        # 36.4 Spray Drying Atomization, Droplet Evaporation & Powder Moisture (Masters / ASABE)
+        spray_res = http_request(port, "POST", "/api/sim/process/spray_drying_kinetics", body={
+            "product_type": "DairyMilkPowder",
+            "feed_rate_kg_h": 1200.0,
+            "feed_solids_fraction": 0.45,
+            "feed_viscosity_mpa_s": 18.0,
+            "feed_surface_tension_mn_m": 48.0,
+            "atomizer_wheel_diameter_mm": 210.0,
+            "atomizer_speed_rpm": 16000.0,
+            "inlet_air_temperature_c": 195.0,
+            "outlet_air_temperature_c": 88.0,
+            "ambient_air_temperature_c": 20.0,
+            "ambient_air_rh_pct": 50.0,
+            "target_product_moisture_pct": 3.50
+        })
+        check(spray_res.get("sauter_mean_diameter_d32_um", 0.0) > 20.0, "SMD > 20 um")
+        check(spray_res.get("droplet_drying_time_seconds", 0.0) < 5.0, "Drying time < 5 s")
+        check(spray_res.get("water_evaporation_rate_kg_h", 0.0) > 600.0, "Evaporation rate > 600 kg/h")
+        check(spray_res.get("dry_powder_production_rate_kg_h", 0.0) > 500.0, "Powder rate > 500 kg/h")
+        check(spray_res.get("is_drying_time_adequate", False) is True, "Drying time adequate")
+        check(spray_res.get("is_stickiness_risk_acceptable", False) is True, "Stickiness risk acceptable")
+        check(spray_res.get("is_thermal_efficiency_acceptable", False) is True, "Thermal efficiency acceptable")
+        print(f"  ✓ 36.4 Spray Drying Atomization & Evaporation (Masters / ASABE): Skim Milk Feed 1200 kg/h (45% solids), Rotary Atomizer Ø210 mm @ 16,000 RPM (Tip Speed = {spray_res['atomizer_tip_speed_m_s']:.1f} m/s), Droplet SMD D32 = {spray_res['sauter_mean_diameter_d32_um']:.1f} µm, Evaporation Constant K_evap = {spray_res['droplet_evaporation_constant_mm2_s']:.3f} mm²/s, Droplet Drying Time = {spray_res['droplet_drying_time_seconds']:.2f} s, Water Evaporated = {spray_res['water_evaporation_rate_kg_h']:.1f} kg/h, Dry Powder Output = {spray_res['dry_powder_production_rate_kg_h']:.1f} kg/h, Process Air Flow = {spray_res['process_air_mass_flow_kg_h']:.0f} kg/h (Inlet 195°C / Outlet 88°C), Heater Duty = {spray_res['air_heater_thermal_duty_kw']:.1f} kW, Specific Energy = {spray_res['specific_thermal_energy_kj_per_kg_water']:.0f} kJ/kg, Gordon-Taylor Powder Tg = {spray_res['powder_glass_transition_temp_c']:.1f}°C, Stickiness Margin ΔT_g = {spray_res['stickiness_temperature_margin_c']:.1f}°C (<= 35°C: {spray_res['is_stickiness_risk_acceptable']}))")
+
+        # 36.5 Radioisotope Thermoelectric Generator (RTG) (NASA SP-8000 / Ioffe)
+        rtg_res = http_request(port, "POST", "/api/sim/energy/thermoelectric_rtg", body={
+            "material_type": "SiliconGermaniumSiGe",
+            "initial_thermal_power_w_th": 4400.0,
+            "hot_junction_temp_k": 1273.15,
+            "cold_junction_temp_k": 573.15,
+            "couple_count": 572,
+            "leg_length_mm": 20.0,
+            "leg_area_mm2": 9.0,
+            "mission_elapsed_years": 17.0,
+            "fuel_half_life_years": 87.7,
+            "annual_junction_degradation_pct": 0.70
+        })
+        check(rtg_res.get("zt_figure_of_merit", 0.0) > 0.7, "ZT > 0.7")
+        check(rtg_res.get("conversion_efficiency_pct", 0.0) > 5.0, "Efficiency > 5%")
+        check(rtg_res.get("bol_electric_power_w_e", 0.0) > 250.0, "BOL power > 250 We")
+        check(rtg_res.get("eol_electric_power_w_e", 0.0) > 180.0, "EOL power > 180 We")
+        check(rtg_res.get("is_bus_voltage_adequate", False) is True, "Bus voltage adequate")
+        check(rtg_res.get("is_eol_power_sufficient", False) is True, "EOL power sufficient")
+        check(rtg_res.get("is_conversion_efficiency_acceptable", False) is True, "Conversion efficiency acceptable")
+        print(f"  ✓ 36.5 Radioisotope Thermoelectric Generator (NASA SP-8000 / Ioffe): GPHS-RTG SiGe Unicouples (572 Couples, Th = 1000°C, Tc = 300°C, ΔT = 700 K), ZT Figure of Merit = {rtg_res['zt_figure_of_merit']:.3f}, Conversion Efficiency = {rtg_res['conversion_efficiency_pct']:.2f}%, BOL Open-Circuit V_oc = {rtg_res['bol_open_circuit_voltage_v']:.1f} V, Internal Resistance R_int = {rtg_res['internal_resistance_ohms']:.3f} Ω, Matched Bus Voltage V_bus = {rtg_res['bol_terminal_voltage_v']:.1f} V, BOL Electric Power P_BOL = {rtg_res['bol_electric_power_w_e']:.1f} W_e (from 4400 W_th Pu-238), 17-Year Mission (Voyager/Cassini Class): EOL Thermal Power = {rtg_res['eol_thermal_power_w_th']:.1f} W_th (t_1/2 = 87.7 yr), Total Power Degradation = {rtg_res['total_power_degradation_pct']:.1f}%, EOL Electric Power P_EOL = {rtg_res['eol_electric_power_w_e']:.1f} W_e (Deep Space Spec >= 180 W_e: {rtg_res['is_eol_power_sufficient']}))")
+
+        # 36.6 Universal Commands Execution Verification (Batch 21 Domains)
+        for cmd_id in [
+            "sim.mining.bucket_wheel_excavator",
+            "sim.process.multiphase_pipe_flow",
+            "sim.energy.geothermal_reservoir",
+            "sim.process.spray_drying_kinetics",
+            "sim.energy.thermoelectric_rtg",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 36.6 Universal Commands: All 5 Batch-21 Engineering Commands verified via typed schema engine")
+
+        # 36.7 Enterprise MCP Tool Calling (Batch 21 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_mining_bucket_wheel_excavator",
+            "atlas_sim_process_multiphase_pipe_flow",
+            "atlas_sim_energy_geothermal_reservoir",
+            "atlas_sim_process_spray_drying_kinetics",
+            "atlas_sim_energy_thermoelectric_rtg",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 990,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 36.7 Enterprise MCP Tool Calling: 5 Batch-21 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

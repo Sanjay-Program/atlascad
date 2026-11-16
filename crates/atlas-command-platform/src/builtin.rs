@@ -5602,5 +5602,255 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.mining.bucket_wheel_excavator",
+            "Bucket Wheel Excavator (BWE) & Continuous Surface Mining Digging Mechanics (ISO 5048 / Krause)",
+            "Calculates hourly theoretical excavation volume, cutting lip tangential digging force, wheel shaft drive torque/power, specific cutting energy, and ISO 5048 machine tipping stability.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "wheel_diameter_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Bucket wheel diameter in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(12.50)),
+            validation_rules: vec![ValidationRule::Min(2.0), ValidationRule::Max(30.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "bucket_nominal_volume_m3".into(),
+            arg_type: ArgumentType::Number,
+            description: "Individual bucket nominal capacity in m³".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1.80)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "wheel_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Bucket wheel rotational speed in RPM".into(),
+            required: false,
+            default_value: Some(serde_json::json!(4.80)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(20.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "lineal_cutting_resistance_kn_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Geological formation lineal digging resistance in kN/m".into(),
+            required: false,
+            default_value: Some(serde_json::json!(110.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "boom_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Excavator bucket wheel boom outreach length in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(42.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(150.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.process.multiphase_pipe_flow",
+            "Two-Phase Gas-Liquid Hydrocarbon Pipe Flow Assurance (Lockhart-Martinelli / Beggs-Brill / API 14E)",
+            "Calculates Lockhart-Martinelli parameter, Chisholm two-phase frictional pressure gradient, in-situ liquid holdup, flow regime, and API RP 14E erosional velocity thresholds.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "pipe_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Pipeline total length in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(8500.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(200000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "pipe_inner_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Pipe internal diameter in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(254.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(1500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "liquid_mass_flow_kg_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Liquid oil/water mass flow rate in kg/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(35.0)),
+            validation_rules: vec![ValidationRule::Min(0.01), ValidationRule::Max(2000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "gas_mass_flow_kg_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Gas vapor mass flow rate in kg/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(4.50)),
+            validation_rules: vec![ValidationRule::Min(0.01), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "elevation_change_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Pipeline net elevation vertical rise in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(120.0)),
+            validation_rules: vec![ValidationRule::Min(-2000.0), ValidationRule::Max(2000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.energy.geothermal_reservoir",
+            "Geothermal Reservoir Doublet Well Heat Extraction & Thermal Breakthrough (Gringarten / Bodvarsson)",
+            "Calculates steady-state doublet hydrodynamic pressure drop, circulation pumping power, Gringarten thermal breakthrough arrival time, 30-year wellhead temperature decline, and thermal COP.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "reservoir_temperature_c".into(),
+            arg_type: ArgumentType::Number,
+            description: "Undisturbed in-situ reservoir formation temperature in °C".into(),
+            required: false,
+            default_value: Some(serde_json::json!(160.0)),
+            validation_rules: vec![ValidationRule::Min(40.0), ValidationRule::Max(350.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "reinjection_temperature_c".into(),
+            arg_type: ArgumentType::Number,
+            description: "Cooled brine reinjection temperature in °C".into(),
+            required: false,
+            default_value: Some(serde_json::json!(65.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(120.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "brine_flow_rate_l_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Production and reinjection brine volumetric flow rate in L/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(75.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "well_spacing_distance_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Horizontal separation distance between doublet wells in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1200.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(5000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "reservoir_permeability_md".into(),
+            arg_type: ArgumentType::Number,
+            description: "Reservoir formation intrinsic permeability in milliDarcys (mD)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(450.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(10000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.process.spray_drying_kinetics",
+            "Spray Drying Atomization, Droplet Evaporation & Powder Moisture (Masters / Ranz-Marshall / ASABE)",
+            "Calculates rotary atomizer tip speed, Sauter Mean Diameter D32, D2-law droplet evaporation drying time, process air heater thermal duty, and Gordon-Taylor powder glass transition stickiness margin.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "feed_rate_kg_h".into(),
+            arg_type: ArgumentType::Number,
+            description: "Liquid slurry feed mass flow rate in kg/h".into(),
+            required: false,
+            default_value: Some(serde_json::json!(2500.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(50000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "feed_solids_fraction".into(),
+            arg_type: ArgumentType::Number,
+            description: "Feed slurry total solids mass fraction (e.g. 0.48 = 48 wt%)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.48)),
+            validation_rules: vec![ValidationRule::Min(0.05), ValidationRule::Max(0.75)],
+        })
+        .with_argument(CommandArgument {
+            name: "atomizer_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rotary atomizer wheel rotational speed in RPM".into(),
+            required: false,
+            default_value: Some(serde_json::json!(18000.0)),
+            validation_rules: vec![ValidationRule::Min(1000.0), ValidationRule::Max(50000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "inlet_air_temperature_c".into(),
+            arg_type: ArgumentType::Number,
+            description: "Hot drying process air inlet temperature in °C".into(),
+            required: false,
+            default_value: Some(serde_json::json!(200.0)),
+            validation_rules: vec![ValidationRule::Min(80.0), ValidationRule::Max(400.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "outlet_air_temperature_c".into(),
+            arg_type: ArgumentType::Number,
+            description: "Exhaust process air outlet temperature in °C".into(),
+            required: false,
+            default_value: Some(serde_json::json!(88.0)),
+            validation_rules: vec![ValidationRule::Min(40.0), ValidationRule::Max(150.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.energy.thermoelectric_rtg",
+            "Radioisotope Thermoelectric Generator (RTG) & Solid-State Conversion (Ioffe / NASA SP-8000)",
+            "Calculates Pu-238 alpha decay heat, thermoelectric figure of merit ZT, Seebeck open-circuit voltage, matched load electrical power, and 15-year deep space mission power degradation profile.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "initial_thermal_power_w_th".into(),
+            arg_type: ArgumentType::Number,
+            description: "Beginning-of-Life initial thermal heat source in Watts-thermal".into(),
+            required: false,
+            default_value: Some(serde_json::json!(4400.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(20000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "hot_junction_temp_k".into(),
+            arg_type: ArgumentType::Number,
+            description: "Hot junction operating temperature in Kelvin".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1273.15)),
+            validation_rules: vec![ValidationRule::Min(300.0), ValidationRule::Max(1800.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "cold_junction_temp_k".into(),
+            arg_type: ArgumentType::Number,
+            description: "Cold junction radiator rejection temperature in Kelvin".into(),
+            required: false,
+            default_value: Some(serde_json::json!(566.15)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(800.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "couple_count".into(),
+            arg_type: ArgumentType::Number,
+            description: "Total number of series-connected unicouples".into(),
+            required: false,
+            default_value: Some(serde_json::json!(572.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(5000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "mission_elapsed_years".into(),
+            arg_type: ArgumentType::Number,
+            description: "Elapsed operational deep-space mission time in years".into(),
+            required: false,
+            default_value: Some(serde_json::json!(15.0)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(100.0)],
+        }),
+    )?;
+
     Ok(())
 }

@@ -2510,6 +2510,120 @@ def simulation_section(studio: Studio) -> None:
     check(decay_data.get("initial_decay_rate_m_per_day", 0.0) > 10.0, "King-Hele decay rate > 10 m/day")
     check(decay_data.get("orbital_lifetime_years", 100.0) < 10.0, "atmospheric lifetime < 10 years")
     check(decay_data.get("is_iadc_25yr_compliant", False) is True, "satisfies international IADC 25-year space debris guideline")
+
+    # 105. Mining Bucket Wheel Excavator Digging Mechanics (ISO 5048 / Krause)
+    bwe = studio.post("/api/sim/mining/bucket_wheel_excavator", {
+        "material_class": "ClaySiltOverburden",
+        "wheel_diameter_m": 12.50,
+        "bucket_count": 14,
+        "bucket_nominal_volume_m3": 1.80,
+        "wheel_speed_rpm": 4.80,
+        "bucket_fill_factor": 1.05,
+        "total_cutting_lip_length_m": 2.40,
+        "lineal_cutting_resistance_kn_m": 110.0,
+        "boom_length_m": 42.0,
+        "slewing_speed_deg_s": 0.25,
+        "upperstructure_mass_tons": 2400.0,
+        "stabilizing_moment_kn_m": 650000.0,
+        "mechanical_efficiency": 0.88
+    })
+    check(bwe.status == 200, f"mining bucket wheel excavator returns 200 (got {bwe.status})")
+    bwe_data = bwe.json()
+    check(bwe_data.get("theoretical_capacity_m3_per_h", 0.0) > 7000.0, "theoretical capacity > 7000 m3/h")
+    check(bwe_data.get("tangential_digging_force_kn", 0.0) > 200.0, "total digging resistance force > 200 kN")
+    check(bwe_data.get("required_drive_power_kw", 0.0) > 800.0, "installed drive motor power > 800 kW")
+    check(bwe_data.get("stability_safety_factor", 0.0) > 1.30, "overturning stability factor of safety > 1.30")
+    check(bwe_data.get("is_machine_stable", False) is True, "excavator structural tipping stability verified")
+
+    # 106. Two-Phase Gas-Liquid Pipe Flow Assurance (Lockhart-Martinelli / API RP 14E)
+    pipe_flow = studio.post("/api/sim/process/multiphase_pipe_flow", {
+        "pipe_length_m": 8500.0,
+        "pipe_inner_diameter_mm": 254.0,
+        "elevation_change_m": 120.0,
+        "liquid_mass_flow_kg_s": 35.0,
+        "gas_mass_flow_kg_s": 4.50,
+        "liquid_density_kg_m3": 840.0,
+        "gas_density_kg_m3": 42.0,
+        "liquid_viscosity_mpa_s": 2.80,
+        "gas_viscosity_mpa_s": 0.016,
+        "pipe_roughness_mm": 0.045,
+        "api_erosion_constant_c": 122.0
+    })
+    check(pipe_flow.status == 200, f"multiphase pipe flow returns 200 (got {pipe_flow.status})")
+    flow_data = pipe_flow.json()
+    check(flow_data.get("mixture_density_kg_m3", 0.0) > 100.0, "mixture density > 100 kg/m3")
+    check(flow_data.get("mixture_velocity_m_s", 0.0) > 1.0, "mixture superficial velocity > 1.0 m/s")
+    check(flow_data.get("lockhart_martinelli_param_x", 0.0) > 0.5, "Lockhart-Martinelli parameter X > 0.5")
+    check(flow_data.get("in_situ_liquid_holdup_hl", 0.0) > 0.1, "liquid holdup fraction > 0.1")
+    check(flow_data.get("total_pressure_drop_bar", 0.0) > 1.0, "total pipe hydraulic pressure drop > 1.0 bar")
+    check(flow_data.get("is_erosion_velocity_acceptable", False) is True, "multiphase flow assurance acceptable")
+
+    # 107. Geothermal Reservoir Doublet Well Heat Extraction (Gringarten / Bodvarsson)
+    geo = studio.post("/api/sim/energy/geothermal_reservoir", {
+        "rock_type": "SandstoneAquifer",
+        "reservoir_temperature_c": 160.0,
+        "reinjection_temperature_c": 65.0,
+        "brine_flow_rate_l_s": 75.0,
+        "reservoir_thickness_m": 80.0,
+        "well_spacing_distance_m": 1200.0,
+        "wellbore_radius_m": 0.108,
+        "reservoir_permeability_md": 450.0,
+        "reservoir_porosity": 0.12,
+        "pump_system_efficiency": 0.72,
+        "project_lifespan_years": 30.0
+    })
+    check(geo.status == 200, f"geothermal reservoir returns 200 (got {geo.status})")
+    geo_data = geo.json()
+    check(geo_data.get("initial_thermal_power_mw_th", 0.0) > 25.0, "extracted thermal power > 25 MWth")
+    check(geo_data.get("parasitic_pump_power_kw_e", 0.0) > 50.0, "parasitic pumping power > 50 kWe")
+    check(geo_data.get("thermal_cop", 0.0) > 100.0, "thermal COP > 100")
+    check(geo_data.get("thermal_breakthrough_years", 0.0) > 20.0, "thermal breakthrough time > 20 years")
+    check(geo_data.get("is_breakthrough_delayed_acceptable", False) is True, "geothermal doublet extraction viable")
+
+    # 108. Spray Drying Atomization, Droplet Evaporation & Powder Moisture (Masters / ASABE)
+    spray = studio.post("/api/sim/process/spray_drying_kinetics", {
+        "product_type": "DairyMilkPowder",
+        "feed_rate_kg_h": 1200.0,
+        "feed_solids_fraction": 0.45,
+        "feed_viscosity_mpa_s": 18.0,
+        "feed_surface_tension_mn_m": 48.0,
+        "atomizer_wheel_diameter_mm": 210.0,
+        "atomizer_speed_rpm": 16000.0,
+        "inlet_air_temperature_c": 195.0,
+        "outlet_air_temperature_c": 88.0,
+        "ambient_air_temperature_c": 20.0,
+        "ambient_air_rh_pct": 50.0,
+        "target_product_moisture_pct": 3.50
+    })
+    check(spray.status == 200, f"spray drying kinetics returns 200 (got {spray.status})")
+    spray_data = spray.json()
+    check(spray_data.get("sauter_mean_diameter_d32_um", 0.0) > 20.0, "Sauter mean droplet diameter > 20 um")
+    check(spray_data.get("droplet_drying_time_seconds", 0.0) < 5.0, "droplet evaporation time < 5.0 s")
+    check(spray_data.get("dry_powder_production_rate_kg_h", 0.0) > 500.0, "dry powder production > 500 kg/h")
+    check(spray_data.get("is_drying_time_adequate", False) is True, "product drying time meets specification")
+    check(spray_data.get("is_stickiness_risk_acceptable", False) is True, "powder non-sticky within dryer chamber")
+
+    # 109. Radioisotope Thermoelectric Generator (RTG) (NASA SP-8000 / Ioffe)
+    rtg = studio.post("/api/sim/energy/thermoelectric_rtg", {
+        "material_type": "SiliconGermaniumSiGe",
+        "initial_thermal_power_w_th": 4400.0,
+        "hot_junction_temp_k": 1273.15,
+        "cold_junction_temp_k": 573.15,
+        "couple_count": 572,
+        "leg_length_mm": 20.0,
+        "leg_area_mm2": 9.0,
+        "mission_elapsed_years": 17.0,
+        "fuel_half_life_years": 87.7,
+        "annual_junction_degradation_pct": 0.70
+    })
+    check(rtg.status == 200, f"thermoelectric rtg returns 200 (got {rtg.status})")
+    rtg_data = rtg.json()
+    check(rtg_data.get("zt_figure_of_merit", 0.0) > 0.7, "dimensionless figure of merit ZT > 0.7")
+    check(rtg_data.get("bol_electric_power_w_e", 0.0) > 250.0, "beginning of life electrical power > 250 We")
+    check(rtg_data.get("eol_electric_power_w_e", 0.0) > 180.0, "end of mission electrical power > 180 We")
+    check(rtg_data.get("conversion_efficiency_pct", 0.0) > 5.0, "solid-state conversion efficiency > 5.0%")
+    check(rtg_data.get("is_eol_power_sufficient", False) is True, "end of mission electrical power sufficient")
+    check(rtg_data.get("is_conversion_efficiency_acceptable", False) is True, "conversion efficiency acceptable")
     report("simulation")
 
 

@@ -141,6 +141,11 @@ pub mod semiconductor_cmp;
 pub mod pavement_mepdg;
 pub mod biomaterial_scaffold;
 pub mod satellite_orbital_decay;
+pub mod mining_excavator;
+pub mod multiphase_pipe_flow;
+pub mod geothermal_reservoir;
+pub mod spray_drying_kinetics;
+pub mod thermoelectric_rtg;
 
 pub mod prelude {
     pub use crate::acoustics::{
@@ -646,5 +651,25 @@ pub mod prelude {
     pub use crate::satellite_orbital_decay::{
         SatelliteOrbitalDecayProblem, SatelliteOrbitalDecayResult, SolarActivityLevel,
         solve_satellite_orbital_decay,
+    };
+    pub use crate::mining_excavator::{
+        MiningExcavatorProblem, MiningExcavatorResult, MiningMaterialClass,
+        solve_mining_excavator,
+    };
+    pub use crate::multiphase_pipe_flow::{
+        MultiphaseFlowRegime, MultiphasePipeFlowProblem, MultiphasePipeFlowResult,
+        solve_multiphase_pipe_flow,
+    };
+    pub use crate::geothermal_reservoir::{
+        GeothermalReservoirProblem, GeothermalReservoirResult, GeothermalRockType,
+        solve_geothermal_reservoir,
+    };
+    pub use crate::spray_drying_kinetics::{
+        SprayDryingKineticsProblem, SprayDryingKineticsResult, SprayDryingProductType,
+        solve_spray_drying_kinetics,
+    };
+    pub use crate::thermoelectric_rtg::{
+        ThermoelectricMaterialType, ThermoelectricRtgProblem, ThermoelectricRtgResult,
+        solve_thermoelectric_rtg,
     };
 }
