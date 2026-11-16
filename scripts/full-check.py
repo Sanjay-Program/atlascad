@@ -1749,6 +1749,102 @@ def simulation_section(studio: Studio) -> None:
     check(bess_data.get("transformer_efficiency_pct", 0.0) > 98.5, "MV step-up transformer efficiency > 98.5%")
     check(bess_data.get("ac_to_ac_rte_pct", 0.0) > 83.0, "utility AC-to-AC round-trip efficiency > 83.0%")
     check(bess_data.get("is_grid_compliant", False) is True, "BESS complies with grid interconnection standards")
+
+    # 65. Soil Consolidation & Foundation Settlement (Terzaghi 1D / ASTM D2435 / Eurocode 7)
+    soil = studio.post("/api/sim/geotechnical/soil_consolidation", {
+        "layer_thickness_m": 6.0,
+        "initial_void_ratio": 0.85,
+        "compression_index_cc": 0.32,
+        "recompression_index_cr": 0.045,
+        "preconsolidation_stress_kpa": 120.0,
+        "initial_effective_stress_kpa": 100.0,
+        "applied_stress_increment_kpa": 80.0,
+        "coefficient_of_consolidation_m2_yr": 2.80,
+        "analysis_time_years": 2.0
+    })
+    check(soil.status == 200, f"soil consolidation returns 200 (got {soil.status})")
+    soil_data = soil.json()
+    check(soil_data.get("over_consolidation_ratio", 0.0) == 1.20, "OCR == 1.20")
+    check(soil_data.get("ultimate_primary_settlement_mm", 0.0) > 150.0, "ultimate primary settlement > 150 mm")
+    check(soil_data.get("time_factor_tv", 0.0) > 0.50, "time factor Tv > 0.50")
+    check(soil_data.get("degree_of_consolidation_pct", 0.0) > 75.0, "degree of consolidation > 75.0%")
+    check(soil_data.get("settlement_at_time_mm", 0.0) > 120.0, "settlement at 2 yr > 120 mm")
+    check(soil_data.get("is_acceptable", False) is True, "settlement conforms to foundation criteria")
+
+    # 66. Hydraulic Turbines Pelton & Francis Energy Conversion (IEC 60193 / Euler)
+    hydro = studio.post("/api/sim/energy/hydraulic_turbine", {
+        "net_head_m": 450.0,
+        "flow_rate_m3_s": 3.20,
+        "rotational_speed_rpm": 500.0,
+        "runner_diameter_m": 1.80,
+        "nozzle_count": 2
+    })
+    check(hydro.status == 200, f"hydraulic turbine returns 200 (got {hydro.status})")
+    hydro_data = hydro.json()
+    check(hydro_data.get("available_hydraulic_power_mw", 0.0) > 13.0, "available hydraulic power > 13 MW")
+    check(hydro_data.get("jet_velocity_m_s", 0.0) > 90.0, "jet velocity > 90 m/s")
+    check(hydro_data.get("speed_ratio_phi", 0.0) > 0.45, "speed ratio phi > 0.45")
+    check(hydro_data.get("shaft_power_mw", 0.0) > 12.0, "shaft mechanical power > 12 MW")
+    check(hydro_data.get("hydraulic_efficiency_pct", 0.0) > 88.0, "hydraulic efficiency > 88.0%")
+    check(hydro_data.get("is_cavitation_safe", False) is True, "turbine cavitation free")
+
+    # 67. Cardiovascular Stent Biomechanics & Radial Expansion (ASTM F3067 / FDA)
+    stent = studio.post("/api/sim/biomedical/stent_expansion", {
+        "crimped_diameter_mm": 1.05,
+        "nominal_expanded_diameter_mm": 3.00,
+        "nominal_length_mm": 18.0,
+        "strut_thickness_um": 81.0,
+        "strut_width_um": 84.0,
+        "crown_count_per_ring": 8,
+        "ring_count": 12,
+        "balloon_pressure_atm": 12.0
+    })
+    check(stent.status == 200, f"stent expansion returns 200 (got {stent.status})")
+    stent_data = stent.json()
+    check(stent_data.get("expansion_ratio", 0.0) > 2.5, "stent expansion ratio > 2.5")
+    check(stent_data.get("inflated_outer_diameter_mm", 0.0) > 3.10, "inflated diameter > 3.10 mm")
+    check(stent_data.get("post_recoil_diameter_mm", 0.0) > 3.00, "post recoil diameter > 3.00 mm")
+    check(stent_data.get("elastic_recoil_pct", 0.0) <= 5.0, "elastic recoil <= 5.0%")
+    check(stent_data.get("foreshortening_pct", 0.0) <= 8.0, "longitudinal foreshortening <= 8.0%")
+    check(stent_data.get("radial_resistive_force_n_mm", 0.0) > 0.70, "radial resistive force > 0.70 N/mm")
+    check(stent_data.get("fracture_safety_factor", 0.0) >= 1.50, "strut fracture safety factor >= 1.50")
+    check(stent_data.get("is_fda_compliant", False) is True, "coronary stent conforms to FDA guidance")
+
+    # 68. Microwave Rectangular Waveguide & Cavity Resonator (IEEE Std 148 / Pozar)
+    wave = studio.post("/api/sim/electronics/microwave_waveguide", {
+        "broad_dimension_a_mm": 22.86,
+        "narrow_dimension_b_mm": 10.16,
+        "length_l_mm": 100.0,
+        "operating_frequency_ghz": 10.0,
+        "transmitted_power_w": 500.0
+    })
+    check(wave.status == 200, f"microwave waveguide returns 200 (got {wave.status})")
+    wave_data = wave.json()
+    check(wave_data.get("cutoff_frequency_te10_ghz", 0.0) > 6.50, "TE10 cutoff > 6.50 GHz")
+    check(wave_data.get("cutoff_frequency_te20_ghz", 0.0) > 13.0, "TE20 cutoff > 13.0 GHz")
+    check(wave_data.get("is_single_mode", False) is True, "single mode operation verified")
+    check(wave_data.get("guide_wavelength_mm", 0.0) > 39.0, "guide wavelength > 39 mm")
+    check(wave_data.get("wave_impedance_ohms", 0.0) > 490.0, "TE10 wave impedance > 490 Ohms")
+    check(wave_data.get("attenuation_rate_db_m", 0.0) > 0.08, "attenuation rate > 0.08 dB/m")
+    check(wave_data.get("cavity_unloaded_q", 0.0) > 5000.0, "TE101 cavity unloaded Q > 5000")
+
+    # 69. Gas-Insulated Switchgear High-Voltage Dielectric Breakdown (IEC 62271-203)
+    gis = studio.post("/api/sim/electrical/gis_dielectric", {
+        "rated_voltage_kv_rms": 420.0,
+        "conductor_radius_mm": 60.0,
+        "enclosure_radius_mm": 165.0,
+        "gas_pressure_abs_bar": 5.50,
+        "lightning_impulse_withstand_kv_pk": 1425.0
+    })
+    check(gis.status == 200, f"gis dielectric returns 200 (got {gis.status})")
+    gis_data = gis.json()
+    check(gis_data.get("radius_ratio", 0.0) == 2.75, "coaxial radius ratio R/r == 2.75")
+    check(gis_data.get("field_utilization_factor", 0.0) > 0.55, "field utilization factor > 0.55")
+    check(gis_data.get("max_continuous_e_field_kv_mm", 0.0) > 5.0, "max continuous E-field > 5.0 kV/mm")
+    check(gis_data.get("max_impulse_e_field_kv_mm", 0.0) > 22.0, "max impulse E-field > 22.0 kV/mm")
+    check(gis_data.get("continuous_safety_factor", 0.0) > 5.0, "continuous AC dielectric safety factor > 5.0")
+    check(gis_data.get("impulse_safety_factor", 0.0) >= 1.25, "lightning impulse safety factor >= 1.25")
+    check(gis_data.get("is_iec_compliant", False) is True, "GIS design compliant with IEC 62271-203")
     report("simulation")
 
 

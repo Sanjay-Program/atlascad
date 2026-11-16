@@ -2798,6 +2798,134 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 27.7 Enterprise MCP Tool Calling: 5 Batch-12 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # ---------------------------------------------------------------------
+        # 28. GEOTECHNICAL, HYDRO, BIOMEDICAL, MICROWAVE & HV GIS (BATCH 13)
+        # ---------------------------------------------------------------------
+        print("\n--- 28. GEOTECHNICAL, HYDRO, BIOMEDICAL, MICROWAVE & HV GIS ---")
+
+        # 28.1 Soil Consolidation & Foundation Settlement (Terzaghi / Eurocode 7)
+        soil_res = http_request(port, "POST", "/api/sim/geotechnical/soil_consolidation", body={
+            "layer_thickness_m": 6.0,
+            "initial_void_ratio": 0.85,
+            "compression_index_cc": 0.32,
+            "recompression_index_cr": 0.045,
+            "preconsolidation_stress_kpa": 120.0,
+            "initial_effective_stress_kpa": 100.0,
+            "applied_stress_increment_kpa": 80.0,
+            "coefficient_of_consolidation_m2_yr": 2.80,
+            "analysis_time_years": 2.0
+        })
+        check(soil_res.get("over_consolidation_ratio", 0.0) == 1.20, "OCR == 1.20")
+        check(soil_res.get("ultimate_primary_settlement_mm", 0.0) > 150.0, "Ultimate settlement > 150 mm")
+        check(soil_res.get("time_factor_tv", 0.0) > 0.50, "Time factor Tv > 0.50")
+        check(soil_res.get("degree_of_consolidation_pct", 0.0) > 75.0, "Consolidation degree > 75%")
+        check(soil_res.get("settlement_at_time_mm", 0.0) > 120.0, "Settlement at 2 yr > 120 mm")
+        check(soil_res.get("is_acceptable", False) is True, "Foundation settlement acceptable")
+        print(f"  ✓ 28.1 Soil Consolidation (Terzaghi / Eurocode 7): H0 = 6m, OCR = {soil_res['over_consolidation_ratio']:.2f}, Sc_ult = {soil_res['ultimate_primary_settlement_mm']:.1f} mm, Tv = {soil_res['time_factor_tv']:.3f}, U = {soil_res['degree_of_consolidation_pct']:.1f}%, S(2yr) = {soil_res['settlement_at_time_mm']:.1f} mm, Pore Dissipation = {soil_res['dissipated_pore_pressure_kpa']:.1f} kPa (u_rem = {soil_res['remaining_pore_pressure_kpa']:.1f} kPa)")
+
+        # 28.2 Hydraulic Turbine Pelton & Francis Energy Conversion (IEC 60193 / Euler)
+        hydro_res = http_request(port, "POST", "/api/sim/energy/hydraulic_turbine", body={
+            "net_head_m": 450.0,
+            "flow_rate_m3_s": 3.20,
+            "rotational_speed_rpm": 500.0,
+            "runner_diameter_m": 1.80,
+            "nozzle_count": 2
+        })
+        check(hydro_res.get("available_hydraulic_power_mw", 0.0) > 13.0, "Hydraulic power > 13 MW")
+        check(hydro_res.get("jet_velocity_m_s", 0.0) > 90.0, "Jet velocity > 90 m/s")
+        check(hydro_res.get("speed_ratio_phi", 0.0) > 0.45, "Speed ratio phi > 0.45")
+        check(hydro_res.get("shaft_power_mw", 0.0) > 12.0, "Shaft power > 12 MW")
+        check(hydro_res.get("hydraulic_efficiency_pct", 0.0) > 88.0, "Hydraulic efficiency > 88%")
+        check(hydro_res.get("is_cavitation_safe", False) is True, "Turbine cavitation free")
+        print(f"  ✓ 28.2 Hydraulic Turbine (IEC 60193): Pelton (2-nozzle), Hn = 450m, Q = 3.20 m³/s, P_hyd = {hydro_res['available_hydraulic_power_mw']:.2f} MW, vj = {hydro_res['jet_velocity_m_s']:.1f} m/s (dj = {hydro_res['jet_diameter_mm']:.1f} mm), u = {hydro_res['runner_tangential_speed_m_s']:.1f} m/s (phi = {hydro_res['speed_ratio_phi']:.3f}), P_shaft = {hydro_res['shaft_power_mw']:.2f} MW, P_elec = {hydro_res['electrical_power_mw']:.2f} MW, eta_hyd = {hydro_res['hydraulic_efficiency_pct']:.2f}%, eta_total = {hydro_res['overall_efficiency_pct']:.2f}%, Cavitation Safe: {hydro_res['is_cavitation_safe']}")
+
+        # 28.3 Cardiovascular Stent Biomechanics & Radial Expansion (ASTM F3067 / FDA)
+        stent_res = http_request(port, "POST", "/api/sim/biomedical/stent_expansion", body={
+            "crimped_diameter_mm": 1.05,
+            "nominal_expanded_diameter_mm": 3.00,
+            "nominal_length_mm": 18.0,
+            "strut_thickness_um": 81.0,
+            "strut_width_um": 84.0,
+            "crown_count_per_ring": 8,
+            "ring_count": 12,
+            "balloon_pressure_atm": 12.0
+        })
+        check(stent_res.get("expansion_ratio", 0.0) > 2.5, "Stent expansion ratio > 2.5")
+        check(stent_res.get("inflated_outer_diameter_mm", 0.0) > 3.10, "Inflated diameter > 3.10 mm")
+        check(stent_res.get("post_recoil_diameter_mm", 0.0) > 3.00, "Post recoil diameter > 3.00 mm")
+        check(stent_res.get("elastic_recoil_pct", 0.0) <= 5.0, "Elastic recoil <= 5.0%")
+        check(stent_res.get("foreshortening_pct", 0.0) <= 8.0, "Longitudinal foreshortening <= 8.0%")
+        check(stent_res.get("radial_resistive_force_n_mm", 0.0) > 0.70, "Radial resistive force > 0.70 N/mm")
+        check(stent_res.get("fracture_safety_factor", 0.0) >= 1.50, "Fracture safety factor >= 1.50")
+        check(stent_res.get("is_fda_compliant", False) is True, "Stent FDA compliant")
+        print(f"  ✓ 28.3 Cardiovascular Stent (ASTM F3067 / FDA): CoCr L605, D_crimped = 1.05 mm -> D_post = {stent_res['post_recoil_diameter_mm']:.3f} mm (ratio = {stent_res['expansion_ratio']:.2f}x), Recoil = {stent_res['elastic_recoil_pct']:.2f}% (<= 5.0%), Foreshortening = {stent_res['foreshortening_pct']:.2f}% (<= 8.0%), RRF = {stent_res['radial_resistive_force_n_mm']:.2f} N/mm, COF = {stent_res['chronic_outward_force_n_mm']:.2f} N/mm, Peak Strain = {stent_res['peak_plastic_strain_pct']:.1f}%, Ductility FoS = {stent_res['fracture_safety_factor']:.2f}, FDA Compliant: {stent_res['is_fda_compliant']}")
+
+        # 28.4 Microwave Rectangular Waveguide & Cavity Resonator (IEEE Std 148 / Pozar)
+        wave_res = http_request(port, "POST", "/api/sim/electronics/microwave_waveguide", body={
+            "broad_dimension_a_mm": 22.86,
+            "narrow_dimension_b_mm": 10.16,
+            "length_l_mm": 100.0,
+            "operating_frequency_ghz": 10.0,
+            "transmitted_power_w": 500.0
+        })
+        check(wave_res.get("cutoff_frequency_te10_ghz", 0.0) > 6.50, "TE10 cutoff > 6.50 GHz")
+        check(wave_res.get("cutoff_frequency_te20_ghz", 0.0) > 13.0, "TE20 cutoff > 13.0 GHz")
+        check(wave_res.get("is_single_mode", False) is True, "Single mode operation verified")
+        check(wave_res.get("guide_wavelength_mm", 0.0) > 39.0, "Guide wavelength > 39 mm")
+        check(wave_res.get("wave_impedance_ohms", 0.0) > 490.0, "TE10 wave impedance > 490 Ohms")
+        check(wave_res.get("attenuation_rate_db_m", 0.0) > 0.08, "Attenuation rate > 0.08 dB/m")
+        check(wave_res.get("cavity_unloaded_q", 0.0) > 5000.0, "TE101 cavity unloaded Q > 5000")
+        print(f"  ✓ 28.4 Microwave Waveguide (IEEE 148 / WR-90): f = 10.0 GHz, fc_TE10 = {wave_res['cutoff_frequency_te10_ghz']:.2f} GHz, fc_TE20 = {wave_res['cutoff_frequency_te20_ghz']:.2f} GHz, λg = {wave_res['guide_wavelength_mm']:.2f} mm, vp = {wave_res['phase_velocity_m_s']/1e8:.2f}e8 m/s, vg = {wave_res['group_velocity_m_s']/1e8:.2f}e8 m/s, Z_TE = {wave_res['wave_impedance_ohms']:.1f} Ω, α = {wave_res['attenuation_rate_db_m']:.3f} dB/m (IL = {wave_res['insertion_loss_db']:.4f} dB), E_pk = {wave_res['peak_electric_field_kv_m']:.1f} kV/m (margin = {wave_res['breakdown_safety_margin']:.1f}x), Cavity f101 = {wave_res['cavity_resonant_frequency_ghz']:.2f} GHz (Q0 = {wave_res['cavity_unloaded_q']:.0f})")
+
+        # 28.5 Gas-Insulated Switchgear High-Voltage Dielectric Breakdown (IEC 62271-203)
+        gis_res = http_request(port, "POST", "/api/sim/electrical/gis_dielectric", body={
+            "rated_voltage_kv_rms": 420.0,
+            "conductor_radius_mm": 60.0,
+            "enclosure_radius_mm": 165.0,
+            "gas_pressure_abs_bar": 5.50,
+            "lightning_impulse_withstand_kv_pk": 1425.0
+        })
+        check(gis_res.get("radius_ratio", 0.0) == 2.75, "Radius ratio R/r == 2.75")
+        check(gis_res.get("field_utilization_factor", 0.0) > 0.55, "Field utilization factor > 0.55")
+        check(gis_res.get("max_continuous_e_field_kv_mm", 0.0) > 5.0, "Continuous max E-field > 5.0 kV/mm")
+        check(gis_res.get("max_impulse_e_field_kv_mm", 0.0) > 22.0, "Impulse max E-field > 22.0 kV/mm")
+        check(gis_res.get("continuous_safety_factor", 0.0) > 5.0, "Continuous AC safety factor > 5.0")
+        check(gis_res.get("impulse_safety_factor", 0.0) >= 1.25, "Impulse BIL safety factor >= 1.25")
+        check(gis_res.get("is_iec_compliant", False) is True, "GIS design compliant with IEC 62271-203")
+        print(f"  ✓ 28.5 HV GIS Dielectric (IEC 62271-203): 420 kV GIS, r1 = 60mm, r2 = 165mm (R/r = {gis_res['radius_ratio']:.2f} ≈ e, eta = {gis_res['field_utilization_factor']:.3f}), Gas = PureSF6 @ 5.5 bar abs, E_cont = {gis_res['max_continuous_e_field_kv_mm']:.2f} kV/mm (SF = {gis_res['continuous_safety_factor']:.2f}), E_bil = {gis_res['max_impulse_e_field_kv_mm']:.2f} kV/mm, E_crit = {gis_res['effective_breakdown_field_kv_mm']:.2f} kV/mm (roughness derating = {gis_res['roughness_derating_factor']:.2f}x), SF_bil = {gis_res['impulse_safety_factor']:.2f} (>= 1.25), P_min = {gis_res['min_required_pressure_bar']:.2f} bar, IEC Compliant: {gis_res['is_iec_compliant']}")
+
+        # 28.6 Universal Commands Execution Verification (Batch 13 Domains)
+        for cmd_id in [
+            "sim.geotechnical.soil_consolidation",
+            "sim.energy.hydraulic_turbine",
+            "sim.biomedical.stent_expansion",
+            "sim.electronics.microwave_waveguide",
+            "sim.electrical.gis_dielectric",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 28.6 Universal Commands: All 5 Batch-13 Engineering Commands verified via typed schema engine")
+
+        # 28.7 Enterprise MCP Tool Calling (Batch 13 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_geotechnical_soil_consolidation",
+            "atlas_sim_energy_hydraulic_turbine",
+            "atlas_sim_biomedical_stent_expansion",
+            "atlas_sim_electronics_microwave_waveguide",
+            "atlas_sim_electrical_gis_dielectric",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 832,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 28.7 Enterprise MCP Tool Calling: 5 Batch-13 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

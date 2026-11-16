@@ -101,6 +101,11 @@ pub mod wind_blade_aeroelastic;
 pub mod subsea_pipeline;
 pub mod combustor_aerothermal;
 pub mod bess_grid;
+pub mod soil_consolidation;
+pub mod hydraulic_turbine;
+pub mod stent_expansion;
+pub mod microwave_waveguide;
+pub mod gis_dielectric;
 
 pub mod prelude {
     pub use crate::acoustics::{
@@ -446,5 +451,25 @@ pub mod prelude {
     pub use crate::bess_grid::{
         BessChemistry, BessGridProblem, BessGridResult,
         solve_bess_grid, solve_bess_grid_sim,
+    };
+    pub use crate::soil_consolidation::{
+        DrainageCondition, SoilConsolidationProblem, SoilConsolidationResult,
+        solve_soil_consolidation, solve_soil_consolidation_sim,
+    };
+    pub use crate::hydraulic_turbine::{
+        HydraulicTurbineProblem, HydraulicTurbineResult, HydraulicTurbineType,
+        solve_hydraulic_turbine, solve_hydraulic_turbine_sim,
+    };
+    pub use crate::stent_expansion::{
+        StentExpansionProblem, StentExpansionResult, StentMaterial,
+        solve_stent_expansion, solve_stent_expansion_sim,
+    };
+    pub use crate::microwave_waveguide::{
+        MicrowaveWaveguideProblem, MicrowaveWaveguideResult,
+        solve_microwave_waveguide, solve_microwave_waveguide_sim,
+    };
+    pub use crate::gis_dielectric::{
+        GisDielectricProblem, GisDielectricResult, GisInsulatingGas,
+        solve_gis_dielectric, solve_gis_dielectric_sim,
     };
 }

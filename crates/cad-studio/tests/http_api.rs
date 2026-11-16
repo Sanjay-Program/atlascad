@@ -6539,5 +6539,154 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 141. Soil Consolidation & Settlement (Terzaghi 1D / ASTM D2435 / Eurocode 7)
+    let res_soil = post(
+        addr,
+        "/api/sim/geotechnical/soil_consolidation",
+        r#"{
+            "layer_thickness_m": 6.0,
+            "initial_void_ratio": 0.85,
+            "compression_index_cc": 0.32,
+            "recompression_index_cr": 0.045,
+            "preconsolidation_stress_kpa": 120.0,
+            "initial_effective_stress_kpa": 100.0,
+            "applied_stress_increment_kpa": 80.0,
+            "coefficient_of_consolidation_m2_yr": 2.80,
+            "analysis_time_years": 2.0
+        }"#,
+    )?;
+    assert_eq!(res_soil.status, 200);
+    let soil_json = json(&res_soil)?;
+    assert_eq!(soil_json["over_consolidation_ratio"].as_f64().unwrap(), 1.20);
+    assert!(soil_json["ultimate_primary_settlement_mm"].as_f64().unwrap() > 150.0);
+    assert!(soil_json["time_factor_tv"].as_f64().unwrap() > 0.50);
+    assert!(soil_json["degree_of_consolidation_pct"].as_f64().unwrap() > 75.0);
+    assert!(soil_json["settlement_at_time_mm"].as_f64().unwrap() > 120.0);
+    assert!(soil_json["is_acceptable"].as_bool().unwrap());
+
+    // 142. Hydraulic Turbine Energy Conversion (IEC 60193 / Euler Equation)
+    let res_hydro = post(
+        addr,
+        "/api/sim/energy/hydraulic_turbine",
+        r#"{
+            "net_head_m": 450.0,
+            "flow_rate_m3_s": 3.20,
+            "rotational_speed_rpm": 500.0,
+            "runner_diameter_m": 1.80,
+            "nozzle_count": 2
+        }"#,
+    )?;
+    assert_eq!(res_hydro.status, 200);
+    let hydro_json = json(&res_hydro)?;
+    assert!(hydro_json["available_hydraulic_power_mw"].as_f64().unwrap() > 13.0);
+    assert!(hydro_json["jet_velocity_m_s"].as_f64().unwrap() > 90.0);
+    assert!(hydro_json["speed_ratio_phi"].as_f64().unwrap() > 0.45);
+    assert!(hydro_json["shaft_power_mw"].as_f64().unwrap() > 12.0);
+    assert!(hydro_json["hydraulic_efficiency_pct"].as_f64().unwrap() > 88.0);
+    assert!(hydro_json["is_cavitation_safe"].as_bool().unwrap());
+
+    // 143. Cardiovascular Stent Biomechanics & Radial Expansion (ASTM F3067 / FDA)
+    let res_stent = post(
+        addr,
+        "/api/sim/biomedical/stent_expansion",
+        r#"{
+            "crimped_diameter_mm": 1.05,
+            "nominal_expanded_diameter_mm": 3.00,
+            "nominal_length_mm": 18.0,
+            "strut_thickness_um": 81.0,
+            "strut_width_um": 84.0,
+            "crown_count_per_ring": 8,
+            "ring_count": 12,
+            "balloon_pressure_atm": 12.0
+        }"#,
+    )?;
+    assert_eq!(res_stent.status, 200);
+    let stent_json = json(&res_stent)?;
+    assert!(stent_json["expansion_ratio"].as_f64().unwrap() > 2.5);
+    assert!(stent_json["inflated_outer_diameter_mm"].as_f64().unwrap() > 3.10);
+    assert!(stent_json["post_recoil_diameter_mm"].as_f64().unwrap() > 3.00);
+    assert!(stent_json["elastic_recoil_pct"].as_f64().unwrap() <= 5.0);
+    assert!(stent_json["foreshortening_pct"].as_f64().unwrap() <= 8.0);
+    assert!(stent_json["radial_resistive_force_n_mm"].as_f64().unwrap() > 0.70);
+    assert!(stent_json["fracture_safety_factor"].as_f64().unwrap() >= 1.50);
+    assert!(stent_json["is_fda_compliant"].as_bool().unwrap());
+
+    // 144. Microwave Rectangular Waveguide & Cavity Resonator (IEEE Std 148 / Pozar)
+    let res_wave = post(
+        addr,
+        "/api/sim/electronics/microwave_waveguide",
+        r#"{
+            "broad_dimension_a_mm": 22.86,
+            "narrow_dimension_b_mm": 10.16,
+            "length_l_mm": 100.0,
+            "operating_frequency_ghz": 10.0,
+            "transmitted_power_w": 500.0
+        }"#,
+    )?;
+    assert_eq!(res_wave.status, 200);
+    let wave_json = json(&res_wave)?;
+    assert!(wave_json["cutoff_frequency_te10_ghz"].as_f64().unwrap() > 6.50);
+    assert!(wave_json["cutoff_frequency_te20_ghz"].as_f64().unwrap() > 13.0);
+    assert!(wave_json["is_single_mode"].as_bool().unwrap());
+    assert!(wave_json["guide_wavelength_mm"].as_f64().unwrap() > 39.0);
+    assert!(wave_json["wave_impedance_ohms"].as_f64().unwrap() > 490.0);
+    assert!(wave_json["attenuation_rate_db_m"].as_f64().unwrap() > 0.08);
+    assert!(wave_json["cavity_unloaded_q"].as_f64().unwrap() > 5000.0);
+
+    // 145. Gas-Insulated Switchgear High-Voltage Dielectric Breakdown (IEC 62271-203)
+    let res_gis = post(
+        addr,
+        "/api/sim/electrical/gis_dielectric",
+        r#"{
+            "rated_voltage_kv_rms": 420.0,
+            "conductor_radius_mm": 60.0,
+            "enclosure_radius_mm": 165.0,
+            "gas_pressure_abs_bar": 5.50,
+            "lightning_impulse_withstand_kv_pk": 1425.0
+        }"#,
+    )?;
+    assert_eq!(res_gis.status, 200);
+    let gis_json = json(&res_gis)?;
+    assert_eq!(gis_json["radius_ratio"].as_f64().unwrap(), 2.75);
+    assert!(gis_json["field_utilization_factor"].as_f64().unwrap() > 0.55);
+    assert!(gis_json["max_continuous_e_field_kv_mm"].as_f64().unwrap() > 5.0);
+    assert!(gis_json["max_impulse_e_field_kv_mm"].as_f64().unwrap() > 22.0);
+    assert!(gis_json["continuous_safety_factor"].as_f64().unwrap() > 5.0);
+    assert!(gis_json["impulse_safety_factor"].as_f64().unwrap() >= 1.25);
+    assert!(gis_json["is_iec_compliant"].as_bool().unwrap());
+
+    // 146. Universal Commands Execution Verification (Batch 13 Domains)
+    for cmd_id in [
+        "sim.geotechnical.soil_consolidation",
+        "sim.energy.hydraulic_turbine",
+        "sim.biomedical.stent_expansion",
+        "sim.electronics.microwave_waveguide",
+        "sim.electrical.gis_dielectric",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 147. Enterprise MCP Tool Calling (Batch 13 Domains)
+    for tool_name in [
+        "atlas_sim_geotechnical_soil_consolidation",
+        "atlas_sim_energy_hydraulic_turbine",
+        "atlas_sim_biomedical_stent_expansion",
+        "atlas_sim_electronics_microwave_waveguide",
+        "atlas_sim_electrical_gis_dielectric",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 166, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

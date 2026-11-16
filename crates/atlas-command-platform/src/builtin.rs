@@ -3762,5 +3762,175 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.geotechnical.soil_consolidation",
+            "Soil Consolidation & Foundation Settlement (Terzaghi / ASTM D2435 / Eurocode 7)",
+            "Evaluates primary consolidation settlement, OCR, time-rate of consolidation via Fourier series dimensionless time factor Tv, pore water dissipation, and secondary creep.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "layer_thickness_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Clay layer initial thickness in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(6.0)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "initial_effective_stress_kpa".into(),
+            arg_type: ArgumentType::Number,
+            description: "Initial vertical effective overburden stress in kPa".into(),
+            required: true,
+            default_value: Some(serde_json::json!(100.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(5000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "applied_stress_increment_kpa".into(),
+            arg_type: ArgumentType::Number,
+            description: "Applied net foundation stress increment in kPa".into(),
+            required: true,
+            default_value: Some(serde_json::json!(80.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(5000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.energy.hydraulic_turbine",
+            "Hydraulic Turbine Pelton & Francis Energy Conversion (IEC 60193 / Euler)",
+            "Evaluates gross and net head, water jet kinematics, runner speed ratio phi, Euler specific work, shaft power, hydraulic efficiency, Thoma cavitation factor, and generator output.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "net_head_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Net available hydraulic head in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(450.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(2500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "flow_rate_m3_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Volumetric water flow rate in m³/s".into(),
+            required: true,
+            default_value: Some(serde_json::json!(3.20)),
+            validation_rules: vec![ValidationRule::Min(0.01), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "runner_diameter_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Runner pitch diameter in meters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(1.80)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(20.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.biomedical.stent_expansion",
+            "Cardiovascular Stent Biomechanics & Radial Expansion (ASTM F3067 / FDA)",
+            "Evaluates balloon expansion mechanics, crown plastic hinge moments, elastic recoil, longitudinal foreshortening, Radial Resistive Force (RRF), and strut fracture ductility margin.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "nominal_expanded_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Target expanded inner diameter in millimeters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(3.00)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(25.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "balloon_pressure_atm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Inflation balloon pressure in atmospheres".into(),
+            required: true,
+            default_value: Some(serde_json::json!(12.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(40.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.electronics.microwave_waveguide",
+            "Microwave Rectangular Waveguide & Cavity Resonator (IEEE Std 148 / Pozar)",
+            "Evaluates TE10 cutoff frequency, guide wavelength, phase and group velocities, wave impedance, skin depth, conductor attenuation, insertion loss, and TE101 cavity unloaded Q.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "broad_dimension_a_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Waveguide broad internal dimension 'a' in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(22.86)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "narrow_dimension_b_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Waveguide narrow internal dimension 'b' in mm".into(),
+            required: true,
+            default_value: Some(serde_json::json!(10.16)),
+            validation_rules: vec![ValidationRule::Min(0.2), ValidationRule::Max(250.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "operating_frequency_ghz".into(),
+            arg_type: ArgumentType::Number,
+            description: "Carrier frequency in GigaHertz".into(),
+            required: true,
+            default_value: Some(serde_json::json!(10.0)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(500.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.electrical.gis_dielectric",
+            "Gas-Insulated Switchgear High-Voltage Dielectric Breakdown (IEC 62271-203)",
+            "Evaluates coaxial cylinder electric field stress, geometric field utilization factor, SF6/Eco-gas Paschen breakdown scaling, roughness enhancement, and LIWV impulse margin.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "rated_voltage_kv_rms".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rated line-to-line RMS operating voltage in kV".into(),
+            required: true,
+            default_value: Some(serde_json::json!(420.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(1500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "conductor_radius_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Conductor outer radius in millimeters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(60.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(300.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "enclosure_radius_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Grounded enclosure inner radius in millimeters".into(),
+            required: true,
+            default_value: Some(serde_json::json!(165.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(800.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "gas_pressure_abs_bar".into(),
+            arg_type: ArgumentType::Number,
+            description: "Gas absolute filling pressure in bar".into(),
+            required: false,
+            default_value: Some(serde_json::json!(5.50)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(20.0)],
+        }),
+    )?;
+
     Ok(())
 }

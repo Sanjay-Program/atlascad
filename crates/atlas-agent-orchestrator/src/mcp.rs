@@ -1408,6 +1408,71 @@ impl McpServer {
                     "required": ["nominal_capacity_mwh", "rated_power_mw"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_geotechnical_soil_consolidation".into(),
+                description: "Terzaghi 1D consolidation theory, primary consolidation settlement, OCR, Fourier time factor Tv, pore water dissipation, and secondary creep".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "layer_thickness_m": { "type": "number", "default": 6.0 },
+                        "initial_effective_stress_kpa": { "type": "number", "default": 100.0 },
+                        "applied_stress_increment_kpa": { "type": "number", "default": 80.0 }
+                    },
+                    "required": ["layer_thickness_m", "initial_effective_stress_kpa", "applied_stress_increment_kpa"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_energy_hydraulic_turbine".into(),
+                description: "IEC 60193 / Euler turbine equation, Pelton & Francis hydraulic energy conversion, jet kinematics, speed ratio phi, shaft power, and Thoma cavitation factor".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "net_head_m": { "type": "number", "default": 450.0 },
+                        "flow_rate_m3_s": { "type": "number", "default": 3.20 },
+                        "runner_diameter_m": { "type": "number", "default": 1.80 }
+                    },
+                    "required": ["net_head_m", "flow_rate_m3_s", "runner_diameter_m"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_biomedical_stent_expansion".into(),
+                description: "ASTM F3067 / FDA coronary stent balloon expansion, crown plastic hinging, elastic recoil, longitudinal foreshortening, and Radial Resistive Force (RRF)".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "nominal_expanded_diameter_mm": { "type": "number", "default": 3.00 },
+                        "balloon_pressure_atm": { "type": "number", "default": 12.0 }
+                    },
+                    "required": ["nominal_expanded_diameter_mm", "balloon_pressure_atm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_electronics_microwave_waveguide".into(),
+                description: "IEEE Std 148 / Pozar rectangular waveguide propagation, TE10 cutoff, guide wavelength, phase/group velocities, wave impedance, attenuation, and TE101 cavity unloaded Q".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "broad_dimension_a_mm": { "type": "number", "default": 22.86 },
+                        "narrow_dimension_b_mm": { "type": "number", "default": 10.16 },
+                        "operating_frequency_ghz": { "type": "number", "default": 10.0 }
+                    },
+                    "required": ["broad_dimension_a_mm", "narrow_dimension_b_mm", "operating_frequency_ghz"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_electrical_gis_dielectric".into(),
+                description: "IEC 62271-203 / CIGRE high-voltage gas-insulated switchgear coaxial electric field, Paschen breakdown scaling, surface roughness derating, and LIWV lightning impulse margin".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "rated_voltage_kv_rms": { "type": "number", "default": 420.0 },
+                        "conductor_radius_mm": { "type": "number", "default": 60.0 },
+                        "enclosure_radius_mm": { "type": "number", "default": 165.0 },
+                        "gas_pressure_abs_bar": { "type": "number", "default": 5.50 }
+                    },
+                    "required": ["rated_voltage_kv_rms", "conductor_radius_mm", "enclosure_radius_mm"]
+                }),
+            },
         ]
     }
 

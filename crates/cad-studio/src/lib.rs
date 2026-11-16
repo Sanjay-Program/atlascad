@@ -5755,6 +5755,111 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_geotechnical_soil_consolidation(
+        &mut self,
+        req: &SimSoilConsolidationRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::soil_consolidation::SoilConsolidationProblem {
+            problem_id: "soil_consolidation_sim".to_string(),
+            layer_thickness_m: req.layer_thickness_m.unwrap_or(6.0),
+            initial_void_ratio: req.initial_void_ratio.unwrap_or(0.85),
+            compression_index_cc: req.compression_index_cc.unwrap_or(0.32),
+            recompression_index_cr: req.recompression_index_cr.unwrap_or(0.045),
+            secondary_compression_index: req.secondary_compression_index.unwrap_or(0.015),
+            preconsolidation_stress_kpa: req.preconsolidation_stress_kpa.unwrap_or(120.0),
+            initial_effective_stress_kpa: req.initial_effective_stress_kpa.unwrap_or(100.0),
+            applied_stress_increment_kpa: req.applied_stress_increment_kpa.unwrap_or(80.0),
+            coefficient_of_consolidation_m2_yr: req.coefficient_of_consolidation_m2_yr.unwrap_or(2.80),
+            drainage_condition: req.drainage_condition.unwrap_or(atlas_simulation_core::soil_consolidation::DrainageCondition::DoubleDrainage),
+            analysis_time_years: req.analysis_time_years.unwrap_or(2.0),
+        };
+        let res = atlas_simulation_core::soil_consolidation::solve_soil_consolidation(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_energy_hydraulic_turbine(
+        &mut self,
+        req: &SimHydraulicTurbineRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::hydraulic_turbine::HydraulicTurbineProblem {
+            problem_id: "hydraulic_turbine_sim".to_string(),
+            turbine_type: req.turbine_type.unwrap_or(atlas_simulation_core::hydraulic_turbine::HydraulicTurbineType::Pelton),
+            net_head_m: req.net_head_m.unwrap_or(450.0),
+            flow_rate_m3_s: req.flow_rate_m3_s.unwrap_or(3.20),
+            rotational_speed_rpm: req.rotational_speed_rpm.unwrap_or(500.0),
+            runner_diameter_m: req.runner_diameter_m.unwrap_or(1.80),
+            nozzle_count: req.nozzle_count.unwrap_or(2),
+            nozzle_discharge_coeff_cv: req.nozzle_discharge_coeff_cv.unwrap_or(0.98),
+            bucket_deflection_angle_deg: req.bucket_deflection_angle_deg.unwrap_or(165.0),
+            suction_head_m: req.suction_head_m.unwrap_or(1.50),
+            atmospheric_pressure_kpa: req.atmospheric_pressure_kpa.unwrap_or(101.325),
+            vapor_pressure_kpa: req.vapor_pressure_kpa.unwrap_or(2.34),
+        };
+        let res = atlas_simulation_core::hydraulic_turbine::solve_hydraulic_turbine(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_biomedical_stent_expansion(
+        &mut self,
+        req: &SimStentExpansionRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::stent_expansion::StentExpansionProblem {
+            problem_id: "stent_expansion_sim".to_string(),
+            stent_material: req.stent_material.unwrap_or(atlas_simulation_core::stent_expansion::StentMaterial::CobaltChromiumL605),
+            crimped_diameter_mm: req.crimped_diameter_mm.unwrap_or(1.05),
+            nominal_expanded_diameter_mm: req.nominal_expanded_diameter_mm.unwrap_or(3.00),
+            nominal_length_mm: req.nominal_length_mm.unwrap_or(18.0),
+            strut_thickness_um: req.strut_thickness_um.unwrap_or(81.0),
+            strut_width_um: req.strut_width_um.unwrap_or(84.0),
+            crown_count_per_ring: req.crown_count_per_ring.unwrap_or(8),
+            ring_count: req.ring_count.unwrap_or(12),
+            balloon_pressure_atm: req.balloon_pressure_atm.unwrap_or(12.0),
+        };
+        let res = atlas_simulation_core::stent_expansion::solve_stent_expansion(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_electronics_microwave_waveguide(
+        &mut self,
+        req: &SimMicrowaveWaveguideRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::microwave_waveguide::MicrowaveWaveguideProblem {
+            problem_id: "microwave_waveguide_sim".to_string(),
+            broad_dimension_a_mm: req.broad_dimension_a_mm.unwrap_or(22.86),
+            narrow_dimension_b_mm: req.narrow_dimension_b_mm.unwrap_or(10.16),
+            length_l_mm: req.length_l_mm.unwrap_or(100.0),
+            operating_frequency_ghz: req.operating_frequency_ghz.unwrap_or(10.0),
+            wall_conductivity_s_m: req.wall_conductivity_s_m.unwrap_or(5.8e7),
+            dielectric_permittivity: req.dielectric_permittivity.unwrap_or(1.0006),
+            transmitted_power_w: req.transmitted_power_w.unwrap_or(500.0),
+        };
+        let res = atlas_simulation_core::microwave_waveguide::solve_microwave_waveguide(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_electrical_gis_dielectric(
+        &mut self,
+        req: &SimGisDielectricRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::gis_dielectric::GisDielectricProblem {
+            problem_id: "gis_dielectric_sim".to_string(),
+            insulating_gas: req.insulating_gas.unwrap_or(atlas_simulation_core::gis_dielectric::GisInsulatingGas::PureSf6),
+            rated_voltage_kv_rms: req.rated_voltage_kv_rms.unwrap_or(420.0),
+            conductor_radius_mm: req.conductor_radius_mm.unwrap_or(60.0),
+            enclosure_radius_mm: req.enclosure_radius_mm.unwrap_or(165.0),
+            gas_pressure_abs_bar: req.gas_pressure_abs_bar.unwrap_or(5.50),
+            lightning_impulse_withstand_kv_pk: req.lightning_impulse_withstand_kv_pk.unwrap_or(1425.0),
+            surface_roughness_ra_um: req.surface_roughness_ra_um.unwrap_or(6.30),
+        };
+        let res = atlas_simulation_core::gis_dielectric::solve_gis_dielectric(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -7910,6 +8015,61 @@ namespace AtlasCAD.Unity
                     nominal_capacity_mwh: cap,
                     rated_power_mw: p_mw,
                     c_rate: c_rt,
+                    ..Default::default()
+                })?
+            }
+            "sim.geotechnical.soil_consolidation" => {
+                let h0 = req.arguments.get("layer_thickness_m").and_then(|v| v.as_f64());
+                let s0 = req.arguments.get("initial_effective_stress_kpa").and_then(|v| v.as_f64());
+                let ds = req.arguments.get("applied_stress_increment_kpa").and_then(|v| v.as_f64());
+                self.sim_geotechnical_soil_consolidation(&SimSoilConsolidationRequest {
+                    layer_thickness_m: h0,
+                    initial_effective_stress_kpa: s0,
+                    applied_stress_increment_kpa: ds,
+                    ..Default::default()
+                })?
+            }
+            "sim.energy.hydraulic_turbine" => {
+                let h = req.arguments.get("net_head_m").and_then(|v| v.as_f64());
+                let q = req.arguments.get("flow_rate_m3_s").and_then(|v| v.as_f64());
+                let d = req.arguments.get("runner_diameter_m").and_then(|v| v.as_f64());
+                self.sim_energy_hydraulic_turbine(&SimHydraulicTurbineRequest {
+                    net_head_m: h,
+                    flow_rate_m3_s: q,
+                    runner_diameter_m: d,
+                    ..Default::default()
+                })?
+            }
+            "sim.biomedical.stent_expansion" => {
+                let d_exp = req.arguments.get("nominal_expanded_diameter_mm").and_then(|v| v.as_f64());
+                let p_atm = req.arguments.get("balloon_pressure_atm").and_then(|v| v.as_f64());
+                self.sim_biomedical_stent_expansion(&SimStentExpansionRequest {
+                    nominal_expanded_diameter_mm: d_exp,
+                    balloon_pressure_atm: p_atm,
+                    ..Default::default()
+                })?
+            }
+            "sim.electronics.microwave_waveguide" => {
+                let a = req.arguments.get("broad_dimension_a_mm").and_then(|v| v.as_f64());
+                let b = req.arguments.get("narrow_dimension_b_mm").and_then(|v| v.as_f64());
+                let f = req.arguments.get("operating_frequency_ghz").and_then(|v| v.as_f64());
+                self.sim_electronics_microwave_waveguide(&SimMicrowaveWaveguideRequest {
+                    broad_dimension_a_mm: a,
+                    narrow_dimension_b_mm: b,
+                    operating_frequency_ghz: f,
+                    ..Default::default()
+                })?
+            }
+            "sim.electrical.gis_dielectric" => {
+                let v_kv = req.arguments.get("rated_voltage_kv_rms").and_then(|v| v.as_f64());
+                let r1 = req.arguments.get("conductor_radius_mm").and_then(|v| v.as_f64());
+                let r2 = req.arguments.get("enclosure_radius_mm").and_then(|v| v.as_f64());
+                let p_bar = req.arguments.get("gas_pressure_abs_bar").and_then(|v| v.as_f64());
+                self.sim_electrical_gis_dielectric(&SimGisDielectricRequest {
+                    rated_voltage_kv_rms: v_kv,
+                    conductor_radius_mm: r1,
+                    enclosure_radius_mm: r2,
+                    gas_pressure_abs_bar: p_bar,
                     ..Default::default()
                 })?
             }
@@ -10101,6 +10261,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/energy/bess_grid" => {
             match parse_body_or_default::<SimBessGridRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_energy_bess_grid(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/geotechnical/soil_consolidation" => {
+            match parse_body_or_default::<SimSoilConsolidationRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_geotechnical_soil_consolidation(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/energy/hydraulic_turbine" => {
+            match parse_body_or_default::<SimHydraulicTurbineRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_energy_hydraulic_turbine(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/biomedical/stent_expansion" => {
+            match parse_body_or_default::<SimStentExpansionRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_biomedical_stent_expansion(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/electronics/microwave_waveguide" => {
+            match parse_body_or_default::<SimMicrowaveWaveguideRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_electronics_microwave_waveguide(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/electrical/gis_dielectric" => {
+            match parse_body_or_default::<SimGisDielectricRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_electrical_gis_dielectric(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -13753,4 +13958,114 @@ struct SimBessGridRequest {
     pub auxiliary_base_power_kw: Option<f64>,
     #[serde(default)]
     pub chiller_cop: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimSoilConsolidationRequest {
+    #[serde(default)]
+    pub layer_thickness_m: Option<f64>,
+    #[serde(default)]
+    pub initial_void_ratio: Option<f64>,
+    #[serde(default)]
+    pub compression_index_cc: Option<f64>,
+    #[serde(default)]
+    pub recompression_index_cr: Option<f64>,
+    #[serde(default)]
+    pub secondary_compression_index: Option<f64>,
+    #[serde(default)]
+    pub preconsolidation_stress_kpa: Option<f64>,
+    #[serde(default)]
+    pub initial_effective_stress_kpa: Option<f64>,
+    #[serde(default)]
+    pub applied_stress_increment_kpa: Option<f64>,
+    #[serde(default)]
+    pub coefficient_of_consolidation_m2_yr: Option<f64>,
+    #[serde(default)]
+    pub drainage_condition: Option<atlas_simulation_core::soil_consolidation::DrainageCondition>,
+    #[serde(default)]
+    pub analysis_time_years: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimHydraulicTurbineRequest {
+    #[serde(default)]
+    pub turbine_type: Option<atlas_simulation_core::hydraulic_turbine::HydraulicTurbineType>,
+    #[serde(default)]
+    pub net_head_m: Option<f64>,
+    #[serde(default)]
+    pub flow_rate_m3_s: Option<f64>,
+    #[serde(default)]
+    pub rotational_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub runner_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub nozzle_count: Option<u32>,
+    #[serde(default)]
+    pub nozzle_discharge_coeff_cv: Option<f64>,
+    #[serde(default)]
+    pub bucket_deflection_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub suction_head_m: Option<f64>,
+    #[serde(default)]
+    pub atmospheric_pressure_kpa: Option<f64>,
+    #[serde(default)]
+    pub vapor_pressure_kpa: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimStentExpansionRequest {
+    #[serde(default)]
+    pub stent_material: Option<atlas_simulation_core::stent_expansion::StentMaterial>,
+    #[serde(default)]
+    pub crimped_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub nominal_expanded_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub nominal_length_mm: Option<f64>,
+    #[serde(default)]
+    pub strut_thickness_um: Option<f64>,
+    #[serde(default)]
+    pub strut_width_um: Option<f64>,
+    #[serde(default)]
+    pub crown_count_per_ring: Option<u32>,
+    #[serde(default)]
+    pub ring_count: Option<u32>,
+    #[serde(default)]
+    pub balloon_pressure_atm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimMicrowaveWaveguideRequest {
+    #[serde(default)]
+    pub broad_dimension_a_mm: Option<f64>,
+    #[serde(default)]
+    pub narrow_dimension_b_mm: Option<f64>,
+    #[serde(default)]
+    pub length_l_mm: Option<f64>,
+    #[serde(default)]
+    pub operating_frequency_ghz: Option<f64>,
+    #[serde(default)]
+    pub wall_conductivity_s_m: Option<f64>,
+    #[serde(default)]
+    pub dielectric_permittivity: Option<f64>,
+    #[serde(default)]
+    pub transmitted_power_w: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimGisDielectricRequest {
+    #[serde(default)]
+    pub insulating_gas: Option<atlas_simulation_core::gis_dielectric::GisInsulatingGas>,
+    #[serde(default)]
+    pub rated_voltage_kv_rms: Option<f64>,
+    #[serde(default)]
+    pub conductor_radius_mm: Option<f64>,
+    #[serde(default)]
+    pub enclosure_radius_mm: Option<f64>,
+    #[serde(default)]
+    pub gas_pressure_abs_bar: Option<f64>,
+    #[serde(default)]
+    pub lightning_impulse_withstand_kv_pk: Option<f64>,
+    #[serde(default)]
+    pub surface_roughness_ra_um: Option<f64>,
 }
