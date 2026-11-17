@@ -4518,6 +4518,168 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 39.7 Enterprise MCP Tool Calling: 5 Batch-24 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # -------------------------------------------------------------------------
+        # 40. ADVANCED ENGINEERING SOLVERS: PROPELLER HYDRODYNAMICS, IAQ DILUTION, PMSM FOC, MSE WALL & CENTRIFUGE
+        # -------------------------------------------------------------------------
+        print("\n[40/40] ADVANCED ENGINEERING SOLVERS (PROPELLER HYDRODYNAMICS, IAQ DILUTION, PMSM FOC, MSE WALL & CENTRIFUGE)")
+
+        # 40.1 Marine Wageningen B-Series Propeller Hydrodynamics & Cavitation Inception (ITTC 1978 / Oosterveld / Keller)
+        prop_res = http_request(port, "POST", "/api/sim/marine/propeller_hydrodynamics", body={
+            "blade_count": "FourBlades",
+            "propeller_diameter_m": 5.60,
+            "pitch_diameter_ratio": 0.95,
+            "expanded_area_ratio": 0.62,
+            "speed_of_advance_m_s": 7.20,
+            "rotational_speed_rpm": 105.0,
+            "shaft_immersion_depth_m": 5.20,
+            "water_density_kg_m3": 1025.0
+        })
+        check(prop_res.get("advance_ratio_j", 0.0) > 0.60, "Advance ratio J > 0.60")
+        check(prop_res.get("thrust_coefficient_kt", 0.0) > 0.12, "Thrust coefficient KT > 0.12")
+        check(prop_res.get("torque_coefficient_kq", 0.0) > 0.02, "Torque coefficient KQ > 0.02")
+        check(prop_res.get("open_water_efficiency_eta0", 0.0) > 0.55, "Open-water efficiency eta_0 > 0.55")
+        check(prop_res.get("thrust_force_kn", 0.0) > 400.0, "Thrust force > 400 kN")
+        check(prop_res.get("delivered_power_kw", 0.0) > 3000.0, "Delivered power > 3000 kW")
+        check(prop_res.get("blade_tip_speed_m_s", 0.0) <= 40.0, "Tip speed <= 40 m/s")
+        check(prop_res.get("is_keller_criterion_satisfied", False) is True, "Keller criterion satisfied")
+        check(prop_res.get("is_efficiency_satisfactory", False) is True, "Propeller efficiency satisfactory")
+        check(prop_res.get("is_tip_speed_acceptable", False) is True, "Tip speed acceptable")
+        check(prop_res.get("is_propeller_design_viable", False) is True, "Propeller design viable")
+        print(f"  ✓ 40.1 Marine Propeller Hydrodynamics (ITTC 1978 / Oosterveld / Keller): Handymax Bulk Carrier Ø5.60 m 4-Bladed Screw (P/D = {prop_res['open_water_efficiency_eta0']:.2f}, A_E/A_0 = 0.62), Advance Ratio J = {prop_res['advance_ratio_j']:.3f} @ 105 RPM, K_T = {prop_res['thrust_coefficient_kt']:.4f}, 10*K_Q = {prop_res['torque_coefficient_kq']*10.0:.4f}, Open-Water Efficiency η_0 = {prop_res['open_water_efficiency_eta0']*100.0:.1f}%, Open-Water Thrust T = {prop_res['thrust_force_kn']:.1f} kN, Delivered Torque Q = {prop_res['delivered_torque_kn_m']:.1f} kN·m, Delivered Shaft Power P_D = {prop_res['delivered_power_kw']:.1f} kW ({prop_res['delivered_power_kw']/735.5:.0f} metric HP), Blade Tip Speed = {prop_res['blade_tip_speed_m_s']:.1f} m/s, Keller Minimum Blade Area (A_E/A_0)_min = {prop_res['keller_min_blade_area_ratio']:.3f} (Keller Margin Satisfied: True, Cavitation Sigma_0.7R = {prop_res['cavitation_number_sigma07']:.3f}))")
+
+        # 40.2 Indoor Air Quality (IAQ) & Transient Contaminant Dilution (ASHRAE 62.1 / Wells-Riley / ISO 16000)
+        iaq_res = http_request(port, "POST", "/api/sim/environmental/indoor_air_quality", body={
+            "contaminant": "CarbonDioxideCO2",
+            "space_type": "CommercialOffice",
+            "room_floor_area_m2": 120.0,
+            "ceiling_height_m": 3.0,
+            "occupant_count": 12,
+            "outdoor_ventilation_rate_m3_h": 720.0,
+            "hvac_filter_efficiency": 0.0,
+            "outdoor_ambient_concentration": 420.0,
+            "initial_room_concentration": 450.0,
+            "target_threshold_concentration": 1000.0,
+            "exposure_duration_hours": 4.0,
+            "infected_occupants": 0
+        })
+        check(iaq_res.get("room_volume_m3", 0.0) == 360.0, "Room volume == 360 m3")
+        check(iaq_res.get("air_changes_per_hour_ach", 0.0) == 2.0, "Air changes == 2.0 ACH")
+        check(iaq_res.get("steady_state_concentration", 0.0) > 650.0, "Steady-state CO2 > 650 ppm")
+        check(iaq_res.get("ventilation_compliance_ratio", 0.0) >= 1.0, "ASHRAE 62.1 compliance ratio >= 1.0")
+        check(iaq_res.get("outdoor_flow_per_person_l_s", 0.0) >= 10.0, "Outdoor airflow >= 10 L/s/person")
+        check(iaq_res.get("is_target_threshold_satisfied", False) is True, "Target threshold satisfied")
+        check(iaq_res.get("is_ashrae_62_1_compliant", False) is True, "ASHRAE 62.1 compliant")
+        check(iaq_res.get("is_infection_risk_low", False) is True, "Infection risk low")
+        check(iaq_res.get("is_iaq_acceptable", False) is True, "IAQ acceptable")
+        print(f"  ✓ 40.2 Indoor Air Quality & Contaminant Dilution (ASHRAE 62.1 / Wells-Riley / ISO 16000): 120 m² Commercial Office (Volume = {iaq_res['room_volume_m3']:.0f} m³, 12 Occupants), Fresh Air Supply = 720 m³/h ({iaq_res['air_changes_per_hour_ach']:.1f} ACH, {iaq_res['outdoor_flow_per_person_l_s']:.1f} L/(s·person)), Metabolic Respiration S_dot = {iaq_res['total_generation_rate']:.1f} L/h CO2, Steady-State C_ss = {iaq_res['steady_state_concentration']:.1f} ppm (Target Ceiling = 1000 ppm: True), 4h Exposure Concentration C(4h) = {iaq_res['concentration_after_exposure']:.1f} ppm, Purge Time to 700 ppm = {iaq_res['purge_time_to_target_hours']:.2f} h, ASHRAE 62.1 Minimum Outdoor Air V_bz = {iaq_res['ashrae_minimum_outdoor_flow_m3_h']:.1f} m³/h (Ventilation Compliance Ratio = {iaq_res['ventilation_compliance_ratio']:.2f}x >= 1.0), Wells-Riley Infection Risk = {iaq_res['wells_riley_infection_risk_pct']:.2f}%)")
+
+        # 40.3 Three-Phase PMSM FOC Drive Dynamics (Park-Clarke / MTPA / IEEE 1415)
+        pmsm_res = http_request(port, "POST", "/api/sim/electrical/pmsm_foc_drive", body={
+            "rotor_topology": "InteriorIPMSM",
+            "pole_pairs_p": 4,
+            "stator_resistance_ohms": 0.025,
+            "d_axis_inductance_mh": 0.45,
+            "q_axis_inductance_mh": 0.95,
+            "permanent_magnet_flux_wb": 0.095,
+            "rotational_speed_rpm": 4500.0,
+            "q_axis_current_iq_a": 120.0,
+            "inverter_dc_bus_voltage_v": 650.0
+        })
+        check(pmsm_res.get("electrical_angular_velocity_rad_s", 0.0) > 1800.0, "Electrical velocity > 1800 rad/s")
+        check(pmsm_res.get("d_axis_current_id_a", 0.0) < 0.0, "Negative d-axis current")
+        check(pmsm_res.get("pm_alignment_torque_nm", 0.0) > 60.0, "PM alignment torque > 60 N·m")
+        check(pmsm_res.get("reluctance_torque_nm", 0.0) > 5.0, "Reluctance torque > 5 N·m")
+        check(pmsm_res.get("mechanical_shaft_power_kw", 0.0) > 30.0, "Mechanical power > 30 kW")
+        check(pmsm_res.get("motor_efficiency_pct", 0.0) >= 90.0, "Efficiency >= 90%")
+        check(pmsm_res.get("inverter_modulation_index", 2.0) <= 1.0, "Inverter modulation index <= 1.0")
+        check(pmsm_res.get("is_voltage_within_inverter_limits", False) is True, "Voltage within inverter limits")
+        check(pmsm_res.get("is_efficiency_high", False) is True, "Efficiency high")
+        check(pmsm_res.get("is_pmsm_drive_viable", False) is True, "PMSM drive viable")
+        print(f"  ✓ 40.3 Three-Phase PMSM FOC Drive Dynamics (Park-Clarke / MTPA / IEEE 1415): EV Traction IPMSM (8-Pole, Saliency ξ = L_q/L_d = 2.11) @ 4500 RPM (ω_e = {pmsm_res['electrical_angular_velocity_rad_s']:.1f} rad/s), MTPA Optimum Current Injection: i_q = 120.0 A, i_d = {pmsm_res['d_axis_current_id_a']:.1f} A (Stator i_s = {pmsm_res['stator_current_magnitude_a']:.1f} A), PM Alignment Torque T_pm = {pmsm_res['pm_alignment_torque_nm']:.1f} N·m + Reluctance Torque T_rel = {pmsm_res['reluctance_torque_nm']:.1f} N·m = Total T_e = {pmsm_res['total_electromagnetic_torque_nm']:.1f} N·m, Mechanical Shaft Power P_mech = {pmsm_res['mechanical_shaft_power_kw']:.1f} kW ({pmsm_res['mechanical_shaft_power_kw']*1.341:.0f} HP), Copper Loss P_cu = {pmsm_res['copper_losses_w']:.0f} W, Bertotti Core Loss P_fe = {pmsm_res['iron_core_losses_w']:.0f} W, Motor Efficiency η = {pmsm_res['motor_efficiency_pct']:.2f}%, Inverter SVPWM Modulation Index m_a = {pmsm_res['inverter_modulation_index']:.3f} <= 1.0 @ 650 V DC Bus)")
+
+        # 40.4 Mechanically Stabilized Earth (MSE) Wall Geogrid Stability (FHWA-NHI-10-024 / AASHTO LRFD)
+        mse_res = http_request(port, "POST", "/api/sim/civil/mse_retaining_wall", body={
+            "polymer_type": "HdpeUniaxial",
+            "wall_height_h_m": 8.0,
+            "reinforcement_length_l_m": 6.0,
+            "vertical_layer_spacing_m": 0.60,
+            "soil_unit_weight_kn_m3": 19.5,
+            "soil_friction_angle_deg": 34.0,
+            "crest_surcharge_q_kpa": 12.0,
+            "geogrid_ultimate_strength_kn_m": 110.0,
+            "rf_installation_damage": 1.15,
+            "rf_creep_rupture": 1.65,
+            "rf_durability": 1.15
+        })
+        check(mse_res.get("active_earth_pressure_coef_ka", 0.0) > 0.25, "Ka > 0.25")
+        check(mse_res.get("total_reinforcement_layers", 0) == 13, "Layers == 13")
+        check(mse_res.get("allowable_design_strength_tal_kn_m", 0.0) > 35.0, "Tal > 35 kN/m")
+        check(mse_res.get("max_layer_tensile_force_kn_m", 0.0) > 15.0, "Max force > 15 kN/m")
+        check(mse_res.get("min_rupture_safety_factor", 0.0) >= 1.50, "Rupture safety factor >= 1.50")
+        check(mse_res.get("min_pullout_safety_factor", 0.0) >= 1.50, "Pullout safety factor >= 1.50")
+        check(mse_res.get("length_to_height_ratio", 0.0) >= 0.70, "L/H >= 0.70")
+        check(mse_res.get("is_embedment_length_adequate", False) is True, "Embedment length adequate")
+        check(mse_res.get("is_tensile_rupture_safe", False) is True, "Tensile rupture safe")
+        check(mse_res.get("is_pullout_resistance_safe", False) is True, "Pullout resistance safe")
+        check(mse_res.get("is_mse_wall_stable", False) is True, "MSE wall stable")
+        print(f"  ✓ 40.4 Geogrid Mechanically Stabilized Earth (MSE) Wall (FHWA-NHI-10-024 / AASHTO LRFD): 8.0 m Highway Bridge Approach Wall (Granular Backfill γ = 19.5 kN/m³, φ = 34.0°, K_a = {mse_res['active_earth_pressure_coef_ka']:.3f}, 12 kPa Traffic Surcharge), HDPE Uniaxial Geogrid (T_ult = 110 kN/m, RF_total = 2.18, Long-Term Design Strength T_al = {mse_res['allowable_design_strength_tal_kn_m']:.1f} kN/m), 13 Reinforcement Layers @ 0.60 m Spacing (L = 6.0 m, L/H = {mse_res['length_to_height_ratio']:.2f} >= 0.70), Maximum Layer Tensile Force T_max = {mse_res['max_layer_tensile_force_kn_m']:.1f} kN/m, Minimum Tensile Rupture Safety Factor FS_rupture = {mse_res['min_rupture_safety_factor']:.2f} >= 1.50, Soil-Geogrid Pullout Capacity P_r = {mse_res['critical_pullout_resistance_kn_m']:.1f} kN/m (Critical Embedment L_e = {mse_res['critical_embedment_length_le_m']:.2f} m, Minimum Pullout FS_pullout = {mse_res['min_pullout_safety_factor']:.2f} >= 1.50))")
+
+        # 40.5 Gas Centrifuge Isotopic Separation & Separative Work (Cohen-Onsager / Dirac-Peierls / ISO 9001)
+        centrifuge_res = http_request(port, "POST", "/api/sim/nuclear/isotope_centrifuge", body={
+            "rotor_material": "CarbonFiberCfrp",
+            "rotor_radius_m": 0.10,
+            "rotor_length_m": 3.0,
+            "rotational_speed_rpm": 65000.0,
+            "operating_temperature_c": 55.0,
+            "feed_mass_flow_kg_h": 0.85,
+            "feed_assay_u235_fraction": 0.00711,
+            "stage_cut_theta": 0.50,
+            "circulation_efficiency": 0.75
+        })
+        check(centrifuge_res.get("rotor_peripheral_speed_m_s", 0.0) > 600.0, "Tip speed > 600 m/s")
+        check(centrifuge_res.get("centrifugal_acceleration_g", 0.0) > 350000.0, "Acceleration > 350,000 g")
+        check(centrifuge_res.get("rotor_burst_safety_factor", 0.0) >= 1.30, "Burst safety factor >= 1.30")
+        check(centrifuge_res.get("elementary_separation_factor_alpha0", 0.0) > 1.05, "Alpha_0 > 1.05")
+        check(centrifuge_res.get("overall_stage_separation_factor_alpha", 0.0) > 1.10, "Stage alpha > 1.10")
+        check(centrifuge_res.get("separative_power_swu_per_year", 0.0) >= 10.0, "SWU >= 10 kg SWU/yr")
+        check(centrifuge_res.get("is_rotor_stress_safe", False) is True, "Rotor stress safe")
+        check(centrifuge_res.get("is_separation_effective", False) is True, "Separation effective")
+        check(centrifuge_res.get("is_swu_capacity_commercial", False) is True, "SWU commercial")
+        check(centrifuge_res.get("is_centrifuge_stage_viable", False) is True, "Centrifuge stage viable")
+        print(f"  ✓ 40.5 Gas Centrifuge Isotope Separation (Cohen-Onsager / Dirac-Peierls / ISO 9001): High-Modulus CFRP Rotor (Ø200 mm x 3.0 m) @ 65,000 RPM (Peripheral Speed v = {centrifuge_res['rotor_peripheral_speed_m_s']:.1f} m/s, Centrifugal Acceleration = {centrifuge_res['centrifugal_acceleration_g']:.0f} g, Rotor Hoop Stress = {centrifuge_res['rotor_hoop_stress_mpa']:.0f} MPa, Burst Safety Factor = {centrifuge_res['rotor_burst_safety_factor']:.2f} >= 1.30), UF6 Gas Equilibrium Radial Separation Factor α_0 = {centrifuge_res['elementary_separation_factor_alpha0']:.4f}, Counter-Current Axial Stage Factor α = {centrifuge_res['overall_stage_separation_factor_alpha']:.4f}, Stage Cut θ = 0.50 (Feed Assay 0.711% U-235 -> Product x_p = {centrifuge_res['product_assay_u235_fraction']*100.0:.3f}% / Tails x_w = {centrifuge_res['tails_assay_u235_fraction']*100.0:.3f}%), Dirac-Peierls Separative Work δU = {centrifuge_res['separative_power_swu_per_year']:.2f} kg SWU/year (Cohen Theoretical Max = {centrifuge_res['cohen_maximum_separative_power_swu_yr']:.2f} kg SWU/yr, Separative Efficiency = {centrifuge_res['separative_efficiency_pct']:.1f}%))")
+
+        # 40.6 Universal Commands Execution Verification (Batch 25 Domains)
+        for cmd_id in [
+            "sim.marine.propeller_hydrodynamics",
+            "sim.environmental.indoor_air_quality",
+            "sim.electrical.pmsm_foc_drive",
+            "sim.civil.mse_retaining_wall",
+            "sim.nuclear.isotope_centrifuge",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 40.6 Universal Commands: All 5 Batch-25 Engineering Commands verified via typed schema engine")
+
+        # 40.7 Enterprise MCP Tool Calling (Batch 25 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_marine_propeller_hydrodynamics",
+            "atlas_sim_environmental_indoor_air_quality",
+            "atlas_sim_electrical_pmsm_foc_drive",
+            "atlas_sim_civil_mse_retaining_wall",
+            "atlas_sim_nuclear_isotope_centrifuge",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 994,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 40.7 Enterprise MCP Tool Calling: 5 Batch-25 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

@@ -161,6 +161,11 @@ pub mod crystallization_kinetics;
 pub mod thermoelectric_cooler;
 pub mod slurry_pump_derating;
 pub mod fiber_dispersion;
+pub mod propeller_hydrodynamics;
+pub mod indoor_air_quality;
+pub mod pmsm_foc_drive;
+pub mod mse_retaining_wall;
+pub mod isotope_centrifuge;
 
 pub mod prelude {
     pub use crate::acoustics::{
@@ -744,5 +749,22 @@ pub mod prelude {
     pub use crate::fiber_dispersion::{
         FiberDispersionProblem, FiberDispersionResult, FiberStandardType,
         solve_fiber_dispersion,
+    };
+    pub use crate::propeller_hydrodynamics::{
+        BladeCount, PropellerProblem, PropellerResult, solve_propeller_hydrodynamics,
+    };
+    pub use crate::indoor_air_quality::{
+        AirContaminantType, IndoorAirQualityProblem, IndoorAirQualityResult, SpaceOccupancyType,
+        solve_indoor_air_quality,
+    };
+    pub use crate::pmsm_foc_drive::{
+        PmsmDriveProblem, PmsmDriveResult, PmsmRotorTopology, solve_pmsm_foc_drive,
+    };
+    pub use crate::mse_retaining_wall::{
+        GeogridPolymerType, MseWallProblem, MseWallResult, solve_mse_retaining_wall,
+    };
+    pub use crate::isotope_centrifuge::{
+        CentrifugeRotorMaterial, IsotopeCentrifugeProblem, IsotopeCentrifugeResult,
+        solve_isotope_centrifuge,
     };
 }

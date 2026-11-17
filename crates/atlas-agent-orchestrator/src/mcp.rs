@@ -2240,6 +2240,71 @@ impl McpServer {
                     "required": ["wavelength_nm", "fiber_length_km"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_marine_propeller_hydrodynamics".into(),
+                description: "Calculates Wageningen B-series thrust coefficient KT, torque coefficient KQ, open-water efficiency eta_0, delivered power, Keller cavitation blade area ratio, and cavitation margin.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "propeller_diameter_m": { "type": "number", "default": 5.60 },
+                        "pitch_diameter_ratio": { "type": "number", "default": 0.95 },
+                        "rotational_speed_rpm": { "type": "number", "default": 105.0 }
+                    },
+                    "required": ["propeller_diameter_m", "pitch_diameter_ratio"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_environmental_indoor_air_quality".into(),
+                description: "Calculates room effective removal rate lambda, steady-state concentration Css, transient concentration trajectory C(t), Wells-Riley infection risk, and ASHRAE 62.1 outdoor air rate.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "room_floor_area_m2": { "type": "number", "default": 120.0 },
+                        "room_clear_height_m": { "type": "number", "default": 3.0 },
+                        "ventilation_supply_airflow_m3_h": { "type": "number", "default": 720.0 }
+                    },
+                    "required": ["room_floor_area_m2", "ventilation_supply_airflow_m3_h"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_electrical_pmsm_foc_drive".into(),
+                description: "Calculates d-q reference frame voltages, MTPA optimal current angle, electromagnetic torque, copper and core iron losses, electrical efficiency, and inverter SVPWM modulation index.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "rotational_speed_rpm": { "type": "number", "default": 4500.0 },
+                        "q_axis_current_iq_a": { "type": "number", "default": 120.0 },
+                        "inverter_dc_bus_voltage_v": { "type": "number", "default": 650.0 }
+                    },
+                    "required": ["rotational_speed_rpm", "q_axis_current_iq_a"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_civil_mse_retaining_wall".into(),
+                description: "Calculates Rankine active lateral earth pressure, maximum tensile force per geogrid layer, long-term design strength Tal, tensile rupture safety factor, and pullout resistance.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "wall_height_h_m": { "type": "number", "default": 8.0 },
+                        "reinforcement_length_l_m": { "type": "number", "default": 6.0 },
+                        "geogrid_ultimate_strength_kn_m": { "type": "number", "default": 110.0 }
+                    },
+                    "required": ["wall_height_h_m", "reinforcement_length_l_m"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_nuclear_isotope_centrifuge".into(),
+                description: "Calculates rotor peripheral speed, centrifugal g-force acceleration, elementary separation factor alpha0, Dirac-Peierls value function, and stage separative power delta_U (kg SWU/yr).".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "rotor_radius_m": { "type": "number", "default": 0.10 },
+                        "rotor_length_m": { "type": "number", "default": 3.0 },
+                        "rotational_speed_rpm": { "type": "number", "default": 65000.0 }
+                    },
+                    "required": ["rotor_radius_m", "rotational_speed_rpm"]
+                }),
+            },
         ]
     }
 

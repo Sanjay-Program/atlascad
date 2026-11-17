@@ -6434,5 +6434,175 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.marine.propeller_hydrodynamics",
+            "Marine Wageningen B-Series Propeller Hydrodynamics & Cavitation Inception (ITTC 1978 / Oosterveld / Keller)",
+            "Calculates Wageningen B-series thrust coefficient KT, torque coefficient KQ, open-water efficiency eta_0, delivered power, Keller cavitation blade area ratio, and cavitation margin.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "propeller_diameter_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Propeller outer diameter in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(5.60)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(15.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "pitch_diameter_ratio".into(),
+            arg_type: ArgumentType::Number,
+            description: "Propeller pitch-to-diameter ratio P/D at 0.7R".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.95)),
+            validation_rules: vec![ValidationRule::Min(0.4), ValidationRule::Max(2.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rotational_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Propeller rotational shaft speed in RPM".into(),
+            required: false,
+            default_value: Some(serde_json::json!(105.0)),
+            validation_rules: vec![ValidationRule::Min(20.0), ValidationRule::Max(2000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.environmental.indoor_air_quality",
+            "Indoor Air Quality (IAQ) & Transient Contaminant Dilution (ASHRAE 62.1 / Wells-Riley / ISO 16000)",
+            "Calculates room effective removal rate lambda, steady-state concentration Css, transient concentration trajectory C(t), Wells-Riley infection risk, and ASHRAE 62.1 outdoor air rate.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "room_floor_area_m2".into(),
+            arg_type: ArgumentType::Number,
+            description: "Room floor area in square meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(120.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(5000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "room_clear_height_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Room ceiling clear height in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(3.0)),
+            validation_rules: vec![ValidationRule::Min(2.0), ValidationRule::Max(20.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "ventilation_supply_airflow_m3_h".into(),
+            arg_type: ArgumentType::Number,
+            description: "Outdoor clean supply ventilation airflow rate in m³/h".into(),
+            required: false,
+            default_value: Some(serde_json::json!(720.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(50000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.electrical.pmsm_foc_drive",
+            "Three-Phase Permanent Magnet Synchronous Motor (PMSM) FOC Drive Dynamics (Park-Clarke / MTPA / IEEE 1415)",
+            "Calculates d-q reference frame voltages, MTPA optimal current angle, electromagnetic torque, copper and core iron losses, electrical efficiency, and inverter SVPWM modulation index.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "rotational_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Motor shaft rotational speed in RPM".into(),
+            required: false,
+            default_value: Some(serde_json::json!(4500.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(30000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "q_axis_current_iq_a".into(),
+            arg_type: ArgumentType::Number,
+            description: "Torque-producing quadrature current iq in Amperes".into(),
+            required: false,
+            default_value: Some(serde_json::json!(120.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "inverter_dc_bus_voltage_v".into(),
+            arg_type: ArgumentType::Number,
+            description: "Inverter DC link bus voltage in Volts".into(),
+            required: false,
+            default_value: Some(serde_json::json!(650.0)),
+            validation_rules: vec![ValidationRule::Min(24.0), ValidationRule::Max(1500.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.civil.mse_retaining_wall",
+            "Mechanically Stabilized Earth (MSE) Wall Geogrid Stability (FHWA-NHI-10-024 / AASHTO LRFD)",
+            "Calculates Rankine active lateral earth pressure, maximum tensile force per geogrid layer, long-term design strength Tal, tensile rupture safety factor, and pullout resistance.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "wall_height_h_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Total wall vertical height in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(8.0)),
+            validation_rules: vec![ValidationRule::Min(2.0), ValidationRule::Max(30.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "reinforcement_length_l_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Geogrid reinforcement length in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(6.0)),
+            validation_rules: vec![ValidationRule::Min(1.5), ValidationRule::Max(40.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "geogrid_ultimate_strength_kn_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Ultimate manufacturer tensile strength in kN/m".into(),
+            required: false,
+            default_value: Some(serde_json::json!(110.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(500.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.nuclear.isotope_centrifuge",
+            "Gas Centrifuge Isotopic Separation & Separative Work (Cohen-Onsager / Dirac-Peierls / ISO 9001)",
+            "Calculates rotor peripheral speed, centrifugal g-force acceleration, elementary separation factor alpha0, Dirac-Peierls value function, and stage separative power delta_U (kg SWU/yr).",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "rotor_radius_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Centrifuge rotor outer radius in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.10)),
+            validation_rules: vec![ValidationRule::Min(0.02), ValidationRule::Max(0.50)],
+        })
+        .with_argument(CommandArgument {
+            name: "rotor_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Centrifuge rotor active tube length in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(3.0)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "rotational_speed_rpm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Rotor shaft rotational speed in RPM".into(),
+            required: false,
+            default_value: Some(serde_json::json!(65000.0)),
+            validation_rules: vec![ValidationRule::Min(5000.0), ValidationRule::Max(150000.0)],
+        }),
+    )?;
+
     Ok(())
 }

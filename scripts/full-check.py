@@ -2994,6 +2994,136 @@ def simulation_section(studio: Studio) -> None:
     check(fiber_data.get("is_received_optical_power_adequate", False) is True, "optical power adequate")
     check(fiber_data.get("is_dispersion_penalty_tolerable", False) is True, "dispersion penalty tolerable")
     check(fiber_data.get("is_fiber_link_viable", False) is True, "optical fiber link viable")
+
+    # 125. Marine Wageningen B-Series Propeller Hydrodynamics & Cavitation Inception (ITTC 1978 / Oosterveld / Keller)
+    prop = studio.post("/api/sim/marine/propeller_hydrodynamics", {
+        "blade_count": "FourBlades",
+        "propeller_diameter_m": 5.60,
+        "pitch_diameter_ratio": 0.95,
+        "expanded_area_ratio": 0.62,
+        "speed_of_advance_m_s": 7.20,
+        "rotational_speed_rpm": 105.0,
+        "shaft_immersion_depth_m": 5.20,
+        "water_density_kg_m3": 1025.0
+    })
+    check(prop.status == 200, f"propeller hydrodynamics returns 200 (got {prop.status})")
+    prop_data = prop.json()
+    check(prop_data.get("advance_ratio_j", 0.0) > 0.60, "advance ratio J > 0.60")
+    check(prop_data.get("thrust_coefficient_kt", 0.0) > 0.12, "thrust coefficient KT > 0.12")
+    check(prop_data.get("torque_coefficient_kq", 0.0) > 0.02, "torque coefficient KQ > 0.02")
+    check(prop_data.get("open_water_efficiency_eta0", 0.0) > 0.55, "open water efficiency eta_0 > 0.55")
+    check(prop_data.get("thrust_force_kn", 0.0) > 400.0, "thrust force > 400 kN")
+    check(prop_data.get("delivered_power_kw", 0.0) > 3000.0, "delivered power > 3000 kW")
+    check(prop_data.get("blade_tip_speed_m_s", 0.0) <= 40.0, "blade tip speed <= 40 m/s")
+    check(prop_data.get("is_keller_criterion_satisfied", False) is True, "Keller cavitation criterion satisfied")
+    check(prop_data.get("is_efficiency_satisfactory", False) is True, "propeller efficiency satisfactory")
+    check(prop_data.get("is_tip_speed_acceptable", False) is True, "blade tip speed acceptable")
+    check(prop_data.get("is_propeller_design_viable", False) is True, "propeller design viable")
+
+    # 126. Indoor Air Quality (IAQ) & Transient Contaminant Dilution (ASHRAE 62.1 / Wells-Riley / ISO 16000)
+    iaq = studio.post("/api/sim/environmental/indoor_air_quality", {
+        "contaminant": "CarbonDioxideCO2",
+        "space_type": "CommercialOffice",
+        "room_floor_area_m2": 120.0,
+        "ceiling_height_m": 3.0,
+        "occupant_count": 12,
+        "outdoor_ventilation_rate_m3_h": 720.0,
+        "hvac_filter_efficiency": 0.0,
+        "outdoor_ambient_concentration": 420.0,
+        "initial_room_concentration": 450.0,
+        "target_threshold_concentration": 1000.0,
+        "exposure_duration_hours": 4.0,
+        "infected_occupants": 0
+    })
+    check(iaq.status == 200, f"indoor air quality returns 200 (got {iaq.status})")
+    iaq_data = iaq.json()
+    check(iaq_data.get("room_volume_m3", 0.0) == 360.0, "room volume == 360 m3")
+    check(iaq_data.get("air_changes_per_hour_ach", 0.0) == 2.0, "ACH == 2.0")
+    check(iaq_data.get("steady_state_concentration", 0.0) > 650.0, "steady state CO2 > 650 ppm")
+    check(iaq_data.get("ventilation_compliance_ratio", 0.0) >= 1.0, "ASHRAE 62.1 ventilation compliance ratio >= 1.0")
+    check(iaq_data.get("outdoor_flow_per_person_l_s", 0.0) >= 10.0, "outdoor airflow >= 10 L/(s·person)")
+    check(iaq_data.get("is_target_threshold_satisfied", False) is True, "target threshold satisfied")
+    check(iaq_data.get("is_ashrae_62_1_compliant", False) is True, "ASHRAE 62.1 compliant")
+    check(iaq_data.get("is_infection_risk_low", False) is True, "infection risk low")
+    check(iaq_data.get("is_iaq_acceptable", False) is True, "IAQ acceptable")
+
+    # 127. Three-Phase PMSM FOC Drive Dynamics (Park-Clarke / MTPA / IEEE 1415)
+    pmsm = studio.post("/api/sim/electrical/pmsm_foc_drive", {
+        "rotor_topology": "InteriorIPMSM",
+        "pole_pairs_p": 4,
+        "stator_resistance_ohms": 0.025,
+        "d_axis_inductance_mh": 0.45,
+        "q_axis_inductance_mh": 0.95,
+        "permanent_magnet_flux_wb": 0.095,
+        "rotational_speed_rpm": 4500.0,
+        "q_axis_current_iq_a": 120.0,
+        "inverter_dc_bus_voltage_v": 650.0
+    })
+    check(pmsm.status == 200, f"pmsm foc drive returns 200 (got {pmsm.status})")
+    pmsm_data = pmsm.json()
+    check(pmsm_data.get("electrical_angular_velocity_rad_s", 0.0) > 1800.0, "electrical speed > 1800 rad/s")
+    check(pmsm_data.get("d_axis_current_id_a", 0.0) < 0.0, "MTPA negative d-axis current")
+    check(pmsm_data.get("pm_alignment_torque_nm", 0.0) > 60.0, "PM alignment torque > 60 N·m")
+    check(pmsm_data.get("reluctance_torque_nm", 0.0) > 5.0, "reluctance torque > 5 N·m")
+    check(pmsm_data.get("mechanical_shaft_power_kw", 0.0) > 30.0, "mechanical shaft power > 30 kW")
+    check(pmsm_data.get("motor_efficiency_pct", 0.0) >= 90.0, "motor efficiency >= 90%")
+    check(pmsm_data.get("inverter_modulation_index", 2.0) <= 1.0, "inverter modulation index <= 1.0")
+    check(pmsm_data.get("is_voltage_within_inverter_limits", False) is True, "voltage within inverter limits")
+    check(pmsm_data.get("is_efficiency_high", False) is True, "efficiency high")
+    check(pmsm_data.get("is_pmsm_drive_viable", False) is True, "PMSM drive viable")
+
+    # 128. Mechanically Stabilized Earth (MSE) Wall Geogrid Stability (FHWA-NHI-10-024 / AASHTO LRFD)
+    mse = studio.post("/api/sim/civil/mse_retaining_wall", {
+        "polymer_type": "HdpeUniaxial",
+        "wall_height_h_m": 8.0,
+        "reinforcement_length_l_m": 6.0,
+        "vertical_layer_spacing_m": 0.60,
+        "soil_unit_weight_kn_m3": 19.5,
+        "soil_friction_angle_deg": 34.0,
+        "crest_surcharge_q_kpa": 12.0,
+        "geogrid_ultimate_strength_kn_m": 110.0,
+        "rf_installation_damage": 1.15,
+        "rf_creep_rupture": 1.65,
+        "rf_durability": 1.15
+    })
+    check(mse.status == 200, f"mse retaining wall returns 200 (got {mse.status})")
+    mse_data = mse.json()
+    check(mse_data.get("active_earth_pressure_coef_ka", 0.0) > 0.25, "active earth pressure Ka > 0.25")
+    check(mse_data.get("total_reinforcement_layers", 0) == 13, "total geogrid layers == 13")
+    check(mse_data.get("allowable_design_strength_tal_kn_m", 0.0) > 35.0, "allowable strength Tal > 35 kN/m")
+    check(mse_data.get("max_layer_tensile_force_kn_m", 0.0) > 15.0, "max layer force > 15 kN/m")
+    check(mse_data.get("min_rupture_safety_factor", 0.0) >= 1.50, "rupture safety factor >= 1.50")
+    check(mse_data.get("min_pullout_safety_factor", 0.0) >= 1.50, "pullout safety factor >= 1.50")
+    check(mse_data.get("length_to_height_ratio", 0.0) >= 0.70, "L/H ratio >= 0.70")
+    check(mse_data.get("is_embedment_length_adequate", False) is True, "embedment length adequate")
+    check(mse_data.get("is_tensile_rupture_safe", False) is True, "tensile rupture safe")
+    check(mse_data.get("is_pullout_resistance_safe", False) is True, "pullout resistance safe")
+    check(mse_data.get("is_mse_wall_stable", False) is True, "MSE wall stable")
+
+    # 129. Gas Centrifuge Isotopic Separation & Separative Work (Cohen-Onsager / Dirac-Peierls / ISO 9001)
+    centrifuge = studio.post("/api/sim/nuclear/isotope_centrifuge", {
+        "rotor_material": "CarbonFiberCfrp",
+        "rotor_radius_m": 0.10,
+        "rotor_length_m": 3.0,
+        "rotational_speed_rpm": 65000.0,
+        "operating_temperature_c": 55.0,
+        "feed_mass_flow_kg_h": 0.85,
+        "feed_assay_u235_fraction": 0.00711,
+        "stage_cut_theta": 0.50,
+        "circulation_efficiency": 0.75
+    })
+    check(centrifuge.status == 200, f"isotope centrifuge returns 200 (got {centrifuge.status})")
+    cent_data = centrifuge.json()
+    check(cent_data.get("rotor_peripheral_speed_m_s", 0.0) > 600.0, "rotor peripheral speed > 600 m/s")
+    check(cent_data.get("centrifugal_acceleration_g", 0.0) > 350000.0, "centrifugal acceleration > 350,000 g")
+    check(cent_data.get("rotor_burst_safety_factor", 0.0) >= 1.30, "rotor burst safety factor >= 1.30")
+    check(cent_data.get("elementary_separation_factor_alpha0", 0.0) > 1.05, "elementary separation factor alpha_0 > 1.05")
+    check(cent_data.get("overall_stage_separation_factor_alpha", 0.0) > 1.10, "stage separation factor alpha > 1.10")
+    check(cent_data.get("separative_power_swu_per_year", 0.0) >= 10.0, "separative work >= 10 kg SWU/yr")
+    check(cent_data.get("is_rotor_stress_safe", False) is True, "rotor hoop stress safe")
+    check(cent_data.get("is_separation_effective", False) is True, "isotopic separation effective")
+    check(cent_data.get("is_swu_capacity_commercial", False) is True, "SWU capacity commercial")
+    check(cent_data.get("is_centrifuge_stage_viable", False) is True, "centrifuge stage viable")
     report("simulation")
 
 

@@ -7125,6 +7125,115 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_marine_propeller_hydrodynamics(
+        &mut self,
+        req: &SimPropellerRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::propeller_hydrodynamics::PropellerProblem {
+            problem_id: "propeller_sim".to_string(),
+            blade_count: req.blade_count.unwrap_or(atlas_simulation_core::propeller_hydrodynamics::BladeCount::FourBlades),
+            propeller_diameter_m: req.propeller_diameter_m.unwrap_or(5.60),
+            pitch_diameter_ratio: req.pitch_diameter_ratio.unwrap_or(0.95),
+            expanded_area_ratio: req.expanded_area_ratio.unwrap_or(0.62),
+            speed_of_advance_m_s: req.speed_of_advance_m_s.unwrap_or(7.20),
+            rotational_speed_rpm: req.rotational_speed_rpm.unwrap_or(105.0),
+            shaft_immersion_depth_m: req.shaft_immersion_depth_m.unwrap_or(5.20),
+            water_density_kg_m3: req.water_density_kg_m3.unwrap_or(1025.0),
+        };
+        let res = atlas_simulation_core::propeller_hydrodynamics::solve_propeller_hydrodynamics(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_environmental_indoor_air_quality(
+        &mut self,
+        req: &SimIndoorAirQualityRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::indoor_air_quality::IndoorAirQualityProblem {
+            problem_id: "indoor_air_quality_sim".to_string(),
+            contaminant: req.contaminant.unwrap_or(atlas_simulation_core::indoor_air_quality::AirContaminantType::CarbonDioxideCO2),
+            space_type: req.space_type.unwrap_or(atlas_simulation_core::indoor_air_quality::SpaceOccupancyType::CommercialOffice),
+            room_floor_area_m2: req.room_floor_area_m2.unwrap_or(120.0),
+            ceiling_height_m: req.ceiling_height_m.or(req.room_clear_height_m).unwrap_or(3.0),
+            occupant_count: req.occupant_count.unwrap_or(12),
+            outdoor_ventilation_rate_m3_h: req.outdoor_ventilation_rate_m3_h.or(req.ventilation_supply_airflow_m3_h).unwrap_or(720.0),
+            hvac_filter_efficiency: req.hvac_filter_efficiency.unwrap_or(0.0),
+            outdoor_ambient_concentration: req.outdoor_ambient_concentration.unwrap_or(420.0),
+            initial_room_concentration: req.initial_room_concentration.unwrap_or(450.0),
+            target_threshold_concentration: req.target_threshold_concentration.unwrap_or(1000.0),
+            exposure_duration_hours: req.exposure_duration_hours.unwrap_or(4.0),
+            infected_occupants: req.infected_occupants.unwrap_or(0),
+        };
+        let res = atlas_simulation_core::indoor_air_quality::solve_indoor_air_quality(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_electrical_pmsm_foc_drive(
+        &mut self,
+        req: &SimPmsmDriveRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::pmsm_foc_drive::PmsmDriveProblem {
+            problem_id: "pmsm_foc_sim".to_string(),
+            rotor_topology: req.rotor_topology.unwrap_or(atlas_simulation_core::pmsm_foc_drive::PmsmRotorTopology::InteriorIPMSM),
+            pole_pairs_p: req.pole_pairs_p.unwrap_or(4),
+            stator_resistance_ohms: req.stator_resistance_ohms.unwrap_or(0.025),
+            d_axis_inductance_mh: req.d_axis_inductance_mh.unwrap_or(0.45),
+            q_axis_inductance_mh: req.q_axis_inductance_mh.unwrap_or(0.95),
+            permanent_magnet_flux_wb: req.permanent_magnet_flux_wb.unwrap_or(0.095),
+            rotational_speed_rpm: req.rotational_speed_rpm.unwrap_or(4500.0),
+            q_axis_current_iq_a: req.q_axis_current_iq_a.unwrap_or(120.0),
+            inverter_dc_bus_voltage_v: req.inverter_dc_bus_voltage_v.unwrap_or(650.0),
+        };
+        let res = atlas_simulation_core::pmsm_foc_drive::solve_pmsm_foc_drive(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_civil_mse_retaining_wall(
+        &mut self,
+        req: &SimMseWallRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::mse_retaining_wall::MseWallProblem {
+            problem_id: "mse_wall_sim".to_string(),
+            polymer_type: req.polymer_type.unwrap_or(atlas_simulation_core::mse_retaining_wall::GeogridPolymerType::HdpeUniaxial),
+            wall_height_h_m: req.wall_height_h_m.unwrap_or(8.0),
+            reinforcement_length_l_m: req.reinforcement_length_l_m.unwrap_or(6.0),
+            vertical_layer_spacing_m: req.vertical_layer_spacing_m.unwrap_or(0.60),
+            soil_unit_weight_kn_m3: req.soil_unit_weight_kn_m3.unwrap_or(19.5),
+            soil_friction_angle_deg: req.soil_friction_angle_deg.unwrap_or(34.0),
+            crest_surcharge_q_kpa: req.crest_surcharge_q_kpa.unwrap_or(12.0),
+            geogrid_ultimate_strength_kn_m: req.geogrid_ultimate_strength_kn_m.unwrap_or(110.0),
+            rf_installation_damage: req.rf_installation_damage.unwrap_or(1.15),
+            rf_creep_rupture: req.rf_creep_rupture.unwrap_or(1.65),
+            rf_durability: req.rf_durability.unwrap_or(1.15),
+        };
+        let res = atlas_simulation_core::mse_retaining_wall::solve_mse_retaining_wall(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_nuclear_isotope_centrifuge(
+        &mut self,
+        req: &SimIsotopeCentrifugeRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::isotope_centrifuge::IsotopeCentrifugeProblem {
+            problem_id: "isotope_centrifuge_sim".to_string(),
+            rotor_material: req.rotor_material.unwrap_or(atlas_simulation_core::isotope_centrifuge::CentrifugeRotorMaterial::CarbonFiberCfrp),
+            rotor_radius_m: req.rotor_radius_m.unwrap_or(0.10),
+            rotor_length_m: req.rotor_length_m.unwrap_or(3.0),
+            rotational_speed_rpm: req.rotational_speed_rpm.unwrap_or(65000.0),
+            operating_temperature_c: req.operating_temperature_c.unwrap_or(55.0),
+            feed_mass_flow_kg_h: req.feed_mass_flow_kg_h.unwrap_or(0.85),
+            feed_assay_u235_fraction: req.feed_assay_u235_fraction.unwrap_or(0.00711),
+            stage_cut_theta: req.stage_cut_theta.unwrap_or(0.50),
+            circulation_efficiency: req.circulation_efficiency.unwrap_or(0.75),
+        };
+        let res = atlas_simulation_core::isotope_centrifuge::solve_isotope_centrifuge(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -10089,6 +10198,61 @@ namespace AtlasCAD.Unity
                     ..Default::default()
                 })?
             }
+            "sim.marine.propeller_hydrodynamics" => {
+                let d = req.arguments.get("propeller_diameter_m").and_then(|v| v.as_f64());
+                let pd = req.arguments.get("pitch_diameter_ratio").and_then(|v| v.as_f64());
+                let rpm = req.arguments.get("rotational_speed_rpm").and_then(|v| v.as_f64());
+                self.sim_marine_propeller_hydrodynamics(&SimPropellerRequest {
+                    propeller_diameter_m: d,
+                    pitch_diameter_ratio: pd,
+                    rotational_speed_rpm: rpm,
+                    ..Default::default()
+                })?
+            }
+            "sim.environmental.indoor_air_quality" => {
+                let a = req.arguments.get("room_floor_area_m2").and_then(|v| v.as_f64());
+                let h = req.arguments.get("room_clear_height_m").and_then(|v| v.as_f64());
+                let v = req.arguments.get("ventilation_supply_airflow_m3_h").and_then(|v| v.as_f64());
+                self.sim_environmental_indoor_air_quality(&SimIndoorAirQualityRequest {
+                    room_floor_area_m2: a,
+                    room_clear_height_m: h,
+                    ventilation_supply_airflow_m3_h: v,
+                    ..Default::default()
+                })?
+            }
+            "sim.electrical.pmsm_foc_drive" => {
+                let rpm = req.arguments.get("rotational_speed_rpm").and_then(|v| v.as_f64());
+                let iq = req.arguments.get("q_axis_current_iq_a").and_then(|v| v.as_f64());
+                let vdc = req.arguments.get("inverter_dc_bus_voltage_v").and_then(|v| v.as_f64());
+                self.sim_electrical_pmsm_foc_drive(&SimPmsmDriveRequest {
+                    rotational_speed_rpm: rpm,
+                    q_axis_current_iq_a: iq,
+                    inverter_dc_bus_voltage_v: vdc,
+                    ..Default::default()
+                })?
+            }
+            "sim.civil.mse_retaining_wall" => {
+                let h = req.arguments.get("wall_height_h_m").and_then(|v| v.as_f64());
+                let l = req.arguments.get("reinforcement_length_l_m").and_then(|v| v.as_f64());
+                let t = req.arguments.get("geogrid_ultimate_strength_kn_m").and_then(|v| v.as_f64());
+                self.sim_civil_mse_retaining_wall(&SimMseWallRequest {
+                    wall_height_h_m: h,
+                    reinforcement_length_l_m: l,
+                    geogrid_ultimate_strength_kn_m: t,
+                    ..Default::default()
+                })?
+            }
+            "sim.nuclear.isotope_centrifuge" => {
+                let r = req.arguments.get("rotor_radius_m").and_then(|v| v.as_f64());
+                let l = req.arguments.get("rotor_length_m").and_then(|v| v.as_f64());
+                let rpm = req.arguments.get("rotational_speed_rpm").and_then(|v| v.as_f64());
+                self.sim_nuclear_isotope_centrifuge(&SimIsotopeCentrifugeRequest {
+                    rotor_radius_m: r,
+                    rotor_length_m: l,
+                    rotational_speed_rpm: rpm,
+                    ..Default::default()
+                })?
+            }
             "system.deploy.status" => self.deploy_status()?,
             _ => serde_json::json!({
                 "status": "Executed",
@@ -12817,6 +12981,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/optical/fiber_dispersion" => {
             match parse_body_or_default::<SimFiberDispersionRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_optical_fiber_dispersion(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/marine/propeller_hydrodynamics" => {
+            match parse_body_or_default::<SimPropellerRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_marine_propeller_hydrodynamics(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/environmental/indoor_air_quality" => {
+            match parse_body_or_default::<SimIndoorAirQualityRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_environmental_indoor_air_quality(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/electrical/pmsm_foc_drive" => {
+            match parse_body_or_default::<SimPmsmDriveRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_electrical_pmsm_foc_drive(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/civil/mse_retaining_wall" => {
+            match parse_body_or_default::<SimMseWallRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_civil_mse_retaining_wall(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/nuclear/isotope_centrifuge" => {
+            match parse_body_or_default::<SimIsotopeCentrifugeRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_nuclear_isotope_centrifuge(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -17949,4 +18158,126 @@ struct SimFiberDispersionRequest {
     pub launch_power_mw: Option<f64>,
     #[serde(default)]
     pub target_bit_rate_gbps: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimPropellerRequest {
+    #[serde(default)]
+    pub blade_count: Option<atlas_simulation_core::propeller_hydrodynamics::BladeCount>,
+    #[serde(default)]
+    pub propeller_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub pitch_diameter_ratio: Option<f64>,
+    #[serde(default)]
+    pub expanded_area_ratio: Option<f64>,
+    #[serde(default)]
+    pub speed_of_advance_m_s: Option<f64>,
+    #[serde(default)]
+    pub rotational_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub shaft_immersion_depth_m: Option<f64>,
+    #[serde(default)]
+    pub water_density_kg_m3: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimIndoorAirQualityRequest {
+    #[serde(default)]
+    pub contaminant: Option<atlas_simulation_core::indoor_air_quality::AirContaminantType>,
+    #[serde(default)]
+    pub space_type: Option<atlas_simulation_core::indoor_air_quality::SpaceOccupancyType>,
+    #[serde(default)]
+    pub room_floor_area_m2: Option<f64>,
+    #[serde(default)]
+    pub ceiling_height_m: Option<f64>,
+    #[serde(default)]
+    pub room_clear_height_m: Option<f64>,
+    #[serde(default)]
+    pub occupant_count: Option<usize>,
+    #[serde(default)]
+    pub outdoor_ventilation_rate_m3_h: Option<f64>,
+    #[serde(default)]
+    pub ventilation_supply_airflow_m3_h: Option<f64>,
+    #[serde(default)]
+    pub hvac_filter_efficiency: Option<f64>,
+    #[serde(default)]
+    pub outdoor_ambient_concentration: Option<f64>,
+    #[serde(default)]
+    pub initial_room_concentration: Option<f64>,
+    #[serde(default)]
+    pub target_threshold_concentration: Option<f64>,
+    #[serde(default)]
+    pub exposure_duration_hours: Option<f64>,
+    #[serde(default)]
+    pub infected_occupants: Option<usize>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimPmsmDriveRequest {
+    #[serde(default)]
+    pub rotor_topology: Option<atlas_simulation_core::pmsm_foc_drive::PmsmRotorTopology>,
+    #[serde(default)]
+    pub pole_pairs_p: Option<u32>,
+    #[serde(default)]
+    pub stator_resistance_ohms: Option<f64>,
+    #[serde(default)]
+    pub d_axis_inductance_mh: Option<f64>,
+    #[serde(default)]
+    pub q_axis_inductance_mh: Option<f64>,
+    #[serde(default)]
+    pub permanent_magnet_flux_wb: Option<f64>,
+    #[serde(default)]
+    pub rotational_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub q_axis_current_iq_a: Option<f64>,
+    #[serde(default)]
+    pub inverter_dc_bus_voltage_v: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimMseWallRequest {
+    #[serde(default)]
+    pub polymer_type: Option<atlas_simulation_core::mse_retaining_wall::GeogridPolymerType>,
+    #[serde(default)]
+    pub wall_height_h_m: Option<f64>,
+    #[serde(default)]
+    pub reinforcement_length_l_m: Option<f64>,
+    #[serde(default)]
+    pub vertical_layer_spacing_m: Option<f64>,
+    #[serde(default)]
+    pub soil_unit_weight_kn_m3: Option<f64>,
+    #[serde(default)]
+    pub soil_friction_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub crest_surcharge_q_kpa: Option<f64>,
+    #[serde(default)]
+    pub geogrid_ultimate_strength_kn_m: Option<f64>,
+    #[serde(default)]
+    pub rf_installation_damage: Option<f64>,
+    #[serde(default)]
+    pub rf_creep_rupture: Option<f64>,
+    #[serde(default)]
+    pub rf_durability: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimIsotopeCentrifugeRequest {
+    #[serde(default)]
+    pub rotor_material: Option<atlas_simulation_core::isotope_centrifuge::CentrifugeRotorMaterial>,
+    #[serde(default)]
+    pub rotor_radius_m: Option<f64>,
+    #[serde(default)]
+    pub rotor_length_m: Option<f64>,
+    #[serde(default)]
+    pub rotational_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub operating_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub feed_mass_flow_kg_h: Option<f64>,
+    #[serde(default)]
+    pub feed_assay_u235_fraction: Option<f64>,
+    #[serde(default)]
+    pub stage_cut_theta: Option<f64>,
+    #[serde(default)]
+    pub circulation_efficiency: Option<f64>,
 }

@@ -8495,5 +8495,188 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 225. Marine Wageningen B-Series Propeller Hydrodynamics & Cavitation Inception (ITTC 1978 / Oosterveld / Keller)
+    let prop_res = post(
+        addr,
+        "/api/sim/marine/propeller_hydrodynamics",
+        r#"{
+            "blade_count": "FourBlades",
+            "propeller_diameter_m": 5.60,
+            "pitch_diameter_ratio": 0.95,
+            "expanded_area_ratio": 0.62,
+            "speed_of_advance_m_s": 7.20,
+            "rotational_speed_rpm": 105.0,
+            "shaft_immersion_depth_m": 5.20,
+            "water_density_kg_m3": 1025.0
+        }"#,
+    )?;
+    assert_eq!(prop_res.status, 200);
+    let prop_json = json(&prop_res)?;
+    assert!(prop_json["advance_ratio_j"].as_f64().unwrap() > 0.60);
+    assert!(prop_json["thrust_coefficient_kt"].as_f64().unwrap() > 0.12);
+    assert!(prop_json["torque_coefficient_kq"].as_f64().unwrap() > 0.02);
+    assert!(prop_json["open_water_efficiency_eta0"].as_f64().unwrap() > 0.55);
+    assert!(prop_json["thrust_force_kn"].as_f64().unwrap() > 400.0);
+    assert!(prop_json["delivered_power_kw"].as_f64().unwrap() > 3000.0);
+    assert!(prop_json["blade_tip_speed_m_s"].as_f64().unwrap() <= 40.0);
+    assert!(prop_json["is_keller_criterion_satisfied"].as_bool().unwrap());
+    assert!(prop_json["is_efficiency_satisfactory"].as_bool().unwrap());
+    assert!(prop_json["is_tip_speed_acceptable"].as_bool().unwrap());
+    assert!(prop_json["is_propeller_design_viable"].as_bool().unwrap());
+
+    // 226. Indoor Air Quality (IAQ) & Transient Contaminant Dilution (ASHRAE 62.1 / Wells-Riley / ISO 16000)
+    let iaq_res = post(
+        addr,
+        "/api/sim/environmental/indoor_air_quality",
+        r#"{
+            "contaminant": "CarbonDioxideCO2",
+            "space_type": "CommercialOffice",
+            "room_floor_area_m2": 120.0,
+            "ceiling_height_m": 3.0,
+            "occupant_count": 12,
+            "outdoor_ventilation_rate_m3_h": 720.0,
+            "hvac_filter_efficiency": 0.0,
+            "outdoor_ambient_concentration": 420.0,
+            "initial_room_concentration": 450.0,
+            "target_threshold_concentration": 1000.0,
+            "exposure_duration_hours": 4.0,
+            "infected_occupants": 0
+        }"#,
+    )?;
+    assert_eq!(iaq_res.status, 200);
+    let iaq_json = json(&iaq_res)?;
+    assert_eq!(iaq_json["room_volume_m3"].as_f64().unwrap(), 360.0);
+    assert_eq!(iaq_json["air_changes_per_hour_ach"].as_f64().unwrap(), 2.0);
+    assert!(iaq_json["steady_state_concentration"].as_f64().unwrap() > 650.0);
+    assert!(iaq_json["ventilation_compliance_ratio"].as_f64().unwrap() >= 1.0);
+    assert!(iaq_json["outdoor_flow_per_person_l_s"].as_f64().unwrap() >= 10.0);
+    assert!(iaq_json["is_target_threshold_satisfied"].as_bool().unwrap());
+    assert!(iaq_json["is_ashrae_62_1_compliant"].as_bool().unwrap());
+    assert!(iaq_json["is_infection_risk_low"].as_bool().unwrap());
+    assert!(iaq_json["is_iaq_acceptable"].as_bool().unwrap());
+
+    // 227. Three-Phase PMSM FOC Drive Dynamics (Park-Clarke / MTPA / IEEE 1415)
+    let pmsm_res = post(
+        addr,
+        "/api/sim/electrical/pmsm_foc_drive",
+        r#"{
+            "rotor_topology": "InteriorIPMSM",
+            "pole_pairs_p": 4,
+            "stator_resistance_ohms": 0.025,
+            "d_axis_inductance_mh": 0.45,
+            "q_axis_inductance_mh": 0.95,
+            "permanent_magnet_flux_wb": 0.095,
+            "rotational_speed_rpm": 4500.0,
+            "q_axis_current_iq_a": 120.0,
+            "inverter_dc_bus_voltage_v": 650.0
+        }"#,
+    )?;
+    assert_eq!(pmsm_res.status, 200);
+    let pmsm_json = json(&pmsm_res)?;
+    assert!(pmsm_json["electrical_angular_velocity_rad_s"].as_f64().unwrap() > 1800.0);
+    assert!(pmsm_json["d_axis_current_id_a"].as_f64().unwrap() < 0.0);
+    assert!(pmsm_json["pm_alignment_torque_nm"].as_f64().unwrap() > 60.0);
+    assert!(pmsm_json["reluctance_torque_nm"].as_f64().unwrap() > 5.0);
+    assert!(pmsm_json["mechanical_shaft_power_kw"].as_f64().unwrap() > 30.0);
+    assert!(pmsm_json["motor_efficiency_pct"].as_f64().unwrap() >= 90.0);
+    assert!(pmsm_json["inverter_modulation_index"].as_f64().unwrap() <= 1.0);
+    assert!(pmsm_json["is_voltage_within_inverter_limits"].as_bool().unwrap());
+    assert!(pmsm_json["is_efficiency_high"].as_bool().unwrap());
+    assert!(pmsm_json["is_pmsm_drive_viable"].as_bool().unwrap());
+
+    // 228. Mechanically Stabilized Earth (MSE) Wall Geogrid Stability (FHWA-NHI-10-024 / AASHTO LRFD)
+    let mse_res = post(
+        addr,
+        "/api/sim/civil/mse_retaining_wall",
+        r#"{
+            "polymer_type": "HdpeUniaxial",
+            "wall_height_h_m": 8.0,
+            "reinforcement_length_l_m": 6.0,
+            "vertical_layer_spacing_m": 0.60,
+            "soil_unit_weight_kn_m3": 19.5,
+            "soil_friction_angle_deg": 34.0,
+            "crest_surcharge_q_kpa": 12.0,
+            "geogrid_ultimate_strength_kn_m": 110.0,
+            "rf_installation_damage": 1.15,
+            "rf_creep_rupture": 1.65,
+            "rf_durability": 1.15
+        }"#,
+    )?;
+    assert_eq!(mse_res.status, 200);
+    let mse_json = json(&mse_res)?;
+    assert!(mse_json["active_earth_pressure_coef_ka"].as_f64().unwrap() > 0.25);
+    assert_eq!(mse_json["total_reinforcement_layers"].as_u64().unwrap(), 13);
+    assert!(mse_json["allowable_design_strength_tal_kn_m"].as_f64().unwrap() > 35.0);
+    assert!(mse_json["max_layer_tensile_force_kn_m"].as_f64().unwrap() > 15.0);
+    assert!(mse_json["min_rupture_safety_factor"].as_f64().unwrap() >= 1.50);
+    assert!(mse_json["min_pullout_safety_factor"].as_f64().unwrap() >= 1.50);
+    assert!(mse_json["length_to_height_ratio"].as_f64().unwrap() >= 0.70);
+    assert!(mse_json["is_embedment_length_adequate"].as_bool().unwrap());
+    assert!(mse_json["is_tensile_rupture_safe"].as_bool().unwrap());
+    assert!(mse_json["is_pullout_resistance_safe"].as_bool().unwrap());
+    assert!(mse_json["is_mse_wall_stable"].as_bool().unwrap());
+
+    // 229. Gas Centrifuge Isotopic Separation & Separative Work (Cohen-Onsager / Dirac-Peierls / ISO 9001)
+    let centrifuge_res = post(
+        addr,
+        "/api/sim/nuclear/isotope_centrifuge",
+        r#"{
+            "rotor_material": "CarbonFiberCfrp",
+            "rotor_radius_m": 0.10,
+            "rotor_length_m": 3.0,
+            "rotational_speed_rpm": 65000.0,
+            "operating_temperature_c": 55.0,
+            "feed_mass_flow_kg_h": 0.85,
+            "feed_assay_u235_fraction": 0.00711,
+            "stage_cut_theta": 0.50,
+            "circulation_efficiency": 0.75
+        }"#,
+    )?;
+    assert_eq!(centrifuge_res.status, 200);
+    let centrifuge_json = json(&centrifuge_res)?;
+    assert!(centrifuge_json["rotor_peripheral_speed_m_s"].as_f64().unwrap() > 600.0);
+    assert!(centrifuge_json["centrifugal_acceleration_g"].as_f64().unwrap() > 350000.0);
+    assert!(centrifuge_json["rotor_burst_safety_factor"].as_f64().unwrap() >= 1.30);
+    assert!(centrifuge_json["elementary_separation_factor_alpha0"].as_f64().unwrap() > 1.05);
+    assert!(centrifuge_json["overall_stage_separation_factor_alpha"].as_f64().unwrap() > 1.10);
+    assert!(centrifuge_json["separative_power_swu_per_year"].as_f64().unwrap() >= 10.0);
+    assert!(centrifuge_json["is_rotor_stress_safe"].as_bool().unwrap());
+    assert!(centrifuge_json["is_separation_effective"].as_bool().unwrap());
+    assert!(centrifuge_json["is_swu_capacity_commercial"].as_bool().unwrap());
+    assert!(centrifuge_json["is_centrifuge_stage_viable"].as_bool().unwrap());
+
+    // 230. Universal Commands Execution Verification (Batch 25 Domains)
+    for cmd_id in [
+        "sim.marine.propeller_hydrodynamics",
+        "sim.environmental.indoor_air_quality",
+        "sim.electrical.pmsm_foc_drive",
+        "sim.civil.mse_retaining_wall",
+        "sim.nuclear.isotope_centrifuge",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 231. Enterprise MCP Tool Calling (Batch 25 Domains)
+    for tool_name in [
+        "atlas_sim_marine_propeller_hydrodynamics",
+        "atlas_sim_environmental_indoor_air_quality",
+        "atlas_sim_electrical_pmsm_foc_drive",
+        "atlas_sim_civil_mse_retaining_wall",
+        "atlas_sim_nuclear_isotope_centrifuge",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 231, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }
