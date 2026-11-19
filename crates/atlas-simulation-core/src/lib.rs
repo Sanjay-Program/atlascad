@@ -166,6 +166,11 @@ pub mod indoor_air_quality;
 pub mod pmsm_foc_drive;
 pub mod mse_retaining_wall;
 pub mod isotope_centrifuge;
+pub mod conveyor_bulk_handling;
+pub mod offshore_wave_loading;
+pub mod spacecraft_adcs_attitude;
+pub mod battery_fast_charging;
+pub mod packed_bed_scrubber;
 
 pub mod prelude {
     pub use crate::acoustics::{
@@ -766,5 +771,25 @@ pub mod prelude {
     pub use crate::isotope_centrifuge::{
         CentrifugeRotorMaterial, IsotopeCentrifugeProblem, IsotopeCentrifugeResult,
         solve_isotope_centrifuge,
+    };
+    pub use crate::conveyor_bulk_handling::{
+        BeltCarcassType, ConveyorProblem, ConveyorResult, TroughingAngleClass,
+        solve_conveyor_bulk_handling,
+    };
+    pub use crate::offshore_wave_loading::{
+        OffshoreStructureType, OffshoreWaveProblem, OffshoreWaveResult,
+        solve_offshore_wave_loading,
+    };
+    pub use crate::spacecraft_adcs_attitude::{
+        SpacecraftAdcsProblem, SpacecraftAdcsResult, SpacecraftOrbitRegime,
+        solve_spacecraft_adcs_attitude,
+    };
+    pub use crate::battery_fast_charging::{
+        BatteryCathodeChemistry, BatteryFastChargeProblem, BatteryFastChargeResult,
+        solve_battery_fast_charging,
+    };
+    pub use crate::packed_bed_scrubber::{
+        PackedBedProblem, PackedBedResult, PackingTypeClass, ScrubberApplication,
+        solve_packed_bed_scrubber,
     };
 }

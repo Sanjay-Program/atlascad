@@ -4680,6 +4680,166 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 40.7 Enterprise MCP Tool Calling: 5 Batch-25 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # =========================================================================
+        # DEMO 41: Multi-Disciplinary Engineering Simulation Solvers (Batch 26)
+        # =========================================================================
+        print("\n--- DEMO 41: MULTI-DISCIPLINARY SIMULATION SOLVERS (BATCH 26: CONVEYOR, OFFSHORE WAVE, SPACECRAFT ADCS, FAST CHARGING, PACKED SCRUBBER) ---")
+
+        # 41.1 Industrial Belt Conveyor Bulk Material Handling & Drive Power (DIN 22101 / ISO 5048 / CEMA)
+        conveyor_res = http_request(port, "POST", "/api/sim/mechanical/conveyor_bulk_handling", body={
+            "carcass_type": "SteelCordST",
+            "troughing_angle": "Trough35Deg",
+            "belt_width_mm": 1200.0,
+            "conveyor_length_m": 450.0,
+            "elevation_lift_m": 28.0,
+            "belt_speed_m_s": 3.15,
+            "material_bulk_density_kg_m3": 1650.0,
+            "surcharge_angle_deg": 20.0,
+            "drive_wrap_angle_deg": 210.0,
+            "drive_friction_mu": 0.35,
+            "belt_rated_breaking_strength_kn_m": 1250.0,
+            "drive_mechanical_efficiency": 0.92,
+        })
+        check(conveyor_res.get("material_cross_section_m2", 0.0) > 0.10, "Material cross section > 0.10 m2")
+        check(conveyor_res.get("volumetric_capacity_m3_h", 0.0) > 1200.0, "Volumetric capacity > 1200 m3/h")
+        check(conveyor_res.get("mass_throughput_t_h", 0.0) > 2000.0, "Mass throughput > 2000 t/h")
+        check(conveyor_res.get("peripheral_drive_force_fu_kn", 0.0) > 80.0, "Peripheral force > 80 kN")
+        check(conveyor_res.get("motor_brake_power_kw", 0.0) > 250.0, "Motor brake power > 250 kW")
+        check(conveyor_res.get("belt_tensile_safety_factor", 0.0) >= 8.0, "Belt tensile safety factor >= 8.0")
+        check(conveyor_res.get("is_drive_slip_safe", False) is True, "Drive slip prevented")
+        check(conveyor_res.get("is_belt_strength_sufficient", False) is True, "Belt strength sufficient")
+        check(conveyor_res.get("is_conveyor_design_viable", False) is True, "Conveyor design viable")
+        print(f"  ✓ 41.1 Industrial Belt Conveyor (DIN 22101 / ISO 5048 / CEMA): 1200 mm Belt @ 3.15 m/s (450 m Center Distance, 28 m Lift, 35° 3-Roll Idlers), Bulk Ore Throughput Q_m = {conveyor_res['mass_throughput_t_h']:.0f} t/h (Q_v = {conveyor_res['volumetric_capacity_m3_h']:.0f} m³/h, Area A = {conveyor_res['material_cross_section_m2']:.3f} m²), Primary Resistance F_H = {conveyor_res['primary_resistance_fh_kn']:.1f} kN, Lift Slope F_St = {conveyor_res['slope_resistance_fst_kn']:.1f} kN, Total Peripheral Drive Force F_U = {conveyor_res['peripheral_drive_force_fu_kn']:.1f} kN, Motor Brake Power P_m = {conveyor_res['motor_brake_power_kw']:.1f} kW (Slack Tension T_2 = {conveyor_res['slack_side_tension_t2_kn']:.1f} kN, Tight Tension T_1 = {conveyor_res['tight_side_tension_t1_kn']:.1f} kN, Capstan Slip Margin = {conveyor_res['drive_slip_safety_factor']:.2f} >= 1.05, ST1250 Tensile Safety Factor = {conveyor_res['belt_tensile_safety_factor']:.1f} >= 6.5))")
+
+        # 41.2 Offshore Monopile / Jacket Wave & Current Hydrodynamics (API RP 2A-WSD / DNV-RP-C205 / Morison)
+        wave_res = http_request(port, "POST", "/api/sim/marine/offshore_wave_loading", body={
+            "structure_type": "OffshoreWindMonopile",
+            "water_depth_m": 40.0,
+            "wave_height_m": 14.5,
+            "wave_period_s": 13.0,
+            "surface_current_m_s": 1.20,
+            "cylinder_diameter_m": 8.50,
+            "wall_thickness_mm": 85.0,
+            "steel_yield_strength_mpa": 355.0,
+            "drag_coefficient_cd": 0.70,
+            "inertia_coefficient_cm": 2.00,
+        })
+        check(wave_res.get("wavelength_m", 0.0) > 150.0, "Airy wavelength > 150 m")
+        check(wave_res.get("keulegan_carpenter_number", 0.0) > 4.0, "KC number > 4.0")
+        check(wave_res.get("peak_base_shear_kn", 0.0) > 3000.0, "Peak base shear > 3000 kN")
+        check(wave_res.get("peak_overturning_moment_kn_m", 0.0) > 60000.0, "Overturning moment > 60,000 kNm")
+        check(wave_res.get("mudline_bending_stress_mpa", 0.0) > 15.0, "Mudline bending stress > 15 MPa")
+        check(wave_res.get("structural_bending_safety_factor", 0.0) >= 1.35, "Bending safety factor >= 1.35")
+        check(wave_res.get("is_morison_valid", False) is True, "Morison valid")
+        check(wave_res.get("is_bending_stress_acceptable", False) is True, "Bending stress acceptable")
+        check(wave_res.get("is_offshore_design_viable", False) is True, "Offshore design viable")
+        print(f"  ✓ 41.2 Offshore Wind Monopile Hydrodynamics (API RP 2A / DNV-RP-C205 / Morison): Ø8.5 m x 85 mm S355 Monopile in 40 m Water (Extreme 50-Year Storm Wave H = 14.5 m, T = 13.0 s, Current = 1.2 m/s), Airy Dispersion Wavelength L = {wave_res['wavelength_m']:.1f} m (Celerity c = {wave_res['wave_celerity_m_s']:.1f} m/s, Surface u = {wave_res['surface_wave_velocity_m_s']:.2f} m/s, KC = {wave_res['keulegan_carpenter_number']:.2f}, Diffraction D/L = {wave_res['diffraction_parameter_d_l']:.3f} <= 0.20), Morison Mudline Base Shear F_base = {wave_res['peak_base_shear_kn']:.0f} kN, Overturning Moment M_base = {wave_res['peak_overturning_moment_kn_m']:.0f} kN·m (Mudline Bending Stress σ = {wave_res['mudline_bending_stress_mpa']:.1f} MPa, Structural Yield Safety Factor = {wave_res['structural_bending_safety_factor']:.1f} >= 1.35))")
+
+        # 41.3 Spacecraft ADCS Three-Axis Disturbance Torques & Reaction Wheel Sizing (NASA-SP-8007 / Wertz / ECSS)
+        adcs_res = http_request(port, "POST", "/api/sim/aerospace/spacecraft_adcs_attitude", body={
+            "orbit_regime": "LowEarthOrbitLEO",
+            "orbit_altitude_km": 550.0,
+            "spacecraft_mass_kg": 350.0,
+            "inertia_ixx_kg_m2": 85.0,
+            "inertia_iyy_kg_m2": 120.0,
+            "inertia_izz_kg_m2": 75.0,
+            "cp_cg_offset_arm_m": 0.08,
+            "projected_surface_area_m2": 2.40,
+            "solar_reflectance_q": 0.60,
+            "residual_magnetic_dipole_a_m2": 0.50,
+            "target_slew_accel_deg_s2": 1.50,
+        })
+        check(adcs_res.get("gravity_gradient_torque_un_m", 0.0) > 10.0, "Gravity gradient > 10 uNm")
+        check(adcs_res.get("aerodynamic_drag_torque_un_m", 0.0) > 0.10, "Aero drag > 0.10 uNm")
+        check(adcs_res.get("magnetic_residual_torque_un_m", 0.0) > 5.0, "Magnetic residual > 5.0 uNm")
+        check(adcs_res.get("peak_disturbance_torque_un_m", 0.0) > 30.0, "Peak torque > 30 uNm")
+        check(adcs_res.get("accumulated_momentum_per_orbit_nms", 0.0) > 0.04, "Momentum per orbit > 0.04 Nms")
+        check(adcs_res.get("recommended_wheel_momentum_nms", 0.0) > 0.08, "Wheel capacity > 0.08 Nms")
+        check(adcs_res.get("required_slew_torque_mn_m", 0.0) > 500.0, "Slew torque > 500 mNm")
+        check(adcs_res.get("is_wheel_capacity_adequate", False) is True, "Wheel capacity adequate")
+        check(adcs_res.get("is_mtq_desaturation_adequate", False) is True, "MTQ desaturation adequate")
+        check(adcs_res.get("is_adcs_sizing_viable", False) is True, "ADCS sizing viable")
+        print(f"  ✓ 41.3 Spacecraft ADCS Disturbance Torques & Actuator Sizing (NASA-SP-8007 / Wertz / ECSS): 350 kg SmallSat in 550 km SSO (I = [85, 120, 75] kg·m², T_orb = {adcs_res['orbit_period_minutes']:.1f} min, v = {adcs_res['orbital_velocity_m_s']:.0f} m/s, B = {adcs_res['local_magnetic_field_tesla']*1e6:.1f} µT), Peak Environmental Torques (Gravity Gradient T_gg = {adcs_res['gravity_gradient_torque_un_m']:.1f} µN·m, SRP T_srp = {adcs_res['solar_radiation_torque_un_m']:.2f} µN·m, Aero T_aero = {adcs_res['aerodynamic_drag_torque_un_m']:.2f} µN·m, Residual Mag T_mag = {adcs_res['magnetic_residual_torque_un_m']:.1f} µN·m, Peak Total = {adcs_res['peak_disturbance_torque_un_m']:.1f} µN·m), Orbit Momentum Accumulation H_accum = {adcs_res['accumulated_momentum_per_orbit_nms']:.4f} N·m·s, Sized Reaction Wheel Capacity H_rw = {adcs_res['recommended_wheel_momentum_nms']:.3f} N·m·s, Fast 1.5°/s² Slew Motor Torque = {adcs_res['required_slew_torque_mn_m']:.0f} mN·m, Magnetorquer Desaturation Dipole M_mtq = {adcs_res['required_mtq_dipole_a_m2']:.2f} A·m²)")
+
+        # 41.4 Lithium-Ion Battery Fast-Charging CC-CV Dynamics & Degradation (ISO 12405 / SAE J2464 / Newman)
+        batt_res = http_request(port, "POST", "/api/sim/electrical/battery_fast_charging", body={
+            "cathode_chemistry": "Nmc811HighEnergy",
+            "nominal_capacity_ah": 75.0,
+            "initial_soc_fraction": 0.10,
+            "target_soc_fraction": 0.80,
+            "charge_c_rate": 2.50,
+            "internal_resistance_mohms": 0.85,
+            "diffusion_time_constant_s": 95.0,
+            "charge_cutoff_voltage_v": 4.20,
+            "ambient_temperature_c": 25.0,
+        })
+        check(batt_res.get("cc_phase_current_a", 0.0) >= 180.0, "CC current >= 180 A")
+        check(batt_res.get("cc_phase_duration_minutes", 0.0) > 10.0, "CC duration > 10 min")
+        check(batt_res.get("total_charge_time_minutes", 0.0) < 25.0, "Total charge time < 25 min")
+        check(batt_res.get("peak_heat_generation_w", 0.0) > 20.0, "Peak heat > 20 W")
+        check(batt_res.get("min_anode_plating_margin_mv", 0.0) > 0.0, "Plating margin > 0 mV")
+        check(batt_res.get("estimated_cycle_life_to_80_soh", 0) > 1200, "Cycle life > 1200")
+        check(batt_res.get("is_fast_charge_time_competitive", False) is True, "Fast charge time competitive")
+        check(batt_res.get("is_lithium_plating_prevented", False) is True, "Lithium plating prevented")
+        check(batt_res.get("is_thermal_dissipation_manageable", False) is True, "Thermal dissipation manageable")
+        check(batt_res.get("is_fast_charging_viable", False) is True, "Fast charging viable")
+        print(f"  ✓ 41.4 Lithium-Ion Battery Fast Charging (ISO 12405 / SAE J2464 / Newman): 75 Ah NMC811 Prismatic Cell @ 2.5C Fast Charge (10% -> 80% SOC, I_cc = {batt_res['cc_phase_current_a']:.1f} A, R_0 = 0.85 mΩ), CC Phase = {batt_res['cc_phase_duration_minutes']:.1f} min (Switch at SOC = {batt_res['soc_at_cc_cv_transition']*100.0:.1f}%), CV Decay Phase = {batt_res['cv_phase_duration_minutes']:.1f} min, Total Charge Time = {batt_res['total_charge_time_minutes']:.1f} min <= 25 min, Peak Thermal Heat Dissipation = {batt_res['peak_heat_generation_w']:.1f} W (Total Dissipated Heat Q = {batt_res['total_heat_dissipated_kj']:.1f} kJ), Negative Graphite Anode Plating Margin = +{batt_res['min_anode_plating_margin_mv']:.1f} mV > 0 mV (Plating Prevented), SEI Growth = {batt_res['sei_layer_growth_nm']:.3f} nm/cycle, Predicted Cycle Life to 80% SOH = {batt_res['estimated_cycle_life_to_80_soh']} Cycles)")
+
+        # 41.5 Industrial Packed Bed Gas Absorption & Wet Scrubber Sizing (Coulson-Richardson / Onda / EPA OAQPS)
+        scrub_res = http_request(port, "POST", "/api/sim/process/packed_bed_scrubber", body={
+            "application": "AcidGasAbatement",
+            "packing_type": "PallRings25mm",
+            "flue_gas_flow_rate_m3_h": 8500.0,
+            "inlet_pollutant_mole_fraction": 0.0120,
+            "target_outlet_mole_fraction": 0.00024,
+            "operating_temperature_c": 45.0,
+            "operating_pressure_kpa": 101.325,
+            "liquid_to_gas_ratio_multiplier": 1.50,
+        })
+        check(scrub_res.get("column_diameter_m", 0.0) > 0.8, "Column diameter > 0.8 m")
+        check(scrub_res.get("active_bed_height_m", 0.0) > 3.0, "Active bed height > 3.0 m")
+        check(scrub_res.get("solvent_flow_rate_m3_h", 0.0) > 2.0, "Solvent flow rate > 2.0 m3/h")
+        check(scrub_res.get("number_of_transfer_units_ntu", 0.0) > 5.0, "Transfer units > 5.0")
+        check(scrub_res.get("total_gas_pressure_drop_pa", 0.0) <= 3500.0, "Pressure drop <= 3500 Pa")
+        check(scrub_res.get("pollutant_removal_efficiency_pct", 0.0) >= 95.0, "Removal efficiency >= 95%")
+        check(scrub_res.get("is_removal_efficiency_met", False) is True, "Removal efficiency met")
+        check(scrub_res.get("is_pressure_drop_acceptable", False) is True, "Pressure drop acceptable")
+        check(scrub_res.get("is_flooding_velocity_safe", False) is True, "Flooding velocity safe")
+        check(scrub_res.get("is_packed_bed_viable", False) is True, "Packed bed scrubber viable")
+        print(f"  ✓ 41.5 Industrial Packed Bed Wet Scrubber (Coulson-Richardson / Onda / EPA OAQPS): 8,500 m³/h Flue Gas Abatement (12,000 ppmv -> 240 ppmv SO2, 98.0% Target Removal Efficiency), 25 mm Metal Pall Rings (F_p = 170 m⁻¹), Tower Diameter D_col = {scrub_res['column_diameter_m']:.2f} m (Area A = {3.14159 * (scrub_res['column_diameter_m']/2.0)**2:.3f} m², Gas Velocity u = {scrub_res['operating_gas_velocity_m_s']:.2f} m/s @ 70% Sherwood Flooding), Solvent Circulation Flow L = {scrub_res['solvent_flow_rate_m3_h']:.2f} m³/h, Colburn Absorption Kinetics NTU_OG = {scrub_res['number_of_transfer_units_ntu']:.2f}, Onda HTU_OG = {scrub_res['height_of_transfer_unit_htu_m']:.3f} m, Active Packed Bed Height Z_bed = {scrub_res['active_bed_height_m']:.2f} m, Gas-Side Bed Pressure Drop ΔP = {scrub_res['total_gas_pressure_drop_pa']:.0f} Pa <= 3500 Pa)")
+
+        # 41.6 Universal Commands Execution Verification (Batch 26 Domains)
+        for cmd_id in [
+            "sim.mechanical.conveyor_bulk_handling",
+            "sim.marine.offshore_wave_loading",
+            "sim.aerospace.spacecraft_adcs_attitude",
+            "sim.electrical.battery_fast_charging",
+            "sim.process.packed_bed_scrubber",
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": {}
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 41.6 Universal Commands: All 5 Batch-26 Engineering Commands verified via typed schema engine")
+
+        # 41.7 Enterprise MCP Tool Calling (Batch 26 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_mechanical_conveyor_bulk_handling",
+            "atlas_sim_marine_offshore_wave_loading",
+            "atlas_sim_aerospace_spacecraft_adcs_attitude",
+            "atlas_sim_electrical_battery_fast_charging",
+            "atlas_sim_process_packed_bed_scrubber",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 995,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 41.7 Enterprise MCP Tool Calling: 5 Batch-26 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

@@ -8678,5 +8678,188 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 232. Industrial Belt Conveyor Bulk Material Handling & Drive Power (DIN 22101 / ISO 5048 / CEMA)
+    let conveyor_res = post(
+        addr,
+        "/api/sim/mechanical/conveyor_bulk_handling",
+        r#"{
+            "carcass_type": "SteelCordST",
+            "troughing_angle": "Trough35Deg",
+            "belt_width_mm": 1200.0,
+            "conveyor_length_m": 450.0,
+            "elevation_lift_m": 28.0,
+            "belt_speed_m_s": 3.15,
+            "material_bulk_density_kg_m3": 1650.0,
+            "surcharge_angle_deg": 20.0,
+            "drive_wrap_angle_deg": 210.0,
+            "drive_friction_mu": 0.35,
+            "belt_rated_breaking_strength_kn_m": 1250.0,
+            "drive_mechanical_efficiency": 0.92
+        }"#,
+    )?;
+    assert_eq!(conveyor_res.status, 200);
+    let conveyor_json = json(&conveyor_res)?;
+    assert!(conveyor_json["material_cross_section_m2"].as_f64().unwrap() > 0.10);
+    assert!(conveyor_json["volumetric_capacity_m3_h"].as_f64().unwrap() > 1200.0);
+    assert!(conveyor_json["mass_throughput_t_h"].as_f64().unwrap() > 2000.0);
+    assert!(conveyor_json["peripheral_drive_force_fu_kn"].as_f64().unwrap() > 80.0);
+    assert!(conveyor_json["motor_brake_power_kw"].as_f64().unwrap() > 250.0);
+    assert!(conveyor_json["slack_side_tension_t2_kn"].as_f64().unwrap() > 30.0);
+    assert!(conveyor_json["tight_side_tension_t1_kn"].as_f64().unwrap() > 100.0);
+    assert!(conveyor_json["belt_tensile_safety_factor"].as_f64().unwrap() >= 8.0);
+    assert!(conveyor_json["is_drive_slip_safe"].as_bool().unwrap());
+    assert!(conveyor_json["is_belt_strength_sufficient"].as_bool().unwrap());
+    assert!(conveyor_json["is_conveyor_design_viable"].as_bool().unwrap());
+
+    // 233. Offshore Monopile / Jacket Wave & Current Hydrodynamics (API RP 2A-WSD / DNV-RP-C205 / Morison)
+    let wave_res = post(
+        addr,
+        "/api/sim/marine/offshore_wave_loading",
+        r#"{
+            "structure_type": "OffshoreWindMonopile",
+            "water_depth_m": 40.0,
+            "wave_height_m": 14.5,
+            "wave_period_s": 13.0,
+            "surface_current_m_s": 1.20,
+            "cylinder_diameter_m": 8.50,
+            "wall_thickness_mm": 85.0,
+            "steel_yield_strength_mpa": 355.0,
+            "drag_coefficient_cd": 0.70,
+            "inertia_coefficient_cm": 2.00
+        }"#,
+    )?;
+    assert_eq!(wave_res.status, 200);
+    let wave_json = json(&wave_res)?;
+    assert!(wave_json["wavelength_m"].as_f64().unwrap() > 150.0);
+    assert!(wave_json["keulegan_carpenter_number"].as_f64().unwrap() > 4.0);
+    assert!(wave_json["peak_base_shear_kn"].as_f64().unwrap() > 3000.0);
+    assert!(wave_json["peak_overturning_moment_kn_m"].as_f64().unwrap() > 60000.0);
+    assert!(wave_json["mudline_bending_stress_mpa"].as_f64().unwrap() > 15.0);
+    assert!(wave_json["structural_bending_safety_factor"].as_f64().unwrap() >= 1.35);
+    assert!(wave_json["is_morison_valid"].as_bool().unwrap());
+    assert!(wave_json["is_bending_stress_acceptable"].as_bool().unwrap());
+    assert!(wave_json["is_offshore_design_viable"].as_bool().unwrap());
+
+    // 234. Spacecraft ADCS Three-Axis Disturbance Torques & Reaction Wheel Sizing (NASA-SP-8007 / Wertz / ECSS)
+    let adcs_res = post(
+        addr,
+        "/api/sim/aerospace/spacecraft_adcs_attitude",
+        r#"{
+            "orbit_regime": "LowEarthOrbitLEO",
+            "orbit_altitude_km": 550.0,
+            "spacecraft_mass_kg": 350.0,
+            "inertia_ixx_kg_m2": 85.0,
+            "inertia_iyy_kg_m2": 120.0,
+            "inertia_izz_kg_m2": 75.0,
+            "cp_cg_offset_arm_m": 0.08,
+            "projected_surface_area_m2": 2.40,
+            "solar_reflectance_q": 0.60,
+            "residual_magnetic_dipole_a_m2": 0.50,
+            "target_slew_accel_deg_s2": 1.50
+        }"#,
+    )?;
+    assert_eq!(adcs_res.status, 200);
+    let adcs_json = json(&adcs_res)?;
+    assert!(adcs_json["gravity_gradient_torque_un_m"].as_f64().unwrap() > 10.0);
+    assert!(adcs_json["aerodynamic_drag_torque_un_m"].as_f64().unwrap() > 0.10);
+    assert!(adcs_json["magnetic_residual_torque_un_m"].as_f64().unwrap() > 5.0);
+    assert!(adcs_json["peak_disturbance_torque_un_m"].as_f64().unwrap() > 30.0);
+    assert!(adcs_json["accumulated_momentum_per_orbit_nms"].as_f64().unwrap() > 0.04);
+    assert!(adcs_json["recommended_wheel_momentum_nms"].as_f64().unwrap() > 0.08);
+    assert!(adcs_json["required_slew_torque_mn_m"].as_f64().unwrap() > 500.0);
+    assert!(adcs_json["is_wheel_capacity_adequate"].as_bool().unwrap());
+    assert!(adcs_json["is_mtq_desaturation_adequate"].as_bool().unwrap());
+    assert!(adcs_json["is_adcs_sizing_viable"].as_bool().unwrap());
+
+    // 235. Lithium-Ion Battery Fast-Charging CC-CV Dynamics & Degradation (ISO 12405 / SAE J2464 / Newman)
+    let battery_res = post(
+        addr,
+        "/api/sim/electrical/battery_fast_charging",
+        r#"{
+            "cathode_chemistry": "Nmc811HighEnergy",
+            "nominal_capacity_ah": 75.0,
+            "initial_soc_fraction": 0.10,
+            "target_soc_fraction": 0.80,
+            "charge_c_rate": 2.50,
+            "internal_resistance_mohms": 0.85,
+            "diffusion_time_constant_s": 95.0,
+            "charge_cutoff_voltage_v": 4.20,
+            "ambient_temperature_c": 25.0
+        }"#,
+    )?;
+    assert_eq!(battery_res.status, 200);
+    let battery_json = json(&battery_res)?;
+    assert!(battery_json["cc_phase_current_a"].as_f64().unwrap() >= 180.0);
+    assert!(battery_json["cc_phase_duration_minutes"].as_f64().unwrap() > 10.0);
+    assert!(battery_json["total_charge_time_minutes"].as_f64().unwrap() < 25.0);
+    assert!(battery_json["peak_heat_generation_w"].as_f64().unwrap() > 20.0);
+    assert!(battery_json["min_anode_plating_margin_mv"].as_f64().unwrap() > 0.0);
+    assert!(battery_json["estimated_cycle_life_to_80_soh"].as_u64().unwrap() > 1200);
+    assert!(battery_json["is_fast_charge_time_competitive"].as_bool().unwrap());
+    assert!(battery_json["is_lithium_plating_prevented"].as_bool().unwrap());
+    assert!(battery_json["is_thermal_dissipation_manageable"].as_bool().unwrap());
+    assert!(battery_json["is_fast_charging_viable"].as_bool().unwrap());
+
+    // 236. Industrial Packed Bed Gas Absorption & Wet Scrubber Sizing (Coulson-Richardson / Onda / EPA OAQPS)
+    let scrubber_res = post(
+        addr,
+        "/api/sim/process/packed_bed_scrubber",
+        r#"{
+            "application": "AcidGasAbatement",
+            "packing_type": "PallRings25mm",
+            "flue_gas_flow_rate_m3_h": 8500.0,
+            "inlet_pollutant_mole_fraction": 0.0120,
+            "target_outlet_mole_fraction": 0.00024,
+            "operating_temperature_c": 45.0,
+            "operating_pressure_kpa": 101.325,
+            "liquid_to_gas_ratio_multiplier": 1.50
+        }"#,
+    )?;
+    assert_eq!(scrubber_res.status, 200);
+    let scrubber_json = json(&scrubber_res)?;
+    assert!(scrubber_json["column_diameter_m"].as_f64().unwrap() > 0.8);
+    assert!(scrubber_json["active_bed_height_m"].as_f64().unwrap() > 3.0);
+    assert!(scrubber_json["solvent_flow_rate_m3_h"].as_f64().unwrap() > 2.0);
+    assert!(scrubber_json["number_of_transfer_units_ntu"].as_f64().unwrap() > 5.0);
+    assert!(scrubber_json["total_gas_pressure_drop_pa"].as_f64().unwrap() <= 3500.0);
+    assert!(scrubber_json["pollutant_removal_efficiency_pct"].as_f64().unwrap() >= 95.0);
+    assert!(scrubber_json["is_removal_efficiency_met"].as_bool().unwrap());
+    assert!(scrubber_json["is_pressure_drop_acceptable"].as_bool().unwrap());
+    assert!(scrubber_json["is_flooding_velocity_safe"].as_bool().unwrap());
+    assert!(scrubber_json["is_packed_bed_viable"].as_bool().unwrap());
+
+    // 237. Universal Commands Execution Verification (Batch 26 Domains)
+    for cmd_id in [
+        "sim.mechanical.conveyor_bulk_handling",
+        "sim.marine.offshore_wave_loading",
+        "sim.aerospace.spacecraft_adcs_attitude",
+        "sim.electrical.battery_fast_charging",
+        "sim.process.packed_bed_scrubber",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 238. Enterprise MCP Tool Calling (Batch 26 Domains)
+    for tool_name in [
+        "atlas_sim_mechanical_conveyor_bulk_handling",
+        "atlas_sim_marine_offshore_wave_loading",
+        "atlas_sim_aerospace_spacecraft_adcs_attitude",
+        "atlas_sim_electrical_battery_fast_charging",
+        "atlas_sim_process_packed_bed_scrubber",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(r#"{{"jsonrpc": "2.0", "id": 238, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

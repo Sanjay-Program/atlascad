@@ -7234,6 +7234,124 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_mechanical_conveyor_bulk_handling(
+        &mut self,
+        req: &SimConveyorRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::conveyor_bulk_handling::ConveyorProblem {
+            problem_id: "conveyor_sim".to_string(),
+            carcass_type: req.carcass_type.unwrap_or(atlas_simulation_core::conveyor_bulk_handling::BeltCarcassType::SteelCordST),
+            troughing_angle: req.troughing_angle.unwrap_or(atlas_simulation_core::conveyor_bulk_handling::TroughingAngleClass::Trough35Deg),
+            belt_width_mm: req.belt_width_mm.unwrap_or(1200.0),
+            conveyor_length_m: req.conveyor_length_m.unwrap_or(450.0),
+            elevation_lift_m: req.elevation_lift_m.unwrap_or(28.0),
+            belt_speed_m_s: req.belt_speed_m_s.unwrap_or(3.15),
+            material_bulk_density_kg_m3: req.material_bulk_density_kg_m3.unwrap_or(1650.0),
+            surcharge_angle_deg: req.surcharge_angle_deg.unwrap_or(20.0),
+            belt_unit_weight_kg_m: req.belt_unit_weight_kg_m.unwrap_or(24.5),
+            idlers_carrying_weight_kg_m: req.idlers_carrying_weight_kg_m.unwrap_or(28.0),
+            idlers_return_weight_kg_m: req.idlers_return_weight_kg_m.unwrap_or(8.5),
+            friction_factor_f: req.friction_factor_f.unwrap_or(0.022),
+            drive_wrap_angle_deg: req.drive_wrap_angle_deg.unwrap_or(210.0),
+            drive_friction_mu: req.drive_friction_mu.unwrap_or(0.35),
+            belt_rated_breaking_strength_kn_m: req.belt_rated_breaking_strength_kn_m.unwrap_or(1250.0),
+            drive_mechanical_efficiency: req.drive_mechanical_efficiency.unwrap_or(0.92),
+        };
+        let res = atlas_simulation_core::conveyor_bulk_handling::solve_conveyor_bulk_handling(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_marine_offshore_wave_loading(
+        &mut self,
+        req: &SimOffshoreWaveRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::offshore_wave_loading::OffshoreWaveProblem {
+            problem_id: "offshore_wave_sim".to_string(),
+            structure_type: req.structure_type.unwrap_or(atlas_simulation_core::offshore_wave_loading::OffshoreStructureType::OffshoreWindMonopile),
+            water_depth_m: req.water_depth_m.unwrap_or(40.0),
+            wave_height_m: req.wave_height_m.unwrap_or(14.5),
+            wave_period_s: req.wave_period_s.unwrap_or(13.0),
+            surface_current_m_s: req.surface_current_m_s.unwrap_or(1.20),
+            cylinder_diameter_m: req.cylinder_diameter_m.unwrap_or(8.50),
+            wall_thickness_mm: req.wall_thickness_mm.unwrap_or(85.0),
+            steel_yield_strength_mpa: req.steel_yield_strength_mpa.unwrap_or(355.0),
+            drag_coefficient_cd: req.drag_coefficient_cd.unwrap_or(0.70),
+            inertia_coefficient_cm: req.inertia_coefficient_cm.unwrap_or(2.00),
+            seawater_density_kg_m3: req.seawater_density_kg_m3.unwrap_or(1025.0),
+        };
+        let res = atlas_simulation_core::offshore_wave_loading::solve_offshore_wave_loading(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_aerospace_spacecraft_adcs_attitude(
+        &mut self,
+        req: &SimSpacecraftAdcsRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::spacecraft_adcs_attitude::SpacecraftAdcsProblem {
+            problem_id: "spacecraft_adcs_sim".to_string(),
+            orbit_regime: req.orbit_regime.unwrap_or(atlas_simulation_core::spacecraft_adcs_attitude::SpacecraftOrbitRegime::LowEarthOrbitLEO),
+            orbit_altitude_km: req.orbit_altitude_km.unwrap_or(550.0),
+            spacecraft_mass_kg: req.spacecraft_mass_kg.unwrap_or(350.0),
+            inertia_ixx_kg_m2: req.inertia_ixx_kg_m2.unwrap_or(85.0),
+            inertia_iyy_kg_m2: req.inertia_iyy_kg_m2.unwrap_or(120.0),
+            inertia_izz_kg_m2: req.inertia_izz_kg_m2.unwrap_or(75.0),
+            cp_cg_offset_arm_m: req.cp_cg_offset_arm_m.unwrap_or(0.08),
+            projected_surface_area_m2: req.projected_surface_area_m2.unwrap_or(2.40),
+            solar_reflectance_q: req.solar_reflectance_q.unwrap_or(0.60),
+            residual_magnetic_dipole_a_m2: req.residual_magnetic_dipole_a_m2.unwrap_or(0.50),
+            target_slew_accel_deg_s2: req.target_slew_accel_deg_s2.unwrap_or(1.50),
+        };
+        let res = atlas_simulation_core::spacecraft_adcs_attitude::solve_spacecraft_adcs_attitude(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_electrical_battery_fast_charging(
+        &mut self,
+        req: &SimBatteryFastChargeRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::battery_fast_charging::BatteryFastChargeProblem {
+            problem_id: "battery_fast_charge_sim".to_string(),
+            cathode_chemistry: req.cathode_chemistry.unwrap_or(atlas_simulation_core::battery_fast_charging::BatteryCathodeChemistry::Nmc811HighEnergy),
+            nominal_capacity_ah: req.nominal_capacity_ah.unwrap_or(75.0),
+            initial_soc_fraction: req.initial_soc_fraction.unwrap_or(0.10),
+            target_soc_fraction: req.target_soc_fraction.unwrap_or(0.80),
+            charge_c_rate: req.charge_c_rate.unwrap_or(2.50),
+            internal_resistance_mohms: req.internal_resistance_mohms.unwrap_or(0.85),
+            diffusion_time_constant_s: req.diffusion_time_constant_s.unwrap_or(95.0),
+            charge_cutoff_voltage_v: req.charge_cutoff_voltage_v.unwrap_or(4.20),
+            ambient_temperature_c: req.ambient_temperature_c.unwrap_or(25.0),
+        };
+        let res = atlas_simulation_core::battery_fast_charging::solve_battery_fast_charging(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_process_packed_bed_scrubber(
+        &mut self,
+        req: &SimPackedBedRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::packed_bed_scrubber::PackedBedProblem {
+            problem_id: "packed_bed_sim".to_string(),
+            application: req.application.unwrap_or(atlas_simulation_core::packed_bed_scrubber::ScrubberApplication::AcidGasAbatement),
+            packing_type: req.packing_type.unwrap_or(atlas_simulation_core::packed_bed_scrubber::PackingTypeClass::PallRings25mm),
+            flue_gas_flow_rate_m3_h: req.flue_gas_flow_rate_m3_h.unwrap_or(8500.0),
+            inlet_pollutant_mole_fraction: req.inlet_pollutant_mole_fraction.unwrap_or(0.0120),
+            target_outlet_mole_fraction: req.target_outlet_mole_fraction.unwrap_or(0.00024),
+            operating_temperature_c: req.operating_temperature_c.unwrap_or(45.0),
+            operating_pressure_kpa: req.operating_pressure_kpa.unwrap_or(101.325),
+            liquid_to_gas_ratio_multiplier: req.liquid_to_gas_ratio_multiplier.unwrap_or(1.50),
+            liquid_density_kg_m3: req.liquid_density_kg_m3.unwrap_or(1020.0),
+            liquid_viscosity_cp: req.liquid_viscosity_cp.unwrap_or(1.05),
+            henrys_law_slope_m: req.henrys_law_slope_m.unwrap_or(0.45),
+        };
+        let res = atlas_simulation_core::packed_bed_scrubber::solve_packed_bed_scrubber(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -10253,6 +10371,61 @@ namespace AtlasCAD.Unity
                     ..Default::default()
                 })?
             }
+            "sim.mechanical.conveyor_bulk_handling" => {
+                let b = req.arguments.get("belt_width_mm").and_then(|v| v.as_f64());
+                let l = req.arguments.get("conveyor_length_m").and_then(|v| v.as_f64());
+                let v = req.arguments.get("belt_speed_m_s").and_then(|v| v.as_f64());
+                self.sim_mechanical_conveyor_bulk_handling(&SimConveyorRequest {
+                    belt_width_mm: b,
+                    conveyor_length_m: l,
+                    belt_speed_m_s: v,
+                    ..Default::default()
+                })?
+            }
+            "sim.marine.offshore_wave_loading" => {
+                let d = req.arguments.get("water_depth_m").and_then(|v| v.as_f64());
+                let h = req.arguments.get("wave_height_m").and_then(|v| v.as_f64());
+                let dia = req.arguments.get("cylinder_diameter_m").and_then(|v| v.as_f64());
+                self.sim_marine_offshore_wave_loading(&SimOffshoreWaveRequest {
+                    water_depth_m: d,
+                    wave_height_m: h,
+                    cylinder_diameter_m: dia,
+                    ..Default::default()
+                })?
+            }
+            "sim.aerospace.spacecraft_adcs_attitude" => {
+                let alt = req.arguments.get("orbit_altitude_km").and_then(|v| v.as_f64());
+                let m = req.arguments.get("spacecraft_mass_kg").and_then(|v| v.as_f64());
+                let a = req.arguments.get("target_slew_accel_deg_s2").and_then(|v| v.as_f64());
+                self.sim_aerospace_spacecraft_adcs_attitude(&SimSpacecraftAdcsRequest {
+                    orbit_altitude_km: alt,
+                    spacecraft_mass_kg: m,
+                    target_slew_accel_deg_s2: a,
+                    ..Default::default()
+                })?
+            }
+            "sim.electrical.battery_fast_charging" => {
+                let q = req.arguments.get("nominal_capacity_ah").and_then(|v| v.as_f64());
+                let c = req.arguments.get("charge_c_rate").and_then(|v| v.as_f64());
+                let r = req.arguments.get("internal_resistance_mohms").and_then(|v| v.as_f64());
+                self.sim_electrical_battery_fast_charging(&SimBatteryFastChargeRequest {
+                    nominal_capacity_ah: q,
+                    charge_c_rate: c,
+                    internal_resistance_mohms: r,
+                    ..Default::default()
+                })?
+            }
+            "sim.process.packed_bed_scrubber" => {
+                let q = req.arguments.get("flue_gas_flow_rate_m3_h").and_then(|v| v.as_f64());
+                let yin = req.arguments.get("inlet_pollutant_mole_fraction").and_then(|v| v.as_f64());
+                let yout = req.arguments.get("target_outlet_mole_fraction").and_then(|v| v.as_f64());
+                self.sim_process_packed_bed_scrubber(&SimPackedBedRequest {
+                    flue_gas_flow_rate_m3_h: q,
+                    inlet_pollutant_mole_fraction: yin,
+                    target_outlet_mole_fraction: yout,
+                    ..Default::default()
+                })?
+            }
             "system.deploy.status" => self.deploy_status()?,
             _ => serde_json::json!({
                 "status": "Executed",
@@ -13026,6 +13199,51 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/nuclear/isotope_centrifuge" => {
             match parse_body_or_default::<SimIsotopeCentrifugeRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_nuclear_isotope_centrifuge(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/mechanical/conveyor_bulk_handling" => {
+            match parse_body_or_default::<SimConveyorRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_mechanical_conveyor_bulk_handling(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/marine/offshore_wave_loading" => {
+            match parse_body_or_default::<SimOffshoreWaveRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_marine_offshore_wave_loading(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/aerospace/spacecraft_adcs_attitude" => {
+            match parse_body_or_default::<SimSpacecraftAdcsRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_aerospace_spacecraft_adcs_attitude(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/electrical/battery_fast_charging" => {
+            match parse_body_or_default::<SimBatteryFastChargeRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_electrical_battery_fast_charging(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/process/packed_bed_scrubber" => {
+            match parse_body_or_default::<SimPackedBedRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_process_packed_bed_scrubber(&body)) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -18280,4 +18498,140 @@ struct SimIsotopeCentrifugeRequest {
     pub stage_cut_theta: Option<f64>,
     #[serde(default)]
     pub circulation_efficiency: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimConveyorRequest {
+    #[serde(default)]
+    pub carcass_type: Option<atlas_simulation_core::conveyor_bulk_handling::BeltCarcassType>,
+    #[serde(default)]
+    pub troughing_angle: Option<atlas_simulation_core::conveyor_bulk_handling::TroughingAngleClass>,
+    #[serde(default)]
+    pub belt_width_mm: Option<f64>,
+    #[serde(default)]
+    pub conveyor_length_m: Option<f64>,
+    #[serde(default)]
+    pub elevation_lift_m: Option<f64>,
+    #[serde(default)]
+    pub belt_speed_m_s: Option<f64>,
+    #[serde(default)]
+    pub material_bulk_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub surcharge_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub belt_unit_weight_kg_m: Option<f64>,
+    #[serde(default)]
+    pub idlers_carrying_weight_kg_m: Option<f64>,
+    #[serde(default)]
+    pub idlers_return_weight_kg_m: Option<f64>,
+    #[serde(default)]
+    pub friction_factor_f: Option<f64>,
+    #[serde(default)]
+    pub drive_wrap_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub drive_friction_mu: Option<f64>,
+    #[serde(default)]
+    pub belt_rated_breaking_strength_kn_m: Option<f64>,
+    #[serde(default)]
+    pub drive_mechanical_efficiency: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimOffshoreWaveRequest {
+    #[serde(default)]
+    pub structure_type: Option<atlas_simulation_core::offshore_wave_loading::OffshoreStructureType>,
+    #[serde(default)]
+    pub water_depth_m: Option<f64>,
+    #[serde(default)]
+    pub wave_height_m: Option<f64>,
+    #[serde(default)]
+    pub wave_period_s: Option<f64>,
+    #[serde(default)]
+    pub surface_current_m_s: Option<f64>,
+    #[serde(default)]
+    pub cylinder_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub wall_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub steel_yield_strength_mpa: Option<f64>,
+    #[serde(default)]
+    pub drag_coefficient_cd: Option<f64>,
+    #[serde(default)]
+    pub inertia_coefficient_cm: Option<f64>,
+    #[serde(default)]
+    pub seawater_density_kg_m3: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimSpacecraftAdcsRequest {
+    #[serde(default)]
+    pub orbit_regime: Option<atlas_simulation_core::spacecraft_adcs_attitude::SpacecraftOrbitRegime>,
+    #[serde(default)]
+    pub orbit_altitude_km: Option<f64>,
+    #[serde(default)]
+    pub spacecraft_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub inertia_ixx_kg_m2: Option<f64>,
+    #[serde(default)]
+    pub inertia_iyy_kg_m2: Option<f64>,
+    #[serde(default)]
+    pub inertia_izz_kg_m2: Option<f64>,
+    #[serde(default)]
+    pub cp_cg_offset_arm_m: Option<f64>,
+    #[serde(default)]
+    pub projected_surface_area_m2: Option<f64>,
+    #[serde(default)]
+    pub solar_reflectance_q: Option<f64>,
+    #[serde(default)]
+    pub residual_magnetic_dipole_a_m2: Option<f64>,
+    #[serde(default)]
+    pub target_slew_accel_deg_s2: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimBatteryFastChargeRequest {
+    #[serde(default)]
+    pub cathode_chemistry: Option<atlas_simulation_core::battery_fast_charging::BatteryCathodeChemistry>,
+    #[serde(default)]
+    pub nominal_capacity_ah: Option<f64>,
+    #[serde(default)]
+    pub initial_soc_fraction: Option<f64>,
+    #[serde(default)]
+    pub target_soc_fraction: Option<f64>,
+    #[serde(default)]
+    pub charge_c_rate: Option<f64>,
+    #[serde(default)]
+    pub internal_resistance_mohms: Option<f64>,
+    #[serde(default)]
+    pub diffusion_time_constant_s: Option<f64>,
+    #[serde(default)]
+    pub charge_cutoff_voltage_v: Option<f64>,
+    #[serde(default)]
+    pub ambient_temperature_c: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimPackedBedRequest {
+    #[serde(default)]
+    pub application: Option<atlas_simulation_core::packed_bed_scrubber::ScrubberApplication>,
+    #[serde(default)]
+    pub packing_type: Option<atlas_simulation_core::packed_bed_scrubber::PackingTypeClass>,
+    #[serde(default)]
+    pub flue_gas_flow_rate_m3_h: Option<f64>,
+    #[serde(default)]
+    pub inlet_pollutant_mole_fraction: Option<f64>,
+    #[serde(default)]
+    pub target_outlet_mole_fraction: Option<f64>,
+    #[serde(default)]
+    pub operating_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub operating_pressure_kpa: Option<f64>,
+    #[serde(default)]
+    pub liquid_to_gas_ratio_multiplier: Option<f64>,
+    #[serde(default)]
+    pub liquid_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub liquid_viscosity_cp: Option<f64>,
+    #[serde(default)]
+    pub henrys_law_slope_m: Option<f64>,
 }

@@ -2305,6 +2305,71 @@ impl McpServer {
                     "required": ["rotor_radius_m", "rotational_speed_rpm"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_mechanical_conveyor_bulk_handling".into(),
+                description: "Calculates troughed idler cross-sectional area, mass throughput capacity (t/h), motion resistances, Euler-Eytelwein capstan drive slip safety, and motor brake power.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "belt_width_mm": { "type": "number", "default": 1200.0 },
+                        "conveyor_length_m": { "type": "number", "default": 450.0 },
+                        "belt_speed_m_s": { "type": "number", "default": 3.15 }
+                    },
+                    "required": ["belt_width_mm", "conveyor_length_m"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_marine_offshore_wave_loading".into(),
+                description: "Calculates Airy dispersion wavelength, orbital kinematics, Morison hydrodynamic drag and inertia, mudline base shear, overturning moment, and bending stress.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "water_depth_m": { "type": "number", "default": 40.0 },
+                        "wave_height_m": { "type": "number", "default": 14.5 },
+                        "cylinder_diameter_m": { "type": "number", "default": 8.50 }
+                    },
+                    "required": ["water_depth_m", "wave_height_m"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_aerospace_spacecraft_adcs_attitude".into(),
+                description: "Calculates gravity gradient, solar radiation, aerodynamic and magnetic disturbance torques, orbital accumulated angular momentum, reaction wheel capacity, and MTQ sizing.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "orbit_altitude_km": { "type": "number", "default": 550.0 },
+                        "spacecraft_mass_kg": { "type": "number", "default": 350.0 },
+                        "target_slew_accel_deg_s2": { "type": "number", "default": 1.50 }
+                    },
+                    "required": ["orbit_altitude_km", "spacecraft_mass_kg"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_electrical_battery_fast_charging".into(),
+                description: "Calculates CC and CV phase durations, total fast-charge time, peak heat dissipation, SEI parasitic layer growth, capacity loss per cycle, and lithium plating avoidance margin.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "nominal_capacity_ah": { "type": "number", "default": 75.0 },
+                        "charge_c_rate": { "type": "number", "default": 2.50 },
+                        "internal_resistance_mohms": { "type": "number", "default": 0.85 }
+                    },
+                    "required": ["nominal_capacity_ah", "charge_c_rate"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_process_packed_bed_scrubber".into(),
+                description: "Calculates column diameter at 70% Sherwood flooding velocity, Colburn NTU_OG, Onda HTU_OG, active bed height, gas pressure drop, and pollutant removal efficiency.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "flue_gas_flow_rate_m3_h": { "type": "number", "default": 8500.0 },
+                        "inlet_pollutant_mole_fraction": { "type": "number", "default": 0.0120 },
+                        "target_outlet_mole_fraction": { "type": "number", "default": 0.00024 }
+                    },
+                    "required": ["flue_gas_flow_rate_m3_h", "inlet_pollutant_mole_fraction"]
+                }),
+            },
         ]
     }
 

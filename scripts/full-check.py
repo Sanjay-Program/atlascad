@@ -3124,6 +3124,135 @@ def simulation_section(studio: Studio) -> None:
     check(cent_data.get("is_separation_effective", False) is True, "isotopic separation effective")
     check(cent_data.get("is_swu_capacity_commercial", False) is True, "SWU capacity commercial")
     check(cent_data.get("is_centrifuge_stage_viable", False) is True, "centrifuge stage viable")
+
+    # 130. Industrial Belt Conveyor Bulk Material Handling & Drive Power (DIN 22101 / ISO 5048 / CEMA)
+    conveyor = studio.post("/api/sim/mechanical/conveyor_bulk_handling", {
+        "carcass_type": "SteelCordST",
+        "troughing_angle": "Trough35Deg",
+        "belt_width_mm": 1200.0,
+        "conveyor_length_m": 450.0,
+        "elevation_lift_m": 28.0,
+        "belt_speed_m_s": 3.15,
+        "material_bulk_density_kg_m3": 1650.0,
+        "surcharge_angle_deg": 20.0,
+        "drive_wrap_angle_deg": 210.0,
+        "drive_friction_mu": 0.35,
+        "belt_rated_breaking_strength_kn_m": 1250.0,
+        "drive_mechanical_efficiency": 0.92,
+    })
+    check(conveyor.status == 200, f"conveyor bulk handling returns 200 (got {conveyor.status})")
+    conv_data = conveyor.json()
+    check(conv_data.get("material_cross_section_m2", 0.0) > 0.10, "material cross section area > 0.10 m2")
+    check(conv_data.get("volumetric_capacity_m3_h", 0.0) > 1200.0, "volumetric throughput > 1200 m3/h")
+    check(conv_data.get("mass_throughput_t_h", 0.0) > 2000.0, "mass conveyance capacity > 2000 t/h")
+    check(conv_data.get("peripheral_drive_force_fu_kn", 0.0) > 80.0, "peripheral driving force > 80 kN")
+    check(conv_data.get("motor_brake_power_kw", 0.0) > 250.0, "motor brake power > 250 kW")
+    check(conv_data.get("belt_tensile_safety_factor", 0.0) >= 8.0, "belt tensile safety factor >= 8.0")
+    check(conv_data.get("is_drive_slip_safe", False) is True, "drive pulley slip prevented")
+    check(conv_data.get("is_belt_strength_sufficient", False) is True, "belt carcass strength sufficient")
+    check(conv_data.get("is_conveyor_design_viable", False) is True, "belt conveyor design viable")
+
+    # 131. Offshore Monopile / Jacket Wave & Current Hydrodynamics (API RP 2A-WSD / DNV-RP-C205 / Morison)
+    wave = studio.post("/api/sim/marine/offshore_wave_loading", {
+        "structure_type": "OffshoreWindMonopile",
+        "water_depth_m": 40.0,
+        "wave_height_m": 14.5,
+        "wave_period_s": 13.0,
+        "surface_current_m_s": 1.20,
+        "cylinder_diameter_m": 8.50,
+        "wall_thickness_mm": 85.0,
+        "steel_yield_strength_mpa": 355.0,
+        "drag_coefficient_cd": 0.70,
+        "inertia_coefficient_cm": 2.00,
+    })
+    check(wave.status == 200, f"offshore wave loading returns 200 (got {wave.status})")
+    wave_data = wave.json()
+    check(wave_data.get("wavelength_m", 0.0) > 150.0, "Airy wavelength > 150 m")
+    check(wave_data.get("keulegan_carpenter_number", 0.0) > 4.0, "Keulegan-Carpenter number KC > 4.0")
+    check(wave_data.get("peak_base_shear_kn", 0.0) > 3000.0, "mudline peak base shear > 3000 kN")
+    check(wave_data.get("peak_overturning_moment_kn_m", 0.0) > 60000.0, "mudline overturning moment > 60,000 kNm")
+    check(wave_data.get("mudline_bending_stress_mpa", 0.0) > 15.0, "mudline bending stress > 15 MPa")
+    check(wave_data.get("structural_bending_safety_factor", 0.0) >= 1.35, "bending yield safety factor >= 1.35")
+    check(wave_data.get("is_morison_valid", False) is True, "Morison formulation valid")
+    check(wave_data.get("is_bending_stress_acceptable", False) is True, "mudline bending stress acceptable")
+    check(wave_data.get("is_offshore_design_viable", False) is True, "offshore monopile design viable")
+
+    # 132. Spacecraft ADCS Three-Axis Disturbance Torques & Reaction Wheel Sizing (NASA-SP-8007 / Wertz / ECSS)
+    adcs = studio.post("/api/sim/aerospace/spacecraft_adcs_attitude", {
+        "orbit_regime": "LowEarthOrbitLEO",
+        "orbit_altitude_km": 550.0,
+        "spacecraft_mass_kg": 350.0,
+        "inertia_ixx_kg_m2": 85.0,
+        "inertia_iyy_kg_m2": 120.0,
+        "inertia_izz_kg_m2": 75.0,
+        "cp_cg_offset_arm_m": 0.08,
+        "projected_surface_area_m2": 2.40,
+        "solar_reflectance_q": 0.60,
+        "residual_magnetic_dipole_a_m2": 0.50,
+        "target_slew_accel_deg_s2": 1.50,
+    })
+    check(adcs.status == 200, f"spacecraft adcs returns 200 (got {adcs.status})")
+    adcs_data = adcs.json()
+    check(adcs_data.get("gravity_gradient_torque_un_m", 0.0) > 10.0, "gravity gradient torque > 10 uNm")
+    check(adcs_data.get("aerodynamic_drag_torque_un_m", 0.0) > 0.10, "aerodynamic drag torque > 0.10 uNm")
+    check(adcs_data.get("magnetic_residual_torque_un_m", 0.0) > 5.0, "magnetic residual torque > 5.0 uNm")
+    check(adcs_data.get("peak_disturbance_torque_un_m", 0.0) > 30.0, "peak total disturbance torque > 30 uNm")
+    check(adcs_data.get("accumulated_momentum_per_orbit_nms", 0.0) > 0.04, "accumulated momentum per orbit > 0.04 Nms")
+    check(adcs_data.get("recommended_wheel_momentum_nms", 0.0) > 0.08, "reaction wheel momentum capacity > 0.08 Nms")
+    check(adcs_data.get("required_slew_torque_mn_m", 0.0) > 500.0, "slew agility torque > 500 mNm")
+    check(adcs_data.get("is_wheel_capacity_adequate", False) is True, "reaction wheel capacity adequate")
+    check(adcs_data.get("is_mtq_desaturation_adequate", False) is True, "magnetic desaturation adequate")
+    check(adcs_data.get("is_adcs_sizing_viable", False) is True, "spacecraft ADCS sizing viable")
+
+    # 133. Lithium-Ion Battery Fast-Charging CC-CV Dynamics & Degradation (ISO 12405 / SAE J2464 / Newman)
+    battery = studio.post("/api/sim/electrical/battery_fast_charging", {
+        "cathode_chemistry": "Nmc811HighEnergy",
+        "nominal_capacity_ah": 75.0,
+        "initial_soc_fraction": 0.10,
+        "target_soc_fraction": 0.80,
+        "charge_c_rate": 2.50,
+        "internal_resistance_mohms": 0.85,
+        "diffusion_time_constant_s": 95.0,
+        "charge_cutoff_voltage_v": 4.20,
+        "ambient_temperature_c": 25.0,
+    })
+    check(battery.status == 200, f"battery fast charging returns 200 (got {battery.status})")
+    batt_data = battery.json()
+    check(batt_data.get("cc_phase_current_a", 0.0) >= 180.0, "constant current phase >= 180 A")
+    check(batt_data.get("cc_phase_duration_minutes", 0.0) > 10.0, "CC phase duration > 10 min")
+    check(batt_data.get("total_charge_time_minutes", 0.0) < 25.0, "total fast-charge time < 25 min")
+    check(batt_data.get("peak_heat_generation_w", 0.0) > 20.0, "peak heat generation > 20 W")
+    check(batt_data.get("min_anode_plating_margin_mv", 0.0) > 0.0, "anode plating margin > 0 mV")
+    check(batt_data.get("estimated_cycle_life_to_80_soh", 0) > 1200, "cycle life to 80% SOH > 1200 cycles")
+    check(batt_data.get("is_fast_charge_time_competitive", False) is True, "fast-charge time competitive")
+    check(batt_data.get("is_lithium_plating_prevented", False) is True, "lithium metal plating prevented")
+    check(batt_data.get("is_thermal_dissipation_manageable", False) is True, "thermal dissipation manageable")
+    check(batt_data.get("is_fast_charging_viable", False) is True, "fast-charging protocol viable")
+
+    # 134. Industrial Packed Bed Gas Absorption & Wet Scrubber Sizing (Coulson-Richardson / Onda / EPA OAQPS)
+    scrubber = studio.post("/api/sim/process/packed_bed_scrubber", {
+        "application": "AcidGasAbatement",
+        "packing_type": "PallRings25mm",
+        "flue_gas_flow_rate_m3_h": 8500.0,
+        "inlet_pollutant_mole_fraction": 0.0120,
+        "target_outlet_mole_fraction": 0.00024,
+        "operating_temperature_c": 45.0,
+        "operating_pressure_kpa": 101.325,
+        "liquid_to_gas_ratio_multiplier": 1.50,
+    })
+    check(scrubber.status == 200, f"packed bed scrubber returns 200 (got {scrubber.status})")
+    scrub_data = scrubber.json()
+    check(scrub_data.get("column_diameter_m", 0.0) > 0.8, "column diameter > 0.8 m")
+    check(scrub_data.get("active_bed_height_m", 0.0) > 3.0, "active bed height > 3.0 m")
+    check(scrub_data.get("solvent_flow_rate_m3_h", 0.0) > 2.0, "solvent circulation rate > 2.0 m3/h")
+    check(scrub_data.get("number_of_transfer_units_ntu", 0.0) > 5.0, "transfer units NTU > 5.0")
+    check(scrub_data.get("total_gas_pressure_drop_pa", 0.0) <= 3500.0, "gas pressure drop <= 3500 Pa")
+    check(scrub_data.get("pollutant_removal_efficiency_pct", 0.0) >= 95.0, "removal efficiency >= 95%")
+    check(scrub_data.get("is_removal_efficiency_met", False) is True, "removal efficiency met")
+    check(scrub_data.get("is_pressure_drop_acceptable", False) is True, "pressure drop acceptable")
+    check(scrub_data.get("is_flooding_velocity_safe", False) is True, "flooding velocity safe")
+    check(scrub_data.get("is_packed_bed_viable", False) is True, "packed bed scrubber viable")
+
     report("simulation")
 
 

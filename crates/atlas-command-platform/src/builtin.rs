@@ -6604,5 +6604,175 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.mechanical.conveyor_bulk_handling",
+            "Industrial Belt Conveyor Bulk Material Handling & Drive Power (DIN 22101 / ISO 5048 / CEMA)",
+            "Calculates troughed idler cross-sectional area, mass throughput capacity (t/h), motion resistances, Euler-Eytelwein capstan drive slip safety, and motor brake power.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "belt_width_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Conveyor belt width in millimeters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1200.0)),
+            validation_rules: vec![ValidationRule::Min(300.0), ValidationRule::Max(3200.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "conveyor_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Center-to-center conveyor installation length in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(450.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(10000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "belt_speed_m_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Operating belt travel speed in m/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(3.15)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(10.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.marine.offshore_wave_loading",
+            "Offshore Monopile / Jacket Wave & Current Hydrodynamics (API RP 2A-WSD / DNV-RP-C205 / Morison)",
+            "Calculates Airy dispersion wavelength, orbital kinematics, Morison hydrodynamic drag and inertia, mudline base shear, overturning moment, and bending stress.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "water_depth_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Mean sea water depth in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(40.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "wave_height_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Design extreme wave height H in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(14.5)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(40.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "cylinder_diameter_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Outer cylinder diameter in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(8.50)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(20.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.aerospace.spacecraft_adcs_attitude",
+            "Spacecraft ADCS Three-Axis Disturbance Torques & Reaction Wheel Sizing (NASA-SP-8007 / Wertz / ECSS)",
+            "Calculates gravity gradient, solar radiation, aerodynamic and magnetic disturbance torques, orbital accumulated angular momentum, reaction wheel capacity, and MTQ sizing.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "orbit_altitude_km".into(),
+            arg_type: ArgumentType::Number,
+            description: "Circular orbit altitude in kilometers".into(),
+            required: false,
+            default_value: Some(serde_json::json!(550.0)),
+            validation_rules: vec![ValidationRule::Min(200.0), ValidationRule::Max(40000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "spacecraft_mass_kg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Spacecraft total mass in kilograms".into(),
+            required: false,
+            default_value: Some(serde_json::json!(350.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(10000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "target_slew_accel_deg_s2".into(),
+            arg_type: ArgumentType::Number,
+            description: "Target rapid slew acceleration in deg/s²".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1.50)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(20.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.electrical.battery_fast_charging",
+            "Lithium-Ion Battery Fast-Charging CC-CV Dynamics & Degradation (ISO 12405 / SAE J2464 / Newman)",
+            "Calculates CC and CV phase durations, total fast-charge time, peak heat dissipation, SEI parasitic layer growth, capacity loss per cycle, and lithium plating avoidance margin.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "nominal_capacity_ah".into(),
+            arg_type: ArgumentType::Number,
+            description: "Cell nominal capacity in Ampere-hours".into(),
+            required: false,
+            default_value: Some(serde_json::json!(75.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(500.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "charge_c_rate".into(),
+            arg_type: ArgumentType::Number,
+            description: "Fast-charging C-rate multiplier in CC phase".into(),
+            required: false,
+            default_value: Some(serde_json::json!(2.50)),
+            validation_rules: vec![ValidationRule::Min(0.5), ValidationRule::Max(6.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "internal_resistance_mohms".into(),
+            arg_type: ArgumentType::Number,
+            description: "Internal cell ohmic resistance in milliOhms".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.85)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(20.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.process.packed_bed_scrubber",
+            "Industrial Packed Bed Gas Absorption & Wet Scrubber Sizing (Coulson-Richardson / Onda / EPA OAQPS)",
+            "Calculates column diameter at 70% Sherwood flooding velocity, Colburn NTU_OG, Onda HTU_OG, active bed height, gas pressure drop, and pollutant removal efficiency.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "flue_gas_flow_rate_m3_h".into(),
+            arg_type: ArgumentType::Number,
+            description: "Flue gas volumetric flow rate in m³/h".into(),
+            required: false,
+            default_value: Some(serde_json::json!(8500.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(100000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "inlet_pollutant_mole_fraction".into(),
+            arg_type: ArgumentType::Number,
+            description: "Inlet pollutant mole fraction (e.g. 0.012 for 1.2% SO2)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.0120)),
+            validation_rules: vec![ValidationRule::Min(0.0001), ValidationRule::Max(0.20)],
+        })
+        .with_argument(CommandArgument {
+            name: "target_outlet_mole_fraction".into(),
+            arg_type: ArgumentType::Number,
+            description: "Target outlet pollutant mole fraction".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.00024)),
+            validation_rules: vec![ValidationRule::Min(0.00001), ValidationRule::Max(0.05)],
+        }),
+    )?;
+
     Ok(())
 }
