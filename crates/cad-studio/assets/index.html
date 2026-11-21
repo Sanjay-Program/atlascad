@@ -11,13 +11,149 @@
 <body>
   <a class="skip-link" href="#viewport">Skip to viewport</a>
 
-  <header class="topbar">
+  <!-- Left Global Navigation Sidebar -->
+  <aside class="global-sidebar" id="globalSidebar" aria-label="Global Navigation">
+    <div class="sidebar-header">
+      <a href="#view=home" class="sidebar-brand" id="sidebarBrandLink" title="AtlasCAD Home">
+        <img src="/favicon.svg" alt="AtlasCAD" class="sidebar-brand-img">
+        <span class="sidebar-brand-title">AtlasCAD</span>
+      </a>
+      <button type="button" class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Sidebar (Expand/Collapse)" aria-label="Toggle Navigation Sidebar">☰</button>
+    </div>
+
+    <!-- Core Navigation -->
+    <div class="sidebar-nav-group">
+      <button type="button" class="sidebar-item" id="navHome" data-view="home" title="Home / Welcome">
+        <span class="sidebar-item-icon">⌂</span>
+        <span class="sidebar-item-text">Home</span>
+      </button>
+      <button type="button" class="sidebar-item" id="navProjects" data-view="projects" title="Projects & Version History">
+        <span class="sidebar-item-icon">📁</span>
+        <span class="sidebar-item-text">Projects</span>
+      </button>
+    </div>
+
+    <!-- Engineering Studios -->
+    <div class="sidebar-nav-group">
+      <span class="sidebar-group-title">Engineering Studios</span>
+      <button type="button" class="sidebar-item active" id="navMechanical" data-ws="mechanical" title="Mechanical CAD & Parametric Modeling">
+        <span class="sidebar-item-icon">📐</span>
+        <span class="sidebar-item-text">Mechanical</span>
+      </button>
+      <button type="button" class="sidebar-item" id="navAssembly" data-ws="assembly" title="Assemblies & Mechanisms">
+        <span class="sidebar-item-icon">⚙</span>
+        <span class="sidebar-item-text">Assemblies</span>
+      </button>
+      <button type="button" class="sidebar-item" id="navBim" data-ws="bim" title="Architecture & OpenBIM (IFC)">
+        <span class="sidebar-item-icon">🏛</span>
+        <span class="sidebar-item-text">Architecture</span>
+      </button>
+      <button type="button" class="sidebar-item" id="navElectronics" data-ws="electronics" title="Electronics & ECAD (SPICE / PCB)">
+        <span class="sidebar-item-icon">⚡</span>
+        <span class="sidebar-item-text">Electronics</span>
+      </button>
+      <button type="button" class="sidebar-item" id="navSimulation" data-ws="simulation" title="Simulation Studio (140+ Multiphysics Solvers)">
+        <span class="sidebar-item-icon">🌊</span>
+        <span class="sidebar-item-text">Simulation</span>
+        <span class="sidebar-badge">140+</span>
+      </button>
+      <button type="button" class="sidebar-item" id="navManufacturing" data-ws="manufacturing" title="Manufacturing & CNC CAM / Slicing">
+        <span class="sidebar-item-icon">🏭</span>
+        <span class="sidebar-item-text">Manufacturing</span>
+      </button>
+      <button type="button" class="sidebar-item" id="navScience" data-ws="chemical" title="Science & Process Engineering">
+        <span class="sidebar-item-icon">🧪</span>
+        <span class="sidebar-item-text">Science</span>
+      </button>
+      <button type="button" class="sidebar-item" id="navRobotics" data-ws="robotics" title="Robotics & Kinematics (ROS Bridge)">
+        <span class="sidebar-item-icon">🤖</span>
+        <span class="sidebar-item-text">Robotics</span>
+      </button>
+    </div>
+
+    <!-- Creative & RealTime Studios -->
+    <div class="sidebar-nav-group">
+      <span class="sidebar-group-title">Creative & Media</span>
+      <button type="button" class="sidebar-item" id="navCreate" data-ws="create" title="Create 3D Studio (SubD, Sculpt, PBR)">
+        <span class="sidebar-item-icon">🎨</span>
+        <span class="sidebar-item-text">Create 3D</span>
+      </button>
+      <button type="button" class="sidebar-item" id="navRealtime" data-ws="realtime" title="RealTime Studio & Unity Digital Twin">
+        <span class="sidebar-item-icon">🎮</span>
+        <span class="sidebar-item-text">RealTime</span>
+      </button>
+      <button type="button" class="sidebar-item" id="navMedia" data-ws="media" title="Media Studio & DaVinci Resolve NLE">
+        <span class="sidebar-item-icon">🎬</span>
+        <span class="sidebar-item-text">Media NLE</span>
+      </button>
+    </div>
+
+    <!-- Platform & Automation -->
+    <div class="sidebar-nav-group">
+      <span class="sidebar-group-title">Platform</span>
+      <button type="button" class="sidebar-item" id="navAgents" data-ws="agents" title="AI Engineering Agents (44 Specialists)">
+        <span class="sidebar-item-icon">🧠</span>
+        <span class="sidebar-item-text">AI Agents</span>
+        <span class="sidebar-badge">44</span>
+      </button>
+      <button type="button" class="sidebar-item" id="navWorkflows" data-view="workflows" title="Workflow Automation & Pipelines">
+        <span class="sidebar-item-icon">🔀</span>
+        <span class="sidebar-item-text">Workflows</span>
+      </button>
+      <button type="button" class="sidebar-item" id="navAssets" data-view="assets" title="Assets & Standard Hardware Library">
+        <span class="sidebar-item-icon">📦</span>
+        <span class="sidebar-item-text">Assets</span>
+      </button>
+      <button type="button" class="sidebar-item" id="navJobs" data-view="jobs" title="HPC Job Queue & Simulation Results">
+        <span class="sidebar-item-icon">⏱</span>
+        <span class="sidebar-item-text">Jobs</span>
+        <span class="sidebar-badge pulse" id="sidebarJobsBadge">0</span>
+      </button>
+      <button type="button" class="sidebar-item" id="navCollab" data-view="collab" title="Enterprise Collaboration, ECOs & Audit">
+        <span class="sidebar-item-icon">👥</span>
+        <span class="sidebar-item-text">Team & ECO</span>
+      </button>
+      <button type="button" class="sidebar-item" id="navSettings" data-view="settings" title="System Settings & Engine Config">
+        <span class="sidebar-item-icon">⚙</span>
+        <span class="sidebar-item-text">Settings</span>
+      </button>
+      <button type="button" class="sidebar-item" id="navDev" data-view="dev" title="Developer Portal & MCP Tool Testing">
+        <span class="sidebar-item-icon">💻</span>
+        <span class="sidebar-item-text">Developer</span>
+      </button>
+    </div>
+
+    <div class="sidebar-spacer"></div>
+
+    <!-- Footer System Health -->
+    <div class="sidebar-footer">
+      <div class="sidebar-status-chip" title="System Status: Deterministic Local Solvers Ready">
+        <span class="status-indicator-dot"></span>
+        <span class="sidebar-status-text">Ready (Local Engine)</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Application Container -->
+  <div class="app-workspace-container" id="appWorkspaceContainer">
+    <header class="topbar">
     <div class="brand">
       <img src="/favicon.svg" alt="" width="24" height="24">
       <span class="brand-name">Atlas CAD</span>
       <span class="brand-tag">studio</span>
     </div>
     <div class="doc-title" id="docTitle" title="Project name">Loading…</div>
+    <nav class="topbar-breadcrumbs" id="topbarBreadcrumbs" aria-label="Breadcrumb navigation">
+      <span class="bc-crumb" id="bcHome" data-target="home">AtlasCAD</span>
+      <span class="bc-sep">/</span>
+      <span class="bc-crumb active" id="bcStudio">Drafting</span>
+      <span class="bc-sep">/</span>
+      <span class="bc-crumb" id="bcDoc">Project</span>
+    </nav>
+    <div class="save-status-indicator" id="saveStatusIndicator" title="Project Save State">
+      <span class="save-dot"></span>
+      <span class="save-text" id="saveStatusText">Saved</span>
+    </div>
     <div class="workspace-switcher-wrap" title="Switch Engineering Discipline Workspace">
       <label for="workspaceSelect" class="workspace-label">Workspace:</label>
       <select id="workspaceSelect" class="workspace-select" aria-label="Engineering Workspace">
@@ -73,9 +209,13 @@
       <button id="simBtn" class="button ghost" title="Engineering Simulation & Multiphysics (FEA / Modal / Thermal / CAM)">Simulation</button>
       <button id="engineManagerBtn" class="button ghost" title="Open Engineering Engine Manager & Solvers">Engines</button>
       <button id="enterpriseSaasBtn" class="button ghost" title="Enterprise SaaS Suite (Audit Trail, Cert Reports, HPC Queue, Org & ECO)">Enterprise</button>
+      <button type="button" id="topbarJobsBtn" class="topbar-jobs-btn" title="HPC Job Queue & Telemetry">
+        <span>⚡</span><span id="topbarJobsText">Idle</span>
+      </button>
       <button id="paletteBtn" class="button command" title="Command palette (Ctrl+K)">
         <span>Commands</span><kbd>Ctrl K</kbd>
       </button>
+      <button id="helpShortcutsBtn" class="icon-button" title="Shortcuts & Ergonomics Guide (F1 / ?)" aria-label="Shortcuts & Help">❓</button>
       <button id="themeBtn" class="icon-button" title="Toggle light/dark theme" aria-label="Toggle theme">◐</button>
     </nav>
   </header>
@@ -735,7 +875,275 @@
       </section>
     </aside>
 
+    <div class="panel-resizer-left" id="panelResizerLeft" title="Drag to resize Project Browser"></div>
+    <div class="panel-resizer-right" id="panelResizerRight" title="Drag to resize Inspector"></div>
+
     <section class="viewport-shell" id="viewportShell">
+      <!-- Floating Quick-Action Dock (Zero-Friction Ergonomics) -->
+      <div class="quick-action-dock" id="quickActionDock" role="toolbar" aria-label="Quick Actions">
+        <button type="button" class="dock-btn active" id="dockSelectBtn" title="Select / Inspect Tool (S)">
+          <span class="dock-icon">↖</span>
+          <span class="dock-label">Select</span>
+        </button>
+        <div class="dock-sep"></div>
+        <button type="button" class="dock-btn" id="dockLineBtn" title="Draw 2D Line (L)">
+          <span class="dock-icon">╱</span>
+          <span class="dock-label">Line</span>
+        </button>
+        <button type="button" class="dock-btn" id="dockRectBtn" title="Draw Rectangle (REC)">
+          <span class="dock-icon">▭</span>
+          <span class="dock-label">Rect</span>
+        </button>
+        <button type="button" class="dock-btn" id="dockCircleBtn" title="Draw Circle (C)">
+          <span class="dock-icon">◯</span>
+          <span class="dock-label">Circle</span>
+        </button>
+        <div class="dock-sep"></div>
+        <button type="button" class="dock-btn primary" id="dockExtrudeBtn" title="Extrude 3D Solid (EXT / E)">
+          <span class="dock-icon">⬡</span>
+          <span class="dock-label">Extrude</span>
+        </button>
+        <button type="button" class="dock-btn" id="dockCutBtn" title="Cut / Subtract (SU)">
+          <span class="dock-icon">⊖</span>
+          <span class="dock-label">Cut</span>
+        </button>
+        <button type="button" class="dock-btn" id="dockFilletBtn" title="3D Fillet Edge (F)">
+          <span class="dock-icon">╭</span>
+          <span class="dock-label">Fillet</span>
+        </button>
+        <div class="dock-sep"></div>
+        <button type="button" class="dock-btn" id="dockMaterialBarBtn" title="Toggle Drag & Drop Material Swatches (M)">
+          <span class="dock-icon">🎨</span>
+          <span class="dock-label">Materials</span>
+        </button>
+        <button type="button" class="dock-btn primary" id="dockAiBtn" title="Autonomous AI Engineering Copilot (Alt+A / Ctrl+Space)">
+          <span class="dock-icon">✨</span>
+          <span class="dock-label">AI Copilot</span>
+        </button>
+        <button type="button" class="dock-btn" id="dock2dSheetBtn" title="1-Click 2D Drawing Sheet Generator (Paper Space Layout)">
+          <span class="dock-icon">📐</span>
+          <span class="dock-label">2D Sheet</span>
+        </button>
+        <button type="button" class="dock-btn" id="dockFeaBtn" title="Quick Linear FEA Simulation">
+          <span class="dock-icon">⚡</span>
+          <span class="dock-label">FEA</span>
+        </button>
+        <button type="button" class="dock-btn" id="dockQuadBtn" title="Toggle Quad View 4-Up (Alt+Q)">
+          <span class="dock-icon">⊞</span>
+          <span class="dock-label">4-Up</span>
+        </button>
+        <div class="dock-sep"></div>
+        <button type="button" class="dock-btn" id="dockGizmoBtn" title="Toggle 3D Transform Gizmo HUD">
+          <span class="dock-icon">✦</span>
+          <span class="dock-label">Gizmo</span>
+        </button>
+        <button type="button" class="dock-btn" id="dockHelpBtn" title="Shortcuts & Help Guide (F1 / ?)">
+          <span class="dock-icon">❓</span>
+          <span class="dock-label">Help</span>
+        </button>
+      </div>
+
+      <!-- Interactive Drag & Drop Material Swatch Bar -->
+      <div class="quick-material-bar" id="quickMaterialBar" hidden aria-label="Quick Material Swatches">
+        <div class="mat-bar-header">
+          <span class="mat-bar-title">📦 Drag Material onto 3D Body</span>
+          <button type="button" class="icon-button small" id="closeMatBarBtn" title="Close Material Bar">&times;</button>
+        </div>
+        <div class="mat-swatches-grid">
+          <div class="mat-swatch" draggable="true" data-name="Aluminum 6061-T6" data-density="2.70" data-yield="276" data-youngs="68.9" data-color="#94a3b8" title="Drag to apply: 6061-T6 (E=69 GPa, Yield=276 MPa, Density=2.70 g/cm³)">
+            <span class="mat-chip" style="background: linear-gradient(135deg, #cbd5e1, #64748b);"></span>
+            <div class="mat-info">
+              <span class="mat-name">Al 6061-T6</span>
+              <span class="mat-sub">2.70 g/cm³ · 276 MPa</span>
+            </div>
+            <span class="mat-drag-hint">⠿ drag</span>
+          </div>
+          <div class="mat-swatch" draggable="true" data-name="Structural Steel A36" data-density="7.85" data-yield="250" data-youngs="200" data-color="#64748b" title="Drag to apply: Steel A36 (E=200 GPa, Yield=250 MPa, Density=7.85 g/cm³)">
+            <span class="mat-chip" style="background: linear-gradient(135deg, #64748b, #334155);"></span>
+            <div class="mat-info">
+              <span class="mat-name">Steel A36</span>
+              <span class="mat-sub">7.85 g/cm³ · 250 MPa</span>
+            </div>
+            <span class="mat-drag-hint">⠿ drag</span>
+          </div>
+          <div class="mat-swatch" draggable="true" data-name="Titanium Ti-6Al-4V" data-density="4.43" data-yield="880" data-youngs="114" data-color="#38bdf8" title="Drag to apply: Ti-6Al-4V (E=114 GPa, Yield=880 MPa, Density=4.43 g/cm³)">
+            <span class="mat-chip" style="background: linear-gradient(135deg, #38bdf8, #0284c7);"></span>
+            <div class="mat-info">
+              <span class="mat-name">Ti-6Al-4V</span>
+              <span class="mat-sub">4.43 g/cm³ · 880 MPa</span>
+            </div>
+            <span class="mat-drag-hint">⠿ drag</span>
+          </div>
+          <div class="mat-swatch" draggable="true" data-name="Carbon Fiber / PEEK" data-density="1.55" data-yield="650" data-youngs="140" data-color="#1e293b" title="Drag to apply: CFRP PEEK (E=140 GPa, Yield=650 MPa, Density=1.55 g/cm³)">
+            <span class="mat-chip" style="background: linear-gradient(135deg, #334155, #0f172a);"></span>
+            <div class="mat-info">
+              <span class="mat-name">CFRP PEEK</span>
+              <span class="mat-sub">1.55 g/cm³ · 650 MPa</span>
+            </div>
+            <span class="mat-drag-hint">⠿ drag</span>
+          </div>
+          <div class="mat-swatch" draggable="true" data-name="Copper C11000" data-density="8.96" data-yield="200" data-youngs="117" data-color="#f97316" title="Drag to apply: Copper C11000 (E=117 GPa, Yield=200 MPa, Density=8.96 g/cm³)">
+            <span class="mat-chip" style="background: linear-gradient(135deg, #fb923c, #c2410c);"></span>
+            <div class="mat-info">
+              <span class="mat-name">Copper C110</span>
+              <span class="mat-sub">8.96 g/cm³ · 117 GPa</span>
+            </div>
+            <span class="mat-drag-hint">⠿ drag</span>
+          </div>
+          <div class="mat-swatch" draggable="true" data-name="Inconel 718" data-density="8.19" data-yield="1100" data-youngs="211" data-color="#a855f7" title="Drag to apply: Inconel 718 (E=211 GPa, Yield=1100 MPa, Density=8.19 g/cm³)">
+            <span class="mat-chip" style="background: linear-gradient(135deg, #c084fc, #7e22ce);"></span>
+            <div class="mat-info">
+              <span class="mat-name">Inconel 718</span>
+              <span class="mat-sub">8.19 g/cm³ · 1.1 GPa</span>
+            </div>
+            <span class="mat-drag-hint">⠿ drag</span>
+          </div>
+          <div class="mat-swatch" draggable="true" data-name="Delrin POM / Acetal" data-density="1.41" data-yield="65" data-youngs="2.8" data-color="#f1f5f9" title="Drag to apply: Delrin POM (E=2.8 GPa, Yield=65 MPa, Density=1.41 g/cm³)">
+            <span class="mat-chip" style="background: linear-gradient(135deg, #f8fafc, #cbd5e1);"></span>
+            <div class="mat-info">
+              <span class="mat-name">Delrin POM</span>
+              <span class="mat-sub">1.41 g/cm³ · 2.8 GPa</span>
+            </div>
+            <span class="mat-drag-hint">⠿ drag</span>
+          </div>
+          <div class="mat-swatch" draggable="true" data-name="Structural Concrete C30" data-density="2.40" data-yield="30" data-youngs="30" data-color="#6b7280" title="Drag to apply: Concrete C30 (E=30 GPa, Compressive=30 MPa, Density=2.40 g/cm³)">
+            <span class="mat-chip" style="background: linear-gradient(135deg, #9ca3af, #4b5563);"></span>
+            <div class="mat-info">
+              <span class="mat-name">Concrete C30</span>
+              <span class="mat-sub">2.40 g/cm³ · 30 MPa</span>
+            </div>
+            <span class="mat-drag-hint">⠿ drag</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Autonomous AI Engineering Copilot Dock (Natural Language to CAD/CAE) -->
+      <div class="ai-copilot-dock" id="aiCopilotDock" hidden aria-label="AI Engineering Copilot">
+        <div class="ai-copilot-head">
+          <div class="ai-copilot-title">
+            <span class="ai-sparkle-icon">✨</span>
+            <div class="ai-title-wrap">
+              <strong>AtlasCAD Autonomous AI Copilot</strong>
+              <span class="ai-tagline">Natural Language to Parametric 3D CAD &amp; Multiphysics</span>
+            </div>
+          </div>
+          <button type="button" class="icon-button small" id="closeAiCopilotBtn" title="Close AI Copilot">&times;</button>
+        </div>
+        
+        <div class="ai-copilot-prompts-bar">
+          <span class="ai-prompts-label">Quick Actions:</span>
+          <div class="ai-pills-scroll">
+            <button type="button" class="ai-prompt-pill" data-prompt="holes">🔩 Add 4x M6 Hole Pattern</button>
+            <button type="button" class="ai-prompt-pill" data-prompt="fillet">╭ Fillet Top Edges (3mm)</button>
+            <button type="button" class="ai-prompt-pill" data-prompt="fea">⚡ Linear Static FEA (5 kN)</button>
+            <button type="button" class="ai-prompt-pill" data-prompt="sheet">📐 1-Click 2D Drawing Sheet</button>
+            <button type="button" class="ai-prompt-pill" data-prompt="mass">⚖ Inspect Mass &amp; Inertia</button>
+            <button type="button" class="ai-prompt-pill" data-prompt="step">📤 Download STEP AP214</button>
+          </div>
+        </div>
+
+        <div class="ai-copilot-body" id="aiCopilotLog">
+          <div class="ai-message assistant">
+            <span class="ai-avatar">🤖</span>
+            <div class="ai-msg-bubble">
+              <strong>AI Engineering Agent online.</strong><br>
+              I can execute parametric 3D features, run finite element simulations, assign certified materials, or generate 2D orthographic shop floor drawings. Click a quick action above or describe your design requirement.
+            </div>
+          </div>
+        </div>
+
+        <form class="ai-copilot-input-form" id="aiCopilotForm">
+          <input type="text" id="aiCopilotInput" class="ai-copilot-input" placeholder="e.g. 'Extrude by 35mm with Aluminum 6061-T6' or 'Run modal vibration'…" autocomplete="off" />
+          <button type="submit" class="ai-send-btn" id="aiCopilotSendBtn" title="Execute AI Engineering Action">
+            <span>Execute</span> ↵
+          </button>
+        </form>
+      </div>
+
+      <!-- Direct-Manipulation 3D Entity Inspection HUD -->
+      <div class="direct-inspection-hud" id="directInspectionHud" hidden aria-label="3D Entity Inspection">
+        <div class="inspection-head">
+          <div class="inspection-title-wrap">
+            <span class="inspection-icon">✦</span>
+            <span class="inspection-title" id="inspEntityName">Solid Body #1</span>
+          </div>
+          <button type="button" class="icon-button small" id="closeInspectionBtn" title="Close HUD">&times;</button>
+        </div>
+        <div class="inspection-body">
+          <div class="inspection-metric-grid">
+            <div class="insp-metric">
+              <span class="insp-label">Dimensions (X×Y×Z)</span>
+              <span class="insp-val" id="inspDims">100.0 × 60.0 × 20.0 mm</span>
+            </div>
+            <div class="insp-metric">
+              <span class="insp-label">Volume</span>
+              <span class="insp-val" id="inspVolume">120,000 mm³</span>
+            </div>
+            <div class="insp-metric">
+              <span class="insp-label">Mass (6061-T6)</span>
+              <span class="insp-val" id="inspMass">324.0 g</span>
+            </div>
+            <div class="insp-metric">
+              <span class="insp-label">Surface Area</span>
+              <span class="insp-val" id="inspArea">18,400 mm²</span>
+            </div>
+          </div>
+          <div class="insp-actions-row">
+            <button type="button" class="insp-btn primary" id="inspQuickFeaBtn">⚡ Quick FEA</button>
+            <button type="button" class="insp-btn" id="inspFilletBtn">╭ Fillet</button>
+            <button type="button" class="insp-btn" id="inspExportStepBtn">📤 STEP</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- OSNAP Snapping Modes Quick Popup -->
+      <div class="osnap-quick-popup" id="osnapQuickPopup" hidden aria-label="OSNAP Settings">
+        <div class="osnap-popup-head">
+          <span>🧲 Object Snap Modes (F3)</span>
+          <button type="button" class="icon-button small" id="closeOsnapPopupBtn" title="Close">&times;</button>
+        </div>
+        <div class="osnap-modes-list">
+          <label class="osnap-item"><input type="checkbox" id="osnapEnd" checked /> <span>Endpoint (END)</span></label>
+          <label class="osnap-item"><input type="checkbox" id="osnapMid" checked /> <span>Midpoint (MID)</span></label>
+          <label class="osnap-item"><input type="checkbox" id="osnapCen" checked /> <span>Center (CEN)</span></label>
+          <label class="osnap-item"><input type="checkbox" id="osnapInt" checked /> <span>Intersection (INT)</span></label>
+          <label class="osnap-item"><input type="checkbox" id="osnapPerp" checked /> <span>Perpendicular (PERP)</span></label>
+          <label class="osnap-item"><input type="checkbox" id="osnapTan" /> <span>Tangent (TAN)</span></label>
+          <label class="osnap-item"><input type="checkbox" id="osnapQuad" /> <span>Quadrant (QUAD)</span></label>
+        </div>
+      </div>
+
+      <!-- Camera Presets Quick Bar -->
+      <div class="camera-preset-bar" id="cameraPresetBar" aria-label="Camera Presets">
+        <button type="button" class="cam-preset-btn" data-preset="iso" title="Isometric View (Home)">ISO</button>
+        <button type="button" class="cam-preset-btn" data-preset="top" title="Top View (XY)">TOP</button>
+        <button type="button" class="cam-preset-btn" data-preset="front" title="Front View (XZ)">FRONT</button>
+        <button type="button" class="cam-preset-btn" data-preset="right" title="Right View (YZ)">RIGHT</button>
+      </div>
+
+      <!-- 3D On-Canvas Transform Gizmo HUD -->
+      <div class="transform-gizmo-hud" id="transformGizmoHud" hidden aria-label="3D Transform Gizmo">
+        <div class="gizmo-head">
+          <span class="gizmo-title"><span>✦</span> Transform Manipulator</span>
+          <button type="button" class="icon-button small" id="gizmoCloseBtn" title="Close Gizmo">&times;</button>
+        </div>
+        <div class="gizmo-scrub-row">
+          <span class="gizmo-axis-badge axis-ext">D</span>
+          <span>Extrude Depth:</span>
+          <span class="gizmo-scrubber" id="gizmoScrubExt" data-param="depth" title="Drag horizontally to scrub extrude depth">20.00 mm</span>
+        </div>
+        <div class="gizmo-scrub-row">
+          <span class="gizmo-axis-badge axis-x">X</span>
+          <span>Offset X:</span>
+          <span class="gizmo-scrubber" id="gizmoScrubX" data-param="x" title="Drag horizontally to scrub X position">0.00 mm</span>
+        </div>
+        <div class="gizmo-scrub-row">
+          <span class="gizmo-axis-badge axis-y">Y</span>
+          <span>Offset Y:</span>
+          <span class="gizmo-scrubber" id="gizmoScrubY" data-param="y" title="Drag horizontally to scrub Y position">0.00 mm</span>
+        </div>
+      </div>
+
       <canvas id="viewport" tabindex="0" aria-label="3D viewport. Drag to orbit, right-drag or Shift-drag to pan, scroll to zoom, click a face to inspect it. While drawing a polyline, click to place points on the z = 0 plane."></canvas>
       
       <!-- Interactive CAD Viewport Drop Overlay -->
@@ -798,7 +1206,18 @@
         <button type="button" class="navbar-btn" id="navCleanScreenBtn" title="AutoCAD Clean Screen Focus Mode (Ctrl+0 / F11)">
           <span class="nav-icon">⤢</span>
         </button>
+        <button type="button" class="navbar-btn" id="navQuadViewBtn" title="Toggle Multi-Viewport Quad View (4-Up Split: Top, Front, Right, Perspective)">
+          <span class="nav-icon">⊞</span>
+        </button>
       </nav>
+
+      <!-- Quad View Labels Overlay -->
+      <div class="quad-view-labels-overlay" id="quadViewLabelsOverlay" hidden>
+        <div class="quad-label-cell"><span class="quad-label-tag">TOP (XY)</span></div>
+        <div class="quad-label-cell"><span class="quad-label-tag">PERSPECTIVE (ISO)</span></div>
+        <div class="quad-label-cell"><span class="quad-label-tag">FRONT (XZ)</span></div>
+        <div class="quad-label-cell"><span class="quad-label-tag">RIGHT (YZ)</span></div>
+      </div>
 
       <!-- AutoCAD Clean Screen Banner (Focus Mode) -->
       <div class="clean-screen-banner" id="cleanScreenBanner" hidden>
@@ -1018,10 +1437,53 @@
       <div id="feature-timeline" class="feature-timeline" aria-label="Feature history timeline" role="toolbar">
         <span class="timeline-label">TIMELINE</span>
         <div class="timeline-nav-group">
+          <button type="button" class="timeline-nav-btn" id="timelineJumpStart" title="Jump to Beginning (Home)">⏮</button>
           <button type="button" class="timeline-nav-btn" id="timelineStepUndo" title="Step Back / Undo (Ctrl+Z)">◀</button>
           <button type="button" class="timeline-nav-btn" id="timelineStepRedo" title="Step Forward / Redo (Ctrl+Y)">▶</button>
+          <button type="button" class="timeline-nav-btn" id="timelineJumpEnd" title="Jump to End (End)">⏭</button>
         </div>
         <div id="feature-timeline-pills" class="feature-timeline-pills"></div>
+      </div>
+
+      <!-- Autodesk-Style Radial Marking Menu Wheel -->
+      <div id="radialMarkingMenu" class="radial-marking-menu" hidden aria-label="Marking Menu Wheel">
+        <div class="radial-wheel">
+          <button type="button" class="radial-slice slice-n" data-action="extrude" title="Extrude 3D Solid (EXT)">
+            <span class="slice-icon">⬡</span>
+            <span class="slice-label">Extrude</span>
+          </button>
+          <button type="button" class="radial-slice slice-ne" data-action="fea" title="Quick Stress FEA">
+            <span class="slice-icon">⚡</span>
+            <span class="slice-label">FEA</span>
+          </button>
+          <button type="button" class="radial-slice slice-e" data-action="fillet" title="3D Fillet Edge (F)">
+            <span class="slice-icon">╭</span>
+            <span class="slice-label">Fillet</span>
+          </button>
+          <button type="button" class="radial-slice slice-se" data-action="measure" title="3D Measure (M)">
+            <span class="slice-icon">📏</span>
+            <span class="slice-label">Measure</span>
+          </button>
+          <button type="button" class="radial-slice slice-s" data-action="sheet" title="1-Click 2D Drawing Sheet">
+            <span class="slice-icon">📐</span>
+            <span class="slice-label">2D Sheet</span>
+          </button>
+          <button type="button" class="radial-slice slice-sw" data-action="cut" title="Cut / Subtract (SU)">
+            <span class="slice-icon">⊖</span>
+            <span class="slice-label">Cut</span>
+          </button>
+          <button type="button" class="radial-slice slice-w" data-action="line" title="Draw Line (L)">
+            <span class="slice-icon">╱</span>
+            <span class="slice-label">Line</span>
+          </button>
+          <button type="button" class="radial-slice slice-nw" data-action="circle" title="Draw Circle (C)">
+            <span class="slice-icon">◯</span>
+            <span class="slice-label">Circle</span>
+          </button>
+          <button type="button" class="radial-center-btn" id="radialCenterCancelBtn" title="Cancel (Esc)">
+            ✕
+          </button>
+        </div>
       </div>
 
       <!-- Right-Click Context Menu -->
@@ -1032,6 +1494,17 @@
           <li role="menuitem" class="ctx-menu-item" id="ctxCreateFeature">⬆ Create feature here</li>
           <li role="menuitem" class="ctx-menu-item" id="ctxMeasureFace">📏 Measure face</li>
           <li role="menuitem" class="ctx-menu-item" id="ctxIsolateFace">👁 Isolate face</li>
+          <li role="separator" class="ctx-menu-sep"></li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxExtrudeJoin">➕ Extrude Join (EXT)</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxExtrudeCut">✂ Cut / Subtract (CUT)</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxRevolve">🔄 Revolve Solid (REV)</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxFillet3D">⌒ 3D Fillet (FILLET)</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxChamfer3D">⊿ 3D Chamfer (CHAMFER)</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxAssignMaterial">🧪 Assign Material...</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxQuickFEA">⚡ Run Quick Stress FEA</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxExportStep">📦 Export STEP (ISO 10303)</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxExport3mf">🖨 Export 3MF Additive</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxQuadView">⊞ Toggle Quad View (Alt+Q)</li>
           <li role="separator" class="ctx-menu-sep"></li>
           <li role="menuitem" class="ctx-menu-item" id="ctxZoomExtents">🔍 Zoom extents (F)</li>
           <li role="menuitem" class="ctx-menu-item" id="ctxNewSketch">📐 New sketch here</li>
@@ -2979,6 +3452,515 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
     </aside>
   </main>
 
+  <!-- =======================================================================
+       Global Studio Views (Home, Projects, Assets, Jobs, Settings)
+       ======================================================================= -->
+
+  <!-- Home / Welcome Studio View -->
+  <div id="homeStudioView" class="studio-view" hidden>
+    <div class="studio-view-header">
+      <div class="studio-view-title">
+        <h2>Welcome to AtlasCAD</h2>
+        <p>Unified Engineering &amp; Creative Workstation — Parametric CAD, Multiphysics Solvers, Autonomous AI Agents &amp; Digital Twins.</p>
+      </div>
+      <div class="studio-view-actions">
+        <button type="button" class="button primary" id="homeNewProjectBtn">+ New Project</button>
+        <button type="button" class="button ghost" id="homeOpenCmdBtn">Command Palette (Ctrl+K)</button>
+      </div>
+    </div>
+
+    <div class="studio-grid-3">
+      <!-- Active Project Card -->
+      <div class="studio-card">
+        <div class="studio-card-header">
+          <span class="studio-card-title"><span>📁</span> Active Project</span>
+          <span class="save-status-indicator" id="homeProjectSaveBadge"><span class="save-dot"></span> <span id="homeProjectSaveText">Saved</span></span>
+        </div>
+        <div>
+          <h3 id="homeProjectName" style="margin:0 0 6px 0; font-size:16px;">Loading Project…</h3>
+          <p style="margin:0; font-size:12px; color:var(--atlas-text-muted);">Revision: <strong id="homeProjectRev">0</strong> &bull; Entities: <strong id="homeProjectEntities">0</strong> &bull; Status: <span class="honest-state-badge native">Authoritative CAD</span></p>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:auto;">
+          <button type="button" class="table-action-btn" id="homeResumeBtn">Open in Mechanical</button>
+          <button type="button" class="table-action-btn" id="homeSimBtn">Run Simulation</button>
+          <button type="button" class="table-action-btn" id="homeDrawingBtn">2D Drafting Sheet</button>
+        </div>
+      </div>
+
+      <!-- HPC Solvers & Jobs Summary -->
+      <div class="studio-card">
+        <div class="studio-card-header">
+          <span class="studio-card-title"><span>⚡</span> High-Performance Compute</span>
+          <span class="honest-state-badge native">140+ Solvers Ready</span>
+        </div>
+        <div style="font-size:12.5px; line-height:1.6; color:var(--atlas-text-muted);">
+          <div>&bull; Active Background Jobs: <strong id="homeActiveJobsCount" style="color:var(--atlas-text);">0 Running</strong></div>
+          <div>&bull; Completed Studies: <strong id="homeCompletedJobsCount" style="color:var(--atlas-text);">43 Verified</strong></div>
+          <div>&bull; Engine Backends: <strong style="color:var(--atlas-accent-secondary);">In-Process Native Rust</strong></div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:auto;">
+          <button type="button" class="table-action-btn" id="homeOpenJobsBtn">Open Jobs Center</button>
+          <button type="button" class="table-action-btn" id="homeOpenSolversBtn">Inspect Solvers</button>
+        </div>
+      </div>
+
+      <!-- System Governance & Integrity -->
+      <div class="studio-card">
+        <div class="studio-card-header">
+          <span class="studio-card-title"><span>🛡</span> Provenance &amp; Integrity</span>
+          <span class="honest-state-badge native">Cryptographic SHA-256</span>
+        </div>
+        <div style="font-size:12.5px; line-height:1.6; color:var(--atlas-text-muted);">
+          <div>&bull; Audit Chain: <strong style="color:var(--atlas-success);">Tamper-Evident Merkle Log</strong></div>
+          <div>&bull; Standards Compliance: <strong style="color:var(--atlas-text);">ISO 10303 / ASME Y14.5</strong></div>
+          <div>&bull; Memory Footprint: <strong style="color:var(--atlas-text);">&lt; 50 MiB Active</strong></div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:auto;">
+          <button type="button" class="table-action-btn" id="homeOpenAuditBtn">View Audit Trail</button>
+          <button type="button" class="table-action-btn" id="homeOpenCertBtn">Compliance Report</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick-Start Engineering Templates -->
+    <div>
+      <h3 style="margin:0 0 14px 0; font-size:16px; color:var(--atlas-text);">Quick-Start Engineering Templates</h3>
+      <div class="template-card-grid">
+        <div class="template-card" data-template="hypersonic">
+          <div class="template-icon">🚀</div>
+          <div class="template-name">Hypersonic Wave-Rider Airframe</div>
+          <div class="template-desc">Mach 5–10 waverider aerodynamics, TPS aerothermal ablation, and scramjet inlet shock wave interaction.</div>
+          <div class="template-tag">Aerospace &bull; Multiphysics</div>
+        </div>
+        <div class="template-card" data-template="ev-powertrain">
+          <div class="template-icon">⚡</div>
+          <div class="template-name">EV Dual-Motor AWD Powertrain</div>
+          <div class="template-desc">ISO 8855 vehicle dynamics, Pacejka magic formula tire slip, and active yaw moment torque vectoring.</div>
+          <div class="template-tag">Automotive &bull; Dynamics</div>
+        </div>
+        <div class="template-card" data-template="subsea-riser">
+          <div class="template-icon">🌊</div>
+          <div class="template-name">Ultra-Deepwater Subsea Riser</div>
+          <div class="template-desc">DNV-RP-F204 vortex-induced vibration (VIV), helical strakes suppression, and multi-year fatigue damage.</div>
+          <div class="template-tag">Marine &bull; Structural</div>
+        </div>
+        <div class="template-card" data-template="openbim-frame">
+          <div class="template-icon">🏛</div>
+          <div class="template-name">OpenBIM Multi-Story Frame</div>
+          <div class="template-desc">IFC4 architectural columns, slabs, structural steel joints, and seismic base isolation analysis.</div>
+          <div class="template-tag">Architecture &bull; BIM</div>
+        </div>
+        <div class="template-card" data-template="biopharma-chrom">
+          <div class="template-icon">🧪</div>
+          <div class="template-name">Biopharma Chromatography Column</div>
+          <div class="template-desc">FDA cGMP / ASME BPE axial dispersion, Langmuir isotherm adsorption, and resin bed yield kinetics.</div>
+          <div class="template-tag">Science &bull; Chemical</div>
+        </div>
+        <div class="template-card" data-template="robotics-6dof">
+          <div class="template-icon">🤖</div>
+          <div class="template-name">6-DOF Robotic Manipulator Cell</div>
+          <div class="template-desc">Denavit-Hartenberg kinematics, singularity avoidance, obstacle collision detection, and ROS bridge.</div>
+          <div class="template-tag">Robotics &bull; Kinematics</div>
+        </div>
+        <div class="template-card" data-template="unity-realtime">
+          <div class="template-icon">🎮</div>
+          <div class="template-name">Unity Interactive Digital Twin</div>
+          <div class="template-desc">Exportable Unity package with C# client, telemetry streaming, flight dynamics HUD, and glTF 2.0 asset.</div>
+          <div class="template-tag">RealTime &bull; XR</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- System Capability & Technical Honesty Note -->
+    <div class="honest-state-box">
+      <strong>Engine Architecture &amp; Technical Honesty:</strong>
+      All 140+ mathematical, finite-element, aerothermal, and fluid solvers run locally in-process via optimized Rust crates without external latency. External enterprise engines (ROS 2, OpenXR, DaVinci Resolve Studio, Unity 3D) are supported via verified standard package exports and WebSocket bridge adapters.
+    </div>
+  </div>
+
+  <!-- Projects List Studio View -->
+  <div id="projectsStudioView" class="studio-view" hidden>
+    <div class="studio-view-header">
+      <div class="studio-view-title">
+        <h2>Projects &amp; Document Management</h2>
+        <p>Inspect revisions, manage parametric assemblies, and organize engineering designs.</p>
+      </div>
+      <div class="studio-view-actions">
+        <button type="button" class="button primary" id="projectsNewBtn">+ New Project</button>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <input type="text" id="projectsSearchInput" class="filter-input" placeholder="Search projects by name, tag or revision…" />
+      <select id="projectsDisciplineFilter" class="filter-select">
+        <option value="all">All Disciplines</option>
+        <option value="mechanical">Mechanical &amp; Drafting</option>
+        <option value="simulation">Simulation &amp; Multiphysics</option>
+        <option value="architecture">Architecture &amp; BIM</option>
+        <option value="electronics">Electronics &amp; ECAD</option>
+        <option value="chemical">Science &amp; Process</option>
+        <option value="robotics">Robotics</option>
+        <option value="creative">Creative &amp; RealTime</option>
+      </select>
+      <select id="projectsSortSelect" class="filter-select">
+        <option value="recent">Recently Modified</option>
+        <option value="name">Project Name (A-Z)</option>
+        <option value="revision">Highest Revision</option>
+      </select>
+    </div>
+
+    <div class="studio-table-wrap" id="assetsTableWrap" hidden>
+      <table class="studio-table">
+        <thead>
+          <tr>
+            <th>Project Name</th>
+            <th>Discipline</th>
+            <th>Revision</th>
+            <th>Entities</th>
+            <th>Status</th>
+            <th>Last Saved</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="projectsTableBody">
+          <!-- Dynamically populated from active project and state -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Assets Catalog Studio View -->
+  <div id="assetsStudioView" class="studio-view" hidden>
+    <div class="studio-view-header">
+      <div class="studio-view-title">
+        <h2>Assets &amp; Standard Hardware Catalog</h2>
+        <p>Parametric ISO/DIN fasteners, power transmission gears, springs, and certified engineering materials.</p>
+      </div>
+      <div class="studio-view-actions">
+        <div class="view-mode-toggle" id="assetsViewModeToggle" role="radiogroup" aria-label="View Mode">
+          <button type="button" class="view-mode-btn active" id="assetsGridModeBtn" data-mode="grid" title="Visual Cards View">▦ Grid</button>
+          <button type="button" class="view-mode-btn" id="assetsTableModeBtn" data-mode="table" title="Detailed Table View">☵ Table</button>
+        </div>
+        <button type="button" class="button ghost" id="assetsRefreshBtn">Refresh Catalog</button>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <input type="text" id="assetsSearchInput" class="filter-input" placeholder="Search standard fasteners, gears, keys, materials…" />
+      <select id="assetsCategorySelect" class="filter-select">
+        <option value="all">All Categories</option>
+        <option value="fastener">ISO/DIN Fasteners (Bolts, Screws, Nuts)</option>
+        <option value="gear">Power Transmission (Spur &amp; Helical Gears)</option>
+        <option value="bearing">Bearings &amp; Bushings</option>
+        <option value="motor">Motors &amp; Actuators</option>
+        <option value="structural">Structural Aluminum Extrusions</option>
+        <option value="material">Engineering Materials Database</option>
+      </select>
+    </div>
+
+    <div class="category-pills-bar" id="assetsCategoryPills">
+      <button type="button" class="cat-pill active" data-cat="all">All Assets</button>
+      <button type="button" class="cat-pill" data-cat="fastener">🔩 Fasteners</button>
+      <button type="button" class="cat-pill" data-cat="gear">⚙ Transmission</button>
+      <button type="button" class="cat-pill" data-cat="bearing">🔘 Bearings</button>
+      <button type="button" class="cat-pill" data-cat="motor">⚡ Motors</button>
+      <button type="button" class="cat-pill" data-cat="structural">🏗 Frames</button>
+      <button type="button" class="cat-pill" data-cat="material">📦 Materials</button>
+    </div>
+
+    <!-- Visual Asset Cards Grid -->
+    <div class="assets-cards-grid" id="assetsGridWrap">
+      <!-- Dynamically populated cards with drag handles -->
+    </div>
+
+    <div class="studio-table-wrap">
+      <table class="studio-table">
+        <thead>
+          <tr>
+            <th>Component Name</th>
+            <th>Standard</th>
+            <th>Specification</th>
+            <th>Material</th>
+            <th>Rated Load / Yield</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="assetsTableBody">
+          <!-- Dynamically populated from /api/cad/hardware/* -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- HPC Jobs & Results Studio View -->
+  <div id="jobsStudioView" class="studio-view" hidden>
+    <div class="studio-view-header">
+      <div class="studio-view-title">
+        <h2>HPC Job Queue &amp; Simulation Results</h2>
+        <p>Monitor multi-threaded finite element solvers, aerothermal computations, and rendering pipelines.</p>
+      </div>
+      <div class="studio-view-actions">
+        <button type="button" class="button ghost" id="jobsRefreshBtn">Refresh Queue</button>
+      </div>
+    </div>
+
+    <div class="studio-table-wrap">
+      <table class="studio-table">
+        <thead>
+          <tr>
+            <th>Job ID</th>
+            <th>Discipline / Study</th>
+            <th>Solver Engine</th>
+            <th>Status</th>
+            <th>Execution Time</th>
+            <th>Submitted</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="jobsTableBody">
+          <!-- Dynamically populated from /api/jobs -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Settings Studio View -->
+  <div id="settingsStudioView" class="studio-view" hidden>
+    <div class="studio-view-header">
+      <div class="studio-view-title">
+        <h2>System Settings &amp; Engine Preferences</h2>
+        <p>Configure theme, display density, units of measurement, and external solver bridge daemons.</p>
+      </div>
+      <div class="studio-view-actions">
+        <button type="button" class="button primary" id="settingsSaveBtn">Apply Preferences</button>
+      </div>
+    </div>
+
+    <div class="studio-grid-2">
+      <div class="studio-card">
+        <h3 style="margin:0 0 10px 0; font-size:14px; color:var(--atlas-text);">Display &amp; Ergonomics</h3>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <label style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Theme Mode</span>
+            <select id="settingsThemeSelect" class="filter-select">
+              <option value="dark">Engineering Dark (Recommended)</option>
+              <option value="light">Documentation Light</option>
+            </select>
+          </label>
+          <label style="display:flex; justify-content:space-between; align-items:center;">
+            <span>UI Density</span>
+            <select id="settingsDensitySelect" class="filter-select">
+              <option value="compact">Compact (Dense Engineering Tables)</option>
+              <option value="regular" selected>Regular (Default)</option>
+              <option value="comfortable">Comfortable (High-DPI)</option>
+            </select>
+          </label>
+          <label style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Default Measurement Unit</span>
+            <select id="settingsUnitsSelect" class="filter-select">
+              <option value="millimeter" selected>Millimeter (mm) [ISO Metric]</option>
+              <option value="centimeter">Centimeter (cm)</option>
+              <option value="meter">Meter (m)</option>
+              <option value="inch">Inch (in) [US Customary]</option>
+              <option value="foot">Foot (ft)</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="studio-card">
+        <h3 style="margin:0 0 10px 0; font-size:14px; color:var(--atlas-text);">Compute &amp; External Integrations</h3>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="honest-state-box">
+            <strong>Native Compute Solvers:</strong> All 140+ multidisciplinary physics models run in-process on CPU multi-threading.
+          </div>
+          <div>
+            <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+              <span>ROS 2 Robotics Bridge</span>
+              <span class="honest-state-badge unconfigured">Unconfigured (Daemon offline)</span>
+            </div>
+            <div style="font-size:11px; color:var(--atlas-text-dim);">To connect a live hardware cell: <code>ros2 launch atlas_bridge bridge.launch.py</code></div>
+          </div>
+          <div>
+            <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+              <span>DaVinci Resolve NLE Bridge</span>
+              <span class="honest-state-badge unconfigured">Manual Export Mode</span>
+            </div>
+            <div style="font-size:11px; color:var(--atlas-text-dim);">Direct FCPXML &amp; CMX 3600 EDL downloads active via Topbar export.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Workflows Studio View -->
+  <div id="workflowsStudioView" class="studio-view" hidden>
+    <div class="studio-view-header">
+      <div class="studio-view-title">
+        <h2>Autonomous Engineering Workflows &amp; DAG Pipelines</h2>
+        <p>Orchestrate multi-agent parametric sweeps, mesh generation, simulation loops, and report signoffs.</p>
+      </div>
+      <div class="studio-view-actions">
+        <button type="button" class="button primary" id="wfRunPipelineBtn">Run Active Workflow</button>
+      </div>
+    </div>
+
+    <div>
+      <h3 style="margin:0 0 10px 0; font-size:14px; color:var(--atlas-text);">Active DAG Pipeline: Aerothermal Optimization Loop</h3>
+      <div class="dag-pipeline-wrap">
+        <div class="dag-node completed">
+          <span class="dag-node-title">1. Geometry Ingest</span>
+          <span class="dag-node-desc">Parametric STEP Body</span>
+          <span class="honest-state-badge native">Verified</span>
+        </div>
+        <span class="dag-arrow">➔</span>
+        <div class="dag-node active" id="dagNodeMesh">
+          <span class="dag-node-title">2. Mesh Generation</span>
+          <span class="dag-node-desc">Tet10 Adaptive Mesh</span>
+          <span class="honest-state-badge unconfigured" id="dagNodeMeshStatus">Active</span>
+        </div>
+        <span class="dag-arrow">➔</span>
+        <div class="dag-node" id="dagNodeSolver">
+          <span class="dag-node-title">3. Multiphysics</span>
+          <span class="dag-node-desc">SU2 &bull; Aerothermal</span>
+          <span class="honest-state-badge" style="background:var(--atlas-surface-3); color:var(--atlas-text-dim);">Queued</span>
+        </div>
+        <span class="dag-arrow">➔</span>
+        <div class="dag-node" id="dagNodeOpt">
+          <span class="dag-node-title">4. AI Optimization</span>
+          <span class="dag-node-desc">Gradient Descent Loop</span>
+          <span class="honest-state-badge" style="background:var(--atlas-surface-3); color:var(--atlas-text-dim);">Pending</span>
+        </div>
+        <span class="dag-arrow">➔</span>
+        <div class="dag-node" id="dagNodeCert">
+          <span class="dag-node-title">5. Cryptographic Signoff</span>
+          <span class="dag-node-desc">SHA-256 Merkle Block</span>
+          <span class="honest-state-badge" style="background:var(--atlas-surface-3); color:var(--atlas-text-dim);">Pending</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="studio-grid-2">
+      <div class="studio-card">
+        <h3 style="margin:0 0 10px 0; font-size:14px; color:var(--atlas-text);">Pipeline Configurations</h3>
+        <div style="display:flex; flex-direction:column; gap:10px; font-size:12.5px;">
+          <label style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Workflow Preset</span>
+            <select id="wfPresetSelect" class="filter-select">
+              <option value="aero">Aerothermal Optimization (Mach 6.5 Waverider)</option>
+              <option value="topo">Topology Optimization (35% Volume Reduction)</option>
+              <option value="cam">Design-to-CAM 5-Axis Milling Generation</option>
+              <option value="seismic">OpenBIM Dynamic Seismic Spectrum Loop</option>
+            </select>
+          </label>
+          <label style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Max Autonomous Iterations</span>
+            <input type="number" class="filter-input" style="width:100px; min-width:unset;" value="10" min="1" max="100" />
+          </label>
+          <label style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Convergence Criterion (&Delta;&sigma; / &sigma;)</span>
+            <input type="number" class="filter-input" style="width:100px; min-width:unset;" value="0.001" step="0.0001" />
+          </label>
+        </div>
+      </div>
+
+      <div class="studio-card">
+        <h3 style="margin:0 0 10px 0; font-size:14px; color:var(--atlas-text);">Workflow Execution Telemetry</h3>
+        <div class="dev-console-box" id="wfTelemetryBox">[READY] Workflow agent engine idling. Press 'Run Active Workflow' to dispatch.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collaboration & Reviews Studio View -->
+  <div id="collabStudioView" class="studio-view" hidden>
+    <div class="studio-view-header">
+      <div class="studio-view-title">
+        <h2>Engineering Collaboration &amp; Review Inbox</h2>
+        <p>Review engineering changes, sign off on simulations, and inspect tamper-evident audit logs.</p>
+      </div>
+      <div class="studio-view-actions">
+        <button type="button" class="button primary" id="collabNewEcoBtn">Submit New ECO</button>
+      </div>
+    </div>
+
+    <div class="studio-table-wrap">
+      <table class="studio-table">
+        <thead>
+          <tr>
+            <th>Review ID</th>
+            <th>Title &amp; Justification</th>
+            <th>Author</th>
+            <th>Revision</th>
+            <th>Discipline</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="collabTableBody">
+          <tr>
+            <td><code>REV-041</code></td>
+            <td><strong>Leading edge radius increase (3.5mm -> 5.0mm)</strong></td>
+            <td>aerothermal_lead@atlascad.com</td>
+            <td>Rev 14</td>
+            <td>Aerospace</td>
+            <td><span class="honest-state-badge unconfigured">Pending Signoff</span></td>
+            <td><button type="button" class="table-action-btn" id="collabSignBtn">Sign &amp; Approve</button></td>
+          </tr>
+          <tr>
+            <td><code>REV-039</code></td>
+            <td><strong>Inconel 718 thermal barrier coating assignment</strong></td>
+            <td>materials_specialist@atlascad.com</td>
+            <td>Rev 12</td>
+            <td>Materials</td>
+            <td><span class="honest-state-badge native">Approved</span></td>
+            <td><span style="font-size:11px; color:var(--atlas-text-dim);">Signed by Chief Architect</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Developer Portal & Scripting Studio View -->
+  <div id="devStudioView" class="studio-view" hidden>
+    <div class="studio-view-header">
+      <div class="studio-view-title">
+        <h2>Developer Portal &amp; Universal Command Runner</h2>
+        <p>Direct JSON-RPC command execution, Model Context Protocol (MCP) tool testing, and API diagnostics.</p>
+      </div>
+      <div class="studio-view-actions">
+        <button type="button" class="button primary" id="devRunCommandBtn">Execute Command</button>
+      </div>
+    </div>
+
+    <div class="studio-grid-2">
+      <div class="studio-card">
+        <h3 style="margin:0 0 10px 0; font-size:14px; color:var(--atlas-text);">Universal Command Dispatcher</h3>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <label style="display:flex; flex-direction:column; gap:4px;">
+            <span style="font-size:12px; color:var(--atlas-text-muted);">Select Command</span>
+            <select id="devCommandSelect" class="filter-select">
+              <option value="sim.aerodynamics">sim.aerodynamics (Wing Aerodynamics)</option>
+              <option value="sim.chemical.acid_base">sim.chemical.acid_base (Titration Dynamics)</option>
+              <option value="sim.transport.maglev_suspension">sim.transport.maglev_suspension (Transrapid Airgap)</option>
+              <option value="sim.automotive.ev_torque_vectoring">sim.automotive.ev_torque_vectoring (Pacejka Yaw Control)</option>
+              <option value="sim.marine.subsea_riser_viv">sim.marine.subsea_riser_viv (DNV-RP-F204 Helical Strakes)</option>
+              <option value="sim.chemical.chromatography_column">sim.chemical.chromatography_column (FDA cGMP Purification)</option>
+            </select>
+          </label>
+          <label style="display:flex; flex-direction:column; gap:4px;">
+            <span style="font-size:12px; color:var(--atlas-text-muted);">Arguments (JSON Schema)</span>
+            <textarea id="devCommandArgs" class="dev-command-input" rows="6">{}</textarea>
+          </label>
+        </div>
+      </div>
+
+      <div class="studio-card">
+        <h3 style="margin:0 0 10px 0; font-size:14px; color:var(--atlas-text);">Response Payload (JSON)</h3>
+        <div class="dev-console-box" id="devResponseBox">// Command output will appear here with execution timing…</div>
+      </div>
+    </div>
+  </div>
+
   <div id="commandLineBar" class="command-line-bar" role="region" aria-label="AutoCAD Command Prompt">
     <div class="command-history-log" id="commandHistoryLog">
       <div class="history-line" id="commandHistoryLine1">AutoCAD Command Line active. Type command (e.g. L, C, REC, EXT, CUT, JOIN, REV, DIM, MASSPROP, BOM) or coordinates.</div>
@@ -3004,8 +3986,9 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
     <button type="button" id="statusDeployIndicator" class="status-badge active" title="System Deployment & Runtime Health: 27 Engines Online">DEPLOY: HEALTHY</button>
     <span id="statusPick" class="status-item">—</span>
     <span id="statusGeometry" class="status-item">—</span>
-    <span id="statusUnits" class="status-item">mm</span>
+    <button type="button" id="statusUnits" class="status-badge" title="Click to cycle units (mm ↔ in ↔ cm ↔ m)">UNIT: mm</button>
   </footer>
+  </div> <!-- end appWorkspaceContainer -->
 
   <div id="palette" class="palette" hidden>
     <div class="palette-backdrop" data-close="palette"></div>
@@ -3466,6 +4449,225 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
 
     </div>
   </div>
+
+    <!-- New Project Wizard Modal -->
+  <div id="newProjectModal" class="palette new-project-modal" hidden role="dialog" aria-modal="true" aria-labelledby="newProjectTitle">
+    <div class="palette-backdrop" id="newProjectBackdrop"></div>
+    <div class="palette-card" style="max-width:480px;">
+      <div class="palette-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 id="newProjectTitle" style="margin:0; font-size:15px;">Create New Engineering Project</h3>
+        <button type="button" class="icon-button" id="newProjectCloseBtn" aria-label="Close dialog">&times;</button>
+      </div>
+      <div class="modal-body" style="display:flex; flex-direction:column; gap:14px;">
+        <div>
+          <span style="font-size:12px; color:var(--atlas-text-muted); display:block; margin-bottom:6px;">Quick-Start Parametric Template:</span>
+          <div class="quick-template-grid" id="quickTemplateCards">
+            <button type="button" class="quick-tpl-btn active" data-tpl="bracket">
+              <span class="tpl-icon">🔩</span>
+              <span class="tpl-title">Mounting Bracket</span>
+              <span class="tpl-desc">6061-T6 Aluminum bracket with 4 mounting holes</span>
+            </button>
+            <button type="button" class="quick-tpl-btn" data-tpl="scramjet">
+              <span class="tpl-icon">🚀</span>
+              <span class="tpl-title">Scramjet Nacelle</span>
+              <span class="tpl-desc">Mach 6+ Ti-6Al-4V waverider cowl geometry</span>
+            </button>
+            <button type="button" class="quick-tpl-btn" data-tpl="drone">
+              <span class="tpl-icon">🛸</span>
+              <span class="tpl-title">Quadcopter Arm</span>
+              <span class="tpl-desc">Lightweight carbon-fiber hollow tubular beam</span>
+            </button>
+            <button type="button" class="quick-tpl-btn" data-tpl="enclosure">
+              <span class="tpl-icon">🖲</span>
+              <span class="tpl-title">PCB Enclosure</span>
+              <span class="tpl-desc">Electronics housing with standoffs and port cutouts</span>
+            </button>
+          </div>
+        </div>
+        <label style="display:flex; flex-direction:column; gap:4px;">
+          <span style="font-size:12px; color:var(--atlas-text-muted);">Project Name</span>
+          <input type="text" id="newProjectNameInput" class="filter-input" placeholder="e.g. Hypersonic_Nozzle_Assembly" value="Untitled_Project" required />
+        </label>
+        <label style="display:flex; flex-direction:column; gap:4px;">
+          <span style="font-size:12px; color:var(--atlas-text-muted);">Primary Discipline Workspace</span>
+          <select id="newProjectDisciplineSelect" class="filter-select">
+            <option value="mechanical">Mechanical CAD &amp; Parametric 3D</option>
+            <option value="drafting">Drafting &amp; 2D Engineering</option>
+            <option value="assembly">Assemblies &amp; Mechanisms</option>
+            <option value="simulation">Structural FEA &amp; Multiphysics</option>
+            <option value="manufacturing">Manufacturing &amp; CNC CAM</option>
+            <option value="bim">Architecture &amp; OpenBIM (IFC)</option>
+            <option value="electronics">Electronics &amp; ECAD (SPICE / PCB)</option>
+            <option value="chemical">Science &amp; Process Engineering</option>
+            <option value="robotics">Robotics &amp; Kinematics</option>
+            <option value="create">Atlas Create 3D &amp; PBR</option>
+            <option value="realtime">Atlas RealTime &amp; Digital Twin</option>
+          </select>
+        </label>
+        <label style="display:flex; flex-direction:column; gap:4px;">
+          <span style="font-size:12px; color:var(--atlas-text-muted);">Units of Measurement</span>
+          <select id="newProjectUnitsSelect" class="filter-select">
+            <option value="millimeter" selected>Millimeter (mm) [ISO Metric]</option>
+            <option value="centimeter">Centimeter (cm)</option>
+            <option value="meter">Meter (m)</option>
+            <option value="inch">Inch (in) [US Customary]</option>
+          </select>
+        </label>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+        <button type="button" class="button ghost" id="newProjectCancelBtn">Cancel</button>
+        <button type="button" class="button primary" id="newProjectConfirmBtn">Create Project</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Project Comparison & Diff Modal -->
+  <div id="projectCompareModal" class="palette" hidden role="dialog" aria-modal="true" aria-labelledby="projectCompareTitle">
+    <div class="palette-backdrop" id="projectCompareBackdrop"></div>
+    <div class="palette-card" style="max-width:680px;">
+      <div class="palette-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 id="projectCompareTitle" style="margin:0; font-size:15px;">Project Revision Comparison &amp; Diff</h3>
+        <button type="button" class="icon-button" id="projectCompareCloseBtn">&times;</button>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div style="display:flex; gap:12px;">
+          <div style="flex:1; background:var(--atlas-surface-2); padding:10px; border-radius:6px; border:1px solid var(--atlas-border);">
+            <h4 style="margin:0 0 4px 0; font-size:12px;">Baseline Revision (Saved)</h4>
+            <div style="font-size:11.5px; color:var(--atlas-text-muted);">Revision: <strong>14</strong> &bull; Volume: <strong>6,000 mm&sup3;</strong> &bull; Mass: <strong>0.047 kg</strong></div>
+          </div>
+          <div style="flex:1; background:var(--atlas-surface-2); padding:10px; border-radius:6px; border:1px solid var(--atlas-accent);">
+            <h4 style="margin:0 0 4px 0; font-size:12px; color:var(--atlas-accent);">Working Copy (Unsaved)</h4>
+            <div style="font-size:11.5px; color:var(--atlas-text-muted);">Revision: <strong id="compareWorkingRev">15</strong> &bull; Volume: <strong>6,240 mm&sup3;</strong> &bull; Mass: <strong>0.049 kg</strong></div>
+          </div>
+        </div>
+        <div class="honest-state-box">
+          <strong>Parametric Geometric Delta:</strong>
+          &bull; +1 Extrude feature (Join, depth = 20.0 mm)<br>
+          &bull; &Delta;Volume = +240 mm&sup3; (+4.0%)<br>
+          &bull; Interference Check: Zero collision detected with assembly components.
+        </div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+        <button type="button" class="button ghost" id="projectCompareCancelBtn">Close</button>
+        <button type="button" class="button primary" id="projectCompareSaveBtn">Accept &amp; Save Revision</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Consolidated Import & Export Center Modal -->
+  <div id="importExportModal" class="palette" hidden role="dialog" aria-modal="true" aria-labelledby="importExportTitle">
+    <div class="palette-backdrop" id="importExportBackdrop"></div>
+    <div class="palette-card" style="max-width:680px;">
+      <div class="palette-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 id="importExportTitle" style="margin:0; font-size:15px;">Import &amp; Export Center</h3>
+        <button type="button" class="icon-button" id="importExportCloseBtn">&times;</button>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+        <div style="background:var(--atlas-surface-2); padding:14px; border-radius:6px; border:1px solid var(--atlas-border);">
+          <h4 style="margin:0 0 10px 0; font-size:13px;">CAD &amp; Engineering Downloads</h4>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <a href="/api/export/step" class="table-action-btn" style="text-align:center; text-decoration:none;">Download ISO 10303 STEP (.step)</a>
+            <a href="/api/export/3mf" class="table-action-btn" style="text-align:center; text-decoration:none;">Download ASTM 3MF (.3mf)</a>
+            <a href="/api/export/stl" class="table-action-btn" style="text-align:center; text-decoration:none;">Download Binary STL (.stl)</a>
+            <a href="/api/export/dxf" class="table-action-btn" style="text-align:center; text-decoration:none;">Download AutoCAD DXF (.dxf)</a>
+            <a href="/api/export/pdf" class="table-action-btn" style="text-align:center; text-decoration:none;">Download Vector PDF Drawing (.pdf)</a>
+          </div>
+        </div>
+        <div style="background:var(--atlas-surface-2); padding:14px; border-radius:6px; border:1px solid var(--atlas-border);">
+          <h4 style="margin:0 0 10px 0; font-size:13px;">Creative &amp; RealTime Exports</h4>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <a href="/api/export/davinci?format=fcpxml" class="table-action-btn" style="text-align:center; text-decoration:none;">DaVinci Resolve FCPXML (.fcpxml)</a>
+            <a href="/api/export/davinci?format=edl" class="table-action-btn" style="text-align:center; text-decoration:none;">CMX 3600 EDL (.edl)</a>
+            <a href="/api/export/davinci?format=cube" class="table-action-btn" style="text-align:center; text-decoration:none;">3D Thermal LUT (.cube)</a>
+            <a href="/api/export/unity" class="table-action-btn" style="text-align:center; text-decoration:none;">Unity 3D Engine Package (.json)</a>
+            <a href="/api/export/gltf" class="table-action-btn" style="text-align:center; text-decoration:none;">glTF 2.0 Digital Twin (.gltf)</a>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+        <button type="button" class="button ghost" id="importExportDoneBtn">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Keyboard Shortcuts & Ergonomics Cheat Sheet Modal -->
+  <dialog id="helpShortcutsModal" class="studio-dialog modal-lg" aria-labelledby="helpModalTitle" style="max-width:760px;">
+    <div class="dialog-header" style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--atlas-border); background:var(--atlas-surface-2);">
+      <div class="dialog-title-wrap" style="display:flex; align-items:center; gap:8px;">
+        <span class="dialog-icon" style="font-size:16px;">⌨</span>
+        <h3 id="helpModalTitle" style="margin:0; font-size:14.5px;">AtlasCAD Shortcuts & Ergonomics Guide</h3>
+      </div>
+      <button type="button" class="icon-button" id="closeHelpModalBtn">&times;</button>
+    </div>
+    <div class="dialog-body shortcuts-guide-grid">
+      <div class="shortcut-section">
+        <h4>⚡ Core Controls & Navigation</h4>
+        <table class="shortcuts-table">
+          <tr><td><kbd>Ctrl</kbd> + <kbd>S</kbd></td><td>Save Project (.zcad)</td></tr>
+          <tr><td><kbd>Ctrl</kbd> + <kbd>K</kbd></td><td>Command Palette / Fuzzy Search</td></tr>
+          <tr><td><kbd>Ctrl</kbd> + <kbd>Z</kbd></td><td>Undo CAD Action</td></tr>
+          <tr><td><kbd>Ctrl</kbd> + <kbd>Y</kbd></td><td>Redo CAD Action</td></tr>
+          <tr><td><kbd>Ctrl</kbd> + <kbd>0</kbd></td><td>Clean Screen / Focus Mode</td></tr>
+          <tr><td><kbd>Alt</kbd> + <kbd>Q</kbd></td><td>Toggle Quad View (4-Up Split)</td></tr>
+          <tr><td><kbd>?</kbd> or <kbd>F1</kbd></td><td>Open This Shortcuts Guide</td></tr>
+        </table>
+      </div>
+      <div class="shortcut-section">
+        <h4>🖱 3D Viewport Navigation</h4>
+        <table class="shortcuts-table">
+          <tr><td><kbd>Left Drag</kbd></td><td>3D Orbit / Rotate Camera</td></tr>
+          <tr><td><kbd>Right Drag</kbd> or <kbd>Shift</kbd>+<kbd>Left</kbd></td><td>Pan Camera Across Plane</td></tr>
+          <tr><td><kbd>Scroll Wheel</kbd></td><td>Smooth Zoom In / Out</td></tr>
+          <tr><td><kbd>H</kbd></td><td>Reset View to Isometric (Home)</td></tr>
+          <tr><td><kbd>F</kbd></td><td>Fit Extents (Center Geometry)</td></tr>
+          <tr><td><kbd>Click Face</kbd></td><td>Select Face & Show Dimensions</td></tr>
+        </table>
+      </div>
+      <div class="shortcut-section">
+        <h4>✏ 2D Drafting & Modeling</h4>
+        <table class="shortcuts-table">
+          <tr><td><kbd>L</kbd></td><td>Draw Line</td></tr>
+          <tr><td><kbd>PL</kbd></td><td>Draw Polyline</td></tr>
+          <tr><td><kbd>C</kbd></td><td>Draw Circle</td></tr>
+          <tr><td><kbd>REC</kbd></td><td>Draw Rectangle</td></tr>
+          <tr><td><kbd>EXT</kbd> / <kbd>E</kbd></td><td>Extrude Profile to 3D</td></tr>
+          <tr><td><kbd>SU</kbd></td><td>Cut / Subtract from Solid</td></tr>
+          <tr><td><kbd>F</kbd></td><td>3D Fillet Edge</td></tr>
+          <tr><td><kbd>CHA</kbd></td><td>3D Chamfer Edge</td></tr>
+        </table>
+      </div>
+      <div class="shortcut-section">
+        <h4>📦 Drag & Drop Ergonomics</h4>
+        <table class="shortcuts-table">
+          <tr><td><span class="badge-subtle">Drop Files</span></td><td>Drag STEP, DXF, STL, OBJ, JSON from OS desktop straight onto 3D viewport to import</td></tr>
+          <tr><td><span class="badge-subtle">Drop Material</span></td><td>Drag material swatches from the palette onto 3D part to assign density, modulus & yield stress</td></tr>
+          <tr><td><span class="badge-subtle">Drop Asset</span></td><td>Drag standard hardware (bolts, bearings) from catalog directly into assembly</td></tr>
+          <tr><td><span class="badge-subtle">Timeline Drag</span></td><td>Drag feature timeline pills to reorder parametric operations</td></tr>
+        </table>
+      </div>
+      <div class="shortcut-section full-span">
+        <h4>🌐 Studio Switching Hotkeys</h4>
+        <div class="studio-hotkeys-row">
+          <span><kbd>Alt</kbd>+<kbd>0</kbd> Home</span>
+          <span><kbd>Alt</kbd>+<kbd>1</kbd> Drafting</span>
+          <span><kbd>Alt</kbd>+<kbd>2</kbd> Mechanical</span>
+          <span><kbd>Alt</kbd>+<kbd>3</kbd> Assembly</span>
+          <span><kbd>Alt</kbd>+<kbd>4</kbd> Simulation</span>
+          <span><kbd>Alt</kbd>+<kbd>5</kbd> Manufacturing</span>
+          <span><kbd>Alt</kbd>+<kbd>6</kbd> OpenBIM</span>
+          <span><kbd>Alt</kbd>+<kbd>7</kbd> Electronics</span>
+          <span><kbd>Alt</kbd>+<kbd>8</kbd> Robotics</span>
+          <span><kbd>Alt</kbd>+<kbd>9</kbd> Aerospace</span>
+          <span><kbd>Alt</kbd>+<kbd>P</kbd> Projects</span>
+          <span><kbd>Alt</kbd>+<kbd>W</kbd> Workflows</span>
+          <span><kbd>Alt</kbd>+<kbd>D</kbd> Dev Portal</span>
+        </div>
+      </div>
+    </div>
+    <div class="dialog-footer" style="padding:10px 16px; border-top:1px solid var(--atlas-border); background:var(--atlas-surface-2); display:flex; justify-content:flex-end;">
+      <button type="button" class="button primary" id="okHelpModalBtn">Got It</button>
+    </div>
+  </dialog>
 
   <script src="/app.js"></script>
 </body>
