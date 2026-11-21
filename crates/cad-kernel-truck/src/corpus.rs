@@ -213,11 +213,9 @@ fn build_union_tangent_contact(kernel: &mut dyn Kernel) -> Result<SolidId, Kerne
     // volume = 1000 + 1000 = 2000 mm³.
     // The shared 10 x 10 face is interior, so a correct boundary is
     //   area = 600 + 600 - 2 * 100 = 1000 mm².
-    // Measured today: volume 2000.0 (exact) but area 1200.0 — truck's union of two solids in
-    // face-to-face contact returns them as a compound that still carries both coincident contact
-    // patches, so the surface has an internal double wall. Volume survives because the two
-    // patches have opposite normals and cancel; area does not. Documented as a known failure
-    // (see docs/kernel-comparison.md).
+    // Truck's raw union keeps both coincident contact patches (area 1200, an internal double
+    // wall). The adapter detects one shell per operand and retries inward by 1e-3 mm, which fuses
+    // the boxes into one watertight solid: measured 1999.900 mm³ and 1000.000 mm².
     Ok(joined)
 }
 
@@ -371,9 +369,10 @@ pub const FIXTURES: &[Fixture] = &[
         id: "union_tangent_contact",
         description: "two 10x10x10 boxes sharing a whole face (coplanar contact)",
         capability: Capability::BooleanUnion,
-        // Truck keeps both coincident contact patches (area 1200, not 1000) — a known failure
-        // until the adapter fuses tangent solids. If this ever starts passing, promote it.
-        expectation: Expectation::KnownFailure,
+        // The adapter now retries inward when a successful union returns one shell per operand:
+        // truck's raw result keeps both contact patches (area 1200, not 1000). Measured after the
+        // inward retry: 1999.9927 mm³, 1000.0011 mm², watertight.
+        expectation: Expectation::MustPass,
         volume_mm3: 2000.0,
         volume_tolerance_mm3: 1.0,
         area_mm2: 1000.0,
@@ -384,10 +383,11 @@ pub const FIXTURES: &[Fixture] = &[
         id: "intersection_large_coordinates",
         description: "10x100x10 overlap of two boxes placed near 1e6 mm",
         capability: Capability::BooleanIntersection,
-        // At ~1e6 mm absolute coordinates the operand edges (100 mm long, 1e-6 relative
-        // precision) sit at truck's boolean tolerance: the measured intersection comes back
-        // 11499.8 mm³ with 24 open edges — not a solid. Known failure until the adapter
-        // re-centres operands before the boolean.
+        // At ~1e6 mm absolute coordinates the measured intersection comes back 11 499.8 mm³ with
+        // 24 open edges — not a solid. The adapter now refuses operands beyond 1e5 mm with a
+        // re-centre message rather than returning that solid. The same full-span coplanar
+        // intersection also leaves 18 open edges at the origin, so precision is not the only cause;
+        // this stays a recorded known failure until the kernel can represent it.
         expectation: Expectation::KnownFailure,
         volume_mm3: 10_000.0,
         volume_tolerance_mm3: 1.0,

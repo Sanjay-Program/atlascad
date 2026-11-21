@@ -82,7 +82,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 ///   travels with the design instead of living in a sidecar that can be lost or copied separately.
 ///   The field is defaulted, so a schema-8 file opens with an empty registry; the version is bumped
 ///   so a schema-8 build says "newer schema" instead of discarding the records.
-pub const PROJECT_SCHEMA: u32 = 9;
+/// * Schema 10 adds imported mesh bodies, which are merged after the parametric history. A schema-9
+///   file has none, so it is migrated with no field changes.
+/// * Schema 11 adds a revolve **angle**. A schema-10 reader would refuse the unknown field as an
+///   invalid document rather than report a newer schema, so the version is bumped. The field is
+///   defaulted to a full turn, which is exactly what a schema-10 revolve meant; a schema-10 file is
+///   migrated with no field changes.
+pub const PROJECT_SCHEMA: u32 = 11;
+
+/// A revolve with this angle is the closed solid of revolution a schema-10 file could express.
+pub const FULL_REVOLVE_DEGREES: f64 = 360.0;
 
 /// Smallest regular polygon the sketch model accepts.
 pub const MIN_POLYGON_SIDES: u32 = 3;
@@ -376,11 +385,21 @@ pub enum FeatureKind {
         #[serde(default)]
         direction: ExtrudeDirection,
     },
-    /// Sweep the profile a full turn about `axis`, producing a solid of revolution.
+    /// Sweep the profile `angle_deg` degrees about `axis`, producing a solid of revolution.
     ///
-    /// A full turn is the only mode: a partial sweep is an open shell, which is not a body, and the
-    /// document carries bodies only. See [`RevolveAxis`] for which line is used.
-    Revolve { axis: RevolveAxis },
+    /// A full 360° turn is closed by the sweep itself. A partial angle is capped at both ends with
+    /// the profile in its start and rotated positions, so the result is still a body. The angle is
+    /// defaulted for a schema-10 file, whose revolve was always a full turn. See [`RevolveAxis`]
+    /// for which line is used.
+    Revolve {
+        axis: RevolveAxis,
+        #[serde(default = "default_revolve_angle_deg")]
+        angle_deg: f64,
+    },
+}
+
+fn default_revolve_angle_deg() -> f64 {
+    FULL_REVOLVE_DEGREES
 }
 
 impl FeatureKind {
@@ -454,6 +473,9 @@ struct Snapshot {
     sketches: Vec<Sketch>,
     features: Vec<Feature>,
     next_entity: u64,
+    /// Imported bodies are editable document state, so an import must be undoable like a feature.
+    #[serde(default)]
+    imports: Vec<ImportedBody>,
 }
 
 /// A named, timestamped copy of the editable history.
@@ -619,6 +641,10 @@ pub struct Project {
     /// disappear with the edit that produced it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     artifacts: Option<ArtifactRegistry>,
+    /// Bodies read from exchange files, merged into the built geometry after the feature history.
+    /// Absent from a project that has none, so an ordinary file stays byte-identical in shape.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    imports: Vec<ImportedBody>,
 }
 
 /// First revision id. Named revisions have their own id space, separate from entity ids, because a
@@ -655,6 +681,42 @@ pub struct FeatureReport {
 pub struct FeatureFailure {
     pub id: EntityId,
     pub message: String,
+}
+
+/// Most imported bodies one project may hold. Imports are stored as meshes, so the bound is about
+/// keeping a document openable rather than about geometry.
+pub const MAX_IMPORTED_BODIES: usize = 64;
+
+/// Most triangles one imported body may hold, independent of the project file-size cap.
+pub const MAX_IMPORTED_TRIANGLES: usize = 2_000_000;
+
+/// Longest imported-body name accepted.
+pub const MAX_IMPORT_NAME_CHARS: usize = 120;
+
+/// A body read from an exchange file rather than built by the feature history.
+///
+/// It has no sketch, no feature and no kernel solid: the mesh is the geometry. The document merges
+/// it into the built model after the features, so the viewport, the exports and mass properties see
+/// one consistent result without pretending the body is parametric.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ImportedBody {
+    pub name: String,
+    /// The format the body was read from (`STEP` today). Displayed, never used to reopen a path.
+    pub source: String,
+    pub mesh: Mesh,
+}
+
+impl ImportedBody {
+    /// Volume in mm³, measured from the mesh.
+    pub fn volume_mm3(&self) -> f64 {
+        self.mesh.signed_volume().abs()
+    }
+
+    /// Triangle count.
+    pub fn triangles(&self) -> usize {
+        self.mesh.triangle_count()
+    }
 }
 
 /// Summary information for one named solid body in a multi-body document.
@@ -1149,12 +1211,14 @@ fn prefix_hash(
             axis_origin_mm,
             axis_direction_mm,
             plane_mm,
+            angle_rad,
         } => {
             hash = hash_u64(hash, axis_origin_mm[0].to_bits());
             hash = hash_u64(hash, axis_origin_mm[1].to_bits());
             hash = hash_u64(hash, axis_direction_mm[0].to_bits());
             hash = hash_u64(hash, axis_direction_mm[1].to_bits());
             hash = hash_u64(hash, plane_mm.to_bits());
+            hash = hash_u64(hash, angle_rad.to_bits());
         }
     }
     match pattern {
@@ -1232,6 +1296,8 @@ enum ResolvedAction {
         axis_direction_mm: [f64; 2],
         /// Height of the sketch plane above z = 0.
         plane_mm: f64,
+        /// How far the sweep turns, in radians (0 < angle ≤ a full turn).
+        angle_rad: f64,
     },
 }
 
@@ -1277,6 +1343,7 @@ impl Project {
             revisions: Vec::new(),
             next_revision: first_revision_id(),
             artifacts: None,
+            imports: Vec::new(),
         }
     }
 
@@ -1307,6 +1374,64 @@ impl Project {
 
     pub fn sketches(&self) -> &[Sketch] {
         &self.sketches
+    }
+
+    /// Bodies read from exchange files, in the order they were imported.
+    pub fn imports(&self) -> &[ImportedBody] {
+        &self.imports
+    }
+
+    /// Add a body read from an exchange file.
+    ///
+    /// This is a document edit like any other: it takes an undo snapshot, refuses a duplicate name,
+    /// validates the mesh before storing it, and bumps the revision so derived results go stale.
+    pub fn add_imported_body(
+        &mut self,
+        name: &str,
+        source: &str,
+        mesh: Mesh,
+    ) -> Result<(), ProjectError> {
+        let name = name.trim();
+        if name.is_empty() || name.chars().count() > MAX_IMPORT_NAME_CHARS {
+            return Err(ProjectError::Invalid(format!(
+                "an imported body needs a name of 1-{MAX_IMPORT_NAME_CHARS} characters"
+            )));
+        }
+        if self.imports.len() >= MAX_IMPORTED_BODIES {
+            return Err(ProjectError::Invalid(format!(
+                "a project holds at most {MAX_IMPORTED_BODIES} imported bodies"
+            )));
+        }
+        if self
+            .imports
+            .iter()
+            .any(|body| body.name.eq_ignore_ascii_case(name))
+        {
+            return Err(ProjectError::Invalid(format!(
+                "an imported body named `{name}` already exists"
+            )));
+        }
+        validate_import_mesh(name, &mesh)?;
+        self.push_undo();
+        self.imports.push(ImportedBody {
+            name: name.to_string(),
+            source: source.trim().to_string(),
+            mesh,
+        });
+        self.bump_revision()
+    }
+
+    /// Remove an imported body by name. Case-insensitive, like the duplicate check.
+    pub fn remove_imported_body(&mut self, name: &str) -> Result<(), ProjectError> {
+        let name = name.trim();
+        let index = self
+            .imports
+            .iter()
+            .position(|body| body.name.eq_ignore_ascii_case(name))
+            .ok_or_else(|| ProjectError::Invalid(format!("no imported body named `{name}`")))?;
+        self.push_undo();
+        self.imports.remove(index);
+        self.bump_revision()
     }
 
     pub fn features(&self) -> &[Feature] {
@@ -1631,6 +1756,7 @@ impl Project {
             sketches: self.sketches.clone(),
             features: self.features.clone(),
             next_entity: self.next_entity,
+            imports: self.imports.clone(),
         }
     }
 
@@ -1639,6 +1765,7 @@ impl Project {
         self.sketches = snapshot.sketches;
         self.features = snapshot.features;
         self.next_entity = snapshot.next_entity;
+        self.imports = snapshot.imports;
     }
 
     fn bump_revision(&mut self) -> Result<(), ProjectError> {
@@ -2009,14 +2136,30 @@ impl Project {
         self.add_revolve_feature(sketch_id, axis, ExtrudeOperation::NewBody)
     }
 
-    /// Append a revolve with an explicit operation, as the API and UI do.
+    /// Append a full-turn revolve with an explicit operation, as the API and UI do.
     pub fn add_revolve_feature(
         &mut self,
         sketch_id: EntityId,
         axis: RevolveAxis,
         operation: ExtrudeOperation,
     ) -> Result<EntityId, ProjectError> {
-        self.append_feature(sketch_id, operation, FeatureKind::Revolve { axis })
+        self.add_revolve_feature_angle(sketch_id, axis, FULL_REVOLVE_DEGREES, operation)
+    }
+
+    /// Append a revolve of `angle_deg` degrees, capped at both ends when it is partial.
+    pub fn add_revolve_feature_angle(
+        &mut self,
+        sketch_id: EntityId,
+        axis: RevolveAxis,
+        angle_deg: f64,
+        operation: ExtrudeOperation,
+    ) -> Result<EntityId, ProjectError> {
+        validate_revolve_angle(angle_deg)?;
+        self.append_feature(
+            sketch_id,
+            operation,
+            FeatureKind::Revolve { axis, angle_deg },
+        )
     }
 
     /// Revolve an existing sketch and union it into the body built so far.
@@ -2505,7 +2648,9 @@ impl Project {
         }
 
         build.solid = last_solid;
-        build.mesh = last_mesh;
+        // Imported bodies are not part of the ordered history but they are part of the model, so
+        // they are appended to the geometry the viewport, the exports and the measurements see.
+        build.mesh = merge_imported(last_mesh.as_ref(), &self.imports)?;
         let mut all_bodies: Vec<BodyInfo> = body_info.into_values().collect();
         all_bodies.sort_by(|a, b| a.id.cmp(&b.id));
         build.bodies = all_bodies;
@@ -2690,7 +2835,9 @@ impl Project {
         cache.entries = kept;
 
         build.solid = last_solid;
-        build.mesh = last_mesh;
+        // Imported bodies are not part of the ordered history but they are part of the model, so
+        // they are appended to the geometry the viewport, the exports and the measurements see.
+        build.mesh = merge_imported(last_mesh.as_ref(), &self.imports)?;
         let mut all_bodies: Vec<BodyInfo> = body_info.into_values().collect();
         all_bodies.sort_by(|a, b| a.id.cmp(&b.id));
         build.bodies = all_bodies;
@@ -2775,12 +2922,14 @@ impl Project {
                 ) * direction.sign(),
                 plane_mm,
             },
-            FeatureKind::Revolve { axis } => {
+            FeatureKind::Revolve { axis, angle_deg } => {
+                validate_revolve_angle(*angle_deg).map_err(|error| error.to_string())?;
                 let (origin, direction) = axis.line();
                 ResolvedAction::Revolve {
                     axis_origin_mm: [ox + unit.to_mm(origin[0]), oy + unit.to_mm(origin[1])],
                     axis_direction_mm: direction,
                     plane_mm,
+                    angle_rad: angle_deg.to_radians(),
                 }
             }
         };
@@ -2824,6 +2973,7 @@ impl Project {
                     axis_origin_mm,
                     axis_direction_mm,
                     plane_mm,
+                    angle_rad,
                 } => {
                     if !kernel.supports(cad_contract::capability::Capability::Revolve) {
                         return Err(
@@ -2836,7 +2986,7 @@ impl Project {
                             inst_profile,
                             *axis_origin_mm,
                             *axis_direction_mm,
-                            std::f64::consts::TAU,
+                            *angle_rad,
                         )
                         .map_err(|error| format!("revolve failed: {error}"))?;
                     (turned, *plane_mm)
@@ -3147,6 +3297,14 @@ impl Project {
             value = migrate_v8_to_v9(value)?;
             schema = 9;
         }
+        if schema == 9 {
+            value = migrate_v9_to_v10(value)?;
+            schema = 10;
+        }
+        if schema == 10 {
+            value = migrate_v10_to_v11(value)?;
+            schema = 11;
+        }
         if schema != PROJECT_SCHEMA {
             return Err(ProjectError::UnsupportedSchema {
                 found: schema,
@@ -3206,6 +3364,7 @@ impl Project {
             &self.features,
             self.next_entity,
         )?;
+        validate_imports(&self.imports)?;
         for snapshot in self.undo.iter().chain(self.redo.iter()) {
             validate_contents(
                 &snapshot.parameters,
@@ -3213,6 +3372,7 @@ impl Project {
                 &snapshot.features,
                 snapshot.next_entity,
             )?;
+            validate_imports(&snapshot.imports)?;
         }
         if self.revisions.len() > MAX_REVISIONS {
             return Err(ProjectError::Invalid(format!(
@@ -3260,6 +3420,7 @@ impl Project {
                 &revision.snapshot.features,
                 revision.snapshot.next_entity,
             )?;
+            validate_imports(&revision.snapshot.imports)?;
         }
         Ok(())
     }
@@ -3484,10 +3645,13 @@ fn validate_contents(
                 feature.id, sketch.id
             )));
         }
-        if let FeatureKind::Extrude { depth_param, .. } = &feature.kind
-            && !parameter_ids.contains(depth_param.as_str())
-        {
-            return Err(ProjectError::UnknownParameter(depth_param.clone()));
+        match &feature.kind {
+            FeatureKind::Extrude { depth_param, .. } => {
+                if !parameter_ids.contains(depth_param.as_str()) {
+                    return Err(ProjectError::UnknownParameter(depth_param.clone()));
+                }
+            }
+            FeatureKind::Revolve { angle_deg, .. } => validate_revolve_angle(*angle_deg)?,
         }
     }
     if next_entity <= max_id {
@@ -3537,6 +3701,21 @@ fn validate_sector(start_degrees: f64, sweep_degrees: f64) -> Result<(), Project
         return Err(ProjectError::Invalid(format!(
             "a sector sweep must be between 0 and 360 degrees, exclusive; got {sweep_degrees}. A \
              full turn is a circle profile"
+        )));
+    }
+    Ok(())
+}
+
+/// A revolve must turn more than nothing and no more than once around its axis.
+///
+/// 0° encloses no volume, and more than a full turn would sweep the profile through itself. The
+/// bound is checked when a feature is added and again when a file is loaded, because both paths can
+/// produce a [`FeatureKind`] by different routes.
+fn validate_revolve_angle(angle_deg: f64) -> Result<(), ProjectError> {
+    if !angle_deg.is_finite() || angle_deg <= 0.0 || angle_deg > FULL_REVOLVE_DEGREES {
+        return Err(ProjectError::Invalid(format!(
+            "a revolve angle must be greater than 0 and at most {FULL_REVOLVE_DEGREES} degrees, \
+             got {angle_deg}"
         )));
     }
     Ok(())
@@ -3767,6 +3946,27 @@ fn migrate_v8_to_v9(mut value: serde_json::Value) -> Result<serde_json::Value, P
         .as_object_mut()
         .ok_or_else(|| ProjectError::Invalid("project JSON is not an object".into()))?;
     object.insert("schema".into(), serde_json::json!(9));
+    Ok(value)
+}
+
+/// Schema 10 adds imported mesh bodies. A schema-9 file has none, so it only needs the new stamp:
+/// the field is `#[serde(default)]` and an older project is otherwise unchanged.
+fn migrate_v9_to_v10(mut value: serde_json::Value) -> Result<serde_json::Value, ProjectError> {
+    let object = value
+        .as_object_mut()
+        .ok_or_else(|| ProjectError::Invalid("project JSON is not an object".into()))?;
+    object.insert("schema".into(), serde_json::json!(10));
+    Ok(value)
+}
+
+/// Schema 11 gives a revolve an angle. A schema-10 revolve was always a full turn, and the field is
+/// defaulted to exactly that, so the payload only needs the new stamp. No file is rewritten by
+/// loading it; the next save writes the angle explicitly.
+fn migrate_v10_to_v11(mut value: serde_json::Value) -> Result<serde_json::Value, ProjectError> {
+    let object = value
+        .as_object_mut()
+        .ok_or_else(|| ProjectError::Invalid("project JSON is not an object".into()))?;
+    object.insert("schema".into(), serde_json::json!(11));
     Ok(value)
 }
 
@@ -4247,6 +4447,95 @@ fn atomic_replace(path: &Path, bytes: &[u8]) -> Result<(), ProjectError> {
         let _ = std::fs::remove_file(&temp_path);
     }
     write_result
+}
+
+/// One imported body's mesh: validated, bounded, and non-empty.
+fn validate_import_mesh(name: &str, mesh: &Mesh) -> Result<(), ProjectError> {
+    mesh.validate()
+        .map_err(|error| ProjectError::Invalid(format!("imported body `{name}`: {error}")))?;
+    if mesh.triangles.len() > MAX_IMPORTED_TRIANGLES {
+        return Err(ProjectError::Invalid(format!(
+            "imported body `{name}` has {} triangles, over the {MAX_IMPORTED_TRIANGLES} limit",
+            mesh.triangles.len()
+        )));
+    }
+    Ok(())
+}
+
+/// Every imported body in a live history, an undo snapshot or a named revision must satisfy the
+/// same rules; a file that smuggled an invalid one in must not open.
+fn validate_imports(imports: &[ImportedBody]) -> Result<(), ProjectError> {
+    if imports.len() > MAX_IMPORTED_BODIES {
+        return Err(ProjectError::Invalid(format!(
+            "project holds more than {MAX_IMPORTED_BODIES} imported bodies"
+        )));
+    }
+    let mut names = std::collections::BTreeSet::new();
+    for body in imports {
+        let name = body.name.trim();
+        if name.is_empty() || name.chars().count() > MAX_IMPORT_NAME_CHARS {
+            return Err(ProjectError::Invalid(
+                "an imported body has an empty or over-long name".into(),
+            ));
+        }
+        if !names.insert(name.to_ascii_lowercase()) {
+            return Err(ProjectError::Invalid(format!(
+                "imported body name `{name}` is used twice"
+            )));
+        }
+        validate_import_mesh(name, &body.mesh)?;
+    }
+    Ok(())
+}
+
+/// Append one validated mesh to a growing combined mesh.
+fn append_mesh(
+    positions: &mut Vec<[f64; 3]>,
+    triangles: &mut Vec<[u32; 3]>,
+    mesh: &Mesh,
+) -> Result<(), ProjectError> {
+    mesh.validate()
+        .map_err(|error| ProjectError::Invalid(format!("geometry cannot be merged: {error}")))?;
+    let offset = u32::try_from(positions.len()).map_err(|_| {
+        ProjectError::Invalid("the merged model has more vertices than a u32 mesh can hold".into())
+    })?;
+    positions.extend_from_slice(&mesh.positions);
+    for triangle in &mesh.triangles {
+        let mut shifted = [0u32; 3];
+        for (slot, index) in triangle.iter().enumerate() {
+            shifted[slot] = index
+                .checked_add(offset)
+                .ok_or_else(|| ProjectError::Invalid("merged triangle index overflowed".into()))?;
+        }
+        triangles.push(shifted);
+    }
+    Ok(())
+}
+
+fn merge_imported(
+    base: Option<&Mesh>,
+    imports: &[ImportedBody],
+) -> Result<Option<Mesh>, ProjectError> {
+    if imports.is_empty() {
+        return Ok(base.cloned());
+    }
+    let mut positions = Vec::new();
+    let mut triangles = Vec::new();
+    if let Some(base) = base {
+        append_mesh(&mut positions, &mut triangles, base)?;
+    }
+    for body in imports {
+        append_mesh(&mut positions, &mut triangles, &body.mesh)?;
+    }
+    let merged = Mesh {
+        positions,
+        triangles,
+        normals: Vec::new(),
+    };
+    merged.validate().map_err(|error| {
+        ProjectError::Invalid(format!("the merged model is not a valid mesh: {error}"))
+    })?;
+    Ok(Some(merged))
 }
 
 #[cfg(test)]
@@ -6243,6 +6532,89 @@ mod tests {
     }
 
     #[test]
+    fn a_partial_revolve_resolves_its_angle_to_radians() -> TestResult {
+        let (mut project, sketch) = revolve_project()?;
+        let feature = project.add_revolve_feature_angle(
+            sketch,
+            RevolveAxis::Vertical,
+            90.0,
+            ExtrudeOperation::NewBody,
+        )?;
+        let mut kernel = RevolveKernel::new();
+        let build = project.build(&mut kernel)?;
+
+        assert!(build.is_complete());
+        assert_eq!(
+            kernel.calls,
+            vec![([5.0, 7.0], [0.0, 1.0], std::f64::consts::FRAC_PI_2)]
+        );
+        match build.feature(feature) {
+            Some(FeatureOutcome::Built { volume_mm3, .. }) => {
+                assert!((volume_mm3 - 123.0).abs() < 1e-9);
+            }
+            other => return Err(format!("partial revolve was not built: {other:?}").into()),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_revolve_angle_outside_one_turn_is_refused() -> TestResult {
+        let (mut project, sketch) = revolve_project()?;
+        for angle in [0.0, -1.0, 360.5, f64::NAN] {
+            match project.add_revolve_feature_angle(
+                sketch,
+                RevolveAxis::Vertical,
+                angle,
+                ExtrudeOperation::NewBody,
+            ) {
+                Err(ProjectError::Invalid(message)) => {
+                    assert!(message.contains("revolve angle"), "{message}")
+                }
+                other => {
+                    return Err(format!("angle {angle} must be refused, got {other:?}").into());
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_schema_ten_revolve_defaults_to_a_full_turn() -> TestResult {
+        let (mut project, sketch) = revolve_project()?;
+        project.add_revolve_feature_angle(
+            sketch,
+            RevolveAxis::Vertical,
+            90.0,
+            ExtrudeOperation::NewBody,
+        )?;
+        let mut value = serde_json::to_value(&project)?;
+        value["schema"] = serde_json::json!(10);
+        let features = value
+            .get_mut("features")
+            .and_then(serde_json::Value::as_array_mut)
+            .ok_or_else(|| ProjectError::Invalid("features array".into()))?;
+        for feature in features {
+            if let Some(kind) = feature
+                .get_mut("kind")
+                .and_then(serde_json::Value::as_object_mut)
+            {
+                kind.remove("angle_deg");
+            }
+        }
+        let bytes = serde_json::to_vec(&value)?;
+
+        let loaded = Project::from_json(&bytes)?;
+        assert_eq!(loaded.schema, PROJECT_SCHEMA);
+        match &loaded.features()[0].kind {
+            FeatureKind::Revolve { angle_deg, .. } => {
+                assert_eq!(*angle_deg, FULL_REVOLVE_DEGREES)
+            }
+            other => return Err(format!("expected a revolve, got {other:?}").into()),
+        }
+        Ok(())
+    }
+
+    #[test]
     fn a_revolve_is_refused_when_the_kernel_cannot_revolve() -> TestResult {
         let (mut project, sketch) = revolve_project()?;
         let feature = project.add_revolve(sketch, RevolveAxis::Vertical)?;
@@ -6320,12 +6692,21 @@ mod tests {
     fn a_revolve_survives_save_and_reopen_with_its_axis() -> TestResult {
         let dir = TempDir::new("revolve")?;
         let (mut project, sketch) = revolve_project()?;
-        project.add_revolve(sketch, RevolveAxis::Horizontal)?;
+        project.add_revolve_feature_angle(
+            sketch,
+            RevolveAxis::Horizontal,
+            90.0,
+            ExtrudeOperation::NewBody,
+        )?;
         let path = dir.0.join("lathe.zcad");
         project.save(&path)?;
 
         let loaded = Project::load(&path)?;
         assert_eq!(loaded.features(), project.features());
+        match &loaded.features()[0].kind {
+            FeatureKind::Revolve { angle_deg, .. } => assert_eq!(*angle_deg, 90.0),
+            other => return Err(format!("expected a revolve, got {other:?}").into()),
+        }
         assert_eq!(loaded.to_json()?, project.to_json()?);
         let mut before = RevolveKernel::new();
         let mut after = RevolveKernel::new();

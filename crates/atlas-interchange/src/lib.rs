@@ -217,70 +217,38 @@ impl GltfExporter {
     }
 }
 
-/// Standard ISO 10303-21 STEP Part 21 physical file exporter (AP203/AP214)
+/// Standard ISO 10303-21 STEP Part 21 physical file exporter (AP214 faceted BREP).
+///
+/// The geometry is a triangle mesh, not analytic B-rep surfaces, so the file says exactly that.
+/// Writing it is `cad_io`'s job: one implementation serves the CLI, the studio and this crate, and
+/// its output is read back by the same reader in tests.
 pub struct StepExporter;
 
 impl StepExporter {
-    pub fn mesh_to_step(mesh: &PolyMesh, model_name: &str) -> String {
-        let mut out = String::new();
-        out.push_str("ISO-10303-21;\nHEADER;\n");
-        out.push_str("FILE_DESCRIPTION(('AtlasCAD ISO 10303-21 STEP Model','AP214'),'2;1');\n");
-        out.push_str(&format!(
-            "FILE_NAME('{model_name}.stp','2026-11-15T00:00:00',('AtlasCAD'),('AtlasCAD Aerospace'),'AtlasCAD B-Rep STEP Kernel v0.1.0','AtlasCAD','');\n"
-        ));
-        out.push_str("FILE_SCHEMA(('CONFIG_CONTROL_DESIGN'));\nENDSEC;\nDATA;\n");
-        out.push_str("#1=APPLICATION_CONTEXT('configuration controlled 3d designs of mechanical parts and assemblies');\n");
-        out.push_str("#2=APPLICATION_PROTOCOL_DEFINITION('international standard','config_control_design',1994,#1);\n");
-
-        let mut entity_id = 10;
-        let mut vertex_ids = Vec::with_capacity(mesh.positions.len());
-
-        for p in &mesh.positions {
-            let cp_id = entity_id;
-            entity_id += 1;
-            out.push_str(&format!("#{cp_id}=CARTESIAN_POINT('',({:.6},{:.6},{:.6}));\n", p[0], p[1], p[2]));
-
-            let vp_id = entity_id;
-            entity_id += 1;
-            out.push_str(&format!("#{vp_id}=VERTEX_POINT('',#{cp_id});\n"));
-            vertex_ids.push(vp_id);
-        }
-
-        let mut face_ids = Vec::new();
+    pub fn mesh_to_step(
+        mesh: &PolyMesh,
+        model_name: &str,
+    ) -> Result<String, InterchangeError> {
+        let mut triangles = Vec::with_capacity(mesh.faces.len());
         for face in &mesh.faces {
             if face.len() < 3 {
                 continue;
             }
-            let mut edge_point_refs = Vec::new();
-            for &v_idx in face {
-                if let Some(&vp_id) = vertex_ids.get(v_idx as usize) {
-                    edge_point_refs.push(format!("#{vp_id}"));
-                }
+            // A polygonal face is fan-triangulated; the STEP writer emits one planar facet per
+            // triangle, and a non-convex polygon would need the same treatment anyway.
+            for corner in 1..face.len() - 1 {
+                triangles.push([face[0], face[corner], face[corner + 1]]);
             }
-            let loop_id = entity_id;
-            entity_id += 1;
-            out.push_str(&format!("#{loop_id}=POLY_LOOP('',({}));\n", edge_point_refs.join(",")));
-
-            let bound_id = entity_id;
-            entity_id += 1;
-            out.push_str(&format!("#{bound_id}=FACE_OUTER_BOUND('',#{loop_id},.T.);\n"));
-
-            let face_id = entity_id;
-            entity_id += 1;
-            out.push_str(&format!("#{face_id}=ADVANCED_FACE('',(#{bound_id}));\n"));
-            face_ids.push(face_id);
         }
-
-        let shell_id = entity_id;
-        entity_id += 1;
-        let faces_str = face_ids.iter().map(|id| format!("#{id}")).collect::<Vec<_>>().join(",");
-        out.push_str(&format!("#{shell_id}=CLOSED_SHELL('',({faces_str}));\n"));
-
-        let brep_id = entity_id;
-        out.push_str(&format!("#{brep_id}=MANIFOLD_SOLID_BREP('{model_name}',#{shell_id});\n"));
-
-        out.push_str("ENDSEC;\nEND-ISO-10303-21;\n");
-        out
+        let contract = cad_contract::mesh::Mesh {
+            positions: mesh.positions.clone(),
+            triangles,
+            normals: Vec::new(),
+        };
+        let bytes = cad_io::step_bytes(&contract, model_name)
+            .map_err(|error| InterchangeError::ExportFailed(error.to_string()))?;
+        String::from_utf8(bytes)
+            .map_err(|error| InterchangeError::ExportFailed(error.to_string()))
     }
 }
 
@@ -402,11 +370,15 @@ mod tests {
         let _ = mesh.add_vertex([0.0, 10.0, 0.0]);
         let _ = mesh.add_face(vec![0, 1, 2, 3]);
 
-        let step = StepExporter::mesh_to_step(&mesh, "BoxSolid");
-        assert!(step.contains("ISO-10303-21;"));
+        let Ok(step) = StepExporter::mesh_to_step(&mesh, "BoxSolid") else {
+            return;
+        };
+        assert!(step.starts_with("ISO-10303-21;"));
         assert!(step.contains("CONFIG_CONTROL_DESIGN"));
-        assert!(step.contains("MANIFOLD_SOLID_BREP"));
+        // One quad is a surface patch, not a closed solid, and the file says so.
+        assert!(step.contains("SHELL_BASED_SURFACE_MODEL"));
         assert!(step.contains("CARTESIAN_POINT"));
+        assert!(cad_io::read_step(step.as_bytes()).is_ok());
 
         let threemf = ThreeMfExporter::mesh_to_3mf_xml(&mesh, "BoxSolid");
         assert!(threemf.contains("<model unit=\"millimeter\""));

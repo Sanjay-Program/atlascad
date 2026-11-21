@@ -127,10 +127,10 @@ fn main() {
     // Pairwise unions of two verified operands: a 10 x 10 x 10 mm box and a 4 x 4 x 10 mm box
     // overlapping by 2 x 2 x 10. Analytic union volume: 1000 + 160 - 40 = 1120 mm³.
     //
-    // Pairwise rather than a chain: chaining a third union panics inside truck's intersection-curve
-    // code (`tolerance must be no less than 1e-6`), which the adapter reports as `Internal` rather
-    // than crashing. See docs/kernel-comparison.md. Union is used rather than difference because
-    // difference returns malformed topology and is not advertised.
+    // Pairwise rather than a chain so the sample measures one boolean rather than a sequence that
+    // can take the tolerance ladder. Chains are supported: the adapter retries at 3e-2/1e-1 mm (see
+    // docs/kernel-comparison.md §4.3), and difference is advertised after the adapter's shell-sign
+    // repair (§4.2).
     const UNIONS: usize = 20;
     let mut samples = Vec::with_capacity(iters);
     let mut union_volumes = Vec::new();

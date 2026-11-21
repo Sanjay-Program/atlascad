@@ -28,18 +28,18 @@ end-to-end run is not a performance measurement.
 
 | Feature | Rung | Evidence | Gap to the next rung |
 |---|---:|---|---|
-| `.zcad` project: atomic save, migration, refusal of unknown/newer schemas | **8** | 78 `cad-document` tests; corrupt/oversized/newer fixtures; `t-platform-workspace-20261030` | security review of the untrusted-input path |
+| `.zcad` project: atomic save, migration, refusal of unknown/newer schemas (schema 11) | **8** | 91 `cad-document` tests; corrupt/oversized/newer fixtures; schema-10 revolve-angle default; `t-cad-revolve-angle-20261121` | security review of the untrusted-input path |
 | Ordered feature history with per-prefix rebuild cache | **8** | kernel-call-log tests; 0.01 ms unchanged / 7.9 ms last-of-six; `docs/performance-baseline.md` §9 | security review; the 64-bit hash collision caveat is recorded |
 | Sketch profiles: rectangle, circle, regular polygon, polyline, arc sector | **8** | analytic shoelace/volume tests; HTTP cut tests; browser sector run | security review |
 | Sketch plane height + extrude direction (new 2026-10-30) | **8** | 8 document tests + 3 analytic HTTP tests (pocket, boss, through-hole, 1e-2 mm³) + 5 browser assertions; `docs/performance-baseline.md` §11 | security review (input is a finite f64, validated on create/load) |
 | Extrude as new body / join / cut | **8** | corpus + HTTP analytic volumes; watertight exports; 1.50–4.80 ms rebuilds | coplanar join/kernel robustness is a recorded limitation, not a rung |
-| Full-turn revolve | **7** | analytic cylinder/annulus over HTTP; save/reopen; watertight export | no benchmark (rung 8); security review |
+| Revolve, full turn or capped partial angle (extended 2026-11-21) | **8** | analytic cylinder/annulus over HTTP; a 90° turn of an offset rectangle measures the analytic quarter annulus (2356.194 mm³) and a 180° turn on the axis the analytic half cylinder (785.398 mm³), both watertight; 42 `cad-kernel-truck` tests, 91 `cad-document` tests and 51 `cad-studio` tests; save/reopen and STL export | security review of untrusted input |
 | Named revisions + last-good-file backup + crash recovery | **7** | 7 document tests, HTTP round-trip, `kill -9` scenario, browser restore | no benchmark; no audit log (recorded) |
 | Studio HTTP API (state, parameter, sketch, feature, revision, undo/redo/save, STL, discard) | **7** | 25 real-socket tests, incl. token boundary and payload limits | no benchmark of request latency since the cache (in-process figures only) |
 | WebGL viewport: orbit/pan/zoom/fit/views, wireframe, picking | **7** | headless-browser checks, 20 assertions, zero console errors | no frame-time measurement (integrated GPU only; a figure would mislead) |
 | Token-gated LAN sharing | **7** | 401/403/415/413 tests; shared-page browser run | security review is partial (finding S-4 covers the MCP/agent port, not this); no concurrency model |
 | Binary STL export | **7** | volume asserted from the exported file, 0 open edges after welding | no importer wired |
-| Analytic kernel corpus + regression gate | **8** | 11 fixtures, 8 ok, 3 recorded known failures, exit-code gate; `t-cad-kernel-truck-corpus` | the real SolidCraft kernel has not been run against it (needs ≥16 GB host) |
+| Analytic kernel corpus + regression gate | **9** | 11 fixtures, 9 ok, 2 recorded known failures (large-coordinate intersection, raw coplanar cut), exit-code gate; tangent contact promoted to must-pass; `t-cad-kernel-truck-corpus` | the real SolidCraft kernel has not been run against it (needs ≥16 GB host) |
 | `cad-contract` (capabilities, errors, mesh, header) | **8** | 55 tests | security review of `serde` boundaries |
 | Headless CLI (`atlas`) | **7** | 10 tests incl. a multi-process project workflow | no batch mode; no benchmark |
 | Agent platform + geometry agent | **7** | 53 tests across api/runtime/geometry; grant, budget, quarantine, schema | in-process and unscheduled (S-8); no second agent or host (M9) |
@@ -73,7 +73,7 @@ end-to-end run is not a performance measurement.
 |---|---|---|
 | 3D Assembly mates & joint kinematics | **1–2** | `docs/research/INDUSTRY_TOOLSETS.md` §3B |
 | 3D Fillet / chamfer / shell on B-Rep | **1** | present in SolidCraft's kernel, not in the contract; no accepted plan |
-| Sweep / loft, partial revolve | **1–2** | contract declares `Sweep`/`Loft`, no adapter |
+| Sweep / loft | **1–2** | contract declares `Sweep`/`Loft`, no adapter |
 | STEP / 3MF / OBJ / glTF / IFC / GIS formats | **0–1** | matrix §3; nothing wired in the platform path. **DXF is the exception and is at rung 8** — see §2 |
 | Industry workspaces (architecture, electrical, MEP, plant, GIS, raster) | **1–2** | `docs/research/INDUSTRY_TOOLSETS.md`; **none implemented** |
 | AI assistance (typed plan → preview → approval) | **1–2** | matrix §4; needs the command layer first |

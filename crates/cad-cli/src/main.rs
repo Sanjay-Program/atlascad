@@ -7,6 +7,7 @@
 //! atlas draft --file part.zcad [--save part.zdraft] [--out part.dxf]
 //! atlas dxf   --from sheet.zdraft --out sheet.dxf
 //! atlas dxf-import --from sheet.dxf [--save sheet.zdraft] [--out sheet.dxf]
+//! atlas step-import --from part.stp [--out part.stl]
 //! atlas sheet --file part.zcad --pdf part.pdf [--paper A3] [--scale fit|N]
 //! atlas artifacts add --registry part.artifacts.json --document 1 --revision 3
 //!                     --id 1 --kind drawing --label "shop drawing"
@@ -70,6 +71,7 @@ fn run() -> Result<i32, CliError> {
         "draft" => cmd_draft(&rest),
         "dxf" => cmd_dxf(&rest),
         "dxf-import" => cmd_dxf_import(&rest),
+        "step-import" => cmd_step_import(&rest),
         "sheet" => cmd_sheet(&rest),
         "artifacts" => cmd_artifacts(&rest),
         "cae" => cmd_cae(&rest),
@@ -109,6 +111,7 @@ fn usage() {
     println!("  atlas draft --file PROJECT.zcad [--save DRAWING.zdraft] [--out DRAWING.dxf]");
     println!("  atlas dxf   --from DRAWING.zdraft --out DRAWING.dxf");
     println!("  atlas dxf-import --from DRAWING.dxf [--save DRAWING.zdraft] [--out DRAWING.dxf]");
+    println!("  atlas step-import --from PART.stp [--out PART.stl]");
     println!(
         "  atlas sheet --file PROJECT.zcad|DRAWING.zdraft --pdf SHEET.pdf [--paper A3] [--scale fit|N]"
     );
@@ -478,6 +481,64 @@ fn cmd_dxf_import(arguments: &[String]) -> Result<i32, CliError> {
             from.display()
         );
     }
+    Ok(0)
+}
+
+/// `atlas step-import --from part.stp [--out part.stl]`
+///
+/// Reads the faceted STEP boundary representation back into a validated millimetre mesh. Without
+/// `--out` the command is a validator: it prints what the file contains and exits non-zero when the
+/// file cannot be read. A supplier's file can be checked before it is trusted in a study.
+fn cmd_step_import(arguments: &[String]) -> Result<i32, CliError> {
+    let flags = Flags::parse(arguments)?;
+    let from = PathBuf::from(flags.require("--from")?);
+    let out = flags.get("--out").map(PathBuf::from);
+    let imported = cad_io::read_step_file(&from).map_err(|error| match error {
+        cad_io::StepError::Io { path, source } => CliError::Io { path, source },
+        other => CliError::Input(other.to_string()),
+    })?;
+
+    let volume = imported.mesh.signed_volume().abs();
+    let triangles = imported.mesh.triangle_count();
+    let vertices = imported.mesh.vertex_count();
+    let bounds = imported.mesh.bounding_box();
+    let mut stl = None;
+    if let Some(path) = out.as_deref() {
+        let bytes = write_stl_binary(&imported.mesh, path)?;
+        stl = Some(path.display().to_string());
+        eprintln!("wrote {} ({bytes} bytes, binary STL)", path.display());
+    }
+
+    let summary = serde_json::json!({
+        "source": from.display().to_string(),
+        "name": imported.name,
+        "source_unit": imported.source_unit.symbol(),
+        "closed": imported.closed,
+        "entities": imported.entities,
+        "faces": imported.faces,
+        "skipped_faces": imported.skipped_faces,
+        "vertices": vertices,
+        "triangles": triangles,
+        "volume_mm3": volume,
+        "bounds": bounds.map(|bounds| serde_json::json!({
+            "min": bounds.min,
+            "max": bounds.max,
+        })),
+        "stl": stl,
+    });
+    print_json(&summary)?;
+    eprintln!(
+        "read {} as {}: {} triangles, {} face(s) skipped, {:.6} mm3",
+        from.display(),
+        if imported.closed {
+            "a closed solid"
+        } else {
+            "an open shell"
+        },
+        triangles,
+        imported.skipped_faces,
+        volume
+    );
     Ok(0)
 }
 

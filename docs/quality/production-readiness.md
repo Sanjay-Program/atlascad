@@ -20,17 +20,18 @@ penetration test, and it says so.
 **The product is not worth $10,000–$50,000 per year today, and no single change makes it so.**
 
 What exists is a small, unusually honest local CAD application: one body, one sketch family,
-extrude/cut/revolve, a per-feature rebuild cache, save/reopen, undo/redo, STL export, a loopback HTTP
+extrude/cut/revolve (full turn or capped partial angle), a per-feature rebuild cache, save/reopen, undo/redo, STL export, a loopback HTTP
 API with real origin and size checks, and a test suite that measures analytic volumes instead of
 comparing the program to itself. That is a credible **prototype or a free/inexpensive niche tool**.
 It is not an enterprise CAD seat.
 
 The gap is not polish. It is in the three things a paying professional buys:
 
-1. **Geometry that survives real parts.** The booleans fail on ordinary modelling, measured in this
-   cycle: a union of a body with a fully contained solid returns no result. The repository's own
-   corpus records tangent contact, coordinates near 1e6 mm and the raw coplanar cut as failures, and
-   three-operand unions panic inside truck (caught, reported, and then unavailable).
+1. **Geometry that survives real parts.** Most ordinary cases now work: contained unions and
+   face-to-face joins complete through a measured 1e-3 mm inward retry, and three-operand chains
+   complete through a 3e-2 mm tolerance escalation (0.003 % volume cost). The corpus still records
+   two failures: booleans beyond ±1e5 mm are refused with a re-centre message, and the raw coplanar
+   cut still fails.
 2. **Interoperability.** There is no STEP or IGES import or export anywhere in the platform — only
    binary STL out. A tool that cannot read the customer's STEP files and cannot write STEP back does
    not enter a professional workflow at any price.
@@ -72,7 +73,7 @@ Chrome.
 | `atlas box --size 10,10,5 --out part.stl` | < 10 ms, 4.5 MB RSS, 684-byte STL, 12 triangles | release CLI |
 | Workspace tests | **309 passed, 0 failed** | `cargo test --offline --workspace -j 2` |
 | fmt / clippy | clean, 0 warnings | `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -D warnings` |
-| Kernel corpus | 8 must-pass ok, 3 recorded known failures, **0 regressions** | `cargo run -p cad-kernel-truck --example corpus` |
+| Kernel corpus | 9 must-pass ok, 2 recorded known failures, **0 regressions** | `cargo run -p cad-kernel-truck --example corpus` |
 | Control-plane validation | 0 errors, 0 warnings | `atlas-eng validate` |
 | Full release gate, warm | **~15 s** including the release rebuild, simulation and browser check | `./scripts/gate.sh` |
 | Deployable bundle | 3.1 MB tarball, verified by extraction + checksums + smoke tests | `./scripts/package.sh` |
@@ -88,11 +89,12 @@ faces, and the error discipline is real. Neither is the problem.
 
 | Case | Result |
 |---|---|
-| Union of a 40×30×10 plate with a boss **fully inside** it | `join failed: … union produced no result; the operands may be tangent, coincident, or nearly degenerate` — the feature is marked failed and export is refused, which is honest, but the modelling operation is unavailable |
+| Union of a 40×30×10 plate with a boss **fully inside** it | **fixed**: a strictly contained solid unions exactly; if it touches a face, the adapter's 1e-3 mm inward retry completes at 1000.016 vs 1000 mm³ and is watertight (`a_contained_union_that_touches_a_face_returns_the_container`) |
+| Face-to-face union (tangent contact) | **fixed**: truck's raw compound (area 1200 for two cubes) is retried inward to one watertight solid, 1999.900 mm³ / 1000.000 mm² |
 | Crash (`kill -9`) after an unsaved parameter edit | **24 000 mm³ lost, reopened at 12 000 mm³** before the fix in §5; now recovered from a snapshot, verified in the API and in the browser |
 | Truncated (half-written) project file | refused with `not valid JSON: EOF while parsing a value`, exit 1 — correct, and now a snapshot can recover the edit if one exists |
 | Coplanar cut at the raw kernel | recorded known failure; the adapter works around it with a ~1e-4 mm tool nudge, and the bound is tested |
-| Three-operand boolean chain | recorded failure: the third union panics inside truck (`intersection_curve.rs:172`), caught and reported |
+| Three-operand boolean chain | **fixed for unions and cuts**: a nine-box union chain completes via the 3e-2 mm tolerance escalation (5000.136 vs 5000 mm³, 0.003 % high); a five-hole cut chain is unchanged at every rung, and `boolean_escalations()` reports each use |
 
 ### 2.2 What was not verified here
 
@@ -109,7 +111,7 @@ faces, and the error discipline is real. Neither is the problem.
 
 | Requirement at the $10k–50k/yr bar | Today | Evidence |
 |---|---|---|
-| Reliable B-rep booleans on real parts | **Fails**: contained union, tangent contact, 3+ chains, large coordinates | §2.1, `docs/kernel-comparison.md` §4 |
+| Reliable B-rep booleans on real parts | **Partial**: raw coplanar cuts still fail, and booleans beyond ±1e5 mm are refused with a re-centre message; chains, tangent contact and contained unions are handled with measured bounds | §2.1, `docs/kernel-comparison.md` §4 |
 | STEP AP203/214/242 import **and** export | **Absent** | no implementation in `crates/` |
 | IGES / STEP-adjacent neutral interchange | **Absent** | same |
 | DXF **read and write** of a 2D drawing | **Present for a plan drawing** (2026-10-30): layers, point/line/circle/arc/polyline, R12 out and in, unsupported types reported | `crates/cad-drafting`, `t-platform-drafting-20261030`. Not a drafting editor and not a supplier-file corpus |
@@ -135,10 +137,11 @@ faces, and the error discipline is real. Neither is the problem.
 
 ## 4. Findings, in severity order
 
-**F-1 (Critical) — Geometry fails on ordinary parts.** The booleans are the product's core, and they
-are the weakest part. A contained union returns no result; chains of three or more fail; tangent
-contact fails; coordinates near 1e6 mm fail; the raw coplanar cut fails (worked around with a nudge).
-A professional cannot model a bracket with a pocket and a boss without hitting one of these.
+**F-1 (High) — Geometry still fails on some parts.** Contained unions, tangent joins and chains now
+complete with measured bounds, but booleans beyond ±1e5 mm are refused (rather than returning a
+malformed solid) and the raw coplanar cut still fails. A professional working at large coordinates
+or relying on a coincident-face cut can still hit these, which is why the corpus, not the happy path,
+remains the gate.
 *Consequence:* unusable for paid work, and the worst kind of support load — the failure is correct but
 the operation is missing.
 
@@ -301,12 +304,14 @@ tool refuses with a reason.
 
 1. Implement `cad_contract::Kernel` for `solidcraft-kernel` behind a feature flag (M1) and run both
    kernels against the corpus, per operation, in the report.
-2. Close the boolean gaps or refuse them explicitly: contained unions, tangent contact, three-operand
-   chains, large coordinates, coplanar cuts without the nudge.
+2. Close the remaining boolean gaps or refuse them explicitly: large coordinates (currently refused
+   beyond ±1e5 mm) and coplanar cuts without the nudge. Chains, tangent joins and contained unions
+   are closed through the measured retries.
 3. Fillets and chamfers on the kernel that wins, then shells and drafts.
 4. Tessellation resource budgets and a 10k-face benchmark with a published latency and memory target.
 
-**Exit:** zero wrong solids on a 500-fixture corpus; at least five-operand boolean chains; a housing
+**Exit:** zero wrong solids on a 500-fixture corpus; five-operand boolean chains (already met for a
+nine-box union chain via the ladder); a housing
 with 20 fillets edits in under 200 ms.
 
 ### P3 — Modelling depth (12–24 weeks)

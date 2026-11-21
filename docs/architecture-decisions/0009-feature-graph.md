@@ -16,9 +16,11 @@ features were built on top of it.
 
 Two constraints shaped the design:
 
-- **The kernel decides which operations exist.** The M2 corpus records difference as unsupported and
-  union as passing except for `union_tangent_contact`. A feature graph that promises cut would be
-  shipping a defect generator, so only extrude + join is wired to real geometry.
+- **The kernel decides which operations exist.** At decision time the M2 corpus recorded difference
+  as unsupported and union as passing except for `union_tangent_contact`. A feature graph that
+  promises cut would be shipping a defect generator, so only extrude + join was wired to real
+  geometry. (Both have since changed: difference is supported, and tangent contact is fused by the
+  adapter's inward retry — `docs/kernel-comparison.md` §4.2.3.)
 - **A failed rebuild must not destroy the user's model.** The studio previously rolled the whole
   mutation back when the kernel failed, which is correct for an invalid parameter but wrong for a
   history: the user needs to see *which* feature failed and keep editing the rest.
@@ -119,13 +121,13 @@ migration rules are covered by tests rather than prose.
   feature, and undo/redo restores history and geometry together because the snapshots contain both.
 - `cad-cli` and `cad-studio` both consume the same `build` report; neither carries its own history
   logic.
-- Cut and full-turn revolve are available because the kernel corpus and analytic tests back them;
-  fillet, sweep, loft, partial revolve and multi-body remain unavailable. They are stated as
+- Cut and revolve — a full turn or a capped partial angle — are available because the kernel corpus
+  and analytic tests back them; fillet, sweep, loft and multi-body remain unavailable. They are stated as
   unavailable in the UI rather than faked, and the kernel corpus is the authority on when that can
   change.
-- **Known limit carried forward:** a join of two bodies that only touch tangentially hits the
-  corpus's recorded `union_tangent_contact` failure. The application reports the join failure and
-  keeps the previous body; it does not emit a wrong solid.
+- **Resolved (2026-11-21):** a join of two bodies that only touch is now fused by the adapter's
+  1e-3 mm inward retry (`docs/kernel-comparison.md` §4.2.3); the application no longer reports that
+  join as failed, and it still never emits the raw two-shell compound as a solid.
 - **Performance cost:** an unchanged request is served from a per-prefix `BuildCache`, so it does no
   kernel work; an edit re-runs only the features whose resolved inputs changed. A two-feature join
   with a shared parameter still rebuilds both and measures ~18.5 ms on the recorded host; see

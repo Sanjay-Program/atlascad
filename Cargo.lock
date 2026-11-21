@@ -171,6 +171,8 @@ dependencies = [
  "atlas-material-system",
  "atlas-scene-graph",
  "atlas-timeline",
+ "cad-contract",
+ "cad-io",
  "serde",
  "serde_json",
  "thiserror 2.0.21",

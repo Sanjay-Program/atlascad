@@ -176,6 +176,11 @@ pub mod pumped_storage_hydro;
 pub mod semiconductor_euv_lithography;
 pub mod geothermal_binary_orc;
 pub mod cable_stayed_bridge;
+pub mod supersonic_wind_tunnel_nozzle;
+pub mod ev_torque_vectoring;
+pub mod subsea_riser_viv;
+pub mod chromatography_column;
+pub mod maglev_guideway_suspension;
 
 pub mod prelude {
     pub use crate::acoustics::{
@@ -812,5 +817,25 @@ pub mod prelude {
     };
     pub use crate::cable_stayed_bridge::{
         CableStayProblem, CableStayResult, StayCableClass, solve_cable_stayed_bridge,
+    };
+    pub use crate::supersonic_wind_tunnel_nozzle::{
+        NozzleContourMethod, SupersonicGasMedium, SupersonicNozzleProblem, SupersonicNozzleResult,
+        solve_supersonic_wind_tunnel_nozzle,
+    };
+    pub use crate::ev_torque_vectoring::{
+        EvAwdLayout, EvTorqueVectoringProblem, EvTorqueVectoringResult, RoadSurfaceCondition,
+        solve_ev_torque_vectoring,
+    };
+    pub use crate::subsea_riser_viv::{
+        MarineRiserType, OceanCurrentProfile, SubseaRiserVivProblem, SubseaRiserVivResult,
+        VivSuppressionDevice, solve_subsea_riser_viv,
+    };
+    pub use crate::chromatography_column::{
+        ChromatographyColumnProblem, ChromatographyColumnResult, ChromatographyMode,
+        solve_chromatography_column,
+    };
+    pub use crate::maglev_guideway_suspension::{
+        GuidewayDisturbanceType, MaglevCoreMaterial, MaglevSuspensionProblem, MaglevSuspensionResult,
+        solve_maglev_guideway_suspension,
     };
 }

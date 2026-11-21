@@ -462,7 +462,7 @@
     {
       "id": "cap.kernel.revolve",
       "name": "Revolve",
-      "description": "Turn a validated planar profile a full revolution about one of its sketch axes, producing a solid of revolution.",
+      "description": "Turn a validated planar profile about one of its sketch axes by an angle up to a full revolution, producing a solid of revolution with capped ends when the turn is partial.",
       "provided_by": [
         "module.cad-kernel-truck",
         "module.kernel.truck"
@@ -470,10 +470,11 @@
       "verification": "verified",
       "evidence": [
         "engineering/quality/tests.json#t-cad-kernel-truck-m11d (analytic cylinder and annulus volumes, watertight meshes)",
+        "engineering/quality/tests.json#t-cad-revolve-angle-20261121 (analytic quarter annulus and half cylinder, watertight partial turns)",
         "engineering/quality/tests.json#t-cad-studio-m11d (annulus over HTTP, save/reopen, watertight STL export)",
         "crates/cad-kernel-truck/src/lib.rs::tests::revolve_on_the_axis_is_a_cylinder"
       ],
-      "notes": "Full turn only: a partial sweep is an open shell and the document carries bodies only, so it is refused with a reason. A profile that straddles the axis is refused rather than producing a self-intersecting solid. The adapter uses truck's `rsweep`."
+      "notes": "A partial turn is a capped solid: truck's closed sweep already closes both ends, measured as the analytic quarter annulus (2356.194 mm3) and half cylinder (785.398 mm3), both watertight. The angle is validated to be greater than 0 and at most 360 degrees. A profile that straddles the axis is refused rather than producing a self-intersecting solid. The adapter uses truck's `rsweep`."
     },
     {
       "id": "cap.engineering.release-gate",

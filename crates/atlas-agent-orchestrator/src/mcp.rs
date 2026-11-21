@@ -2435,6 +2435,71 @@ impl McpServer {
                     "required": ["cable_chord_length_m", "cable_pretension_kn"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_aerospace_supersonic_nozzle".into(),
+                description: "Calculates choked mass flow rate, exit Mach number, expansion area ratio, normal shock jump conditions, and oblique shock wave angles.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "design_mach": { "type": "number", "default": 2.20 },
+                        "stagnation_pressure_pa": { "type": "number", "default": 450000.0 },
+                        "stagnation_temperature_k": { "type": "number", "default": 320.0 }
+                    },
+                    "required": ["design_mach", "stagnation_pressure_pa"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_automotive_ev_torque_vectoring".into(),
+                description: "Calculates understeer gradient, target yaw rate, longitudinal motor torque split, direct yaw moment, and individual wheel differential torques.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "total_vehicle_mass_kg": { "type": "number", "default": 2150.0 },
+                        "vehicle_speed_m_s": { "type": "number", "default": 25.0 },
+                        "front_steering_angle_deg": { "type": "number", "default": 1.2 }
+                    },
+                    "required": ["total_vehicle_mass_kg", "vehicle_speed_m_s"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_marine_subsea_riser_viv".into(),
+                description: "Calculates transverse modal frequencies, vortex shedding lock-in mode, strake vibration suppression, drag amplification, and S-N fatigue damage.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "riser_total_length_m": { "type": "number", "default": 1850.0 },
+                        "top_tension_kn": { "type": "number", "default": 6500.0 },
+                        "surface_current_velocity_m_s": { "type": "number", "default": 1.65 }
+                    },
+                    "required": ["riser_total_length_m", "top_tension_kn"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_chemical_chromatography_column".into(),
+                description: "Calculates interstitial flow velocity, Reynolds number, plate height HETP, number of theoretical plates, dynamic binding capacity DBC_10%, and bed pressure drop.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "column_inner_diameter_mm": { "type": "number", "default": 300.0 },
+                        "bed_height_mm": { "type": "number", "default": 200.0 },
+                        "superficial_linear_velocity_cm_h": { "type": "number", "default": 300.0 }
+                    },
+                    "required": ["column_inner_diameter_mm", "bed_height_mm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_transport_maglev_suspension".into(),
+                description: "Calculates equilibrium levitation current, flux density, open-loop unstable pole frequency, state-feedback control gains, and dynamic track disturbance attenuation.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "levitated_mass_per_magnet_kg": { "type": "number", "default": 1250.0 },
+                        "nominal_airgap_mm": { "type": "number", "default": 12.0 },
+                        "track_joint_step_disturbance_mm": { "type": "number", "default": 2.50 }
+                    },
+                    "required": ["levitated_mass_per_magnet_kg", "nominal_airgap_mm"]
+                }),
+            },
         ]
     }
 

@@ -61,6 +61,10 @@
       <button id="redoBtn" class="icon-button" title="Redo (Ctrl+Y)" aria-label="Redo" disabled>↷</button>
       <button id="saveBtn" class="button ghost" title="Save project (Ctrl+S)">Save</button>
       <button id="exportBtn" class="button ghost" title="Export binary STL">Export STL</button>
+      <button id="importStepBtn" class="button ghost" title="Import a STEP part as a mesh body (up to 1 MiB)">Import STEP</button>
+      <input id="importStepFile" type="file" accept=".step,.stp,application/step,text/plain" hidden>
+      <button id="importDxfBtn" class="button ghost" title="Import a DXF drawing (up to 1 MiB)">Import DXF</button>
+      <input id="importDxfFile" type="file" accept=".dxf,application/dxf,text/plain" hidden>
       <button id="exportDxfBtn" class="button ghost" title="Download the plan drawing as DXF R12">Export DXF</button>
       <button id="exportStepBtn" class="button ghost" title="Export ISO 10303-21 STEP AP214 CAD Part">Export STEP</button>
       <button id="export3mfBtn" class="button ghost" title="Export ASTM/ISO 52915 3MF Additive Model">Export 3MF</button>
@@ -564,6 +568,17 @@
         </div>
       </section>
 
+      <section class="panel-section collapsible-section" id="sectionImports" hidden>
+        <div class="section-head">
+          <h2>Imported bodies</h2>
+          <span class="hint" id="importsLabel">0</span>
+          <button type="button" class="section-collapse-btn" aria-expanded="true" aria-controls="sectionImportsBody" title="Collapse section">▾</button>
+        </div>
+        <div class="section-body" id="sectionImportsBody">
+          <ul id="imports" class="revision-list" aria-live="polite"></ul>
+        </div>
+      </section>
+
       <section class="panel-section collapsible-section" id="sectionCreate">
         <div class="section-head">
           <h2>Create</h2>
@@ -648,6 +663,10 @@
             <option value="vertical">Vertical (sketch Y)</option>
             <option value="horizontal">Horizontal (sketch X)</option>
           </select>
+        </div>
+        <div class="field" id="newAngleField" hidden>
+          <label for="newFeatureAngle">Angle</label>
+          <input id="newFeatureAngle" type="number" min="1" max="360" step="1" value="360" aria-label="Revolve angle in degrees">
         </div>
         <button id="addFeatureBtn" class="button wide">Add extrude</button>
         <p class="hint" id="createHint">The first extrude starts the body; later extrudes join it.</p>
@@ -2805,6 +2824,9 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
           <button type="button" class="tool-button" data-tool="spline" aria-pressed="false" title="Spline: click fit points, then Finish or Close">Spline</button>
           <button type="button" class="tool-button" data-tool="point" aria-pressed="false" title="Point">Point</button>
           <button type="button" class="tool-button" data-tool="dimension" aria-pressed="false" title="Dimension: click the two points to measure">Dim</button>
+          <button type="button" class="tool-button" data-tool="angdim" aria-pressed="false" title="Angular Dimension (DAN): click the vertex, then a point on each ray">AngDim</button>
+          <button type="button" class="tool-button" data-tool="leader" aria-pressed="false" title="Leader (LE): click the arrow and shoulder points, type text, then Finish">Leader</button>
+          <button type="button" class="tool-button" data-tool="centermark" aria-pressed="false" title="Center Mark (CM): select a circle/arc, or click its centre and an arm point">Center</button>
           <button type="button" class="tool-button" data-tool="text" aria-pressed="false" title="Text: type a value, then click where it goes">Text</button>
           <button type="button" class="tool-button" id="drawUndoBtn" title="Undo the last drawing edit">↶</button>
           <button type="button" class="tool-button" id="drawDeleteBtn" title="Delete the selected entity">✕</button>
@@ -3009,6 +3031,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
         <dt>L / C / REC</dt><dd>AutoCAD Line / Circle / Rectangle</dd>
         <dt>EL / PL / SPL</dt><dd>AutoCAD Ellipse / Polyline / Spline</dd>
         <dt>DIM / TEXT / PO</dt><dd>AutoCAD Dimension / Text / Point</dd>
+        <dt>LE / DAN / CM</dt><dd>Leader / Angular Dimension / Center Mark</dd>
         <dt>F3 / F10</dt><dd>Toggle Object Snap / Polar Tracking</dd>
         <dt>FEA / MODAL</dt><dd>Linear Static Stress / Dynamic Vibration FEA</dd>
         <dt>CAM / GCODE</dt><dd>Generate 3-Axis CNC Machining Toolpaths</dd>
@@ -3029,6 +3052,12 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
         <dt>Drag</dt><dd>Orbit</dd>
         <dt>Shift + drag</dt><dd>Pan</dd>
         <dt>Scroll</dt><dd>Zoom</dd>
+        <dt>Drag a drawing entity</dt><dd>Move it (Shift = ortho, Ctrl/Cmd = copy, Esc = cancel)</dd>
+        <dt>Drag a block card</dt><dd>Place a library component on the drawing sheet</dd>
+        <dt>Drag a layout / workbench tab</dt><dd>Reorder tabs (order is remembered in this browser)</dd>
+        <dt>Drag a panel heading</dt><dd>Reorder project-browser sections</dd>
+        <dt>Drag a number field label</dt><dd>Scrub the value (Shift ×10, Alt ×0.1, Esc = cancel)</dd>
+        <dt>Alt + Arrow</dt><dd>Move the focused tab or panel section with the keyboard</dd>
       </dl>
       <p class="hint">All commands in the palette are connected to the project API. There are no placeholder actions.</p>
     </div>
@@ -3044,6 +3073,12 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
       <div id="simHudContent" class="sim-hud-content"></div>
     </div>
   </div>
+
+  <div id="dragHud" class="drag-hud" hidden aria-hidden="true">
+    <span class="drag-hud-title" id="dragHudTitle"></span>
+    <span class="drag-hud-detail" id="dragHudDetail"></span>
+  </div>
+  <div id="atlasDragAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
@@ -3079,9 +3114,15 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
         <dt>EXT / REV</dt><dd>Extrude / Revolve</dd>
         <dt>EL / PL / SPL</dt><dd>Ellipse / Polyline / Spline</dd>
         <dt>DIM / TEXT / PO</dt><dd>Dimension / Text / Point</dd>
+        <dt>LE / DAN / CM</dt><dd>Leader / Angular Dimension / Center Mark</dd>
         <dt>F3 / F10</dt><dd>Toggle Object Snap / Polar Tracking</dd>
         <dt>FEA / MODAL</dt><dd>Linear Static Stress / Modal Vibration FEA</dd>
         <dt>CAM / GCODE</dt><dd>Generate 3-Axis CNC Toolpaths</dd>
+        <dt>Drag entity</dt><dd>Move drawing geometry (Shift ortho, Ctrl copy, Esc cancel)</dd>
+        <dt>Drag block card</dt><dd>Place a library component on the sheet</dd>
+        <dt>Drag tab / section heading</dt><dd>Reorder (saved in this browser)</dd>
+        <dt>Drag a number label</dt><dd>Scrub the field value</dd>
+        <dt>Alt + Arrow</dt><dd>Move the focused tab or section</dd>
       </dl>
       <p class="hint">All commands in the palette are connected to the project API. There are no placeholder actions.</p>
     </div>
@@ -3145,7 +3186,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
       </div>
       <div class="block-lib-grid" id="blockLibGrid"></div>
       <div class="block-lib-foot">
-        <span class="hint">Click any component to insert instance into active drawing sheet at cursor.</span>
+        <span class="hint">Click a component to insert it at the cursor, or drag it onto the drawing sheet to place it exactly.</span>
       </div>
     </div>
   </div>

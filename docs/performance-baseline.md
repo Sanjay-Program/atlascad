@@ -109,13 +109,13 @@ cost of this hardware: a single crate build, not a micro-benchmark.
 | Artifact | Command | Expected |
 |---|---|---|
 | Contract tests | `cargo test --release -p cad-contract` | 54 pass + 1 doctest |
-| Adapter tests | `cargo test --release -p cad-kernel-truck` | 13 pass |
+| Adapter tests | `cargo test --release -p cad-kernel-truck` | 40 pass (2026-11-21) |
 | Benchmark | `./target/release/examples/bench --iters 5` | exit 0, volumes within 1 mm³ of analytic |
 | Boolean failure matrix | `cargo run --release -p cad-kernel-truck --example probe` | coplanar rows FAILED, others OK |
 | Coplanar retry threshold | `... --example probe5` | 1e-6 FAILED, 1e-5…1e-2 OK |
 | Difference diagnosis | `... --example probe6` | raw difference 1053.3 vs analytic 840; inner shell reported **+**117.3. Resolved: the cavity walls were wound outward, and the adapter's shell-sign repair fixes it — the repaired fixtures are exact (docs/kernel-comparison.md §4.2) |
 | Cut rebuild cost | `cargo run --release -p cad-studio --example rebuild_bench` | box+join 3.14 ms, box+cut **1.81 ms**, box+cut+join 4.05 ms (rebuild only; median of 20 on this host) |
-| Chain limit | `... --example chain` | union 1 OK, union 2 Internal error |
+| Chain limit | `... --example chain` | **resolved**: a nine-box chain completes at the 3e-2 mm rung, 5000.136 mm³ vs 5000; unions 2–8 take the ladder |
 
 Determinism: no random seeds, no time-of-day input, no network. The only variability is scheduling.
 

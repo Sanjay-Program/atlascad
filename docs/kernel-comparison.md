@@ -23,9 +23,9 @@ reason is stated. The full evidence for truck's behaviour is reproducible with:
 cargo run --release -p cad-kernel-truck --example probe     # boolean matrix, coplanar vs non-coplanar
 cargo run --release -p cad-kernel-truck --example probe5    # coplanar + nudge experiment
 cargo run --release -p cad-kernel-truck --example probe6    # per-shell volume localisation
-cargo run --release -p cad-kernel-truck --example chain     # union chain limit
+cargo run --release -p cad-kernel-truck --example chain     # union chain: completes via the tolerance ladder
 cargo run --release -p cad-kernel-truck --example bench     # timings + correctness
-cargo test  --release -p cad-kernel-truck                   # 13 tests
+cargo test  --release -p cad-kernel-truck                   # 42 tests
 ```
 
 ## 2. Candidates at a glance (facts verified from the checkouts)
@@ -51,12 +51,13 @@ Legend: **V** verified by execution · **R** read from source · **—** not pre
 | B-rep topology | **V** (`Solid`, shells, faces, edges) | R | R | R | R | R |
 | Solid primitives | **V** (extruded prisms) | R | R | R | R | R |
 | Boolean union | **V** — 1120 mm³ for a 1000+160−40 fixture, 0.0037 mm³ error; corpus: partial overlap passes | R | R | R | R | R |
+| Face-to-face union (tangent contact) | **V** — fused into one watertight solid by a 1e-3 mm inward retry (§4.2.3); measured 1999.900 mm³ / 1000.000 mm² | ? | ? | ? | ? | ? |
 | Boolean intersection | **V** — 40 mm³ for a 2×2×10 overlap; corpus: thin wall and near-degenerate sliver pass | R | R | R | R | R |
 | Boolean difference | **V** — exact for a tool that pierces the body, and the document refuses a cut that stops inside it (§4.2.1); coincident faces remain a recorded limitation | ? | ? | ? | ? | ? |
-| Boolean chains (3+ operands) | **V — fails at the third union** (§4.3) | ? | ? | ? | ? | ? |
+| Boolean chains (3+ operands) | **V — completes via a 3e-2 mm tolerance escalation** (§4.3) | ? | ? | ? | ? | ? |
 | Coplanar-face booleans | **V — fails without a nudge** (§4.1) | R | R | R | R | R |
 | Extrude | **V** — 148 753 boxes/s, exact analytic volume | R | R | R | R | R |
-| Revolution (full turn) | **V** — truck's `rsweep`; a rectangle on the axis measures 150.796 mm³ against π·4²·3 within 0.05, an offset rectangle 113.097 mm³ against π·(4²−2²)·3, both watertight; a partial turn and a profile crossing the axis are refused | R | R | R | R | R |
+| Revolution (full or partial turn) | **V** — truck's `rsweep`; a rectangle on the axis measures 150.796 mm³ against π·4²·3 within 0.05, an offset rectangle 113.097 mm³ against π·(4²−2²)·3, both watertight; a 90° turn of the offset rectangle measures the analytic quarter annulus (2356.194 mm³) and a 180° turn on the axis the analytic half cylinder (785.398 mm³), both watertight; a profile crossing the axis is refused | R | R | R | R | R |
 | Sweep / loft | — in the adapter; R in SolidCraft's kernel | R | R | R | R | R |
 | Fillet / chamfer | — in the adapter; **R + shipped** in SolidCraft's kernel (own implementation) | R | R | R | R | R |
 | Shell / offset | — in the adapter; R in SolidCraft | R | R | R | R | R |
@@ -82,21 +83,28 @@ makes the binary exit non-zero.
 | `union_partial_overlap` | 1120 mm³ | **ok** |
 | `intersection_thin_wall` | analytic | **ok** |
 | `intersection_near_degenerate_sliver` | analytic | **ok** |
-| `union_tangent_contact` | analytic | **known failure** — the tangent case does not produce a solid |
-| `intersection_large_coordinates` | analytic (coords near 1e6 mm) | **known failure** — the kernel loses precision at that scale |
+| `union_tangent_contact` | 2000 mm³ / 1000 mm² | **ok** — 1999.900 mm³ / 1000.000 mm², watertight (§4.2.3) |
+| `intersection_large_coordinates` | analytic (coords near 1e6 mm) | **known failure** — refused with a re-centre message; the same full-span coplanar case also leaves open edges at the origin |
 | `difference_piercing_cut` | 84 000 mm³ / 22 400 mm² | **ok** — delta 0 |
 | `difference_contained_void` | 184 000 mm³ / 32 800 mm² | **ok** — delta 0 |
 | `difference_coplanar_cut` | 84 000 mm³ / 22 400 mm² | **known failure** — volume 84 000.18, area 25 600, not watertight (§4.2) |
 
-Measured: **8 ok, 3 known failures, 0 regressions, 0 unexpected passes**, exit code 0. The two cut
-fixtures that pass are exact rather than close: their reported delta is 0.000e0.
+Measured: **9 ok, 2 known failures, 0 regressions, 0 unexpected passes**, exit code 0. The two cut
+fixtures that pass are exact rather than close: their reported delta is 0.000e0, and tangent contact
+is now fused into one watertight solid by the inward retry (§4.2.3).
 
-Two things are worth stating plainly. First, the two known failures were **not known before the
-corpus existed**: tangent contact and large-coordinate intersection were invisible to the
-hand-written tests, which is precisely the argument for a corpus over ad-hoc cases. Second, a known
-failure is recorded as a **baseline**, not a skip — the corpus prints it, the gate stays green, and a
-future fix appears as an unexpected pass that has to be promoted deliberately. Silently skipping the
-two would have made the corpus agree with itself rather than with the kernel.
+Two things are worth stating plainly. First, the known failures were **not known before the corpus
+existed**: tangent contact and large-coordinate intersection were invisible to the hand-written
+tests. Tangent contact has since been fixed and promoted to must-pass; the remaining two — the
+large-coordinate intersection and the raw coplanar cut — are still recorded as a **baseline**, not a
+skip: the corpus prints them, the gate stays green, and a future fix appears as an unexpected pass
+that has to be promoted deliberately.
+
+The large-coordinate case is now **refused rather than measured**: operands beyond ±1e5 mm get an
+error naming the bound and asking for a re-centre. Probing showed precision is not the only cause —
+the same full-span coplanar intersection leaves 18 open edges at the origin, and translating the
+malformed result back hangs inside truck. The refusal is therefore the honest answer until the
+kernel can represent the case.
 
 The real kernel (`solidcraft-kernel`) has **not** been run against this corpus: it needs the ≥16 GB
 RAM host. Until it is, the "two kernels, one corpus" comparison this document is meant to deliver
@@ -220,10 +228,26 @@ guarded: a difference that removes everything is refused with a message, because
 "nothing" and the retry would otherwise return a shell as thick as its own nudge (measured 0.008 mm³ for
 a plate cut by its own profile).
 
-### 4.3 Chains fail
+#### 4.2.3 Tangent contact and contained union
 
-A union of boxes offset by half their width: the first union succeeds (1500.010 mm³ vs 1500), the
-second **panics inside truck's geometry code**:
+Truck's raw union of two solids that share a face returns both as a two-shell compound: the volume is
+right, but the shared face is counted twice, so two 10 mm cubes measure 1200 mm² instead of 1000.
+Volume conservation cannot see this because the double wall's normals cancel. The adapter now checks
+the result's shell count against the operands': when a union returns one shell per operand, it retries
+with the tool moved 1e-3 mm **inward** and keeps the merged result only if it has fewer shells.
+Measured: 1999.900 mm³ and 1000.000 mm², watertight, against 2000 / 1200 unmerged. The cost is 0.1 mm³
+(50 ppm) on this pair, and a genuinely disjoint union is untouched because the inward retry does not
+reduce its shell count.
+
+A contained solid uses the same direction. Strictly inside, truck already returns the container
+exactly (1000.000 mm³ / 600.000 mm²). When the inner solid touches the container's bottom face, the
+raw union and the outward retry both return no result; the inward retry pulls it 1e-3 mm out
+through that face and completes at 1000.016 mm³ / 600.016 mm², watertight.
+
+### 4.3 Chains need a tolerance escalation
+
+A union of boxes offset by half their width: at the configured 1e-3 mm tolerance the first union
+succeeds (1500.010 mm³ vs 1500) and the second **panics inside truck's geometry code**:
 
 ```
 union 1 at x=5  -> ok, volume 1500.010 (expected 1500), retries so far 1
@@ -231,9 +255,14 @@ union 2 at x=10 -> FAILED: kernel internal error: union: non-string panic payloa
                    (panic: tolerance must be no less than 1e-6, intersection_curve.rs:172)
 ```
 
-The panic is caught and reported as `KernelError::Internal`, so the document is not corrupted — but
-the operation is unavailable. Real modelling is a sequence of booleans, so this alone disqualifies a
-naive "just use truck" integration.
+The adapter now retries a boolean that panics (or returns no result) at
+`BOOLEAN_TOLERANCE_LADDER_MM = [3e-2, 1e-1]`. Measured on a nine-box chain, every union from the
+second onwards needs a rung; at 3e-2 mm all eight unions complete, and the result is 5000.136 mm³
+against an analytic 5000 (0.003 % high, from the coplanar retry's membranes). A five-hole difference
+chain measures the same volume at 1e-3, 5e-2 and 1e-1 mm, so cuts are not perturbed. The cost is
+honest and bounded: an escalated operation may classify features closer than the rung as touching,
+it is only used after the configured tolerance has failed, and `boolean_escalations()` counts it.
+Ordinary booleans stay on the configured tolerance (asserted in `operations_are_counted`).
 
 ### 4.4 Upstream non-determinism (from the vendored patch notes)
 
@@ -304,7 +333,11 @@ lacks, and every second kernel multiplies the test surface.
   **evidence-based for truck and repository-based for the alternatives**, and says so.
 * The 75/76 oracle figure is SolidCraft's claim, not a re-run.
 * WASM viability is unverified for every candidate.
-* Boolean chains are **unavailable** through the adapter (the third union panics inside truck). Difference
-  is available and exact for a tool that clears the body's top face, and the document refuses a tool
-  that stops below it (§4.2.1); operands with coincident faces remain a recorded, measured limitation
-  (§4.2.2), and the root cause is in the kernel layer, not the adapter.
+* Boolean chains are **available through a tolerance escalation**: a chain that panics at the
+  configured tolerance is retried at 3e-2 and then 1e-1 mm (`boolean_escalations()` counts it), and a
+  nine-box union chain completes at 5000.136 mm³ vs analytic 5000. Difference is available and exact
+  for a tool that clears the body's top face, and the document refuses a tool that stops below it
+  (§4.2.1); a raw coplanar cut remains a recorded, measured limitation (§4.2.2), while tangent
+  contact and contained unions are fused by the inward retry (§4.2.3); booleans beyond ±1e5 mm are
+  refused with a re-centre message rather than returning malformed topology (the 1e6 mm case is both
+  a precision and a full-span coplanar defect); the root cause is in the kernel layer.

@@ -4792,6 +4792,160 @@ body.viewport-orbiting #cadCanvas {
   border: 1px solid #334155;
 }
 
+/* ==========================================================================
+   Unified Drag & Drop Layer
+   ========================================================================== */
+label.scrub-label {
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+label.scrub-label:hover,
+label.scrub-label.scrubbing {
+  color: var(--accent);
+}
+
+label.scrub-label::after {
+  content: "⇔";
+  margin-left: 4px;
+  font-size: 9px;
+  opacity: 0.45;
+  vertical-align: middle;
+}
+
+.drag-hud {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 14000;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 280px;
+  padding: 7px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 7px;
+  background: rgba(9, 13, 19, 0.94);
+  color: #f8fafc;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  transform: translate(14px, 12px);
+  animation: hudFadeIn 0.12s ease-out;
+}
+
+.drag-hud[hidden] {
+  display: none;
+}
+
+.drag-hud-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.drag-hud-detail {
+  font-size: 10.5px;
+  color: #9fb3c8;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+[data-theme="light"] .drag-hud {
+  background: rgba(248, 250, 252, 0.97);
+  color: #0f172a;
+  border-color: #0284c7;
+}
+
+[data-theme="light"] .drag-hud-detail {
+  color: #475569;
+}
+
+.layout-tab,
+.wb-tab {
+  cursor: grab;
+  touch-action: none;
+}
+
+.panel-left .panel-section > .section-head {
+  cursor: grab;
+  touch-action: none;
+}
+
+.sortable-active,
+body.sortable-dragging {
+  cursor: grabbing !important;
+}
+
+.sortable-dragging {
+  opacity: 0.55;
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+}
+
+#fullDrawingCanvas.entity-dragging {
+  cursor: grabbing;
+}
+
+#fullDrawingCanvas svg .drawing-entity,
+#fullDrawingCanvas svg .drawing-text,
+#fullDrawingCanvas svg .drawing-point,
+#fullDrawingCanvas svg .drawing-dimension,
+#fullDrawingCanvas svg .drawing-insert {
+  cursor: move;
+}
+
+#layoutSheetView.drop-target-active .drawing-sheet-wrapper {
+  outline: 2px dashed var(--accent);
+  outline-offset: 4px;
+}
+
+#fullDrawingCanvas.active-drop {
+  box-shadow: inset 0 0 0 3px rgba(0, 229, 255, 0.45);
+}
+
+.block-card {
+  touch-action: none;
+}
+
+.block-drag-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 14001;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  max-width: 150px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+  font-size: 10.5px;
+  text-align: center;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.block-drag-thumb svg {
+  width: 48px;
+  height: 48px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 
 
 

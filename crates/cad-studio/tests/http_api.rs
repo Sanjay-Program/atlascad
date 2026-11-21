@@ -9040,5 +9040,167 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 246. Supersonic Wind Tunnel Convergent-Divergent de Laval Nozzle Aerodynamics (NASA SP-3012 / Anderson / ISO 5167)
+    let nozzle_res = post(
+        addr,
+        "/api/sim/aerospace/supersonic_nozzle",
+        r#"{
+            "design_mach_number": 2.20,
+            "stagnation_pressure_kpa": 450.0,
+            "stagnation_temperature_k": 320.0,
+            "throat_diameter_mm": 85.0,
+            "ambient_backpressure_kpa": 42.0,
+            "model_deflection_angle_deg": 10.0
+        }"#,
+    )?;
+    assert_eq!(nozzle_res.status, 200);
+    let nozzle_json = json(&nozzle_res)?;
+    assert!(nozzle_json["choked_mass_flow_rate_kg_s"].as_f64().unwrap() > 5.0);
+    assert!(nozzle_json["exit_flow_velocity_m_s"].as_f64().unwrap() > 500.0);
+    assert!(nozzle_json["normal_shock_downstream_mach"].as_f64().unwrap() < 1.0);
+    assert!(nozzle_json["oblique_shock_wave_angle_deg"].as_f64().unwrap() > 30.0);
+    assert!(nozzle_json["is_choked_at_throat"].as_bool().unwrap());
+    assert!(nozzle_json["is_supersonic_flow_established"].as_bool().unwrap());
+    assert!(nozzle_json["is_nozzle_aerodynamically_viable"].as_bool().unwrap());
+
+    // 247. Electric Vehicle (EV) Dual-Motor AWD Torque Vectoring & Yaw Stability (ISO 8855 / Pacejka Magic Formula)
+    let tv_res = post(
+        addr,
+        "/api/sim/automotive/ev_torque_vectoring",
+        r#"{
+            "drivetrain_layout": "DualMotorAwd",
+            "vehicle_mass_kg": 2150.0,
+            "wheelbase_mm": 2900.0,
+            "track_width_mm": 1620.0,
+            "cg_to_front_axle_mm": 1420.0,
+            "yaw_moment_of_inertia_kg_m2": 2950.0,
+            "front_cornering_stiffness_n_rad": 95000.0,
+            "rear_cornering_stiffness_n_rad": 105000.0,
+            "vehicle_speed_km_h": 90.0,
+            "front_steering_angle_deg": 1.2,
+            "demanded_total_torque_nm": 450.0
+        }"#,
+    )?;
+    assert_eq!(tv_res.status, 200);
+    let tv_json = json(&tv_res)?;
+    assert!(tv_json["understeer_gradient_deg_per_g"].as_f64().unwrap() > 0.0);
+    assert!(tv_json["target_yaw_rate_deg_s"].as_f64().unwrap() > 5.0);
+    assert!(tv_json["active_yaw_moment_demand_nm"].as_f64().unwrap() > 20.0);
+    assert!(tv_json["is_yaw_rate_tracking_satisfied"].as_bool().unwrap());
+    assert!(tv_json["is_sideslip_stable"].as_bool().unwrap());
+    assert!(tv_json["is_torque_vectoring_viable"].as_bool().unwrap());
+
+    // 248. Ultra-Deepwater Subsea Marine Riser Vortex-Induced Vibration & Fatigue (DNV-RP-F204 / API 16Q)
+    let riser_res = post(
+        addr,
+        "/api/sim/marine/subsea_riser_viv",
+        r#"{
+            "suppression_device": "HelicalStrakesTripleStart",
+            "riser_length_m": 1850.0,
+            "water_depth_m": 1800.0,
+            "outer_diameter_mm": 533.4,
+            "wall_thickness_mm": 25.4,
+            "top_tension_kn": 6500.0,
+            "internal_fluid_density_kg_m3": 1250.0,
+            "seawater_density_kg_m3": 1025.0,
+            "surface_current_velocity_m_s": 1.65,
+            "bottom_current_velocity_m_s": 0.25,
+            "steel_elastic_modulus_gpa": 207.0
+        }"#,
+    )?;
+    assert_eq!(riser_res.status, 200);
+    let riser_json = json(&riser_res)?;
+    assert!(riser_json["fundamental_frequency_hz"].as_f64().unwrap() > 0.01);
+    assert!(riser_json["dominant_lockin_mode"].as_u64().unwrap() >= 20);
+    assert!(riser_json["predicted_fatigue_life_years"].as_f64().unwrap() >= 25.0);
+    assert!(riser_json["is_viv_amplitude_acceptable"].as_bool().unwrap());
+    assert!(riser_json["is_fatigue_life_compliant"].as_bool().unwrap());
+    assert!(riser_json["is_subsea_riser_viable"].as_bool().unwrap());
+
+    // 249. Biopharmaceutical Protein Downstream Purification Chromatography Column Dynamics (FDA cGMP / ASME BPE)
+    let chrom_res = post(
+        addr,
+        "/api/sim/chemical/chromatography_column",
+        r#"{
+            "column_diameter_mm": 300.0,
+            "bed_height_mm": 200.0,
+            "linear_velocity_cm_h": 300.0,
+            "feed_protein_concentration_g_l": 3.50,
+            "max_binding_capacity_g_l": 55.0,
+            "langmuir_constant_l_g": 8.33,
+            "resin_particle_diameter_um": 50.0,
+            "bed_void_fraction": 0.36,
+            "intraparticle_porosity": 0.65,
+            "buffer_viscosity_mpa_s": 1.05
+        }"#,
+    )?;
+    assert_eq!(chrom_res.status, 200);
+    let chrom_json = json(&chrom_res)?;
+    assert!(chrom_json["residence_time_minutes"].as_f64().unwrap() > 3.0);
+    assert!(chrom_json["hetp_mm"].as_f64().unwrap() < 1.0);
+    assert!(chrom_json["number_of_theoretical_plates"].as_f64().unwrap() > 400.0);
+    assert!(chrom_json["dynamic_binding_capacity_10pct_g_l"].as_f64().unwrap() > 40.0);
+    assert!(chrom_json["is_pressure_drop_acceptable"].as_bool().unwrap());
+    assert!(chrom_json["is_dbc_utilization_competitive"].as_bool().unwrap());
+    assert!(chrom_json["is_chromatography_column_viable"].as_bool().unwrap());
+
+    // 250. High-Speed Maglev Electromagnetic Suspension Active Airgap Control (Transrapid / IEEE 1475)
+    let maglev_res = post(
+        addr,
+        "/api/sim/transport/maglev_suspension",
+        r#"{
+            "mass_supported_per_magnet_kg": 1250.0,
+            "nominal_airgap_mm": 12.0,
+            "pole_face_area_mm2": 58000.0,
+            "coil_turns": 320,
+            "coil_resistance_ohms": 0.38,
+            "disturbance_amplitude_mm": 2.50,
+            "target_controller_bandwidth_rad_s": 65.0
+        }"#,
+    )?;
+    assert_eq!(maglev_res.status, 200);
+    let maglev_json = json(&maglev_res)?;
+    assert!(maglev_json["equilibrium_current_a"].as_f64().unwrap() > 25.0);
+    assert!(maglev_json["equilibrium_flux_density_t"].as_f64().unwrap() > 0.40);
+    assert!(maglev_json["open_loop_unstable_pole_rad_s"].as_f64().unwrap() > 30.0);
+    assert!(maglev_json["is_core_saturation_prevented"].as_bool().unwrap());
+    assert!(maglev_json["is_airgap_contact_prevented"].as_bool().unwrap());
+    assert!(maglev_json["is_maglev_suspension_viable"].as_bool().unwrap());
+
+    // 251. Universal Commands Execution Verification (Batch 28 Domains)
+    for cmd_id in [
+        "sim.aerospace.supersonic_nozzle",
+        "sim.automotive.ev_torque_vectoring",
+        "sim.marine.subsea_riser_viv",
+        "sim.chemical.chromatography_column",
+        "sim.transport.maglev_suspension",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 252. Enterprise MCP Tool Calling (Batch 28 Domains)
+    for tool_name in [
+        "atlas_sim_aerospace_supersonic_nozzle",
+        "atlas_sim_automotive_ev_torque_vectoring",
+        "atlas_sim_marine_subsea_riser_viv",
+        "atlas_sim_chemical_chromatography_column",
+        "atlas_sim_transport_maglev_suspension",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 252, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }

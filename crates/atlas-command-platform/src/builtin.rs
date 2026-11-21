@@ -6944,5 +6944,175 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.aerospace.supersonic_nozzle",
+            "Supersonic Wind Tunnel Convergent-Divergent de Laval Nozzle (NASA SP-3012 / Anderson)",
+            "Calculates choked mass flow rate, exit Mach number, expansion area ratio, normal shock jump conditions, and oblique shock wave angles.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "design_mach".into(),
+            arg_type: ArgumentType::Number,
+            description: "Target test section supersonic Mach number".into(),
+            required: false,
+            default_value: Some(serde_json::json!(2.20)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(10.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "stagnation_pressure_pa".into(),
+            arg_type: ArgumentType::Number,
+            description: "Reservoir total stagnation pressure in Pa".into(),
+            required: false,
+            default_value: Some(serde_json::json!(450000.0)),
+            validation_rules: vec![ValidationRule::Min(10000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "stagnation_temperature_k".into(),
+            arg_type: ArgumentType::Number,
+            description: "Reservoir total stagnation temperature in K".into(),
+            required: false,
+            default_value: Some(serde_json::json!(320.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(3000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.automotive.ev_torque_vectoring",
+            "Electric Vehicle Dual-Motor AWD Torque Vectoring & Yaw Stability (ISO 8855 / Pacejka)",
+            "Calculates understeer gradient, target yaw rate, longitudinal motor torque split, direct yaw moment, and individual wheel differential torques.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "total_vehicle_mass_kg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Total vehicle curb plus payload mass in kg".into(),
+            required: false,
+            default_value: Some(serde_json::json!(2150.0)),
+            validation_rules: vec![ValidationRule::Min(500.0), ValidationRule::Max(10000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "vehicle_speed_m_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Vehicle longitudinal forward speed in m/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(25.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(150.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "front_steering_angle_deg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Road wheel steering angle at the front axle in degrees".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1.2)),
+            validation_rules: vec![ValidationRule::Min(-45.0), ValidationRule::Max(45.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.marine.subsea_riser_viv",
+            "Ultra-Deepwater Subsea Marine Riser Vortex-Induced Vibration & Fatigue (DNV-RP-F204 / API 16Q)",
+            "Calculates transverse modal frequencies, vortex shedding lock-in mode, strake vibration suppression, drag amplification, and S-N fatigue damage.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "riser_total_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Total suspended riser length in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1850.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(5000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "top_tension_kn".into(),
+            arg_type: ArgumentType::Number,
+            description: "Applied top tension pulling force in kN".into(),
+            required: false,
+            default_value: Some(serde_json::json!(6500.0)),
+            validation_rules: vec![ValidationRule::Min(100.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "surface_current_velocity_m_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Surface ocean current speed in m/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1.65)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(10.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.chemical.chromatography_column",
+            "Biopharmaceutical Protein Downstream Purification Chromatography Column Dynamics (FDA cGMP / ASME BPE)",
+            "Calculates interstitial flow velocity, Reynolds number, plate height HETP, number of theoretical plates, dynamic binding capacity DBC_10%, and bed pressure drop.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "column_inner_diameter_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Process chromatography column internal diameter in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(300.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(3000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "bed_height_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Packed resin bed height in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(200.0)),
+            validation_rules: vec![ValidationRule::Min(10.0), ValidationRule::Max(1000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "superficial_linear_velocity_cm_h".into(),
+            arg_type: ArgumentType::Number,
+            description: "Mobile phase superficial volumetric flux velocity in cm/h".into(),
+            required: false,
+            default_value: Some(serde_json::json!(300.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(2000.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.transport.maglev_suspension",
+            "High-Speed Maglev Electromagnetic Suspension Active Airgap Control (Transrapid / IEEE 1475)",
+            "Calculates equilibrium levitation current, flux density, open-loop unstable pole frequency, state-feedback control gains, and dynamic track disturbance attenuation.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "levitated_mass_per_magnet_kg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Static levitated vehicle mass supported per electromagnet in kg".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1250.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(10000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "nominal_airgap_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Target static equilibrium levitation airgap in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(12.0)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(50.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "track_joint_step_disturbance_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Guideway track joint vertical step misalignment disturbance in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(2.50)),
+            validation_rules: vec![ValidationRule::Min(0.0), ValidationRule::Max(20.0)],
+        }),
+    )?;
+
     Ok(())
 }

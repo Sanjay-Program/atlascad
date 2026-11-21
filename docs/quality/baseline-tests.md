@@ -10,7 +10,13 @@
 | `t-platform-workspace-20261030` | `cargo test --offline --workspace -j 2` | 309 | 0 | 0 | **2026-10-30** — the whole root workspace including doctests. `cad-document` 78 (8 new: raised-plane translation, signed direction, inch plane, no-transform refusal, cache invalidation on a plane move, one-step placement undo, non-finite plane refusal, schema-7 → 8 migration) and `cad-studio` HTTP 25 (3 new analytic tests against the real Truck kernel: blind pocket on a raised plane, top-face boss, downward through-hole; all within 1e-2 mm³ of the inscribed-polygon analytic value, watertight exports). clippy `-D warnings` and fmt clean. |
 | `t-cad-contract` | `cargo test --release -p cad-contract` | 55 | 0 | 0 | 54 unit + 1 doc test |
 | `t-cad-kernel-truck-m11d` | `cargo test --offline -p cad-kernel-truck` | 35 | 0 | 0 | analytic extrude and revolve volumes, capability advertisement, manifold orientation, cancellation and deadlines; supersedes `t-cad-kernel-truck` (26) and `t-cad-kernel-truck-m11c` (31) |
-| `t-cad-kernel-truck-corpus` | `cargo run -p cad-kernel-truck --example corpus` | 8 | 0 | 3 | the analytic boolean corpus: 11 fixtures, 8 ok, 3 recorded known failures (tangent contact, intersection near 1e6 mm, coplanar cut), 0 regressions, exit code 0 |
+| `t-cad-kernel-truck-ladder-20261121` | `cargo test -p cad-kernel-truck` | 37 | 0 | 0 | **2026-11-21**: adds a nine-box union chain that completes at the 3e-2 mm tolerance rung (5000.136 mm³ vs analytic 5000, 0.003 % high), and asserts an ordinary coplanar union does not leave the configured tolerance; `boolean_escalations()` reports the ladder's use |
+| `t-cad-kernel-truck-precision-20261121` | `cargo test -p cad-kernel-truck` | 40 | 0 | 0 | **2026-11-21**: the 39 above plus a boolean at 1e6 mm that must be refused with a re-centre message rather than returning the measured 11 499.8 mm³ / 24-open-edge malformed solid; the corpus is unchanged at 9 ok / 2 known-failure, because the large-coordinate fixture is now a recorded refusal |
+| `t-cad-kernel-truck-fuse-20261121` | `cargo test -p cad-kernel-truck` | 39 | 0 | 0 | **2026-11-21**: the 37 above plus a face-to-face union fused into one watertight solid (1999.900 mm³ / 1000.000 mm², 0 open edges) and a contained union touching the container's face (1000.016 / 600.016, watertight); tangent contact is promoted from known-failure to must-pass in the corpus |
+| `t-cad-kernel-truck-revolve-20261121` | `cargo test -p cad-kernel-truck` | 42 | 0 | 0 | **2026-11-21**: the 40 above, with the old partial-turn refusal replaced by two acceptance tests (a 90° turn of a rectangle offset from the axis measures the analytic quarter annulus 2356.194 mm³; a 180° turn on the axis measures the analytic half cylinder 785.398 mm³, both 0 open edges) and a refusal of anything beyond one full turn; net +2 |
+| `t-cad-document-revolve-angle-20261121` | `cargo test -p cad-document` | 91 | 0 | 0 | **2026-11-21**: the 88 above plus three revolve-angle tests — a 90° feature resolves to π/2 rad at the kernel, an angle outside 0–360° is refused on create, and a schema-10 revolve with no `angle_deg` opens as a full turn; the save/reopen test now persists 90° |
+| `t-cad-studio-revolve-angle-20261121` | `cargo test -p cad-studio` | 51 | 0 | 0 | **2026-11-21**: the 50 above plus a real-socket HTTP test — `POST /api/feature/revolve` with `angle_deg: 90` builds the analytic quarter annulus, reports `angle_deg` in `/api/state`, exports a watertight STL, and 361° is a 400 with the document's reason |
+| `t-cad-kernel-truck-corpus` | `cargo run -p cad-kernel-truck --example corpus` | 9 | 0 | 2 | the analytic boolean corpus: 11 fixtures, 9 ok, 2 recorded known failures (intersection near 1e6 mm, raw coplanar cut), 0 regressions, exit code 0; tangent contact is now must-pass at 1999.900 mm³ / 1000.000 mm² |
 | `t-cad-engineering` | `cargo test --offline -p cad-engineering` | 30 | 0 | 0 | 4 unit + 26 integration, real git fixture; report totals exclude superseded records |
 | `t-cad-cli` | `cargo test --offline -p cad-document -p cad-cli` | 10 | 0 | 0 | 9 end-to-end (units → header → kernel → STL) + 1 multi-process project workflow |
 | `t-cad-agent-api` | `cargo test -p cad-agent-api` | 13 | 0 | 0 | contract version, grant intersection, zero budgets, error taxonomy |
@@ -42,10 +48,11 @@ The workspace summary records **298** tests in the root workspace
 includes the CADCraft audit suite, the browser assertions and the corpus binary, which are not part
 of that workspace run. Rows marked superseded are kept as history and are not counted.
 
-The three "skipped" corpus fixtures are **recorded known failures**, not skipped tests: tangent
-contact, intersection at coordinates near 1e6 mm and a coplanar cut ran and failed as the baseline
-expects. The corpus prints them and the gate stays green, so a future fix shows up as an unexpected
-pass rather than silently changing the answer.
+The two "skipped" corpus fixtures are **recorded known failures**, not skipped tests: intersection at
+coordinates near 1e6 mm and a coplanar cut ran and failed as the baseline expects. Tangent contact
+was a third and is now promoted to must-pass after the adapter's inward retry fused it. The corpus
+prints the remaining two and the gate stays green, so a future fix shows up as an unexpected pass
+rather than silently changing the answer.
 
 ## 2. Not executed
 
@@ -174,8 +181,9 @@ check drive a page that no longer matched the tree. This cycle found that defect
 * **Manifold output:** welded mesh has 0 open edges and every face normal points outward for the box
   fixture (regression for a measured inward-wound cap).
 * **Honest failure:** an operation a kernel does not advertise must be refused with `Unsupported`
-  rather than approximated; a partial revolve and a profile crossing the axis must be `Invalid` with a
-  reason; a stale or foreign handle must be `UnknownSolid`.
+  rather than approximated; a profile crossing the axis must be `Invalid` with a reason; a stale or
+  foreign handle must be `UnknownSolid`. A partial revolve must be a capped solid, not an open
+  shell: the adapter's quarter and half turns are measured and watertight.
 * **Interruption:** an expired deadline is `Timeout`; a cancelled call is `Cancelled`; the kernel
   instance and the agent both survive the interruption and serve the next call.
 * **Control plane:** duplicate ids, unknown cross-references, schema drift, copyleft approval,

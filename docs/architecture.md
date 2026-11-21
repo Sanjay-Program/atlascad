@@ -5,7 +5,7 @@
 application (`cad-studio`) and the agent platform (`cad-agent-api`, `cad-agent-runtime`,
 `cad-agent-geometry`) are **implemented, compiling and tested** (273 tests across eleven root
 workspace packages, verified 2026-10-29; the project payload carries an ordered feature graph that
-includes extrude, cut and full-turn revolve, ADR-0009). The two imported desktop applications (CADCraft and
+includes extrude, cut and revolve (full turn or capped partial angle), ADR-0009). The two imported desktop applications (CADCraft and
 SolidCraft) are **not yet wired to the contract**; the root workspace ships its own local
 application instead, described in §5d.
 
@@ -90,6 +90,18 @@ A truck-backed implementation of the contract — the proof that the contract de
 * **Coplanar-face retry:** when a boolean returns no result, the tool is moved by
   `[7e-5, 9e-5, 1.1e-4]` mm and the result is moved back. The retry count is observable
   (`coplanar_retries()`), and the benchmark reports that **100 of 100** unions needed it.
+* **Tolerance ladder:** a boolean that panics or returns no result at the configured tolerance is
+  retried at 3e-2 mm and then 1e-1 mm (`BOOLEAN_TOLERANCE_LADDER_MM`); `boolean_escalations()`
+  counts the operations that needed it, and ordinary booleans stay on the configured tolerance. A
+  nine-box union chain completes at 5000.136 mm³ against an analytic 5000.
+* **Inward retry:** a union that returns one shell per operand is a compound of touching solids, not
+  a fused body. It is retried with the tool moved 1e-3 mm inward, and the merged result is kept only
+  when its shell count drops; two 10 mm cubes measure 1999.900 mm³ / 1000.000 mm² instead of
+  2000 / 1200 (a double wall). The same direction completes a contained union that touches a face.
+* **Large-coordinate refusal:** operands beyond ±1e5 mm fail with a message naming the bound and
+  asking for a re-centre, instead of returning a malformed mesh (measured at 1e6 mm: 11 499.8 mm³,
+  24 open edges). Re-centring alone does not repair the full-span coplanar case, which also fails at
+  the origin, so refusal is the honest answer until the kernel can represent it.
 * **Volume-conservation guard:** a union may not shrink and an intersection may not grow beyond a
   relative slack; a result that violates this is refused with an error instead of returned.
 * **Bounded input:** profiles are validated before they reach truck (≥3 points, finite, no repeated
@@ -100,13 +112,13 @@ A truck-backed implementation of the contract — the proof that the contract de
   signatures and report `Timeout`/`Cancelled` rather than hanging. Cancellation is cooperative, not
   preemption: a single pathological boolean inside truck cannot be interrupted, which is stated in
   the module rather than implied away.
-* **Correctness corpus:** `crates/cad-kernel-truck/examples/corpus.rs` runs ten analytic fixtures —
-  box control, non-axis-aligned box, partial-overlap union, thin-wall intersection, near-degenerate
-  sliver, tangent contact, large coordinates, and the three difference cases — and prints a
-  pass/fail table. The gate is the exit code: a previously passing fixture that regresses makes the
-  binary exit non-zero. Two fixtures are recorded **known failures** (tangent contact, coordinates
-  near 1e6 mm) and the three difference fixtures are recorded **unsupported by the kernel**, which
-  the corpus counts as correct rather than as a silent skip.
+* **Correctness corpus:** `crates/cad-kernel-truck/examples/corpus.rs` runs eleven analytic
+  fixtures — box control, non-axis-aligned box, partial-overlap union, tangent contact, thin-wall
+  intersection, near-degenerate sliver, large coordinates, and the three difference cases — and
+  prints a pass/fail table. The gate is the exit code: a previously passing fixture that regresses
+  makes the binary exit non-zero. Two fixtures remain recorded **known failures** (coordinates near
+  1e6 mm, now refused beyond ±1e5 mm, and the raw coplanar cut); tangent contact was a third and is
+  now fused and must-pass.
 
 Measured behaviour of this adapter is in `docs/performance-baseline.md`; what the underlying kernel
 can and cannot do is in `docs/kernel-comparison.md`.
@@ -266,9 +278,9 @@ cad-studio  ──  cad-document (parameters, feature graph, undo, .zcad)
 
 1. **The adapter is not the production kernel.** SolidCraft's kernel has 94 803 LOC of fillets,
    chamfers, healing, sheet metal, STEP/IGES, boolean retries and history. The contract adapter has
-   extrude, union, intersection and tessellation. Difference and chains do not work (§
-   `docs/kernel-comparison.md`), which is precisely why the platform should reuse the mature kernel
-   rather than build a new one.
+   extrude, union, intersection and tessellation. Difference works, and chains complete through the
+   tolerance ladder (§ `docs/kernel-comparison.md` §4.3), which is precisely why the platform should
+   reuse the mature kernel rather than build a new one.
 2. **Three application surfaces now exist.** CADCraft and SolidCraft still have separate `ui-egui`
    trees (egui 0.36 + wgpu 30); Atlas Studio is a browser surface over a Rust server. There is no
    shared component library between them and no measured reason to merge them yet.
@@ -277,14 +289,12 @@ cad-studio  ──  cad-document (parameters, feature graph, undo, .zcad)
    sync, hosted storage, or concurrent multi-user editing (a share is one document, one history, and
    whichever client last wrote wins). `wasm32-unknown-unknown` is not
    installed on this machine and no WASM build was attempted; neither is claimed.
-4. **The feature graph is linear and single-body.** `.zcad` schema 9 persists a header, named
+4. **The feature graph is linear and single-body.** `.zcad` schema 11 persists a header, named
    parameters, an ordered list of sketches and features with stable IDs, where the first feature
    starts the body and every later one is a join (union into the body) or a cut (difference out of
    the body) through the kernel's booleans. A feature is an extrude by a parameter, swept up or down
-   from its sketch's horizontal plane at any height above z = 0, or a full-turn revolve of the sketch
-   about one of its own axes; a partial revolve is refused because it
-   would be an open shell, and a profile that crosses the axis is refused because it has no solid of
-   revolution. A sketch profile is a rectangle, circle, regular polygon, drawn polyline or arc sector;
+   from its sketch's horizontal plane at any height above z = 0, or a revolve of the sketch about one of its own axes, a full turn or a capped partial
+   angle; a profile that crosses the axis is refused because it has no solid of revolution. A sketch profile is a rectangle, circle, regular polygon, drawn polyline or arc sector;
    there is only one closed profile per sketch, not an entity graph. There is no sweep, loft, fillet,
    pattern, arbitrary-axis revolve, multi-body,
    constraint solver, assembly or drawing. A per-feature
@@ -295,8 +305,9 @@ cad-studio  ──  cad-document (parameters, feature graph, undo, .zcad)
    Alongside the file, `<name>.zcad.recovery` holds the last unsaved edit and `<name>.zcad.backup`
    holds the previous good save, and neither is read unless the project itself cannot be opened. The
    header and payload schema are versioned
-   independently, and schema 1…8 files migrate on load without being rewritten on disk; schema 9
-   adds the embedded derived-artifact registry. An
+   independently, and schema 1…10 files migrate on load without being rewritten on disk; schema 9
+   added the embedded derived-artifact registry, schema 10 imported mesh bodies and schema 11 a
+   revolve angle. An
    unsaved edit is snapshotted to a separate `<project>.recovery` file after each change, so a crash
    loses no work and a corrupt project file can still be recovered; the snapshot never writes the
    project, and saving or discarding removes it.
@@ -307,7 +318,7 @@ cad-studio  ──  cad-document (parameters, feature graph, undo, .zcad)
 6. **Only one agent exists.** The runtime's guarantees are proven against one agent and the
    registry's own test doubles. The other three planned agents are declared but not implemented.
 7. **The application is not a full CAD product.** It has no constraints, dimensions, arcs/splines,
-   sweep, loft, partial revolve, fillet, chamfer, shell, patterns, multi-body, assemblies, drawings,
+   sweep, loft, fillet, chamfer, shell, patterns, multi-body, assemblies, drawings,
    STEP/IGES/DXF import, autosave, or crash recovery. The verified workflow is exactly what §5d and
    `docs/feature-matrix.md` §3c list, and nothing more.
 

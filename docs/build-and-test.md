@@ -67,7 +67,7 @@ in **3.9 s** wall; fmt and clippy `-D warnings` clean. The record is
 annulus, partial turn refused, profile across the axis refused), `cad-document` six (axis resolution,
 capability refusal, join volume, save/reopen, cache, schema-4 migration) and `cad-studio` two over a
 real socket (analytic annulus through save/reopen to a watertight STL export; a crossing profile as a
-failed feature with export refused). The corpus still reports 8 must-pass ok, 3 recorded
+failed feature with export refused). The corpus now reports 9 must-pass ok, 2 recorded
 known-failure and 0 regressions. The revolve's UI was also driven in headless Chrome
 (`node target/studio-qa/revolve.mjs <url>`, 11 assertions): the Revolve option is
 enabled, choosing it hides the depth field and shows the axis field, the turn is added as a `built`
@@ -220,7 +220,7 @@ seven crates.
 
 ```sh
 cargo run --offline -p cad-kernel-truck --example corpus
-# exit code 0; 8 ok, 2 known failures, 0 regressions, 0 unexpected passes
+# exit code 0; 9 ok, 2 known failures, 0 regressions, 0 unexpected passes
 ```
 
 The exit code is the gate. A fixture that previously passed and now fails makes the binary exit
@@ -300,7 +300,7 @@ cargo build --release -p cad-kernel-truck --examples
 ./target/release/examples/probe                    # boolean matrix: coplanar vs piercing/contained
 ./target/release/examples/probe5                   # coplanar retry threshold (1e-6 fails, 1e-5 works)
 ./target/release/examples/probe6                   # per-shell volume: why difference is wrong
-./target/release/examples/chain                    # union chain: succeeds once, then Internal error
+./target/release/examples/chain                    # nine-box union chain: completes via the tolerance ladder
 ```
 
 Results are in `docs/performance-baseline.md`; conclusions in `docs/kernel-comparison.md`.
@@ -426,7 +426,7 @@ whole-workspace build is reasonable and is what the apps' own workflows do.
 | Root workspace claimed nested repos | **Fixed** via `exclude` |
 | SolidCraft declares MSRV 1.95, machine has 1.94 | **Open** — pin with `rust-toolchain.toml` |
 | Published `truck-shapeops` fails every overlapping boolean | **Worked around** by patching to SolidCraft's vendored copy; upstream fix not attempted |
-| truck panics on a third chained union | **Open, kernel-level** — caught and reported, operation unavailable |
+| truck panics on a third chained union | **Worked around** — a boolean that panics is retried at 3e-2 then 1e-1 mm; a nine-box union chain completes (`boolean_escalations()` counts it) |
 | No WASM target or wasm-pack installed | **Blocked** — nothing claimed |
 | No advisory/licence tooling installed | **Blocked** — see security S-1 |
 | Full test suites never executed here | **Open** — the exact commands are recorded above for a larger machine |
@@ -450,7 +450,7 @@ run, the same way the kernel corpus treats a recorded `known-fail` fixture.
 
 | Stack | Command (2026-11-06) | Result |
 | --- | --- | --- |
-| root platform | `./scripts/gate.sh` | **PASS** — fmt, clippy `-D warnings`, workspace tests, corpus (8 ok / 3 known-fail / 0 regressions), 14 manifests, 87 licences, SBOM, deployment assets (`deploy/validate.sh`), 56 HTTP assertions, 27 + 31 browser assertions |
+| root platform | `./scripts/gate.sh` | **PASS** — fmt, clippy `-D warnings`, workspace tests, corpus (9 ok / 2 known-fail / 0 regressions), 14 manifests, 87 licences, SBOM, deployment assets (`deploy/validate.sh`), 56 HTTP assertions, 27 + 31 browser assertions |
 | hosted compose stack | `deploy/smoke.sh` | **PASS** — fresh 10 × 10 × 5 document created on a new volume, TLS handshake + liveness on `:8443`, 401/200 through the proxy, 31 browser assertions through Caddy, teardown |
 | `kernels/truck` | `cargo check -p truck-meshalgo --lib` | **PASS**, 1 m 20 s. `cargo test -p truck-meshalgo` does **not** compile: `include_str!` reads `../resources/shape/bottle.json`, which is absent from the snapshot (the same path returns 404 at the pinned upstream commit). Library is usable; the test suite is blocked by a missing fixture. |
 | `kernels/monstertruck` | `cargo check -p monstertruck-core -p monstertruck-modeling -p monstertruck-meshing -p monstertruck-solid` | **PASS**, 59.5 s. The checkout pins a nightly `rust-toolchain.toml`, so the first command installs that toolchain through rustup — a one-time download, not a hang. |

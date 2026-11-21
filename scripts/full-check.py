@@ -3376,6 +3376,113 @@ def simulation_section(studio: Studio) -> None:
     check(stay_data.get("is_rwiv_mitigated", False) is True, "rain-wind vibration mitigated")
     check(stay_data.get("is_stay_cable_viable", False) is True, "stay cable system viable")
 
+    # 140. Supersonic Wind Tunnel Convergent-Divergent de Laval Nozzle Aerodynamics (NASA SP-3012 / Anderson / ISO 5167)
+    nozzle = studio.post("/api/sim/aerospace/supersonic_nozzle", {
+        "design_mach_number": 2.20,
+        "stagnation_pressure_kpa": 450.0,
+        "stagnation_temperature_k": 320.0,
+        "throat_diameter_mm": 85.0,
+        "ambient_backpressure_kpa": 42.0,
+        "model_deflection_angle_deg": 10.0
+    })
+    check(nozzle.status == 200, f"supersonic nozzle returns 200 (got {nozzle.status})")
+    nozzle_data = nozzle.json()
+    check(nozzle_data.get("choked_mass_flow_rate_kg_s", 0.0) > 5.0, "choked mass flow > 5 kg/s")
+    check(nozzle_data.get("exit_flow_velocity_m_s", 0.0) > 500.0, "exit flow velocity > 500 m/s")
+    check(nozzle_data.get("normal_shock_downstream_mach", 0.0) < 1.0, "normal shock downstream Mach < 1.0")
+    check(nozzle_data.get("oblique_shock_wave_angle_deg", 0.0) > 30.0, "oblique shock wave angle > 30 deg")
+    check(nozzle_data.get("is_choked_at_throat", False) is True, "flow choked at throat")
+    check(nozzle_data.get("is_supersonic_flow_established", False) is True, "supersonic flow established")
+    check(nozzle_data.get("is_nozzle_aerodynamically_viable", False) is True, "supersonic nozzle viable")
+
+    # 141. Electric Vehicle (EV) Dual-Motor AWD Torque Vectoring & Yaw Stability (ISO 8855 / Pacejka Magic Formula)
+    tv = studio.post("/api/sim/automotive/ev_torque_vectoring", {
+        "drivetrain_layout": "DualMotorAwd",
+        "vehicle_mass_kg": 2150.0,
+        "wheelbase_mm": 2900.0,
+        "track_width_mm": 1620.0,
+        "cg_to_front_axle_mm": 1420.0,
+        "yaw_moment_of_inertia_kg_m2": 2950.0,
+        "front_cornering_stiffness_n_rad": 95000.0,
+        "rear_cornering_stiffness_n_rad": 105000.0,
+        "vehicle_speed_km_h": 90.0,
+        "front_steering_angle_deg": 1.2,
+        "demanded_total_torque_nm": 450.0
+    })
+    check(tv.status == 200, f"EV torque vectoring returns 200 (got {tv.status})")
+    tv_data = tv.json()
+    check(tv_data.get("understeer_gradient_deg_per_g", 0.0) > 0.0, "understeer gradient > 0 deg/g")
+    check(tv_data.get("target_yaw_rate_deg_s", 0.0) > 5.0, "target yaw rate > 5 deg/s")
+    check(tv_data.get("active_yaw_moment_demand_nm", 0.0) > 20.0, "active yaw moment > 20 N*m")
+    check(tv_data.get("is_yaw_rate_tracking_satisfied", False) is True, "yaw rate tracking satisfied")
+    check(tv_data.get("is_sideslip_stable", False) is True, "chassis sideslip stable")
+    check(tv_data.get("is_torque_vectoring_viable", False) is True, "torque vectoring system viable")
+
+    # 142. Ultra-Deepwater Subsea Marine Riser Vortex-Induced Vibration & Fatigue (DNV-RP-F204 / API 16Q)
+    riser = studio.post("/api/sim/marine/subsea_riser_viv", {
+        "suppression_device": "HelicalStrakesTripleStart",
+        "riser_length_m": 1850.0,
+        "water_depth_m": 1800.0,
+        "outer_diameter_mm": 533.4,
+        "wall_thickness_mm": 25.4,
+        "top_tension_kn": 6500.0,
+        "internal_fluid_density_kg_m3": 1250.0,
+        "seawater_density_kg_m3": 1025.0,
+        "surface_current_velocity_m_s": 1.65,
+        "bottom_current_velocity_m_s": 0.25,
+        "steel_elastic_modulus_gpa": 207.0
+    })
+    check(riser.status == 200, f"subsea riser VIV returns 200 (got {riser.status})")
+    riser_data = riser.json()
+    check(riser_data.get("fundamental_frequency_hz", 0.0) > 0.01, "fundamental frequency > 0.01 Hz")
+    check(riser_data.get("dominant_lockin_mode", 0) >= 20, "dominant lock-in mode >= 20")
+    check(riser_data.get("predicted_fatigue_life_years", 0.0) >= 25.0, "fatigue life >= 25 years")
+    check(riser_data.get("is_viv_amplitude_acceptable", False) is True, "VIV amplitude acceptable")
+    check(riser_data.get("is_fatigue_life_compliant", False) is True, "fatigue life compliant with DNV")
+    check(riser_data.get("is_subsea_riser_viable", False) is True, "subsea marine riser viable")
+
+    # 143. Biopharmaceutical Protein Downstream Purification Chromatography Column Dynamics (FDA cGMP / ASME BPE)
+    chrom = studio.post("/api/sim/chemical/chromatography_column", {
+        "column_diameter_mm": 300.0,
+        "bed_height_mm": 200.0,
+        "linear_velocity_cm_h": 300.0,
+        "feed_protein_concentration_g_l": 3.50,
+        "max_binding_capacity_g_l": 55.0,
+        "langmuir_constant_l_g": 8.33,
+        "resin_particle_diameter_um": 50.0,
+        "bed_void_fraction": 0.36,
+        "intraparticle_porosity": 0.65,
+        "buffer_viscosity_mpa_s": 1.05
+    })
+    check(chrom.status == 200, f"chromatography column returns 200 (got {chrom.status})")
+    chrom_data = chrom.json()
+    check(chrom_data.get("residence_time_minutes", 0.0) > 3.0, "residence time > 3 min")
+    check(chrom_data.get("hetp_mm", 0.0) < 1.0, "HETP < 1.0 mm")
+    check(chrom_data.get("number_of_theoretical_plates", 0.0) > 400.0, "theoretical plates > 400")
+    check(chrom_data.get("dynamic_binding_capacity_10pct_g_l", 0.0) > 40.0, "DBC_10% > 40 g/L")
+    check(chrom_data.get("is_pressure_drop_acceptable", False) is True, "bed pressure drop acceptable")
+    check(chrom_data.get("is_dbc_utilization_competitive", False) is True, "DBC utilization competitive")
+    check(chrom_data.get("is_chromatography_column_viable", False) is True, "chromatography column viable")
+
+    # 144. High-Speed Maglev Electromagnetic Suspension Active Airgap Control (Transrapid / IEEE 1475)
+    maglev = studio.post("/api/sim/transport/maglev_suspension", {
+        "mass_supported_per_magnet_kg": 1250.0,
+        "nominal_airgap_mm": 12.0,
+        "pole_face_area_mm2": 58000.0,
+        "coil_turns": 320,
+        "coil_resistance_ohms": 0.38,
+        "disturbance_amplitude_mm": 2.50,
+        "target_controller_bandwidth_rad_s": 65.0
+    })
+    check(maglev.status == 200, f"maglev suspension returns 200 (got {maglev.status})")
+    maglev_data = maglev.json()
+    check(maglev_data.get("equilibrium_current_a", 0.0) > 25.0, "equilibrium current > 25 A")
+    check(maglev_data.get("equilibrium_flux_density_t", 0.0) > 0.40, "flux density > 0.40 T")
+    check(maglev_data.get("open_loop_unstable_pole_rad_s", 0.0) > 30.0, "unstable pole > 30 rad/s")
+    check(maglev_data.get("is_core_saturation_prevented", False) is True, "core saturation prevented")
+    check(maglev_data.get("is_airgap_contact_prevented", False) is True, "airgap contact prevented")
+    check(maglev_data.get("is_maglev_suspension_viable", False) is True, "maglev suspension viable")
+
     report("simulation")
 
 

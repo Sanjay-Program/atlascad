@@ -809,7 +809,7 @@
       "name": "cad-kernel-truck",
       "repository_id": "repo.cad-kernel-truck",
       "language": "rust",
-      "responsibility": "Contract implementation over truck: extrude, full-turn revolve, union, intersection, tessellation with panic guard, volume-conservation guard and coplanar retry.",
+      "responsibility": "Contract implementation over truck: extrude, revolve (full turn or capped partial turn), union, intersection, tessellation with panic guard, volume-conservation guard and coplanar retry.",
       "boundaries": [
         "Advertises only capabilities a test exercises.",
         "Refuses boolean difference with KernelError::Unsupported rather than returning a wrong solid.",
@@ -1200,10 +1200,10 @@
       "name": "cad-document",
       "repository_id": "repo.cad-document",
       "language": "rust",
-      "responsibility": "Local parametric project payload: stable sketch/feature IDs, named parameters, rectangle/circle/regular-polygon/polyline/arc-sector profiles, an ordered feature graph rebuilt through the kernel (new body, union join, difference cut, or a full-turn revolve about a sketch axis), a per-feature rebuild cache keyed by resolved inputs, named revisions of the editable history, crash-recovery snapshots of unsaved edits with a last-good-file backup, bounded undo/redo, schema-checked save/load with schema 1-6 migration, integrity validation and atomic replacement.",
+      "responsibility": "Local parametric project payload: stable sketch/feature IDs, named parameters, rectangle/circle/regular-polygon/polyline/arc-sector profiles, an ordered feature graph rebuilt through the kernel (new body, union join, difference cut, or a revolve about a sketch axis at a full or partial angle), a per-feature rebuild cache keyed by resolved inputs, named revisions of the editable history, crash-recovery snapshots of unsaved edits with a last-good-file backup, bounded undo/redo, schema-checked save/load with schema 1-10 migration, integrity validation and atomic replacement.",
       "boundaries": [
         "Kernel handles are runtime-only and never serialized; BuildCache holds them for the session only and is never persisted.",
-        "Schema 7 stores an ordered, linear, single-body history: the first feature starts the body and every later feature joins or cuts it. A feature is an extrude or a full-turn revolve. There is no multi-body graph or constraint solver.",
+        "Schema 11 stores an ordered, linear, single-body history: the first feature starts the body and every later feature joins or cuts it. A feature is an extrude or a revolve with an angle (a schema-10 feature defaults to a full turn). There is no multi-body graph or constraint solver.",
         "A feature may only reference a sketch created before it; a forward reference or dependency cycle is refused on load and cannot be created.",
         "A kernel failure is a reported result: the failing feature's ID and message are returned with the last good mesh, not an error that discards the document.",
         "Native project loads are limited to 64 MiB; unknown fields, invalid references and unsupported schemas are refused.",

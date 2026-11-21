@@ -708,6 +708,52 @@ impl Draft {
         Ok(id)
     }
 
+    /// Add a group of validated entities as one undo step.
+    ///
+    /// A leader or an angular dimension is several primitives, but it is one edit to the user: a
+    /// single Ctrl+Z must remove the whole annotation, and a locked layer must reject the group
+    /// before any of it is written.
+    pub fn add_entity_batch(
+        &mut self,
+        entities: &[(String, EntityKind)],
+    ) -> Result<Vec<EntityId>, DraftError> {
+        if entities.is_empty() {
+            return Ok(Vec::new());
+        }
+        for (layer, kind) in entities {
+            kind.validate()?;
+            let target = self
+                .layer(layer)
+                .ok_or_else(|| DraftError::UnknownLayer(layer.clone()))?;
+            if target.locked {
+                return Err(DraftError::Invalid(format!(
+                    "layer `{layer}` is locked, so it accepts no geometry"
+                )));
+            }
+        }
+        let count = u64::try_from(entities.len())
+            .map_err(|_| DraftError::Invalid("too many entities in one batch".into()))?;
+        let next = self
+            .next_entity
+            .checked_add(count)
+            .ok_or_else(|| DraftError::Invalid("entity id space exhausted".into()))?;
+        self.push_undo();
+        let mut ids = Vec::with_capacity(entities.len());
+        for (layer, kind) in entities {
+            let id = EntityId::new(self.next_entity)
+                .map_err(|error| DraftError::Invalid(error.to_string()))?;
+            self.next_entity += 1;
+            self.entities.push(Entity {
+                id,
+                layer: layer.clone(),
+                kind: kind.clone(),
+            });
+            ids.push(id);
+        }
+        self.next_entity = next;
+        Ok(ids)
+    }
+
     /// Add a rectangle to an existing, unlocked layer.
     pub fn add_rectangle(
         &mut self,

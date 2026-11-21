@@ -61,7 +61,8 @@ directions, and trust that nothing was silently left behind.
 
 **Why this, after the M11g cycle:** the 2026-10-30 brief asks for every tool a CAD product has, and
 solid modelling alone cannot carry a sale while the kernel's recorded failures (a boss fully inside a
-plate, tangent contact, three-operand chains, coplanar difference) stand. Drafting is the one
+plate, tangent contact, coplanar difference) stand. Boolean chains have since been closed by the
+tolerance ladder. Drafting is the one
 workflow that does not touch the kernel, so it can be built and verified here without pretending the
 boolean defects are fixed. It is also the half of a CAD product a buyer checks second — after the
 model, they open a drawing and send a DXF.
@@ -1094,10 +1095,13 @@ acceptance criteria. The registry and this file are updated together when a slic
 ## 9. What must not be claimed before these tasks close
 
 1. **"Booleans work."** Union, intersection and difference work for the recorded corpus fixtures —
-   including both coplanar-free cut fixtures, exactly. They still fail on **coplanar operands** (a
-   recorded known failure with a 0.176 mm³ membrane on 84 000 mm³ and 8 hairline non-manifold edges),
-   on **tangent contact** and at **coordinates near 1e6 mm**, and boolean **chains of 3+ operands panic
-   inside truck**. Do not generalise from the passing fixtures.
+   including both coplanar-free cut fixtures, exactly. Chains of 3+ operands complete through a
+   documented 3e-2 mm tolerance escalation (a nine-box union chain measures 5000.136 mm³ against an
+   analytic 5000, 0.003 % high). Tangent contact is fused into one watertight solid by a 1e-3 mm
+   inward retry, and contained unions complete. They still fail on **coplanar operands** (a recorded
+   known failure with a 0.176 mm³ membrane on 84 000 mm³ and 8 hairline non-manifold edges); booleans
+   beyond **±1e5 mm** are refused with a re-centre message rather than returning a malformed solid.
+   Do not generalise from the passing fixtures.
 2. **"Cut is verified for what it covers."** M11b is closed: the analytic through-cut and blind-cut
    volumes are asserted in the corpus and over HTTP, the document refuses a cut on a kernel that does
    not advertise difference, and save/reopen/undo cover it. The recorded limits stand: a coplanar cut

@@ -169,16 +169,18 @@ pub trait Kernel {
         })
     }
 
-    /// Revolve a closed profile a full turn about an axis lying in the profile's own plane.
+    /// Revolve a closed profile about an axis lying in the profile's own plane.
     ///
     /// `axis_origin_mm` is a point on the axis in the profile's coordinate system and
     /// `axis_direction_mm` its direction in the same plane; the direction need not be normalized.
-    /// `angle_rad` is currently required to be a full turn: a partial revolve produces an open
-    /// shell, which is not a solid, and the contract has no way to represent one. An adapter that
-    /// cannot produce a closed solid must return [`KernelError::Invalid`] rather than a shell.
+    /// `angle_rad` must be finite, positive and at most one full turn. A full turn returns the
+    /// closed solid of revolution; a partial angle returns the same solid with both angular ends
+    /// **capped** by the profile in its start and rotated positions. An adapter that cannot close a
+    /// partial sweep must return [`KernelError::Invalid`] rather than an open shell.
     ///
     /// The result must be the analytic solid of revolution: a rectangle that shares the axis
-    /// revolved a full turn is a cylinder, and one that does not is an annulus.
+    /// revolved a full turn is a cylinder, one that does not is an annulus, and a partial angle is
+    /// the corresponding sector with flat end caps.
     ///
     /// The default implementation reports the capability as unsupported, so a kernel that has not
     /// implemented it cannot silently accept the call.

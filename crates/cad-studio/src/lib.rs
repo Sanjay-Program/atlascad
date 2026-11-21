@@ -7861,6 +7861,164 @@ namespace AtlasCAD.Unity
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
+    fn sim_aerospace_supersonic_nozzle(
+        &mut self,
+        req: &SimSupersonicNozzleRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::supersonic_wind_tunnel_nozzle::SupersonicNozzleProblem {
+            problem_id: req
+                .problem_id
+                .clone()
+                .unwrap_or_else(|| "supersonic_nozzle_sim".to_string()),
+            gas_medium: req.gas_medium.unwrap_or(
+                atlas_simulation_core::supersonic_wind_tunnel_nozzle::SupersonicGasMedium::DryAir,
+            ),
+            contour_method: req.contour_method.unwrap_or(
+                atlas_simulation_core::supersonic_wind_tunnel_nozzle::NozzleContourMethod::MethodOfCharacteristicsMOC,
+            ),
+            stagnation_pressure_kpa: req.stagnation_pressure_kpa.unwrap_or(450.0),
+            stagnation_temperature_k: req.stagnation_temperature_k.unwrap_or(320.0),
+            design_mach_number: req.design_mach_number.unwrap_or(2.20),
+            throat_diameter_mm: req.throat_diameter_mm.unwrap_or(85.0),
+            ambient_backpressure_kpa: req.ambient_backpressure_kpa.unwrap_or(42.0),
+            model_deflection_angle_deg: req.model_deflection_angle_deg.unwrap_or(10.0),
+            divergence_half_angle_deg: req.divergence_half_angle_deg.unwrap_or(12.0),
+        };
+        let res = atlas_simulation_core::supersonic_wind_tunnel_nozzle::solve_supersonic_wind_tunnel_nozzle(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_automotive_ev_torque_vectoring(
+        &mut self,
+        req: &SimEvTorqueVectoringRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::ev_torque_vectoring::EvTorqueVectoringProblem {
+            problem_id: req
+                .problem_id
+                .clone()
+                .unwrap_or_else(|| "ev_torque_vectoring_sim".to_string()),
+            drivetrain_layout: req.drivetrain_layout.unwrap_or(
+                atlas_simulation_core::ev_torque_vectoring::EvAwdLayout::DualMotorAwd,
+            ),
+            road_condition: req.road_condition.unwrap_or(
+                atlas_simulation_core::ev_torque_vectoring::RoadSurfaceCondition::DryAsphalt,
+            ),
+            vehicle_mass_kg: req.vehicle_mass_kg.unwrap_or(2150.0),
+            yaw_moment_of_inertia_kg_m2: req.yaw_moment_of_inertia_kg_m2.unwrap_or(2950.0),
+            wheelbase_mm: req.wheelbase_mm.unwrap_or(2900.0),
+            track_width_mm: req.track_width_mm.unwrap_or(1620.0),
+            cg_to_front_axle_mm: req.cg_to_front_axle_mm.unwrap_or(1420.0),
+            cg_height_mm: req.cg_height_mm.unwrap_or(480.0),
+            tire_rolling_radius_mm: req.tire_rolling_radius_mm.unwrap_or(340.0),
+            front_cornering_stiffness_n_rad: req.front_cornering_stiffness_n_rad.unwrap_or(95000.0),
+            rear_cornering_stiffness_n_rad: req.rear_cornering_stiffness_n_rad.unwrap_or(105000.0),
+            vehicle_speed_km_h: req.vehicle_speed_km_h.unwrap_or(90.0),
+            front_steering_angle_deg: req.front_steering_angle_deg.unwrap_or(1.2),
+            demanded_total_torque_nm: req.demanded_total_torque_nm.unwrap_or(450.0),
+        };
+        let res = atlas_simulation_core::ev_torque_vectoring::solve_ev_torque_vectoring(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_marine_subsea_riser_viv(
+        &mut self,
+        req: &SimSubseaRiserVivRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::subsea_riser_viv::SubseaRiserVivProblem {
+            problem_id: req
+                .problem_id
+                .clone()
+                .unwrap_or_else(|| "subsea_riser_viv_sim".to_string()),
+            riser_type: req.riser_type.unwrap_or(
+                atlas_simulation_core::subsea_riser_viv::MarineRiserType::TopTensionedProductionRiser,
+            ),
+            current_profile: req.current_profile.unwrap_or(
+                atlas_simulation_core::subsea_riser_viv::OceanCurrentProfile::LinearShearCurrent,
+            ),
+            suppression_device: req.suppression_device.unwrap_or(
+                atlas_simulation_core::subsea_riser_viv::VivSuppressionDevice::HelicalStrakesTripleStart,
+            ),
+            water_depth_m: req.water_depth_m.unwrap_or(1800.0),
+            riser_length_m: req.riser_length_m.unwrap_or(1850.0),
+            outer_diameter_mm: req.outer_diameter_mm.unwrap_or(533.4),
+            wall_thickness_mm: req.wall_thickness_mm.unwrap_or(25.4),
+            top_tension_kn: req.top_tension_kn.unwrap_or(6500.0),
+            steel_elastic_modulus_gpa: req.steel_elastic_modulus_gpa.unwrap_or(207.0),
+            steel_density_kg_m3: req.steel_density_kg_m3.unwrap_or(7850.0),
+            internal_fluid_density_kg_m3: req.internal_fluid_density_kg_m3.unwrap_or(1250.0),
+            seawater_density_kg_m3: req.seawater_density_kg_m3.unwrap_or(1025.0),
+            surface_current_velocity_m_s: req.surface_current_velocity_m_s.unwrap_or(1.65),
+            bottom_current_velocity_m_s: req.bottom_current_velocity_m_s.unwrap_or(0.25),
+            strouhal_number: req.strouhal_number.unwrap_or(0.20),
+            design_fatigue_life_years: req.design_fatigue_life_years.unwrap_or(25.0),
+        };
+        let res = atlas_simulation_core::subsea_riser_viv::solve_subsea_riser_viv(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_chemical_chromatography_column(
+        &mut self,
+        req: &SimChromatographyColumnRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::chromatography_column::ChromatographyColumnProblem {
+            problem_id: req
+                .problem_id
+                .clone()
+                .unwrap_or_else(|| "chromatography_column_sim".to_string()),
+            chromatography_mode: req.chromatography_mode.unwrap_or(
+                atlas_simulation_core::chromatography_column::ChromatographyMode::ProteinAAffinity,
+            ),
+            column_diameter_mm: req.column_diameter_mm.unwrap_or(300.0),
+            bed_height_mm: req.bed_height_mm.unwrap_or(200.0),
+            linear_velocity_cm_h: req.linear_velocity_cm_h.unwrap_or(300.0),
+            resin_particle_diameter_um: req.resin_particle_diameter_um.unwrap_or(50.0),
+            bed_void_fraction: req.bed_void_fraction.unwrap_or(0.36),
+            intraparticle_porosity: req.intraparticle_porosity.unwrap_or(0.65),
+            feed_protein_concentration_g_l: req.feed_protein_concentration_g_l.unwrap_or(3.50),
+            max_binding_capacity_g_l: req.max_binding_capacity_g_l.unwrap_or(55.0),
+            langmuir_constant_l_g: req.langmuir_constant_l_g.unwrap_or(8.33),
+            molecular_diffusivity_m2_s: req.molecular_diffusivity_m2_s.unwrap_or(4.5e-11),
+            buffer_viscosity_mpa_s: req.buffer_viscosity_mpa_s.unwrap_or(1.05),
+            buffer_density_kg_m3: req.buffer_density_kg_m3.unwrap_or(1010.0),
+        };
+        let res = atlas_simulation_core::chromatography_column::solve_chromatography_column(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_transport_maglev_suspension(
+        &mut self,
+        req: &SimMaglevSuspensionRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::maglev_guideway_suspension::MaglevSuspensionProblem {
+            problem_id: req
+                .problem_id
+                .clone()
+                .unwrap_or_else(|| "maglev_suspension_sim".to_string()),
+            core_material: req.core_material.unwrap_or(
+                atlas_simulation_core::maglev_guideway_suspension::MaglevCoreMaterial::SiliconSteelFeSi,
+            ),
+            disturbance_type: req.disturbance_type.unwrap_or(
+                atlas_simulation_core::maglev_guideway_suspension::GuidewayDisturbanceType::ExpansionJointStep,
+            ),
+            mass_supported_per_magnet_kg: req.mass_supported_per_magnet_kg.unwrap_or(1250.0),
+            nominal_airgap_mm: req.nominal_airgap_mm.unwrap_or(12.0),
+            coil_turns: req.coil_turns.unwrap_or(320),
+            pole_face_area_mm2: req.pole_face_area_mm2.unwrap_or(58000.0),
+            coil_resistance_ohms: req.coil_resistance_ohms.unwrap_or(0.38),
+            max_inverter_voltage_v: req.max_inverter_voltage_v.unwrap_or(350.0),
+            max_continuous_current_a: req.max_continuous_current_a.unwrap_or(85.0),
+            target_controller_bandwidth_rad_s: req.target_controller_bandwidth_rad_s.unwrap_or(65.0),
+            disturbance_amplitude_mm: req.disturbance_amplitude_mm.unwrap_or(2.50),
+        };
+        let res = atlas_simulation_core::maglev_guideway_suspension::solve_maglev_guideway_suspension(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
     fn sim_molecular(
         &mut self,
         _req: &SimMolecularRequest,
@@ -12450,6 +12608,115 @@ namespace AtlasCAD.Unity
                     ..Default::default()
                 })?
             }
+            "sim.aerospace.supersonic_nozzle" => {
+                let m = req
+                    .arguments
+                    .get("design_mach_number")
+                    .or_else(|| req.arguments.get("design_mach"))
+                    .and_then(|v| v.as_f64());
+                let p = req
+                    .arguments
+                    .get("stagnation_pressure_kpa")
+                    .or_else(|| req.arguments.get("stagnation_pressure_pa"))
+                    .and_then(|v| v.as_f64());
+                let t = req
+                    .arguments
+                    .get("stagnation_temperature_k")
+                    .and_then(|v| v.as_f64());
+                self.sim_aerospace_supersonic_nozzle(&SimSupersonicNozzleRequest {
+                    design_mach_number: m,
+                    stagnation_pressure_kpa: p,
+                    stagnation_temperature_k: t,
+                    ..Default::default()
+                })?
+            }
+            "sim.automotive.ev_torque_vectoring" => {
+                let m = req
+                    .arguments
+                    .get("vehicle_mass_kg")
+                    .or_else(|| req.arguments.get("total_vehicle_mass_kg"))
+                    .and_then(|v| v.as_f64());
+                let v = req
+                    .arguments
+                    .get("vehicle_speed_km_h")
+                    .or_else(|| req.arguments.get("vehicle_speed_m_s"))
+                    .and_then(|v| v.as_f64());
+                let d = req
+                    .arguments
+                    .get("front_steering_angle_deg")
+                    .and_then(|v| v.as_f64());
+                self.sim_automotive_ev_torque_vectoring(&SimEvTorqueVectoringRequest {
+                    vehicle_mass_kg: m,
+                    vehicle_speed_km_h: v,
+                    front_steering_angle_deg: d,
+                    ..Default::default()
+                })?
+            }
+            "sim.marine.subsea_riser_viv" => {
+                let l = req
+                    .arguments
+                    .get("riser_length_m")
+                    .or_else(|| req.arguments.get("riser_total_length_m"))
+                    .and_then(|v| v.as_f64());
+                let t = req
+                    .arguments
+                    .get("top_tension_kn")
+                    .and_then(|v| v.as_f64());
+                let v = req
+                    .arguments
+                    .get("surface_current_velocity_m_s")
+                    .and_then(|v| v.as_f64());
+                self.sim_marine_subsea_riser_viv(&SimSubseaRiserVivRequest {
+                    riser_length_m: l,
+                    top_tension_kn: t,
+                    surface_current_velocity_m_s: v,
+                    ..Default::default()
+                })?
+            }
+            "sim.chemical.chromatography_column" => {
+                let d = req
+                    .arguments
+                    .get("column_diameter_mm")
+                    .or_else(|| req.arguments.get("column_inner_diameter_mm"))
+                    .and_then(|v| v.as_f64());
+                let h = req
+                    .arguments
+                    .get("bed_height_mm")
+                    .and_then(|v| v.as_f64());
+                let u = req
+                    .arguments
+                    .get("linear_velocity_cm_h")
+                    .or_else(|| req.arguments.get("superficial_linear_velocity_cm_h"))
+                    .and_then(|v| v.as_f64());
+                self.sim_chemical_chromatography_column(&SimChromatographyColumnRequest {
+                    column_diameter_mm: d,
+                    bed_height_mm: h,
+                    linear_velocity_cm_h: u,
+                    ..Default::default()
+                })?
+            }
+            "sim.transport.maglev_suspension" => {
+                let m = req
+                    .arguments
+                    .get("mass_supported_per_magnet_kg")
+                    .or_else(|| req.arguments.get("levitated_mass_per_magnet_kg"))
+                    .and_then(|v| v.as_f64());
+                let z = req
+                    .arguments
+                    .get("nominal_airgap_mm")
+                    .and_then(|v| v.as_f64());
+                let s = req
+                    .arguments
+                    .get("disturbance_amplitude_mm")
+                    .or_else(|| req.arguments.get("track_joint_step_disturbance_mm"))
+                    .and_then(|v| v.as_f64());
+                self.sim_transport_maglev_suspension(&SimMaglevSuspensionRequest {
+                    mass_supported_per_magnet_kg: m,
+                    nominal_airgap_mm: z,
+                    disturbance_amplitude_mm: s,
+                    ..Default::default()
+                })?
+            }
             "system.deploy.status" => self.deploy_status()?,
             _ => serde_json::json!({
                 "status": "Executed",
@@ -15579,6 +15846,67 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                 Ok(body) => {
                     match with_state(state, |state| {
                         state.sim_structural_cable_stayed_bridge(&body)
+                    }) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/aerospace/supersonic_nozzle" => {
+            match parse_body_or_default::<SimSupersonicNozzleRequest>(request) {
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_aerospace_supersonic_nozzle(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/automotive/ev_torque_vectoring" => {
+            match parse_body_or_default::<SimEvTorqueVectoringRequest>(request) {
+                Ok(body) => {
+                    match with_state(state, |state| {
+                        state.sim_automotive_ev_torque_vectoring(&body)
+                    }) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/marine/subsea_riser_viv" => {
+            match parse_body_or_default::<SimSubseaRiserVivRequest>(request) {
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_marine_subsea_riser_viv(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/chemical/chromatography_column" => {
+            match parse_body_or_default::<SimChromatographyColumnRequest>(request) {
+                Ok(body) => {
+                    match with_state(state, |state| {
+                        state.sim_chemical_chromatography_column(&body)
+                    }) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/transport/maglev_suspension" => {
+            match parse_body_or_default::<SimMaglevSuspensionRequest>(request) {
+                Ok(body) => {
+                    match with_state(state, |state| {
+                        state.sim_transport_maglev_suspension(&body)
                     }) {
                         Ok(payload) => json_response(200, payload),
                         Err(error) => error_response(&error),
@@ -21194,4 +21522,160 @@ struct SimCableStayRequest {
     pub damper_distance_from_deck_m: Option<f64>,
     #[serde(default)]
     pub wind_speed_m_s: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimSupersonicNozzleRequest {
+    #[serde(default)]
+    pub problem_id: Option<String>,
+    #[serde(default)]
+    pub gas_medium: Option<atlas_simulation_core::supersonic_wind_tunnel_nozzle::SupersonicGasMedium>,
+    #[serde(default)]
+    pub contour_method: Option<atlas_simulation_core::supersonic_wind_tunnel_nozzle::NozzleContourMethod>,
+    #[serde(default)]
+    pub stagnation_pressure_kpa: Option<f64>,
+    #[serde(default)]
+    pub stagnation_temperature_k: Option<f64>,
+    #[serde(default)]
+    pub design_mach_number: Option<f64>,
+    #[serde(default)]
+    pub throat_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub ambient_backpressure_kpa: Option<f64>,
+    #[serde(default)]
+    pub model_deflection_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub divergence_half_angle_deg: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimEvTorqueVectoringRequest {
+    #[serde(default)]
+    pub problem_id: Option<String>,
+    #[serde(default)]
+    pub drivetrain_layout: Option<atlas_simulation_core::ev_torque_vectoring::EvAwdLayout>,
+    #[serde(default)]
+    pub road_condition: Option<atlas_simulation_core::ev_torque_vectoring::RoadSurfaceCondition>,
+    #[serde(default)]
+    pub vehicle_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub yaw_moment_of_inertia_kg_m2: Option<f64>,
+    #[serde(default)]
+    pub wheelbase_mm: Option<f64>,
+    #[serde(default)]
+    pub track_width_mm: Option<f64>,
+    #[serde(default)]
+    pub cg_to_front_axle_mm: Option<f64>,
+    #[serde(default)]
+    pub cg_height_mm: Option<f64>,
+    #[serde(default)]
+    pub tire_rolling_radius_mm: Option<f64>,
+    #[serde(default)]
+    pub front_cornering_stiffness_n_rad: Option<f64>,
+    #[serde(default)]
+    pub rear_cornering_stiffness_n_rad: Option<f64>,
+    #[serde(default)]
+    pub vehicle_speed_km_h: Option<f64>,
+    #[serde(default)]
+    pub front_steering_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub demanded_total_torque_nm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimSubseaRiserVivRequest {
+    #[serde(default)]
+    pub problem_id: Option<String>,
+    #[serde(default)]
+    pub riser_type: Option<atlas_simulation_core::subsea_riser_viv::MarineRiserType>,
+    #[serde(default)]
+    pub current_profile: Option<atlas_simulation_core::subsea_riser_viv::OceanCurrentProfile>,
+    #[serde(default)]
+    pub suppression_device: Option<atlas_simulation_core::subsea_riser_viv::VivSuppressionDevice>,
+    #[serde(default)]
+    pub water_depth_m: Option<f64>,
+    #[serde(default)]
+    pub riser_length_m: Option<f64>,
+    #[serde(default)]
+    pub outer_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub wall_thickness_mm: Option<f64>,
+    #[serde(default)]
+    pub top_tension_kn: Option<f64>,
+    #[serde(default)]
+    pub steel_elastic_modulus_gpa: Option<f64>,
+    #[serde(default)]
+    pub steel_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub internal_fluid_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub seawater_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub surface_current_velocity_m_s: Option<f64>,
+    #[serde(default)]
+    pub bottom_current_velocity_m_s: Option<f64>,
+    #[serde(default)]
+    pub strouhal_number: Option<f64>,
+    #[serde(default)]
+    pub design_fatigue_life_years: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimChromatographyColumnRequest {
+    #[serde(default)]
+    pub problem_id: Option<String>,
+    #[serde(default)]
+    pub chromatography_mode: Option<atlas_simulation_core::chromatography_column::ChromatographyMode>,
+    #[serde(default)]
+    pub column_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub bed_height_mm: Option<f64>,
+    #[serde(default)]
+    pub linear_velocity_cm_h: Option<f64>,
+    #[serde(default)]
+    pub resin_particle_diameter_um: Option<f64>,
+    #[serde(default)]
+    pub bed_void_fraction: Option<f64>,
+    #[serde(default)]
+    pub intraparticle_porosity: Option<f64>,
+    #[serde(default)]
+    pub feed_protein_concentration_g_l: Option<f64>,
+    #[serde(default)]
+    pub max_binding_capacity_g_l: Option<f64>,
+    #[serde(default)]
+    pub langmuir_constant_l_g: Option<f64>,
+    #[serde(default)]
+    pub molecular_diffusivity_m2_s: Option<f64>,
+    #[serde(default)]
+    pub buffer_viscosity_mpa_s: Option<f64>,
+    #[serde(default)]
+    pub buffer_density_kg_m3: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimMaglevSuspensionRequest {
+    #[serde(default)]
+    pub problem_id: Option<String>,
+    #[serde(default)]
+    pub core_material: Option<atlas_simulation_core::maglev_guideway_suspension::MaglevCoreMaterial>,
+    #[serde(default)]
+    pub disturbance_type: Option<atlas_simulation_core::maglev_guideway_suspension::GuidewayDisturbanceType>,
+    #[serde(default)]
+    pub mass_supported_per_magnet_kg: Option<f64>,
+    #[serde(default)]
+    pub nominal_airgap_mm: Option<f64>,
+    #[serde(default)]
+    pub coil_turns: Option<u32>,
+    #[serde(default)]
+    pub pole_face_area_mm2: Option<f64>,
+    #[serde(default)]
+    pub coil_resistance_ohms: Option<f64>,
+    #[serde(default)]
+    pub max_inverter_voltage_v: Option<f64>,
+    #[serde(default)]
+    pub max_continuous_current_a: Option<f64>,
+    #[serde(default)]
+    pub target_controller_bandwidth_rad_s: Option<f64>,
+    #[serde(default)]
+    pub disturbance_amplitude_mm: Option<f64>,
 }

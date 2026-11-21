@@ -1,8 +1,9 @@
-//! Diagnostic: cut nine square holes through a plate one at a time, reporting each step.
+//! Diagnostic: union nine boxes one at a time, reporting each step.
 //!
-//! This exists because the benchmark found that a *chain* of booleans can fail even though each
-//! single boolean succeeds. It prints which step fails and what the kernel says, so the limitation
-//! can be documented with evidence instead of guesswork.
+//! This exists because the benchmark found that a *chain* of booleans used to fail even though each
+//! single boolean succeeded. The adapter now retries a failed step at a larger tolerance, so the
+//! chain completes; this prints the volume and how often the ladder was used, so a regression is
+//! visible with evidence instead of guesswork.
 //!
 //! Run: `cargo run --release -p cad-kernel-truck --example chain`
 
@@ -44,9 +45,10 @@ fn main() {
                 current = joined;
                 let expected = 10.0 * (10.0 + 5.0 * i as f64) * 10.0;
                 println!(
-                    "union {i} at x={x} -> ok, volume {:.3} (expected {expected:.0}), retries so far {}",
+                    "union {i} at x={x} -> ok, volume {:.3} (expected {expected:.0}), retries so far {}, escalations so far {}",
                     kernel.volume(current).unwrap_or(f64::NAN),
-                    kernel.coplanar_retries()
+                    kernel.coplanar_retries(),
+                    kernel.boolean_escalations()
                 );
             }
             Err(e) => {
@@ -55,5 +57,9 @@ fn main() {
             }
         }
     }
-    println!("final live solids: {}", kernel.live_solids());
+    println!(
+        "final live solids: {}, tolerance escalations: {}",
+        kernel.live_solids(),
+        kernel.boolean_escalations()
+    );
 }

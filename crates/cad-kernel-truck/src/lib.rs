@@ -74,6 +74,28 @@ pub const MIN_TOLERANCE_MM: f64 = 1e-4;
 /// for a small tool).
 pub const COPLANAR_NUDGE_MM: [f64; 3] = [7.0e-5, 9.0e-5, 1.1e-4];
 
+/// [`COPLANAR_NUDGE_MM`] with every sign reversed: the retry that moves a tool *into* a coplanar
+/// contact instead of away from it.
+///
+/// Measured on two 10 x 10 x 10 boxes sharing a face: truck's raw union returns two shells and
+/// 1200 mm² of surface (both contact patches kept), even though the volume is 2000. Moving one box
+/// in by 1e-3 mm fuses them into one watertight shell (0 open mesh edges) measuring 1999.900 mm³
+/// and 1000.000 mm². Smaller moves leave 6–14 hairline open edges at the contact, which is why this
+/// is larger than [`COPLANAR_NUDGE_MM`]; the extra 0.1 mm³ is 50 ppm of the part. It is also the
+/// direction that lets a solid contained in another union with it when the two touch a face: the
+/// inward move pulls the inner solid through the container's face, creating the intersection curve
+/// the union needs (measured 1000.016 mm³ / 600.016 mm², watertight).
+pub const COPLANAR_NUDGE_INWARD_MM: [f64; 3] = [-1.0e-3, -1.0e-3, -1.0e-3];
+
+/// Coordinates beyond this magnitude are refused by the boolean operations.
+///
+/// At 1e6 mm, an intersection of two 100 mm boxes comes back as 11 499.8 mm³ with 24 open edges —
+/// not a solid. Re-centring does not repair it: the same full-span coplanar intersection leaves 18
+/// open edges at the origin, and translating that malformed result back hangs inside truck. The
+/// adapter therefore refuses rather than returning a wrong solid, and says what to do about it.
+/// 1e5 mm (100 m) is conservative for f64 and well beyond ordinary millimetre-scale parts.
+pub const MAX_BOOLEAN_COORDINATE_MM: f64 = 1e5;
+
 /// The default tolerance passed to truck's boolean operations, in millimetres.
 ///
 /// This is deliberately **not** the tessellation tolerance. truck's boolean classification is
@@ -82,6 +104,18 @@ pub const COPLANAR_NUDGE_MM: [f64; 3] = [7.0e-5, 9.0e-5, 1.1e-4];
 /// scale-relative values of the same magnitude (`size * 1e-5`); 1e-3 mm is a safe default for
 /// millimetre-scale CAD parts and [`TruckKernel::with_boolean_tolerance`] overrides it.
 pub const DEFAULT_BOOLEAN_TOLERANCE_MM: f64 = 1e-3;
+
+/// Higher tolerances tried, in order, when the configured boolean tolerance yields no result.
+///
+/// truck's boolean panics once a chained operation leaves it with a tolerance below 1e-6 mm
+/// (`intersection_curve.rs:172`). The adapter cannot pass that floor through, so raising the
+/// tolerance is its only lever: measured on a nine-box union chain, 1e-3 and 1e-2 mm fail, while
+/// 3e-2 mm completes all eight unions (final volume 5000.136 mm³ against an analytic 5000, 0.003 %
+/// high from the coplanar retry), and 1e-1 mm completes it too. A rung is only tried after the
+/// configured tolerance has failed, so ordinary geometry keeps its exact default; an escalated
+/// operation may classify features closer than the rung as touching, and
+/// [`TruckKernel::boolean_escalations`] records when that happened.
+pub const BOOLEAN_TOLERANCE_LADDER_MM: [f64; 2] = [3e-2, 1e-1];
 
 /// A cancellation flag shared between the caller and a running operation.
 ///
@@ -274,6 +308,7 @@ pub struct TruckKernel {
     next: u64,
     boolean_tol: f64,
     coplanar_retries: u64,
+    tolerance_escalations: u64,
     // Call counters only. Atomics rather than `Cell` because `Kernel::tessellate` takes `&self`, and
     // `Relaxed` is enough: these are diagnostics, never a synchronisation point.
     extrude_calls: AtomicU64,
@@ -295,6 +330,7 @@ impl TruckKernel {
             next: 1,
             boolean_tol: DEFAULT_BOOLEAN_TOLERANCE_MM,
             coplanar_retries: 0,
+            tolerance_escalations: 0,
             extrude_calls: AtomicU64::new(0),
             boolean_calls: AtomicU64::new(0),
             tessellate_calls: AtomicU64::new(0),
@@ -341,6 +377,15 @@ impl TruckKernel {
     /// can report how often real geometry needs it instead of leaving it as folklore.
     pub fn coplanar_retries(&self) -> u64 {
         self.coplanar_retries
+    }
+
+    /// How many boolean operations only succeeded after raising the tolerance above the configured one.
+    ///
+    /// A chain that panics at the configured tolerance is retried at
+    /// [`BOOLEAN_TOLERANCE_LADDER_MM`]'s rungs; this counts the operations that needed it, so a
+    /// benchmark can report how often the escape hatch is used instead of leaving it as folklore.
+    pub fn boolean_escalations(&self) -> u64 {
+        self.tolerance_escalations
     }
 
     /// Number of live solids (for leak tests and diagnostics).
@@ -416,11 +461,13 @@ impl TruckKernel {
     /// [`Kernel::revolve`] with a caller-supplied [`Budget`].
     ///
     /// The profile is built into a planar face exactly as [`Kernel::extrude`] builds it, then swept
-    /// a full turn about an in-plane axis. Two inputs are validated here rather than left to truck:
+    /// about an in-plane axis by `angle_rad` (0 < angle ≤ a full turn). truck's closed sweep caps a
+    /// partial turn itself: measured, a 90° turn of an offset rectangle is the analytic quarter
+    /// annulus (2356.194 mm³) and a 180° turn on the axis the analytic half cylinder (785.398 mm³),
+    /// both watertight, so no cap assembly is needed here. Two inputs are validated here rather
+    /// than left to truck:
     ///
-    /// * the angle must be a **full turn**. A partial sweep of a face is an open shell, and truck's
-    ///   return type cannot tell the two apart, so accepting 90° would hand the caller something
-    ///   that is not a solid while claiming it is;
+    /// * the angle must be finite, positive and no more than one full turn;
     /// * the profile must lie on **one side** of the axis. A profile that crosses it self-intersects
     ///   when revolved, which is not a solid of revolution and has no meaningful volume.
     pub fn revolve_with_budget(
@@ -448,10 +495,14 @@ impl TruckKernel {
                 "the revolve axis direction must be non-zero".into(),
             ));
         }
-        if !angle_rad.is_finite() || (angle_rad - std::f64::consts::TAU).abs() > 1e-9 {
+        if !angle_rad.is_finite() || angle_rad <= 0.0 {
             return Err(KernelError::Invalid(format!(
-                "revolve supports a full {:.6} rad turn only, got {angle_rad} rad; a partial \
-                 sweep produces an open shell, not a solid",
+                "revolve angle must be finite and positive, got {angle_rad} rad"
+            )));
+        }
+        if angle_rad > std::f64::consts::TAU + 1e-9 {
+            return Err(KernelError::Invalid(format!(
+                "revolve angle {angle_rad} rad is more than one full turn ({:.6} rad)",
                 std::f64::consts::TAU
             )));
         }
@@ -492,12 +543,17 @@ impl TruckKernel {
             let face = builder::try_attach_plane(&[wire]).map_err(|e| {
                 KernelError::Invalid(format!("profile is not a planar region: {e}"))
             })?;
-            Ok(builder::rsweep(
-                &face,
-                Point3::new(ox, oy, 0.0),
-                Vector3::new(dx / length, dy / length, 0.0),
-                Rad(angle_rad),
-            ))
+            let axis = Vector3::new(dx / length, dy / length, 0.0);
+            let origin = Point3::new(ox, oy, 0.0);
+            let swept = builder::rsweep(&face, origin, axis, Rad(angle_rad));
+            if (angle_rad - std::f64::consts::TAU).abs() <= 1e-9 {
+                return Ok(swept);
+            }
+            // A partial rotation leaves a shell open at both angular ends. Add the profile at the
+            // start and the rotated profile at the end; truck's mesh orientation repair gives the
+            // caps their outward winding, and welding closes the shared edges.
+            // truck's closed sweep already caps a partial turn; return it as built.
+            Ok(swept)
         })?;
         budget.check()?;
         Ok(self.insert(solid))
@@ -518,7 +574,7 @@ impl TruckKernel {
         self.require(op.capability())?;
         budget.check()?;
         self.boolean_calls.fetch_add(1, Ordering::Relaxed);
-        let tolerance = self.boolean_tol;
+        let configured_tolerance = self.boolean_tol;
 
         // Deep copies: truck's operations consume relationships between the operands' topology
         // objects, and the caller's handles must stay valid (the contract says neither input is
@@ -530,7 +586,7 @@ impl TruckKernel {
         let right = guarded("boolean operand", || Ok(builder::clone(self.lookup(b)?)))?;
 
         // One boolean attempt with the tool moved by `offset`. A difference is `a AND NOT b`.
-        let attempt = |offset: [f64; 3]| -> Option<Solid> {
+        let attempt = |offset: [f64; 3], tolerance: f64| -> Option<Solid> {
             let shift = Vector3::new(offset[0], offset[1], offset[2]);
             let tool = if offset == [0.0; 3] {
                 builder::clone(&right)
@@ -556,80 +612,183 @@ impl TruckKernel {
             })
         };
 
-        let (result, retried) = guarded(op.label(), || match attempt([0.0; 3]) {
-            Some(solid) => Ok((solid, false)),
-            None => {
-                // Measured limitation of truck's boolean: operands with **coplanar, overlapping
-                // faces** (for example a hole exactly as tall as the plate it passes through) return
-                // no result, while piercing, contained and partially overlapping pairs succeed.
-                // Moving only the tool by a fraction of a micrometre removes the coincidence; the
-                // result is moved back, so the geometric change is bounded by COPLANAR_NUDGE_MM
-                // (~1e-4 mm per axis) times the tool's surface area.
-                budget.check()?;
-                match attempt(COPLANAR_NUDGE_MM) {
-                    Some(solid) => Ok((solid, true)),
-                    None => Err(KernelError::Failed(format!(
-                        "{} produced no result; the operands may be tangent, coincident, or nearly degenerate",
-                        op.label()
-                    ))),
-                }
+        // Tolerances to try, in order: the configured one first, then the escalation ladder. A
+        // configured tolerance above a rung skips that rung. Deeper chains are why this exists: a
+        // chained union can leave truck with a tolerance below its 1e-6 mm floor and panic, while a
+        // larger tolerance completes the same operation.
+        let mut tolerances = vec![configured_tolerance];
+        for rung in BOOLEAN_TOLERANCE_LADDER_MM {
+            if rung > configured_tolerance {
+                tolerances.push(rung);
             }
-        })?;
-
-        if retried {
-            self.coplanar_retries = self.coplanar_retries.saturating_add(1);
         }
 
-        // Refuse a result that violates conservation of volume, rather than return a wrong solid.
+        // Conservation is measured against the operands once; only the result changes per attempt.
         // A union can only grow and an intersection can only shrink; violating that means the
         // kernel produced malformed topology, which is exactly what a silently accepted boolean
         // would hide. (SolidCraft's `boolean_guard` enforces the same rule for all three ops.)
         let measure_tol = 0.05;
         let before_measure = solid_measure(&left, measure_tol, budget)?;
         let tool_measure = solid_measure(&right, measure_tol, budget)?;
-        let after_measure = solid_measure(&result, measure_tol, budget)?;
         let before = before_measure.map_or(f64::NAN, |measure| measure.0);
         let tool = tool_measure.map_or(f64::NAN, |measure| measure.0);
-        let after = after_measure.map_or(f64::NAN, |measure| measure.0);
         let slack = 1e-3 * before.max(tool).max(1.0);
-        let violated = match op {
-            BooleanOp::Union => after < before.max(tool) - slack,
-            BooleanOp::Intersection => after > before.min(tool) + slack,
-            BooleanOp::Difference => after > before + slack,
+
+        // Refuse booleans at coordinates where truck returns malformed topology instead of a solid.
+        // Measured at 1e6 mm: 11 499.8 mm³ with 24 open edges. Re-centring alone does not repair it
+        // (the same full-span coplanar intersection leaves 18 open edges at the origin) and
+        // translating the malformed result back hangs inside truck, so a clear refusal is the only
+        // honest answer until the kernel can represent the case.
+        let far = |bounds: cad_contract::mesh::Aabb3| {
+            bounds
+                .min
+                .iter()
+                .chain(bounds.max.iter())
+                .any(|v| v.abs() > MAX_BOOLEAN_COORDINATE_MM)
         };
-        if violated {
+        if let (Some((_, _, a_box)), Some((_, _, b_box))) = (before_measure, tool_measure)
+            && (far(a_box) || far(b_box))
+        {
             return Err(KernelError::Failed(format!(
-                "{} produced a result that fails volume conservation \
-                 ({} mm³ and {} mm³ in, {} mm³ out); refusing to return it",
-                op.label(),
-                before,
-                tool,
-                after
+                "{} at coordinates beyond {MAX_BOOLEAN_COORDINATE_MM:.0e} mm would exceed the \
+                 kernel's usable precision; re-centre the model before the boolean",
+                op.label()
             )));
         }
 
-        // An empty result is an error, not a body. Subtracting a solid from itself removes
-        // everything, and there is no mesh that represents nothing — so the coplanar retry reports
-        // a shell as thick as its own nudge instead. Measured: cutting a 10 x 10 x 5 plate with its
-        // own profile returns 0.008 mm³, which would otherwise be handed to the application as a
-        // successfully built feature. A remainder no larger than the nudge could have manufactured
-        // by itself is nothing, and saying so is the only answer a caller can act on.
-        if op == BooleanOp::Difference
-            && after.is_finite()
-            && let Some((_, tool_area)) = tool_measure
-        {
-            let nudge = COPLANAR_NUDGE_MM
-                .iter()
-                .fold(0.0f64, |largest, offset| largest.max(offset.abs()));
-            // Twice the nudge times the tool's surface: the size of the shell the retry can leave.
-            if after <= 2.0 * nudge * tool_area {
-                return Err(KernelError::Failed(format!(
-                    "{} removed the whole solid: {after} mm³ of {before} mm³ is left, which is no \
-                     larger than the {nudge:.1e} mm the coplanar retry has to move the tool; refusing \
-                     to return a sliver as a body",
-                    op.label()
-                )));
+        let mut accepted: Option<(Solid, bool, usize)> = None;
+        let mut last_error: Option<KernelError> = None;
+        for (level, tolerance) in tolerances.iter().copied().enumerate() {
+            budget.check()?;
+            let outcome = guarded(op.label(), || match attempt([0.0; 3], tolerance) {
+                Some(solid) => Ok((solid, false)),
+                None => {
+                    // Measured limitation of truck's boolean: operands with **coplanar, overlapping
+                    // faces** (for example a hole exactly as tall as the plate it passes through) return
+                    // no result, while piercing, contained and partially overlapping pairs succeed.
+                    // Moving only the tool by a fraction of a micrometre removes the coincidence; the
+                    // result is moved back, so the geometric change is bounded by COPLANAR_NUDGE_MM
+                    // (~1e-4 mm per axis) times the tool's surface area.
+                    budget.check()?;
+                    match attempt(COPLANAR_NUDGE_MM, tolerance) {
+                        Some(solid) => Ok((solid, true)),
+                        // The opposite direction is what a contained operand touching a face needs:
+                        // moving it further inside changes no crossing, while pulling it through
+                        // the face creates the intersection the union is built from.
+                        None => match attempt(COPLANAR_NUDGE_INWARD_MM, tolerance) {
+                            Some(solid) => Ok((solid, true)),
+                            None => Err(KernelError::Failed(format!(
+                                "{} produced no result; the operands may be tangent, coincident, or nearly degenerate",
+                                op.label()
+                            ))),
+                        },
+                    }
+                }
+            });
+            let (mut result, mut retried) = match outcome {
+                Ok(value) => value,
+                Err(error)
+                    if level + 1 < tolerances.len()
+                        && matches!(&error, KernelError::Internal(_) | KernelError::Failed(_)) =>
+                {
+                    // A panic or a no-result at this tolerance is retried at the next rung; the
+                    // operation either fails there with a diagnostic or succeeds at a coarse but
+                    // finite tolerance, which is strictly better than no solid.
+                    last_error = Some(error);
+                    continue;
+                }
+                Err(error) => return Err(error),
+            };
+
+            // Face-to-face union: a *successful* truck union of two solids that share only a face
+            // comes back as a compound with one shell per operand (measured: 2 shells, 1200 mm² for
+            // two 10 mm cubes, against 1000 analytic). The volume is right, so conservation cannot
+            // catch it, and the "solid" is really two boxes kept apart by a double wall. Retry
+            // inward and keep the merged result only when it actually has fewer shells, so a
+            // genuinely disjoint union is untouched.
+            if op == BooleanOp::Union {
+                let operand_shells = left.boundaries().len() + right.boundaries().len();
+                if result.boundaries().len() == operand_shells
+                    && operand_shells > 1
+                    && let Ok(Some(merged)) = guarded(op.label(), || {
+                        Ok(attempt(COPLANAR_NUDGE_INWARD_MM, tolerance))
+                    })
+                    && merged.boundaries().len() < result.boundaries().len()
+                {
+                    result = merged;
+                    retried = true;
+                }
             }
+
+            let after_measure = solid_measure(&result, measure_tol, budget)?;
+            let after = after_measure.map_or(f64::NAN, |measure| measure.0);
+            let violated = match op {
+                BooleanOp::Union => after < before.max(tool) - slack,
+                BooleanOp::Intersection => after > before.min(tool) + slack,
+                BooleanOp::Difference => after > before + slack,
+            };
+            if violated {
+                let error = KernelError::Failed(format!(
+                    "{} produced a result that fails volume conservation \
+                     ({} mm³ and {} mm³ in, {} mm³ out); refusing to return it",
+                    op.label(),
+                    before,
+                    tool,
+                    after
+                ));
+                if level + 1 < tolerances.len() {
+                    last_error = Some(error);
+                    continue;
+                }
+                return Err(error);
+            }
+
+            // An empty result is an error, not a body. Subtracting a solid from itself removes
+            // everything, and there is no mesh that represents nothing — so the coplanar retry reports
+            // a shell as thick as its own nudge instead. Measured: cutting a 10 x 10 x 5 plate with its
+            // own profile returns 0.008 mm³, which would otherwise be handed to the application as a
+            // successfully built feature. A remainder no larger than the nudge could have manufactured
+            // by itself is nothing, and saying so is the only answer a caller can act on.
+            if op == BooleanOp::Difference
+                && after.is_finite()
+                && let Some((_, tool_area, _)) = tool_measure
+            {
+                let nudge = COPLANAR_NUDGE_MM
+                    .iter()
+                    .fold(0.0f64, |largest, offset| largest.max(offset.abs()));
+                // Twice the nudge times the tool's surface: the size of the shell the retry can leave.
+                if after <= 2.0 * nudge * tool_area {
+                    let error = KernelError::Failed(format!(
+                        "{} removed the whole solid: {after} mm³ of {before} mm³ is left, which is no \
+                         larger than the {nudge:.1e} mm the coplanar retry has to move the tool; refusing \
+                         to return a sliver as a body",
+                        op.label()
+                    ));
+                    if level + 1 < tolerances.len() {
+                        last_error = Some(error);
+                        continue;
+                    }
+                    return Err(error);
+                }
+            }
+
+            accepted = Some((result, retried, level));
+            break;
+        }
+
+        let (result, retried, level) = match accepted {
+            Some(value) => value,
+            None => {
+                return Err(last_error.unwrap_or_else(|| {
+                    KernelError::Failed(format!("{} produced no result", op.label()))
+                }));
+            }
+        };
+        if retried {
+            self.coplanar_retries = self.coplanar_retries.saturating_add(1);
+        }
+        if level > 0 {
+            self.tolerance_escalations = self.tolerance_escalations.saturating_add(1);
         }
 
         Ok(self.insert(result))
@@ -736,7 +895,8 @@ impl Kernel for TruckKernel {
                 Capability::Extrude,
                 // Revolve is advertised because it is measured: a rectangle sharing the axis gives
                 // the analytic cylinder and one offset from it the analytic annulus (see the tests
-                // below). Only a full turn is supported, and the adapter says so on any other angle.
+                // below). A partial angle returns the capped solid of revolution, measured against
+                // the analytic quarter and half volumes.
                 Capability::Revolve,
                 Capability::BooleanUnion,
                 // Difference is advertised because it is *measured* correct: the raw result's
@@ -1142,9 +1302,18 @@ fn has_directed_edge(tri: &[u32; 3], a: u32, b: u32) -> bool {
 /// guard tolerates an unmeasurable operand by skipping its comparison. The two outcomes this will not
 /// swallow are cancellation and timeout, because those are the caller's decision and must stop the
 /// operation, not be treated as "unmeasurable".
-fn solid_measure(solid: &Solid, tol: f64, budget: &Budget) -> Result<Option<(f64, f64)>> {
+fn solid_measure(
+    solid: &Solid,
+    tol: f64,
+    budget: &Budget,
+) -> Result<Option<(f64, f64, cad_contract::mesh::Aabb3)>> {
     match mesh_of(solid, tol, budget) {
-        Ok(mesh) => Ok(Some((mesh.signed_volume().abs(), mesh.surface_area()))),
+        Ok(mesh) => Ok(Some((
+            mesh.signed_volume().abs(),
+            mesh.surface_area(),
+            mesh.bounding_box()
+                .unwrap_or(cad_contract::mesh::Aabb3::EMPTY),
+        ))),
         Err(e @ (KernelError::Cancelled | KernelError::Timeout(_))) => Err(e),
         Err(_) => Ok(None),
     }
@@ -1235,6 +1404,110 @@ mod tests {
         assert_eq!(kernel.boolean_calls(), 1);
         kernel.tessellate(joined, 0.05)?;
         assert_eq!(kernel.tessellate_calls(), 1);
+        // An ordinary coplanar union is repaired by the nudge at the configured tolerance; it must
+        // not drift onto the escalation ladder.
+        assert_eq!(kernel.boolean_escalations(), 0);
+        Ok(())
+    }
+
+    /// A chain of eight unions must complete, not panic on its third.
+    ///
+    /// Before the tolerance ladder this failed at union 2 with truck's `tolerance must be no less
+    /// than 1e-6` panic. Measured after it: all eight unions complete at the 3e-2 mm rung, and the
+    /// result carries 0.136 mm³ (0.003 %) of extra volume from the coplanar retry's membranes.
+    #[test]
+    fn a_chain_of_unions_completes() -> TestResult {
+        let mut kernel = TruckKernel::new();
+        let mut current = kernel.extrude(&square(10.0), 10.0)?;
+        for i in 1..9 {
+            let next = kernel.extrude(&square_at(10.0, i as f64 * 5.0, 0.0), 10.0)?;
+            current = kernel.boolean(BooleanOp::Union, current, next)?;
+        }
+        close(kernel.volume(current)?, 5000.0, 0.5, "chained union volume")?;
+        assert!(
+            kernel.boolean_escalations() >= 1,
+            "the chain must exercise the tolerance ladder"
+        );
+        Ok(())
+    }
+
+    /// Two boxes sharing a whole face must become one solid, not a two-shell compound.
+    ///
+    /// Measured before the inward retry: volume 2000 but area 1200 — both contact patches kept, so
+    /// the "solid" was two boxes held apart by a double wall. After it: 1999.900 mm³, 1000.000 mm²,
+    /// and no open mesh edges.
+    #[test]
+    fn a_face_to_face_union_fuses_into_one_solid() -> TestResult {
+        let mut kernel = TruckKernel::new();
+        let a = kernel.extrude(&square(10.0), 10.0)?;
+        let b = kernel.extrude(&square_at(10.0, 10.0, 0.0), 10.0)?;
+        let joined = kernel.boolean(BooleanOp::Union, a, b)?;
+        let mesh = kernel.tessellate(joined, 0.05)?;
+        close(
+            mesh.signed_volume().abs(),
+            2000.0,
+            0.2,
+            "tangent union volume",
+        )?;
+        close(mesh.surface_area(), 1000.0, 0.01, "tangent union area")?;
+        assert_eq!(mesh.open_edges(), 0, "a fused union must be watertight");
+        Ok(())
+    }
+
+    /// A contained solid that rests on one of the container's faces unions to the container.
+    ///
+    /// Truck returns no result when the inner solid touches the container's bottom face; the
+    /// inward retry pulls it 1e-3 mm through that face and completes the union. The analytic answer
+    /// is 1000 mm³ / 600 mm²; the measured excess is the 1e-3 mm protrusion (0.016 mm³).
+    #[test]
+    fn a_contained_union_that_touches_a_face_returns_the_container() -> TestResult {
+        let mut kernel = TruckKernel::new();
+        let plate = kernel.extrude(&square(10.0), 10.0)?;
+        let inner = kernel.extrude(&square_at(4.0, 3.0, 3.0), 4.0)?;
+        let joined = kernel.boolean(BooleanOp::Union, plate, inner)?;
+        let mesh = kernel.tessellate(joined, 0.05)?;
+        close(
+            mesh.signed_volume().abs(),
+            1000.0,
+            0.05,
+            "contained union volume",
+        )?;
+        close(mesh.surface_area(), 600.0, 0.05, "contained union area")?;
+        assert_eq!(mesh.open_edges(), 0, "a contained union must be watertight");
+        Ok(())
+    }
+
+    /// A boolean at 1e6 mm is refused with an actionable message, not returned as a broken solid.
+    ///
+    /// Measured before the guard: an intersection of two 100 mm boxes at 1e6 mm came back as
+    /// 11 499.8 mm³ with 24 open edges. The message names the coordinate bound and says to re-centre.
+    #[test]
+    fn a_boolean_at_a_million_mm_is_refused() -> TestResult {
+        let mut kernel = TruckKernel::new();
+        let base = 1_000_000.0;
+        let profile = |x: f64| {
+            vec![
+                [x, base],
+                [x + 100.0, base],
+                [x + 100.0, base + 100.0],
+                [x, base + 100.0],
+            ]
+        };
+        let a = kernel.extrude(&profile(base), 10.0)?;
+        let b = kernel.extrude(&profile(base + 90.0), 10.0)?;
+        match kernel.boolean(BooleanOp::Intersection, a, b) {
+            Err(KernelError::Failed(message)) => {
+                assert!(
+                    message.contains("re-centre"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => {
+                return Err(KernelError::Failed(format!(
+                    "a large-coordinate boolean must be refused, got {other:?}"
+                )));
+            }
+        }
         Ok(())
     }
 
@@ -1290,23 +1563,79 @@ mod tests {
         Ok(())
     }
 
-    /// A partial turn would be an open shell, so it is refused instead of returned as a solid.
+    /// A quarter turn of a rectangle offset from the axis is a capped annular sector.
     #[test]
-    fn a_partial_revolve_is_refused() -> TestResult {
+    fn a_partial_revolve_is_a_capped_solid() -> TestResult {
+        let mut kernel = TruckKernel::new();
+        // x 2..4, y 0..3, a quarter turn about the y axis: (π/4) (16 - 4) 3 mm³.
+        let profile = vec![[2.0, 0.0], [4.0, 0.0], [4.0, 3.0], [2.0, 3.0]];
+        let id = kernel.revolve(
+            &profile,
+            [0.0, 0.0],
+            [0.0, 1.0],
+            std::f64::consts::FRAC_PI_2,
+        )?;
+        let mesh = kernel.tessellate(id, MIN_TOLERANCE_MM)?;
+        let analytic = std::f64::consts::FRAC_PI_4 * 12.0 * 3.0;
+        close(
+            mesh.signed_volume().abs(),
+            analytic,
+            0.05,
+            "quarter annulus volume",
+        )?;
+        assert_eq!(
+            mesh.open_edges(),
+            0,
+            "a capped partial revolve must be closed"
+        );
+
+        // The caps bound the turn: x and y are confined to the first quadrant, and the axis is
+        // untouched at y = 0..3.
+        let bb = mesh
+            .bounding_box()
+            .ok_or(KernelError::Failed("no bounds".into()))?;
+        close(bb.min[0], 0.0, 1e-6, "quarter start cap at x = 0")?;
+        close(bb.min[1], 0.0, 1e-6, "quarter bottom")?;
+        close(bb.max[1], 3.0, 1e-6, "quarter top")?;
+        assert!(bb.max[0] <= 4.0 + 1e-6, "outer radius {}", bb.max[0]);
+        Ok(())
+    }
+
+    /// A half turn of a rectangle sharing the axis is a capped half cylinder.
+    #[test]
+    fn a_half_revolve_on_the_axis_is_a_half_cylinder() -> TestResult {
+        let mut kernel = TruckKernel::new();
+        let profile = vec![[0.0, 0.0], [4.0, 0.0], [4.0, 3.0], [0.0, 3.0]];
+        let id = kernel.revolve(&profile, [0.0, 0.0], [0.0, 1.0], std::f64::consts::PI)?;
+        let mesh = kernel.tessellate(id, MIN_TOLERANCE_MM)?;
+        let analytic = 0.5 * std::f64::consts::PI * 16.0 * 3.0;
+        close(
+            mesh.signed_volume().abs(),
+            analytic,
+            0.05,
+            "half cylinder volume",
+        )?;
+        assert_eq!(mesh.open_edges(), 0, "a capped half revolve must be closed");
+        Ok(())
+    }
+
+    /// More than one full turn is not a solid of revolution this adapter can represent.
+    #[test]
+    fn more_than_a_full_turn_is_refused() -> TestResult {
         let mut kernel = TruckKernel::new();
         let profile = vec![[0.0, 0.0], [4.0, 0.0], [4.0, 3.0], [0.0, 3.0]];
         match kernel.revolve(
             &profile,
             [0.0, 0.0],
             [0.0, 1.0],
-            std::f64::consts::FRAC_PI_2,
+            1.5 * std::f64::consts::TAU,
         ) {
             Err(KernelError::Invalid(message)) => {
-                assert!(message.contains("full"), "{message}");
+                assert!(message.contains("more than one full turn"), "{message}");
                 Ok(())
             }
             other => Err(KernelError::Failed(format!(
-                "a partial revolve must be refused, got {other:?}"
+                "more than a full turn must be refused, got {other:?}"
             ))),
         }
     }

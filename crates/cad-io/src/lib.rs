@@ -1,7 +1,8 @@
 //! Mesh interchange shared by the headless CLI and the desktop application.
 //!
-//! Only binary STL is implemented today. It is the one format the truck adapter can write without
-//! an additional geometry dependency, and it is what every downstream slicer and viewer reads.
+//! Binary STL is the lossless-for-triangles format every slicer and viewer reads; STEP is the
+//! format a CAD system reads. Both are written from the same validated [`Mesh`], and both readers
+//! reject malformed input before allocating for a declared count.
 //!
 //! # What STL does not carry
 //!
@@ -19,6 +20,12 @@
 
 use cad_contract::mesh::{Mesh, MeshError};
 use std::path::Path;
+
+mod step;
+pub use step::{
+    MAX_STEP_BYTES, MAX_STEP_ENTITIES, MAX_STEP_TRIANGLES, StepError, StepImport, read_step,
+    read_step_file, step_bytes, write_step,
+};
 
 /// The 80-byte binary STL header.
 pub const STL_HEADER_BYTES: usize = 80;

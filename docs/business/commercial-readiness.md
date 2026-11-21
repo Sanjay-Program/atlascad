@@ -80,7 +80,7 @@ those can be faked with a landing page.
 |---|---|---|
 | `apps/solidcraft` | Mature parametric 3D engine, constraints, assemblies, sheet metal, STEP/IGES, desktop/browser/CLI/MCP, packaging scripts, MIT/Apache | Not built on the 7.4 GB host; drawings/CAM/simulation deferred; no PDM/identity; unsigned downloads |
 | `apps/cadcraft` | Mature 2D drafting, DXF/DWG, constraints, layouts, plotting, MCP | 2D only; DWG compatibility unverified; heavy build |
-| `cad-contract` / `cad-kernel-truck` | Clean kernel boundary, budgets, capability gates, regression corpus | truck cannot do difference or boolean chains; not a production kernel for a broad commercial product |
+| `cad-contract` / `cad-kernel-truck` | Clean kernel boundary, budgets, capability gates, regression corpus | truck cannot do raw coplanar cuts and refuses booleans beyond ±1e5 mm instead of returning malformed solids; chains, tangent joins and contained unions are available through measured retries |
 | `cad-document` / `cad-studio` | Small, tested, understandable local app and native project format | One feature; not the commercial product base |
 | `cad-agent-*` | Typed, permissioned agent runtime | One agent; no scheduler or process isolation |
 | `cad-engineering` | Manifest-driven evidence and control plane | Needs to track commercial gates and release evidence |

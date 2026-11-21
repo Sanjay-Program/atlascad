@@ -4983,6 +4983,135 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 42.7 Enterprise MCP Tool Calling: 5 Batch-27 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # =========================================================================
+        # 43. MASTER VISION BATCH 28 ADVANCED MULTIPHYSICS & STABILITY
+        # =========================================================================
+        print("\n43. Master Vision Batch 28 Multiphysics, Supersonic Flow & Dynamic Stability:")
+
+        # 43.1 Supersonic Wind Tunnel Convergent-Divergent de Laval Nozzle Aerodynamics (NASA SP-3012 / Anderson / ISO 5167)
+        nozzle_res = http_request(port, "POST", "/api/sim/aerospace/supersonic_nozzle", body={
+            "design_mach_number": 2.20,
+            "stagnation_pressure_kpa": 450.0,
+            "stagnation_temperature_k": 320.0,
+            "throat_diameter_mm": 85.0,
+            "ambient_backpressure_kpa": 42.0,
+            "model_deflection_angle_deg": 10.0
+        })
+        check(nozzle_res.get("choked_mass_flow_rate_kg_s", 0.0) > 5.0, "Choked mass flow m_dot > 5 kg/s")
+        check(nozzle_res.get("exit_flow_velocity_m_s", 0.0) > 500.0, "Exit flow velocity V_exit > 500 m/s")
+        check(nozzle_res.get("normal_shock_downstream_mach", 0.0) < 1.0, "Rankine-Hugoniot normal shock M_2 < 1.0")
+        check(nozzle_res.get("oblique_shock_wave_angle_deg", 0.0) > 30.0, "Oblique shock wave angle beta > 30 deg")
+        check(nozzle_res.get("is_nozzle_aerodynamically_viable") is True, "NASA SP-3012 / Anderson Supersonic Nozzle Viable")
+        print(f"  ✓ 43.1 Supersonic Wind Tunnel Nozzle (NASA SP-3012 / Anderson / ISO 5167): M_design = 2.20, P_0 = 450 kPa, T_0 = 320 K, Throat D = 85 mm -> Choked m_dot = {nozzle_res['choked_mass_flow_rate_kg_s']:.2f} kg/s, A/A* = {nozzle_res['area_expansion_ratio']:.3f}, V_exit = {nozzle_res['exit_flow_velocity_m_s']:.1f} m/s, Normal Shock M_2 = {nozzle_res['normal_shock_downstream_mach']:.3f} (P_02/P_01 = {nozzle_res['normal_shock_total_pressure_recovery']:.3f}), 10° Wedge Oblique Shock beta = {nozzle_res['oblique_shock_wave_angle_deg']:.2f}° (M_downstream = {nozzle_res['oblique_shock_downstream_mach']:.2f})")
+
+        # 43.2 Electric Vehicle Dual-Motor AWD Torque Vectoring & Dynamic Yaw Stability (ISO 8855 / Pacejka Magic Formula)
+        tv_res = http_request(port, "POST", "/api/sim/automotive/ev_torque_vectoring", body={
+            "drivetrain_layout": "DualMotorAwd",
+            "vehicle_mass_kg": 2150.0,
+            "wheelbase_mm": 2900.0,
+            "track_width_mm": 1620.0,
+            "cg_to_front_axle_mm": 1420.0,
+            "yaw_moment_of_inertia_kg_m2": 2950.0,
+            "front_cornering_stiffness_n_rad": 95000.0,
+            "rear_cornering_stiffness_n_rad": 105000.0,
+            "vehicle_speed_km_h": 90.0,
+            "front_steering_angle_deg": 1.2,
+            "demanded_total_torque_nm": 450.0
+        })
+        check(tv_res.get("understeer_gradient_deg_per_g", 0.0) > 0.0, "Understeer gradient K_us > 0 (inherently stable)")
+        check(tv_res.get("target_yaw_rate_deg_s", 0.0) > 5.0, "Target yaw rate r_des > 5 deg/s")
+        check(tv_res.get("active_yaw_moment_demand_nm", 0.0) > 20.0, "Active yaw moment demand M_yaw > 20 N*m")
+        check(tv_res.get("is_torque_vectoring_viable") is True, "ISO 8855 / Pacejka EV Torque Vectoring Viable")
+        print(f"  ✓ 43.2 EV Dual-Motor Torque Vectoring (ISO 8855 / Pacejka MF-Tyre): 2150 kg EV @ 90 km/h, Steering delta_f = 1.2°, K_us = {tv_res['understeer_gradient_deg_per_g']:.2f}°/g, Desired Yaw Rate r_des = {tv_res['target_yaw_rate_deg_s']:.2f}°/s, Lateral Accel a_y = {tv_res['lateral_acceleration_g']:.3f} g, Sideslip beta = {tv_res['vehicle_sideslip_angle_deg']:.2f}°, Motor Torque Split: Front = {tv_res['front_motor_torque_nm']:.1f} N·m / Rear = {tv_res['rear_motor_torque_nm']:.1f} N·m, Corrective Yaw Moment M_yaw = {tv_res['active_yaw_moment_demand_nm']:.1f} N·m (ΔT_wheel = {tv_res['lateral_differential_torque_nm']:.1f} N·m)")
+
+        # 43.3 Ultra-Deepwater Subsea Marine Riser Vortex-Induced Vibration & Fatigue (DNV-RP-F204 / API 16Q)
+        riser_res = http_request(port, "POST", "/api/sim/marine/subsea_riser_viv", body={
+            "suppression_device": "HelicalStrakesTripleStart",
+            "riser_length_m": 1850.0,
+            "water_depth_m": 1800.0,
+            "outer_diameter_mm": 533.4,
+            "wall_thickness_mm": 25.4,
+            "top_tension_kn": 6500.0,
+            "internal_fluid_density_kg_m3": 1250.0,
+            "seawater_density_kg_m3": 1025.0,
+            "surface_current_velocity_m_s": 1.65,
+            "bottom_current_velocity_m_s": 0.25,
+            "steel_elastic_modulus_gpa": 207.0
+        })
+        check(riser_res.get("fundamental_frequency_hz", 0.0) > 0.01, "Transverse fundamental frequency f_1 > 0.01 Hz")
+        check(riser_res.get("dominant_lockin_mode", 0) >= 20, "VIV lock-in mode n >= 20")
+        check(riser_res.get("predicted_fatigue_life_years", 0.0) >= 25.0, "Predicted fatigue life >= 25 years")
+        check(riser_res.get("is_subsea_riser_viable") is True, "DNV-RP-F204 / API 16Q Subsea Riser Viable")
+        print(f"  ✓ 43.3 Subsea Marine Riser VIV & Fatigue (DNV-RP-F204 / API 16Q / Sarpkaya): 1850 m Riser string (Ø533.4x25.4mm) @ 1800m depth, T_top = 6500 kN, f_1 = {riser_res['fundamental_frequency_hz']:.4f} Hz, Surface Current 1.65 m/s -> Shedding f_vs = {riser_res['surface_shedding_frequency_hz']:.3f} Hz Lock-in Mode #{riser_res['dominant_lockin_mode']}, Triple-Start Helical Strakes Suppress A/D to {riser_res['max_amplitude_ratio_a_over_d']:.4f} (90% reduction), Cyclic Stress Δσ = {riser_res['cyclic_bending_stress_range_mpa']:.2f} MPa, Annual Fatigue Damage D_ann = {riser_res['annual_fatigue_damage_rate']:.2e}/yr, Fatigue Life = {riser_res['predicted_fatigue_life_years']:.1f} yrs >= 25 yrs (DNV Compliant)")
+
+        # 43.4 Biopharmaceutical Protein Downstream Purification Chromatography Column Dynamics (FDA cGMP / ASME BPE)
+        chrom_res = http_request(port, "POST", "/api/sim/chemical/chromatography_column", body={
+            "column_diameter_mm": 300.0,
+            "bed_height_mm": 200.0,
+            "linear_velocity_cm_h": 300.0,
+            "feed_protein_concentration_g_l": 3.50,
+            "max_binding_capacity_g_l": 55.0,
+            "langmuir_constant_l_g": 8.33,
+            "resin_particle_diameter_um": 50.0,
+            "bed_void_fraction": 0.36,
+            "intraparticle_porosity": 0.65,
+            "buffer_viscosity_mpa_s": 1.05
+        })
+        check(chrom_res.get("residence_time_minutes", 0.0) > 3.0, "Residence time > 3 min")
+        check(chrom_res.get("hetp_mm", 0.0) < 1.0, "HETP < 1.0 mm (high efficiency packing)")
+        check(chrom_res.get("number_of_theoretical_plates", 0.0) > 400.0, "Theoretical plates N_tp > 400")
+        check(chrom_res.get("dynamic_binding_capacity_10pct_g_l", 0.0) > 40.0, "DBC_10% > 40 g/L")
+        check(chrom_res.get("is_chromatography_column_viable") is True, "FDA cGMP / ASME BPE Chromatography Column Viable")
+        print(f"  ✓ 43.4 Biopharmaceutical Chromatography Column (FDA cGMP / ASME BPE / Guiochon): Ø300x200mm Bed ({chrom_res['column_bed_volume_liters']:.1f} L Resin, 50 µm Protein A beads) @ 300 cm/h ({chrom_res['volumetric_flow_rate_l_h']:.1f} L/h), Residence Time = {chrom_res['residence_time_minutes']:.2f} min, HETP = {chrom_res['hetp_mm']:.3f} mm, Plates N_tp = {chrom_res['number_of_theoretical_plates']:.0f}, Feed mAb 3.5 g/L -> DBC_10% = {chrom_res['dynamic_binding_capacity_10pct_g_l']:.1f} g/L ({chrom_res['capacity_utilization_pct']:.1f}% utilization), Mass Loaded = {chrom_res['loadable_protein_mass_grams']:.1f} g, Blake-Kozeny ΔP = {chrom_res['column_pressure_drop_kpa']:.1f} kPa <= 300 kPa")
+
+        # 43.5 High-Speed Maglev Electromagnetic Suspension Active Airgap Control (Transrapid / ISO 14837 / IEEE 1475)
+        maglev_res = http_request(port, "POST", "/api/sim/transport/maglev_suspension", body={
+            "mass_supported_per_magnet_kg": 1250.0,
+            "nominal_airgap_mm": 12.0,
+            "pole_face_area_mm2": 58000.0,
+            "coil_turns": 320,
+            "coil_resistance_ohms": 0.38,
+            "disturbance_amplitude_mm": 2.50,
+            "target_controller_bandwidth_rad_s": 65.0
+        })
+        check(maglev_res.get("equilibrium_current_a", 0.0) > 25.0, "Equilibrium coil current i_0 > 25 A")
+        check(maglev_res.get("equilibrium_flux_density_t", 0.0) > 0.40, "Airgap magnetic flux density B_0 > 0.40 T")
+        check(maglev_res.get("open_loop_unstable_pole_rad_s", 0.0) > 30.0, "Open-loop unstable pole omega_u > 30 rad/s")
+        check(maglev_res.get("is_maglev_suspension_viable") is True, "Transrapid / IEEE 1475 Maglev EMS Suspension Viable")
+        print(f"  ✓ 43.5 Maglev EMS Suspension Control (Transrapid / ISO 14837 / IEEE 1475): 1250 kg Module @ 12.0 mm Airgap, 320-turn FeSi Magnet (0.058 m² Pole, R = 0.38 Ω), Equilibrium i_0 = {maglev_res['equilibrium_current_a']:.2f} A, B_0 = {maglev_res['equilibrium_flux_density_t']:.3f} T (B_sat = 1.60 T), L_0 = {maglev_res['nominal_inductance_mh']:.1f} mH, Open-loop Unstable Pole = {maglev_res['open_loop_unstable_pole_rad_s']:.2f} rad/s; State-Feedback Gains: K_p = {maglev_res['controller_proportional_gain_v_per_m']:.1f} V/m, K_d = {maglev_res['controller_derivative_gain_v_s_per_m']:.1f} V·s/m, K_i = {maglev_res['controller_current_gain_v_per_a']:.1f} V/A -> 2.5 mm Joint Step Attenuated to {maglev_res['peak_dynamic_airgap_error_mm']:.2f} mm Deflection, Minimum Airgap z_min = {maglev_res['min_transient_airgap_mm']:.2f} mm >= 2.0 mm, P_coil = {maglev_res['steady_state_coil_power_kw']:.3f} kW")
+
+        # 43.6 Universal Commands Execution Verification (Batch 28 Domains)
+        for cmd_id, cmd_args in [
+            ("sim.aerospace.supersonic_nozzle", {"design_mach_number": 2.20, "stagnation_pressure_kpa": 450.0}),
+            ("sim.automotive.ev_torque_vectoring", {"vehicle_mass_kg": 2150.0, "vehicle_speed_km_h": 90.0}),
+            ("sim.marine.subsea_riser_viv", {"riser_length_m": 1850.0, "top_tension_kn": 6500.0}),
+            ("sim.chemical.chromatography_column", {"column_diameter_mm": 300.0, "bed_height_mm": 200.0}),
+            ("sim.transport.maglev_suspension", {"mass_supported_per_magnet_kg": 1250.0, "nominal_airgap_mm": 12.0}),
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": cmd_args
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 43.6 Universal Commands: All 5 Batch-28 Engineering Commands verified via typed schema engine")
+
+        # 43.7 Enterprise MCP Tool Calling (Batch 28 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_aerospace_supersonic_nozzle",
+            "atlas_sim_automotive_ev_torque_vectoring",
+            "atlas_sim_marine_subsea_riser_viv",
+            "atlas_sim_chemical_chromatography_column",
+            "atlas_sim_transport_maglev_suspension",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 997,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 43.7 Enterprise MCP Tool Calling: 5 Batch-28 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

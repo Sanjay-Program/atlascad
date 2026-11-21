@@ -23,6 +23,8 @@ Six kernels were available. Two facts dominated the decision:
      primary kernel, reached through an adapter — is unchanged.
      1000 mm³ plate), i.e. malformed topology;
    * a third chained union panics inside `intersection_curve` (*"tolerance must be no less than 1e-6"*).
+     The adapter now retries a failed boolean at 3e-2 and 1e-1 mm, which completes a nine-box chain
+     (`docs/kernel-comparison.md` §4.3).
 
 SolidCraft vendors four patched truck crates that fix exactly those areas (intersection curves, face
 division, integration, ordering) and adds retries, reseams, history and volume guards on top.
@@ -50,9 +52,10 @@ reaches it through an adapter. The published crates are used only with SolidCraf
 
 * The platform inherits a **fork responsibility**: the four vendored crates must be tracked against
   upstream, and their fixes should be offered upstream rather than diverging forever.
-* **Boolean difference and boolean chains are unavailable** through the shared adapter until either
-  upstream or SolidCraft's kernel exposes reliable ones. The adapter refuses rather than returning a
-  wrong solid.
+* **Boolean chains are available through a measured tolerance escalation**, and difference is
+  available with the coplanar nudge. Contained unions and face-to-face joins now complete through the
+  inward retry; the large-coordinate intersection and the raw coplanar cut remain refused or
+  recorded rather than returned as wrong solids.
 * Coplanar booleans need a ~1e-4 mm tool nudge; this is implemented and counted, and costs ~0.004 mm³
   of volume accuracy on a 1120 mm³ part.
 * A future kernel swap is an adapter, not a rewrite — the contract is the seam.

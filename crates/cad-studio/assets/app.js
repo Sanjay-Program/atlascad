@@ -545,9 +545,17 @@
         if (files && files.length > 0) {
           const file = files[0];
           const ext = file.name.split(".").pop().toLowerCase();
-          toast(`Received 3D CAD File: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`);
-          if (["step", "stp", "3mf", "stl", "obj", "json", "dxf"].includes(ext)) {
-            toast(`Validating & parsing geometry for ${file.name} [${ext.toUpperCase()}]...`);
+          if (ext === "dxf") {
+            toast(`Importing drawing ${file.name} (${(file.size / 1024).toFixed(1)} KB)...`);
+            await importDxfFile(file);
+          } else if (ext === "step" || ext === "stp") {
+            toast(`Importing STEP part ${file.name} (${(file.size / 1024).toFixed(1)} KB)...`);
+            await importStepFile(file);
+          } else {
+            // Only DXF and STEP have validated importers here. Naming the formats that do not is
+            // more honest than a progress message that ends in nothing.
+            toast(`${ext.toUpperCase()} import is not implemented yet; DXF and STEP are.`, true);
+            log(`Refused ${file.name}: no importer for .${ext}`, "error");
           }
         }
       });
@@ -1243,7 +1251,8 @@
     byId("undoBtn").disabled = app.busy || next.history.undo === 0;
     byId("redoBtn").disabled = app.busy || next.history.redo === 0;
     byId("saveBtn").disabled = app.busy;
-    const exportable = next.features.length > 0 && !next.failure;
+    const importCount = (next.imports || []).length;
+    const exportable = (next.features.length > 0 || importCount > 0) && !next.failure;
     byId("exportBtn").disabled = app.busy || !exportable;
     byId("exportBtn").title = next.failure
       ? `Export is refused while feature ${next.failure.feature} cannot rebuild`
@@ -1257,6 +1266,7 @@
     renderProperties();
     renderFeatureTimeline();
     renderRevisions();
+    renderImports();
     renderFailure(next.failure);
     renderRecovery(next.recovery);
     renderShare(next.share);
@@ -1339,6 +1349,41 @@
       return;
     }
     await mutate("/api/parameter", { id, value }, `Set ${id} to ${formatValue(value)}`);
+  }
+
+  // Imported bodies are document state but not part of the parametric tree, so they get their own
+  // list: name, provenance, measurement, and a remove action. Hidden when there are none.
+  function renderImports() {
+    const section = byId("sectionImports");
+    const list = byId("imports");
+    const label = byId("importsLabel");
+    if (!section || !list) return;
+    const bodies = (app.project && app.project.imports) || [];
+    list.textContent = "";
+    section.hidden = bodies.length === 0;
+    if (label) label.textContent = String(bodies.length);
+    for (const body of bodies) {
+      const item = element("li", "revision-row");
+      const text = element("span", "revision-text");
+      text.append(
+        element("span", "revision-name", body.name),
+        element(
+          "span",
+          "revision-meta",
+          `${body.source} · ${body.triangles.toLocaleString()} tri · ${formatNumber(body.volume_mm3)} mm³`
+        )
+      );
+      const actions = element("span", "revision-actions");
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "button ghost small";
+      remove.textContent = "Remove";
+      remove.title = `Remove ${body.name} from the model (undoable)`;
+      remove.addEventListener("click", () => cadRemoveImport(body.name));
+      actions.append(remove);
+      item.append(text, actions);
+      list.append(item);
+    }
   }
 
   function renderTree() {
@@ -1651,6 +1696,7 @@
     byId("newDepthField").hidden = revolves;
     byId("newDirectionField").hidden = revolves;
     byId("newAxisField").hidden = !revolves;
+    byId("newAngleField").hidden = !revolves;
     byId("addFeatureBtn").textContent = revolves ? "Add revolve" : "Add extrude";
 
     const sketchSelect = byId("newFeatureSketch");
@@ -1790,7 +1836,10 @@
         ["Sketch", String(feature.sketch_id)]
       );
       if (feature.kind === "revolve") {
-        rows.push(["Axis", feature.axis], ["Turn", "full revolution"]);
+        const turn = feature.angle_deg === 360
+          ? "full revolution"
+          : `${formatNumber(feature.angle_deg)}°`;
+        rows.push(["Axis", feature.axis], ["Turn", turn]);
       } else {
         rows.push(
           ["Depth parameter", feature.depth_param],
@@ -1951,7 +2000,9 @@
       byId("undoBtn").disabled = value || app.project.history.undo === 0;
       byId("redoBtn").disabled = value || app.project.history.redo === 0;
       byId("saveBtn").disabled = value;
-      const exportable = app.project.features.length > 0 && !app.project.failure;
+      const exportable =
+        (app.project.features.length > 0 || (app.project.imports || []).length > 0) &&
+        !app.project.failure;
       byId("exportBtn").disabled = value || !exportable;
       byId("profileKind").disabled = value;
     }
@@ -2130,6 +2181,11 @@
     viewPan: [0, 0],
   };
 
+  function entitySelected(id) {
+    return drawState.selected === id
+      || (Array.isArray(drawState.selectedSet) && drawState.selectedSet.includes(id));
+  }
+
   async function refreshDrawing() {
     const request = ++drawingRequest;
     try {
@@ -2194,6 +2250,18 @@
       // The panel was rendered while the app was busy, so its buttons are re-enabled here.
       if (app.drawing) syncDrawingControls();
     }
+  }
+
+  // A composite annotation is one user edit even though it is several primitives. The batch route
+  // records a single undo snapshot, so one Ctrl+Z removes the whole leader or dimension.
+  async function drawingAddBatch(kinds, label) {
+    if (!drawState.layer) {
+      toast("This drawing has no layer to draw on.", true);
+      return null;
+    }
+    return drawingMutate("/api/draft/entities", {
+      entities: kinds.map((kind) => ({ layer: drawState.layer, kind })),
+    }, label);
   }
 
   function drawingPath(entity) {
@@ -2315,6 +2383,108 @@
       mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2],
       value: kind.text || formatNumber(length),
     };
+  }
+
+  // A leader is a polyline, a two-stroke arrowhead, a short shoulder, and one text entity. Storing
+  // ordinary primitives keeps it editable by every existing tool and exported by every writer.
+  function leaderEntities(points, label) {
+    const first = points[0];
+    const second = points[1];
+    const dx = second[0] - first[0];
+    const dy = second[1] - first[1];
+    const length = Math.max(Math.hypot(dx, dy), 1e-9);
+    const ux = dx / length;
+    const uy = dy / length;
+    const nx = -uy;
+    const ny = ux;
+    const arrow = Math.min(Math.max(length * 0.22, 0.8), 3.0);
+    const base = [first[0] - ux * arrow, first[1] - uy * arrow];
+    const last = points[points.length - 1];
+    const direction = ux >= 0 ? 1 : -1;
+    const shoulder = [last[0] + direction * Math.max(arrow * 2, 3.0), last[1]];
+    return [
+      { kind: "polyline", points: points.map((point) => [...point]), closed: false },
+      {
+        kind: "line",
+        start: [base[0] + nx * arrow * 0.5, base[1] + ny * arrow * 0.5],
+        end: first,
+      },
+      {
+        kind: "line",
+        start: [base[0] - nx * arrow * 0.5, base[1] - ny * arrow * 0.5],
+        end: first,
+      },
+      { kind: "line", start: last, end: shoulder },
+      { kind: "text", at: [shoulder[0] + direction * 0.6, shoulder[1] + 0.8], height: 2.5, value: label },
+    ];
+  }
+
+  // Angular dimension: an arc between the two rays, extension lines out to the picked points, and
+  // the measured angle. The smaller sweep is used, matching AutoCAD's default angular dimension.
+  function angularDimensionEntities(vertex, first, second, text) {
+    const angleOf = (point) => Math.atan2(point[1] - vertex[1], point[0] - vertex[0]);
+    let a1 = angleOf(first);
+    let a2 = angleOf(second);
+    let sweep = (a2 - a1 + Math.PI * 2) % (Math.PI * 2);
+    if (sweep > Math.PI) {
+      const swap = a1;
+      a1 = a2;
+      a2 = swap;
+      sweep = Math.PI * 2 - sweep;
+    }
+    if (sweep < 1e-6) return null;
+    const r1 = Math.hypot(first[0] - vertex[0], first[1] - vertex[1]);
+    const r2 = Math.hypot(second[0] - vertex[0], second[1] - vertex[1]);
+    if (r1 < 1e-6 || r2 < 1e-6) return null;
+    const radius = Math.max(Math.min(r1, r2) * 0.6, 0.5);
+    const start = [vertex[0] + radius * Math.cos(a1), vertex[1] + radius * Math.sin(a1)];
+    const end = [vertex[0] + radius * Math.cos(a1 + sweep), vertex[1] + radius * Math.sin(a1 + sweep)];
+    const kinds = [{
+      kind: "arc",
+      center: vertex,
+      radius,
+      start_degrees: ((a1 * 180) / Math.PI + 360) % 360,
+      end_degrees: (((a1 + sweep) * 180) / Math.PI + 360) % 360,
+    }];
+    if (r1 > radius) kinds.push({ kind: "line", start, end: first });
+    if (r2 > radius) kinds.push({ kind: "line", start: end, end: second });
+    const mid = a1 + sweep / 2;
+    const textAt = [
+      vertex[0] + radius * 1.15 * Math.cos(mid) - 1.5,
+      vertex[1] + radius * 1.15 * Math.sin(mid) + 0.8,
+    ];
+    kinds.push({
+      kind: "text",
+      at: textAt,
+      height: 2.5,
+      value: text || `${((sweep * 180) / Math.PI).toFixed(2)}\u00b0`,
+    });
+    return kinds;
+  }
+
+  // A centre mark is the standard crossed pair of lines through a circle or arc centre.
+  function centerMarkEntities(center, arm) {
+    return [
+      { kind: "line", start: [center[0] - arm, center[1]], end: [center[0] + arm, center[1]] },
+      { kind: "line", start: [center[0], center[1] - arm], end: [center[0], center[1] + arm] },
+    ];
+  }
+
+  function selectedCircularEntity() {
+    const entities = app.drawing && Array.isArray(app.drawing.entities) ? app.drawing.entities : [];
+    const entity = entities.find((candidate) => candidate.id === drawState.selected);
+    if (!entity) return null;
+    return entity.kind.kind === "circle" || entity.kind.kind === "arc" ? entity : null;
+  }
+
+  async function centerMarkSelected() {
+    const entity = selectedCircularEntity();
+    if (!entity) return false;
+    await drawingAddBatch(
+      centerMarkEntities(entity.kind.center, entity.kind.radius * 1.1),
+      "Center mark added",
+    );
+    return true;
   }
 
   function radialDimensionGeometry(kind) {
@@ -2886,7 +3056,7 @@
     for (const entity of entities) {
       const layer = layers.find((l) => l.name === entity.layer);
       if (layer && layer.visible === false) continue;
-      const selected = drawState.selected === entity.id;
+      const selected = entitySelected(entity.id);
       const kind = entity.kind;
       if (kind.kind === "text") {
         const node = svgNode("text", {
@@ -3072,8 +3242,12 @@
         : (layer.linetype && typeof layer.linetype === "object" && layer.linetype.kind ? layer.linetype.kind : "continuous");
       linetypeSelect.value = (lt || "continuous").toLowerCase();
     }
-    byId("polylineActions").hidden =
-      (drawState.tool !== "polyline" && drawState.tool !== "spline") || drawState.points.length === 0;
+    const isMultiPointTool = drawState.tool === "polyline"
+      || drawState.tool === "spline"
+      || drawState.tool === "leader";
+    byId("polylineActions").hidden = !isMultiPointTool || drawState.points.length === 0;
+    const closeShape = byId("polylineCloseBtn");
+    if (closeShape) closeShape.hidden = drawState.tool === "leader";
     byId("saveDrawingBtn").disabled = app.busy || !draft;
     byId("downloadDxfBtn").disabled = app.busy || entities.length === 0;
     byId("plotPdfBtn").disabled = app.busy || entities.length === 0;
@@ -3104,10 +3278,23 @@
   }
 
   function setDrawTool(tool) {
+    // A centre mark is anchored to the selected circle or arc, so it needs no clicks at all.
+    if (tool === "centermark" && selectedCircularEntity()) {
+      centerMarkSelected();
+      return;
+    }
     drawState.tool = tool;
     drawState.points = [];
     renderDrawing(app.drawing || { entities: [], layers: [], bounds: null, unit: "mm" });
-    if (tool !== "select") setStatus(`${tool} tool: click in the drawing`, "");
+    if (tool === "leader") {
+      setStatus("leader tool: click the arrow point and shoulder points, then Finish", "");
+    } else if (tool === "angdim") {
+      setStatus("angdim tool: click the vertex, then a point on each ray", "");
+    } else if (tool === "centermark") {
+      setStatus("centermark tool: click the centre, then an arm point", "");
+    } else if (tool !== "select") {
+      setStatus(`${tool} tool: click in the drawing`, "");
+    }
   }
 
   async function placeDrawingPoint(point) {
@@ -3148,6 +3335,40 @@
         layer: drawState.layer,
         kind: { kind: "dimension", start, end, offset: Math.max(length * 0.15, 0.5), text: null },
       }, "Dimension added");
+      return;
+    }
+    if (tool === "leader") {
+      drawState.points.push(point);
+      renderDrawing(app.drawing);
+      return;
+    }
+    if (tool === "angdim") {
+      drawState.points.push(point);
+      if (drawState.points.length < 3) {
+        renderDrawing(app.drawing);
+        return;
+      }
+      const [vertex, first, second] = drawState.points;
+      drawState.points = [];
+      const kinds = angularDimensionEntities(vertex, first, second);
+      if (!kinds) {
+        toast("An angular dimension needs a vertex and two distinct ray points.", true);
+        renderDrawing(app.drawing);
+        return;
+      }
+      await drawingAddBatch(kinds, "Angular dimension added");
+      return;
+    }
+    if (tool === "centermark") {
+      drawState.points.push(point);
+      if (drawState.points.length < 2) {
+        renderDrawing(app.drawing);
+        return;
+      }
+      const [center, armPoint] = drawState.points;
+      drawState.points = [];
+      const arm = Math.max(Math.hypot(armPoint[0] - center[0], armPoint[1] - center[1]), 0.5);
+      await drawingAddBatch(centerMarkEntities(center, arm), "Center mark added");
       return;
     }
     if (tool === "polyline" || tool === "spline") {
@@ -3202,6 +3423,10 @@
   }
 
   async function finishPolyline(closed) {
+    if (drawState.tool === "leader") {
+      await finishLeader();
+      return;
+    }
     if (drawState.points.length < 2) {
       toast(`${drawState.tool === "spline" ? "A spline" : "A polyline"} needs at least two points.`, true);
       return;
@@ -3216,6 +3441,18 @@
       layer: drawState.layer,
       kind,
     }, closed ? `Closed ${isSpline ? "spline" : "polyline"} added` : `${isSpline ? "Spline" : "Polyline"} added`);
+  }
+
+  async function finishLeader() {
+    if (drawState.points.length < 2) {
+      toast("A leader needs at least two points.", true);
+      return;
+    }
+    const points = drawState.points.map((point) => [...point]);
+    drawState.points = [];
+    const label = (byId("drawText").value || "").trim() || "NOTE";
+    const payload = await drawingAddBatch(leaderEntities(points, label), "Leader added");
+    if (payload) setDrawTool("select");
   }
 
   async function deleteSelected() {
@@ -3312,6 +3549,119 @@
     } catch (error) {
       toast(error.message, true);
       log(`DXF export failed: ${error.message}`, "error");
+    }
+  }
+
+  // Import a STEP part as a mesh body in the model. The server parses it with the same validated
+  // reader the CLI uses, then records it as a document edit, so undo/redo and save/reopen apply.
+  async function importStepText(text, name) {
+    if (app.busy) return;
+    setBusy(true);
+    try {
+      const payload = await api("/api/import/step", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, name }),
+      });
+      applyState(payload);
+      const body = (payload.imports || [])[payload.imports.length - 1];
+      const message = body
+        ? `Imported ${body.name} from STEP: ${body.triangles.toLocaleString()} triangles, ${body.volume_mm3.toFixed(3)} mm³.`
+        : "STEP part imported.";
+      log(message);
+      toast(message);
+    } catch (error) {
+      toast(error.message, true);
+      log(`STEP import failed: ${error.message}`, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function importStepFile(file) {
+    if (!file) return;
+    if (file.size > 1024 * 1024) {
+      toast("The studio accepts STEP files up to 1 MiB; use `atlas step-import` for larger files.", true);
+      return;
+    }
+    try {
+      await importStepText(await file.text(), file.name.replace(/\.(step|stp)$/i, ""));
+    } catch (error) {
+      toast(`Could not read ${file.name}: ${error.message}`, true);
+    }
+  }
+
+  // Remove one imported body. The panel passes the exact name; the palette command asks for it.
+  async function cadRemoveImport(name) {
+    const bodies = (app.project && app.project.imports) || [];
+    if (bodies.length === 0) {
+      toast("This project has no imported bodies.", true);
+      return;
+    }
+    const target = name || prompt(
+      `Imported bodies: ${bodies.map((body) => body.name).join(", ")}\n\nName to remove:`,
+      bodies[0].name
+    );
+    if (!target || app.busy) return;
+    setBusy(true);
+    try {
+      const payload = await api("/api/import/remove", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: target }),
+      });
+      applyState(payload);
+      log(`Removed imported body ${target}`);
+      toast(`Removed ${target}.`);
+    } catch (error) {
+      toast(error.message, true);
+      log(`Remove failed: ${error.message}`, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Import a DXF drawing into the drawing panel. The server validates the file with the drafting
+  // document's own reader and reports what it could not represent, so a partial import is visible
+  // instead of looking complete.
+  async function importDxf(text, name) {
+    if (app.busy) return;
+    setBusy(true);
+    try {
+      const payload = await api("/api/draft/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, name }),
+      });
+      applyDrawing(payload.draft);
+      const report = payload.report || {};
+      const skipped = (report.skipped || [])
+        .map((entry) => `${entry.count} ${entry.kind}`)
+        .join(", ");
+      const message = `Imported ${report.entities || 0} entities on ${report.layers || 0} layers${skipped ? ` — skipped ${skipped}` : ""}.`;
+      log(message);
+      toast(message, Boolean(skipped));
+      syncDrawingControls();
+    } catch (error) {
+      toast(error.message, true);
+      log(`DXF import failed: ${error.message}`, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function importDxfFile(file) {
+    if (!file) return;
+    // The request body is capped at 1 MiB before routing, so refuse here with an actionable message
+    // rather than letting the upload fail as a generic payload-too-large.
+    if (file.size > 1024 * 1024) {
+      toast("The studio accepts DXF files up to 1 MiB; use `atlas dxf-import` for larger drawings.", true);
+      return;
+    }
+    try {
+      await importDxf(await file.text(), file.name.replace(/\.dxf$/i, ""));
+    } catch (error) {
+      toast(`Could not read ${file.name}: ${error.message}`, true);
     }
   }
 
@@ -3535,9 +3885,14 @@
     const action = operation === "join" ? "Join" : operation === "cut" ? "Cut" : "New body";
     if (kind === "revolve") {
       const axis = byId("newFeatureAxis").value;
+      const angleDeg = Number(byId("newFeatureAngle").value);
+      if (!Number.isFinite(angleDeg) || angleDeg <= 0 || angleDeg > 360) {
+        toast("A revolve angle must be greater than 0 and at most 360 degrees.", true);
+        return;
+      }
       const next = await mutate(
         "/api/feature/revolve",
-        { sketch_id: sketchId, operation, axis },
+        { sketch_id: sketchId, operation, axis, angle_deg: angleDeg },
         `${action} revolve added`
       );
       if (next) selectNewest("feature", next);
@@ -4973,7 +5328,7 @@ ${gcodeSample}`;
   const autocadCommands = [
     { alias: "L", name: "LINE", desc: "Draw 2D line (2 clicks or coordinates)", run: () => setDrawTool("line") },
     { alias: "C", name: "CIRCLE", desc: "Draw 2D circle (centre, radius)", run: () => {
-      if ((drawState.tool === "polyline" || drawState.tool === "spline") && drawState.points.length >= 2) {
+      if ((drawState.tool === "polyline" || drawState.tool === "spline" || drawState.tool === "leader") && drawState.points.length >= 2) {
         finishPolyline(true);
       } else {
         setDrawTool("circle");
@@ -4985,6 +5340,11 @@ ${gcodeSample}`;
     { alias: "SPL", name: "SPLINE", desc: "Draw Catmull-Rom spline curve", run: () => setDrawTool("spline") },
     { alias: "PO", name: "POINT", desc: "Place 2D point entity", run: () => setDrawTool("point") },
     { alias: "DIM", name: "DIMALIGNED", desc: "Measure & dimension between 2 points", run: () => setDrawTool("dimension") },
+    { alias: "LE", name: "LEADER", desc: "Leader annotation with arrow and text", run: () => setDrawTool("leader") },
+    { alias: "LEADER", name: "LEADER", desc: "Leader annotation with arrow and text", run: () => setDrawTool("leader") },
+    { alias: "DAN", name: "DIMANGULAR", desc: "Angular dimension between two rays", run: () => setDrawTool("angdim") },
+    { alias: "DIMANG", name: "DIMANGULAR", desc: "Angular dimension between two rays", run: () => setDrawTool("angdim") },
+    { alias: "CM", name: "CENTERMARK", desc: "Centre mark for a circle or arc", run: () => setDrawTool("centermark") },
     { alias: "DRA", name: "DIMRADIUS", desc: "Create radial dimension for arc or circle", run: () => cadDimRadial(false) },
     { alias: "DDI", name: "DIMDIAMETER", desc: "Create diameter dimension for circle or arc", run: () => cadDimRadial(true) },
     { alias: "LTYPE", name: "LINETYPE", desc: "Set layer linetype (CONTINUOUS, HIDDEN, CENTER, PHANTOM, DASHED, DOT)", run: () => cadLinetype() },
@@ -5017,6 +5377,9 @@ ${gcodeSample}`;
     { alias: "LI", name: "LIST", desc: "List properties of selected entity", run: () => cadList() },
     { alias: "3D", name: "EXTDRAFT", desc: "Extrude 2D sketch profile into 3D solid", run: () => cadToSolid() },
     { alias: "H", name: "HATCH", desc: "Crosshatch boundary with ANSI31 or NET pattern", run: () => cadHatch() },
+    { alias: "DXFIN", name: "IMPORTDXF", desc: "Import an existing DXF drawing", run: () => byId("importDxfFile")?.click() },
+    { alias: "STEPIN", name: "IMPORTSTEP", desc: "Import a STEP part as a mesh body", run: () => byId("importStepFile")?.click() },
+    { alias: "REMOVEBODY", name: "REMOVEBODY", desc: "Remove an imported body by name", run: () => cadRemoveImport() },
     { alias: "BH", name: "BHATCH", desc: "Boundary crosshatch with ANSI31 pattern", run: () => cadHatch() },
     { alias: "MV", name: "MULTIVIEW", desc: "Generate 4-view orthographic drawing with cross-sections", run: () => cadMultiview() },
     { alias: "ORTHO", name: "ORTHOGRAPHIC", desc: "Generate 4-view orthographic drawing with cross-sections", run: () => cadMultiview() },
@@ -5330,6 +5693,23 @@ ${gcodeSample}`;
     let boxSelectStart = null;
     let boxSelectStartModel = null;
     let selectionBoxEl = null;
+    let entityDrag = null;
+    let suppressSheetClick = false;
+
+    function restoreEntityTransforms(drag) {
+      for (const [node, original] of drag.originals) {
+        if (original === null) node.removeAttribute("transform");
+        else node.setAttribute("transform", original);
+      }
+    }
+
+    function cancelEntityDrag() {
+      if (!entityDrag) return;
+      restoreEntityTransforms(entityDrag);
+      entityDrag = null;
+      full.classList.remove("entity-dragging");
+      dragHudHide();
+    }
 
     function getOrCreateSelectionBox() {
       let el = full.querySelector(".selection-box");
@@ -5356,23 +5736,103 @@ ${gcodeSample}`;
         sheetPanStart = [event.clientX, event.clientY];
         full.setPointerCapture(event.pointerId);
         event.preventDefault();
-      } else if (event.button === 0 && !event.shiftKey) {
-        const svg = full.querySelector("svg");
-        const target = event.target;
-        const node = target && typeof target.closest === "function" ? target.closest("[data-entity-id]") : null;
-        if (!node && svg && (drawState.tool === "select" || !drawState.tool || drawState.tool === "none")) {
-          isBoxSelecting = true;
-          boxSelectStart = [event.clientX, event.clientY];
-          boxSelectStartModel = modelPointFromEvent(svg, event);
-          selectionBoxEl = getOrCreateSelectionBox();
-          selectionBoxEl.style.display = "none";
-          full.setPointerCapture(event.pointerId);
-          event.preventDefault();
+        return;
+      }
+      if (event.button !== 0) return;
+      const svg = full.querySelector("svg");
+      if (!svg || !app.drawing) return;
+      const selectMode = drawState.tool === "select" || !drawState.tool || drawState.tool === "none";
+      const node = event.target && typeof event.target.closest === "function"
+        ? event.target.closest("[data-entity-id]")
+        : null;
+
+      if (node && selectMode) {
+        const id = Number(node.dataset.entityId);
+        if (!Number.isFinite(id)) return;
+        const additive = event.ctrlKey || event.metaKey || event.shiftKey;
+        const set = new Set(Array.isArray(drawState.selectedSet) ? drawState.selectedSet : []);
+        if (drawState.selected !== null) set.add(drawState.selected);
+        let ids;
+        if (additive) {
+          // Ctrl/Shift+drag moves (or copies) the set; a plain Ctrl/Shift+click toggles membership
+          // in the click handler below. The selection is applied at drag start, not on pointerdown,
+          // so a click is never mistaken for a drag.
+          if (!set.has(id)) set.add(id);
+          ids = [...set];
+        } else if (set.has(id) && set.size > 1) {
+          // Keep a multi-selection intact so the whole set can be dragged together.
+          ids = [...set];
+        } else {
+          ids = [id];
+          drawState.selectedSet = ids;
+          drawState.selected = id;
+          if (!node.classList.contains("selected")) renderDrawing(app.drawing);
         }
+        const locked = ids
+          .map((entityId) => (app.drawing.entities || []).find((entity) => entity.id === entityId))
+          .find((entity) => {
+            const layer = entity ? drawingLayer(entity.layer) : null;
+            return layer && layer.locked;
+          });
+        if (locked) {
+          const layer = drawingLayer(locked.layer);
+          toast(`Layer ${layer ? layer.name : "?"} is locked; unlock it to drag geometry.`, true);
+          return;
+        }
+        const start = modelPointFromEvent(full.querySelector("svg"), event);
+        if (!start) return;
+        entityDrag = {
+          ids,
+          additive,
+          clickedId: id,
+          pointerId: event.pointerId,
+          startClient: [event.clientX, event.clientY],
+          startPoint: start,
+          dx: 0,
+          dy: 0,
+          moved: false,
+          originals: new Map(),
+        };
+        // Capture and preventDefault are deferred to the first real movement so a plain click
+        // still reaches the entity and selects or toggles it.
+        return;
+      }
+
+      if (!node && selectMode) {
+        isBoxSelecting = true;
+        boxSelectStart = [event.clientX, event.clientY];
+        boxSelectStartModel = modelPointFromEvent(svg, event);
+        selectionBoxEl = getOrCreateSelectionBox();
+        selectionBoxEl.style.display = "none";
+        full.setPointerCapture(event.pointerId);
+        event.preventDefault();
       }
     });
 
     full.addEventListener("pointerup", (event) => {
+      if (entityDrag) {
+        const drag = entityDrag;
+        entityDrag = null;
+        full.classList.remove("entity-dragging");
+        dragHudHide();
+        try { full.releasePointerCapture(event.pointerId); } catch (_) {}
+        if (drag.moved) {
+          suppressSheetClick = true;
+          if (drag.dx !== 0 || drag.dy !== 0) {
+            const copy = event.ctrlKey || event.metaKey;
+            const count = drag.ids.length;
+            drawingMutate("/api/draft/transform", {
+              op: copy ? "copy" : "translate",
+              ids: drag.ids,
+              dx: drag.dx,
+              dy: drag.dy,
+            }, `${copy ? "Copied" : "Moved"} ${count} drawing ${count === 1 ? "entity" : "entities"}`);
+          } else if (app.drawing) {
+            renderDrawing(app.drawing);
+          }
+        }
+        return;
+      }
       if (isPanningSheet) {
         isPanningSheet = false;
         try { full.releasePointerCapture(event.pointerId); } catch (_) {}
@@ -5428,6 +5888,15 @@ ${gcodeSample}`;
       }
     });
 
+    full.addEventListener("pointercancel", () => cancelEntityDrag());
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && entityDrag) {
+        event.preventDefault();
+        cancelEntityDrag();
+        dragAnnounce("Entity drag cancelled");
+      }
+    });
+
     full.addEventListener("dblclick", () => {
       drawState.viewZoom = 1.0;
       drawState.viewPan = [0, 0];
@@ -5477,6 +5946,52 @@ ${gcodeSample}`;
         }
         return;
       }
+      if (entityDrag && entityDrag.pointerId === event.pointerId) {
+        const pixelDistance = Math.hypot(
+          event.clientX - entityDrag.startClient[0],
+          event.clientY - entityDrag.startClient[1]
+        );
+        if (!entityDrag.moved && pixelDistance < 4) return;
+        if (!entityDrag.moved) {
+          entityDrag.moved = true;
+          if (entityDrag.additive) {
+            drawState.selectedSet = entityDrag.ids;
+            drawState.selected = entityDrag.clickedId;
+            renderDrawing(app.drawing);
+          }
+          full.classList.add("entity-dragging");
+          try { full.setPointerCapture(event.pointerId); } catch (_) {}
+          for (const id of entityDrag.ids) {
+            for (const node of full.querySelectorAll(`[data-entity-id="${id}"]`)) {
+              entityDrag.originals.set(node, node.getAttribute("transform"));
+            }
+          }
+        }
+        const dragSvg = full.querySelector("svg");
+        const current = dragSvg ? modelPointFromEvent(dragSvg, event) : null;
+        if (!current) return;
+        let dx = current[0] - entityDrag.startPoint[0];
+        let dy = current[1] - entityDrag.startPoint[1];
+        if (event.shiftKey) {
+          if (Math.abs(dx) >= Math.abs(dy)) dy = 0;
+          else dx = 0;
+        }
+        dx = Math.round(dx * 1000) / 1000;
+        dy = Math.round(dy * 1000) / 1000;
+        entityDrag.dx = dx;
+        entityDrag.dy = dy;
+        const copy = event.ctrlKey || event.metaKey;
+        for (const [node, original] of entityDrag.originals) {
+          node.setAttribute("transform", `translate(${dx} ${-dy})${original ? ` ${original}` : ""}`);
+        }
+        dragHudShow(
+          `${copy ? "Copy" : "Move"} ${entityDrag.ids.length} drawing ${entityDrag.ids.length === 1 ? "entity" : "entities"}`,
+          `ΔX ${dx.toFixed(3)} · ΔY ${dy.toFixed(3)}${event.shiftKey ? " · ortho" : ""}${copy ? " · copy" : ""}`
+        );
+        dragHudMove(event.clientX, event.clientY);
+        event.preventDefault();
+        return;
+      }
       const svg = full.querySelector("svg");
       if (!svg || !app.drawing || drawState.tool === "select") {
         if (drawState.activeSnap || drawState.polarHit) {
@@ -5509,6 +6024,10 @@ ${gcodeSample}`;
     });
 
     full.addEventListener("click", (event) => {
+      if (suppressSheetClick) {
+        suppressSheetClick = false;
+        return;
+      }
       if (event.button !== 0 || event.altKey) return;
       const svg = full.querySelector("svg");
       if (!svg || !app.drawing) return;
@@ -5517,7 +6036,25 @@ ${gcodeSample}`;
         const node = target && typeof target.closest === "function"
           ? target.closest("[data-entity-id]")
           : null;
-        drawState.selected = node ? Number(node.dataset.entityId) : null;
+        if (node) {
+          const id = Number(node.dataset.entityId);
+          const additive = event.ctrlKey || event.metaKey || event.shiftKey;
+          if (additive) {
+            const set = new Set(Array.isArray(drawState.selectedSet) ? drawState.selectedSet : []);
+            if (drawState.selected !== null) set.add(drawState.selected);
+            if (set.has(id)) set.delete(id);
+            else set.add(id);
+            const list = [...set];
+            drawState.selectedSet = list;
+            drawState.selected = list.length ? list[list.length - 1] : null;
+          } else {
+            drawState.selected = id;
+            drawState.selectedSet = [id];
+          }
+        } else {
+          drawState.selected = null;
+          drawState.selectedSet = [];
+        }
         renderDrawing(app.drawing);
         return;
       }
@@ -6228,9 +6765,11 @@ ${gcodeSample}`;
       return;
     }
 
-    items.forEach((item) => {
+    items.forEach((item, index) => {
       const card = document.createElement("div");
       card.className = "block-card";
+      card.dataset.blockIndex = String(index);
+      card.title = `${item.name} — click to insert at the cursor, or drag onto the drawing sheet to place it`;
       card.innerHTML = `
         <div class="block-thumb">${item.svg}</div>
         <div class="block-name">${item.name}</div>
@@ -10641,7 +11180,7 @@ ${gcodeSample}`;
     cliHistoryIndex = cliHistory.length;
 
     // Check for polyline close/finish commands
-    if ((drawState.tool === "polyline" || drawState.tool === "spline") && drawState.points.length >= 2) {
+    if ((drawState.tool === "polyline" || drawState.tool === "spline" || drawState.tool === "leader") && drawState.points.length >= 2) {
       if (text.toUpperCase() === "C" || text.toUpperCase() === "CLOSE") {
         finishPolyline(true);
         toast(`Closed ${drawState.tool}`);
@@ -10973,6 +11512,481 @@ ${gcodeSample}`;
   }
 
   // ---------------------------------------------------------------------------------------
+  // Unified drag & drop layer
+  //
+  // One pointer-driven implementation serves every drag surface: tabs and panel sections
+  // (sortable lists), numeric fields (scrubbers), library components (palette drag), and the
+  // drawing sheet (entity move/copy). Pointer events are used instead of HTML5 drag-and-drop so
+  // pen and touch work, and every action has a keyboard or Escape equivalent.
+  // ---------------------------------------------------------------------------------------
+  const SORTABLE_CLICK_GUARD_MS = 350;
+  let dragAnnounceTimer = 0;
+
+  function dragAnnounce(message) {
+    const node = byId("atlasDragAnnouncer");
+    if (!node) return;
+    node.textContent = "";
+    window.clearTimeout(dragAnnounceTimer);
+    dragAnnounceTimer = window.setTimeout(() => {
+      node.textContent = message;
+    }, 20);
+  }
+
+  function dragHudShow(title, detail) {
+    const hud = byId("dragHud");
+    if (!hud) return;
+    const titleNode = byId("dragHudTitle");
+    const detailNode = byId("dragHudDetail");
+    if (titleNode) titleNode.textContent = title || "";
+    if (detailNode) detailNode.textContent = detail || "";
+    hud.hidden = false;
+  }
+
+  function dragHudMove(x, y) {
+    const hud = byId("dragHud");
+    if (!hud) return;
+    hud.style.left = `${x}px`;
+    hud.style.top = `${y}px`;
+  }
+
+  function dragHudHide() {
+    const hud = byId("dragHud");
+    if (hud) hud.hidden = true;
+  }
+
+  function sortableId(item) {
+    return item.id || item.dataset.workbench || item.dataset.sortId || "";
+  }
+
+  function loadSavedOrder(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      const parsed = raw ? JSON.parse(raw) : null;
+      return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function applySavedOrder(container, itemSelector, key, beforeSelector) {
+    if (!container) return;
+    const saved = loadSavedOrder(key);
+    if (!saved.length) return;
+    const items = Array.from(container.querySelectorAll(itemSelector));
+    const byIdMap = new Map();
+    for (const item of items) {
+      const id = sortableId(item);
+      if (id) byIdMap.set(id, item);
+    }
+    const before = beforeSelector ? container.querySelector(beforeSelector) : null;
+    const placed = new Set();
+    for (const id of saved) {
+      const item = byIdMap.get(id);
+      if (!item || placed.has(item)) continue;
+      placed.add(item);
+      if (before) container.insertBefore(item, before);
+      else container.appendChild(item);
+    }
+    for (const item of items) {
+      if (placed.has(item)) continue;
+      if (before) container.insertBefore(item, before);
+      else container.appendChild(item);
+    }
+  }
+
+  function enableSortable(container, options) {
+    if (!container || container.dataset.sortableReady === "true") return;
+    container.dataset.sortableReady = "true";
+    const {
+      itemSelector,
+      axis = "y",
+      handleSelector = null,
+      beforeSelector = null,
+      persistKey = null,
+      name = "Item",
+    } = options;
+    const horizontal = axis === "x";
+    let session = null;
+    let suppressClickUntil = 0;
+
+    const items = () => Array.from(container.querySelectorAll(itemSelector))
+      .filter((item) => item.parentElement === container);
+
+    function anchor() {
+      return beforeSelector ? container.querySelector(beforeSelector) : null;
+    }
+
+    function placeBefore(item, reference) {
+      if (reference) container.insertBefore(item, reference);
+      else container.appendChild(item);
+    }
+
+    function persist() {
+      const ids = items().map(sortableId).filter(Boolean);
+      if (persistKey && ids.length) {
+        try {
+          localStorage.setItem(persistKey, JSON.stringify(ids));
+        } catch (_) {
+          // Private browsing can refuse storage; the order still holds for this session.
+        }
+      }
+      return ids;
+    }
+
+    // A drag must not also fire the tab/section click that switched the view.
+    container.addEventListener("click", (event) => {
+      if (performance.now() < suppressClickUntil) {
+        event.stopPropagation();
+        event.preventDefault();
+      }
+    }, true);
+
+    container.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      const item = event.target.closest ? event.target.closest(itemSelector) : null;
+      if (!item || item.parentElement !== container) return;
+      if (event.target.closest("input, select, textarea")) return;
+      if (handleSelector) {
+        if (!event.target.closest(handleSelector)) return;
+        if (event.target.closest("button, a")) return;
+      }
+      session = {
+        item,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        moved: false,
+        order: Array.from(container.children),
+        id: sortableId(item),
+      };
+      // Capture only once a drag starts: capturing on pointerdown retargets the click event to
+      // the container, which would stop a plain click from activating the tab or section.
+    });
+
+    container.addEventListener("pointermove", (event) => {
+      if (!session || session.pointerId !== event.pointerId) return;
+      const dx = event.clientX - session.startX;
+      const dy = event.clientY - session.startY;
+      if (!session.moved) {
+        if (Math.hypot(dx, dy) < 5) return;
+        session.moved = true;
+        session.item.classList.add("sortable-dragging");
+        container.classList.add("sortable-active");
+        document.body.classList.add("sortable-dragging");
+        try { container.setPointerCapture(event.pointerId); } catch (_) {}
+      }
+      event.preventDefault();
+      const position = horizontal ? event.clientX : event.clientY;
+      let reference = anchor();
+      for (const other of items()) {
+        if (other === session.item) continue;
+        const rect = other.getBoundingClientRect();
+        const middle = horizontal ? rect.left + rect.width / 2 : rect.top + rect.height / 2;
+        if (position < middle) {
+          reference = other;
+          break;
+        }
+      }
+      if (reference === session.item) return;
+      if (session.item.nextElementSibling === reference) return;
+      placeBefore(session.item, reference);
+    });
+
+    function finish(cancelled) {
+      if (!session) return;
+      const current = session;
+      session = null;
+      try { container.releasePointerCapture(current.pointerId); } catch (_) {}
+      current.item.classList.remove("sortable-dragging");
+      container.classList.remove("sortable-active");
+      document.body.classList.remove("sortable-dragging");
+      if (cancelled) {
+        for (const child of current.order) container.appendChild(child);
+        dragAnnounce(`${name} order restored`);
+        return;
+      }
+      if (!current.moved) return;
+      suppressClickUntil = performance.now() + SORTABLE_CLICK_GUARD_MS;
+      const ids = persist();
+      const position = ids.indexOf(current.id);
+      dragAnnounce(`${name} moved to position ${position >= 0 ? position + 1 : "?"} of ${ids.length}`);
+    }
+
+    container.addEventListener("pointerup", (event) => {
+      if (session && session.pointerId === event.pointerId) finish(false);
+    });
+    container.addEventListener("pointercancel", (event) => {
+      if (session && session.pointerId === event.pointerId) finish(true);
+    });
+    window.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || !session) return;
+      event.preventDefault();
+      finish(true);
+    });
+
+    // Keyboard equivalent: focus a tab/section and press Alt+Arrow.
+    container.addEventListener("keydown", (event) => {
+      if (!event.altKey) return;
+      const direction = horizontal
+        ? (event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0)
+        : (event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0);
+      if (!direction) return;
+      const item = event.target.closest ? event.target.closest(itemSelector) : null;
+      if (!item || item.parentElement !== container) return;
+      const list = items();
+      const index = list.indexOf(item);
+      const target = index + direction;
+      if (target < 0 || target >= list.length) return;
+      event.preventDefault();
+      const others = list.filter((node) => node !== item);
+      const reference = target < others.length ? others[target] : anchor();
+      placeBefore(item, reference);
+      const ids = persist();
+      dragAnnounce(`${name} moved to position ${target + 1} of ${ids.length}`);
+      item.focus({ preventScroll: true });
+    });
+  }
+
+  // Drag a field label horizontally to scrub its number: Shift x10, Alt x0.1.
+  function setupNumberScrubbers() {
+    function numericInputFor(label) {
+      const id = label && label.getAttribute ? label.getAttribute("for") : null;
+      if (!id) return null;
+      const input = byId(id);
+      if (!input || input.type !== "number" || input.disabled || input.readOnly) return null;
+      return input;
+    }
+
+    function markLabel(label) {
+      if (numericInputFor(label)) label.classList.add("scrub-label");
+    }
+
+    document.querySelectorAll("label[for]").forEach(markLabel);
+    document.addEventListener("pointerover", (event) => {
+      const label = event.target.closest ? event.target.closest("label[for]") : null;
+      if (label) markLabel(label);
+    });
+
+    let scrub = null;
+
+    function stop(commit) {
+      if (!scrub) return;
+      const current = scrub;
+      scrub = null;
+      current.label.classList.remove("scrubbing");
+      dragHudHide();
+      if (!current.moved) return;
+      if (!commit) {
+        current.input.value = String(current.startValue);
+        current.input.dispatchEvent(new Event("input", { bubbles: true }));
+        return;
+      }
+      current.input.dispatchEvent(new Event("change", { bubbles: true }));
+      dragAnnounce(`${current.label.textContent.trim()} set to ${current.input.value}`);
+    }
+
+    document.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      const label = event.target.closest ? event.target.closest("label.scrub-label") : null;
+      if (!label) return;
+      const input = numericInputFor(label);
+      if (!input) return;
+      const step = Number.parseFloat(input.step);
+      const startValue = Number.parseFloat(input.value);
+      if (!Number.isFinite(startValue)) return;
+      scrub = {
+        input,
+        label,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startValue,
+        step: Number.isFinite(step) && step > 0 ? step : 1,
+        moved: false,
+      };
+    });
+
+    document.addEventListener("pointermove", (event) => {
+      if (!scrub || scrub.pointerId !== event.pointerId) return;
+      const dx = event.clientX - scrub.startX;
+      if (!scrub.moved && Math.abs(dx) < 3) return;
+      if (!scrub.moved) {
+        scrub.moved = true;
+        scrub.label.classList.add("scrubbing");
+        event.preventDefault();
+      }
+      const multiplier = event.shiftKey ? 10 : event.altKey ? 0.1 : 1;
+      const step = scrub.step * multiplier;
+      const minimum = Number.parseFloat(scrub.input.min);
+      const maximum = Number.parseFloat(scrub.input.max);
+      let value = scrub.startValue + Math.round(dx / 4) * step;
+      if (Number.isFinite(minimum)) value = Math.max(minimum, value);
+      if (Number.isFinite(maximum)) value = Math.min(maximum, value);
+      const decimals = Math.min(6, (String(step).split(".")[1] || "").length);
+      value = Number(value.toFixed(decimals));
+      if (Number.parseFloat(scrub.input.value) !== value) {
+        scrub.input.value = String(value);
+        scrub.input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      const unit = scrub.input.dataset.unit || "";
+      dragHudShow(scrub.label.textContent.trim(), `${value}${unit ? ` ${unit}` : ""} · Shift ×10 · Alt ×0.1`);
+      dragHudMove(event.clientX, event.clientY);
+    });
+
+    document.addEventListener("pointerup", (event) => {
+      if (scrub && scrub.pointerId === event.pointerId) stop(true);
+    });
+    document.addEventListener("pointercancel", (event) => {
+      if (scrub && scrub.pointerId === event.pointerId) stop(false);
+    });
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && scrub) {
+        event.preventDefault();
+        stop(false);
+      }
+    });
+  }
+
+  // Drag a component out of the library and drop it where it should sit on the sheet.
+  function setupBlockPlacement() {
+    const grid = byId("blockLibGrid");
+    if (!grid || grid.dataset.dragReady === "true") return;
+    grid.dataset.dragReady = "true";
+    let placement = null;
+
+    const blockItems = () => STANDARD_BLOCKS.filter((block) => block.category === currentBlockCategory);
+
+    function cleanup(restoreLibrary) {
+      if (!placement) return;
+      const current = placement;
+      placement = null;
+      if (current.ghost) current.ghost.remove();
+      document.body.classList.remove("block-placing");
+      byId("layoutSheetView")?.classList.remove("drop-target-active");
+      byId("fullDrawingCanvas")?.classList.remove("active-drop");
+      dragHudHide();
+      if (restoreLibrary) {
+        const modal = byId("blockLibraryModal");
+        if (modal) modal.hidden = false;
+      }
+    }
+
+    grid.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      const card = event.target.closest ? event.target.closest(".block-card") : null;
+      if (!card) return;
+      const item = blockItems()[Number(card.dataset.blockIndex)];
+      if (!item) return;
+      placement = {
+        item,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        moved: false,
+        ghost: null,
+        point: null,
+      };
+    });
+
+    window.addEventListener("pointermove", (event) => {
+      if (!placement || placement.pointerId !== event.pointerId) return;
+      const dx = event.clientX - placement.startX;
+      const dy = event.clientY - placement.startY;
+      if (!placement.moved) {
+        if (Math.hypot(dx, dy) < 5) return;
+        placement.moved = true;
+        const ghost = document.createElement("div");
+        ghost.className = "block-drag-ghost";
+        ghost.innerHTML = `<div class="block-drag-thumb">${placement.item.svg}</div><span>${placement.item.name}</span>`;
+        document.body.appendChild(ghost);
+        placement.ghost = ghost;
+        const modal = byId("blockLibraryModal");
+        if (modal) modal.hidden = true;
+        document.body.classList.add("block-placing");
+        if (byId("layoutSheetView")?.hidden) switchLayoutTab("layout1");
+        byId("layoutSheetView")?.classList.add("drop-target-active");
+      }
+      event.preventDefault();
+      placement.ghost.style.left = `${event.clientX}px`;
+      placement.ghost.style.top = `${event.clientY}px`;
+      const full = byId("fullDrawingCanvas");
+      const svg = full ? full.querySelector("svg") : null;
+      const rect = full ? full.getBoundingClientRect() : null;
+      const overSheet = Boolean(svg && rect
+        && event.clientX >= rect.left && event.clientX <= rect.right
+        && event.clientY >= rect.top && event.clientY <= rect.bottom);
+      placement.point = overSheet ? modelPointFromEvent(svg, event) : null;
+      if (full) full.classList.toggle("active-drop", Boolean(placement.point));
+      const hint = placement.point
+        ? `X ${placement.point[0].toFixed(2)} · Y ${placement.point[1].toFixed(2)} ${app.drawing?.unit || "mm"}`
+        : "Release over the drawing sheet";
+      dragHudShow(placement.item.name, hint);
+      dragHudMove(event.clientX, event.clientY);
+    });
+
+    window.addEventListener("pointerup", (event) => {
+      if (!placement || placement.pointerId !== event.pointerId) return;
+      const current = placement;
+      if (!current.moved) {
+        placement = null;
+        return;
+      }
+      const point = current.point;
+      cleanup(!point);
+      if (!point) {
+        toast("Drop a library component on the drawing sheet to place it.", true);
+        return;
+      }
+      const entities = current.item.createEntities(point[0], point[1]);
+      insertEntitiesIntoDrawing(entities, drawState.layer || "Geometry");
+      toast(`Placed ${current.item.name} at X ${point[0].toFixed(2)}, Y ${point[1].toFixed(2)}`);
+      dragAnnounce(`${current.item.name} placed on the drawing sheet`);
+    });
+
+    window.addEventListener("pointercancel", () => cleanup(true));
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && placement) {
+        event.preventDefault();
+        cleanup(true);
+        toast("Component placement cancelled");
+      }
+    });
+  }
+
+  function setupUnifiedDragLayer() {
+    const layoutBar = byId("autocadLayoutBar");
+    const workbenchList = document.querySelector(".wb-tabs-list");
+    const leftPanel = document.querySelector(".panel-left");
+
+    applySavedOrder(layoutBar, ".layout-tab:not(.layout-add-btn)", "atlas-layout-order", "#tabAddLayout");
+    applySavedOrder(workbenchList, ".wb-tab", "atlas-workbench-order", null);
+    applySavedOrder(leftPanel, ".panel-section", "atlas-left-panel-order", null);
+
+    enableSortable(layoutBar, {
+      itemSelector: ".layout-tab:not(.layout-add-btn)",
+      axis: "x",
+      beforeSelector: "#tabAddLayout",
+      persistKey: "atlas-layout-order",
+      name: "Layout tab",
+    });
+    enableSortable(workbenchList, {
+      itemSelector: ".wb-tab",
+      axis: "x",
+      persistKey: "atlas-workbench-order",
+      name: "Workbench tab",
+    });
+    enableSortable(leftPanel, {
+      itemSelector: ".panel-section",
+      axis: "y",
+      handleSelector: ".section-head",
+      persistKey: "atlas-left-panel-order",
+      name: "Panel section",
+    });
+
+    setupNumberScrubbers();
+    setupBlockPlacement();
+  }
+
+  // ---------------------------------------------------------------------------------------
   // Boot and events
   // ---------------------------------------------------------------------------------------
 
@@ -10983,6 +11997,18 @@ ${gcodeSample}`;
     byId("copyShareBtn").addEventListener("click", copyShareLink);
     byId("recoveryDiscard").addEventListener("click", discardRecovery);
     byId("exportBtn").addEventListener("click", exportStl);
+    byId("importStepBtn")?.addEventListener("click", () => byId("importStepFile")?.click());
+    byId("importStepFile")?.addEventListener("change", (event) => {
+      const file = event.target.files && event.target.files[0];
+      event.target.value = "";
+      importStepFile(file);
+    });
+    byId("importDxfBtn")?.addEventListener("click", () => byId("importDxfFile")?.click());
+    byId("importDxfFile")?.addEventListener("change", (event) => {
+      const file = event.target.files && event.target.files[0];
+      event.target.value = "";
+      importDxfFile(file);
+    });
     byId("exportDxfBtn")?.addEventListener("click", exportDxf);
     byId("exportStepBtn")?.addEventListener("click", exportStep);
     byId("export3mfBtn")?.addEventListener("click", export3mf);
@@ -11543,6 +12569,7 @@ ${gcodeSample}`;
       const revolves = byId("newFeatureKind").value === "revolve";
       byId("newDepthField").hidden = revolves;
       byId("newAxisField").hidden = !revolves;
+      byId("newAngleField").hidden = !revolves;
       byId("addFeatureBtn").textContent = revolves ? "Add revolve" : "Add extrude";
     });
     byId("moveSketchBtn").addEventListener("click", moveSketch);
@@ -11819,6 +12846,7 @@ ${gcodeSample}`;
     setupDisciplineRibbons();
     setupEnterpriseModal();
     setupEnterpriseWorkbenchBar();
+    setupUnifiedDragLayer();
   }
 
   async function boot() {

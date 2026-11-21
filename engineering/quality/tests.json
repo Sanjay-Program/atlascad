@@ -137,6 +137,21 @@
       "notes": "The analytic correctness corpus, run as a binary. 10 fixtures: 8 ok, 2 known-failure (union_tangent_contact, intersection_large_coordinates), 0 regressions, 0 unexpected passes, exit code 0. The 3 difference fixtures are reported unsupported by the kernel, which the corpus counts as correct rather than as a pass. The 2 known failures are recorded expectations, not skips: the corpus reports them so a future fix has to promote the baseline deliberately."
     },
     {
+      "id": "t-cad-kernel-truck-corpus-20261121",
+      "target": "repo.cad-kernel-truck",
+      "command": "cargo run -p cad-kernel-truck --example corpus",
+      "outcome": "success",
+      "passed": 9,
+      "failed": 0,
+      "skipped": 2,
+      "duration_ms": 300,
+      "recorded_at": "2026-11-21",
+      "notes": "11 fixtures: 9 ok, 2 known-failure (intersection_large_coordinates, difference_coplanar_cut), 0 regressions, 0 unexpected passes, exit code 0. union_tangent_contact is promoted to must-pass: the adapter detects a union that returns one shell per operand and retries 1e-3 mm inward, fusing it into one watertight solid (1999.900 mm³, 1000.000 mm²). Contained unions now complete too, including an inner solid touching the container's face.",
+      "supersedes": [
+        "t-cad-kernel-truck-corpus"
+      ]
+    },
+    {
       "id": "t-cad-document",
       "target": "repo.cad-document",
       "command": "cargo test --offline -p cad-document -p cad-cli -j 2",
@@ -358,6 +373,36 @@
       "notes": "31 previous tests plus 4 for revolve: a closed rectangle turned a full turn about the Y axis measures the analytic cylinder volume and stays watertight; an offset rectangle measures the analytic annulus volume; a partial sweep is refused with an explanation rather than returned as an open shell; and a profile that straddles the axis is refused because it is not a solid of revolution. All 35 tests pass, so advertising the new capability changed no existing behaviour. Corpus still 8 must-pass ok, 3 known-failure, 0 regressions.",
       "supersedes": [
         "t-cad-kernel-truck-m11c"
+      ]
+    },
+    {
+      "id": "t-cad-kernel-truck-fuse-20261121",
+      "target": "repo.cad-kernel-truck",
+      "command": "cargo test -p cad-kernel-truck",
+      "outcome": "success",
+      "passed": 39,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 3070,
+      "recorded_at": "2026-11-21",
+      "notes": "37 previous tests plus two for the inward retry: a face-to-face union must fuse into one watertight solid (1999.900 mm³ / 1000.000 mm², 0 open mesh edges), and a contained union whose inner solid touches the container's bottom face must return the container (1000.016 mm³ / 600.016 mm², watertight). The corpus promotes union_tangent_contact to must-pass and now reports 9 ok, 2 known-failure, exit code 0.",
+      "supersedes": [
+        "t-cad-kernel-truck-m11d"
+      ]
+    },
+    {
+      "id": "t-cad-kernel-truck-precision-20261121",
+      "target": "repo.cad-kernel-truck",
+      "command": "cargo test -p cad-kernel-truck",
+      "outcome": "success",
+      "passed": 40,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 2950,
+      "recorded_at": "2026-11-21",
+      "notes": "39 previous tests plus a large-coordinate guard: an intersection of two 100 mm boxes at 1e6 mm is refused with a message naming the ±1e5 mm bound and asking for a re-centre, instead of returning the measured 11 499.8 mm³ / 24-open-edge malformed solid. Probing showed the same full-span coplanar intersection also leaves 18 open edges at the origin and translating the malformed result back hangs inside truck, so refusal is the honest fix. The corpus is unchanged at 9 ok / 2 known-failure, with the large-coordinate fixture now recorded as a refusal.",
+      "supersedes": [
+        "t-cad-kernel-truck-fuse-20261121"
       ]
     },
     {
@@ -723,6 +768,18 @@
       "duration_ms": 0,
       "recorded_at": "2026-11-03",
       "notes": "Fourteen-package root workspace, 410 tests including doctests, 0 failed (405 before this cycle), fmt and clippy --all-targets -D warnings clean. New this cycle: 3 cad-cae unit tests (versioned study round trip; malformed/oversized/unknown-field/newer-schema refusals; a well-formed but unsupportable study is a validation refusal, not a broken file) and 2 cad-cli cae_workflow tests (a --study file and the equivalent flags produce identical mesh/results, the result embeds definition + engine cad-cae 0.1.0 + source document/revision, the atomic write leaves no temp file; malformed/newer/mixed input exits 2, an empty study and an unknown material exit 3, and a refusal publishes no result). Exit codes are now 0 ok / 1 internal or I/O / 2 bad input / 3 analysis refused across atlas, so two drafting workflow assertions moved from 1 to 2. deploy/build-cae-image.sh --smoke built the non-root image and ran the hardened shape (no network, read-only root, cap-drop ALL, no-new-privileges, 512 MB cap): the 384-element cantilever measured 0.041352 mm, 3.95% from the Timoshenko reference, 111 PCG iterations; the read-only project stayed byte-identical; an off-body load exited 3 and published nothing; a malformed study exited 2; the process ran as uid 10001; a job without a result volume exited 2; recording a simulation inside the container left atlas artifacts check passing. Measured host envelope: 64 000 elements 7.8 s / 20 MB peak RSS, 160 000 elements 22.9 s / 43 MB, and 160 000 elements in 24.1 s in the container under 512 MB. The Kubernetes Job in docs/operations/cae-deployment.md was NOT run on a cluster; the image is unsigned and unscanned."
+    },
+    {
+      "id": "t-cad-revolve-angle-20261121",
+      "target": "repo.cad-document",
+      "command": "cargo test -p cad-kernel-truck -p cad-document -p cad-studio",
+      "outcome": "success",
+      "passed": 184,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 0,
+      "recorded_at": "2026-11-21",
+      "notes": "Partial revolve across three packages: 42 cad-kernel-truck + 91 cad-document + 51 cad-studio tests, 0 failed. The kernel now accepts 0 < angle <= 360 degrees; truck's closed sweep already caps a partial turn, measured against the analytic quarter annulus (2356.194 mm3 from pi/4*(16-4)*3 at 1e-4 mm chord tolerance) and half cylinder (785.398 mm3), both watertight with 0 open edges. The document stores angle_deg in schema 11 (a schema-10 feature defaults to 360), validates 0 < angle <= 360 on create and on load, and hashes the angle into the rebuild-cache key. The studio accepts angle_deg on POST /api/feature/revolve, exposes it in /api/state, and the create form shows an Angle field; a real-socket HTTP test measures the quarter annulus and re-reads a watertight STL, and 361 degrees is a 400 with the document's reason. The corpus is unchanged (9 ok / 2 recorded known failures)."
     }
   ]
 }

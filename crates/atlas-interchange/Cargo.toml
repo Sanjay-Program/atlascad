@@ -7,6 +7,8 @@ rust-version.workspace = true
 description = "Atlas Interchange: OpenUSD, glTF 2.0, MaterialX, OpenTimelineIO, and Wavefront OBJ universal translators"
 
 [dependencies]
+cad-contract.workspace = true
+cad-io.workspace = true
 atlas-creative-core.workspace = true
 atlas-material-system.workspace = true
 atlas-scene-graph.workspace = true
