@@ -67,6 +67,8 @@ pub enum StudioError {
     Project(ProjectError),
     Kernel(cad_contract::error::KernelError),
     Stl(cad_io::StlError),
+    /// A STEP file could not be written; the geometry is valid, the exchange format refused it.
+    Step(cad_io::StepError),
     Drafting(cad_drafting::PlanError),
     /// A drawing operation (edit, save, plot) failed; the drawing is its own document.
     DrawingDoc(cad_drafting::DraftError),
@@ -94,6 +96,7 @@ impl std::fmt::Display for StudioError {
             StudioError::Project(error) => write!(f, "project: {error}"),
             StudioError::Kernel(error) => write!(f, "kernel: {error}"),
             StudioError::Stl(error) => write!(f, "STL: {error}"),
+            StudioError::Step(error) => write!(f, "STEP: {error}"),
             StudioError::Drafting(error) => write!(f, "drawing: {error}"),
             StudioError::DrawingDoc(error) => write!(f, "drawing: {error}"),
             StudioError::Sheet(error) => write!(f, "sheet: {error}"),
@@ -134,6 +137,12 @@ impl From<cad_contract::error::KernelError> for StudioError {
 impl From<cad_io::StlError> for StudioError {
     fn from(error: cad_io::StlError) -> Self {
         StudioError::Stl(error)
+    }
+}
+
+impl From<cad_io::StepError> for StudioError {
+    fn from(error: cad_io::StepError) -> Self {
+        StudioError::Step(error)
     }
 }
 
@@ -194,6 +203,7 @@ impl StudioError {
             StudioError::Drafting(_) | StudioError::DrawingDoc(_) | StudioError::Sheet(_) => 400,
             StudioError::Model(_)
             | StudioError::Stl(_)
+            | StudioError::Step(_)
             | StudioError::Io(_)
             | StudioError::Lock
             | StudioError::Bind(_) => 500,
@@ -219,7 +229,7 @@ impl StudioError {
             StudioError::Project(ProjectError::Engineering(_)) => "engineering_model_failure",
             StudioError::Project(_) => "invalid_project",
             StudioError::Kernel(_) => "kernel_failure",
-            StudioError::Stl(_) => "export_failure",
+            StudioError::Stl(_) | StudioError::Step(_) => "export_failure",
             StudioError::Drafting(_) | StudioError::DrawingDoc(_) => "drawing_failure",
             StudioError::Sheet(_) => "sheet_failure",
             StudioError::Model(_) => "engineering_model_failure",
@@ -260,6 +270,8 @@ struct FeatureView {
     depth_mm: Option<f64>,
     /// For a revolve: `vertical` or `horizontal`, the sketch axis it turns about.
     axis: Option<&'static str>,
+    /// For a revolve: how far it turns, in degrees.
+    angle_deg: Option<f64>,
     /// For an extrude: `up` or `down`, the way it sweeps from its sketch plane.
     direction: Option<&'static str>,
     /// `new_body`, `join`, or `cut`, in build order.
@@ -307,6 +319,17 @@ struct GeometryView {
     surface_area_mm2: f64,
     triangles: usize,
     vertices: usize,
+}
+
+/// One body read from an exchange file, as the UI lists it.
+#[derive(Debug, Serialize)]
+struct ImportView {
+    name: String,
+    /// The format it was read from (`STEP` today).
+    source: String,
+    triangles: usize,
+    volume_mm3: f64,
+    bounds: Option<BoundsView>,
 }
 
 #[derive(Debug, Serialize)]
@@ -362,9 +385,9 @@ struct DraftView {
     /// `[min_x, min_y, max_x, max_y]`, or null for an empty drawing.
     bounds: Option<[f64; 4]>,
     total_length: f64,
-    /// `model` while the plan is generated from the sketch, `file` once it is (or was saved as) a
-    /// `.zdraft` beside the project. The distinction matters: a `model` drawing follows the model,
-    /// a `file` drawing does not.
+    /// `model` while the plan is generated from the sketch, `imported` for a drawing read from a
+    /// DXF, `file` once it is (or was saved as) a `.zdraft` beside the project. The distinction
+    /// matters: a `model` drawing follows the model, the other two do not.
     source: &'static str,
     file: Option<String>,
     dirty: bool,
@@ -411,6 +434,9 @@ struct StatePayload {
     parameters: Vec<ParameterView>,
     sketches: Vec<SketchView>,
     features: Vec<FeatureView>,
+    /// Bodies read from exchange files; merged into `mesh` above, listed here so the UI can name
+    /// and remove them.
+    imports: Vec<ImportView>,
     mesh: MeshView,
     outline: Option<Vec<[f64; 2]>>,
     bounds: Option<BoundsView>,
@@ -545,6 +571,9 @@ struct StudioState {
     /// Set by any drawing edit. A drawing generated from the model is regenerated when the model
     /// changes *unless* this is set: once a user has drawn on it, the drawing is theirs.
     drawing_edited: bool,
+    /// Set when the drawing came from an imported DXF rather than the model. The panel says so, and
+    /// the model no longer regenerates it: the file's geometry is the user's, not a projection.
+    drawing_imported: bool,
     /// The project revision the drawing was generated from. `None` when the drawing came from a
     /// `.zdraft` file, which does not carry its source revision, or before one exists.
     drawing_revision: Option<u64>,
@@ -595,6 +624,7 @@ impl StudioState {
             drawing: None,
             drawing_file: None,
             drawing_edited: false,
+            drawing_imported: false,
             drawing_revision: None,
             artifacts_changed: false,
             dependency_graph: init_default_dependency_graph(),
@@ -675,7 +705,7 @@ impl StudioState {
                 Some(FeatureOutcome::Failed { message }) => ("failed", None, Some(message.clone())),
                 None => ("pending", None, None),
             };
-            let (depth_param, depth_mm, axis, direction) = match &feature.kind {
+            let (depth_param, depth_mm, axis, angle_deg, direction) = match &feature.kind {
                 FeatureKind::Extrude {
                     depth_param,
                     direction,
@@ -683,9 +713,12 @@ impl StudioState {
                     Some(depth_param.clone()),
                     Some(unit.to_mm(self.project.parameter(depth_param)?)),
                     None,
+                    None,
                     Some(direction.label()),
                 ),
-                FeatureKind::Revolve { axis } => (None, None, Some(axis.label()), None),
+                FeatureKind::Revolve { axis, angle_deg } => {
+                    (None, None, Some(axis.label()), Some(*angle_deg), None)
+                }
             };
             features.push(FeatureView {
                 id: feature.id.get(),
@@ -694,6 +727,7 @@ impl StudioState {
                 depth_param,
                 depth_mm,
                 axis,
+                angle_deg,
                 direction,
                 operation: feature.operation.label(),
                 status,
@@ -743,6 +777,22 @@ impl StudioState {
             ),
         };
 
+        let imports = self
+            .project
+            .imports()
+            .iter()
+            .map(|body| ImportView {
+                name: body.name.clone(),
+                source: body.source.clone(),
+                triangles: body.triangles(),
+                volume_mm3: body.volume_mm3(),
+                bounds: body.mesh.bounding_box().map(|bounds| BoundsView {
+                    min: bounds.min,
+                    max: bounds.max,
+                }),
+            })
+            .collect();
+
         Ok(StatePayload {
             schema: self.project.schema,
             revision: self.project.revision.get(),
@@ -760,6 +810,7 @@ impl StudioState {
             parameters,
             sketches,
             features,
+            imports,
             mesh: mesh_view,
             outline,
             bounds,
@@ -1157,6 +1208,8 @@ impl StudioState {
             total_length: draft.total_length(),
             source: if self.drawing_file.is_some() {
                 "file"
+            } else if self.drawing_imported {
+                "imported"
             } else {
                 "model"
             },
@@ -1258,6 +1311,16 @@ impl StudioState {
         self.draft_payload()
     }
 
+    /// Add a composite annotation (leader, angular dimension, centre mark) as one undo step.
+    fn drawing_add_batch(
+        &mut self,
+        items: &[(String, cad_drafting::EntityKind)],
+    ) -> Result<DraftView, StudioError> {
+        self.drawing_mut()?.add_entity_batch(items)?;
+        self.drawing_edited = true;
+        self.draft_payload()
+    }
+
     fn drawing_remove(&mut self, id: EntityId) -> Result<DraftView, StudioError> {
         self.drawing_mut()?.remove_entity(id)?;
         self.drawing_edited = true;
@@ -1326,10 +1389,48 @@ impl StudioState {
         }
         self.drawing_file = Some(path);
         self.drawing_edited = false;
+        self.drawing_imported = false;
         // Saving pins the drawing to the model revision it now represents.
         self.drawing_revision = Some(self.project.revision.get());
         self.record_drawing_artifact()?;
         self.draft_payload()
+    }
+
+    /// Replace the drawing with one read from a DXF file.
+    ///
+    /// Reading is the drafting document's own validated reader, so an unsupported entity is reported
+    /// in the import report rather than silently missing, and a malformed file fails with the group
+    /// that broke it. The project is untouched: a drawing is its own document.
+    fn drawing_import(
+        &mut self,
+        req: &DraftImportRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let name = req
+            .name
+            .clone()
+            .filter(|name| !name.trim().is_empty())
+            .unwrap_or_else(|| format!("{} drawing", self.project.name));
+        let import = cad_drafting::from_dxf(&name, self.project.header.document, &req.text)?;
+        let report = serde_json::json!({
+            "declared_unit": import.report.declared_unit.map(|unit| unit.symbol().to_string()),
+            "layers": import.report.layers,
+            "entities": import.report.entities,
+            "skipped": import
+                .report
+                .skipped
+                .iter()
+                .map(|(kind, count)| serde_json::json!({ "kind": kind, "count": count }))
+                .collect::<Vec<_>>(),
+        });
+        self.drawing = Some(import.draft);
+        self.drawing_file = None;
+        // A DXF does not record the model revision it was drawn from, so provenance is unknown
+        // until the user saves it, which pins it to the current revision.
+        self.drawing_revision = None;
+        self.drawing_edited = true;
+        self.drawing_imported = true;
+        let draft = self.draft_payload()?;
+        Ok(serde_json::json!({ "draft": draft, "report": report }))
     }
 
     fn drawing_transform(&mut self, req: &DraftTransformRequest) -> Result<DraftView, StudioError> {
@@ -1521,7 +1622,7 @@ impl StudioState {
                 )));
             }
             None => {
-                if self.project.features().is_empty() {
+                if self.project.features().is_empty() && self.project.imports().is_empty() {
                     ExtrudeOperation::NewBody
                 } else {
                     ExtrudeOperation::Join
@@ -1614,6 +1715,9 @@ impl StudioState {
         let draft = cad_drafting::multiview_draft(&self.project)?;
         self.drawing = Some(draft);
         self.drawing_edited = true;
+        // A generated multiview is a projection of the model again, so it carries the model's
+        // provenance rather than the provenance of the drawing it replaced.
+        self.drawing_imported = false;
         self.draft_payload()
     }
 
@@ -2286,8 +2390,25 @@ impl StudioState {
         ))
     }
 
+    /// Add a STEP part to the model as an imported mesh body. The parse is the platform's validated
+    /// reader, and the document validates and records the body like any other edit.
+    fn import_step(&mut self, req: &StepImportRequest) -> Result<StatePayload, StudioError> {
+        let imported = cad_io::read_step(req.text.as_bytes())?;
+        let name = req
+            .name
+            .clone()
+            .filter(|name| !name.trim().is_empty())
+            .unwrap_or_else(|| imported.name.clone());
+        let mesh = imported.mesh;
+        self.mutate(|project| project.add_imported_body(&name, "STEP", mesh))
+    }
+
+    fn remove_import(&mut self, req: &ImportRemoveRequest) -> Result<StatePayload, StudioError> {
+        self.mutate(|project| project.remove_imported_body(&req.name))
+    }
+
     fn stl(&mut self) -> Result<(Vec<u8>, String), StudioError> {
-        if self.project.features().is_empty() {
+        if self.project.features().is_empty() && self.project.imports().is_empty() {
             return Err(StudioError::BadRequest(
                 "this project has no solid to export".into(),
             ));
@@ -2309,7 +2430,7 @@ impl StudioState {
     }
 
     fn step(&mut self) -> Result<(Vec<u8>, String), StudioError> {
-        if self.project.features().is_empty() {
+        if self.project.features().is_empty() && self.project.imports().is_empty() {
             return Err(StudioError::BadRequest(
                 "this project has no solid to export".into(),
             ));
@@ -2327,21 +2448,15 @@ impl StudioState {
             .mesh
             .ok_or_else(|| StudioError::BadRequest("this project has no solid to export".into()))?;
 
-        let mut poly = atlas_creative_core::mesh::PolyMesh::new(&self.project.name);
-        for p in &mesh.positions {
-            let _ = poly.add_vertex(*p);
-        }
-        for tri in &mesh.triangles {
-            let _ = poly.add_face(vec![tri[0], tri[1], tri[2]]);
-        }
-
-        let step_text = atlas_interchange::StepExporter::mesh_to_step(&poly, &self.project.name);
+        // One STEP writer, shared with the CLI and the agent platform, so the file the browser
+        // downloads is the same file every other surface produces.
+        let bytes = cad_io::step_bytes(&mesh, &self.project.name)?;
         let filename = format!("{}.stp", export_stem(&self.project.name));
-        Ok((step_text.into_bytes(), filename))
+        Ok((bytes, filename))
     }
 
     fn threemf(&mut self) -> Result<(Vec<u8>, String), StudioError> {
-        if self.project.features().is_empty() {
+        if self.project.features().is_empty() && self.project.imports().is_empty() {
             return Err(StudioError::BadRequest(
                 "this project has no solid to export".into(),
             ));
@@ -2367,7 +2482,8 @@ impl StudioState {
             let _ = poly.add_face(vec![tri[0], tri[1], tri[2]]);
         }
 
-        let threemf_text = atlas_interchange::ThreeMfExporter::mesh_to_3mf_xml(&poly, &self.project.name);
+        let threemf_text =
+            atlas_interchange::ThreeMfExporter::mesh_to_3mf_xml(&poly, &self.project.name);
         let filename = format!("{}.3mf", export_stem(&self.project.name));
         Ok((threemf_text.into_bytes(), filename))
     }
@@ -3229,7 +3345,7 @@ namespace AtlasCAD.Unity
     }
 
     fn cae_static(&mut self, request: &CaeStaticRequest) -> Result<serde_json::Value, StudioError> {
-        if self.project.features().is_empty() {
+        if self.project.features().is_empty() && self.project.imports().is_empty() {
             return Err(StudioError::BadRequest(
                 "this project has no solid to analyze".into(),
             ));
@@ -3293,7 +3409,7 @@ namespace AtlasCAD.Unity
     }
 
     fn cae_modal(&mut self, request: &CaeModalRequest) -> Result<serde_json::Value, StudioError> {
-        if self.project.features().is_empty() {
+        if self.project.features().is_empty() && self.project.imports().is_empty() {
             return Err(StudioError::BadRequest(
                 "this project has no solid to analyze".into(),
             ));
@@ -3365,7 +3481,7 @@ namespace AtlasCAD.Unity
         &mut self,
         request: &CaeThermalRequest,
     ) -> Result<serde_json::Value, StudioError> {
-        if self.project.features().is_empty() {
+        if self.project.features().is_empty() && self.project.imports().is_empty() {
             return Err(StudioError::BadRequest(
                 "this project has no solid to analyze".into(),
             ));
@@ -3430,7 +3546,7 @@ namespace AtlasCAD.Unity
     }
 
     fn cam_toolpaths(&mut self, request: &CamRequest) -> Result<serde_json::Value, StudioError> {
-        if self.project.features().is_empty() {
+        if self.project.features().is_empty() && self.project.imports().is_empty() {
             return Err(StudioError::BadRequest(
                 "this project has no solid to machine".into(),
             ));
@@ -3700,7 +3816,7 @@ namespace AtlasCAD.Unity
         &mut self,
         request: &AdditiveSliceRequest,
     ) -> Result<serde_json::Value, StudioError> {
-        if self.project.features().is_empty() {
+        if self.project.features().is_empty() && self.project.imports().is_empty() {
             return Err(StudioError::BadRequest(
                 "this project has no solid to slice".into(),
             ));
@@ -3855,11 +3971,7 @@ namespace AtlasCAD.Unity
         let q = req.heat_flux_mw_m2.unwrap_or(1.45);
         let m_dot = req.coolant_flow_kg_s.unwrap_or(4.93);
         let res = atlas_simulation_core::hypersonic::thermal::evaluate_active_cooling(
-            q,
-            18.5,
-            m_dot,
-            35.0,
-            4.5,
+            q, 18.5, m_dot, 35.0, 4.5,
         );
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
@@ -3890,9 +4002,7 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let fuel_mass = req.fuel_mass_kg.unwrap_or(16300.0);
         let res = atlas_simulation_core::hypersonic::cryo::evaluate_cryogenic_system(
-            fuel_mass,
-            240.0,
-            4.93,
+            fuel_mass, 240.0, 4.93,
         );
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
@@ -3934,9 +4044,8 @@ namespace AtlasCAD.Unity
         let t_k = req.operating_temp_k.unwrap_or(2545.0);
         let stress = req.applied_stress_mpa.unwrap_or(45.0);
         let dur = req.flight_duration_hours.unwrap_or(1.6);
-        let res = atlas_simulation_core::hypersonic::thermal::evaluate_high_temp_creep(
-            t_k, stress, dur,
-        );
+        let res =
+            atlas_simulation_core::hypersonic::thermal::evaluate_high_temp_creep(t_k, stress, dur);
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
@@ -4018,10 +4127,7 @@ namespace AtlasCAD.Unity
                 .unwrap_or_else(|| "acetic_acid".to_string()),
             analyte_concentration_m: req.analyte_concentration_m.unwrap_or(0.10),
             analyte_volume_ml: req.analyte_volume_ml.unwrap_or(25.0),
-            titrant_id: req
-                .titrant_id
-                .clone()
-                .unwrap_or_else(|| "naoh".to_string()),
+            titrant_id: req.titrant_id.clone().unwrap_or_else(|| "naoh".to_string()),
             titrant_concentration_m: req.titrant_concentration_m.unwrap_or(0.10),
             temperature_c: req.temperature_c.unwrap_or(25.0),
             titrant_max_volume_ml: req.titrant_max_volume_ml,
@@ -4203,25 +4309,25 @@ namespace AtlasCAD.Unity
             None
         };
 
-        let slm_params = if tech == atlas_additive::process_profiles::AdditiveTechnology::SlmMetalPbf
-        {
-            let mut slm = atlas_additive::process_profiles::SlmMetalParameters::default();
-            if let Some(p) = req.laser_power_w {
-                slm.laser_power_w = p;
-            }
-            if let Some(v) = req.scan_speed_mm_s {
-                slm.scan_speed_mm_s = v;
-            }
-            if let Some(h) = req.hatch_spacing_mm {
-                slm.hatch_spacing_mm = h;
-            }
-            if let Some(t) = req.layer_height_mm {
-                slm.layer_thickness_mm = t;
-            }
-            Some(slm)
-        } else {
-            None
-        };
+        let slm_params =
+            if tech == atlas_additive::process_profiles::AdditiveTechnology::SlmMetalPbf {
+                let mut slm = atlas_additive::process_profiles::SlmMetalParameters::default();
+                if let Some(p) = req.laser_power_w {
+                    slm.laser_power_w = p;
+                }
+                if let Some(v) = req.scan_speed_mm_s {
+                    slm.scan_speed_mm_s = v;
+                }
+                if let Some(h) = req.hatch_spacing_mm {
+                    slm.hatch_spacing_mm = h;
+                }
+                if let Some(t) = req.layer_height_mm {
+                    slm.layer_thickness_mm = t;
+                }
+                Some(slm)
+            } else {
+                None
+            };
 
         let prob = atlas_additive::process_profiles::AdditiveProcessProblem {
             technology: tech,
@@ -4412,7 +4518,9 @@ namespace AtlasCAD.Unity
             nominal_voltage_un_v: req.nominal_voltage_un_v.unwrap_or(400.0),
             upstream_fault_capacity_mva: req.upstream_short_circuit_mva.unwrap_or(250.0),
             transformer_rating_kva: req.transformer_rated_power_sn_kva.unwrap_or(1000.0),
-            transformer_impedance_percent: req.transformer_impedance_voltage_uk_percent.unwrap_or(6.0),
+            transformer_impedance_percent: req
+                .transformer_impedance_voltage_uk_percent
+                .unwrap_or(6.0),
             transformer_copper_loss_kw: req.transformer_copper_losses_pk_kw.unwrap_or(10.5),
             cable_length_m: req.feeder_length_l_m.unwrap_or(65.0),
             conductor_area_mm2: req.conductor_cross_section_q_mm2.unwrap_or(150.0),
@@ -4474,20 +4582,33 @@ namespace AtlasCAD.Unity
         req: &CadHardwareShaftKeyRequest,
     ) -> Result<serde_json::Value, StudioError> {
         let smat = match req.shaft_material.as_deref().unwrap_or("AlloySteel42CrMo4") {
-            "CarbonSteelC45" | "c45" => atlas_simulation_core::shafts_keys::ShaftMaterial::CarbonSteelC45,
-            "NickelChromeSteel4340" | "4340" => atlas_simulation_core::shafts_keys::ShaftMaterial::NickelChromeSteel4340,
-            "Stainless316" | "stainless" => atlas_simulation_core::shafts_keys::ShaftMaterial::Stainless316,
+            "CarbonSteelC45" | "c45" => {
+                atlas_simulation_core::shafts_keys::ShaftMaterial::CarbonSteelC45
+            }
+            "NickelChromeSteel4340" | "4340" => {
+                atlas_simulation_core::shafts_keys::ShaftMaterial::NickelChromeSteel4340
+            }
+            "Stainless316" | "stainless" => {
+                atlas_simulation_core::shafts_keys::ShaftMaterial::Stainless316
+            }
             _ => atlas_simulation_core::shafts_keys::ShaftMaterial::AlloySteel42CrMo4,
         };
 
         let hmat = match req.hub_material.as_deref().unwrap_or("StructuralSteelS275") {
-            "CastIronGG25" | "cast_iron" => atlas_simulation_core::shafts_keys::HubMaterial::CastIronGG25,
-            "AlloySteel42CrMo4" | "alloy_steel" => atlas_simulation_core::shafts_keys::HubMaterial::AlloySteel42CrMo4,
+            "CastIronGG25" | "cast_iron" => {
+                atlas_simulation_core::shafts_keys::HubMaterial::CastIronGG25
+            }
+            "AlloySteel42CrMo4" | "alloy_steel" => {
+                atlas_simulation_core::shafts_keys::HubMaterial::AlloySteel42CrMo4
+            }
             _ => atlas_simulation_core::shafts_keys::HubMaterial::StructuralSteelS275,
         };
 
         let prob = atlas_simulation_core::shafts_keys::ShaftKeyProblem {
-            shaft_name: req.shaft_name.clone().unwrap_or_else(|| "Transmission Shaft".to_string()),
+            shaft_name: req
+                .shaft_name
+                .clone()
+                .unwrap_or_else(|| "Transmission Shaft".to_string()),
             shaft_material: smat,
             hub_material: hmat,
             transmitted_power_kw: req.transmitted_power_kw.unwrap_or(45.0),
@@ -4511,26 +4632,43 @@ namespace AtlasCAD.Unity
         req: &SimPressureVesselRequest,
     ) -> Result<serde_json::Value, StudioError> {
         let mat = match req.material.as_deref().unwrap_or("Sa516Gr70") {
-            "Sa240Type304" | "stainless_304" => atlas_simulation_core::pressure_vessel::VesselMaterial::Sa240Type304,
-            "Sa387Gr11" | "chrome_moly" => atlas_simulation_core::pressure_vessel::VesselMaterial::Sa387Gr11,
-            "Sb168Inconel600" | "inconel_600" => atlas_simulation_core::pressure_vessel::VesselMaterial::Sb168Inconel600,
+            "Sa240Type304" | "stainless_304" => {
+                atlas_simulation_core::pressure_vessel::VesselMaterial::Sa240Type304
+            }
+            "Sa387Gr11" | "chrome_moly" => {
+                atlas_simulation_core::pressure_vessel::VesselMaterial::Sa387Gr11
+            }
+            "Sb168Inconel600" | "inconel_600" => {
+                atlas_simulation_core::pressure_vessel::VesselMaterial::Sb168Inconel600
+            }
             _ => atlas_simulation_core::pressure_vessel::VesselMaterial::Sa516Gr70,
         };
 
         let head = match req.head_type.as_deref().unwrap_or("Ellipsoidal2to1") {
-            "TorisphericalAsme" | "torispherical" => atlas_simulation_core::pressure_vessel::HeadType::TorisphericalAsme,
-            "Hemispherical" | "hemispherical" => atlas_simulation_core::pressure_vessel::HeadType::Hemispherical,
+            "TorisphericalAsme" | "torispherical" => {
+                atlas_simulation_core::pressure_vessel::HeadType::TorisphericalAsme
+            }
+            "Hemispherical" | "hemispherical" => {
+                atlas_simulation_core::pressure_vessel::HeadType::Hemispherical
+            }
             _ => atlas_simulation_core::pressure_vessel::HeadType::Ellipsoidal2to1,
         };
 
         let je = match req.joint_efficiency.as_deref().unwrap_or("SpotRadiography") {
-            "FullRadiography" | "full" => atlas_simulation_core::pressure_vessel::JointEfficiencyType::FullRadiography,
-            "NoneVisualOnly" | "visual" => atlas_simulation_core::pressure_vessel::JointEfficiencyType::NoneVisualOnly,
+            "FullRadiography" | "full" => {
+                atlas_simulation_core::pressure_vessel::JointEfficiencyType::FullRadiography
+            }
+            "NoneVisualOnly" | "visual" => {
+                atlas_simulation_core::pressure_vessel::JointEfficiencyType::NoneVisualOnly
+            }
             _ => atlas_simulation_core::pressure_vessel::JointEfficiencyType::SpotRadiography,
         };
 
         let prob = atlas_simulation_core::pressure_vessel::PressureVesselProblem {
-            vessel_name: req.vessel_name.clone().unwrap_or_else(|| "Chemical Pressure Vessel".to_string()),
+            vessel_name: req
+                .vessel_name
+                .clone()
+                .unwrap_or_else(|| "Chemical Pressure Vessel".to_string()),
             material: mat,
             head_type: head,
             joint_efficiency: je,
@@ -4553,7 +4691,10 @@ namespace AtlasCAD.Unity
         req: &SimPsychrometricsRequest,
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::psychrometrics::PsychrometricProblem {
-            stream_name: req.stream_name.clone().unwrap_or_else(|| "Moist Air Stream".to_string()),
+            stream_name: req
+                .stream_name
+                .clone()
+                .unwrap_or_else(|| "Moist Air Stream".to_string()),
             dry_bulb_temp_c: req.dry_bulb_temp_c.unwrap_or(24.0),
             relative_humidity: req.relative_humidity.unwrap_or(0.50),
             atmospheric_pressure_pa: req.atmospheric_pressure_pa.or(Some(101325.0)),
@@ -4569,21 +4710,34 @@ namespace AtlasCAD.Unity
         req: &SimHydrologyRequest,
     ) -> Result<serde_json::Value, StudioError> {
         let land = match req.land_use.as_deref().unwrap_or("CommercialDowntown") {
-            "PavedRoadsRoofs" | "paved" => atlas_simulation_core::hydrology::LandUseCategory::PavedRoadsRoofs,
-            "IndustrialHeavy" | "industrial" => atlas_simulation_core::hydrology::LandUseCategory::IndustrialHeavy,
-            "ResidentialSuburban" | "residential" => atlas_simulation_core::hydrology::LandUseCategory::ResidentialSuburban,
-            "ParksLawnsMeadows" | "parks" => atlas_simulation_core::hydrology::LandUseCategory::ParksLawnsMeadows,
+            "PavedRoadsRoofs" | "paved" => {
+                atlas_simulation_core::hydrology::LandUseCategory::PavedRoadsRoofs
+            }
+            "IndustrialHeavy" | "industrial" => {
+                atlas_simulation_core::hydrology::LandUseCategory::IndustrialHeavy
+            }
+            "ResidentialSuburban" | "residential" => {
+                atlas_simulation_core::hydrology::LandUseCategory::ResidentialSuburban
+            }
+            "ParksLawnsMeadows" | "parks" => {
+                atlas_simulation_core::hydrology::LandUseCategory::ParksLawnsMeadows
+            }
             _ => atlas_simulation_core::hydrology::LandUseCategory::CommercialDowntown,
         };
 
         let pipe = match req.pipe_material.as_deref().unwrap_or("PrecastConcrete") {
             "SmoothHdpPvc" | "pvc" => atlas_simulation_core::hydrology::PipeMaterial::SmoothHdpPvc,
-            "CorrugatedMetal" | "metal" => atlas_simulation_core::hydrology::PipeMaterial::CorrugatedMetal,
+            "CorrugatedMetal" | "metal" => {
+                atlas_simulation_core::hydrology::PipeMaterial::CorrugatedMetal
+            }
             _ => atlas_simulation_core::hydrology::PipeMaterial::PrecastConcrete,
         };
 
         let prob = atlas_simulation_core::hydrology::HydrologyProblem {
-            basin_name: req.basin_name.clone().unwrap_or_else(|| "Catchment Basin".to_string()),
+            basin_name: req
+                .basin_name
+                .clone()
+                .unwrap_or_else(|| "Catchment Basin".to_string()),
             land_use: land,
             pipe_material: pipe,
             catchment_area_ha: req.catchment_area_ha.unwrap_or(8.5),
@@ -4606,20 +4760,33 @@ namespace AtlasCAD.Unity
         req: &SimFractureRequest,
     ) -> Result<serde_json::Value, StudioError> {
         let mat = match req.material.as_deref().unwrap_or("Aluminum7075T6") {
-            "TitaniumTi6Al4V" | "titanium" => atlas_simulation_core::fracture::FractureMaterial::TitaniumTi6Al4V,
-            "AlloySteel4340" | "alloy_steel" => atlas_simulation_core::fracture::FractureMaterial::AlloySteel4340,
-            "CarbonSteelSa516" | "carbon_steel" => atlas_simulation_core::fracture::FractureMaterial::CarbonSteelSa516,
+            "TitaniumTi6Al4V" | "titanium" => {
+                atlas_simulation_core::fracture::FractureMaterial::TitaniumTi6Al4V
+            }
+            "AlloySteel4340" | "alloy_steel" => {
+                atlas_simulation_core::fracture::FractureMaterial::AlloySteel4340
+            }
+            "CarbonSteelSa516" | "carbon_steel" => {
+                atlas_simulation_core::fracture::FractureMaterial::CarbonSteelSa516
+            }
             _ => atlas_simulation_core::fracture::FractureMaterial::Aluminum7075T6,
         };
 
         let crack = match req.crack_type.as_deref().unwrap_or("EdgeCrackInTension") {
-            "CenterCrackInTension" | "center" => atlas_simulation_core::fracture::CrackConfiguration::CenterCrackInTension,
-            "EmbeddedCircularCrack" | "circular" => atlas_simulation_core::fracture::CrackConfiguration::EmbeddedCircularCrack,
+            "CenterCrackInTension" | "center" => {
+                atlas_simulation_core::fracture::CrackConfiguration::CenterCrackInTension
+            }
+            "EmbeddedCircularCrack" | "circular" => {
+                atlas_simulation_core::fracture::CrackConfiguration::EmbeddedCircularCrack
+            }
             _ => atlas_simulation_core::fracture::CrackConfiguration::EdgeCrackInTension,
         };
 
         let prob = atlas_simulation_core::fracture::FractureProblem {
-            component_name: req.component_name.clone().unwrap_or_else(|| "Structural Member".to_string()),
+            component_name: req
+                .component_name
+                .clone()
+                .unwrap_or_else(|| "Structural Member".to_string()),
             material: mat,
             crack_type: crack,
             max_stress_mpa: req.max_stress_mpa.unwrap_or(180.0),
@@ -4698,7 +4865,8 @@ namespace AtlasCAD.Unity
             distillate_mole_fraction_xd: req.distillate_mole_fraction_xd.unwrap_or(0.95),
             bottoms_mole_fraction_xb: req.bottoms_mole_fraction_xb.unwrap_or(0.05),
             relative_volatility_alpha: req.relative_volatility_alpha.unwrap_or(2.45),
-            feed_condition: atlas_simulation_core::distillation::FeedThermalCondition::SaturatedLiquid,
+            feed_condition:
+                atlas_simulation_core::distillation::FeedThermalCondition::SaturatedLiquid,
             reflux_multiplier: req.reflux_multiplier.unwrap_or(1.30),
             heat_of_vaporization_kj_mol: 30.8,
             tray_efficiency: 0.72,
@@ -4817,7 +4985,8 @@ namespace AtlasCAD.Unity
             tube_outer_diameter_mm: 19.05,
             tube_wall_thickness_mm: 1.65,
             tube_pitch_mm: 25.4,
-            layout_pattern: atlas_simulation_core::heat_exchanger_rating::TubeLayoutPattern::SquarePitch90,
+            layout_pattern:
+                atlas_simulation_core::heat_exchanger_rating::TubeLayoutPattern::SquarePitch90,
             tube_count: req.tube_count.unwrap_or(380),
             tube_passes: req.tube_passes.unwrap_or(2),
             tube_length_m: req.tube_length_m.unwrap_or(4.5),
@@ -4857,7 +5026,9 @@ namespace AtlasCAD.Unity
         req: &SimGasCompressionRequest,
     ) -> Result<serde_json::Value, StudioError> {
         let gas = match req.gas_type.as_deref().unwrap_or("air") {
-            "methane" | "naturalgas" => atlas_simulation_core::gas_compression::ProcessGas::MethaneNaturalGas,
+            "methane" | "naturalgas" => {
+                atlas_simulation_core::gas_compression::ProcessGas::MethaneNaturalGas
+            }
             "nitrogen" => atlas_simulation_core::gas_compression::ProcessGas::Nitrogen,
             "hydrogen" => atlas_simulation_core::gas_compression::ProcessGas::Hydrogen,
             "carbondioxide" => atlas_simulation_core::gas_compression::ProcessGas::CarbonDioxide,
@@ -5041,7 +5212,8 @@ namespace AtlasCAD.Unity
             barrel_yield_strength_mpa: req.barrel_yield_strength_mpa.unwrap_or(355.0),
             rod_yield_strength_mpa: req.rod_yield_strength_mpa.unwrap_or(460.0),
             rod_youngs_modulus_gpa: req.rod_youngs_modulus_gpa.unwrap_or(210.0),
-            mounting_end_condition: atlas_simulation_core::hydraulic_actuator::MountingCondition::PinnedPinned,
+            mounting_end_condition:
+                atlas_simulation_core::hydraulic_actuator::MountingCondition::PinnedPinned,
             load_mass_kg: req.load_mass_kg.unwrap_or(2500.0),
             stroke_velocity_m_s: req.stroke_velocity_m_s.unwrap_or(0.45),
             cushion_length_mm: req.cushion_length_mm.unwrap_or(25.0),
@@ -5068,7 +5240,9 @@ namespace AtlasCAD.Unity
             service_factor: req.service_factor.unwrap_or(1.30),
             friction_coefficient: req.friction_coefficient.unwrap_or(0.35),
             belt_linear_mass_kg_m: req.belt_linear_mass_kg_m.unwrap_or(0.125),
-            max_allowable_tension_per_belt_n: req.max_allowable_tension_per_belt_n.unwrap_or(1100.0),
+            max_allowable_tension_per_belt_n: req
+                .max_allowable_tension_per_belt_n
+                .unwrap_or(1100.0),
         };
         let res = atlas_simulation_core::belt_transmission::solve_belt_transmission(&prob)
             .map_err(StudioError::BadRequest)?;
@@ -5112,7 +5286,9 @@ namespace AtlasCAD.Unity
             stator_resistance_r1_ohm: req.stator_resistance_r1_ohm.unwrap_or(0.35),
             stator_leakage_reactance_x1_ohm: req.stator_leakage_reactance_x1_ohm.unwrap_or(0.85),
             rotor_resistance_r2_prime_ohm: req.rotor_resistance_r2_prime_ohm.unwrap_or(0.32),
-            rotor_leakage_reactance_x2_prime_ohm: req.rotor_leakage_reactance_x2_prime_ohm.unwrap_or(0.95),
+            rotor_leakage_reactance_x2_prime_ohm: req
+                .rotor_leakage_reactance_x2_prime_ohm
+                .unwrap_or(0.95),
             magnetizing_reactance_xm_ohm: req.magnetizing_reactance_xm_ohm.unwrap_or(38.0),
             rotational_loss_w: req.rotational_loss_w.unwrap_or(450.0),
             operating_slip: req.operating_slip,
@@ -5226,19 +5402,33 @@ namespace AtlasCAD.Unity
             soil_layers: vec![
                 atlas_simulation_core::pile_foundation::SoilLayerSpec {
                     layer_thickness_m: 6.0,
-                    soil_type: atlas_simulation_core::pile_foundation::SoilLayerType::CohesiveClay { cu_kpa: 45.0 },
+                    soil_type:
+                        atlas_simulation_core::pile_foundation::SoilLayerType::CohesiveClay {
+                            cu_kpa: 45.0,
+                        },
                 },
                 atlas_simulation_core::pile_foundation::SoilLayerSpec {
                     layer_thickness_m: 8.0,
-                    soil_type: atlas_simulation_core::pile_foundation::SoilLayerType::CohesiveClay { cu_kpa: 80.0 },
+                    soil_type:
+                        atlas_simulation_core::pile_foundation::SoilLayerType::CohesiveClay {
+                            cu_kpa: 80.0,
+                        },
                 },
                 atlas_simulation_core::pile_foundation::SoilLayerSpec {
                     layer_thickness_m: 6.0,
-                    soil_type: atlas_simulation_core::pile_foundation::SoilLayerType::CohesionlessSand { friction_angle_deg: 35.0, unit_weight_kn_m3: 19.5 },
+                    soil_type:
+                        atlas_simulation_core::pile_foundation::SoilLayerType::CohesionlessSand {
+                            friction_angle_deg: 35.0,
+                            unit_weight_kn_m3: 19.5,
+                        },
                 },
             ],
             groundwater_depth_m: req.groundwater_depth_m.unwrap_or(3.0),
-            base_soil_type: atlas_simulation_core::pile_foundation::SoilLayerType::CohesionlessSand { friction_angle_deg: 36.0, unit_weight_kn_m3: 20.0 },
+            base_soil_type:
+                atlas_simulation_core::pile_foundation::SoilLayerType::CohesionlessSand {
+                    friction_angle_deg: 36.0,
+                    unit_weight_kn_m3: 20.0,
+                },
             partial_factor_base: req.partial_factor_base.unwrap_or(1.30),
             partial_factor_shaft: req.partial_factor_shaft.unwrap_or(1.15),
             max_allowable_settlement_mm: req.max_allowable_settlement_mm.unwrap_or(15.0),
@@ -5263,8 +5453,12 @@ namespace AtlasCAD.Unity
             helix_angle_deg: req.helix_angle_deg.unwrap_or(15.0),
             normal_pressure_angle_deg: req.normal_pressure_angle_deg.unwrap_or(20.0),
             application_factor_ka: req.application_factor_ka.unwrap_or(1.25),
-            material_contact_fatigue_limit_mpa: req.material_contact_fatigue_limit_mpa.unwrap_or(1450.0),
-            material_bending_fatigue_limit_mpa: req.material_bending_fatigue_limit_mpa.unwrap_or(850.0),
+            material_contact_fatigue_limit_mpa: req
+                .material_contact_fatigue_limit_mpa
+                .unwrap_or(1450.0),
+            material_bending_fatigue_limit_mpa: req
+                .material_bending_fatigue_limit_mpa
+                .unwrap_or(850.0),
             required_safety_factor_pitting: req.required_safety_factor_pitting.unwrap_or(1.25),
             required_safety_factor_bending: req.required_safety_factor_bending.unwrap_or(1.40),
         };
@@ -5330,7 +5524,9 @@ namespace AtlasCAD.Unity
             problem_id: "cstr_reactor_sim".to_string(),
             reactor_volume_m3: req.reactor_volume_m3.unwrap_or(2.50),
             feed_volumetric_flow_m3_h: req.feed_volumetric_flow_m3_h.unwrap_or(5.0),
-            feed_reactant_concentration_mol_m3: req.feed_reactant_concentration_mol_m3.unwrap_or(2000.0),
+            feed_reactant_concentration_mol_m3: req
+                .feed_reactant_concentration_mol_m3
+                .unwrap_or(2000.0),
             feed_temperature_c: req.feed_temperature_c.unwrap_or(25.0),
             pre_exponential_factor_s_inv: req.pre_exponential_factor_s_inv.unwrap_or(4.5e9),
             activation_energy_kj_mol: req.activation_energy_kj_mol.unwrap_or(75.0),
@@ -5422,8 +5618,12 @@ namespace AtlasCAD.Unity
         req: &SimQuarterCarRequest,
     ) -> Result<serde_json::Value, StudioError> {
         let roughness = match req.road_class.as_deref().unwrap_or("ClassBGood") {
-            "ClassAVeryGood" => atlas_simulation_core::quarter_car::RoadRoughnessClass::ClassAVeryGood,
-            "ClassCAverage" => atlas_simulation_core::quarter_car::RoadRoughnessClass::ClassCAverage,
+            "ClassAVeryGood" => {
+                atlas_simulation_core::quarter_car::RoadRoughnessClass::ClassAVeryGood
+            }
+            "ClassCAverage" => {
+                atlas_simulation_core::quarter_car::RoadRoughnessClass::ClassCAverage
+            }
             "ClassDPoor" => atlas_simulation_core::quarter_car::RoadRoughnessClass::ClassDPoor,
             _ => atlas_simulation_core::quarter_car::RoadRoughnessClass::ClassBGood,
         };
@@ -5523,10 +5723,18 @@ namespace AtlasCAD.Unity
         req: &SimInjectionMoldingRequest,
     ) -> Result<serde_json::Value, StudioError> {
         let resin = match req.resin.as_deref().unwrap_or("ABS") {
-            "Polypropylene" | "PP" => atlas_simulation_core::injection_molding::PolymerResin::Polypropylene,
-            "Polyamide66" | "PA66" => atlas_simulation_core::injection_molding::PolymerResin::Polyamide66,
-            "Polycarbonate" | "PC" => atlas_simulation_core::injection_molding::PolymerResin::Polycarbonate,
-            "Polyoxymethylene" | "POM" => atlas_simulation_core::injection_molding::PolymerResin::Polyoxymethylene,
+            "Polypropylene" | "PP" => {
+                atlas_simulation_core::injection_molding::PolymerResin::Polypropylene
+            }
+            "Polyamide66" | "PA66" => {
+                atlas_simulation_core::injection_molding::PolymerResin::Polyamide66
+            }
+            "Polycarbonate" | "PC" => {
+                atlas_simulation_core::injection_molding::PolymerResin::Polycarbonate
+            }
+            "Polyoxymethylene" | "POM" => {
+                atlas_simulation_core::injection_molding::PolymerResin::Polyoxymethylene
+            }
             _ => atlas_simulation_core::injection_molding::PolymerResin::ABS,
         };
         let prob = atlas_simulation_core::injection_molding::InjectionMoldingProblem {
@@ -5650,7 +5858,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::wire_edm::WireEdmProblem {
             problem_id: "wire_edm_sim".to_string(),
-            workpiece_material: req.workpiece_material.unwrap_or(atlas_simulation_core::wire_edm::EdmWorkpieceMaterial::ToolSteelD2),
+            workpiece_material: req
+                .workpiece_material
+                .unwrap_or(atlas_simulation_core::wire_edm::EdmWorkpieceMaterial::ToolSteelD2),
             workpiece_thickness_mm: req.workpiece_thickness_mm.unwrap_or(50.0),
             wire_diameter_mm: req.wire_diameter_mm.unwrap_or(0.25),
             open_circuit_voltage_v: req.open_circuit_voltage_v.unwrap_or(95.0),
@@ -5685,8 +5895,9 @@ namespace AtlasCAD.Unity
             cg_ea_offset_m: req.cg_ea_offset_m.unwrap_or(0.075),
             air_density_kg_m3: req.air_density_kg_m3.unwrap_or(1.225),
         };
-        let res = atlas_simulation_core::wind_blade_aeroelastic::solve_wind_blade_aeroelastic(&prob)
-            .map_err(StudioError::BadRequest)?;
+        let res =
+            atlas_simulation_core::wind_blade_aeroelastic::solve_wind_blade_aeroelastic(&prob)
+                .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
@@ -5739,7 +5950,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::bess_grid::BessGridProblem {
             problem_id: "bess_grid_sim".to_string(),
-            chemistry: req.chemistry.unwrap_or(atlas_simulation_core::bess_grid::BessChemistry::Lfp),
+            chemistry: req
+                .chemistry
+                .unwrap_or(atlas_simulation_core::bess_grid::BessChemistry::Lfp),
             nominal_capacity_mwh: req.nominal_capacity_mwh.unwrap_or(10.0),
             rated_power_mw: req.rated_power_mw.unwrap_or(2.50),
             dc_bus_voltage_v: req.dc_bus_voltage_v.unwrap_or(1250.0),
@@ -5769,8 +5982,12 @@ namespace AtlasCAD.Unity
             preconsolidation_stress_kpa: req.preconsolidation_stress_kpa.unwrap_or(120.0),
             initial_effective_stress_kpa: req.initial_effective_stress_kpa.unwrap_or(100.0),
             applied_stress_increment_kpa: req.applied_stress_increment_kpa.unwrap_or(80.0),
-            coefficient_of_consolidation_m2_yr: req.coefficient_of_consolidation_m2_yr.unwrap_or(2.80),
-            drainage_condition: req.drainage_condition.unwrap_or(atlas_simulation_core::soil_consolidation::DrainageCondition::DoubleDrainage),
+            coefficient_of_consolidation_m2_yr: req
+                .coefficient_of_consolidation_m2_yr
+                .unwrap_or(2.80),
+            drainage_condition: req.drainage_condition.unwrap_or(
+                atlas_simulation_core::soil_consolidation::DrainageCondition::DoubleDrainage,
+            ),
             analysis_time_years: req.analysis_time_years.unwrap_or(2.0),
         };
         let res = atlas_simulation_core::soil_consolidation::solve_soil_consolidation(&prob)
@@ -5784,7 +6001,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::hydraulic_turbine::HydraulicTurbineProblem {
             problem_id: "hydraulic_turbine_sim".to_string(),
-            turbine_type: req.turbine_type.unwrap_or(atlas_simulation_core::hydraulic_turbine::HydraulicTurbineType::Pelton),
+            turbine_type: req
+                .turbine_type
+                .unwrap_or(atlas_simulation_core::hydraulic_turbine::HydraulicTurbineType::Pelton),
             net_head_m: req.net_head_m.unwrap_or(450.0),
             flow_rate_m3_s: req.flow_rate_m3_s.unwrap_or(3.20),
             rotational_speed_rpm: req.rotational_speed_rpm.unwrap_or(500.0),
@@ -5807,7 +6026,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::stent_expansion::StentExpansionProblem {
             problem_id: "stent_expansion_sim".to_string(),
-            stent_material: req.stent_material.unwrap_or(atlas_simulation_core::stent_expansion::StentMaterial::CobaltChromiumL605),
+            stent_material: req.stent_material.unwrap_or(
+                atlas_simulation_core::stent_expansion::StentMaterial::CobaltChromiumL605,
+            ),
             crimped_diameter_mm: req.crimped_diameter_mm.unwrap_or(1.05),
             nominal_expanded_diameter_mm: req.nominal_expanded_diameter_mm.unwrap_or(3.00),
             nominal_length_mm: req.nominal_length_mm.unwrap_or(18.0),
@@ -5847,12 +6068,16 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::gis_dielectric::GisDielectricProblem {
             problem_id: "gis_dielectric_sim".to_string(),
-            insulating_gas: req.insulating_gas.unwrap_or(atlas_simulation_core::gis_dielectric::GisInsulatingGas::PureSf6),
+            insulating_gas: req
+                .insulating_gas
+                .unwrap_or(atlas_simulation_core::gis_dielectric::GisInsulatingGas::PureSf6),
             rated_voltage_kv_rms: req.rated_voltage_kv_rms.unwrap_or(420.0),
             conductor_radius_mm: req.conductor_radius_mm.unwrap_or(60.0),
             enclosure_radius_mm: req.enclosure_radius_mm.unwrap_or(165.0),
             gas_pressure_abs_bar: req.gas_pressure_abs_bar.unwrap_or(5.50),
-            lightning_impulse_withstand_kv_pk: req.lightning_impulse_withstand_kv_pk.unwrap_or(1425.0),
+            lightning_impulse_withstand_kv_pk: req
+                .lightning_impulse_withstand_kv_pk
+                .unwrap_or(1425.0),
             surface_roughness_ra_um: req.surface_roughness_ra_um.unwrap_or(6.30),
         };
         let res = atlas_simulation_core::gis_dielectric::solve_gis_dielectric(&prob)
@@ -5886,7 +6111,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::superconducting_magnet::CryoMagnetProblem {
             problem_id: "superconducting_magnet_sim".to_string(),
-            material: req.material.unwrap_or(atlas_simulation_core::superconducting_magnet::SuperconductorMaterial::NbTi),
+            material: req.material.unwrap_or(
+                atlas_simulation_core::superconducting_magnet::SuperconductorMaterial::NbTi,
+            ),
             inner_radius_m: req.inner_radius_m.unwrap_or(0.35),
             outer_radius_m: req.outer_radius_m.unwrap_or(0.48),
             coil_length_m: req.coil_length_m.unwrap_or(1.25),
@@ -5917,7 +6144,10 @@ namespace AtlasCAD.Unity
             tps_surface_emissivity: req.tps_surface_emissivity.unwrap_or(0.88),
             max_allowable_tps_temperature_k: req.max_allowable_tps_temperature_k.unwrap_or(2300.0),
         };
-        let res = atlas_simulation_core::reentry_aerothermodynamics::solve_reentry_aerothermodynamics(&prob)
+        let res =
+            atlas_simulation_core::reentry_aerothermodynamics::solve_reentry_aerothermodynamics(
+                &prob,
+            )
             .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
@@ -5928,7 +6158,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::lpbf_meltpool::LpbfProblem {
             problem_id: "lpbf_meltpool_sim".to_string(),
-            material: req.material.unwrap_or(atlas_simulation_core::lpbf_meltpool::LpbfPowderMaterial::Ti6Al4V),
+            material: req
+                .material
+                .unwrap_or(atlas_simulation_core::lpbf_meltpool::LpbfPowderMaterial::Ti6Al4V),
             laser_power_w: req.laser_power_w.unwrap_or(250.0),
             scan_speed_mm_s: req.scan_speed_mm_s.unwrap_or(950.0),
             beam_diameter_um: req.beam_diameter_um.unwrap_or(80.0),
@@ -5948,13 +6180,19 @@ namespace AtlasCAD.Unity
         let prob = atlas_simulation_core::phononic_bandgap::PhononicCrystalProblem {
             problem_id: "phononic_bandgap_sim".to_string(),
             layer_a: atlas_simulation_core::phononic_bandgap::PhononicLayer {
-                name: req.layer_a_name.clone().unwrap_or_else(|| "Steel".to_string()),
+                name: req
+                    .layer_a_name
+                    .clone()
+                    .unwrap_or_else(|| "Steel".to_string()),
                 thickness_mm: req.layer_a_thickness_mm.unwrap_or(24.0),
                 density_kg_m3: req.layer_a_density_kg_m3.unwrap_or(7850.0),
                 sound_speed_m_s: req.layer_a_sound_speed_m_s.unwrap_or(5150.0),
             },
             layer_b: atlas_simulation_core::phononic_bandgap::PhononicLayer {
-                name: req.layer_b_name.clone().unwrap_or_else(|| "Polymer_Epoxy".to_string()),
+                name: req
+                    .layer_b_name
+                    .clone()
+                    .unwrap_or_else(|| "Polymer_Epoxy".to_string()),
                 thickness_mm: req.layer_b_thickness_mm.unwrap_or(16.0),
                 density_kg_m3: req.layer_b_density_kg_m3.unwrap_or(1180.0),
                 sound_speed_m_s: req.layer_b_sound_speed_m_s.unwrap_or(1450.0),
@@ -5994,7 +6232,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::mine_ventilation::MineVentilationProblem {
             problem_id: "mine_ventilation_sim".to_string(),
-            lining_type: req.lining_type.unwrap_or(atlas_simulation_core::mine_ventilation::AirwayLiningType::RoughBlastedRock),
+            lining_type: req.lining_type.unwrap_or(
+                atlas_simulation_core::mine_ventilation::AirwayLiningType::RoughBlastedRock,
+            ),
             airway_length_m: req.airway_length_m.unwrap_or(1400.0),
             airway_area_m2: req.airway_area_m2.unwrap_or(20.0),
             airway_perimeter_m: req.airway_perimeter_m.unwrap_or(18.0),
@@ -6017,7 +6257,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::reflector_antenna::ReflectorAntennaProblem {
             problem_id: "reflector_antenna_sim".to_string(),
-            feed_pattern: req.feed_pattern.unwrap_or(atlas_simulation_core::reflector_antenna::FeedIlluminationPattern::TaperMinus10dB),
+            feed_pattern: req.feed_pattern.unwrap_or(
+                atlas_simulation_core::reflector_antenna::FeedIlluminationPattern::TaperMinus10dB,
+            ),
             dish_diameter_m: req.dish_diameter_m.unwrap_or(2.40),
             focal_length_m: req.focal_length_m.unwrap_or(0.96),
             operating_frequency_ghz: req.operating_frequency_ghz.unwrap_or(14.25),
@@ -6035,7 +6277,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::semiconductor_gaa_fet::GaaFetProblem {
             problem_id: "gaa_fet_sim".to_string(),
-            channel_material: req.channel_material.unwrap_or(atlas_simulation_core::semiconductor_gaa_fet::GaaChannelMaterial::Silicon),
+            channel_material: req.channel_material.unwrap_or(
+                atlas_simulation_core::semiconductor_gaa_fet::GaaChannelMaterial::Silicon,
+            ),
             nanosheet_count: req.nanosheet_count.unwrap_or(3),
             gate_length_nm: req.gate_length_nm.unwrap_or(12.0),
             nanosheet_width_nm: req.nanosheet_width_nm.unwrap_or(30.0),
@@ -6055,7 +6299,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::irrigation_hydraulics::IrrigationHydraulicsProblem {
             problem_id: "irrigation_hydraulics_sim".to_string(),
-            emitter_type: req.emitter_type.unwrap_or(atlas_simulation_core::irrigation_hydraulics::EmitterType::NonCompensatingOrifice),
+            emitter_type: req.emitter_type.unwrap_or(
+                atlas_simulation_core::irrigation_hydraulics::EmitterType::NonCompensatingOrifice,
+            ),
             pipe_inside_diameter_mm: req.pipe_inside_diameter_mm.unwrap_or(16.0),
             lateral_length_m: req.lateral_length_m.unwrap_or(120.0),
             emitter_spacing_m: req.emitter_spacing_m.unwrap_or(0.40),
@@ -6099,7 +6345,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::ev_powertrain::EvPowertrainProblem {
             problem_id: "ev_powertrain_sim".to_string(),
-            layout: req.layout.unwrap_or(atlas_simulation_core::ev_powertrain::EvDrivetrainLayout::RearWheelDrive),
+            layout: req.layout.unwrap_or(
+                atlas_simulation_core::ev_powertrain::EvDrivetrainLayout::RearWheelDrive,
+            ),
             vehicle_mass_kg: req.vehicle_mass_kg.unwrap_or(1850.0),
             rolling_resistance_coeff: req.rolling_resistance_coeff.unwrap_or(0.009),
             drag_coefficient: req.drag_coefficient.unwrap_or(0.24),
@@ -6137,8 +6385,9 @@ namespace AtlasCAD.Unity
             site_coefficient_fv: req.site_coefficient_fv.unwrap_or(1.20),
             fixed_base_period_s: req.fixed_base_period_s.unwrap_or(0.55),
         };
-        let res = atlas_simulation_core::seismic_base_isolation::solve_seismic_base_isolation(&prob)
-            .map_err(StudioError::BadRequest)?;
+        let res =
+            atlas_simulation_core::seismic_base_isolation::solve_seismic_base_isolation(&prob)
+                .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
@@ -6148,8 +6397,12 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::terminal_ballistics::TerminalBallisticsProblem {
             problem_id: "terminal_ballistics_sim".to_string(),
-            projectile_type: req.projectile_type.unwrap_or(atlas_simulation_core::terminal_ballistics::ProjectileType::TungstenLongRod),
-            armor_type: req.armor_type.unwrap_or(atlas_simulation_core::terminal_ballistics::TargetArmorType::RolledHomogeneousArmor),
+            projectile_type: req.projectile_type.unwrap_or(
+                atlas_simulation_core::terminal_ballistics::ProjectileType::TungstenLongRod,
+            ),
+            armor_type: req.armor_type.unwrap_or(
+                atlas_simulation_core::terminal_ballistics::TargetArmorType::RolledHomogeneousArmor,
+            ),
             projectile_mass_kg: req.projectile_mass_kg.unwrap_or(0.180),
             projectile_diameter_mm: req.projectile_diameter_mm.unwrap_or(12.0),
             projectile_length_mm: req.projectile_length_mm.unwrap_or(90.0),
@@ -6168,7 +6421,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::solder_thermal_fatigue::SolderThermalFatigueProblem {
             problem_id: "solder_thermal_fatigue_sim".to_string(),
-            alloy_type: req.alloy_type.unwrap_or(atlas_simulation_core::solder_thermal_fatigue::SolderAlloyType::Sac305),
+            alloy_type: req
+                .alloy_type
+                .unwrap_or(atlas_simulation_core::solder_thermal_fatigue::SolderAlloyType::Sac305),
             package_width_mm: req.package_width_mm.unwrap_or(35.0),
             package_length_mm: req.package_length_mm.unwrap_or(35.0),
             solder_joint_height_um: req.solder_joint_height_um.unwrap_or(400.0),
@@ -6180,8 +6435,9 @@ namespace AtlasCAD.Unity
             dwell_time_minutes: req.dwell_time_minutes.unwrap_or(15.0),
             ramp_rate_c_min: req.ramp_rate_c_min.unwrap_or(15.0),
         };
-        let res = atlas_simulation_core::solder_thermal_fatigue::solve_solder_thermal_fatigue(&prob)
-            .map_err(StudioError::BadRequest)?;
+        let res =
+            atlas_simulation_core::solder_thermal_fatigue::solve_solder_thermal_fatigue(&prob)
+                .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
@@ -6191,7 +6447,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::ship_slamming::ShipSlammingProblem {
             problem_id: "ship_slamming_sim".to_string(),
-            location: req.location.unwrap_or(atlas_simulation_core::ship_slamming::SlammingLocation::BowFlare),
+            location: req
+                .location
+                .unwrap_or(atlas_simulation_core::ship_slamming::SlammingLocation::BowFlare),
             deadrise_angle_deg: req.deadrise_angle_deg.unwrap_or(18.0),
             relative_impact_velocity_m_s: req.relative_impact_velocity_m_s.unwrap_or(7.5),
             frame_spacing_m: req.frame_spacing_m.unwrap_or(0.75),
@@ -6231,7 +6489,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::nuclear_fuel_pin::NuclearFuelPinProblem {
             problem_id: "nuclear_fuel_pin_sim".to_string(),
-            lattice: req.lattice.unwrap_or(atlas_simulation_core::nuclear_fuel_pin::LatticeGeometry::PwrSquarePitch17x17),
+            lattice: req.lattice.unwrap_or(
+                atlas_simulation_core::nuclear_fuel_pin::LatticeGeometry::PwrSquarePitch17x17,
+            ),
             linear_heat_rate_kw_per_m: req.linear_heat_rate_kw_per_m.unwrap_or(32.0),
             pellet_radius_mm: req.pellet_radius_mm.unwrap_or(4.10),
             gap_thickness_um: req.gap_thickness_um.unwrap_or(80.0),
@@ -6253,7 +6513,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::adsorption_psa::AdsorptionPsaProblem {
             problem_id: "adsorption_psa_sim".to_string(),
-            duty: req.duty.unwrap_or(atlas_simulation_core::adsorption_psa::PsaSeparationDuty::OxygenGenerationFromAir),
+            duty: req.duty.unwrap_or(
+                atlas_simulation_core::adsorption_psa::PsaSeparationDuty::OxygenGenerationFromAir,
+            ),
             bed_diameter_m: req.bed_diameter_m.unwrap_or(0.60),
             bed_length_m: req.bed_length_m.unwrap_or(2.20),
             adsorption_pressure_bar: req.adsorption_pressure_bar.unwrap_or(5.50),
@@ -6275,7 +6537,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::rotorcraft_aerodynamics::RotorcraftAerodynamicsProblem {
             problem_id: "rotorcraft_aerodynamics_sim".to_string(),
-            regime: req.regime.unwrap_or(atlas_simulation_core::rotorcraft_aerodynamics::RotorFlightRegime::HoverOge),
+            regime: req.regime.unwrap_or(
+                atlas_simulation_core::rotorcraft_aerodynamics::RotorFlightRegime::HoverOge,
+            ),
             gross_weight_kg: req.gross_weight_kg.unwrap_or(4300.0),
             rotor_radius_m: req.rotor_radius_m.unwrap_or(6.50),
             number_of_blades: req.number_of_blades.unwrap_or(4),
@@ -6287,8 +6551,9 @@ namespace AtlasCAD.Unity
             blade_profile_cd0: req.blade_profile_cd0.unwrap_or(0.0095),
             fuselage_flat_plate_area_m2: req.fuselage_flat_plate_area_m2.unwrap_or(1.65),
         };
-        let res = atlas_simulation_core::rotorcraft_aerodynamics::solve_rotorcraft_aerodynamics(&prob)
-            .map_err(StudioError::BadRequest)?;
+        let res =
+            atlas_simulation_core::rotorcraft_aerodynamics::solve_rotorcraft_aerodynamics(&prob)
+                .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
@@ -6298,8 +6563,12 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::heat_exchanger_delaware::HeatExchangerDelawareProblem {
             problem_id: "heat_exchanger_delaware_sim".to_string(),
-            shell_type: req.shell_type.unwrap_or(atlas_simulation_core::heat_exchanger_delaware::TemaShellType::EOnePassShell),
-            tube_layout: req.tube_layout.unwrap_or(atlas_simulation_core::heat_exchanger_delaware::TemaTubeLayout::Triangular30Deg),
+            shell_type: req.shell_type.unwrap_or(
+                atlas_simulation_core::heat_exchanger_delaware::TemaShellType::EOnePassShell,
+            ),
+            tube_layout: req.tube_layout.unwrap_or(
+                atlas_simulation_core::heat_exchanger_delaware::TemaTubeLayout::Triangular30Deg,
+            ),
             shell_inside_diameter_m: req.shell_inside_diameter_m.unwrap_or(0.60),
             number_of_tubes: req.number_of_tubes.unwrap_or(360),
             tube_outer_diameter_mm: req.tube_outer_diameter_mm.unwrap_or(19.05),
@@ -6321,8 +6590,9 @@ namespace AtlasCAD.Unity
             tube_side_htc_w_m2_k: req.tube_side_htc_w_m2_k.unwrap_or(1850.0),
             fouling_resistance_m2_k_w: req.fouling_resistance_m2_k_w.unwrap_or(0.00035),
         };
-        let res = atlas_simulation_core::heat_exchanger_delaware::solve_heat_exchanger_delaware(&prob)
-            .map_err(StudioError::BadRequest)?;
+        let res =
+            atlas_simulation_core::heat_exchanger_delaware::solve_heat_exchanger_delaware(&prob)
+                .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
@@ -6332,7 +6602,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::drilled_shaft_foundation::DrilledShaftProblem {
             problem_id: "drilled_shaft_sim".to_string(),
-            geomaterial: req.geomaterial.unwrap_or(atlas_simulation_core::drilled_shaft_foundation::GeomaterialType::CohesiveClay),
+            geomaterial: req.geomaterial.unwrap_or(
+                atlas_simulation_core::drilled_shaft_foundation::GeomaterialType::CohesiveClay,
+            ),
             shaft_diameter_m: req.shaft_diameter_m.unwrap_or(1.20),
             embedded_length_m: req.embedded_length_m.unwrap_or(18.0),
             factored_load_demand_kn: req.factored_load_demand_kn.unwrap_or(3200.0),
@@ -6340,7 +6612,9 @@ namespace AtlasCAD.Unity
             undrained_shear_strength_kpa: req.undrained_shear_strength_kpa.unwrap_or(120.0),
             effective_friction_angle_deg: req.effective_friction_angle_deg.unwrap_or(32.0),
             soil_unit_weight_kn_m3: req.soil_unit_weight_kn_m3.unwrap_or(18.5),
-            concrete_compressive_strength_mpa: req.concrete_compressive_strength_mpa.unwrap_or(35.0),
+            concrete_compressive_strength_mpa: req
+                .concrete_compressive_strength_mpa
+                .unwrap_or(35.0),
             steel_reinforcement_ratio_pct: req.steel_reinforcement_ratio_pct.unwrap_or(1.50),
         };
         let res = atlas_simulation_core::drilled_shaft_foundation::solve_drilled_shaft(&prob)
@@ -6365,8 +6639,9 @@ namespace AtlasCAD.Unity
             dynamic_closing_volume_ml: req.dynamic_closing_volume_ml.unwrap_or(2.8),
             static_leakage_volume_ml: req.static_leakage_volume_ml.unwrap_or(3.2),
         };
-        let res = atlas_simulation_core::heart_valve_hemodynamics::solve_heart_valve_hemodynamics(&prob)
-            .map_err(StudioError::BadRequest)?;
+        let res =
+            atlas_simulation_core::heart_valve_hemodynamics::solve_heart_valve_hemodynamics(&prob)
+                .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
@@ -6376,7 +6651,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::centrifugal_compressor::CentrifugalCompressorProblem {
             problem_id: "centrifugal_compressor_sim".to_string(),
-            blade_style: req.blade_style.unwrap_or(atlas_simulation_core::centrifugal_compressor::ImpellerBladeStyle::BacksweptBlades),
+            blade_style: req.blade_style.unwrap_or(
+                atlas_simulation_core::centrifugal_compressor::ImpellerBladeStyle::BacksweptBlades,
+            ),
             mass_flow_rate_kg_s: req.mass_flow_rate_kg_s.unwrap_or(3.80),
             rotational_speed_rpm: req.rotational_speed_rpm.unwrap_or(38000.0),
             impeller_tip_diameter_m: req.impeller_tip_diameter_m.unwrap_or(0.285),
@@ -6390,8 +6667,9 @@ namespace AtlasCAD.Unity
             impeller_material_density_kg_m3: req.impeller_material_density_kg_m3.unwrap_or(4430.0),
             impeller_yield_strength_mpa: req.impeller_yield_strength_mpa.unwrap_or(880.0),
         };
-        let res = atlas_simulation_core::centrifugal_compressor::solve_centrifugal_compressor(&prob)
-            .map_err(StudioError::BadRequest)?;
+        let res =
+            atlas_simulation_core::centrifugal_compressor::solve_centrifugal_compressor(&prob)
+                .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
@@ -6401,15 +6679,21 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::rail_pantograph::RailPantographProblem {
             problem_id: "rail_pantograph_sim".to_string(),
-            system: req.system.unwrap_or(atlas_simulation_core::rail_pantograph::CatenaryVoltageSystem::Ac25kV),
+            system: req
+                .system
+                .unwrap_or(atlas_simulation_core::rail_pantograph::CatenaryVoltageSystem::Ac25kV),
             train_speed_km_h: req.train_speed_km_h.unwrap_or(300.0),
             static_contact_force_n: req.static_contact_force_n.unwrap_or(80.0),
             aerodynamic_uplift_coeff: req.aerodynamic_uplift_coeff.unwrap_or(0.00095),
             contact_wire_tension_kn: req.contact_wire_tension_kn.unwrap_or(22.0),
             contact_wire_mass_kg_per_m: req.contact_wire_mass_kg_per_m.unwrap_or(1.07),
             catenary_span_length_m: req.catenary_span_length_m.unwrap_or(55.0),
-            catenary_midspan_elasticity_mm_per_n: req.catenary_midspan_elasticity_mm_per_n.unwrap_or(0.75),
-            catenary_support_elasticity_mm_per_n: req.catenary_support_elasticity_mm_per_n.unwrap_or(0.35),
+            catenary_midspan_elasticity_mm_per_n: req
+                .catenary_midspan_elasticity_mm_per_n
+                .unwrap_or(0.75),
+            catenary_support_elasticity_mm_per_n: req
+                .catenary_support_elasticity_mm_per_n
+                .unwrap_or(0.35),
         };
         let res = atlas_simulation_core::rail_pantograph::solve_rail_pantograph(&prob)
             .map_err(StudioError::BadRequest)?;
@@ -6422,13 +6706,17 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::tbm_tunneling::TbmTunnelingProblem {
             problem_id: "tbm_tunneling_sim".to_string(),
-            ground_condition: req.ground_condition.unwrap_or(atlas_simulation_core::tbm_tunneling::GroundConditionType::CohesionlessSandGravel),
+            ground_condition: req.ground_condition.unwrap_or(
+                atlas_simulation_core::tbm_tunneling::GroundConditionType::CohesionlessSandGravel,
+            ),
             tunnel_outer_diameter_m: req.tunnel_outer_diameter_m.unwrap_or(6.60),
             tunnel_depth_to_axis_m: req.tunnel_depth_to_axis_m.unwrap_or(22.0),
             water_table_depth_m: req.water_table_depth_m.unwrap_or(4.0),
             soil_bulk_unit_weight_kn_m3: req.soil_bulk_unit_weight_kn_m3.unwrap_or(19.5),
             soil_effective_cohesion_kpa: req.soil_effective_cohesion_kpa.unwrap_or(12.0),
-            soil_effective_friction_angle_deg: req.soil_effective_friction_angle_deg.unwrap_or(32.0),
+            soil_effective_friction_angle_deg: req
+                .soil_effective_friction_angle_deg
+                .unwrap_or(32.0),
             soil_compressive_strength_mpa: req.soil_compressive_strength_mpa.unwrap_or(0.85),
             cutterhead_opening_ratio_pct: req.cutterhead_opening_ratio_pct.unwrap_or(35.0),
             cutterhead_rotational_speed_rpm: req.cutterhead_rotational_speed_rpm.unwrap_or(2.5),
@@ -6503,7 +6791,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::radar_lidar_sensor::RadarLidarSensorProblem {
             problem_id: "radar_lidar_sensor_sim".to_string(),
-            weather_condition: req.weather_condition.unwrap_or(atlas_simulation_core::radar_lidar_sensor::WeatherConditionType::ModerateRain),
+            weather_condition: req.weather_condition.unwrap_or(
+                atlas_simulation_core::radar_lidar_sensor::WeatherConditionType::ModerateRain,
+            ),
             target_range_m: req.target_range_m.unwrap_or(120.0),
             target_rcs_m2: req.target_rcs_m2.unwrap_or(5.0),
             target_optical_reflectivity: req.target_optical_reflectivity.unwrap_or(0.18),
@@ -6527,7 +6817,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::auv_propulsion::AuvPropulsionProblem {
             problem_id: "auv_propulsion_sim".to_string(),
-            mission_regime: req.mission_regime.unwrap_or(atlas_simulation_core::auv_propulsion::AuvMissionRegime::StandardTransit),
+            mission_regime: req.mission_regime.unwrap_or(
+                atlas_simulation_core::auv_propulsion::AuvMissionRegime::StandardTransit,
+            ),
             cruising_speed_knots: req.cruising_speed_knots.unwrap_or(3.50),
             vehicle_length_m: req.vehicle_length_m.unwrap_or(4.80),
             vehicle_diameter_m: req.vehicle_diameter_m.unwrap_or(0.533),
@@ -6551,7 +6843,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::hydro_governor::HydroGovernorProblem {
             problem_id: "hydro_governor_sim".to_string(),
-            turbine_type: req.turbine_type.unwrap_or(atlas_simulation_core::hydro_governor::HydroTurbineType::FrancisReaction),
+            turbine_type: req.turbine_type.unwrap_or(
+                atlas_simulation_core::hydro_governor::HydroTurbineType::FrancisReaction,
+            ),
             rated_net_head_m: req.rated_net_head_m.unwrap_or(145.0),
             rated_discharge_m3_s: req.rated_discharge_m3_s.unwrap_or(24.0),
             rated_speed_rpm: req.rated_speed_rpm.unwrap_or(500.0),
@@ -6575,7 +6869,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::semiconductor_cmp::SemiconductorCmpProblem {
             problem_id: "semiconductor_cmp_sim".to_string(),
-            layer_type: req.layer_type.unwrap_or(atlas_simulation_core::semiconductor_cmp::CmpLayerType::CopperDamascene),
+            layer_type: req
+                .layer_type
+                .unwrap_or(atlas_simulation_core::semiconductor_cmp::CmpLayerType::CopperDamascene),
             wafer_diameter_mm: req.wafer_diameter_mm.unwrap_or(300.0),
             down_force_pressure_kpa: req.down_force_pressure_kpa.unwrap_or(20.68),
             relative_velocity_m_s: req.relative_velocity_m_s.unwrap_or(1.25),
@@ -6599,7 +6895,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::pavement_mepdg::PavementMepdgProblem {
             problem_id: "pavement_mepdg_sim".to_string(),
-            binder_grade: req.binder_grade.unwrap_or(atlas_simulation_core::pavement_mepdg::AsphaltBinderGrade::Pg70_22),
+            binder_grade: req
+                .binder_grade
+                .unwrap_or(atlas_simulation_core::pavement_mepdg::AsphaltBinderGrade::Pg70_22),
             asphalt_thickness_mm: req.asphalt_thickness_mm.unwrap_or(150.0),
             base_thickness_mm: req.base_thickness_mm.unwrap_or(200.0),
             subbase_thickness_mm: req.subbase_thickness_mm.unwrap_or(250.0),
@@ -6621,7 +6919,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::biomaterial_scaffold::BiomaterialScaffoldProblem {
             problem_id: "biomaterial_scaffold_sim".to_string(),
-            biomaterial_type: req.biomaterial_type.unwrap_or(atlas_simulation_core::biomaterial_scaffold::ScaffoldBiomaterialType::PllaPolymer),
+            biomaterial_type: req.biomaterial_type.unwrap_or(
+                atlas_simulation_core::biomaterial_scaffold::ScaffoldBiomaterialType::PllaPolymer,
+            ),
             scaffold_diameter_mm: req.scaffold_diameter_mm.unwrap_or(10.0),
             scaffold_height_mm: req.scaffold_height_mm.unwrap_or(15.0),
             target_porosity_pct: req.target_porosity_pct.unwrap_or(75.0),
@@ -6643,7 +6943,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::satellite_orbital_decay::SatelliteOrbitalDecayProblem {
             problem_id: "satellite_orbital_decay_sim".to_string(),
-            solar_activity: req.solar_activity.unwrap_or(atlas_simulation_core::satellite_orbital_decay::SolarActivityLevel::ModerateMean),
+            solar_activity: req.solar_activity.unwrap_or(
+                atlas_simulation_core::satellite_orbital_decay::SolarActivityLevel::ModerateMean,
+            ),
             satellite_mass_kg: req.satellite_mass_kg.unwrap_or(12.0),
             drag_cross_section_area_m2: req.drag_cross_section_area_m2.unwrap_or(0.045),
             drag_coefficient_cd: req.drag_coefficient_cd.unwrap_or(2.20),
@@ -6651,8 +6953,9 @@ namespace AtlasCAD.Unity
             initial_apogee_altitude_km: req.initial_apogee_altitude_km.unwrap_or(440.0),
             orbit_inclination_deg: req.orbit_inclination_deg.unwrap_or(51.6),
         };
-        let res = atlas_simulation_core::satellite_orbital_decay::solve_satellite_orbital_decay(&prob)
-            .map_err(StudioError::BadRequest)?;
+        let res =
+            atlas_simulation_core::satellite_orbital_decay::solve_satellite_orbital_decay(&prob)
+                .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
@@ -6662,7 +6965,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::mining_excavator::MiningExcavatorProblem {
             problem_id: "mining_excavator_sim".to_string(),
-            material_class: req.material_class.unwrap_or(atlas_simulation_core::mining_excavator::MiningMaterialClass::ClaySiltOverburden),
+            material_class: req.material_class.unwrap_or(
+                atlas_simulation_core::mining_excavator::MiningMaterialClass::ClaySiltOverburden,
+            ),
             wheel_diameter_m: req.wheel_diameter_m.unwrap_or(12.50),
             bucket_count: req.bucket_count.unwrap_or(14),
             bucket_nominal_volume_m3: req.bucket_nominal_volume_m3.unwrap_or(1.80),
@@ -6710,7 +7015,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::geothermal_reservoir::GeothermalReservoirProblem {
             problem_id: "geothermal_reservoir_sim".to_string(),
-            rock_type: req.rock_type.unwrap_or(atlas_simulation_core::geothermal_reservoir::GeothermalRockType::SandstoneAquifer),
+            rock_type: req.rock_type.unwrap_or(
+                atlas_simulation_core::geothermal_reservoir::GeothermalRockType::SandstoneAquifer,
+            ),
             reservoir_temperature_c: req.reservoir_temperature_c.unwrap_or(160.0),
             reinjection_temperature_c: req.reinjection_temperature_c.unwrap_or(65.0),
             brine_flow_rate_l_s: req.brine_flow_rate_l_s.unwrap_or(75.0),
@@ -6816,8 +7123,9 @@ namespace AtlasCAD.Unity
             receptor_downwind_distance_m: req.receptor_downwind_distance_m.unwrap_or(8400.0),
             receptor_crosswind_distance_m: req.receptor_crosswind_distance_m.unwrap_or(0.0),
         };
-        let res = atlas_simulation_core::atmospheric_dispersion::solve_atmospheric_dispersion(&prob)
-            .map_err(StudioError::BadRequest)?;
+        let res =
+            atlas_simulation_core::atmospheric_dispersion::solve_atmospheric_dispersion(&prob)
+                .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
@@ -6942,7 +7250,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::cryogenic_liquefaction::CryogenicLiquefactionProblem {
             problem_id: "cryogenic_liquefaction_sim".to_string(),
-            fluid_type: req.fluid_type.unwrap_or(atlas_simulation_core::cryogenic_liquefaction::CryogenicFluidType::NitrogenN2),
+            fluid_type: req.fluid_type.unwrap_or(
+                atlas_simulation_core::cryogenic_liquefaction::CryogenicFluidType::NitrogenN2,
+            ),
             feed_gas_flow_rate_kg_h: req.feed_gas_flow_rate_kg_h.unwrap_or(1200.0),
             suction_pressure_bar_a: req.suction_pressure_bar_a.unwrap_or(1.05),
             discharge_pressure_bar_a: req.discharge_pressure_bar_a.unwrap_or(200.0),
@@ -6952,8 +7262,9 @@ namespace AtlasCAD.Unity
             heat_exchanger_effectiveness: req.heat_exchanger_effectiveness.unwrap_or(0.97),
             ambient_heat_leak_w: req.ambient_heat_leak_w.unwrap_or(180.0),
         };
-        let res = atlas_simulation_core::cryogenic_liquefaction::solve_cryogenic_liquefaction(&prob)
-            .map_err(StudioError::BadRequest)?;
+        let res =
+            atlas_simulation_core::cryogenic_liquefaction::solve_cryogenic_liquefaction(&prob)
+                .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
@@ -6975,8 +7286,9 @@ namespace AtlasCAD.Unity
             liquid_density_kg_m3: req.liquid_density_kg_m3.unwrap_or(1000.0),
             target_evaluation_size_um: req.target_evaluation_size_um.unwrap_or(75.0),
         };
-        let res = atlas_simulation_core::hydrocyclone_separation::solve_hydrocyclone_separation(&prob)
-            .map_err(StudioError::BadRequest)?;
+        let res =
+            atlas_simulation_core::hydrocyclone_separation::solve_hydrocyclone_separation(&prob)
+                .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
@@ -6986,7 +7298,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::magnetic_bearing::MagneticBearingProblem {
             problem_id: "magnetic_bearing_sim".to_string(),
-            topology: req.topology.unwrap_or(atlas_simulation_core::magnetic_bearing::MagneticBearingTopology::Heteropolar8Pole),
+            topology: req.topology.unwrap_or(
+                atlas_simulation_core::magnetic_bearing::MagneticBearingTopology::Heteropolar8Pole,
+            ),
             rotor_supported_mass_kg: req.rotor_supported_mass_kg.unwrap_or(85.0),
             max_rotational_speed_rpm: req.max_rotational_speed_rpm.unwrap_or(36000.0),
             nominal_air_gap_mm: req.nominal_air_gap_mm.unwrap_or(0.60),
@@ -6995,8 +7309,12 @@ namespace AtlasCAD.Unity
             bias_current_a: req.bias_current_a.unwrap_or(5.0),
             max_control_current_a: req.max_control_current_a.unwrap_or(12.0),
             amplifier_bus_voltage_v: req.amplifier_bus_voltage_v.unwrap_or(180.0),
-            controller_proportional_gain_a_per_mm: req.controller_proportional_gain_a_per_mm.unwrap_or(18.0),
-            controller_derivative_gain_a_s_per_m: req.controller_derivative_gain_a_s_per_m.unwrap_or(35.0),
+            controller_proportional_gain_a_per_mm: req
+                .controller_proportional_gain_a_per_mm
+                .unwrap_or(18.0),
+            controller_derivative_gain_a_s_per_m: req
+                .controller_derivative_gain_a_s_per_m
+                .unwrap_or(35.0),
             rotor_unbalance_eccentricity_um: req.rotor_unbalance_eccentricity_um.unwrap_or(0.50),
         };
         let res = atlas_simulation_core::magnetic_bearing::solve_magnetic_bearing(&prob)
@@ -7032,7 +7350,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::electron_beam_welding::EbwWeldingProblem {
             problem_id: "ebw_welding_sim".to_string(),
-            alloy_grade: req.alloy_grade.unwrap_or(atlas_simulation_core::electron_beam_welding::EbwAlloyGrade::Ti6Al4V),
+            alloy_grade: req
+                .alloy_grade
+                .unwrap_or(atlas_simulation_core::electron_beam_welding::EbwAlloyGrade::Ti6Al4V),
             acceleration_voltage_kv: req.acceleration_voltage_kv.unwrap_or(120.0),
             beam_current_ma: req.beam_current_ma.unwrap_or(50.0),
             travel_speed_mm_s: req.travel_speed_mm_s.unwrap_or(15.0),
@@ -7059,8 +7379,9 @@ namespace AtlasCAD.Unity
             crystal_volumetric_shape_factor: req.crystal_volumetric_shape_factor.unwrap_or(0.85),
             target_median_size_um: req.target_median_size_um.unwrap_or(350.0),
         };
-        let res = atlas_simulation_core::crystallization_kinetics::solve_crystallization_kinetics(&prob)
-            .map_err(StudioError::BadRequest)?;
+        let res =
+            atlas_simulation_core::crystallization_kinetics::solve_crystallization_kinetics(&prob)
+                .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
@@ -7070,7 +7391,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::thermoelectric_cooler::TecCoolerProblem {
             problem_id: "tec_cooler_sim".to_string(),
-            material: req.material.unwrap_or(atlas_simulation_core::thermoelectric_cooler::TecMaterialType::BismuthTelluride),
+            material: req.material.unwrap_or(
+                atlas_simulation_core::thermoelectric_cooler::TecMaterialType::BismuthTelluride,
+            ),
             couple_count_n: req.couple_count_n.unwrap_or(127),
             pellet_area_mm2: req.pellet_area_mm2.unwrap_or(2.25),
             pellet_length_mm: req.pellet_length_mm.unwrap_or(1.80),
@@ -7090,7 +7413,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::slurry_pump_derating::SlurryPumpProblem {
             problem_id: "slurry_pump_sim".to_string(),
-            abrasiveness_class: req.abrasiveness_class.unwrap_or(atlas_simulation_core::slurry_pump_derating::SlurryAbrasivenessClass::Class3Severe),
+            abrasiveness_class: req.abrasiveness_class.unwrap_or(
+                atlas_simulation_core::slurry_pump_derating::SlurryAbrasivenessClass::Class3Severe,
+            ),
             slurry_flow_rate_m3_h: req.slurry_flow_rate_m3_h.unwrap_or(650.0),
             clear_water_head_m: req.clear_water_head_m.unwrap_or(45.0),
             clear_water_efficiency: req.clear_water_efficiency.unwrap_or(0.78),
@@ -7112,7 +7437,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::fiber_dispersion::FiberDispersionProblem {
             problem_id: "fiber_dispersion_sim".to_string(),
-            fiber_standard: req.fiber_standard.unwrap_or(atlas_simulation_core::fiber_dispersion::FiberStandardType::ItuG652dStandard),
+            fiber_standard: req.fiber_standard.unwrap_or(
+                atlas_simulation_core::fiber_dispersion::FiberStandardType::ItuG652dStandard,
+            ),
             wavelength_nm: req.wavelength_nm.unwrap_or(1550.0),
             fiber_length_km: req.fiber_length_km.unwrap_or(80.0),
             laser_linewidth_fwhm_nm: req.laser_linewidth_fwhm_nm.unwrap_or(0.015),
@@ -7131,7 +7458,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::propeller_hydrodynamics::PropellerProblem {
             problem_id: "propeller_sim".to_string(),
-            blade_count: req.blade_count.unwrap_or(atlas_simulation_core::propeller_hydrodynamics::BladeCount::FourBlades),
+            blade_count: req
+                .blade_count
+                .unwrap_or(atlas_simulation_core::propeller_hydrodynamics::BladeCount::FourBlades),
             propeller_diameter_m: req.propeller_diameter_m.unwrap_or(5.60),
             pitch_diameter_ratio: req.pitch_diameter_ratio.unwrap_or(0.95),
             expanded_area_ratio: req.expanded_area_ratio.unwrap_or(0.62),
@@ -7140,8 +7469,9 @@ namespace AtlasCAD.Unity
             shaft_immersion_depth_m: req.shaft_immersion_depth_m.unwrap_or(5.20),
             water_density_kg_m3: req.water_density_kg_m3.unwrap_or(1025.0),
         };
-        let res = atlas_simulation_core::propeller_hydrodynamics::solve_propeller_hydrodynamics(&prob)
-            .map_err(StudioError::BadRequest)?;
+        let res =
+            atlas_simulation_core::propeller_hydrodynamics::solve_propeller_hydrodynamics(&prob)
+                .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
@@ -7151,12 +7481,22 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::indoor_air_quality::IndoorAirQualityProblem {
             problem_id: "indoor_air_quality_sim".to_string(),
-            contaminant: req.contaminant.unwrap_or(atlas_simulation_core::indoor_air_quality::AirContaminantType::CarbonDioxideCO2),
-            space_type: req.space_type.unwrap_or(atlas_simulation_core::indoor_air_quality::SpaceOccupancyType::CommercialOffice),
+            contaminant: req.contaminant.unwrap_or(
+                atlas_simulation_core::indoor_air_quality::AirContaminantType::CarbonDioxideCO2,
+            ),
+            space_type: req.space_type.unwrap_or(
+                atlas_simulation_core::indoor_air_quality::SpaceOccupancyType::CommercialOffice,
+            ),
             room_floor_area_m2: req.room_floor_area_m2.unwrap_or(120.0),
-            ceiling_height_m: req.ceiling_height_m.or(req.room_clear_height_m).unwrap_or(3.0),
+            ceiling_height_m: req
+                .ceiling_height_m
+                .or(req.room_clear_height_m)
+                .unwrap_or(3.0),
             occupant_count: req.occupant_count.unwrap_or(12),
-            outdoor_ventilation_rate_m3_h: req.outdoor_ventilation_rate_m3_h.or(req.ventilation_supply_airflow_m3_h).unwrap_or(720.0),
+            outdoor_ventilation_rate_m3_h: req
+                .outdoor_ventilation_rate_m3_h
+                .or(req.ventilation_supply_airflow_m3_h)
+                .unwrap_or(720.0),
             hvac_filter_efficiency: req.hvac_filter_efficiency.unwrap_or(0.0),
             outdoor_ambient_concentration: req.outdoor_ambient_concentration.unwrap_or(420.0),
             initial_room_concentration: req.initial_room_concentration.unwrap_or(450.0),
@@ -7175,7 +7515,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::pmsm_foc_drive::PmsmDriveProblem {
             problem_id: "pmsm_foc_sim".to_string(),
-            rotor_topology: req.rotor_topology.unwrap_or(atlas_simulation_core::pmsm_foc_drive::PmsmRotorTopology::InteriorIPMSM),
+            rotor_topology: req
+                .rotor_topology
+                .unwrap_or(atlas_simulation_core::pmsm_foc_drive::PmsmRotorTopology::InteriorIPMSM),
             pole_pairs_p: req.pole_pairs_p.unwrap_or(4),
             stator_resistance_ohms: req.stator_resistance_ohms.unwrap_or(0.025),
             d_axis_inductance_mh: req.d_axis_inductance_mh.unwrap_or(0.45),
@@ -7196,7 +7538,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::mse_retaining_wall::MseWallProblem {
             problem_id: "mse_wall_sim".to_string(),
-            polymer_type: req.polymer_type.unwrap_or(atlas_simulation_core::mse_retaining_wall::GeogridPolymerType::HdpeUniaxial),
+            polymer_type: req.polymer_type.unwrap_or(
+                atlas_simulation_core::mse_retaining_wall::GeogridPolymerType::HdpeUniaxial,
+            ),
             wall_height_h_m: req.wall_height_h_m.unwrap_or(8.0),
             reinforcement_length_l_m: req.reinforcement_length_l_m.unwrap_or(6.0),
             vertical_layer_spacing_m: req.vertical_layer_spacing_m.unwrap_or(0.60),
@@ -7219,7 +7563,9 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::isotope_centrifuge::IsotopeCentrifugeProblem {
             problem_id: "isotope_centrifuge_sim".to_string(),
-            rotor_material: req.rotor_material.unwrap_or(atlas_simulation_core::isotope_centrifuge::CentrifugeRotorMaterial::CarbonFiberCfrp),
+            rotor_material: req.rotor_material.unwrap_or(
+                atlas_simulation_core::isotope_centrifuge::CentrifugeRotorMaterial::CarbonFiberCfrp,
+            ),
             rotor_radius_m: req.rotor_radius_m.unwrap_or(0.10),
             rotor_length_m: req.rotor_length_m.unwrap_or(3.0),
             rotational_speed_rpm: req.rotational_speed_rpm.unwrap_or(65000.0),
@@ -7240,8 +7586,12 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::conveyor_bulk_handling::ConveyorProblem {
             problem_id: "conveyor_sim".to_string(),
-            carcass_type: req.carcass_type.unwrap_or(atlas_simulation_core::conveyor_bulk_handling::BeltCarcassType::SteelCordST),
-            troughing_angle: req.troughing_angle.unwrap_or(atlas_simulation_core::conveyor_bulk_handling::TroughingAngleClass::Trough35Deg),
+            carcass_type: req.carcass_type.unwrap_or(
+                atlas_simulation_core::conveyor_bulk_handling::BeltCarcassType::SteelCordST,
+            ),
+            troughing_angle: req.troughing_angle.unwrap_or(
+                atlas_simulation_core::conveyor_bulk_handling::TroughingAngleClass::Trough35Deg,
+            ),
             belt_width_mm: req.belt_width_mm.unwrap_or(1200.0),
             conveyor_length_m: req.conveyor_length_m.unwrap_or(450.0),
             elevation_lift_m: req.elevation_lift_m.unwrap_or(28.0),
@@ -7254,11 +7604,14 @@ namespace AtlasCAD.Unity
             friction_factor_f: req.friction_factor_f.unwrap_or(0.022),
             drive_wrap_angle_deg: req.drive_wrap_angle_deg.unwrap_or(210.0),
             drive_friction_mu: req.drive_friction_mu.unwrap_or(0.35),
-            belt_rated_breaking_strength_kn_m: req.belt_rated_breaking_strength_kn_m.unwrap_or(1250.0),
+            belt_rated_breaking_strength_kn_m: req
+                .belt_rated_breaking_strength_kn_m
+                .unwrap_or(1250.0),
             drive_mechanical_efficiency: req.drive_mechanical_efficiency.unwrap_or(0.92),
         };
-        let res = atlas_simulation_core::conveyor_bulk_handling::solve_conveyor_bulk_handling(&prob)
-            .map_err(StudioError::BadRequest)?;
+        let res =
+            atlas_simulation_core::conveyor_bulk_handling::solve_conveyor_bulk_handling(&prob)
+                .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
@@ -7303,8 +7656,9 @@ namespace AtlasCAD.Unity
             residual_magnetic_dipole_a_m2: req.residual_magnetic_dipole_a_m2.unwrap_or(0.50),
             target_slew_accel_deg_s2: req.target_slew_accel_deg_s2.unwrap_or(1.50),
         };
-        let res = atlas_simulation_core::spacecraft_adcs_attitude::solve_spacecraft_adcs_attitude(&prob)
-            .map_err(StudioError::BadRequest)?;
+        let res =
+            atlas_simulation_core::spacecraft_adcs_attitude::solve_spacecraft_adcs_attitude(&prob)
+                .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
 
@@ -7335,8 +7689,12 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let prob = atlas_simulation_core::packed_bed_scrubber::PackedBedProblem {
             problem_id: "packed_bed_sim".to_string(),
-            application: req.application.unwrap_or(atlas_simulation_core::packed_bed_scrubber::ScrubberApplication::AcidGasAbatement),
-            packing_type: req.packing_type.unwrap_or(atlas_simulation_core::packed_bed_scrubber::PackingTypeClass::PallRings25mm),
+            application: req.application.unwrap_or(
+                atlas_simulation_core::packed_bed_scrubber::ScrubberApplication::AcidGasAbatement,
+            ),
+            packing_type: req.packing_type.unwrap_or(
+                atlas_simulation_core::packed_bed_scrubber::PackingTypeClass::PallRings25mm,
+            ),
             flue_gas_flow_rate_m3_h: req.flue_gas_flow_rate_m3_h.unwrap_or(8500.0),
             inlet_pollutant_mole_fraction: req.inlet_pollutant_mole_fraction.unwrap_or(0.0120),
             target_outlet_mole_fraction: req.target_outlet_mole_fraction.unwrap_or(0.00024),
@@ -7348,6 +7706,157 @@ namespace AtlasCAD.Unity
             henrys_law_slope_m: req.henrys_law_slope_m.unwrap_or(0.45),
         };
         let res = atlas_simulation_core::packed_bed_scrubber::solve_packed_bed_scrubber(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_aerospace_aircraft_landing_gear(
+        &mut self,
+        req: &SimLandingGearRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::aircraft_landing_gear::LandingGearProblem {
+            problem_id: req
+                .problem_id
+                .clone()
+                .unwrap_or_else(|| "landing_gear_sim".to_string()),
+            metering_type: req.metering_type.unwrap_or(
+                atlas_simulation_core::aircraft_landing_gear::MeteringPinType::TaperedContourPin,
+            ),
+            gear_landed_mass_kg: req.gear_landed_mass_kg.unwrap_or(18500.0),
+            vertical_sink_velocity_m_s: req.vertical_sink_velocity_m_s.unwrap_or(3.05),
+            lift_to_weight_ratio: req.lift_to_weight_ratio.unwrap_or(0.85),
+            available_stroke_mm: req.available_stroke_mm.unwrap_or(420.0),
+            piston_diameter_mm: req.piston_diameter_mm.unwrap_or(180.0),
+            gas_precharge_pressure_mpa: req.gas_precharge_pressure_mpa.unwrap_or(4.20),
+            initial_gas_volume_liters: req.initial_gas_volume_liters.unwrap_or(14.50),
+            polytropic_exponent: req.polytropic_exponent.unwrap_or(1.35),
+            orifice_diameter_mm: req.orifice_diameter_mm.unwrap_or(34.0),
+            orifice_discharge_coeff: req.orifice_discharge_coeff.unwrap_or(0.68),
+            fluid_density_kg_m3: req.fluid_density_kg_m3.unwrap_or(885.0),
+            tire_stiffness_kn_m: req.tire_stiffness_kn_m.unwrap_or(2400.0),
+            max_allowable_tire_deflection_mm: req.max_allowable_tire_deflection_mm.unwrap_or(160.0),
+        };
+        let res = atlas_simulation_core::aircraft_landing_gear::solve_aircraft_landing_gear(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_energy_pumped_storage_hydro(
+        &mut self,
+        req: &SimPumpedStorageRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::pumped_storage_hydro::PumpedStorageProblem {
+            problem_id: req
+                .problem_id
+                .clone()
+                .unwrap_or_else(|| "pumped_storage_sim".to_string()),
+            runner_type: req.runner_type.unwrap_or(
+                atlas_simulation_core::pumped_storage_hydro::PumpTurbineType::FrancisReversible,
+            ),
+            upper_reservoir_elevation_m: req.upper_reservoir_elevation_m.unwrap_or(1850.0),
+            lower_reservoir_elevation_m: req.lower_reservoir_elevation_m.unwrap_or(1540.0),
+            conduit_length_m: req.conduit_length_m.unwrap_or(1650.0),
+            conduit_diameter_m: req.conduit_diameter_m.unwrap_or(3.80),
+            darcy_friction_factor: req.darcy_friction_factor.unwrap_or(0.014),
+            minor_loss_k_total: req.minor_loss_k_total.unwrap_or(1.85),
+            pumping_discharge_m3_s: req.pumping_discharge_m3_s.unwrap_or(32.0),
+            generating_discharge_m3_s: req.generating_discharge_m3_s.unwrap_or(36.5),
+            rotational_speed_rpm: req.rotational_speed_rpm.unwrap_or(428.6),
+            runner_diameter_m: req.runner_diameter_m.unwrap_or(3.50),
+            runner_submergence_depth_m: req.runner_submergence_depth_m.unwrap_or(35.0),
+            atmospheric_pressure_kpa: req.atmospheric_pressure_kpa.unwrap_or(101.325),
+            water_vapor_pressure_kpa: req.water_vapor_pressure_kpa.unwrap_or(2.34),
+            pump_hydraulic_efficiency: req.pump_hydraulic_efficiency.unwrap_or(0.91),
+            turbine_hydraulic_efficiency: req.turbine_hydraulic_efficiency.unwrap_or(0.925),
+            motor_generator_efficiency: req.motor_generator_efficiency.unwrap_or(0.982),
+        };
+        let res = atlas_simulation_core::pumped_storage_hydro::solve_pumped_storage_hydro(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_semiconductor_euv_lithography(
+        &mut self,
+        req: &SimEuvLithographyRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::semiconductor_euv_lithography::EuvLithographyProblem {
+            problem_id: req
+                .problem_id
+                .clone()
+                .unwrap_or_else(|| "euv_litho_sim".to_string()),
+            tool_generation: req.tool_generation.unwrap_or(
+                atlas_simulation_core::semiconductor_euv_lithography::EuvToolGeneration::StandardNa033,
+            ),
+            wavelength_nm: req.wavelength_nm.unwrap_or(13.50),
+            numerical_aperture: req.numerical_aperture.unwrap_or(0.33),
+            process_factor_k1: req.process_factor_k1.unwrap_or(0.32),
+            dof_factor_k2: req.dof_factor_k2.unwrap_or(0.60),
+            bilayer_period_d_nm: req.bilayer_period_d_nm.unwrap_or(6.90),
+            molybdenum_fraction_gamma: req.molybdenum_fraction_gamma.unwrap_or(0.40),
+            bilayer_pair_count: req.bilayer_pair_count.unwrap_or(50),
+            interface_roughness_nm: req.interface_roughness_nm.unwrap_or(0.15),
+            incidence_angle_deg: req.incidence_angle_deg.unwrap_or(6.0),
+            mirror_count_in_train: req.mirror_count_in_train.unwrap_or(11),
+            resist_exposure_dose_mj_cm2: req.resist_exposure_dose_mj_cm2.unwrap_or(45.0),
+        };
+        let res = atlas_simulation_core::semiconductor_euv_lithography::solve_semiconductor_euv_lithography(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_renewable_geothermal_binary_orc(
+        &mut self,
+        req: &SimGeothermalOrcRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::geothermal_binary_orc::GeothermalOrcProblem {
+            problem_id: req
+                .problem_id
+                .clone()
+                .unwrap_or_else(|| "geothermal_orc_sim".to_string()),
+            working_fluid: req.working_fluid.unwrap_or(
+                atlas_simulation_core::geothermal_binary_orc::OrcWorkingFluid::Isopentane,
+            ),
+            brine_mass_flow_kg_s: req.brine_mass_flow_kg_s.unwrap_or(85.0),
+            brine_inlet_temperature_c: req.brine_inlet_temperature_c.unwrap_or(165.0),
+            min_reinjection_temperature_c: req.min_reinjection_temperature_c.unwrap_or(72.0),
+            pinch_point_temp_diff_c: req.pinch_point_temp_diff_c.unwrap_or(6.0),
+            evaporator_pressure_bar: req.evaporator_pressure_bar.unwrap_or(18.5),
+            condensing_temperature_c: req.condensing_temperature_c.unwrap_or(36.0),
+            expander_isentropic_efficiency: req.expander_isentropic_efficiency.unwrap_or(0.86),
+            pump_isentropic_efficiency: req.pump_isentropic_efficiency.unwrap_or(0.78),
+            generator_efficiency: req.generator_efficiency.unwrap_or(0.97),
+            parasitic_power_fraction: req.parasitic_power_fraction.unwrap_or(0.085),
+            ambient_reference_temp_c: req.ambient_reference_temp_c.unwrap_or(20.0),
+        };
+        let res = atlas_simulation_core::geothermal_binary_orc::solve_geothermal_binary_orc(&prob)
+            .map_err(StudioError::BadRequest)?;
+        serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn sim_structural_cable_stayed_bridge(
+        &mut self,
+        req: &SimCableStayRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let prob = atlas_simulation_core::cable_stayed_bridge::CableStayProblem {
+            problem_id: req
+                .problem_id
+                .clone()
+                .unwrap_or_else(|| "cable_stay_sim".to_string()),
+            stay_class: req.stay_class.unwrap_or(
+                atlas_simulation_core::cable_stayed_bridge::StayCableClass::ParallelStrandSystemPSS,
+            ),
+            cable_chord_length_m: req.cable_chord_length_m.unwrap_or(240.0),
+            outer_pipe_diameter_mm: req.outer_pipe_diameter_mm.unwrap_or(160.0),
+            chord_inclination_deg: req.chord_inclination_deg.unwrap_or(32.0),
+            cable_pretension_kn: req.cable_pretension_kn.unwrap_or(3600.0),
+            total_linear_mass_kg_m: req.total_linear_mass_kg_m.unwrap_or(52.0),
+            elastic_modulus_gpa: req.elastic_modulus_gpa.unwrap_or(195.0),
+            net_steel_area_mm2: req.net_steel_area_mm2.unwrap_or(6400.0),
+            inherent_damping_ratio: req.inherent_damping_ratio.unwrap_or(0.0012),
+            damper_distance_from_deck_m: req.damper_distance_from_deck_m.unwrap_or(5.50),
+            wind_speed_m_s: req.wind_speed_m_s.unwrap_or(14.0),
+        };
+        let res = atlas_simulation_core::cable_stayed_bridge::solve_cable_stayed_bridge(&prob)
             .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
@@ -8378,17 +8887,35 @@ namespace AtlasCAD.Unity
             "sim.hypersonic.plasma" => {
                 let mach = req.arguments.get("flight_mach").and_then(|v| v.as_f64());
                 let alt = req.arguments.get("altitude_m").and_then(|v| v.as_f64());
-                self.sim_hypersonic_plasma(&HypersonicPlasmaRequest { flight_mach: mach, altitude_m: alt })?
+                self.sim_hypersonic_plasma(&HypersonicPlasmaRequest {
+                    flight_mach: mach,
+                    altitude_m: alt,
+                })?
             }
             "sim.hypersonic.thermal" => {
-                let q = req.arguments.get("heat_flux_mw_m2").and_then(|v| v.as_f64());
-                let m_dot = req.arguments.get("coolant_flow_kg_s").and_then(|v| v.as_f64());
-                self.sim_hypersonic_thermal(&HypersonicThermalRequest { heat_flux_mw_m2: q, coolant_flow_kg_s: m_dot })?
+                let q = req
+                    .arguments
+                    .get("heat_flux_mw_m2")
+                    .and_then(|v| v.as_f64());
+                let m_dot = req
+                    .arguments
+                    .get("coolant_flow_kg_s")
+                    .and_then(|v| v.as_f64());
+                self.sim_hypersonic_thermal(&HypersonicThermalRequest {
+                    heat_flux_mw_m2: q,
+                    coolant_flow_kg_s: m_dot,
+                })?
             }
             "sim.hypersonic.scramjet" => {
                 let mach = req.arguments.get("flight_mach").and_then(|v| v.as_f64());
-                let phi = req.arguments.get("equivalence_ratio").and_then(|v| v.as_f64());
-                self.sim_hypersonic_scramjet(&HypersonicScramjetRequest { flight_mach: mach, equivalence_ratio: phi })?
+                let phi = req
+                    .arguments
+                    .get("equivalence_ratio")
+                    .and_then(|v| v.as_f64());
+                self.sim_hypersonic_scramjet(&HypersonicScramjetRequest {
+                    flight_mach: mach,
+                    equivalence_ratio: phi,
+                })?
             }
             "sim.hypersonic.cryo" => {
                 let fuel = req.arguments.get("fuel_mass_kg").and_then(|v| v.as_f64());
@@ -8396,21 +8923,47 @@ namespace AtlasCAD.Unity
             }
             "sim.hypersonic.bom" => self.sim_hypersonic_bom()?,
             "sim.hypersonic.mhd_bypass" => {
-                let u = req.arguments.get("flow_velocity_m_s").and_then(|v| v.as_f64());
+                let u = req
+                    .arguments
+                    .get("flow_velocity_m_s")
+                    .and_then(|v| v.as_f64());
                 let b = req.arguments.get("b_field_tesla").and_then(|v| v.as_f64());
-                let vol = req.arguments.get("channel_volume_m3").and_then(|v| v.as_f64());
-                self.sim_hypersonic_mhd(&HypersonicMhdRequest { flow_velocity_m_s: u, b_field_tesla: b, channel_volume_m3: vol })?
+                let vol = req
+                    .arguments
+                    .get("channel_volume_m3")
+                    .and_then(|v| v.as_f64());
+                self.sim_hypersonic_mhd(&HypersonicMhdRequest {
+                    flow_velocity_m_s: u,
+                    b_field_tesla: b,
+                    channel_volume_m3: vol,
+                })?
             }
             "sim.hypersonic.slush_h2" => {
                 let fuel = req.arguments.get("fuel_mass_kg").and_then(|v| v.as_f64());
                 let solid = req.arguments.get("solid_fraction").and_then(|v| v.as_f64());
-                self.sim_hypersonic_slush(&HypersonicSlushRequest { fuel_mass_kg: fuel, solid_fraction: solid })?
+                self.sim_hypersonic_slush(&HypersonicSlushRequest {
+                    fuel_mass_kg: fuel,
+                    solid_fraction: solid,
+                })?
             }
             "sim.hypersonic.creep" => {
-                let t_k = req.arguments.get("operating_temp_k").and_then(|v| v.as_f64());
-                let s = req.arguments.get("applied_stress_mpa").and_then(|v| v.as_f64());
-                let dur = req.arguments.get("flight_duration_hours").and_then(|v| v.as_f64());
-                self.sim_hypersonic_creep(&HypersonicCreepRequest { operating_temp_k: t_k, applied_stress_mpa: s, flight_duration_hours: dur })?
+                let t_k = req
+                    .arguments
+                    .get("operating_temp_k")
+                    .and_then(|v| v.as_f64());
+                let s = req
+                    .arguments
+                    .get("applied_stress_mpa")
+                    .and_then(|v| v.as_f64());
+                let dur = req
+                    .arguments
+                    .get("flight_duration_hours")
+                    .and_then(|v| v.as_f64());
+                self.sim_hypersonic_creep(&HypersonicCreepRequest {
+                    operating_temp_k: t_k,
+                    applied_stress_mpa: s,
+                    flight_duration_hours: dur,
+                })?
             }
             "sim.multiphysics_suite.solve" => self.sim_multiphysics_suite()?,
             "cam.toolpaths.generate" => serde_json::json!({
@@ -8458,10 +9011,7 @@ namespace AtlasCAD.Unity
                     .arguments
                     .get("titrant_concentration_m")
                     .and_then(|v| v.as_f64());
-                let temp = req
-                    .arguments
-                    .get("temperature_c")
-                    .and_then(|v| v.as_f64());
+                let temp = req.arguments.get("temperature_c").and_then(|v| v.as_f64());
                 self.sim_chemical_acid_base(&SimAcidBaseRequest {
                     analyte_id: analyte,
                     analyte_concentration_m: ca,
@@ -8479,10 +9029,7 @@ namespace AtlasCAD.Unity
                     .get("material")
                     .and_then(|v| v.as_str())
                     .map(String::from);
-                let thickness = req
-                    .arguments
-                    .get("thickness_mm")
-                    .and_then(|v| v.as_f64());
+                let thickness = req.arguments.get("thickness_mm").and_then(|v| v.as_f64());
                 let flanges = req
                     .arguments
                     .get("flange_lengths_mm")
@@ -8568,10 +9115,7 @@ namespace AtlasCAD.Unity
                     .arguments
                     .get("rate_constant_k")
                     .and_then(|v| v.as_f64());
-                let temp = req
-                    .arguments
-                    .get("temperature_k")
-                    .and_then(|v| v.as_f64());
+                let temp = req.arguments.get("temperature_k").and_then(|v| v.as_f64());
                 let flow = req
                     .arguments
                     .get("volumetric_flow_m3_s")
@@ -8600,10 +9144,7 @@ namespace AtlasCAD.Unity
                     .get("technology")
                     .and_then(|v| v.as_str())
                     .map(String::from);
-                let h = req
-                    .arguments
-                    .get("part_height_mm")
-                    .and_then(|v| v.as_f64());
+                let h = req.arguments.get("part_height_mm").and_then(|v| v.as_f64());
                 let vol = req
                     .arguments
                     .get("part_volume_cm3")
@@ -8612,10 +9153,7 @@ namespace AtlasCAD.Unity
                     .arguments
                     .get("layer_height_mm")
                     .and_then(|v| v.as_f64());
-                let power = req
-                    .arguments
-                    .get("laser_power_w")
-                    .and_then(|v| v.as_f64());
+                let power = req.arguments.get("laser_power_w").and_then(|v| v.as_f64());
                 let speed = req
                     .arguments
                     .get("scan_speed_mm_s")
@@ -8656,10 +9194,7 @@ namespace AtlasCAD.Unity
                     .arguments
                     .get("sound_power_lwa")
                     .and_then(|v| v.as_f64());
-                let dist = req
-                    .arguments
-                    .get("distance_m")
-                    .and_then(|v| v.as_f64());
+                let dist = req.arguments.get("distance_m").and_then(|v| v.as_f64());
                 let hs = req
                     .arguments
                     .get("source_height_m")
@@ -8676,10 +9211,7 @@ namespace AtlasCAD.Unity
                     .arguments
                     .get("barrier_distance_m")
                     .and_then(|v| v.as_f64());
-                let g = req
-                    .arguments
-                    .get("ground_factor")
-                    .and_then(|v| v.as_f64());
+                let g = req.arguments.get("ground_factor").and_then(|v| v.as_f64());
                 let limit = req
                     .arguments
                     .get("regulatory_limit_dba")
@@ -8699,13 +9231,36 @@ namespace AtlasCAD.Unity
                 })?
             }
             "cad.hardware.spring" => {
-                let d = req.arguments.get("wire_diameter_d_mm").and_then(|v| v.as_f64());
-                let mean_d = req.arguments.get("mean_coil_diameter_d_mm").and_then(|v| v.as_f64());
-                let l0 = req.arguments.get("free_length_l0_mm").and_then(|v| v.as_f64());
-                let na = req.arguments.get("active_coils_na").and_then(|v| v.as_f64());
-                let f2 = req.arguments.get("operating_force_f2_n").and_then(|v| v.as_f64());
-                let mat = req.arguments.get("material").and_then(|v| v.as_str()).map(String::from);
-                let end = req.arguments.get("end_type").and_then(|v| v.as_str()).map(String::from);
+                let d = req
+                    .arguments
+                    .get("wire_diameter_d_mm")
+                    .and_then(|v| v.as_f64());
+                let mean_d = req
+                    .arguments
+                    .get("mean_coil_diameter_d_mm")
+                    .and_then(|v| v.as_f64());
+                let l0 = req
+                    .arguments
+                    .get("free_length_l0_mm")
+                    .and_then(|v| v.as_f64());
+                let na = req
+                    .arguments
+                    .get("active_coils_na")
+                    .and_then(|v| v.as_f64());
+                let f2 = req
+                    .arguments
+                    .get("operating_force_f2_n")
+                    .and_then(|v| v.as_f64());
+                let mat = req
+                    .arguments
+                    .get("material")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let end = req
+                    .arguments
+                    .get("end_type")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
                 self.cad_hardware_spring(&CadHardwareSpringRequest {
                     wire_diameter_d_mm: d,
                     mean_coil_diameter_d_mm: mean_d,
@@ -8717,14 +9272,41 @@ namespace AtlasCAD.Unity
                 })?
             }
             "cad.hardware.gear_pair" => {
-                let gtype = req.arguments.get("gear_type").and_then(|v| v.as_str()).map(String::from);
-                let mn = req.arguments.get("normal_module_mn").and_then(|v| v.as_f64());
-                let z1 = req.arguments.get("pinion_teeth_z1").and_then(|v| v.as_u64()).map(|v| v as u32);
-                let z2 = req.arguments.get("gear_teeth_z2").and_then(|v| v.as_u64()).map(|v| v as u32);
-                let b = req.arguments.get("face_width_b_mm").and_then(|v| v.as_f64());
-                let beta = req.arguments.get("helix_angle_beta_deg").and_then(|v| v.as_f64());
-                let rpm = req.arguments.get("pinion_speed_rpm").and_then(|v| v.as_f64());
-                let power = req.arguments.get("transmitted_power_kw").and_then(|v| v.as_f64());
+                let gtype = req
+                    .arguments
+                    .get("gear_type")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let mn = req
+                    .arguments
+                    .get("normal_module_mn")
+                    .and_then(|v| v.as_f64());
+                let z1 = req
+                    .arguments
+                    .get("pinion_teeth_z1")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as u32);
+                let z2 = req
+                    .arguments
+                    .get("gear_teeth_z2")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as u32);
+                let b = req
+                    .arguments
+                    .get("face_width_b_mm")
+                    .and_then(|v| v.as_f64());
+                let beta = req
+                    .arguments
+                    .get("helix_angle_beta_deg")
+                    .and_then(|v| v.as_f64());
+                let rpm = req
+                    .arguments
+                    .get("pinion_speed_rpm")
+                    .and_then(|v| v.as_f64());
+                let power = req
+                    .arguments
+                    .get("transmitted_power_kw")
+                    .and_then(|v| v.as_f64());
                 self.cad_hardware_gear_pair(&CadHardwareGearPairRequest {
                     gear_type: gtype,
                     normal_module_mn: mn,
@@ -8739,14 +9321,38 @@ namespace AtlasCAD.Unity
                 })?
             }
             "cam.physics.cutting_force" => {
-                let op = req.arguments.get("operation").and_then(|v| v.as_str()).map(String::from);
-                let mat = req.arguments.get("workpiece").and_then(|v| v.as_str()).map(String::from);
-                let vc = req.arguments.get("cutting_speed_vc_m_per_min").and_then(|v| v.as_f64());
+                let op = req
+                    .arguments
+                    .get("operation")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let mat = req
+                    .arguments
+                    .get("workpiece")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let vc = req
+                    .arguments
+                    .get("cutting_speed_vc_m_per_min")
+                    .and_then(|v| v.as_f64());
                 let f = req.arguments.get("feed_f_mm").and_then(|v| v.as_f64());
-                let ap = req.arguments.get("depth_of_cut_ap_mm").and_then(|v| v.as_f64());
-                let ae = req.arguments.get("radial_width_ae_mm").and_then(|v| v.as_f64());
-                let dc = req.arguments.get("tool_diameter_dc_mm").and_then(|v| v.as_f64());
-                let z = req.arguments.get("number_of_teeth_z").and_then(|v| v.as_u64()).map(|v| v as u32);
+                let ap = req
+                    .arguments
+                    .get("depth_of_cut_ap_mm")
+                    .and_then(|v| v.as_f64());
+                let ae = req
+                    .arguments
+                    .get("radial_width_ae_mm")
+                    .and_then(|v| v.as_f64());
+                let dc = req
+                    .arguments
+                    .get("tool_diameter_dc_mm")
+                    .and_then(|v| v.as_f64());
+                let z = req
+                    .arguments
+                    .get("number_of_teeth_z")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as u32);
                 self.cam_cutting_force(&CamCuttingForceRequest {
                     operation: op,
                     workpiece: mat,
@@ -8761,13 +9367,35 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.electrical.short_circuit" => {
-                let un = req.arguments.get("nominal_voltage_un_v").and_then(|v| v.as_f64());
-                let sn = req.arguments.get("transformer_rated_power_sn_kva").and_then(|v| v.as_f64());
-                let uk = req.arguments.get("transformer_impedance_voltage_uk_percent").and_then(|v| v.as_f64());
-                let l = req.arguments.get("feeder_length_l_m").and_then(|v| v.as_f64());
-                let q = req.arguments.get("conductor_cross_section_q_mm2").and_then(|v| v.as_f64());
-                let mat = req.arguments.get("conductor_material").and_then(|v| v.as_str()).map(String::from);
-                let ib = req.arguments.get("operating_current_ib_a").and_then(|v| v.as_f64());
+                let un = req
+                    .arguments
+                    .get("nominal_voltage_un_v")
+                    .and_then(|v| v.as_f64());
+                let sn = req
+                    .arguments
+                    .get("transformer_rated_power_sn_kva")
+                    .and_then(|v| v.as_f64());
+                let uk = req
+                    .arguments
+                    .get("transformer_impedance_voltage_uk_percent")
+                    .and_then(|v| v.as_f64());
+                let l = req
+                    .arguments
+                    .get("feeder_length_l_m")
+                    .and_then(|v| v.as_f64());
+                let q = req
+                    .arguments
+                    .get("conductor_cross_section_q_mm2")
+                    .and_then(|v| v.as_f64());
+                let mat = req
+                    .arguments
+                    .get("conductor_material")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let ib = req
+                    .arguments
+                    .get("operating_current_ib_a")
+                    .and_then(|v| v.as_f64());
                 self.sim_electrical_short_circuit(&SimShortCircuitRequest {
                     nominal_voltage_un_v: un,
                     transformer_rated_power_sn_kva: sn,
@@ -8781,13 +9409,23 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.building.daylight_factor" => {
-                let sky = req.arguments.get("sky_type").and_then(|v| v.as_str()).map(String::from);
+                let sky = req
+                    .arguments
+                    .get("sky_type")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
                 let l = req.arguments.get("room_length_m").and_then(|v| v.as_f64());
                 let w = req.arguments.get("room_width_m").and_then(|v| v.as_f64());
                 let h = req.arguments.get("room_height_m").and_then(|v| v.as_f64());
                 let ww = req.arguments.get("window_width_m").and_then(|v| v.as_f64());
-                let wh = req.arguments.get("window_height_m").and_then(|v| v.as_f64());
-                let desk = req.arguments.get("desk_distance_from_window_m").and_then(|v| v.as_f64());
+                let wh = req
+                    .arguments
+                    .get("window_height_m")
+                    .and_then(|v| v.as_f64());
+                let desk = req
+                    .arguments
+                    .get("desk_distance_from_window_m")
+                    .and_then(|v| v.as_f64());
                 self.sim_building_daylight_factor(&SimDaylightingRequest {
                     sky_type: sky,
                     room_length_m: l,
@@ -8808,10 +9446,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "cad.hardware.shaft_key" => {
-                let p = req.arguments.get("transmitted_power_kw").and_then(|v| v.as_f64());
-                let n = req.arguments.get("rotational_speed_rpm").and_then(|v| v.as_f64());
-                let mb = req.arguments.get("bending_moment_nm").and_then(|v| v.as_f64());
-                let d = req.arguments.get("selected_shaft_diameter_mm").and_then(|v| v.as_f64());
+                let p = req
+                    .arguments
+                    .get("transmitted_power_kw")
+                    .and_then(|v| v.as_f64());
+                let n = req
+                    .arguments
+                    .get("rotational_speed_rpm")
+                    .and_then(|v| v.as_f64());
+                let mb = req
+                    .arguments
+                    .get("bending_moment_nm")
+                    .and_then(|v| v.as_f64());
+                let d = req
+                    .arguments
+                    .get("selected_shaft_diameter_mm")
+                    .and_then(|v| v.as_f64());
                 self.cad_hardware_shaft_key(&CadHardwareShaftKeyRequest {
                     shaft_name: None,
                     shaft_material: None,
@@ -8826,10 +9476,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.pressure_vessel.asme" => {
-                let p = req.arguments.get("design_pressure_bar").and_then(|v| v.as_f64());
-                let d = req.arguments.get("inside_diameter_d_mm").and_then(|v| v.as_f64());
-                let l = req.arguments.get("tangent_length_l_mm").and_then(|v| v.as_f64());
-                let ca = req.arguments.get("corrosion_allowance_mm").and_then(|v| v.as_f64());
+                let p = req
+                    .arguments
+                    .get("design_pressure_bar")
+                    .and_then(|v| v.as_f64());
+                let d = req
+                    .arguments
+                    .get("inside_diameter_d_mm")
+                    .and_then(|v| v.as_f64());
+                let l = req
+                    .arguments
+                    .get("tangent_length_l_mm")
+                    .and_then(|v| v.as_f64());
+                let ca = req
+                    .arguments
+                    .get("corrosion_allowance_mm")
+                    .and_then(|v| v.as_f64());
                 self.sim_pressure_vessel_asme(&SimPressureVesselRequest {
                     vessel_name: None,
                     material: None,
@@ -8845,8 +9507,14 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.thermal.psychrometrics" => {
-                let t = req.arguments.get("dry_bulb_temp_c").and_then(|v| v.as_f64());
-                let rh = req.arguments.get("relative_humidity").and_then(|v| v.as_f64());
+                let t = req
+                    .arguments
+                    .get("dry_bulb_temp_c")
+                    .and_then(|v| v.as_f64());
+                let rh = req
+                    .arguments
+                    .get("relative_humidity")
+                    .and_then(|v| v.as_f64());
                 self.sim_thermal_psychrometrics(&SimPsychrometricsRequest {
                     stream_name: None,
                     dry_bulb_temp_c: t,
@@ -8855,8 +9523,14 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.civil.hydrology" => {
-                let a = req.arguments.get("catchment_area_ha").and_then(|v| v.as_f64());
-                let l = req.arguments.get("flow_path_length_m").and_then(|v| v.as_f64());
+                let a = req
+                    .arguments
+                    .get("catchment_area_ha")
+                    .and_then(|v| v.as_f64());
+                let l = req
+                    .arguments
+                    .get("flow_path_length_m")
+                    .and_then(|v| v.as_f64());
                 let s_terr = req.arguments.get("terrain_slope").and_then(|v| v.as_f64());
                 let s_pipe = req.arguments.get("pipe_slope").and_then(|v| v.as_f64());
                 self.sim_civil_hydrology(&SimHydrologyRequest {
@@ -8873,8 +9547,14 @@ namespace AtlasCAD.Unity
             "sim.structural.fracture" => {
                 let s_max = req.arguments.get("max_stress_mpa").and_then(|v| v.as_f64());
                 let s_min = req.arguments.get("min_stress_mpa").and_then(|v| v.as_f64());
-                let a0 = req.arguments.get("initial_crack_depth_a0_mm").and_then(|v| v.as_f64());
-                let w = req.arguments.get("plate_width_w_mm").and_then(|v| v.as_f64());
+                let a0 = req
+                    .arguments
+                    .get("initial_crack_depth_a0_mm")
+                    .and_then(|v| v.as_f64());
+                let w = req
+                    .arguments
+                    .get("plate_width_w_mm")
+                    .and_then(|v| v.as_f64());
                 self.sim_structural_fracture(&SimFractureRequest {
                     component_name: None,
                     material: None,
@@ -8886,9 +9566,15 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.rotordynamics.api617" => {
-                let n_rpm = req.arguments.get("operating_speed_rpm").and_then(|v| v.as_f64());
+                let n_rpm = req
+                    .arguments
+                    .get("operating_speed_rpm")
+                    .and_then(|v| v.as_f64());
                 let l = req.arguments.get("shaft_span_m").and_then(|v| v.as_f64());
-                let d = req.arguments.get("shaft_diameter_m").and_then(|v| v.as_f64());
+                let d = req
+                    .arguments
+                    .get("shaft_diameter_m")
+                    .and_then(|v| v.as_f64());
                 let m = req.arguments.get("disc_mass_kg").and_then(|v| v.as_f64());
                 let u = req.arguments.get("unbalance_g_mm").and_then(|v| v.as_f64());
                 self.sim_rotordynamics_api617(&SimRotorDynamicsRequest {
@@ -8901,9 +9587,18 @@ namespace AtlasCAD.Unity
             }
             "cam.welding.metallurgy" => {
                 let v = req.arguments.get("arc_voltage_v").and_then(|v| v.as_f64());
-                let i = req.arguments.get("welding_current_a").and_then(|v| v.as_f64());
-                let s = req.arguments.get("travel_speed_mm_s").and_then(|v| v.as_f64());
-                let t = req.arguments.get("plate_thickness_mm").and_then(|v| v.as_f64());
+                let i = req
+                    .arguments
+                    .get("welding_current_a")
+                    .and_then(|v| v.as_f64());
+                let s = req
+                    .arguments
+                    .get("travel_speed_mm_s")
+                    .and_then(|v| v.as_f64());
+                let t = req
+                    .arguments
+                    .get("plate_thickness_mm")
+                    .and_then(|v| v.as_f64());
                 let tp = req.arguments.get("preheat_temp_c").and_then(|v| v.as_f64());
                 self.cam_welding_metallurgy(&CamWeldingRequest {
                     arc_voltage_v: v,
@@ -8915,12 +9610,30 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.chemical.distillation" => {
-                let f = req.arguments.get("feed_rate_kmol_hr").and_then(|v| v.as_f64());
-                let zf = req.arguments.get("feed_mole_fraction_zf").and_then(|v| v.as_f64());
-                let xd = req.arguments.get("distillate_mole_fraction_xd").and_then(|v| v.as_f64());
-                let xb = req.arguments.get("bottoms_mole_fraction_xb").and_then(|v| v.as_f64());
-                let a = req.arguments.get("relative_volatility_alpha").and_then(|v| v.as_f64());
-                let r_mult = req.arguments.get("reflux_multiplier").and_then(|v| v.as_f64());
+                let f = req
+                    .arguments
+                    .get("feed_rate_kmol_hr")
+                    .and_then(|v| v.as_f64());
+                let zf = req
+                    .arguments
+                    .get("feed_mole_fraction_zf")
+                    .and_then(|v| v.as_f64());
+                let xd = req
+                    .arguments
+                    .get("distillate_mole_fraction_xd")
+                    .and_then(|v| v.as_f64());
+                let xb = req
+                    .arguments
+                    .get("bottoms_mole_fraction_xb")
+                    .and_then(|v| v.as_f64());
+                let a = req
+                    .arguments
+                    .get("relative_volatility_alpha")
+                    .and_then(|v| v.as_f64());
+                let r_mult = req
+                    .arguments
+                    .get("reflux_multiplier")
+                    .and_then(|v| v.as_f64());
                 self.sim_chemical_distillation(&SimDistillationRequest {
                     feed_rate_kmol_hr: f,
                     feed_mole_fraction_zf: zf,
@@ -8932,10 +9645,19 @@ namespace AtlasCAD.Unity
             }
             "sim.ecad.pcb_thermal" => {
                 let w = req.arguments.get("trace_width_mm").and_then(|v| v.as_f64());
-                let l = req.arguments.get("trace_length_mm").and_then(|v| v.as_f64());
+                let l = req
+                    .arguments
+                    .get("trace_length_mm")
+                    .and_then(|v| v.as_f64());
                 let i = req.arguments.get("current_a").and_then(|v| v.as_f64());
-                let dt = req.arguments.get("allowable_temp_rise_c").and_then(|v| v.as_f64());
-                let p = req.arguments.get("component_heat_power_w").and_then(|v| v.as_f64());
+                let dt = req
+                    .arguments
+                    .get("allowable_temp_rise_c")
+                    .and_then(|v| v.as_f64());
+                let p = req
+                    .arguments
+                    .get("component_heat_power_w")
+                    .and_then(|v| v.as_f64());
                 self.sim_ecad_pcb_thermal(&SimPcbThermalRequest {
                     trace_width_mm: w,
                     trace_length_mm: l,
@@ -8946,11 +9668,23 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.structural.connections" => {
-                let v = req.arguments.get("applied_shear_force_kn").and_then(|v| v.as_f64());
-                let n = req.arguments.get("applied_tension_force_kn").and_then(|v| v.as_f64());
-                let a = req.arguments.get("weld_throat_thickness_mm").and_then(|v| v.as_f64());
+                let v = req
+                    .arguments
+                    .get("applied_shear_force_kn")
+                    .and_then(|v| v.as_f64());
+                let n = req
+                    .arguments
+                    .get("applied_tension_force_kn")
+                    .and_then(|v| v.as_f64());
+                let a = req
+                    .arguments
+                    .get("weld_throat_thickness_mm")
+                    .and_then(|v| v.as_f64());
                 let l = req.arguments.get("weld_length_mm").and_then(|v| v.as_f64());
-                let fw = req.arguments.get("applied_weld_force_kn").and_then(|v| v.as_f64());
+                let fw = req
+                    .arguments
+                    .get("applied_weld_force_kn")
+                    .and_then(|v| v.as_f64());
                 self.sim_structural_connections(&SimStructuralConnectionRequest {
                     applied_shear_force_kn: v,
                     applied_tension_force_kn: n,
@@ -8963,11 +9697,23 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.hydraulic.pump" => {
-                let n = req.arguments.get("nominal_speed_rpm").and_then(|v| v.as_f64());
-                let d = req.arguments.get("nominal_impeller_diameter_mm").and_then(|v| v.as_f64());
+                let n = req
+                    .arguments
+                    .get("nominal_speed_rpm")
+                    .and_then(|v| v.as_f64());
+                let d = req
+                    .arguments
+                    .get("nominal_impeller_diameter_mm")
+                    .and_then(|v| v.as_f64());
                 let h0 = req.arguments.get("shutoff_head_m").and_then(|v| v.as_f64());
-                let hstat = req.arguments.get("system_static_head_m").and_then(|v| v.as_f64());
-                let npsh = req.arguments.get("npsh_available_m").and_then(|v| v.as_f64());
+                let hstat = req
+                    .arguments
+                    .get("system_static_head_m")
+                    .and_then(|v| v.as_f64());
+                let npsh = req
+                    .arguments
+                    .get("npsh_available_m")
+                    .and_then(|v| v.as_f64());
                 self.sim_hydraulic_pump(&SimPumpRequest {
                     nominal_speed_rpm: n,
                     nominal_impeller_diameter_mm: d,
@@ -8978,10 +9724,23 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.thermal.heat_exchanger_rating" => {
-                let m_hot = req.arguments.get("hot_mass_flow_kg_s").and_then(|v| v.as_f64());
-                let m_cold = req.arguments.get("cold_mass_flow_kg_s").and_then(|v| v.as_f64());
-                let ds = req.arguments.get("shell_diameter_mm").and_then(|v| v.as_f64());
-                let nt = req.arguments.get("tube_count").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let m_hot = req
+                    .arguments
+                    .get("hot_mass_flow_kg_s")
+                    .and_then(|v| v.as_f64());
+                let m_cold = req
+                    .arguments
+                    .get("cold_mass_flow_kg_s")
+                    .and_then(|v| v.as_f64());
+                let ds = req
+                    .arguments
+                    .get("shell_diameter_mm")
+                    .and_then(|v| v.as_f64());
+                let nt = req
+                    .arguments
+                    .get("tube_count")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
                 let l = req.arguments.get("tube_length_m").and_then(|v| v.as_f64());
                 self.sim_heat_exchanger_rating(&SimHeatExchangerRatingRequest {
                     hot_mass_flow_kg_s: m_hot,
@@ -8993,11 +9752,26 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.civil.geotechnical_bearing" => {
-                let b = req.arguments.get("foundation_width_b_m").and_then(|v| v.as_f64());
-                let l = req.arguments.get("foundation_length_l_m").and_then(|v| v.as_f64());
-                let df = req.arguments.get("embedment_depth_df_m").and_then(|v| v.as_f64());
-                let p = req.arguments.get("column_axial_load_kn").and_then(|v| v.as_f64());
-                let phi = req.arguments.get("friction_angle_deg").and_then(|v| v.as_f64());
+                let b = req
+                    .arguments
+                    .get("foundation_width_b_m")
+                    .and_then(|v| v.as_f64());
+                let l = req
+                    .arguments
+                    .get("foundation_length_l_m")
+                    .and_then(|v| v.as_f64());
+                let df = req
+                    .arguments
+                    .get("embedment_depth_df_m")
+                    .and_then(|v| v.as_f64());
+                let p = req
+                    .arguments
+                    .get("column_axial_load_kn")
+                    .and_then(|v| v.as_f64());
+                let phi = req
+                    .arguments
+                    .get("friction_angle_deg")
+                    .and_then(|v| v.as_f64());
                 self.sim_geotechnical_bearing(&SimGeotechnicalBearingRequest {
                     foundation_width_b_m: b,
                     foundation_length_l_m: l,
@@ -9009,10 +9783,23 @@ namespace AtlasCAD.Unity
             }
             "sim.thermal.gas_compression" => {
                 let m = req.arguments.get("mass_flow_kg_s").and_then(|v| v.as_f64());
-                let p_in = req.arguments.get("inlet_pressure_bar").and_then(|v| v.as_f64());
-                let p_out = req.arguments.get("target_outlet_pressure_bar").and_then(|v| v.as_f64());
-                let n_st = req.arguments.get("number_of_stages").and_then(|v| v.as_u64()).map(|v| v as usize);
-                let eta = req.arguments.get("polytropic_efficiency").and_then(|v| v.as_f64());
+                let p_in = req
+                    .arguments
+                    .get("inlet_pressure_bar")
+                    .and_then(|v| v.as_f64());
+                let p_out = req
+                    .arguments
+                    .get("target_outlet_pressure_bar")
+                    .and_then(|v| v.as_f64());
+                let n_st = req
+                    .arguments
+                    .get("number_of_stages")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+                let eta = req
+                    .arguments
+                    .get("polytropic_efficiency")
+                    .and_then(|v| v.as_f64());
                 self.sim_gas_compression(&SimGasCompressionRequest {
                     mass_flow_kg_s: m,
                     inlet_pressure_bar: p_in,
@@ -9023,11 +9810,26 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.structural.timber_fire" => {
-                let b = req.arguments.get("initial_breadth_mm").and_then(|v| v.as_f64());
-                let h = req.arguments.get("initial_depth_mm").and_then(|v| v.as_f64());
-                let t_fire = req.arguments.get("fire_duration_min").and_then(|v| v.as_f64());
-                let med = req.arguments.get("ambient_moment_ed_kn_m").and_then(|v| v.as_f64());
-                let eta = req.arguments.get("fire_load_ratio_eta_fi").and_then(|v| v.as_f64());
+                let b = req
+                    .arguments
+                    .get("initial_breadth_mm")
+                    .and_then(|v| v.as_f64());
+                let h = req
+                    .arguments
+                    .get("initial_depth_mm")
+                    .and_then(|v| v.as_f64());
+                let t_fire = req
+                    .arguments
+                    .get("fire_duration_min")
+                    .and_then(|v| v.as_f64());
+                let med = req
+                    .arguments
+                    .get("ambient_moment_ed_kn_m")
+                    .and_then(|v| v.as_f64());
+                let eta = req
+                    .arguments
+                    .get("fire_load_ratio_eta_fi")
+                    .and_then(|v| v.as_f64());
                 self.sim_timber_fire(&SimTimberFireRequest {
                     initial_breadth_mm: b,
                     initial_depth_mm: h,
@@ -9039,9 +9841,18 @@ namespace AtlasCAD.Unity
             }
             "sim.marine.propeller" => {
                 let d = req.arguments.get("diameter_m").and_then(|v| v.as_f64());
-                let pd = req.arguments.get("pitch_ratio_p_d").and_then(|v| v.as_f64());
-                let n = req.arguments.get("rotational_speed_rpm").and_then(|v| v.as_f64());
-                let va = req.arguments.get("advance_speed_knots").and_then(|v| v.as_f64());
+                let pd = req
+                    .arguments
+                    .get("pitch_ratio_p_d")
+                    .and_then(|v| v.as_f64());
+                let n = req
+                    .arguments
+                    .get("rotational_speed_rpm")
+                    .and_then(|v| v.as_f64());
+                let va = req
+                    .arguments
+                    .get("advance_speed_knots")
+                    .and_then(|v| v.as_f64());
                 self.sim_marine_propeller(&SimMarinePropellerRequest {
                     diameter_m: d,
                     pitch_ratio_p_d: pd,
@@ -9051,10 +9862,19 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.automotive.braking" => {
-                let m = req.arguments.get("vehicle_mass_kg").and_then(|v| v.as_f64());
+                let m = req
+                    .arguments
+                    .get("vehicle_mass_kg")
+                    .and_then(|v| v.as_f64());
                 let l = req.arguments.get("wheelbase_m").and_then(|v| v.as_f64());
-                let v = req.arguments.get("initial_speed_kph").and_then(|v| v.as_f64());
-                let mu = req.arguments.get("road_friction_coeff").and_then(|v| v.as_f64());
+                let v = req
+                    .arguments
+                    .get("initial_speed_kph")
+                    .and_then(|v| v.as_f64());
+                let mu = req
+                    .arguments
+                    .get("road_friction_coeff")
+                    .and_then(|v| v.as_f64());
                 self.sim_automotive_braking(&SimAutomotiveBrakingRequest {
                     vehicle_mass_kg: m,
                     wheelbase_m: l,
@@ -9066,9 +9886,19 @@ namespace AtlasCAD.Unity
             "sim.civil.reinforced_concrete" => {
                 let b = req.arguments.get("breadth_b_mm").and_then(|v| v.as_f64());
                 let h = req.arguments.get("depth_h_mm").and_then(|v| v.as_f64());
-                let med = req.arguments.get("applied_moment_ed_kn_m").and_then(|v| v.as_f64());
-                let n_bars = req.arguments.get("rebar_count").and_then(|v| v.as_u64()).map(|v| v as usize);
-                let phi = req.arguments.get("rebar_diameter_mm").and_then(|v| v.as_f64());
+                let med = req
+                    .arguments
+                    .get("applied_moment_ed_kn_m")
+                    .and_then(|v| v.as_f64());
+                let n_bars = req
+                    .arguments
+                    .get("rebar_count")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+                let phi = req
+                    .arguments
+                    .get("rebar_diameter_mm")
+                    .and_then(|v| v.as_f64());
                 self.sim_civil_reinforced_concrete(&SimReinforcedConcreteRequest {
                     breadth_b_mm: b,
                     depth_h_mm: h,
@@ -9094,9 +9924,18 @@ namespace AtlasCAD.Unity
             "sim.aerospace.gas_turbine" => {
                 let m0 = req.arguments.get("flight_mach").and_then(|v| v.as_f64());
                 let alt = req.arguments.get("altitude_m").and_then(|v| v.as_f64());
-                let m_core = req.arguments.get("core_mass_flow_kg_s").and_then(|v| v.as_f64());
-                let opr = req.arguments.get("compressor_pressure_ratio").and_then(|v| v.as_f64());
-                let tit = req.arguments.get("turbine_inlet_temp_k").and_then(|v| v.as_f64());
+                let m_core = req
+                    .arguments
+                    .get("core_mass_flow_kg_s")
+                    .and_then(|v| v.as_f64());
+                let opr = req
+                    .arguments
+                    .get("compressor_pressure_ratio")
+                    .and_then(|v| v.as_f64());
+                let tit = req
+                    .arguments
+                    .get("turbine_inlet_temp_k")
+                    .and_then(|v| v.as_f64());
                 self.sim_aerospace_gas_turbine(&SimGasTurbineRequest {
                     flight_mach: m0,
                     altitude_m: alt,
@@ -9107,11 +9946,26 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.hydraulic.cylinder" => {
-                let bore = req.arguments.get("bore_diameter_mm").and_then(|v| v.as_f64());
-                let rod = req.arguments.get("rod_diameter_mm").and_then(|v| v.as_f64());
-                let stroke = req.arguments.get("stroke_length_mm").and_then(|v| v.as_f64());
-                let press = req.arguments.get("working_pressure_bar").and_then(|v| v.as_f64());
-                let wall = req.arguments.get("barrel_wall_thickness_mm").and_then(|v| v.as_f64());
+                let bore = req
+                    .arguments
+                    .get("bore_diameter_mm")
+                    .and_then(|v| v.as_f64());
+                let rod = req
+                    .arguments
+                    .get("rod_diameter_mm")
+                    .and_then(|v| v.as_f64());
+                let stroke = req
+                    .arguments
+                    .get("stroke_length_mm")
+                    .and_then(|v| v.as_f64());
+                let press = req
+                    .arguments
+                    .get("working_pressure_bar")
+                    .and_then(|v| v.as_f64());
+                let wall = req
+                    .arguments
+                    .get("barrel_wall_thickness_mm")
+                    .and_then(|v| v.as_f64());
                 self.sim_hydraulic_cylinder(&SimHydraulicCylinderRequest {
                     bore_diameter_mm: bore,
                     rod_diameter_mm: rod,
@@ -9123,10 +9977,22 @@ namespace AtlasCAD.Unity
             }
             "sim.mechanical.belt_drive" => {
                 let p = req.arguments.get("power_kw").and_then(|v| v.as_f64());
-                let n1 = req.arguments.get("driver_speed_rpm").and_then(|v| v.as_f64());
-                let d1 = req.arguments.get("driver_diameter_mm").and_then(|v| v.as_f64());
-                let d2 = req.arguments.get("driven_diameter_mm").and_then(|v| v.as_f64());
-                let c = req.arguments.get("center_distance_mm").and_then(|v| v.as_f64());
+                let n1 = req
+                    .arguments
+                    .get("driver_speed_rpm")
+                    .and_then(|v| v.as_f64());
+                let d1 = req
+                    .arguments
+                    .get("driver_diameter_mm")
+                    .and_then(|v| v.as_f64());
+                let d2 = req
+                    .arguments
+                    .get("driven_diameter_mm")
+                    .and_then(|v| v.as_f64());
+                let c = req
+                    .arguments
+                    .get("center_distance_mm")
+                    .and_then(|v| v.as_f64());
                 self.sim_mechanical_belt_drive(&SimBeltDriveRequest {
                     power_kw: p,
                     driver_speed_rpm: n1,
@@ -9138,10 +10004,22 @@ namespace AtlasCAD.Unity
             }
             "sim.geotechnical.slope_stability" => {
                 let h = req.arguments.get("slope_height_m").and_then(|v| v.as_f64());
-                let beta = req.arguments.get("slope_angle_deg").and_then(|v| v.as_f64());
-                let gamma = req.arguments.get("soil_unit_weight_kn_m3").and_then(|v| v.as_f64());
-                let c = req.arguments.get("effective_cohesion_kpa").and_then(|v| v.as_f64());
-                let phi = req.arguments.get("effective_friction_angle_deg").and_then(|v| v.as_f64());
+                let beta = req
+                    .arguments
+                    .get("slope_angle_deg")
+                    .and_then(|v| v.as_f64());
+                let gamma = req
+                    .arguments
+                    .get("soil_unit_weight_kn_m3")
+                    .and_then(|v| v.as_f64());
+                let c = req
+                    .arguments
+                    .get("effective_cohesion_kpa")
+                    .and_then(|v| v.as_f64());
+                let phi = req
+                    .arguments
+                    .get("effective_friction_angle_deg")
+                    .and_then(|v| v.as_f64());
                 self.sim_geotechnical_slope_stability(&SimSlopeStabilityRequest {
                     slope_height_m: h,
                     slope_angle_deg: beta,
@@ -9153,9 +10031,16 @@ namespace AtlasCAD.Unity
             }
             "sim.electrical.induction_motor" => {
                 let p = req.arguments.get("rated_power_kw").and_then(|v| v.as_f64());
-                let v = req.arguments.get("rated_voltage_ll_v").and_then(|v| v.as_f64());
+                let v = req
+                    .arguments
+                    .get("rated_voltage_ll_v")
+                    .and_then(|v| v.as_f64());
                 let f = req.arguments.get("frequency_hz").and_then(|v| v.as_f64());
-                let poles = req.arguments.get("pole_count").and_then(|v| v.as_u64()).map(|n| n as usize);
+                let poles = req
+                    .arguments
+                    .get("pole_count")
+                    .and_then(|v| v.as_u64())
+                    .map(|n| n as usize);
                 self.sim_electrical_induction_motor(&SimInductionMotorRequest {
                     rated_power_kw: p,
                     rated_voltage_ll_v: v,
@@ -9165,11 +10050,23 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.thermal.solar_collector" => {
-                let a = req.arguments.get("aperture_area_m2").and_then(|v| v.as_f64());
-                let g = req.arguments.get("solar_irradiance_w_m2").and_then(|v| v.as_f64());
+                let a = req
+                    .arguments
+                    .get("aperture_area_m2")
+                    .and_then(|v| v.as_f64());
+                let g = req
+                    .arguments
+                    .get("solar_irradiance_w_m2")
+                    .and_then(|v| v.as_f64());
                 let t_amb = req.arguments.get("ambient_temp_c").and_then(|v| v.as_f64());
-                let t_in = req.arguments.get("fluid_inlet_temp_c").and_then(|v| v.as_f64());
-                let m_dot = req.arguments.get("fluid_flow_rate_kg_s").and_then(|v| v.as_f64());
+                let t_in = req
+                    .arguments
+                    .get("fluid_inlet_temp_c")
+                    .and_then(|v| v.as_f64());
+                let m_dot = req
+                    .arguments
+                    .get("fluid_flow_rate_kg_s")
+                    .and_then(|v| v.as_f64());
                 self.sim_thermal_solar_collector(&SimSolarCollectorRequest {
                     aperture_area_m2: a,
                     solar_irradiance_w_m2: g,
@@ -9180,10 +10077,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.tribology.journal_bearing" => {
-                let d = req.arguments.get("journal_diameter_mm").and_then(|v| v.as_f64());
-                let l = req.arguments.get("bearing_length_mm").and_then(|v| v.as_f64());
-                let c = req.arguments.get("radial_clearance_um").and_then(|v| v.as_f64());
-                let rpm = req.arguments.get("rotational_speed_rpm").and_then(|v| v.as_f64());
+                let d = req
+                    .arguments
+                    .get("journal_diameter_mm")
+                    .and_then(|v| v.as_f64());
+                let l = req
+                    .arguments
+                    .get("bearing_length_mm")
+                    .and_then(|v| v.as_f64());
+                let c = req
+                    .arguments
+                    .get("radial_clearance_um")
+                    .and_then(|v| v.as_f64());
+                let rpm = req
+                    .arguments
+                    .get("rotational_speed_rpm")
+                    .and_then(|v| v.as_f64());
                 let load = req.arguments.get("radial_load_n").and_then(|v| v.as_f64());
                 self.sim_tribology_journal_bearing(&SimJournalBearingRequest {
                     journal_diameter_mm: d,
@@ -9197,8 +10106,14 @@ namespace AtlasCAD.Unity
             "sim.renewable.wind_turbine" => {
                 let r = req.arguments.get("rotor_radius_m").and_then(|v| v.as_f64());
                 let p = req.arguments.get("rated_power_mw").and_then(|v| v.as_f64());
-                let v_rated = req.arguments.get("rated_wind_speed_m_s").and_then(|v| v.as_f64());
-                let v_op = req.arguments.get("operating_wind_speed_m_s").and_then(|v| v.as_f64());
+                let v_rated = req
+                    .arguments
+                    .get("rated_wind_speed_m_s")
+                    .and_then(|v| v.as_f64());
+                let v_op = req
+                    .arguments
+                    .get("operating_wind_speed_m_s")
+                    .and_then(|v| v.as_f64());
                 self.sim_renewable_wind_turbine(&SimWindTurbineRequest {
                     rotor_radius_m: r,
                     rated_power_mw: p,
@@ -9208,10 +10123,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.thermal.steam_rankine" => {
-                let m = req.arguments.get("steam_mass_flow_kg_s").and_then(|v| v.as_f64());
-                let p_b = req.arguments.get("boiler_pressure_bar").and_then(|v| v.as_f64());
-                let t_sup = req.arguments.get("superheater_temp_c").and_then(|v| v.as_f64());
-                let p_c = req.arguments.get("condenser_pressure_bar").and_then(|v| v.as_f64());
+                let m = req
+                    .arguments
+                    .get("steam_mass_flow_kg_s")
+                    .and_then(|v| v.as_f64());
+                let p_b = req
+                    .arguments
+                    .get("boiler_pressure_bar")
+                    .and_then(|v| v.as_f64());
+                let t_sup = req
+                    .arguments
+                    .get("superheater_temp_c")
+                    .and_then(|v| v.as_f64());
+                let p_c = req
+                    .arguments
+                    .get("condenser_pressure_bar")
+                    .and_then(|v| v.as_f64());
                 self.sim_thermal_steam_rankine(&SimSteamRankineRequest {
                     steam_mass_flow_kg_s: m,
                     boiler_pressure_bar: p_b,
@@ -9221,9 +10148,15 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.civil.pile_foundation" => {
-                let d = req.arguments.get("pile_diameter_m").and_then(|v| v.as_f64());
+                let d = req
+                    .arguments
+                    .get("pile_diameter_m")
+                    .and_then(|v| v.as_f64());
                 let l = req.arguments.get("pile_length_m").and_then(|v| v.as_f64());
-                let load = req.arguments.get("applied_axial_load_kn").and_then(|v| v.as_f64());
+                let load = req
+                    .arguments
+                    .get("applied_axial_load_kn")
+                    .and_then(|v| v.as_f64());
                 self.sim_civil_pile_foundation(&SimPileFoundationRequest {
                     pile_diameter_m: d,
                     pile_length_m: l,
@@ -9232,11 +10165,28 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.mechanical.gear_fatigue" => {
-                let p = req.arguments.get("transmitted_power_kw").and_then(|v| v.as_f64());
-                let rpm = req.arguments.get("pinion_speed_rpm").and_then(|v| v.as_f64());
-                let z1 = req.arguments.get("pinion_teeth_z1").and_then(|v| v.as_u64()).map(|v| v as usize);
-                let z2 = req.arguments.get("gear_teeth_z2").and_then(|v| v.as_u64()).map(|v| v as usize);
-                let mn = req.arguments.get("normal_module_mm").and_then(|v| v.as_f64());
+                let p = req
+                    .arguments
+                    .get("transmitted_power_kw")
+                    .and_then(|v| v.as_f64());
+                let rpm = req
+                    .arguments
+                    .get("pinion_speed_rpm")
+                    .and_then(|v| v.as_f64());
+                let z1 = req
+                    .arguments
+                    .get("pinion_teeth_z1")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+                let z2 = req
+                    .arguments
+                    .get("gear_teeth_z2")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+                let mn = req
+                    .arguments
+                    .get("normal_module_mm")
+                    .and_then(|v| v.as_f64());
                 let b = req.arguments.get("face_width_mm").and_then(|v| v.as_f64());
                 self.sim_mechanical_gear_fatigue(&SimGearFatigueRequest {
                     transmitted_power_kw: p,
@@ -9249,10 +10199,24 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.energy.battery_thermal" => {
-                let ns = req.arguments.get("cell_count_series").and_then(|v| v.as_u64()).map(|v| v as usize);
-                let np = req.arguments.get("cell_count_parallel").and_then(|v| v.as_u64()).map(|v| v as usize);
-                let curr = req.arguments.get("operating_current_a").and_then(|v| v.as_f64());
-                let flow = req.arguments.get("coolant_flow_rate_l_min").and_then(|v| v.as_f64());
+                let ns = req
+                    .arguments
+                    .get("cell_count_series")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+                let np = req
+                    .arguments
+                    .get("cell_count_parallel")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+                let curr = req
+                    .arguments
+                    .get("operating_current_a")
+                    .and_then(|v| v.as_f64());
+                let flow = req
+                    .arguments
+                    .get("coolant_flow_rate_l_min")
+                    .and_then(|v| v.as_f64());
                 self.sim_energy_battery_thermal(&SimBatteryThermalRequest {
                     cell_count_series: ns,
                     cell_count_parallel: np,
@@ -9262,10 +10226,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.aerospace.rocket_nozzle" => {
-                let pc = req.arguments.get("chamber_pressure_bar").and_then(|v| v.as_f64());
-                let tc = req.arguments.get("chamber_temperature_k").and_then(|v| v.as_f64());
-                let dt = req.arguments.get("throat_diameter_mm").and_then(|v| v.as_f64());
-                let eps = req.arguments.get("expansion_ratio_eps").and_then(|v| v.as_f64());
+                let pc = req
+                    .arguments
+                    .get("chamber_pressure_bar")
+                    .and_then(|v| v.as_f64());
+                let tc = req
+                    .arguments
+                    .get("chamber_temperature_k")
+                    .and_then(|v| v.as_f64());
+                let dt = req
+                    .arguments
+                    .get("throat_diameter_mm")
+                    .and_then(|v| v.as_f64());
+                let eps = req
+                    .arguments
+                    .get("expansion_ratio_eps")
+                    .and_then(|v| v.as_f64());
                 self.sim_aerospace_rocket_nozzle(&SimRocketNozzleRequest {
                     chamber_pressure_bar: pc,
                     chamber_temperature_k: tc,
@@ -9275,9 +10251,18 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.chemical.cstr_reactor" => {
-                let vol = req.arguments.get("reactor_volume_m3").and_then(|v| v.as_f64());
-                let v0 = req.arguments.get("feed_volumetric_flow_m3_h").and_then(|v| v.as_f64());
-                let ca0 = req.arguments.get("feed_reactant_concentration_mol_m3").and_then(|v| v.as_f64());
+                let vol = req
+                    .arguments
+                    .get("reactor_volume_m3")
+                    .and_then(|v| v.as_f64());
+                let v0 = req
+                    .arguments
+                    .get("feed_volumetric_flow_m3_h")
+                    .and_then(|v| v.as_f64());
+                let ca0 = req
+                    .arguments
+                    .get("feed_reactant_concentration_mol_m3")
+                    .and_then(|v| v.as_f64());
                 self.sim_chemical_cstr_reactor(&SimCstrReactorRequest {
                     reactor_volume_m3: vol,
                     feed_volumetric_flow_m3_h: v0,
@@ -9288,7 +10273,10 @@ namespace AtlasCAD.Unity
             "sim.civil.channel_hydraulics" => {
                 let b = req.arguments.get("bottom_width_m").and_then(|v| v.as_f64());
                 let z = req.arguments.get("side_slope_z").and_then(|v| v.as_f64());
-                let q = req.arguments.get("discharge_rate_m3_s").and_then(|v| v.as_f64());
+                let q = req
+                    .arguments
+                    .get("discharge_rate_m3_s")
+                    .and_then(|v| v.as_f64());
                 let s0 = req.arguments.get("bed_slope_s0").and_then(|v| v.as_f64());
                 self.sim_civil_channel_hydraulics(&SimChannelHydraulicsRequest {
                     bottom_width_m: b,
@@ -9300,9 +10288,18 @@ namespace AtlasCAD.Unity
             }
             "sim.electrical.transmission_line" => {
                 let span = req.arguments.get("span_length_m").and_then(|v| v.as_f64());
-                let d = req.arguments.get("conductor_diameter_mm").and_then(|v| v.as_f64());
-                let rts = req.arguments.get("rated_tensile_strength_kn").and_then(|v| v.as_f64());
-                let h0 = req.arguments.get("initial_horizontal_tension_kn").and_then(|v| v.as_f64());
+                let d = req
+                    .arguments
+                    .get("conductor_diameter_mm")
+                    .and_then(|v| v.as_f64());
+                let rts = req
+                    .arguments
+                    .get("rated_tensile_strength_kn")
+                    .and_then(|v| v.as_f64());
+                let h0 = req
+                    .arguments
+                    .get("initial_horizontal_tension_kn")
+                    .and_then(|v| v.as_f64());
                 self.sim_electrical_transmission_line(&SimTransmissionLineRequest {
                     span_length_m: span,
                     conductor_diameter_mm: d,
@@ -9312,10 +10309,25 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.piping.flexibility" => {
-                let od = req.arguments.get("nominal_outside_diameter_mm").or_else(|| req.arguments.get("pipe_outer_diameter_mm")).and_then(|v| v.as_f64());
-                let l = req.arguments.get("anchor_distance_m").or_else(|| req.arguments.get("total_line_length_m")).and_then(|v| v.as_f64());
-                let t = req.arguments.get("design_temperature_c").and_then(|v| v.as_f64());
-                let h = req.arguments.get("loop_height_m").or_else(|| req.arguments.get("expansion_loop_height_m")).and_then(|v| v.as_f64());
+                let od = req
+                    .arguments
+                    .get("nominal_outside_diameter_mm")
+                    .or_else(|| req.arguments.get("pipe_outer_diameter_mm"))
+                    .and_then(|v| v.as_f64());
+                let l = req
+                    .arguments
+                    .get("anchor_distance_m")
+                    .or_else(|| req.arguments.get("total_line_length_m"))
+                    .and_then(|v| v.as_f64());
+                let t = req
+                    .arguments
+                    .get("design_temperature_c")
+                    .and_then(|v| v.as_f64());
+                let h = req
+                    .arguments
+                    .get("loop_height_m")
+                    .or_else(|| req.arguments.get("expansion_loop_height_m"))
+                    .and_then(|v| v.as_f64());
                 self.sim_piping_flexibility(&SimPipingFlexibilityRequest {
                     nominal_outside_diameter_mm: od,
                     anchor_distance_m: l,
@@ -9326,11 +10338,28 @@ namespace AtlasCAD.Unity
             }
             "sim.automotive.quarter_car" => {
                 let ms = req.arguments.get("sprung_mass_kg").and_then(|v| v.as_f64());
-                let mu = req.arguments.get("unsprung_mass_kg").and_then(|v| v.as_f64());
-                let ks = req.arguments.get("suspension_stiffness_n_m").and_then(|v| v.as_f64());
-                let cs = req.arguments.get("suspension_damping_n_s_m").and_then(|v| v.as_f64());
-                let v = req.arguments.get("vehicle_speed_km_h").and_then(|v| v.as_f64());
-                let road = req.arguments.get("road_class").or_else(|| req.arguments.get("road_roughness_class")).and_then(|v| v.as_str()).map(|s| s.to_string());
+                let mu = req
+                    .arguments
+                    .get("unsprung_mass_kg")
+                    .and_then(|v| v.as_f64());
+                let ks = req
+                    .arguments
+                    .get("suspension_stiffness_n_m")
+                    .and_then(|v| v.as_f64());
+                let cs = req
+                    .arguments
+                    .get("suspension_damping_n_s_m")
+                    .and_then(|v| v.as_f64());
+                let v = req
+                    .arguments
+                    .get("vehicle_speed_km_h")
+                    .and_then(|v| v.as_f64());
+                let road = req
+                    .arguments
+                    .get("road_class")
+                    .or_else(|| req.arguments.get("road_roughness_class"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
                 self.sim_automotive_quarter_car(&SimQuarterCarRequest {
                     sprung_mass_kg: ms,
                     unsprung_mass_kg: mu,
@@ -9342,10 +10371,24 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.electrical.power_transformer" => {
-                let s = req.arguments.get("rated_apparent_power_mva").or_else(|| req.arguments.get("rated_power_mva")).and_then(|v| v.as_f64());
-                let v1 = req.arguments.get("primary_voltage_kv").and_then(|v| v.as_f64());
-                let v2 = req.arguments.get("secondary_voltage_kv").and_then(|v| v.as_f64());
-                let z = req.arguments.get("percent_impedance_z").or_else(|| req.arguments.get("percent_impedance")).and_then(|v| v.as_f64());
+                let s = req
+                    .arguments
+                    .get("rated_apparent_power_mva")
+                    .or_else(|| req.arguments.get("rated_power_mva"))
+                    .and_then(|v| v.as_f64());
+                let v1 = req
+                    .arguments
+                    .get("primary_voltage_kv")
+                    .and_then(|v| v.as_f64());
+                let v2 = req
+                    .arguments
+                    .get("secondary_voltage_kv")
+                    .and_then(|v| v.as_f64());
+                let z = req
+                    .arguments
+                    .get("percent_impedance_z")
+                    .or_else(|| req.arguments.get("percent_impedance"))
+                    .and_then(|v| v.as_f64());
                 self.sim_electrical_power_transformer(&SimPowerTransformerRequest {
                     rated_apparent_power_mva: s,
                     primary_voltage_kv: v1,
@@ -9355,10 +10398,23 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.thermal.refrigeration_cycle" => {
-                let ref_str = req.arguments.get("refrigerant").and_then(|v| v.as_str()).map(|s| s.to_string());
-                let q = req.arguments.get("design_cooling_capacity_kw").and_then(|v| v.as_f64());
-                let t_e = req.arguments.get("evaporating_temperature_c").and_then(|v| v.as_f64());
-                let t_c = req.arguments.get("condensing_temperature_c").and_then(|v| v.as_f64());
+                let ref_str = req
+                    .arguments
+                    .get("refrigerant")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let q = req
+                    .arguments
+                    .get("design_cooling_capacity_kw")
+                    .and_then(|v| v.as_f64());
+                let t_e = req
+                    .arguments
+                    .get("evaporating_temperature_c")
+                    .and_then(|v| v.as_f64());
+                let t_c = req
+                    .arguments
+                    .get("condensing_temperature_c")
+                    .and_then(|v| v.as_f64());
                 self.sim_thermal_refrigeration_cycle(&SimRefrigerationCycleRequest {
                     refrigerant: ref_str,
                     design_cooling_capacity_kw: q,
@@ -9368,10 +10424,25 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.marine.ship_stability" => {
-                let lbp = req.arguments.get("length_between_perpendiculars_m").or_else(|| req.arguments.get("length_bp_m")).and_then(|v| v.as_f64());
-                let b = req.arguments.get("molded_beam_m").or_else(|| req.arguments.get("beam_m")).and_then(|v| v.as_f64());
-                let t = req.arguments.get("design_draft_m").or_else(|| req.arguments.get("draft_m")).and_then(|v| v.as_f64());
-                let kg = req.arguments.get("vertical_center_of_gravity_kg_m").and_then(|v| v.as_f64());
+                let lbp = req
+                    .arguments
+                    .get("length_between_perpendiculars_m")
+                    .or_else(|| req.arguments.get("length_bp_m"))
+                    .and_then(|v| v.as_f64());
+                let b = req
+                    .arguments
+                    .get("molded_beam_m")
+                    .or_else(|| req.arguments.get("beam_m"))
+                    .and_then(|v| v.as_f64());
+                let t = req
+                    .arguments
+                    .get("design_draft_m")
+                    .or_else(|| req.arguments.get("draft_m"))
+                    .and_then(|v| v.as_f64());
+                let kg = req
+                    .arguments
+                    .get("vertical_center_of_gravity_kg_m")
+                    .and_then(|v| v.as_f64());
                 self.sim_marine_ship_stability(&SimShipStabilityRequest {
                     length_between_perpendiculars_m: lbp,
                     molded_beam_m: b,
@@ -9381,11 +10452,27 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.manufacturing.injection_molding" => {
-                let resin = req.arguments.get("resin").and_then(|v| v.as_str()).map(|s| s.to_string());
-                let h = req.arguments.get("nominal_wall_thickness_mm").and_then(|v| v.as_f64());
-                let a = req.arguments.get("projected_area_cm2").and_then(|v| v.as_f64());
-                let vol = req.arguments.get("cavity_volume_cm3").and_then(|v| v.as_f64());
-                let l = req.arguments.get("max_flow_length_mm").and_then(|v| v.as_f64());
+                let resin = req
+                    .arguments
+                    .get("resin")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let h = req
+                    .arguments
+                    .get("nominal_wall_thickness_mm")
+                    .and_then(|v| v.as_f64());
+                let a = req
+                    .arguments
+                    .get("projected_area_cm2")
+                    .and_then(|v| v.as_f64());
+                let vol = req
+                    .arguments
+                    .get("cavity_volume_cm3")
+                    .and_then(|v| v.as_f64());
+                let l = req
+                    .arguments
+                    .get("max_flow_length_mm")
+                    .and_then(|v| v.as_f64());
                 self.sim_manufacturing_injection_molding(&SimInjectionMoldingRequest {
                     resin,
                     nominal_wall_thickness_mm: h,
@@ -9396,11 +10483,27 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.civil.seismic_analysis" => {
-                let hn = req.arguments.get("building_height_m").and_then(|v| v.as_f64());
-                let n = req.arguments.get("story_count").and_then(|v| v.as_u64()).map(|v| v as usize);
-                let w = req.arguments.get("total_seismic_weight_kn").and_then(|v| v.as_f64());
-                let ss = req.arguments.get("short_period_spectral_accel_ss_g").and_then(|v| v.as_f64());
-                let s1 = req.arguments.get("one_second_spectral_accel_s1_g").and_then(|v| v.as_f64());
+                let hn = req
+                    .arguments
+                    .get("building_height_m")
+                    .and_then(|v| v.as_f64());
+                let n = req
+                    .arguments
+                    .get("story_count")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+                let w = req
+                    .arguments
+                    .get("total_seismic_weight_kn")
+                    .and_then(|v| v.as_f64());
+                let ss = req
+                    .arguments
+                    .get("short_period_spectral_accel_ss_g")
+                    .and_then(|v| v.as_f64());
+                let s1 = req
+                    .arguments
+                    .get("one_second_spectral_accel_s1_g")
+                    .and_then(|v| v.as_f64());
                 self.sim_civil_seismic_analysis(&SimSeismicAnalysisRequest {
                     building_height_m: hn,
                     story_count: n,
@@ -9411,10 +10514,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.aerospace.orbital_mechanics" => {
-                let h1 = req.arguments.get("initial_altitude_km").and_then(|v| v.as_f64());
-                let h2 = req.arguments.get("target_altitude_km").and_then(|v| v.as_f64());
-                let m = req.arguments.get("spacecraft_wet_mass_kg").and_then(|v| v.as_f64());
-                let isp = req.arguments.get("propulsion_isp_s").and_then(|v| v.as_f64());
+                let h1 = req
+                    .arguments
+                    .get("initial_altitude_km")
+                    .and_then(|v| v.as_f64());
+                let h2 = req
+                    .arguments
+                    .get("target_altitude_km")
+                    .and_then(|v| v.as_f64());
+                let m = req
+                    .arguments
+                    .get("spacecraft_wet_mass_kg")
+                    .and_then(|v| v.as_f64());
+                let isp = req
+                    .arguments
+                    .get("propulsion_isp_s")
+                    .and_then(|v| v.as_f64());
                 self.sim_aerospace_orbital_mechanics(&SimOrbitalMechanicsRequest {
                     initial_altitude_km: h1,
                     target_altitude_km: h2,
@@ -9424,10 +10539,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.electronics.dc_dc_converter" => {
-                let vin = req.arguments.get("input_voltage_v").and_then(|v| v.as_f64());
-                let vout = req.arguments.get("output_voltage_v").and_then(|v| v.as_f64());
-                let iout = req.arguments.get("rated_output_current_a").and_then(|v| v.as_f64());
-                let fsw = req.arguments.get("switching_frequency_hz").and_then(|v| v.as_f64());
+                let vin = req
+                    .arguments
+                    .get("input_voltage_v")
+                    .and_then(|v| v.as_f64());
+                let vout = req
+                    .arguments
+                    .get("output_voltage_v")
+                    .and_then(|v| v.as_f64());
+                let iout = req
+                    .arguments
+                    .get("rated_output_current_a")
+                    .and_then(|v| v.as_f64());
+                let fsw = req
+                    .arguments
+                    .get("switching_frequency_hz")
+                    .and_then(|v| v.as_f64());
                 self.sim_electronics_dc_dc_converter(&SimDcDcConverterRequest {
                     input_voltage_v: vin,
                     output_voltage_v: vout,
@@ -9437,10 +10564,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.science.fusion_tokamak" => {
-                let r0 = req.arguments.get("major_radius_r0_m").and_then(|v| v.as_f64());
-                let a = req.arguments.get("minor_radius_a_m").and_then(|v| v.as_f64());
-                let bt = req.arguments.get("toroidal_magnetic_field_t").and_then(|v| v.as_f64());
-                let ip = req.arguments.get("plasma_current_ma").and_then(|v| v.as_f64());
+                let r0 = req
+                    .arguments
+                    .get("major_radius_r0_m")
+                    .and_then(|v| v.as_f64());
+                let a = req
+                    .arguments
+                    .get("minor_radius_a_m")
+                    .and_then(|v| v.as_f64());
+                let bt = req
+                    .arguments
+                    .get("toroidal_magnetic_field_t")
+                    .and_then(|v| v.as_f64());
+                let ip = req
+                    .arguments
+                    .get("plasma_current_ma")
+                    .and_then(|v| v.as_f64());
                 self.sim_science_fusion_tokamak(&SimFusionTokamakRequest {
                     major_radius_r0_m: r0,
                     minor_radius_a_m: a,
@@ -9450,10 +10589,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.manufacturing.wire_edm" => {
-                let thick = req.arguments.get("workpiece_thickness_mm").and_then(|v| v.as_f64());
-                let dw = req.arguments.get("wire_diameter_mm").and_then(|v| v.as_f64());
-                let u0 = req.arguments.get("open_circuit_voltage_v").and_then(|v| v.as_f64());
-                let ie = req.arguments.get("discharge_current_a").and_then(|v| v.as_f64());
+                let thick = req
+                    .arguments
+                    .get("workpiece_thickness_mm")
+                    .and_then(|v| v.as_f64());
+                let dw = req
+                    .arguments
+                    .get("wire_diameter_mm")
+                    .and_then(|v| v.as_f64());
+                let u0 = req
+                    .arguments
+                    .get("open_circuit_voltage_v")
+                    .and_then(|v| v.as_f64());
+                let ie = req
+                    .arguments
+                    .get("discharge_current_a")
+                    .and_then(|v| v.as_f64());
                 self.sim_manufacturing_wire_edm(&SimWireEdmRequest {
                     workpiece_thickness_mm: thick,
                     wire_diameter_mm: dw,
@@ -9464,8 +10615,14 @@ namespace AtlasCAD.Unity
             }
             "sim.renewable.wind_blade_aeroelastic" => {
                 let l = req.arguments.get("blade_length_m").and_then(|v| v.as_f64());
-                let rpm = req.arguments.get("rated_rotor_speed_rpm").and_then(|v| v.as_f64());
-                let vgust = req.arguments.get("extreme_gust_speed_m_s").and_then(|v| v.as_f64());
+                let rpm = req
+                    .arguments
+                    .get("rated_rotor_speed_rpm")
+                    .and_then(|v| v.as_f64());
+                let vgust = req
+                    .arguments
+                    .get("extreme_gust_speed_m_s")
+                    .and_then(|v| v.as_f64());
                 self.sim_renewable_wind_blade_aeroelastic(&SimWindBladeRequest {
                     blade_length_m: l,
                     rated_rotor_speed_rpm: rpm,
@@ -9474,10 +10631,19 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.marine.subsea_pipeline" => {
-                let do_mm = req.arguments.get("outside_diameter_mm").and_then(|v| v.as_f64());
-                let t_mm = req.arguments.get("nominal_wall_thickness_mm").and_then(|v| v.as_f64());
+                let do_mm = req
+                    .arguments
+                    .get("outside_diameter_mm")
+                    .and_then(|v| v.as_f64());
+                let t_mm = req
+                    .arguments
+                    .get("nominal_wall_thickness_mm")
+                    .and_then(|v| v.as_f64());
                 let depth = req.arguments.get("water_depth_m").and_then(|v| v.as_f64());
-                let pi = req.arguments.get("internal_design_pressure_mpa").and_then(|v| v.as_f64());
+                let pi = req
+                    .arguments
+                    .get("internal_design_pressure_mpa")
+                    .and_then(|v| v.as_f64());
                 self.sim_marine_subsea_pipeline(&SimSubseaPipelineRequest {
                     outside_diameter_mm: do_mm,
                     nominal_wall_thickness_mm: t_mm,
@@ -9487,10 +10653,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.aerospace.combustor_aerothermal" => {
-                let p3 = req.arguments.get("inlet_total_pressure_mpa").and_then(|v| v.as_f64());
-                let t3 = req.arguments.get("inlet_total_temperature_k").and_then(|v| v.as_f64());
-                let m_a = req.arguments.get("air_mass_flow_kg_s").and_then(|v| v.as_f64());
-                let m_f = req.arguments.get("fuel_mass_flow_kg_s").and_then(|v| v.as_f64());
+                let p3 = req
+                    .arguments
+                    .get("inlet_total_pressure_mpa")
+                    .and_then(|v| v.as_f64());
+                let t3 = req
+                    .arguments
+                    .get("inlet_total_temperature_k")
+                    .and_then(|v| v.as_f64());
+                let m_a = req
+                    .arguments
+                    .get("air_mass_flow_kg_s")
+                    .and_then(|v| v.as_f64());
+                let m_f = req
+                    .arguments
+                    .get("fuel_mass_flow_kg_s")
+                    .and_then(|v| v.as_f64());
                 self.sim_aerospace_combustor_aerothermal(&SimCombustorRequest {
                     inlet_total_pressure_mpa: p3,
                     inlet_total_temperature_k: t3,
@@ -9500,7 +10678,10 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.energy.bess_grid" => {
-                let cap = req.arguments.get("nominal_capacity_mwh").and_then(|v| v.as_f64());
+                let cap = req
+                    .arguments
+                    .get("nominal_capacity_mwh")
+                    .and_then(|v| v.as_f64());
                 let p_mw = req.arguments.get("rated_power_mw").and_then(|v| v.as_f64());
                 let c_rt = req.arguments.get("c_rate").and_then(|v| v.as_f64());
                 self.sim_energy_bess_grid(&SimBessGridRequest {
@@ -9511,9 +10692,18 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.geotechnical.soil_consolidation" => {
-                let h0 = req.arguments.get("layer_thickness_m").and_then(|v| v.as_f64());
-                let s0 = req.arguments.get("initial_effective_stress_kpa").and_then(|v| v.as_f64());
-                let ds = req.arguments.get("applied_stress_increment_kpa").and_then(|v| v.as_f64());
+                let h0 = req
+                    .arguments
+                    .get("layer_thickness_m")
+                    .and_then(|v| v.as_f64());
+                let s0 = req
+                    .arguments
+                    .get("initial_effective_stress_kpa")
+                    .and_then(|v| v.as_f64());
+                let ds = req
+                    .arguments
+                    .get("applied_stress_increment_kpa")
+                    .and_then(|v| v.as_f64());
                 self.sim_geotechnical_soil_consolidation(&SimSoilConsolidationRequest {
                     layer_thickness_m: h0,
                     initial_effective_stress_kpa: s0,
@@ -9524,7 +10714,10 @@ namespace AtlasCAD.Unity
             "sim.energy.hydraulic_turbine" => {
                 let h = req.arguments.get("net_head_m").and_then(|v| v.as_f64());
                 let q = req.arguments.get("flow_rate_m3_s").and_then(|v| v.as_f64());
-                let d = req.arguments.get("runner_diameter_m").and_then(|v| v.as_f64());
+                let d = req
+                    .arguments
+                    .get("runner_diameter_m")
+                    .and_then(|v| v.as_f64());
                 self.sim_energy_hydraulic_turbine(&SimHydraulicTurbineRequest {
                     net_head_m: h,
                     flow_rate_m3_s: q,
@@ -9533,8 +10726,14 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.biomedical.stent_expansion" => {
-                let d_exp = req.arguments.get("nominal_expanded_diameter_mm").and_then(|v| v.as_f64());
-                let p_atm = req.arguments.get("balloon_pressure_atm").and_then(|v| v.as_f64());
+                let d_exp = req
+                    .arguments
+                    .get("nominal_expanded_diameter_mm")
+                    .and_then(|v| v.as_f64());
+                let p_atm = req
+                    .arguments
+                    .get("balloon_pressure_atm")
+                    .and_then(|v| v.as_f64());
                 self.sim_biomedical_stent_expansion(&SimStentExpansionRequest {
                     nominal_expanded_diameter_mm: d_exp,
                     balloon_pressure_atm: p_atm,
@@ -9542,9 +10741,18 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.electronics.microwave_waveguide" => {
-                let a = req.arguments.get("broad_dimension_a_mm").and_then(|v| v.as_f64());
-                let b = req.arguments.get("narrow_dimension_b_mm").and_then(|v| v.as_f64());
-                let f = req.arguments.get("operating_frequency_ghz").and_then(|v| v.as_f64());
+                let a = req
+                    .arguments
+                    .get("broad_dimension_a_mm")
+                    .and_then(|v| v.as_f64());
+                let b = req
+                    .arguments
+                    .get("narrow_dimension_b_mm")
+                    .and_then(|v| v.as_f64());
+                let f = req
+                    .arguments
+                    .get("operating_frequency_ghz")
+                    .and_then(|v| v.as_f64());
                 self.sim_electronics_microwave_waveguide(&SimMicrowaveWaveguideRequest {
                     broad_dimension_a_mm: a,
                     narrow_dimension_b_mm: b,
@@ -9553,10 +10761,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.electrical.gis_dielectric" => {
-                let v_kv = req.arguments.get("rated_voltage_kv_rms").and_then(|v| v.as_f64());
-                let r1 = req.arguments.get("conductor_radius_mm").and_then(|v| v.as_f64());
-                let r2 = req.arguments.get("enclosure_radius_mm").and_then(|v| v.as_f64());
-                let p_bar = req.arguments.get("gas_pressure_abs_bar").and_then(|v| v.as_f64());
+                let v_kv = req
+                    .arguments
+                    .get("rated_voltage_kv_rms")
+                    .and_then(|v| v.as_f64());
+                let r1 = req
+                    .arguments
+                    .get("conductor_radius_mm")
+                    .and_then(|v| v.as_f64());
+                let r2 = req
+                    .arguments
+                    .get("enclosure_radius_mm")
+                    .and_then(|v| v.as_f64());
+                let p_bar = req
+                    .arguments
+                    .get("gas_pressure_abs_bar")
+                    .and_then(|v| v.as_f64());
                 self.sim_electrical_gis_dielectric(&SimGisDielectricRequest {
                     rated_voltage_kv_rms: v_kv,
                     conductor_radius_mm: r1,
@@ -9566,10 +10786,23 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.energy.pem_fuel_cell" => {
-                let n_c = req.arguments.get("cell_count").and_then(|v| v.as_u64()).map(|v| v as u32);
-                let a_cm2 = req.arguments.get("active_cell_area_cm2").and_then(|v| v.as_f64());
-                let t_c = req.arguments.get("operating_temperature_c").and_then(|v| v.as_f64());
-                let i_dens = req.arguments.get("operating_current_density_a_cm2").and_then(|v| v.as_f64());
+                let n_c = req
+                    .arguments
+                    .get("cell_count")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as u32);
+                let a_cm2 = req
+                    .arguments
+                    .get("active_cell_area_cm2")
+                    .and_then(|v| v.as_f64());
+                let t_c = req
+                    .arguments
+                    .get("operating_temperature_c")
+                    .and_then(|v| v.as_f64());
+                let i_dens = req
+                    .arguments
+                    .get("operating_current_density_a_cm2")
+                    .and_then(|v| v.as_f64());
                 self.sim_energy_pem_fuel_cell(&SimPemFuelCellRequest {
                     cell_count: n_c,
                     active_cell_area_cm2: a_cm2,
@@ -9582,8 +10815,15 @@ namespace AtlasCAD.Unity
                 let r1 = req.arguments.get("inner_radius_m").and_then(|v| v.as_f64());
                 let r2 = req.arguments.get("outer_radius_m").and_then(|v| v.as_f64());
                 let l_m = req.arguments.get("coil_length_m").and_then(|v| v.as_f64());
-                let n_t = req.arguments.get("turns_count").and_then(|v| v.as_u64()).map(|v| v as u32);
-                let i_op = req.arguments.get("operating_current_a").and_then(|v| v.as_f64());
+                let n_t = req
+                    .arguments
+                    .get("turns_count")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as u32);
+                let i_op = req
+                    .arguments
+                    .get("operating_current_a")
+                    .and_then(|v| v.as_f64());
                 self.sim_science_superconducting_magnet(&SimSuperconductingMagnetRequest {
                     inner_radius_m: r1,
                     outer_radius_m: r2,
@@ -9594,10 +10834,16 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.aerospace.reentry_aerothermodynamics" => {
-                let v_inf = req.arguments.get("freestream_velocity_m_s").and_then(|v| v.as_f64());
+                let v_inf = req
+                    .arguments
+                    .get("freestream_velocity_m_s")
+                    .and_then(|v| v.as_f64());
                 let alt = req.arguments.get("altitude_km").and_then(|v| v.as_f64());
                 let r_n = req.arguments.get("nose_radius_m").and_then(|v| v.as_f64());
-                let m_kg = req.arguments.get("vehicle_mass_kg").and_then(|v| v.as_f64());
+                let m_kg = req
+                    .arguments
+                    .get("vehicle_mass_kg")
+                    .and_then(|v| v.as_f64());
                 self.sim_aerospace_reentry_aerothermodynamics(&SimReentryRequest {
                     freestream_velocity_m_s: v_inf,
                     altitude_km: alt,
@@ -9608,9 +10854,18 @@ namespace AtlasCAD.Unity
             }
             "sim.manufacturing.lpbf_meltpool" => {
                 let p_w = req.arguments.get("laser_power_w").and_then(|v| v.as_f64());
-                let v_s = req.arguments.get("scan_speed_mm_s").and_then(|v| v.as_f64());
-                let d_b = req.arguments.get("beam_diameter_um").and_then(|v| v.as_f64());
-                let t_l = req.arguments.get("layer_thickness_um").and_then(|v| v.as_f64());
+                let v_s = req
+                    .arguments
+                    .get("scan_speed_mm_s")
+                    .and_then(|v| v.as_f64());
+                let d_b = req
+                    .arguments
+                    .get("beam_diameter_um")
+                    .and_then(|v| v.as_f64());
+                let t_l = req
+                    .arguments
+                    .get("layer_thickness_um")
+                    .and_then(|v| v.as_f64());
                 self.sim_manufacturing_lpbf_meltpool(&SimLpbfRequest {
                     laser_power_w: p_w,
                     scan_speed_mm_s: v_s,
@@ -9620,10 +10875,23 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.acoustics.phononic_bandgap" => {
-                let n_c = req.arguments.get("unit_cell_count").and_then(|v| v.as_u64()).map(|v| v as u32);
-                let d_a = req.arguments.get("layer_a_thickness_mm").and_then(|v| v.as_f64());
-                let d_b = req.arguments.get("layer_b_thickness_mm").and_then(|v| v.as_f64());
-                let f_hz = req.arguments.get("excitation_frequency_hz").and_then(|v| v.as_f64());
+                let n_c = req
+                    .arguments
+                    .get("unit_cell_count")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as u32);
+                let d_a = req
+                    .arguments
+                    .get("layer_a_thickness_mm")
+                    .and_then(|v| v.as_f64());
+                let d_b = req
+                    .arguments
+                    .get("layer_b_thickness_mm")
+                    .and_then(|v| v.as_f64());
+                let f_hz = req
+                    .arguments
+                    .get("excitation_frequency_hz")
+                    .and_then(|v| v.as_f64());
                 self.sim_acoustics_phononic_bandgap(&SimPhononicCrystalRequest {
                     unit_cell_count: n_c,
                     layer_a_thickness_mm: d_a,
@@ -9633,10 +10901,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.rail.wheel_rail_contact" => {
-                let load_kn = req.arguments.get("wheel_vertical_load_kn").and_then(|v| v.as_f64());
-                let r_w = req.arguments.get("wheel_radius_mm").and_then(|v| v.as_f64());
-                let r_r = req.arguments.get("rail_crown_radius_mm").and_then(|v| v.as_f64());
-                let v_kmh = req.arguments.get("train_speed_km_h").and_then(|v| v.as_f64());
+                let load_kn = req
+                    .arguments
+                    .get("wheel_vertical_load_kn")
+                    .and_then(|v| v.as_f64());
+                let r_w = req
+                    .arguments
+                    .get("wheel_radius_mm")
+                    .and_then(|v| v.as_f64());
+                let r_r = req
+                    .arguments
+                    .get("rail_crown_radius_mm")
+                    .and_then(|v| v.as_f64());
+                let v_kmh = req
+                    .arguments
+                    .get("train_speed_km_h")
+                    .and_then(|v| v.as_f64());
                 self.sim_rail_wheel_rail_contact(&SimWheelRailRequest {
                     wheel_vertical_load_kn: load_kn,
                     wheel_radius_mm: r_w,
@@ -9646,10 +10926,19 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.mining.mine_ventilation" => {
-                let l_m = req.arguments.get("airway_length_m").and_then(|v| v.as_f64());
+                let l_m = req
+                    .arguments
+                    .get("airway_length_m")
+                    .and_then(|v| v.as_f64());
                 let a_m2 = req.arguments.get("airway_area_m2").and_then(|v| v.as_f64());
-                let q_m3s = req.arguments.get("airflow_rate_m3_s").and_then(|v| v.as_f64());
-                let d_m = req.arguments.get("vertical_depth_m").and_then(|v| v.as_f64());
+                let q_m3s = req
+                    .arguments
+                    .get("airflow_rate_m3_s")
+                    .and_then(|v| v.as_f64());
+                let d_m = req
+                    .arguments
+                    .get("vertical_depth_m")
+                    .and_then(|v| v.as_f64());
                 self.sim_mining_mine_ventilation(&SimMineVentilationRequest {
                     airway_length_m: l_m,
                     airway_area_m2: a_m2,
@@ -9659,9 +10948,18 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.telecom.reflector_antenna" => {
-                let d_m = req.arguments.get("dish_diameter_m").and_then(|v| v.as_f64());
-                let f_ghz = req.arguments.get("operating_frequency_ghz").and_then(|v| v.as_f64());
-                let err_mm = req.arguments.get("surface_rms_error_mm").and_then(|v| v.as_f64());
+                let d_m = req
+                    .arguments
+                    .get("dish_diameter_m")
+                    .and_then(|v| v.as_f64());
+                let f_ghz = req
+                    .arguments
+                    .get("operating_frequency_ghz")
+                    .and_then(|v| v.as_f64());
+                let err_mm = req
+                    .arguments
+                    .get("surface_rms_error_mm")
+                    .and_then(|v| v.as_f64());
                 self.sim_telecom_reflector_antenna(&SimReflectorAntennaRequest {
                     dish_diameter_m: d_m,
                     operating_frequency_ghz: f_ghz,
@@ -9670,10 +10968,20 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.semiconductor.gaa_fet" => {
-                let n_sheets = req.arguments.get("nanosheet_count").and_then(|v| v.as_u64()).map(|v| v as u32);
+                let n_sheets = req
+                    .arguments
+                    .get("nanosheet_count")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as u32);
                 let l_g = req.arguments.get("gate_length_nm").and_then(|v| v.as_f64());
-                let w_ns = req.arguments.get("nanosheet_width_nm").and_then(|v| v.as_f64());
-                let t_ns = req.arguments.get("nanosheet_thickness_nm").and_then(|v| v.as_f64());
+                let w_ns = req
+                    .arguments
+                    .get("nanosheet_width_nm")
+                    .and_then(|v| v.as_f64());
+                let t_ns = req
+                    .arguments
+                    .get("nanosheet_thickness_nm")
+                    .and_then(|v| v.as_f64());
                 self.sim_semiconductor_gaa_fet(&SimGaaFetRequest {
                     nanosheet_count: n_sheets,
                     gate_length_nm: l_g,
@@ -9683,10 +10991,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.agri.irrigation_hydraulics" => {
-                let d_mm = req.arguments.get("pipe_inside_diameter_mm").and_then(|v| v.as_f64());
-                let l_m = req.arguments.get("lateral_length_m").and_then(|v| v.as_f64());
-                let s_m = req.arguments.get("emitter_spacing_m").and_then(|v| v.as_f64());
-                let q_lh = req.arguments.get("nominal_discharge_l_h").and_then(|v| v.as_f64());
+                let d_mm = req
+                    .arguments
+                    .get("pipe_inside_diameter_mm")
+                    .and_then(|v| v.as_f64());
+                let l_m = req
+                    .arguments
+                    .get("lateral_length_m")
+                    .and_then(|v| v.as_f64());
+                let s_m = req
+                    .arguments
+                    .get("emitter_spacing_m")
+                    .and_then(|v| v.as_f64());
+                let q_lh = req
+                    .arguments
+                    .get("nominal_discharge_l_h")
+                    .and_then(|v| v.as_f64());
                 self.sim_agri_irrigation_hydraulics(&SimIrrigationHydraulicsRequest {
                     pipe_inside_diameter_mm: d_mm,
                     lateral_length_m: l_m,
@@ -9696,9 +11016,18 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.environmental.wastewater_treatment" => {
-                let q_m3d = req.arguments.get("influent_flow_m3_day").and_then(|v| v.as_f64());
-                let bod_in = req.arguments.get("influent_bod_mg_l").and_then(|v| v.as_f64());
-                let bod_out = req.arguments.get("target_effluent_bod_mg_l").and_then(|v| v.as_f64());
+                let q_m3d = req
+                    .arguments
+                    .get("influent_flow_m3_day")
+                    .and_then(|v| v.as_f64());
+                let bod_in = req
+                    .arguments
+                    .get("influent_bod_mg_l")
+                    .and_then(|v| v.as_f64());
+                let bod_out = req
+                    .arguments
+                    .get("target_effluent_bod_mg_l")
+                    .and_then(|v| v.as_f64());
                 let mlss = req.arguments.get("mlss_mg_l").and_then(|v| v.as_f64());
                 self.sim_environmental_wastewater_treatment(&SimWastewaterTreatmentRequest {
                     influent_flow_m3_day: q_m3d,
@@ -9709,10 +11038,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.automotive.ev_powertrain" => {
-                let mass = req.arguments.get("vehicle_mass_kg").and_then(|v| v.as_f64());
-                let torque = req.arguments.get("motor_peak_torque_nm").and_then(|v| v.as_f64());
-                let batt = req.arguments.get("battery_capacity_kwh").and_then(|v| v.as_f64());
-                let speed = req.arguments.get("cruising_speed_km_h").and_then(|v| v.as_f64());
+                let mass = req
+                    .arguments
+                    .get("vehicle_mass_kg")
+                    .and_then(|v| v.as_f64());
+                let torque = req
+                    .arguments
+                    .get("motor_peak_torque_nm")
+                    .and_then(|v| v.as_f64());
+                let batt = req
+                    .arguments
+                    .get("battery_capacity_kwh")
+                    .and_then(|v| v.as_f64());
+                let speed = req
+                    .arguments
+                    .get("cruising_speed_km_h")
+                    .and_then(|v| v.as_f64());
                 self.sim_automotive_ev_powertrain(&SimEvPowertrainRequest {
                     vehicle_mass_kg: mass,
                     motor_peak_torque_nm: torque,
@@ -9722,10 +11063,23 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.civil.seismic_base_isolation" => {
-                let mass_t = req.arguments.get("superstructure_mass_tonnes").and_then(|v| v.as_f64());
-                let n_bearings = req.arguments.get("bearing_count").and_then(|v| v.as_u64()).map(|v| v as u32);
-                let d_outer = req.arguments.get("bearing_outer_diameter_mm").and_then(|v| v.as_f64());
-                let d_lead = req.arguments.get("lead_core_diameter_mm").and_then(|v| v.as_f64());
+                let mass_t = req
+                    .arguments
+                    .get("superstructure_mass_tonnes")
+                    .and_then(|v| v.as_f64());
+                let n_bearings = req
+                    .arguments
+                    .get("bearing_count")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as u32);
+                let d_outer = req
+                    .arguments
+                    .get("bearing_outer_diameter_mm")
+                    .and_then(|v| v.as_f64());
+                let d_lead = req
+                    .arguments
+                    .get("lead_core_diameter_mm")
+                    .and_then(|v| v.as_f64());
                 self.sim_civil_seismic_base_isolation(&SimSeismicBaseIsolationRequest {
                     superstructure_mass_tonnes: mass_t,
                     bearing_count: n_bearings,
@@ -9735,10 +11089,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.defense.terminal_ballistics" => {
-                let l_p = req.arguments.get("projectile_length_mm").and_then(|v| v.as_f64());
-                let v_0 = req.arguments.get("impact_velocity_m_s").and_then(|v| v.as_f64());
-                let theta = req.arguments.get("obliquity_angle_deg").and_then(|v| v.as_f64());
-                let t_arm = req.arguments.get("armor_thickness_mm").and_then(|v| v.as_f64());
+                let l_p = req
+                    .arguments
+                    .get("projectile_length_mm")
+                    .and_then(|v| v.as_f64());
+                let v_0 = req
+                    .arguments
+                    .get("impact_velocity_m_s")
+                    .and_then(|v| v.as_f64());
+                let theta = req
+                    .arguments
+                    .get("obliquity_angle_deg")
+                    .and_then(|v| v.as_f64());
+                let t_arm = req
+                    .arguments
+                    .get("armor_thickness_mm")
+                    .and_then(|v| v.as_f64());
                 self.sim_defense_terminal_ballistics(&SimTerminalBallisticsRequest {
                     projectile_length_mm: l_p,
                     impact_velocity_m_s: v_0,
@@ -9748,10 +11114,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.packaging.solder_thermal_fatigue" => {
-                let w_pkg = req.arguments.get("package_width_mm").and_then(|v| v.as_f64());
-                let h_solder = req.arguments.get("solder_joint_height_um").and_then(|v| v.as_f64());
-                let t_min = req.arguments.get("cycle_min_temp_c").and_then(|v| v.as_f64());
-                let t_max = req.arguments.get("cycle_max_temp_c").and_then(|v| v.as_f64());
+                let w_pkg = req
+                    .arguments
+                    .get("package_width_mm")
+                    .and_then(|v| v.as_f64());
+                let h_solder = req
+                    .arguments
+                    .get("solder_joint_height_um")
+                    .and_then(|v| v.as_f64());
+                let t_min = req
+                    .arguments
+                    .get("cycle_min_temp_c")
+                    .and_then(|v| v.as_f64());
+                let t_max = req
+                    .arguments
+                    .get("cycle_max_temp_c")
+                    .and_then(|v| v.as_f64());
                 self.sim_packaging_solder_thermal_fatigue(&SimSolderThermalFatigueRequest {
                     package_width_mm: w_pkg,
                     solder_joint_height_um: h_solder,
@@ -9761,12 +11139,27 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.marine.ship_slamming" => {
-                let beta = req.arguments.get("deadrise_angle_deg").and_then(|v| v.as_f64());
-                let v_rel = req.arguments.get("relative_impact_velocity_m_s").and_then(|v| v.as_f64());
-                let s_m = req.arguments.get("frame_spacing_m").and_then(|v| v.as_f64());
+                let beta = req
+                    .arguments
+                    .get("deadrise_angle_deg")
+                    .and_then(|v| v.as_f64());
+                let v_rel = req
+                    .arguments
+                    .get("relative_impact_velocity_m_s")
+                    .and_then(|v| v.as_f64());
+                let s_m = req
+                    .arguments
+                    .get("frame_spacing_m")
+                    .and_then(|v| v.as_f64());
                 let l_m = req.arguments.get("plate_length_m").and_then(|v| v.as_f64());
-                let t_mm = req.arguments.get("plate_thickness_mm").and_then(|v| v.as_f64());
-                let f_y = req.arguments.get("steel_yield_strength_mpa").and_then(|v| v.as_f64());
+                let t_mm = req
+                    .arguments
+                    .get("plate_thickness_mm")
+                    .and_then(|v| v.as_f64());
+                let f_y = req
+                    .arguments
+                    .get("steel_yield_strength_mpa")
+                    .and_then(|v| v.as_f64());
                 self.sim_marine_ship_slamming(&SimShipSlammingRequest {
                     deadrise_angle_deg: beta,
                     relative_impact_velocity_m_s: v_rel,
@@ -9778,12 +11171,30 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.automotive.crash_deceleration" => {
-                let m_veh = req.arguments.get("vehicle_mass_kg").and_then(|v| v.as_f64());
-                let v_kmh = req.arguments.get("impact_velocity_km_h").and_then(|v| v.as_f64());
-                let l_crush = req.arguments.get("crumple_zone_length_m").and_then(|v| v.as_f64());
-                let f_box = req.arguments.get("crash_box_mean_force_kn").and_then(|v| v.as_f64());
-                let eta = req.arguments.get("structural_energy_efficiency").and_then(|v| v.as_f64());
-                let m_occ = req.arguments.get("occupant_mass_kg").and_then(|v| v.as_f64());
+                let m_veh = req
+                    .arguments
+                    .get("vehicle_mass_kg")
+                    .and_then(|v| v.as_f64());
+                let v_kmh = req
+                    .arguments
+                    .get("impact_velocity_km_h")
+                    .and_then(|v| v.as_f64());
+                let l_crush = req
+                    .arguments
+                    .get("crumple_zone_length_m")
+                    .and_then(|v| v.as_f64());
+                let f_box = req
+                    .arguments
+                    .get("crash_box_mean_force_kn")
+                    .and_then(|v| v.as_f64());
+                let eta = req
+                    .arguments
+                    .get("structural_energy_efficiency")
+                    .and_then(|v| v.as_f64());
+                let m_occ = req
+                    .arguments
+                    .get("occupant_mass_kg")
+                    .and_then(|v| v.as_f64());
                 self.sim_automotive_crash_deceleration(&SimCrashDecelerationRequest {
                     vehicle_mass_kg: m_veh,
                     impact_velocity_km_h: v_kmh,
@@ -9795,13 +11206,34 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.nuclear.fuel_pin" => {
-                let q_prime = req.arguments.get("linear_heat_rate_kw_per_m").and_then(|v| v.as_f64());
-                let r_p = req.arguments.get("pellet_radius_mm").and_then(|v| v.as_f64());
-                let gap_um = req.arguments.get("gap_thickness_um").and_then(|v| v.as_f64());
-                let t_clad = req.arguments.get("clad_thickness_mm").and_then(|v| v.as_f64());
-                let p_sys = req.arguments.get("coolant_pressure_mpa").and_then(|v| v.as_f64());
-                let t_b = req.arguments.get("bulk_coolant_temperature_c").and_then(|v| v.as_f64());
-                let g_flux = req.arguments.get("coolant_mass_flux_kg_m2_s").and_then(|v| v.as_f64());
+                let q_prime = req
+                    .arguments
+                    .get("linear_heat_rate_kw_per_m")
+                    .and_then(|v| v.as_f64());
+                let r_p = req
+                    .arguments
+                    .get("pellet_radius_mm")
+                    .and_then(|v| v.as_f64());
+                let gap_um = req
+                    .arguments
+                    .get("gap_thickness_um")
+                    .and_then(|v| v.as_f64());
+                let t_clad = req
+                    .arguments
+                    .get("clad_thickness_mm")
+                    .and_then(|v| v.as_f64());
+                let p_sys = req
+                    .arguments
+                    .get("coolant_pressure_mpa")
+                    .and_then(|v| v.as_f64());
+                let t_b = req
+                    .arguments
+                    .get("bulk_coolant_temperature_c")
+                    .and_then(|v| v.as_f64());
+                let g_flux = req
+                    .arguments
+                    .get("coolant_mass_flux_kg_m2_s")
+                    .and_then(|v| v.as_f64());
                 self.sim_nuclear_fuel_pin(&SimNuclearFuelPinRequest {
                     linear_heat_rate_kw_per_m: q_prime,
                     pellet_radius_mm: r_p,
@@ -9816,10 +11248,22 @@ namespace AtlasCAD.Unity
             "sim.chemical.adsorption_psa" => {
                 let d_bed = req.arguments.get("bed_diameter_m").and_then(|v| v.as_f64());
                 let l_bed = req.arguments.get("bed_length_m").and_then(|v| v.as_f64());
-                let p_ads = req.arguments.get("adsorption_pressure_bar").and_then(|v| v.as_f64());
-                let p_des = req.arguments.get("desorption_pressure_bar").and_then(|v| v.as_f64());
-                let v_feed = req.arguments.get("feed_flow_rate_nm3_h").and_then(|v| v.as_f64());
-                let rho_bulk = req.arguments.get("adsorbent_bulk_density_kg_m3").and_then(|v| v.as_f64());
+                let p_ads = req
+                    .arguments
+                    .get("adsorption_pressure_bar")
+                    .and_then(|v| v.as_f64());
+                let p_des = req
+                    .arguments
+                    .get("desorption_pressure_bar")
+                    .and_then(|v| v.as_f64());
+                let v_feed = req
+                    .arguments
+                    .get("feed_flow_rate_nm3_h")
+                    .and_then(|v| v.as_f64());
+                let rho_bulk = req
+                    .arguments
+                    .get("adsorbent_bulk_density_kg_m3")
+                    .and_then(|v| v.as_f64());
                 self.sim_chemical_adsorption_psa(&SimAdsorptionPsaRequest {
                     bed_diameter_m: d_bed,
                     bed_length_m: l_bed,
@@ -9831,12 +11275,25 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.aerospace.rotorcraft_aerodynamics" => {
-                let w_gross = req.arguments.get("gross_weight_kg").and_then(|v| v.as_f64());
+                let w_gross = req
+                    .arguments
+                    .get("gross_weight_kg")
+                    .and_then(|v| v.as_f64());
                 let r_main = req.arguments.get("rotor_radius_m").and_then(|v| v.as_f64());
-                let n_b = req.arguments.get("number_of_blades").and_then(|v| v.as_u64()).map(|v| v as u32);
+                let n_b = req
+                    .arguments
+                    .get("number_of_blades")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as u32);
                 let c_blade = req.arguments.get("blade_chord_m").and_then(|v| v.as_f64());
-                let rpm = req.arguments.get("rotor_speed_rpm").and_then(|v| v.as_f64());
-                let v_kts = req.arguments.get("forward_speed_knots").and_then(|v| v.as_f64());
+                let rpm = req
+                    .arguments
+                    .get("rotor_speed_rpm")
+                    .and_then(|v| v.as_f64());
+                let v_kts = req
+                    .arguments
+                    .get("forward_speed_knots")
+                    .and_then(|v| v.as_f64());
                 self.sim_aerospace_rotorcraft_aerodynamics(&SimRotorcraftAerodynamicsRequest {
                     gross_weight_kg: w_gross,
                     rotor_radius_m: r_main,
@@ -9848,11 +11305,24 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.thermal.heat_exchanger_delaware" => {
-                let d_s = req.arguments.get("shell_inside_diameter_m").and_then(|v| v.as_f64());
-                let n_t = req.arguments.get("number_of_tubes").and_then(|v| v.as_u64()).map(|v| v as u32);
+                let d_s = req
+                    .arguments
+                    .get("shell_inside_diameter_m")
+                    .and_then(|v| v.as_f64());
+                let n_t = req
+                    .arguments
+                    .get("number_of_tubes")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as u32);
                 let l_t = req.arguments.get("tube_length_m").and_then(|v| v.as_f64());
-                let b_s = req.arguments.get("baffle_spacing_m").and_then(|v| v.as_f64());
-                let m_h = req.arguments.get("hot_mass_flow_kg_s").and_then(|v| v.as_f64());
+                let b_s = req
+                    .arguments
+                    .get("baffle_spacing_m")
+                    .and_then(|v| v.as_f64());
+                let m_h = req
+                    .arguments
+                    .get("hot_mass_flow_kg_s")
+                    .and_then(|v| v.as_f64());
                 self.sim_thermal_heat_exchanger_delaware(&SimHeatExchangerDelawareRequest {
                     shell_inside_diameter_m: d_s,
                     number_of_tubes: n_t,
@@ -9863,11 +11333,26 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.geotechnical.drilled_shaft" => {
-                let b_shaft = req.arguments.get("shaft_diameter_m").and_then(|v| v.as_f64());
-                let l_shaft = req.arguments.get("embedded_length_m").and_then(|v| v.as_f64());
-                let q_fact = req.arguments.get("factored_load_demand_kn").and_then(|v| v.as_f64());
-                let q_serv = req.arguments.get("service_load_demand_kn").and_then(|v| v.as_f64());
-                let s_u = req.arguments.get("undrained_shear_strength_kpa").and_then(|v| v.as_f64());
+                let b_shaft = req
+                    .arguments
+                    .get("shaft_diameter_m")
+                    .and_then(|v| v.as_f64());
+                let l_shaft = req
+                    .arguments
+                    .get("embedded_length_m")
+                    .and_then(|v| v.as_f64());
+                let q_fact = req
+                    .arguments
+                    .get("factored_load_demand_kn")
+                    .and_then(|v| v.as_f64());
+                let q_serv = req
+                    .arguments
+                    .get("service_load_demand_kn")
+                    .and_then(|v| v.as_f64());
+                let s_u = req
+                    .arguments
+                    .get("undrained_shear_strength_kpa")
+                    .and_then(|v| v.as_f64());
                 self.sim_geotechnical_drilled_shaft(&SimDrilledShaftRequest {
                     shaft_diameter_m: b_shaft,
                     embedded_length_m: l_shaft,
@@ -9878,11 +11363,20 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.biomedical.heart_valve" => {
-                let size = req.arguments.get("nominal_size_mm").and_then(|v| v.as_f64());
+                let size = req
+                    .arguments
+                    .get("nominal_size_mm")
+                    .and_then(|v| v.as_f64());
                 let hr = req.arguments.get("heart_rate_bpm").and_then(|v| v.as_f64());
-                let sv = req.arguments.get("stroke_volume_ml").and_then(|v| v.as_f64());
+                let sv = req
+                    .arguments
+                    .get("stroke_volume_ml")
+                    .and_then(|v| v.as_f64());
                 let bsa = req.arguments.get("patient_bsa_m2").and_then(|v| v.as_f64());
-                let mean_dp = req.arguments.get("mean_pressure_gradient_mmhg").and_then(|v| v.as_f64());
+                let mean_dp = req
+                    .arguments
+                    .get("mean_pressure_gradient_mmhg")
+                    .and_then(|v| v.as_f64());
                 self.sim_biomedical_heart_valve(&SimHeartValveRequest {
                     nominal_size_mm: size,
                     heart_rate_bpm: hr,
@@ -9893,11 +11387,27 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.aerospace.centrifugal_compressor" => {
-                let m_air = req.arguments.get("mass_flow_rate_kg_s").and_then(|v| v.as_f64());
-                let rpm = req.arguments.get("rotational_speed_rpm").and_then(|v| v.as_f64());
-                let d_tip = req.arguments.get("impeller_tip_diameter_m").and_then(|v| v.as_f64());
-                let n_blades = req.arguments.get("number_of_blades").and_then(|v| v.as_u64()).map(|v| v as u32);
-                let beta_bs = req.arguments.get("blade_backsweep_deg").and_then(|v| v.as_f64());
+                let m_air = req
+                    .arguments
+                    .get("mass_flow_rate_kg_s")
+                    .and_then(|v| v.as_f64());
+                let rpm = req
+                    .arguments
+                    .get("rotational_speed_rpm")
+                    .and_then(|v| v.as_f64());
+                let d_tip = req
+                    .arguments
+                    .get("impeller_tip_diameter_m")
+                    .and_then(|v| v.as_f64());
+                let n_blades = req
+                    .arguments
+                    .get("number_of_blades")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as u32);
+                let beta_bs = req
+                    .arguments
+                    .get("blade_backsweep_deg")
+                    .and_then(|v| v.as_f64());
                 self.sim_aerospace_centrifugal_compressor(&SimCentrifugalCompressorRequest {
                     mass_flow_rate_kg_s: m_air,
                     rotational_speed_rpm: rpm,
@@ -9908,11 +11418,26 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.rail.pantograph" => {
-                let v_train = req.arguments.get("train_speed_km_h").and_then(|v| v.as_f64());
-                let f_0 = req.arguments.get("static_contact_force_n").and_then(|v| v.as_f64());
-                let t_wire = req.arguments.get("contact_wire_tension_kn").and_then(|v| v.as_f64());
-                let mu_wire = req.arguments.get("contact_wire_mass_kg_per_m").and_then(|v| v.as_f64());
-                let l_span = req.arguments.get("catenary_span_length_m").and_then(|v| v.as_f64());
+                let v_train = req
+                    .arguments
+                    .get("train_speed_km_h")
+                    .and_then(|v| v.as_f64());
+                let f_0 = req
+                    .arguments
+                    .get("static_contact_force_n")
+                    .and_then(|v| v.as_f64());
+                let t_wire = req
+                    .arguments
+                    .get("contact_wire_tension_kn")
+                    .and_then(|v| v.as_f64());
+                let mu_wire = req
+                    .arguments
+                    .get("contact_wire_mass_kg_per_m")
+                    .and_then(|v| v.as_f64());
+                let l_span = req
+                    .arguments
+                    .get("catenary_span_length_m")
+                    .and_then(|v| v.as_f64());
                 self.sim_rail_pantograph(&SimRailPantographRequest {
                     train_speed_km_h: v_train,
                     static_contact_force_n: f_0,
@@ -9923,11 +11448,26 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.geotechnical.tbm_tunneling" => {
-                let d_tunnel = req.arguments.get("tunnel_outer_diameter_m").and_then(|v| v.as_f64());
-                let h_depth = req.arguments.get("tunnel_depth_to_axis_m").and_then(|v| v.as_f64());
-                let h_water = req.arguments.get("water_table_depth_m").and_then(|v| v.as_f64());
-                let rpm = req.arguments.get("cutterhead_rotational_speed_rpm").and_then(|v| v.as_f64());
-                let pr = req.arguments.get("penetration_rate_mm_per_rev").and_then(|v| v.as_f64());
+                let d_tunnel = req
+                    .arguments
+                    .get("tunnel_outer_diameter_m")
+                    .and_then(|v| v.as_f64());
+                let h_depth = req
+                    .arguments
+                    .get("tunnel_depth_to_axis_m")
+                    .and_then(|v| v.as_f64());
+                let h_water = req
+                    .arguments
+                    .get("water_table_depth_m")
+                    .and_then(|v| v.as_f64());
+                let rpm = req
+                    .arguments
+                    .get("cutterhead_rotational_speed_rpm")
+                    .and_then(|v| v.as_f64());
+                let pr = req
+                    .arguments
+                    .get("penetration_rate_mm_per_rev")
+                    .and_then(|v| v.as_f64());
                 self.sim_geotechnical_tbm_tunneling(&SimTbmTunnelingRequest {
                     tunnel_outer_diameter_m: d_tunnel,
                     tunnel_depth_to_axis_m: h_depth,
@@ -9939,10 +11479,22 @@ namespace AtlasCAD.Unity
             }
             "sim.structural.prestressed_concrete" => {
                 let l_span = req.arguments.get("span_length_m").and_then(|v| v.as_f64());
-                let fc = req.arguments.get("concrete_f_c_mpa").and_then(|v| v.as_f64());
-                let aps = req.arguments.get("tendon_steel_area_mm2").and_then(|v| v.as_f64());
-                let e_mid = req.arguments.get("midspan_eccentricity_m").and_then(|v| v.as_f64());
-                let m_serv = req.arguments.get("service_moment_midspan_kn_m").and_then(|v| v.as_f64());
+                let fc = req
+                    .arguments
+                    .get("concrete_f_c_mpa")
+                    .and_then(|v| v.as_f64());
+                let aps = req
+                    .arguments
+                    .get("tendon_steel_area_mm2")
+                    .and_then(|v| v.as_f64());
+                let e_mid = req
+                    .arguments
+                    .get("midspan_eccentricity_m")
+                    .and_then(|v| v.as_f64());
+                let m_serv = req
+                    .arguments
+                    .get("service_moment_midspan_kn_m")
+                    .and_then(|v| v.as_f64());
                 self.sim_structural_prestressed_concrete(&SimPrestressedConcreteRequest {
                     span_length_m: l_span,
                     concrete_f_c_mpa: fc,
@@ -9953,11 +11505,26 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.aerospace.spacecraft_jitter" => {
-                let rpm = req.arguments.get("wheel_speed_rpm").and_then(|v| v.as_f64());
-                let u_stat = req.arguments.get("static_imbalance_g_mm").and_then(|v| v.as_f64());
-                let u_dyn = req.arguments.get("dynamic_imbalance_g_mm2").and_then(|v| v.as_f64());
-                let f_res = req.arguments.get("structural_resonance_freq_hz").and_then(|v| v.as_f64());
-                let j_sat = req.arguments.get("satellite_inertia_kg_m2").and_then(|v| v.as_f64());
+                let rpm = req
+                    .arguments
+                    .get("wheel_speed_rpm")
+                    .and_then(|v| v.as_f64());
+                let u_stat = req
+                    .arguments
+                    .get("static_imbalance_g_mm")
+                    .and_then(|v| v.as_f64());
+                let u_dyn = req
+                    .arguments
+                    .get("dynamic_imbalance_g_mm2")
+                    .and_then(|v| v.as_f64());
+                let f_res = req
+                    .arguments
+                    .get("structural_resonance_freq_hz")
+                    .and_then(|v| v.as_f64());
+                let j_sat = req
+                    .arguments
+                    .get("satellite_inertia_kg_m2")
+                    .and_then(|v| v.as_f64());
                 self.sim_aerospace_spacecraft_jitter(&SimSpacecraftJitterRequest {
                     wheel_speed_rpm: rpm,
                     static_imbalance_g_mm: u_stat,
@@ -9970,9 +11537,18 @@ namespace AtlasCAD.Unity
             "sim.automotive.radar_lidar_sensor" => {
                 let r_tgt = req.arguments.get("target_range_m").and_then(|v| v.as_f64());
                 let rcs = req.arguments.get("target_rcs_m2").and_then(|v| v.as_f64());
-                let rho = req.arguments.get("target_optical_reflectivity").and_then(|v| v.as_f64());
-                let p_rad = req.arguments.get("radar_tx_power_w").and_then(|v| v.as_f64());
-                let p_lid = req.arguments.get("lidar_pulse_power_w").and_then(|v| v.as_f64());
+                let rho = req
+                    .arguments
+                    .get("target_optical_reflectivity")
+                    .and_then(|v| v.as_f64());
+                let p_rad = req
+                    .arguments
+                    .get("radar_tx_power_w")
+                    .and_then(|v| v.as_f64());
+                let p_lid = req
+                    .arguments
+                    .get("lidar_pulse_power_w")
+                    .and_then(|v| v.as_f64());
                 self.sim_automotive_radar_lidar_sensor(&SimRadarLidarSensorRequest {
                     target_range_m: r_tgt,
                     target_rcs_m2: rcs,
@@ -9983,11 +11559,26 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.marine.auv_propulsion" => {
-                let v_kts = req.arguments.get("cruising_speed_knots").and_then(|v| v.as_f64());
-                let l_auv = req.arguments.get("vehicle_length_m").and_then(|v| v.as_f64());
-                let d_auv = req.arguments.get("vehicle_diameter_m").and_then(|v| v.as_f64());
-                let e_bat = req.arguments.get("battery_capacity_kwh").and_then(|v| v.as_f64());
-                let p_hot = req.arguments.get("hotel_power_draw_w").and_then(|v| v.as_f64());
+                let v_kts = req
+                    .arguments
+                    .get("cruising_speed_knots")
+                    .and_then(|v| v.as_f64());
+                let l_auv = req
+                    .arguments
+                    .get("vehicle_length_m")
+                    .and_then(|v| v.as_f64());
+                let d_auv = req
+                    .arguments
+                    .get("vehicle_diameter_m")
+                    .and_then(|v| v.as_f64());
+                let e_bat = req
+                    .arguments
+                    .get("battery_capacity_kwh")
+                    .and_then(|v| v.as_f64());
+                let p_hot = req
+                    .arguments
+                    .get("hotel_power_draw_w")
+                    .and_then(|v| v.as_f64());
                 self.sim_marine_auv_propulsion(&SimAuvPropulsionRequest {
                     cruising_speed_knots: v_kts,
                     vehicle_length_m: l_auv,
@@ -9998,11 +11589,26 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.energy.hydro_governor" => {
-                let h0 = req.arguments.get("rated_net_head_m").and_then(|v| v.as_f64());
-                let q0 = req.arguments.get("rated_discharge_m3_s").and_then(|v| v.as_f64());
-                let n0 = req.arguments.get("rated_speed_rpm").and_then(|v| v.as_f64());
-                let l_pen = req.arguments.get("penstock_length_m").and_then(|v| v.as_f64());
-                let tc = req.arguments.get("wicket_gate_closure_time_s").and_then(|v| v.as_f64());
+                let h0 = req
+                    .arguments
+                    .get("rated_net_head_m")
+                    .and_then(|v| v.as_f64());
+                let q0 = req
+                    .arguments
+                    .get("rated_discharge_m3_s")
+                    .and_then(|v| v.as_f64());
+                let n0 = req
+                    .arguments
+                    .get("rated_speed_rpm")
+                    .and_then(|v| v.as_f64());
+                let l_pen = req
+                    .arguments
+                    .get("penstock_length_m")
+                    .and_then(|v| v.as_f64());
+                let tc = req
+                    .arguments
+                    .get("wicket_gate_closure_time_s")
+                    .and_then(|v| v.as_f64());
                 self.sim_energy_hydro_governor(&SimHydroGovernorRequest {
                     rated_net_head_m: h0,
                     rated_discharge_m3_s: q0,
@@ -10013,10 +11619,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.semiconductor.cmp_planarization" => {
-                let d_waf = req.arguments.get("wafer_diameter_mm").and_then(|v| v.as_f64());
-                let p_down = req.arguments.get("down_force_pressure_kpa").and_then(|v| v.as_f64());
-                let v_rel = req.arguments.get("relative_velocity_m_s").and_then(|v| v.as_f64());
-                let t_pol = req.arguments.get("polish_time_seconds").and_then(|v| v.as_f64());
+                let d_waf = req
+                    .arguments
+                    .get("wafer_diameter_mm")
+                    .and_then(|v| v.as_f64());
+                let p_down = req
+                    .arguments
+                    .get("down_force_pressure_kpa")
+                    .and_then(|v| v.as_f64());
+                let v_rel = req
+                    .arguments
+                    .get("relative_velocity_m_s")
+                    .and_then(|v| v.as_f64());
+                let t_pol = req
+                    .arguments
+                    .get("polish_time_seconds")
+                    .and_then(|v| v.as_f64());
                 self.sim_semiconductor_cmp(&SimSemiconductorCmpRequest {
                     wafer_diameter_mm: d_waf,
                     down_force_pressure_kpa: p_down,
@@ -10026,10 +11644,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.transportation.pavement_mepdg" => {
-                let h_ac = req.arguments.get("asphalt_thickness_mm").and_then(|v| v.as_f64());
-                let h_base = req.arguments.get("base_thickness_mm").and_then(|v| v.as_f64());
-                let h_sub = req.arguments.get("subbase_thickness_mm").and_then(|v| v.as_f64());
-                let esal = req.arguments.get("design_traffic_millions_esal").and_then(|v| v.as_f64());
+                let h_ac = req
+                    .arguments
+                    .get("asphalt_thickness_mm")
+                    .and_then(|v| v.as_f64());
+                let h_base = req
+                    .arguments
+                    .get("base_thickness_mm")
+                    .and_then(|v| v.as_f64());
+                let h_sub = req
+                    .arguments
+                    .get("subbase_thickness_mm")
+                    .and_then(|v| v.as_f64());
+                let esal = req
+                    .arguments
+                    .get("design_traffic_millions_esal")
+                    .and_then(|v| v.as_f64());
                 self.sim_transportation_pavement_mepdg(&SimPavementMepdgRequest {
                     asphalt_thickness_mm: h_ac,
                     base_thickness_mm: h_base,
@@ -10039,10 +11669,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.biomedical.scaffold_degradation" => {
-                let d_scaf = req.arguments.get("scaffold_diameter_mm").and_then(|v| v.as_f64());
-                let h_scaf = req.arguments.get("scaffold_height_mm").and_then(|v| v.as_f64());
-                let eps = req.arguments.get("target_porosity_pct").and_then(|v| v.as_f64());
-                let t_deg = req.arguments.get("degradation_evaluation_weeks").and_then(|v| v.as_f64());
+                let d_scaf = req
+                    .arguments
+                    .get("scaffold_diameter_mm")
+                    .and_then(|v| v.as_f64());
+                let h_scaf = req
+                    .arguments
+                    .get("scaffold_height_mm")
+                    .and_then(|v| v.as_f64());
+                let eps = req
+                    .arguments
+                    .get("target_porosity_pct")
+                    .and_then(|v| v.as_f64());
+                let t_deg = req
+                    .arguments
+                    .get("degradation_evaluation_weeks")
+                    .and_then(|v| v.as_f64());
                 self.sim_biomedical_scaffold_degradation(&SimBiomaterialScaffoldRequest {
                     scaffold_diameter_mm: d_scaf,
                     scaffold_height_mm: h_scaf,
@@ -10052,11 +11694,26 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.aerospace.satellite_orbital_decay" => {
-                let m_sat = req.arguments.get("satellite_mass_kg").and_then(|v| v.as_f64());
-                let a_drag = req.arguments.get("drag_cross_section_area_m2").and_then(|v| v.as_f64());
-                let cd = req.arguments.get("drag_coefficient_cd").and_then(|v| v.as_f64());
-                let hp = req.arguments.get("initial_perigee_altitude_km").and_then(|v| v.as_f64());
-                let ha = req.arguments.get("initial_apogee_altitude_km").and_then(|v| v.as_f64());
+                let m_sat = req
+                    .arguments
+                    .get("satellite_mass_kg")
+                    .and_then(|v| v.as_f64());
+                let a_drag = req
+                    .arguments
+                    .get("drag_cross_section_area_m2")
+                    .and_then(|v| v.as_f64());
+                let cd = req
+                    .arguments
+                    .get("drag_coefficient_cd")
+                    .and_then(|v| v.as_f64());
+                let hp = req
+                    .arguments
+                    .get("initial_perigee_altitude_km")
+                    .and_then(|v| v.as_f64());
+                let ha = req
+                    .arguments
+                    .get("initial_apogee_altitude_km")
+                    .and_then(|v| v.as_f64());
                 self.sim_aerospace_satellite_orbital_decay(&SimSatelliteOrbitalDecayRequest {
                     satellite_mass_kg: m_sat,
                     drag_cross_section_area_m2: a_drag,
@@ -10067,10 +11724,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.mining.bucket_wheel_excavator" => {
-                let d_w = req.arguments.get("wheel_diameter_m").and_then(|v| v.as_f64());
-                let v_b = req.arguments.get("bucket_nominal_volume_m3").and_then(|v| v.as_f64());
-                let rpm = req.arguments.get("wheel_speed_rpm").and_then(|v| v.as_f64());
-                let kl = req.arguments.get("lineal_cutting_resistance_kn_m").and_then(|v| v.as_f64());
+                let d_w = req
+                    .arguments
+                    .get("wheel_diameter_m")
+                    .and_then(|v| v.as_f64());
+                let v_b = req
+                    .arguments
+                    .get("bucket_nominal_volume_m3")
+                    .and_then(|v| v.as_f64());
+                let rpm = req
+                    .arguments
+                    .get("wheel_speed_rpm")
+                    .and_then(|v| v.as_f64());
+                let kl = req
+                    .arguments
+                    .get("lineal_cutting_resistance_kn_m")
+                    .and_then(|v| v.as_f64());
                 let l_b = req.arguments.get("boom_length_m").and_then(|v| v.as_f64());
                 self.sim_mining_bucket_wheel_excavator(&SimMiningExcavatorRequest {
                     wheel_diameter_m: d_w,
@@ -10083,10 +11752,22 @@ namespace AtlasCAD.Unity
             }
             "sim.process.multiphase_pipe_flow" => {
                 let l_p = req.arguments.get("pipe_length_m").and_then(|v| v.as_f64());
-                let d_p = req.arguments.get("pipe_inner_diameter_mm").and_then(|v| v.as_f64());
-                let m_l = req.arguments.get("liquid_mass_flow_kg_s").and_then(|v| v.as_f64());
-                let m_g = req.arguments.get("gas_mass_flow_kg_s").and_then(|v| v.as_f64());
-                let dz = req.arguments.get("elevation_change_m").and_then(|v| v.as_f64());
+                let d_p = req
+                    .arguments
+                    .get("pipe_inner_diameter_mm")
+                    .and_then(|v| v.as_f64());
+                let m_l = req
+                    .arguments
+                    .get("liquid_mass_flow_kg_s")
+                    .and_then(|v| v.as_f64());
+                let m_g = req
+                    .arguments
+                    .get("gas_mass_flow_kg_s")
+                    .and_then(|v| v.as_f64());
+                let dz = req
+                    .arguments
+                    .get("elevation_change_m")
+                    .and_then(|v| v.as_f64());
                 self.sim_process_multiphase_pipe_flow(&SimMultiphasePipeFlowRequest {
                     pipe_length_m: l_p,
                     pipe_inner_diameter_mm: d_p,
@@ -10097,11 +11778,26 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.energy.geothermal_reservoir" => {
-                let t_res = req.arguments.get("reservoir_temperature_c").and_then(|v| v.as_f64());
-                let t_inj = req.arguments.get("reinjection_temperature_c").and_then(|v| v.as_f64());
-                let q_w = req.arguments.get("brine_flow_rate_l_s").and_then(|v| v.as_f64());
-                let d_w = req.arguments.get("well_spacing_distance_m").and_then(|v| v.as_f64());
-                let k_md = req.arguments.get("reservoir_permeability_md").and_then(|v| v.as_f64());
+                let t_res = req
+                    .arguments
+                    .get("reservoir_temperature_c")
+                    .and_then(|v| v.as_f64());
+                let t_inj = req
+                    .arguments
+                    .get("reinjection_temperature_c")
+                    .and_then(|v| v.as_f64());
+                let q_w = req
+                    .arguments
+                    .get("brine_flow_rate_l_s")
+                    .and_then(|v| v.as_f64());
+                let d_w = req
+                    .arguments
+                    .get("well_spacing_distance_m")
+                    .and_then(|v| v.as_f64());
+                let k_md = req
+                    .arguments
+                    .get("reservoir_permeability_md")
+                    .and_then(|v| v.as_f64());
                 self.sim_energy_geothermal_reservoir(&SimGeothermalReservoirRequest {
                     reservoir_temperature_c: t_res,
                     reinjection_temperature_c: t_inj,
@@ -10113,10 +11809,22 @@ namespace AtlasCAD.Unity
             }
             "sim.process.spray_drying_kinetics" => {
                 let m_f = req.arguments.get("feed_rate_kg_h").and_then(|v| v.as_f64());
-                let s_f = req.arguments.get("feed_solids_fraction").and_then(|v| v.as_f64());
-                let rpm = req.arguments.get("atomizer_speed_rpm").and_then(|v| v.as_f64());
-                let t_in = req.arguments.get("inlet_air_temperature_c").and_then(|v| v.as_f64());
-                let t_out = req.arguments.get("outlet_air_temperature_c").and_then(|v| v.as_f64());
+                let s_f = req
+                    .arguments
+                    .get("feed_solids_fraction")
+                    .and_then(|v| v.as_f64());
+                let rpm = req
+                    .arguments
+                    .get("atomizer_speed_rpm")
+                    .and_then(|v| v.as_f64());
+                let t_in = req
+                    .arguments
+                    .get("inlet_air_temperature_c")
+                    .and_then(|v| v.as_f64());
+                let t_out = req
+                    .arguments
+                    .get("outlet_air_temperature_c")
+                    .and_then(|v| v.as_f64());
                 self.sim_process_spray_drying_kinetics(&SimSprayDryingKineticsRequest {
                     feed_rate_kg_h: m_f,
                     feed_solids_fraction: s_f,
@@ -10127,11 +11835,27 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.energy.thermoelectric_rtg" => {
-                let q0 = req.arguments.get("initial_thermal_power_w_th").and_then(|v| v.as_f64());
-                let th = req.arguments.get("hot_junction_temp_k").and_then(|v| v.as_f64());
-                let tc = req.arguments.get("cold_junction_temp_k").and_then(|v| v.as_f64());
-                let n_c = req.arguments.get("couple_count").and_then(|v| v.as_u64()).map(|n| n as u32);
-                let t_yr = req.arguments.get("mission_elapsed_years").and_then(|v| v.as_f64());
+                let q0 = req
+                    .arguments
+                    .get("initial_thermal_power_w_th")
+                    .and_then(|v| v.as_f64());
+                let th = req
+                    .arguments
+                    .get("hot_junction_temp_k")
+                    .and_then(|v| v.as_f64());
+                let tc = req
+                    .arguments
+                    .get("cold_junction_temp_k")
+                    .and_then(|v| v.as_f64());
+                let n_c = req
+                    .arguments
+                    .get("couple_count")
+                    .and_then(|v| v.as_u64())
+                    .map(|n| n as u32);
+                let t_yr = req
+                    .arguments
+                    .get("mission_elapsed_years")
+                    .and_then(|v| v.as_f64());
                 self.sim_energy_thermoelectric_rtg(&SimThermoelectricRtgRequest {
                     initial_thermal_power_w_th: q0,
                     hot_junction_temp_k: th,
@@ -10142,10 +11866,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.nuclear.containment_loca" => {
-                let vol = req.arguments.get("containment_free_volume_m3").and_then(|v| v.as_f64());
-                let p_des = req.arguments.get("design_pressure_bar_a").and_then(|v| v.as_f64());
-                let h_blow = req.arguments.get("blowdown_enthalpy_gj").and_then(|v| v.as_f64());
-                let q_spray = req.arguments.get("spray_flow_rate_l_s").and_then(|v| v.as_f64());
+                let vol = req
+                    .arguments
+                    .get("containment_free_volume_m3")
+                    .and_then(|v| v.as_f64());
+                let p_des = req
+                    .arguments
+                    .get("design_pressure_bar_a")
+                    .and_then(|v| v.as_f64());
+                let h_blow = req
+                    .arguments
+                    .get("blowdown_enthalpy_gj")
+                    .and_then(|v| v.as_f64());
+                let q_spray = req
+                    .arguments
+                    .get("spray_flow_rate_l_s")
+                    .and_then(|v| v.as_f64());
                 self.sim_nuclear_containment_loca(&SimContainmentLocaRequest {
                     containment_free_volume_m3: vol,
                     design_pressure_bar_a: p_des,
@@ -10155,10 +11891,19 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.environmental.atmospheric_dispersion" => {
-                let q = req.arguments.get("emission_rate_g_s").and_then(|v| v.as_f64());
+                let q = req
+                    .arguments
+                    .get("emission_rate_g_s")
+                    .and_then(|v| v.as_f64());
                 let hs = req.arguments.get("stack_height_m").and_then(|v| v.as_f64());
-                let ts = req.arguments.get("stack_gas_temperature_c").and_then(|v| v.as_f64());
-                let u = req.arguments.get("wind_speed_at_stack_height_m_s").and_then(|v| v.as_f64());
+                let ts = req
+                    .arguments
+                    .get("stack_gas_temperature_c")
+                    .and_then(|v| v.as_f64());
+                let u = req
+                    .arguments
+                    .get("wind_speed_at_stack_height_m_s")
+                    .and_then(|v| v.as_f64());
                 self.sim_environmental_atmospheric_dispersion(&SimAtmosphericDispersionRequest {
                     emission_rate_g_s: q,
                     stack_height_m: hs,
@@ -10168,10 +11913,22 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.aerospace.rocket_ascent_trajectory" => {
-                let m0 = req.arguments.get("gross_liftoff_mass_kg").and_then(|v| v.as_f64());
-                let mpl = req.arguments.get("payload_mass_kg").and_then(|v| v.as_f64());
-                let f1 = req.arguments.get("stage1_thrust_sl_kn").and_then(|v| v.as_f64());
-                let alt = req.arguments.get("target_orbit_altitude_km").and_then(|v| v.as_f64());
+                let m0 = req
+                    .arguments
+                    .get("gross_liftoff_mass_kg")
+                    .and_then(|v| v.as_f64());
+                let mpl = req
+                    .arguments
+                    .get("payload_mass_kg")
+                    .and_then(|v| v.as_f64());
+                let f1 = req
+                    .arguments
+                    .get("stage1_thrust_sl_kn")
+                    .and_then(|v| v.as_f64());
+                let alt = req
+                    .arguments
+                    .get("target_orbit_altitude_km")
+                    .and_then(|v| v.as_f64());
                 self.sim_aerospace_rocket_ascent_trajectory(&SimRocketAscentRequest {
                     gross_liftoff_mass_kg: m0,
                     payload_mass_kg: mpl,
@@ -10183,7 +11940,10 @@ namespace AtlasCAD.Unity
             "sim.civil.gravity_dam_stability" => {
                 let h = req.arguments.get("dam_height_m").and_then(|v| v.as_f64());
                 let b = req.arguments.get("base_width_m").and_then(|v| v.as_f64());
-                let h_w = req.arguments.get("upstream_water_depth_m").and_then(|v| v.as_f64());
+                let h_w = req
+                    .arguments
+                    .get("upstream_water_depth_m")
+                    .and_then(|v| v.as_f64());
                 let b_crest = req.arguments.get("crest_width_m").and_then(|v| v.as_f64());
                 self.sim_civil_gravity_dam_stability(&SimGravityDamRequest {
                     dam_height_m: h,
@@ -10194,10 +11954,23 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.energy.electrolyzer_hydrogen" => {
-                let t_cell = req.arguments.get("cell_temperature_c").and_then(|v| v.as_f64());
-                let p_h2 = req.arguments.get("hydrogen_operating_pressure_bar_a").and_then(|v| v.as_f64());
-                let j = req.arguments.get("current_density_a_per_cm2").and_then(|v| v.as_f64());
-                let n_cells = req.arguments.get("cell_count").and_then(|v| v.as_u64()).map(|n| n as u32);
+                let t_cell = req
+                    .arguments
+                    .get("cell_temperature_c")
+                    .and_then(|v| v.as_f64());
+                let p_h2 = req
+                    .arguments
+                    .get("hydrogen_operating_pressure_bar_a")
+                    .and_then(|v| v.as_f64());
+                let j = req
+                    .arguments
+                    .get("current_density_a_per_cm2")
+                    .and_then(|v| v.as_f64());
+                let n_cells = req
+                    .arguments
+                    .get("cell_count")
+                    .and_then(|v| v.as_u64())
+                    .map(|n| n as u32);
                 self.sim_energy_electrolyzer_hydrogen(&SimElectrolyzerHydrogenRequest {
                     cell_temperature_c: t_cell,
                     hydrogen_operating_pressure_bar_a: p_h2,
@@ -10208,8 +11981,14 @@ namespace AtlasCAD.Unity
             }
             "sim.optical.thin_film_optics" => {
                 let wl = req.arguments.get("wavelength_nm").and_then(|v| v.as_f64());
-                let aoi = req.arguments.get("angle_of_incidence_deg").and_then(|v| v.as_f64());
-                let n_sub = req.arguments.get("substrate_index").and_then(|v| v.as_f64());
+                let aoi = req
+                    .arguments
+                    .get("angle_of_incidence_deg")
+                    .and_then(|v| v.as_f64());
+                let n_sub = req
+                    .arguments
+                    .get("substrate_index")
+                    .and_then(|v| v.as_f64());
                 self.sim_optical_thin_film_optics(&SimThinFilmOpticsRequest {
                     wavelength_nm: wl,
                     angle_of_incidence_deg: aoi,
@@ -10218,9 +11997,18 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.energy.cryogenic_liquefaction" => {
-                let m_feed = req.arguments.get("feed_gas_flow_rate_kg_h").and_then(|v| v.as_f64());
-                let p1 = req.arguments.get("suction_pressure_bar_a").and_then(|v| v.as_f64());
-                let p2 = req.arguments.get("discharge_pressure_bar_a").and_then(|v| v.as_f64());
+                let m_feed = req
+                    .arguments
+                    .get("feed_gas_flow_rate_kg_h")
+                    .and_then(|v| v.as_f64());
+                let p1 = req
+                    .arguments
+                    .get("suction_pressure_bar_a")
+                    .and_then(|v| v.as_f64());
+                let p2 = req
+                    .arguments
+                    .get("discharge_pressure_bar_a")
+                    .and_then(|v| v.as_f64());
                 self.sim_energy_cryogenic_liquefaction(&SimCryogenicLiquefactionRequest {
                     feed_gas_flow_rate_kg_h: m_feed,
                     suction_pressure_bar_a: p1,
@@ -10229,9 +12017,18 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.process.hydrocyclone_separation" => {
-                let dc = req.arguments.get("cyclone_diameter_mm").and_then(|v| v.as_f64());
-                let q = req.arguments.get("feed_flow_rate_m3_h").and_then(|v| v.as_f64());
-                let cv = req.arguments.get("solids_volumetric_concentration_pct").and_then(|v| v.as_f64());
+                let dc = req
+                    .arguments
+                    .get("cyclone_diameter_mm")
+                    .and_then(|v| v.as_f64());
+                let q = req
+                    .arguments
+                    .get("feed_flow_rate_m3_h")
+                    .and_then(|v| v.as_f64());
+                let cv = req
+                    .arguments
+                    .get("solids_volumetric_concentration_pct")
+                    .and_then(|v| v.as_f64());
                 self.sim_process_hydrocyclone_separation(&SimHydrocycloneRequest {
                     cyclone_diameter_mm: dc,
                     feed_flow_rate_m3_h: q,
@@ -10240,9 +12037,18 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.mechanical.magnetic_bearing" => {
-                let m = req.arguments.get("rotor_supported_mass_kg").and_then(|v| v.as_f64());
-                let g = req.arguments.get("nominal_air_gap_mm").and_then(|v| v.as_f64());
-                let rpm = req.arguments.get("max_rotational_speed_rpm").and_then(|v| v.as_f64());
+                let m = req
+                    .arguments
+                    .get("rotor_supported_mass_kg")
+                    .and_then(|v| v.as_f64());
+                let g = req
+                    .arguments
+                    .get("nominal_air_gap_mm")
+                    .and_then(|v| v.as_f64());
+                let rpm = req
+                    .arguments
+                    .get("max_rotational_speed_rpm")
+                    .and_then(|v| v.as_f64());
                 self.sim_mechanical_magnetic_bearing(&SimMagneticBearingRequest {
                     rotor_supported_mass_kg: m,
                     nominal_air_gap_mm: g,
@@ -10251,8 +12057,14 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.marine.sonar_propagation" => {
-                let f = req.arguments.get("operating_frequency_khz").and_then(|v| v.as_f64());
-                let p = req.arguments.get("transmitter_acoustic_power_w").and_then(|v| v.as_f64());
+                let f = req
+                    .arguments
+                    .get("operating_frequency_khz")
+                    .and_then(|v| v.as_f64());
+                let p = req
+                    .arguments
+                    .get("transmitter_acoustic_power_w")
+                    .and_then(|v| v.as_f64());
                 let r = req.arguments.get("target_range_m").and_then(|v| v.as_f64());
                 self.sim_marine_sonar_propagation(&SimSonarPropagationRequest {
                     operating_frequency_khz: f,
@@ -10262,9 +12074,18 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.manufacturing.electron_beam_welding" => {
-                let v = req.arguments.get("acceleration_voltage_kv").and_then(|v| v.as_f64());
-                let i = req.arguments.get("beam_current_ma").and_then(|v| v.as_f64());
-                let s = req.arguments.get("travel_speed_mm_s").and_then(|v| v.as_f64());
+                let v = req
+                    .arguments
+                    .get("acceleration_voltage_kv")
+                    .and_then(|v| v.as_f64());
+                let i = req
+                    .arguments
+                    .get("beam_current_ma")
+                    .and_then(|v| v.as_f64());
+                let s = req
+                    .arguments
+                    .get("travel_speed_mm_s")
+                    .and_then(|v| v.as_f64());
                 self.sim_manufacturing_electron_beam_welding(&SimEbwWeldingRequest {
                     acceleration_voltage_kv: v,
                     beam_current_ma: i,
@@ -10273,9 +12094,18 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.process.crystallization_kinetics" => {
-                let q = req.arguments.get("feed_volumetric_flow_m3_h").and_then(|v| v.as_f64());
-                let vol = req.arguments.get("crystallizer_active_volume_m3").and_then(|v| v.as_f64());
-                let d = req.arguments.get("target_median_size_um").and_then(|v| v.as_f64());
+                let q = req
+                    .arguments
+                    .get("feed_volumetric_flow_m3_h")
+                    .and_then(|v| v.as_f64());
+                let vol = req
+                    .arguments
+                    .get("crystallizer_active_volume_m3")
+                    .and_then(|v| v.as_f64());
+                let d = req
+                    .arguments
+                    .get("target_median_size_um")
+                    .and_then(|v| v.as_f64());
                 self.sim_process_crystallization_kinetics(&SimCrystallizationRequest {
                     feed_volumetric_flow_m3_h: q,
                     crystallizer_active_volume_m3: vol,
@@ -10284,9 +12114,19 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.thermal.thermoelectric_cooler" => {
-                let n = req.arguments.get("couple_count_n").and_then(|v| v.as_u64()).map(|v| v as usize);
-                let i = req.arguments.get("operating_current_a").and_then(|v| v.as_f64());
-                let q = req.arguments.get("heat_load_qc_target_w").and_then(|v| v.as_f64());
+                let n = req
+                    .arguments
+                    .get("couple_count_n")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+                let i = req
+                    .arguments
+                    .get("operating_current_a")
+                    .and_then(|v| v.as_f64());
+                let q = req
+                    .arguments
+                    .get("heat_load_qc_target_w")
+                    .and_then(|v| v.as_f64());
                 self.sim_thermal_thermoelectric_cooler(&SimTecCoolerRequest {
                     couple_count_n: n,
                     operating_current_a: i,
@@ -10295,9 +12135,18 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.mechanical.slurry_pump_derating" => {
-                let q = req.arguments.get("slurry_flow_rate_m3_h").and_then(|v| v.as_f64());
-                let h = req.arguments.get("clear_water_head_m").and_then(|v| v.as_f64());
-                let cw = req.arguments.get("solids_concentration_wt_pct").and_then(|v| v.as_f64());
+                let q = req
+                    .arguments
+                    .get("slurry_flow_rate_m3_h")
+                    .and_then(|v| v.as_f64());
+                let h = req
+                    .arguments
+                    .get("clear_water_head_m")
+                    .and_then(|v| v.as_f64());
+                let cw = req
+                    .arguments
+                    .get("solids_concentration_wt_pct")
+                    .and_then(|v| v.as_f64());
                 self.sim_mechanical_slurry_pump_derating(&SimSlurryPumpRequest {
                     slurry_flow_rate_m3_h: q,
                     clear_water_head_m: h,
@@ -10307,8 +12156,14 @@ namespace AtlasCAD.Unity
             }
             "sim.optical.fiber_dispersion" => {
                 let w = req.arguments.get("wavelength_nm").and_then(|v| v.as_f64());
-                let l = req.arguments.get("fiber_length_km").and_then(|v| v.as_f64());
-                let b = req.arguments.get("target_bit_rate_gbps").and_then(|v| v.as_f64());
+                let l = req
+                    .arguments
+                    .get("fiber_length_km")
+                    .and_then(|v| v.as_f64());
+                let b = req
+                    .arguments
+                    .get("target_bit_rate_gbps")
+                    .and_then(|v| v.as_f64());
                 self.sim_optical_fiber_dispersion(&SimFiberDispersionRequest {
                     wavelength_nm: w,
                     fiber_length_km: l,
@@ -10317,9 +12172,18 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.marine.propeller_hydrodynamics" => {
-                let d = req.arguments.get("propeller_diameter_m").and_then(|v| v.as_f64());
-                let pd = req.arguments.get("pitch_diameter_ratio").and_then(|v| v.as_f64());
-                let rpm = req.arguments.get("rotational_speed_rpm").and_then(|v| v.as_f64());
+                let d = req
+                    .arguments
+                    .get("propeller_diameter_m")
+                    .and_then(|v| v.as_f64());
+                let pd = req
+                    .arguments
+                    .get("pitch_diameter_ratio")
+                    .and_then(|v| v.as_f64());
+                let rpm = req
+                    .arguments
+                    .get("rotational_speed_rpm")
+                    .and_then(|v| v.as_f64());
                 self.sim_marine_propeller_hydrodynamics(&SimPropellerRequest {
                     propeller_diameter_m: d,
                     pitch_diameter_ratio: pd,
@@ -10328,9 +12192,18 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.environmental.indoor_air_quality" => {
-                let a = req.arguments.get("room_floor_area_m2").and_then(|v| v.as_f64());
-                let h = req.arguments.get("room_clear_height_m").and_then(|v| v.as_f64());
-                let v = req.arguments.get("ventilation_supply_airflow_m3_h").and_then(|v| v.as_f64());
+                let a = req
+                    .arguments
+                    .get("room_floor_area_m2")
+                    .and_then(|v| v.as_f64());
+                let h = req
+                    .arguments
+                    .get("room_clear_height_m")
+                    .and_then(|v| v.as_f64());
+                let v = req
+                    .arguments
+                    .get("ventilation_supply_airflow_m3_h")
+                    .and_then(|v| v.as_f64());
                 self.sim_environmental_indoor_air_quality(&SimIndoorAirQualityRequest {
                     room_floor_area_m2: a,
                     room_clear_height_m: h,
@@ -10339,9 +12212,18 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.electrical.pmsm_foc_drive" => {
-                let rpm = req.arguments.get("rotational_speed_rpm").and_then(|v| v.as_f64());
-                let iq = req.arguments.get("q_axis_current_iq_a").and_then(|v| v.as_f64());
-                let vdc = req.arguments.get("inverter_dc_bus_voltage_v").and_then(|v| v.as_f64());
+                let rpm = req
+                    .arguments
+                    .get("rotational_speed_rpm")
+                    .and_then(|v| v.as_f64());
+                let iq = req
+                    .arguments
+                    .get("q_axis_current_iq_a")
+                    .and_then(|v| v.as_f64());
+                let vdc = req
+                    .arguments
+                    .get("inverter_dc_bus_voltage_v")
+                    .and_then(|v| v.as_f64());
                 self.sim_electrical_pmsm_foc_drive(&SimPmsmDriveRequest {
                     rotational_speed_rpm: rpm,
                     q_axis_current_iq_a: iq,
@@ -10350,9 +12232,18 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.civil.mse_retaining_wall" => {
-                let h = req.arguments.get("wall_height_h_m").and_then(|v| v.as_f64());
-                let l = req.arguments.get("reinforcement_length_l_m").and_then(|v| v.as_f64());
-                let t = req.arguments.get("geogrid_ultimate_strength_kn_m").and_then(|v| v.as_f64());
+                let h = req
+                    .arguments
+                    .get("wall_height_h_m")
+                    .and_then(|v| v.as_f64());
+                let l = req
+                    .arguments
+                    .get("reinforcement_length_l_m")
+                    .and_then(|v| v.as_f64());
+                let t = req
+                    .arguments
+                    .get("geogrid_ultimate_strength_kn_m")
+                    .and_then(|v| v.as_f64());
                 self.sim_civil_mse_retaining_wall(&SimMseWallRequest {
                     wall_height_h_m: h,
                     reinforcement_length_l_m: l,
@@ -10363,7 +12254,10 @@ namespace AtlasCAD.Unity
             "sim.nuclear.isotope_centrifuge" => {
                 let r = req.arguments.get("rotor_radius_m").and_then(|v| v.as_f64());
                 let l = req.arguments.get("rotor_length_m").and_then(|v| v.as_f64());
-                let rpm = req.arguments.get("rotational_speed_rpm").and_then(|v| v.as_f64());
+                let rpm = req
+                    .arguments
+                    .get("rotational_speed_rpm")
+                    .and_then(|v| v.as_f64());
                 self.sim_nuclear_isotope_centrifuge(&SimIsotopeCentrifugeRequest {
                     rotor_radius_m: r,
                     rotor_length_m: l,
@@ -10373,7 +12267,10 @@ namespace AtlasCAD.Unity
             }
             "sim.mechanical.conveyor_bulk_handling" => {
                 let b = req.arguments.get("belt_width_mm").and_then(|v| v.as_f64());
-                let l = req.arguments.get("conveyor_length_m").and_then(|v| v.as_f64());
+                let l = req
+                    .arguments
+                    .get("conveyor_length_m")
+                    .and_then(|v| v.as_f64());
                 let v = req.arguments.get("belt_speed_m_s").and_then(|v| v.as_f64());
                 self.sim_mechanical_conveyor_bulk_handling(&SimConveyorRequest {
                     belt_width_mm: b,
@@ -10385,7 +12282,10 @@ namespace AtlasCAD.Unity
             "sim.marine.offshore_wave_loading" => {
                 let d = req.arguments.get("water_depth_m").and_then(|v| v.as_f64());
                 let h = req.arguments.get("wave_height_m").and_then(|v| v.as_f64());
-                let dia = req.arguments.get("cylinder_diameter_m").and_then(|v| v.as_f64());
+                let dia = req
+                    .arguments
+                    .get("cylinder_diameter_m")
+                    .and_then(|v| v.as_f64());
                 self.sim_marine_offshore_wave_loading(&SimOffshoreWaveRequest {
                     water_depth_m: d,
                     wave_height_m: h,
@@ -10394,9 +12294,18 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.aerospace.spacecraft_adcs_attitude" => {
-                let alt = req.arguments.get("orbit_altitude_km").and_then(|v| v.as_f64());
-                let m = req.arguments.get("spacecraft_mass_kg").and_then(|v| v.as_f64());
-                let a = req.arguments.get("target_slew_accel_deg_s2").and_then(|v| v.as_f64());
+                let alt = req
+                    .arguments
+                    .get("orbit_altitude_km")
+                    .and_then(|v| v.as_f64());
+                let m = req
+                    .arguments
+                    .get("spacecraft_mass_kg")
+                    .and_then(|v| v.as_f64());
+                let a = req
+                    .arguments
+                    .get("target_slew_accel_deg_s2")
+                    .and_then(|v| v.as_f64());
                 self.sim_aerospace_spacecraft_adcs_attitude(&SimSpacecraftAdcsRequest {
                     orbit_altitude_km: alt,
                     spacecraft_mass_kg: m,
@@ -10405,9 +12314,15 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.electrical.battery_fast_charging" => {
-                let q = req.arguments.get("nominal_capacity_ah").and_then(|v| v.as_f64());
+                let q = req
+                    .arguments
+                    .get("nominal_capacity_ah")
+                    .and_then(|v| v.as_f64());
                 let c = req.arguments.get("charge_c_rate").and_then(|v| v.as_f64());
-                let r = req.arguments.get("internal_resistance_mohms").and_then(|v| v.as_f64());
+                let r = req
+                    .arguments
+                    .get("internal_resistance_mohms")
+                    .and_then(|v| v.as_f64());
                 self.sim_electrical_battery_fast_charging(&SimBatteryFastChargeRequest {
                     nominal_capacity_ah: q,
                     charge_c_rate: c,
@@ -10416,13 +12331,122 @@ namespace AtlasCAD.Unity
                 })?
             }
             "sim.process.packed_bed_scrubber" => {
-                let q = req.arguments.get("flue_gas_flow_rate_m3_h").and_then(|v| v.as_f64());
-                let yin = req.arguments.get("inlet_pollutant_mole_fraction").and_then(|v| v.as_f64());
-                let yout = req.arguments.get("target_outlet_mole_fraction").and_then(|v| v.as_f64());
+                let q = req
+                    .arguments
+                    .get("flue_gas_flow_rate_m3_h")
+                    .and_then(|v| v.as_f64());
+                let yin = req
+                    .arguments
+                    .get("inlet_pollutant_mole_fraction")
+                    .and_then(|v| v.as_f64());
+                let yout = req
+                    .arguments
+                    .get("target_outlet_mole_fraction")
+                    .and_then(|v| v.as_f64());
                 self.sim_process_packed_bed_scrubber(&SimPackedBedRequest {
                     flue_gas_flow_rate_m3_h: q,
                     inlet_pollutant_mole_fraction: yin,
                     target_outlet_mole_fraction: yout,
+                    ..Default::default()
+                })?
+            }
+            "sim.aerospace.aircraft_landing_gear" => {
+                let m = req
+                    .arguments
+                    .get("gear_landed_mass_kg")
+                    .and_then(|v| v.as_f64());
+                let v = req
+                    .arguments
+                    .get("vertical_sink_velocity_m_s")
+                    .and_then(|v| v.as_f64());
+                let s = req
+                    .arguments
+                    .get("available_stroke_mm")
+                    .and_then(|v| v.as_f64());
+                self.sim_aerospace_aircraft_landing_gear(&SimLandingGearRequest {
+                    gear_landed_mass_kg: m,
+                    vertical_sink_velocity_m_s: v,
+                    available_stroke_mm: s,
+                    ..Default::default()
+                })?
+            }
+            "sim.energy.pumped_storage_hydro" => {
+                let h1 = req
+                    .arguments
+                    .get("upper_reservoir_elevation_m")
+                    .and_then(|v| v.as_f64());
+                let h2 = req
+                    .arguments
+                    .get("lower_reservoir_elevation_m")
+                    .and_then(|v| v.as_f64());
+                let q = req
+                    .arguments
+                    .get("pumping_discharge_m3_s")
+                    .and_then(|v| v.as_f64());
+                self.sim_energy_pumped_storage_hydro(&SimPumpedStorageRequest {
+                    upper_reservoir_elevation_m: h1,
+                    lower_reservoir_elevation_m: h2,
+                    pumping_discharge_m3_s: q,
+                    ..Default::default()
+                })?
+            }
+            "sim.semiconductor.euv_lithography" => {
+                let na = req
+                    .arguments
+                    .get("numerical_aperture")
+                    .and_then(|v| v.as_f64());
+                let r = req
+                    .arguments
+                    .get("interface_roughness_nm")
+                    .and_then(|v| v.as_f64());
+                let d = req
+                    .arguments
+                    .get("resist_exposure_dose_mj_cm2")
+                    .and_then(|v| v.as_f64());
+                self.sim_semiconductor_euv_lithography(&SimEuvLithographyRequest {
+                    numerical_aperture: na,
+                    interface_roughness_nm: r,
+                    resist_exposure_dose_mj_cm2: d,
+                    ..Default::default()
+                })?
+            }
+            "sim.renewable.geothermal_binary_orc" => {
+                let m = req
+                    .arguments
+                    .get("brine_mass_flow_kg_s")
+                    .and_then(|v| v.as_f64());
+                let t = req
+                    .arguments
+                    .get("brine_inlet_temperature_c")
+                    .and_then(|v| v.as_f64());
+                let p = req
+                    .arguments
+                    .get("evaporator_pressure_bar")
+                    .and_then(|v| v.as_f64());
+                self.sim_renewable_geothermal_binary_orc(&SimGeothermalOrcRequest {
+                    brine_mass_flow_kg_s: m,
+                    brine_inlet_temperature_c: t,
+                    evaporator_pressure_bar: p,
+                    ..Default::default()
+                })?
+            }
+            "sim.structural.cable_stayed_bridge" => {
+                let l = req
+                    .arguments
+                    .get("cable_chord_length_m")
+                    .and_then(|v| v.as_f64());
+                let t = req
+                    .arguments
+                    .get("cable_pretension_kn")
+                    .and_then(|v| v.as_f64());
+                let x = req
+                    .arguments
+                    .get("damper_distance_from_deck_m")
+                    .and_then(|v| v.as_f64());
+                self.sim_structural_cable_stayed_bridge(&SimCableStayRequest {
+                    cable_chord_length_m: l,
+                    cable_pretension_kn: t,
+                    damper_distance_from_deck_m: x,
                     ..Default::default()
                 })?
             }
@@ -10542,7 +12566,10 @@ namespace AtlasCAD.Unity
         }))
     }
 
-    fn run_workflow_all(&mut self, req: &RunWorkflowRequest) -> Result<serde_json::Value, StudioError> {
+    fn run_workflow_all(
+        &mut self,
+        req: &RunWorkflowRequest,
+    ) -> Result<serde_json::Value, StudioError> {
         let graph =
             atlas_agent_orchestrator::WorkflowRegistry::instantiate_template(&req.workflow_id)
                 .map_err(|e| StudioError::BadRequest(e.to_string()))?;
@@ -10700,17 +12727,17 @@ namespace AtlasCAD.Unity
         }))
     }
 
-    fn realtime_scene_build(
-        &self,
-        name: &str,
-    ) -> Result<serde_json::Value, StudioError> {
+    fn realtime_scene_build(&self, name: &str) -> Result<serde_json::Value, StudioError> {
         let mut scene = atlas_scene_graph::Scene::new(name);
-        let mut root = atlas_scene_graph::SceneNode::new("root_aircraft", "Hypersonic Aircraft Airframe");
+        let mut root =
+            atlas_scene_graph::SceneNode::new("root_aircraft", "Hypersonic Aircraft Airframe");
         root.local_transform.position = [0.0, 32000.0, 0.0];
-        let root_id = scene.add_node(root, None)
+        let root_id = scene
+            .add_node(root, None)
             .map_err(|e| StudioError::BadRequest(e.to_string()))?;
 
-        let mut scramjet = atlas_scene_graph::SceneNode::new("child_scramjet", "Dual Scramjet Combustor");
+        let mut scramjet =
+            atlas_scene_graph::SceneNode::new("child_scramjet", "Dual Scramjet Combustor");
         scramjet.local_transform.position = [0.0, -1.2, 8.5];
         let mut telemetry = atlas_scene_graph::TelemetryComponent::default();
         telemetry.channels.insert("thrust_kn".into(), 485.0);
@@ -10718,7 +12745,8 @@ namespace AtlasCAD.Unity
         telemetry.channels.insert("total_temp_k".into(), 3120.0);
         scramjet.telemetry = Some(telemetry);
 
-        let _ = scene.add_node(scramjet, Some(&root_id))
+        let _ = scene
+            .add_node(scramjet, Some(&root_id))
             .map_err(|e| StudioError::BadRequest(e.to_string()))?;
 
         let bounds = scene.compute_world_bounds(&root_id);
@@ -10744,7 +12772,10 @@ namespace AtlasCAD.Unity
     ) -> Result<serde_json::Value, StudioError> {
         let mut timeline = atlas_timeline::Timeline::new("tl_01", title, fps);
         let v1 = timeline.add_track("Video 1 (4K Masters)", atlas_timeline::TrackKind::Video);
-        let a1 = timeline.add_track("Audio 1 (Fairlight Stereo)", atlas_timeline::TrackKind::Audio);
+        let a1 = timeline.add_track(
+            "Audio 1 (Fairlight Stereo)",
+            atlas_timeline::TrackKind::Audio,
+        );
 
         let clip1 = atlas_timeline::TimelineClip::new(
             "clip_hypersonic_takeoff",
@@ -10755,10 +12786,12 @@ namespace AtlasCAD.Unity
             240,
             0,
         );
-        timeline.add_clip_to_track(&v1, clip1)
+        timeline
+            .add_clip_to_track(&v1, clip1)
             .map_err(|e| StudioError::BadRequest(e.to_string()))?;
 
-        let otio_json = timeline.to_otio_json()
+        let otio_json = timeline
+            .to_otio_json()
             .map_err(|e| StudioError::BadRequest(e.to_string()))?;
 
         let otio_val = match serde_json::from_str::<serde_json::Value>(&otio_json) {
@@ -10780,9 +12813,7 @@ namespace AtlasCAD.Unity
         }))
     }
 
-    fn media_render_export(
-        &self,
-    ) -> Result<serde_json::Value, StudioError> {
+    fn media_render_export(&self) -> Result<serde_json::Value, StudioError> {
         let grade = atlas_compositor::ThreeWayColorGrade {
             lift: [-0.02, -0.02, 0.01],
             gamma: [1.02, 1.0, 0.98],
@@ -10797,7 +12828,8 @@ namespace AtlasCAD.Unity
 
         let b1 = atlas_audio::AudioBuffer::new(48000, 1, 4800);
         let b2 = atlas_audio::AudioBuffer::new(48000, 1, 4800);
-        let mix_res = mixer.mix_to_stereo(&[&b1, &b2])
+        let mix_res = mixer
+            .mix_to_stereo(&[&b1, &b2])
             .map_err(|e| StudioError::BadRequest(e.to_string()))?;
 
         Ok(serde_json::json!({
@@ -11626,10 +13658,11 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                         return error_response(&StudioError::BadRequest(error.to_string()));
                     }
                 };
+                let angle_deg = body.angle_deg.unwrap_or(cad_document::FULL_REVOLVE_DEGREES);
                 match with_state(state, |state| {
                     state.mutate(|project| {
                         project
-                            .add_revolve_feature(sketch_id, axis, operation)
+                            .add_revolve_feature_angle(sketch_id, axis, angle_deg, operation)
                             .map(|_| ())
                     })
                 }) {
@@ -11637,6 +13670,27 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                     Err(error) => error_response(&error),
                 }
             }
+            Err(error) => error_response(&error),
+        },
+        "/api/import/step" => match parse_body::<StepImportRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.import_step(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/import/remove" => match parse_body::<ImportRemoveRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.remove_import(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/import" => match parse_body::<DraftImportRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.drawing_import(&body)) {
+                Ok(payload) => to_json(200, &payload),
+                Err(error) => error_response(&error),
+            },
             Err(error) => error_response(&error),
         },
         "/api/draft/entity" => match parse_body::<DrawingEntityRequest>(request) {
@@ -11649,6 +13703,31 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                     "the entity is not a drawing entity: {error}"
                 ))),
             },
+            Err(error) => error_response(&error),
+        },
+        "/api/draft/entities" => match parse_body::<DrawingBatchRequest>(request) {
+            Ok(body) => {
+                let mut items = Vec::with_capacity(body.entities.len());
+                for item in body.entities {
+                    match serde_json::from_value::<cad_drafting::EntityKind>(item.kind) {
+                        Ok(kind) => items.push((item.layer, kind)),
+                        Err(error) => {
+                            return error_response(&StudioError::BadRequest(format!(
+                                "the entity is not a drawing entity: {error}"
+                            )));
+                        }
+                    }
+                }
+                if items.is_empty() {
+                    return error_response(&StudioError::BadRequest(
+                        "a batch needs at least one entity".into(),
+                    ));
+                }
+                match with_state(state, |state| state.drawing_add_batch(&items)) {
+                    Ok(payload) => to_json(200, &payload),
+                    Err(error) => error_response(&error),
+                }
+            }
             Err(error) => error_response(&error),
         },
         "/api/draft/remove" => match parse_body::<DrawingRemoveRequest>(request) {
@@ -12154,19 +14233,23 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/electrical/short_circuit" => {
             match parse_body_or_default::<SimShortCircuitRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_electrical_short_circuit(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_electrical_short_circuit(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/building/daylight_factor" => {
             match parse_body_or_default::<SimDaylightingRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_building_daylight_factor(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_building_daylight_factor(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
@@ -12181,31 +14264,33 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/pressure_vessel/asme" => {
             match parse_body_or_default::<SimPressureVesselRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_pressure_vessel_asme(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_pressure_vessel_asme(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/thermal/psychrometrics" => {
             match parse_body_or_default::<SimPsychrometricsRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_thermal_psychrometrics(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_thermal_psychrometrics(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
-        "/api/sim/civil/hydrology" => {
-            match parse_body_or_default::<SimHydrologyRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_civil_hydrology(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+        "/api/sim/civil/hydrology" => match parse_body_or_default::<SimHydrologyRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_civil_hydrology(&body)) {
+                Ok(payload) => json_response(200, payload),
                 Err(error) => error_response(&error),
-            }
-        }
+            },
+            Err(error) => error_response(&error),
+        },
         "/api/sim/structural/fracture" => {
             match parse_body_or_default::<SimFractureRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_structural_fracture(&body)) {
@@ -12217,10 +14302,12 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/rotordynamics/api617" => {
             match parse_body_or_default::<SimRotorDynamicsRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_rotordynamics_api617(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_rotordynamics_api617(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
@@ -12235,7 +14322,8 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/chemical/distillation" => {
             match parse_body_or_default::<SimDistillationRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_chemical_distillation(&body)) {
+                Ok(body) => match with_state(state, |state| state.sim_chemical_distillation(&body))
+                {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12253,25 +14341,26 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/structural/connections" => {
             match parse_body_or_default::<SimStructuralConnectionRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_structural_connections(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_structural_connections(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
-        "/api/sim/hydraulic/pump" => {
-            match parse_body_or_default::<SimPumpRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_hydraulic_pump(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+        "/api/sim/hydraulic/pump" => match parse_body_or_default::<SimPumpRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_hydraulic_pump(&body)) {
+                Ok(payload) => json_response(200, payload),
                 Err(error) => error_response(&error),
-            }
-        }
+            },
+            Err(error) => error_response(&error),
+        },
         "/api/sim/thermal/heat_exchanger_rating" => {
             match parse_body_or_default::<SimHeatExchangerRatingRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_heat_exchanger_rating(&body)) {
+                Ok(body) => match with_state(state, |state| state.sim_heat_exchanger_rating(&body))
+                {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12280,10 +14369,12 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/civil/geotechnical_bearing" => {
             match parse_body_or_default::<SimGeotechnicalBearingRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_geotechnical_bearing(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_geotechnical_bearing(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
@@ -12325,10 +14416,12 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/civil/reinforced_concrete" => {
             match parse_body_or_default::<SimReinforcedConcreteRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_civil_reinforced_concrete(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_civil_reinforced_concrete(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
@@ -12343,7 +14436,8 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/aerospace/gas_turbine" => {
             match parse_body_or_default::<SimGasTurbineRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_aerospace_gas_turbine(&body)) {
+                Ok(body) => match with_state(state, |state| state.sim_aerospace_gas_turbine(&body))
+                {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12361,7 +14455,8 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/mechanical/belt_drive" => {
             match parse_body_or_default::<SimBeltDriveRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_mechanical_belt_drive(&body)) {
+                Ok(body) => match with_state(state, |state| state.sim_mechanical_belt_drive(&body))
+                {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12370,52 +14465,63 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/geotechnical/slope_stability" => {
             match parse_body_or_default::<SimSlopeStabilityRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_geotechnical_slope_stability(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_geotechnical_slope_stability(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/electrical/induction_motor" => {
             match parse_body_or_default::<SimInductionMotorRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_electrical_induction_motor(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_electrical_induction_motor(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/thermal/solar_collector" => {
             match parse_body_or_default::<SimSolarCollectorRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_thermal_solar_collector(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_thermal_solar_collector(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/tribology/journal_bearing" => {
             match parse_body_or_default::<SimJournalBearingRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_tribology_journal_bearing(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_tribology_journal_bearing(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/renewable/wind_turbine" => {
             match parse_body_or_default::<SimWindTurbineRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_renewable_wind_turbine(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_renewable_wind_turbine(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/thermal/steam_rankine" => {
             match parse_body_or_default::<SimSteamRankineRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_thermal_steam_rankine(&body)) {
+                Ok(body) => match with_state(state, |state| state.sim_thermal_steam_rankine(&body))
+                {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12424,7 +14530,8 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/civil/pile_foundation" => {
             match parse_body_or_default::<SimPileFoundationRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_civil_pile_foundation(&body)) {
+                Ok(body) => match with_state(state, |state| state.sim_civil_pile_foundation(&body))
+                {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12433,34 +14540,41 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/mechanical/gear_fatigue" => {
             match parse_body_or_default::<SimGearFatigueRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_mechanical_gear_fatigue(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_mechanical_gear_fatigue(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/energy/battery_thermal" => {
             match parse_body_or_default::<SimBatteryThermalRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_energy_battery_thermal(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_energy_battery_thermal(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/aerospace/rocket_nozzle" => {
             match parse_body_or_default::<SimRocketNozzleRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_aerospace_rocket_nozzle(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_aerospace_rocket_nozzle(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/chemical/cstr_reactor" => {
             match parse_body_or_default::<SimCstrReactorRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_chemical_cstr_reactor(&body)) {
+                Ok(body) => match with_state(state, |state| state.sim_chemical_cstr_reactor(&body))
+                {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12469,19 +14583,23 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/civil/channel_hydraulics" => {
             match parse_body_or_default::<SimChannelHydraulicsRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_civil_channel_hydraulics(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_civil_channel_hydraulics(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/electrical/transmission_line" => {
             match parse_body_or_default::<SimTransmissionLineRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_electrical_transmission_line(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_electrical_transmission_line(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
@@ -12496,34 +14614,41 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/automotive/quarter_car" => {
             match parse_body_or_default::<SimQuarterCarRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_automotive_quarter_car(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_automotive_quarter_car(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/electrical/power_transformer" => {
             match parse_body_or_default::<SimPowerTransformerRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_electrical_power_transformer(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_electrical_power_transformer(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/thermal/refrigeration_cycle" => {
             match parse_body_or_default::<SimRefrigerationCycleRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_thermal_refrigeration_cycle(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_thermal_refrigeration_cycle(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/marine/ship_stability" => {
             match parse_body_or_default::<SimShipStabilityRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_marine_ship_stability(&body)) {
+                Ok(body) => match with_state(state, |state| state.sim_marine_ship_stability(&body))
+                {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12532,7 +14657,9 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/manufacturing/injection_molding" => {
             match parse_body_or_default::<SimInjectionMoldingRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_manufacturing_injection_molding(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_manufacturing_injection_molding(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12541,52 +14668,64 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/civil/seismic_analysis" => {
             match parse_body_or_default::<SimSeismicAnalysisRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_civil_seismic_analysis(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_civil_seismic_analysis(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/aerospace/orbital_mechanics" => {
             match parse_body_or_default::<SimOrbitalMechanicsRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_aerospace_orbital_mechanics(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_aerospace_orbital_mechanics(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/electronics/dc_dc_converter" => {
             match parse_body_or_default::<SimDcDcConverterRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_electronics_dc_dc_converter(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_electronics_dc_dc_converter(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/science/fusion_tokamak" => {
             match parse_body_or_default::<SimFusionTokamakRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_science_fusion_tokamak(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_science_fusion_tokamak(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/manufacturing/wire_edm" => {
             match parse_body_or_default::<SimWireEdmRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_manufacturing_wire_edm(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_manufacturing_wire_edm(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/renewable/wind_blade_aeroelastic" => {
             match parse_body_or_default::<SimWindBladeRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_renewable_wind_blade_aeroelastic(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_renewable_wind_blade_aeroelastic(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12595,34 +14734,38 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/marine/subsea_pipeline" => {
             match parse_body_or_default::<SimSubseaPipelineRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_marine_subsea_pipeline(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_marine_subsea_pipeline(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/aerospace/combustor_aerothermal" => {
             match parse_body_or_default::<SimCombustorRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_aerospace_combustor_aerothermal(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_aerospace_combustor_aerothermal(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
                 Err(error) => error_response(&error),
             }
         }
-        "/api/sim/energy/bess_grid" => {
-            match parse_body_or_default::<SimBessGridRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_energy_bess_grid(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+        "/api/sim/energy/bess_grid" => match parse_body_or_default::<SimBessGridRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.sim_energy_bess_grid(&body)) {
+                Ok(payload) => json_response(200, payload),
                 Err(error) => error_response(&error),
-            }
-        }
+            },
+            Err(error) => error_response(&error),
+        },
         "/api/sim/geotechnical/soil_consolidation" => {
             match parse_body_or_default::<SimSoilConsolidationRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_geotechnical_soil_consolidation(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_geotechnical_soil_consolidation(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12631,25 +14774,31 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/energy/hydraulic_turbine" => {
             match parse_body_or_default::<SimHydraulicTurbineRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_energy_hydraulic_turbine(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_energy_hydraulic_turbine(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/biomedical/stent_expansion" => {
             match parse_body_or_default::<SimStentExpansionRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_biomedical_stent_expansion(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_biomedical_stent_expansion(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/electronics/microwave_waveguide" => {
             match parse_body_or_default::<SimMicrowaveWaveguideRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_electronics_microwave_waveguide(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_electronics_microwave_waveguide(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12658,25 +14807,31 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/electrical/gis_dielectric" => {
             match parse_body_or_default::<SimGisDielectricRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_electrical_gis_dielectric(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_electrical_gis_dielectric(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/energy/pem_fuel_cell" => {
             match parse_body_or_default::<SimPemFuelCellRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_energy_pem_fuel_cell(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_energy_pem_fuel_cell(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/science/superconducting_magnet" => {
             match parse_body_or_default::<SimSuperconductingMagnetRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_science_superconducting_magnet(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_science_superconducting_magnet(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12685,7 +14840,9 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/aerospace/reentry_aerothermodynamics" => {
             match parse_body_or_default::<SimReentryRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_aerospace_reentry_aerothermodynamics(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_aerospace_reentry_aerothermodynamics(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12694,52 +14851,63 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/manufacturing/lpbf_meltpool" => {
             match parse_body_or_default::<SimLpbfRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_manufacturing_lpbf_meltpool(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_manufacturing_lpbf_meltpool(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/acoustics/phononic_bandgap" => {
             match parse_body_or_default::<SimPhononicCrystalRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_acoustics_phononic_bandgap(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_acoustics_phononic_bandgap(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/rail/wheel_rail_contact" => {
             match parse_body_or_default::<SimWheelRailRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_rail_wheel_rail_contact(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_rail_wheel_rail_contact(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/mining/mine_ventilation" => {
             match parse_body_or_default::<SimMineVentilationRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_mining_mine_ventilation(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_mining_mine_ventilation(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/telecom/reflector_antenna" => {
             match parse_body_or_default::<SimReflectorAntennaRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_telecom_reflector_antenna(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_telecom_reflector_antenna(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/semiconductor/gaa_fet" => {
             match parse_body_or_default::<SimGaaFetRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_semiconductor_gaa_fet(&body)) {
+                Ok(body) => match with_state(state, |state| state.sim_semiconductor_gaa_fet(&body))
+                {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12748,16 +14916,20 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/agri/irrigation_hydraulics" => {
             match parse_body_or_default::<SimIrrigationHydraulicsRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_agri_irrigation_hydraulics(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_agri_irrigation_hydraulics(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/environmental/wastewater_treatment" => {
             match parse_body_or_default::<SimWastewaterTreatmentRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_environmental_wastewater_treatment(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_environmental_wastewater_treatment(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12766,34 +14938,42 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/automotive/ev_powertrain" => {
             match parse_body_or_default::<SimEvPowertrainRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_automotive_ev_powertrain(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_automotive_ev_powertrain(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/civil/seismic_base_isolation" => {
             match parse_body_or_default::<SimSeismicBaseIsolationRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_civil_seismic_base_isolation(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_civil_seismic_base_isolation(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/defense/terminal_ballistics" => {
             match parse_body_or_default::<SimTerminalBallisticsRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_defense_terminal_ballistics(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_defense_terminal_ballistics(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/packaging/solder_thermal_fatigue" => {
             match parse_body_or_default::<SimSolderThermalFatigueRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_packaging_solder_thermal_fatigue(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_packaging_solder_thermal_fatigue(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12802,16 +14982,20 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/marine/ship_slamming" => {
             match parse_body_or_default::<SimShipSlammingRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_marine_ship_slamming(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_marine_ship_slamming(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/automotive/crash_deceleration" => {
             match parse_body_or_default::<SimCrashDecelerationRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_automotive_crash_deceleration(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_automotive_crash_deceleration(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12829,16 +15013,20 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/chemical/adsorption_psa" => {
             match parse_body_or_default::<SimAdsorptionPsaRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_chemical_adsorption_psa(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_chemical_adsorption_psa(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/aerospace/rotorcraft_aerodynamics" => {
             match parse_body_or_default::<SimRotorcraftAerodynamicsRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_aerospace_rotorcraft_aerodynamics(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_aerospace_rotorcraft_aerodynamics(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12847,7 +15035,9 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/thermal/heat_exchanger_delaware" => {
             match parse_body_or_default::<SimHeatExchangerDelawareRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_thermal_heat_exchanger_delaware(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_thermal_heat_exchanger_delaware(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12856,25 +15046,31 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/geotechnical/drilled_shaft" => {
             match parse_body_or_default::<SimDrilledShaftRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_geotechnical_drilled_shaft(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_geotechnical_drilled_shaft(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/biomedical/heart_valve" => {
             match parse_body_or_default::<SimHeartValveRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_biomedical_heart_valve(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_biomedical_heart_valve(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/aerospace/centrifugal_compressor" => {
             match parse_body_or_default::<SimCentrifugalCompressorRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_aerospace_centrifugal_compressor(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_aerospace_centrifugal_compressor(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12892,16 +15088,20 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/geotechnical/tbm_tunneling" => {
             match parse_body_or_default::<SimTbmTunnelingRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_geotechnical_tbm_tunneling(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_geotechnical_tbm_tunneling(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/structural/prestressed_concrete" => {
             match parse_body_or_default::<SimPrestressedConcreteRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_structural_prestressed_concrete(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_structural_prestressed_concrete(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12910,16 +15110,20 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/aerospace/spacecraft_jitter" => {
             match parse_body_or_default::<SimSpacecraftJitterRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_aerospace_spacecraft_jitter(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_aerospace_spacecraft_jitter(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/automotive/radar_lidar_sensor" => {
             match parse_body_or_default::<SimRadarLidarSensorRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_automotive_radar_lidar_sensor(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_automotive_radar_lidar_sensor(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12928,7 +15132,8 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/marine/auv_propulsion" => {
             match parse_body_or_default::<SimAuvPropulsionRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_marine_auv_propulsion(&body)) {
+                Ok(body) => match with_state(state, |state| state.sim_marine_auv_propulsion(&body))
+                {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12937,7 +15142,8 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/energy/hydro_governor" => {
             match parse_body_or_default::<SimHydroGovernorRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_energy_hydro_governor(&body)) {
+                Ok(body) => match with_state(state, |state| state.sim_energy_hydro_governor(&body))
+                {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12955,7 +15161,9 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/transportation/pavement_mepdg" => {
             match parse_body_or_default::<SimPavementMepdgRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_transportation_pavement_mepdg(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_transportation_pavement_mepdg(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12964,7 +15172,9 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/biomedical/scaffold_degradation" => {
             match parse_body_or_default::<SimBiomaterialScaffoldRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_biomedical_scaffold_degradation(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_biomedical_scaffold_degradation(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12973,7 +15183,9 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/aerospace/satellite_orbital_decay" => {
             match parse_body_or_default::<SimSatelliteOrbitalDecayRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_aerospace_satellite_orbital_decay(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_aerospace_satellite_orbital_decay(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12982,7 +15194,9 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/mining/bucket_wheel_excavator" => {
             match parse_body_or_default::<SimMiningExcavatorRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_mining_bucket_wheel_excavator(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_mining_bucket_wheel_excavator(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -12991,25 +15205,31 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/process/multiphase_pipe_flow" => {
             match parse_body_or_default::<SimMultiphasePipeFlowRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_process_multiphase_pipe_flow(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_process_multiphase_pipe_flow(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/energy/geothermal_reservoir" => {
             match parse_body_or_default::<SimGeothermalReservoirRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_energy_geothermal_reservoir(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_energy_geothermal_reservoir(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/process/spray_drying_kinetics" => {
             match parse_body_or_default::<SimSprayDryingKineticsRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_process_spray_drying_kinetics(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_process_spray_drying_kinetics(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -13018,25 +15238,31 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/energy/thermoelectric_rtg" => {
             match parse_body_or_default::<SimThermoelectricRtgRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_energy_thermoelectric_rtg(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_energy_thermoelectric_rtg(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/nuclear/containment_loca" => {
             match parse_body_or_default::<SimContainmentLocaRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_nuclear_containment_loca(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_nuclear_containment_loca(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/environmental/atmospheric_dispersion" => {
             match parse_body_or_default::<SimAtmosphericDispersionRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_environmental_atmospheric_dispersion(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_environmental_atmospheric_dispersion(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -13045,7 +15271,9 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/aerospace/rocket_ascent_trajectory" => {
             match parse_body_or_default::<SimRocketAscentRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_aerospace_rocket_ascent_trajectory(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_aerospace_rocket_ascent_trajectory(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -13054,34 +15282,42 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/civil/gravity_dam_stability" => {
             match parse_body_or_default::<SimGravityDamRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_civil_gravity_dam_stability(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_civil_gravity_dam_stability(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/energy/electrolyzer_hydrogen" => {
             match parse_body_or_default::<SimElectrolyzerHydrogenRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_energy_electrolyzer_hydrogen(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_energy_electrolyzer_hydrogen(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/optical/thin_film_optics" => {
             match parse_body_or_default::<SimThinFilmOpticsRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_optical_thin_film_optics(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_optical_thin_film_optics(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/energy/cryogenic_liquefaction" => {
             match parse_body_or_default::<SimCryogenicLiquefactionRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_energy_cryogenic_liquefaction(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_energy_cryogenic_liquefaction(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -13090,7 +15326,9 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/process/hydrocyclone_separation" => {
             match parse_body_or_default::<SimHydrocycloneRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_process_hydrocyclone_separation(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_process_hydrocyclone_separation(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -13099,25 +15337,31 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/mechanical/magnetic_bearing" => {
             match parse_body_or_default::<SimMagneticBearingRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_mechanical_magnetic_bearing(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_mechanical_magnetic_bearing(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/marine/sonar_propagation" => {
             match parse_body_or_default::<SimSonarPropagationRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_marine_sonar_propagation(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_marine_sonar_propagation(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/manufacturing/electron_beam_welding" => {
             match parse_body_or_default::<SimEbwWeldingRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_manufacturing_electron_beam_welding(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_manufacturing_electron_beam_welding(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -13126,7 +15370,9 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/process/crystallization_kinetics" => {
             match parse_body_or_default::<SimCrystallizationRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_process_crystallization_kinetics(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_process_crystallization_kinetics(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -13135,7 +15381,9 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/thermal/thermoelectric_cooler" => {
             match parse_body_or_default::<SimTecCoolerRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_thermal_thermoelectric_cooler(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_thermal_thermoelectric_cooler(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -13144,7 +15392,9 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/mechanical/slurry_pump_derating" => {
             match parse_body_or_default::<SimSlurryPumpRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_mechanical_slurry_pump_derating(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_mechanical_slurry_pump_derating(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -13153,16 +15403,20 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/optical/fiber_dispersion" => {
             match parse_body_or_default::<SimFiberDispersionRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_optical_fiber_dispersion(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_optical_fiber_dispersion(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/marine/propeller_hydrodynamics" => {
             match parse_body_or_default::<SimPropellerRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_marine_propeller_hydrodynamics(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_marine_propeller_hydrodynamics(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -13171,7 +15425,9 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/environmental/indoor_air_quality" => {
             match parse_body_or_default::<SimIndoorAirQualityRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_environmental_indoor_air_quality(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_environmental_indoor_air_quality(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -13180,34 +15436,42 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/electrical/pmsm_foc_drive" => {
             match parse_body_or_default::<SimPmsmDriveRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_electrical_pmsm_foc_drive(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_electrical_pmsm_foc_drive(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/civil/mse_retaining_wall" => {
             match parse_body_or_default::<SimMseWallRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_civil_mse_retaining_wall(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_civil_mse_retaining_wall(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/nuclear/isotope_centrifuge" => {
             match parse_body_or_default::<SimIsotopeCentrifugeRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_nuclear_isotope_centrifuge(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_nuclear_isotope_centrifuge(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/mechanical/conveyor_bulk_handling" => {
             match parse_body_or_default::<SimConveyorRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_mechanical_conveyor_bulk_handling(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_mechanical_conveyor_bulk_handling(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -13216,16 +15480,20 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/marine/offshore_wave_loading" => {
             match parse_body_or_default::<SimOffshoreWaveRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_marine_offshore_wave_loading(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_marine_offshore_wave_loading(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/sim/aerospace/spacecraft_adcs_attitude" => {
             match parse_body_or_default::<SimSpacecraftAdcsRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_aerospace_spacecraft_adcs_attitude(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_aerospace_spacecraft_adcs_attitude(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -13234,7 +15502,9 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/electrical/battery_fast_charging" => {
             match parse_body_or_default::<SimBatteryFastChargeRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_electrical_battery_fast_charging(&body)) {
+                Ok(body) => match with_state(state, |state| {
+                    state.sim_electrical_battery_fast_charging(&body)
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 },
@@ -13243,19 +15513,88 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         }
         "/api/sim/process/packed_bed_scrubber" => {
             match parse_body_or_default::<SimPackedBedRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_process_packed_bed_scrubber(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_process_packed_bed_scrubber(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/aerospace/aircraft_landing_gear" => {
+            match parse_body_or_default::<SimLandingGearRequest>(request) {
+                Ok(body) => {
+                    match with_state(state, |state| {
+                        state.sim_aerospace_aircraft_landing_gear(&body)
+                    }) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/energy/pumped_storage_hydro" => {
+            match parse_body_or_default::<SimPumpedStorageRequest>(request) {
+                Ok(body) => {
+                    match with_state(state, |state| {
+                        state.sim_energy_pumped_storage_hydro(&body)
+                    }) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/semiconductor/euv_lithography" => {
+            match parse_body_or_default::<SimEuvLithographyRequest>(request) {
+                Ok(body) => {
+                    match with_state(state, |state| {
+                        state.sim_semiconductor_euv_lithography(&body)
+                    }) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/renewable/geothermal_binary_orc" => {
+            match parse_body_or_default::<SimGeothermalOrcRequest>(request) {
+                Ok(body) => {
+                    match with_state(state, |state| {
+                        state.sim_renewable_geothermal_binary_orc(&body)
+                    }) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
+                Err(error) => error_response(&error),
+            }
+        }
+        "/api/sim/structural/cable_stayed_bridge" => {
+            match parse_body_or_default::<SimCableStayRequest>(request) {
+                Ok(body) => {
+                    match with_state(state, |state| {
+                        state.sim_structural_cable_stayed_bridge(&body)
+                    }) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
         "/api/additive/process_profile" => {
             match parse_body_or_default::<AdditiveProcessProfileRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.additive_process_profile(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.additive_process_profile(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
         }
@@ -13287,28 +15626,35 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             },
             Err(error) => error_response(&error),
         },
-        "/api/sim/hypersonic/plasma" => match parse_body_or_default::<HypersonicPlasmaRequest>(request) {
-            Ok(body) => match with_state(state, |state| state.sim_hypersonic_plasma(&body)) {
-                Ok(payload) => json_response(200, payload),
+        "/api/sim/hypersonic/plasma" => {
+            match parse_body_or_default::<HypersonicPlasmaRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_hypersonic_plasma(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
                 Err(error) => error_response(&error),
-            },
-            Err(error) => error_response(&error),
-        },
-        "/api/sim/hypersonic/thermal" => match parse_body_or_default::<HypersonicThermalRequest>(request) {
-            Ok(body) => match with_state(state, |state| state.sim_hypersonic_thermal(&body)) {
-                Ok(payload) => json_response(200, payload),
+            }
+        }
+        "/api/sim/hypersonic/thermal" => {
+            match parse_body_or_default::<HypersonicThermalRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_hypersonic_thermal(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
                 Err(error) => error_response(&error),
-            },
-            Err(error) => error_response(&error),
-        },
-        "/api/sim/hypersonic/scramjet" => match parse_body_or_default::<HypersonicScramjetRequest>(request) {
-            Ok(body) => match with_state(state, |state| state.sim_hypersonic_scramjet(&body)) {
-                Ok(payload) => json_response(200, payload),
+            }
+        }
+        "/api/sim/hypersonic/scramjet" => {
+            match parse_body_or_default::<HypersonicScramjetRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_hypersonic_scramjet(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
                 Err(error) => error_response(&error),
-            },
-            Err(error) => error_response(&error),
-        },
-        "/api/sim/hypersonic/cryo" => match parse_body_or_default::<HypersonicCryoRequest>(request) {
+            }
+        }
+        "/api/sim/hypersonic/cryo" => match parse_body_or_default::<HypersonicCryoRequest>(request)
+        {
             Ok(body) => match with_state(state, |state| state.sim_hypersonic_cryo(&body)) {
                 Ok(payload) => json_response(200, payload),
                 Err(error) => error_response(&error),
@@ -13326,48 +15672,59 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             },
             Err(error) => error_response(&error),
         },
-        "/api/sim/hypersonic/slush" => match parse_body_or_default::<HypersonicSlushRequest>(request) {
-            Ok(body) => match with_state(state, |state| state.sim_hypersonic_slush(&body)) {
-                Ok(payload) => json_response(200, payload),
+        "/api/sim/hypersonic/slush" => {
+            match parse_body_or_default::<HypersonicSlushRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_hypersonic_slush(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
                 Err(error) => error_response(&error),
-            },
-            Err(error) => error_response(&error),
-        },
-        "/api/sim/hypersonic/creep" => match parse_body_or_default::<HypersonicCreepRequest>(request) {
-            Ok(body) => match with_state(state, |state| state.sim_hypersonic_creep(&body)) {
-                Ok(payload) => json_response(200, payload),
+            }
+        }
+        "/api/sim/hypersonic/creep" => {
+            match parse_body_or_default::<HypersonicCreepRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_hypersonic_creep(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
                 Err(error) => error_response(&error),
-            },
-            Err(error) => error_response(&error),
-        },
-        "/api/sim/hypersonic/flutter" => match parse_body_or_default::<HypersonicFlutterRequest>(request) {
-            Ok(body) => match with_state(state, |state| state.sim_hypersonic_flutter(&body)) {
-                Ok(payload) => json_response(200, payload),
+            }
+        }
+        "/api/sim/hypersonic/flutter" => {
+            match parse_body_or_default::<HypersonicFlutterRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_hypersonic_flutter(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
                 Err(error) => error_response(&error),
-            },
-            Err(error) => error_response(&error),
-        },
-        "/api/sim/hypersonic/6dof" => match parse_body_or_default::<Hypersonic6DofRequest>(request) {
+            }
+        }
+        "/api/sim/hypersonic/6dof" => match parse_body_or_default::<Hypersonic6DofRequest>(request)
+        {
             Ok(body) => match with_state(state, |state| state.sim_hypersonic_6dof(&body)) {
                 Ok(payload) => json_response(200, payload),
                 Err(error) => error_response(&error),
             },
             Err(error) => error_response(&error),
         },
-        "/api/sim/hypersonic/magnet" => match parse_body_or_default::<HypersonicMagnetRequest>(request) {
-            Ok(body) => match with_state(state, |state| state.sim_hypersonic_magnet(&body)) {
-                Ok(payload) => json_response(200, payload),
+        "/api/sim/hypersonic/magnet" => {
+            match parse_body_or_default::<HypersonicMagnetRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.sim_hypersonic_magnet(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
                 Err(error) => error_response(&error),
-            },
-            Err(error) => error_response(&error),
-        },
-        "/api/orchestrator/workflows/run" => match parse_body_or_default::<RunWorkflowRequest>(request) {
-            Ok(body) => match with_state(state, |state| state.run_workflow_all(&body)) {
-                Ok(payload) => json_response(200, payload),
+            }
+        }
+        "/api/orchestrator/workflows/run" => {
+            match parse_body_or_default::<RunWorkflowRequest>(request) {
+                Ok(body) => match with_state(state, |state| state.run_workflow_all(&body)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                },
                 Err(error) => error_response(&error),
-            },
-            Err(error) => error_response(&error),
-        },
+            }
+        }
         "/api/sim/chemical" => match parse_body_or_default::<SimChemicalRequest>(request) {
             Ok(body) => match with_state(state, |state| state.sim_chemical(&body)) {
                 Ok(payload) => json_response(200, payload),
@@ -13375,17 +15732,20 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             },
             Err(error) => error_response(&error),
         },
-        "/api/sim/chemical/acid_base" => match parse_body_or_default::<SimAcidBaseRequest>(request) {
+        "/api/sim/chemical/acid_base" => match parse_body_or_default::<SimAcidBaseRequest>(request)
+        {
             Ok(body) => match with_state(state, |state| state.sim_chemical_acid_base(&body)) {
                 Ok(payload) => json_response(200, payload),
                 Err(error) => error_response(&error),
             },
             Err(error) => error_response(&error),
         },
-        "/api/sim/chemical/species" => match with_state(state, |state| state.sim_chemical_species()) {
-            Ok(payload) => json_response(200, payload),
-            Err(error) => error_response(&error),
-        },
+        "/api/sim/chemical/species" => {
+            match with_state(state, |state| state.sim_chemical_species()) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            }
+        }
         "/api/sim/chemical/kinetics" => {
             match parse_body_or_default::<SimChemicalKineticsRequest>(request) {
                 Ok(body) => match with_state(state, |state| state.sim_chemical_kinetics(&body)) {
@@ -13394,7 +15754,7 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                 },
                 Err(error) => error_response(&error),
             }
-        },
+        }
         "/api/sim/molecular" => match parse_body_or_default::<SimMolecularRequest>(request) {
             Ok(body) => match with_state(state, |state| state.sim_molecular(&body)) {
                 Ok(payload) => json_response(200, payload),
@@ -13514,13 +15874,15 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         },
         "/api/sim/acoustics/outdoor_noise" => {
             match parse_body_or_default::<SimOutdoorNoiseRequest>(request) {
-                Ok(body) => match with_state(state, |state| state.sim_acoustics_outdoor_noise(&body)) {
-                    Ok(payload) => json_response(200, payload),
-                    Err(error) => error_response(&error),
-                },
+                Ok(body) => {
+                    match with_state(state, |state| state.sim_acoustics_outdoor_noise(&body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
                 Err(error) => error_response(&error),
             }
-        },
+        }
         "/api/sim/solar" => match parse_body_or_default::<SimSolarRequest>(request) {
             Ok(body) => match with_state(state, |state| state.sim_solar(&body)) {
                 Ok(payload) => json_response(200, payload),
@@ -13745,64 +16107,57 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             },
             Err(error) => error_response(&error),
         },
-        "/api/create/subdivide" => {
-            match parse_body_or_default::<CreateSubdivideRequest>(request) {
-                Ok(body) => {
-                    let mesh_id = body.mesh_id.as_deref().unwrap_or("cad_tessellated_mesh");
-                    let levels = body.levels.unwrap_or(1);
-                    match with_state(state, |state| state.create_subdivide(mesh_id, levels)) {
-                        Ok(payload) => json_response(200, payload),
-                        Err(error) => error_response(&error),
-                    }
+        "/api/create/subdivide" => match parse_body_or_default::<CreateSubdivideRequest>(request) {
+            Ok(body) => {
+                let mesh_id = body.mesh_id.as_deref().unwrap_or("cad_tessellated_mesh");
+                let levels = body.levels.unwrap_or(1);
+                match with_state(state, |state| state.create_subdivide(mesh_id, levels)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
                 }
-                Err(error) => error_response(&error),
             }
-        }
-        "/api/create/sculpt" => {
-            match parse_body_or_default::<CreateSculptRequest>(request) {
-                Ok(body) => {
-                    let brush = body.brush.as_deref().unwrap_or("clay");
-                    let radius = body.radius.unwrap_or(0.5);
-                    let strength = body.strength.unwrap_or(0.35);
-                    match with_state(state, |state| state.create_sculpt(brush, radius, strength)) {
-                        Ok(payload) => json_response(200, payload),
-                        Err(error) => error_response(&error),
-                    }
+            Err(error) => error_response(&error),
+        },
+        "/api/create/sculpt" => match parse_body_or_default::<CreateSculptRequest>(request) {
+            Ok(body) => {
+                let brush = body.brush.as_deref().unwrap_or("clay");
+                let radius = body.radius.unwrap_or(0.5);
+                let strength = body.strength.unwrap_or(0.35);
+                match with_state(state, |state| state.create_sculpt(brush, radius, strength)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
                 }
-                Err(error) => error_response(&error),
             }
-        }
-        "/api/realtime/scene" => {
-            match parse_body_or_default::<RealTimeSceneRequest>(request) {
-                Ok(body) => {
-                    let name = body.name.as_deref().unwrap_or("Hypersonic Digital Twin World");
-                    match with_state(state, |state| state.realtime_scene_build(name)) {
-                        Ok(payload) => json_response(200, payload),
-                        Err(error) => error_response(&error),
-                    }
+            Err(error) => error_response(&error),
+        },
+        "/api/realtime/scene" => match parse_body_or_default::<RealTimeSceneRequest>(request) {
+            Ok(body) => {
+                let name = body
+                    .name
+                    .as_deref()
+                    .unwrap_or("Hypersonic Digital Twin World");
+                match with_state(state, |state| state.realtime_scene_build(name)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
                 }
-                Err(error) => error_response(&error),
             }
-        }
-        "/api/media/timeline" => {
-            match parse_body_or_default::<MediaTimelineRequest>(request) {
-                Ok(body) => {
-                    let title = body.title.as_deref().unwrap_or("Mach 11 Jet Commercial");
-                    let fps = body.fps.unwrap_or(24);
-                    match with_state(state, |state| state.media_timeline_build(title, fps)) {
-                        Ok(payload) => json_response(200, payload),
-                        Err(error) => error_response(&error),
-                    }
+            Err(error) => error_response(&error),
+        },
+        "/api/media/timeline" => match parse_body_or_default::<MediaTimelineRequest>(request) {
+            Ok(body) => {
+                let title = body.title.as_deref().unwrap_or("Mach 11 Jet Commercial");
+                let fps = body.fps.unwrap_or(24);
+                match with_state(state, |state| state.media_timeline_build(title, fps)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
                 }
-                Err(error) => error_response(&error),
             }
-        }
-        "/api/media/render" => {
-            match with_state(state, |state| state.media_render_export()) {
-                Ok(payload) => json_response(200, payload),
-                Err(error) => error_response(&error),
-            }
-        }
+            Err(error) => error_response(&error),
+        },
+        "/api/media/render" => match with_state(state, |state| state.media_render_export()) {
+            Ok(payload) => json_response(200, payload),
+            Err(error) => error_response(&error),
+        },
         _ => error_response(&StudioError::NotFound),
     }
 }
@@ -13953,6 +16308,11 @@ struct OriginRequest {
 struct DrawingEntityRequest {
     layer: String,
     kind: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+struct DrawingBatchRequest {
+    entities: Vec<DrawingEntityRequest>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -14200,6 +16560,34 @@ struct DraftToSolidRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct StepImportRequest {
+    /// STEP physical-file text. The studio's JSON body cap bounds it well below the reader's own
+    /// 256 MiB limit.
+    text: String,
+    /// Name for the body; the STEP product name is used when absent.
+    #[serde(default)]
+    name: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ImportRemoveRequest {
+    name: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftImportRequest {
+    /// The DXF text. The studio's JSON body cap applies, so this is bounded well below the
+    /// drafting document's own 32 MiB file limit.
+    text: String,
+    /// Name for the imported drawing; the project's name is used when absent.
+    #[serde(default)]
+    name: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct DraftHatchRequest {
     #[serde(default)]
     layer: Option<String>,
@@ -14384,8 +16772,8 @@ fn direction_for(name: &str) -> Result<ExtrudeDirection, StudioError> {
     }
 }
 
-/// A new revolve. It has no depth: the tool is the sketch turned a full turn about one of the
-/// sketch's own axes, so the axis is the only extra input.
+/// A new revolve. It has no depth: the tool is the sketch turned about one of the sketch's own
+/// axes. `angle_deg` defaults to a full turn, which is what a schema-10 revolve meant.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct NewRevolveRequest {
@@ -14393,6 +16781,8 @@ struct NewRevolveRequest {
     operation: String,
     #[serde(default = "default_axis")]
     axis: String,
+    #[serde(default)]
+    angle_deg: Option<f64>,
 }
 
 fn default_axis() -> String {
@@ -17847,7 +20237,8 @@ struct SimPavementMepdgRequest {
 #[derive(Debug, Default, Deserialize)]
 struct SimBiomaterialScaffoldRequest {
     #[serde(default)]
-    pub biomaterial_type: Option<atlas_simulation_core::biomaterial_scaffold::ScaffoldBiomaterialType>,
+    pub biomaterial_type:
+        Option<atlas_simulation_core::biomaterial_scaffold::ScaffoldBiomaterialType>,
     #[serde(default)]
     pub scaffold_diameter_mm: Option<f64>,
     #[serde(default)]
@@ -17993,7 +20384,8 @@ struct SimSprayDryingKineticsRequest {
 #[derive(Debug, Default, Deserialize)]
 struct SimThermoelectricRtgRequest {
     #[serde(default)]
-    pub material_type: Option<atlas_simulation_core::thermoelectric_rtg::ThermoelectricMaterialType>,
+    pub material_type:
+        Option<atlas_simulation_core::thermoelectric_rtg::ThermoelectricMaterialType>,
     #[serde(default)]
     pub initial_thermal_power_w_th: Option<f64>,
     #[serde(default)]
@@ -18047,7 +20439,8 @@ struct SimContainmentLocaRequest {
 #[derive(Debug, Default, Deserialize)]
 struct SimAtmosphericDispersionRequest {
     #[serde(default)]
-    pub stability_class: Option<atlas_simulation_core::atmospheric_dispersion::AtmosphericStabilityClass>,
+    pub stability_class:
+        Option<atlas_simulation_core::atmospheric_dispersion::AtmosphericStabilityClass>,
     #[serde(default)]
     pub pollutant: Option<atlas_simulation_core::atmospheric_dispersion::AirPollutantType>,
     #[serde(default)]
@@ -18073,7 +20466,8 @@ struct SimAtmosphericDispersionRequest {
 #[derive(Debug, Default, Deserialize)]
 struct SimRocketAscentRequest {
     #[serde(default)]
-    pub staging_type: Option<atlas_simulation_core::rocket_ascent_trajectory::RocketStagingArchitecture>,
+    pub staging_type:
+        Option<atlas_simulation_core::rocket_ascent_trajectory::RocketStagingArchitecture>,
     #[serde(default)]
     pub gross_liftoff_mass_kg: Option<f64>,
     #[serde(default)]
@@ -18339,7 +20733,8 @@ struct SimTecCoolerRequest {
 #[derive(Debug, Default, Deserialize)]
 struct SimSlurryPumpRequest {
     #[serde(default)]
-    pub abrasiveness_class: Option<atlas_simulation_core::slurry_pump_derating::SlurryAbrasivenessClass>,
+    pub abrasiveness_class:
+        Option<atlas_simulation_core::slurry_pump_derating::SlurryAbrasivenessClass>,
     #[serde(default)]
     pub slurry_flow_rate_m3_h: Option<f64>,
     #[serde(default)]
@@ -18565,7 +20960,8 @@ struct SimOffshoreWaveRequest {
 #[derive(Debug, Default, Deserialize)]
 struct SimSpacecraftAdcsRequest {
     #[serde(default)]
-    pub orbit_regime: Option<atlas_simulation_core::spacecraft_adcs_attitude::SpacecraftOrbitRegime>,
+    pub orbit_regime:
+        Option<atlas_simulation_core::spacecraft_adcs_attitude::SpacecraftOrbitRegime>,
     #[serde(default)]
     pub orbit_altitude_km: Option<f64>,
     #[serde(default)]
@@ -18591,7 +20987,8 @@ struct SimSpacecraftAdcsRequest {
 #[derive(Debug, Default, Deserialize)]
 struct SimBatteryFastChargeRequest {
     #[serde(default)]
-    pub cathode_chemistry: Option<atlas_simulation_core::battery_fast_charging::BatteryCathodeChemistry>,
+    pub cathode_chemistry:
+        Option<atlas_simulation_core::battery_fast_charging::BatteryCathodeChemistry>,
     #[serde(default)]
     pub nominal_capacity_ah: Option<f64>,
     #[serde(default)]
@@ -18634,4 +21031,167 @@ struct SimPackedBedRequest {
     pub liquid_viscosity_cp: Option<f64>,
     #[serde(default)]
     pub henrys_law_slope_m: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimLandingGearRequest {
+    #[serde(default)]
+    pub problem_id: Option<String>,
+    #[serde(default)]
+    pub metering_type: Option<atlas_simulation_core::aircraft_landing_gear::MeteringPinType>,
+    #[serde(default)]
+    pub gear_landed_mass_kg: Option<f64>,
+    #[serde(default)]
+    pub vertical_sink_velocity_m_s: Option<f64>,
+    #[serde(default)]
+    pub lift_to_weight_ratio: Option<f64>,
+    #[serde(default)]
+    pub available_stroke_mm: Option<f64>,
+    #[serde(default)]
+    pub piston_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub gas_precharge_pressure_mpa: Option<f64>,
+    #[serde(default)]
+    pub initial_gas_volume_liters: Option<f64>,
+    #[serde(default)]
+    pub polytropic_exponent: Option<f64>,
+    #[serde(default)]
+    pub orifice_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub orifice_discharge_coeff: Option<f64>,
+    #[serde(default)]
+    pub fluid_density_kg_m3: Option<f64>,
+    #[serde(default)]
+    pub tire_stiffness_kn_m: Option<f64>,
+    #[serde(default)]
+    pub max_allowable_tire_deflection_mm: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimPumpedStorageRequest {
+    #[serde(default)]
+    pub problem_id: Option<String>,
+    #[serde(default)]
+    pub runner_type: Option<atlas_simulation_core::pumped_storage_hydro::PumpTurbineType>,
+    #[serde(default)]
+    pub upper_reservoir_elevation_m: Option<f64>,
+    #[serde(default)]
+    pub lower_reservoir_elevation_m: Option<f64>,
+    #[serde(default)]
+    pub conduit_length_m: Option<f64>,
+    #[serde(default)]
+    pub conduit_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub darcy_friction_factor: Option<f64>,
+    #[serde(default)]
+    pub minor_loss_k_total: Option<f64>,
+    #[serde(default)]
+    pub pumping_discharge_m3_s: Option<f64>,
+    #[serde(default)]
+    pub generating_discharge_m3_s: Option<f64>,
+    #[serde(default)]
+    pub rotational_speed_rpm: Option<f64>,
+    #[serde(default)]
+    pub runner_diameter_m: Option<f64>,
+    #[serde(default)]
+    pub runner_submergence_depth_m: Option<f64>,
+    #[serde(default)]
+    pub atmospheric_pressure_kpa: Option<f64>,
+    #[serde(default)]
+    pub water_vapor_pressure_kpa: Option<f64>,
+    #[serde(default)]
+    pub pump_hydraulic_efficiency: Option<f64>,
+    #[serde(default)]
+    pub turbine_hydraulic_efficiency: Option<f64>,
+    #[serde(default)]
+    pub motor_generator_efficiency: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimEuvLithographyRequest {
+    #[serde(default)]
+    pub problem_id: Option<String>,
+    #[serde(default)]
+    pub tool_generation:
+        Option<atlas_simulation_core::semiconductor_euv_lithography::EuvToolGeneration>,
+    #[serde(default)]
+    pub wavelength_nm: Option<f64>,
+    #[serde(default)]
+    pub numerical_aperture: Option<f64>,
+    #[serde(default)]
+    pub process_factor_k1: Option<f64>,
+    #[serde(default)]
+    pub dof_factor_k2: Option<f64>,
+    #[serde(default)]
+    pub bilayer_period_d_nm: Option<f64>,
+    #[serde(default)]
+    pub molybdenum_fraction_gamma: Option<f64>,
+    #[serde(default)]
+    pub bilayer_pair_count: Option<u32>,
+    #[serde(default)]
+    pub interface_roughness_nm: Option<f64>,
+    #[serde(default)]
+    pub incidence_angle_deg: Option<f64>,
+    #[serde(default)]
+    pub mirror_count_in_train: Option<u32>,
+    #[serde(default)]
+    pub resist_exposure_dose_mj_cm2: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimGeothermalOrcRequest {
+    #[serde(default)]
+    pub problem_id: Option<String>,
+    #[serde(default)]
+    pub working_fluid: Option<atlas_simulation_core::geothermal_binary_orc::OrcWorkingFluid>,
+    #[serde(default)]
+    pub brine_mass_flow_kg_s: Option<f64>,
+    #[serde(default)]
+    pub brine_inlet_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub min_reinjection_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub pinch_point_temp_diff_c: Option<f64>,
+    #[serde(default)]
+    pub evaporator_pressure_bar: Option<f64>,
+    #[serde(default)]
+    pub condensing_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub expander_isentropic_efficiency: Option<f64>,
+    #[serde(default)]
+    pub pump_isentropic_efficiency: Option<f64>,
+    #[serde(default)]
+    pub generator_efficiency: Option<f64>,
+    #[serde(default)]
+    pub parasitic_power_fraction: Option<f64>,
+    #[serde(default)]
+    pub ambient_reference_temp_c: Option<f64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SimCableStayRequest {
+    #[serde(default)]
+    pub problem_id: Option<String>,
+    #[serde(default)]
+    pub stay_class: Option<atlas_simulation_core::cable_stayed_bridge::StayCableClass>,
+    #[serde(default)]
+    pub cable_chord_length_m: Option<f64>,
+    #[serde(default)]
+    pub outer_pipe_diameter_mm: Option<f64>,
+    #[serde(default)]
+    pub chord_inclination_deg: Option<f64>,
+    #[serde(default)]
+    pub cable_pretension_kn: Option<f64>,
+    #[serde(default)]
+    pub total_linear_mass_kg_m: Option<f64>,
+    #[serde(default)]
+    pub elastic_modulus_gpa: Option<f64>,
+    #[serde(default)]
+    pub net_steel_area_mm2: Option<f64>,
+    #[serde(default)]
+    pub inherent_damping_ratio: Option<f64>,
+    #[serde(default)]
+    pub damper_distance_from_deck_m: Option<f64>,
+    #[serde(default)]
+    pub wind_speed_m_s: Option<f64>,
 }

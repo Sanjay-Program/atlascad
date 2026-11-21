@@ -6774,5 +6774,175 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         }),
     )?;
 
+    registry.register(
+        CommandSchema::new(
+            "sim.aerospace.aircraft_landing_gear",
+            "Aircraft Landing Gear Oleo-Pneumatic Shock Absorber & Drop Dynamics (FAR/CS 25.723 / Mil-L-8552)",
+            "Calculates touchdown impact kinetics, non-linear gas spring compression, hydraulic metering orifice damping, tire crushing deflection, stroke efficiency, and limit landing load factor.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "gear_landed_mass_kg".into(),
+            arg_type: ArgumentType::Number,
+            description: "Landed mass per gear strut in kg".into(),
+            required: false,
+            default_value: Some(serde_json::json!(18500.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(100000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "vertical_sink_velocity_m_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Vertical sink velocity at touchdown in m/s (FAR 25.723 limit = 3.05 m/s)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(3.05)),
+            validation_rules: vec![ValidationRule::Min(0.1), ValidationRule::Max(8.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "available_stroke_mm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Maximum available internal shock strut stroke in mm".into(),
+            required: false,
+            default_value: Some(serde_json::json!(420.0)),
+            validation_rules: vec![ValidationRule::Min(50.0), ValidationRule::Max(1500.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.energy.pumped_storage_hydro",
+            "Pumped Storage Hydroelectric Plant Reversible Pump-Turbine & Water Conduit (IEC 60041 / IEC 61362)",
+            "Calculates static and dynamic head losses, reversible Francis pump-turbine pumping/generating duty, specific speed, cavitation Thoma parameter, and round-trip cycle efficiency.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "upper_reservoir_elevation_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Upper reservoir water surface elevation in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1850.0)),
+            validation_rules: vec![ValidationRule::Min(0.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "lower_reservoir_elevation_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Lower reservoir water surface elevation in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(1540.0)),
+            validation_rules: vec![ValidationRule::Min(0.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "pumping_discharge_m3_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Pumping mode volumetric discharge in m³/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(32.0)),
+            validation_rules: vec![ValidationRule::Min(0.1)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.semiconductor.euv_lithography",
+            "Semiconductor EUV Photolithography Multi-Layer Optics & Resolution (ASML / SEMI / Fresnel-Debye)",
+            "Calculates 13.5 nm EUV Mo/Si multi-layer mirror Bragg reflectivity, Debye-Waller roughness scattering, optical train throughput, Rayleigh critical dimension, DOF, and photon shot-noise LER.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "numerical_aperture".into(),
+            arg_type: ArgumentType::Number,
+            description: "Scanner optical projection numerical aperture (0.33 or 0.55)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.33)),
+            validation_rules: vec![ValidationRule::Min(0.20), ValidationRule::Max(0.90)],
+        })
+        .with_argument(CommandArgument {
+            name: "interface_roughness_nm".into(),
+            arg_type: ArgumentType::Number,
+            description: "Mo/Si multi-layer interface RMS roughness in nanometers".into(),
+            required: false,
+            default_value: Some(serde_json::json!(0.15)),
+            validation_rules: vec![ValidationRule::Min(0.01), ValidationRule::Max(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "resist_exposure_dose_mj_cm2".into(),
+            arg_type: ArgumentType::Number,
+            description: "Photoresist sensitivity exposure dose in mJ/cm²".into(),
+            required: false,
+            default_value: Some(serde_json::json!(45.0)),
+            validation_rules: vec![ValidationRule::Min(5.0), ValidationRule::Max(200.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.renewable.geothermal_binary_orc",
+            "Geothermal Binary Organic Rankine Cycle (ORC) Power Plant (ASME PTC 46 / VDI 4670 / DiPippo)",
+            "Calculates low-to-medium enthalpy geothermal brine heat extraction, binary hydrocarbon ORC state points, pinch point dynamics, expander turbine power, net power output, and exergy efficiency.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "brine_mass_flow_kg_s".into(),
+            arg_type: ArgumentType::Number,
+            description: "Geothermal brine production mass flow in kg/s".into(),
+            required: false,
+            default_value: Some(serde_json::json!(85.0)),
+            validation_rules: vec![ValidationRule::Min(1.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "brine_inlet_temperature_c".into(),
+            arg_type: ArgumentType::Number,
+            description: "Wellhead brine production temperature in °C".into(),
+            required: false,
+            default_value: Some(serde_json::json!(165.0)),
+            validation_rules: vec![ValidationRule::Min(80.0), ValidationRule::Max(250.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "evaporator_pressure_bar".into(),
+            arg_type: ArgumentType::Number,
+            description: "ORC evaporating pressure in bar(a)".into(),
+            required: false,
+            default_value: Some(serde_json::json!(18.5)),
+            validation_rules: vec![ValidationRule::Min(2.0), ValidationRule::Max(50.0)],
+        }),
+    )?;
+
+    registry.register(
+        CommandSchema::new(
+            "sim.structural.cable_stayed_bridge",
+            "Cable-Stayed Bridge Stay Cable Rain-Wind Induced Vibration & Damping (FHWA-HRT-05-072 / PTI)",
+            "Calculates stay cable Irvine sag-extensible transverse eigenfrequencies, rain-wind induced vibration (RWIV) critical onset velocity, Scruton number, and external damper sizing per PTI criteria.",
+            CommandCategory::Simulation,
+        )
+        .with_permission(CommandPermission::SimulationRun)
+        .with_argument(CommandArgument {
+            name: "cable_chord_length_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "Stay cable chord length between anchorages in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(240.0)),
+            validation_rules: vec![ValidationRule::Min(20.0), ValidationRule::Max(800.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "cable_pretension_kn".into(),
+            arg_type: ArgumentType::Number,
+            description: "Effective service stay cable pretension force in kN".into(),
+            required: false,
+            default_value: Some(serde_json::json!(3600.0)),
+            validation_rules: vec![ValidationRule::Min(100.0), ValidationRule::Max(20000.0)],
+        })
+        .with_argument(CommandArgument {
+            name: "damper_distance_from_deck_m".into(),
+            arg_type: ArgumentType::Number,
+            description: "External damper installation distance from deck anchorage in meters".into(),
+            required: false,
+            default_value: Some(serde_json::json!(5.50)),
+            validation_rules: vec![ValidationRule::Min(1.0), ValidationRule::Max(30.0)],
+        }),
+    )?;
+
     Ok(())
 }

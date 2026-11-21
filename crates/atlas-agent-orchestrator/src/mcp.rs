@@ -2370,6 +2370,71 @@ impl McpServer {
                     "required": ["flue_gas_flow_rate_m3_h", "inlet_pollutant_mole_fraction"]
                 }),
             },
+            McpToolDefinition {
+                name: "atlas_sim_aerospace_aircraft_landing_gear".into(),
+                description: "Calculates touchdown impact kinetics, non-linear gas spring compression, hydraulic metering orifice damping, tire crushing deflection, stroke efficiency, and limit landing load factor.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "gear_landed_mass_kg": { "type": "number", "default": 18500.0 },
+                        "vertical_sink_velocity_m_s": { "type": "number", "default": 3.05 },
+                        "available_stroke_mm": { "type": "number", "default": 420.0 }
+                    },
+                    "required": ["gear_landed_mass_kg", "vertical_sink_velocity_m_s"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_energy_pumped_storage_hydro".into(),
+                description: "Calculates static and dynamic head losses, reversible Francis pump-turbine pumping/generating duty, specific speed, cavitation Thoma parameter, and round-trip cycle efficiency.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "upper_reservoir_elevation_m": { "type": "number", "default": 1850.0 },
+                        "lower_reservoir_elevation_m": { "type": "number", "default": 1540.0 },
+                        "pumping_discharge_m3_s": { "type": "number", "default": 32.0 }
+                    },
+                    "required": ["upper_reservoir_elevation_m", "lower_reservoir_elevation_m"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_semiconductor_euv_lithography".into(),
+                description: "Calculates 13.5 nm EUV Mo/Si multi-layer mirror Bragg reflectivity, Debye-Waller roughness scattering, optical train throughput, Rayleigh critical dimension, DOF, and photon shot-noise LER.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "numerical_aperture": { "type": "number", "default": 0.33 },
+                        "interface_roughness_nm": { "type": "number", "default": 0.15 },
+                        "resist_exposure_dose_mj_cm2": { "type": "number", "default": 45.0 }
+                    },
+                    "required": ["numerical_aperture", "interface_roughness_nm"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_renewable_geothermal_binary_orc".into(),
+                description: "Calculates low-to-medium enthalpy geothermal brine heat extraction, binary hydrocarbon ORC state points, pinch point dynamics, expander turbine power, net power output, and exergy efficiency.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "brine_mass_flow_kg_s": { "type": "number", "default": 85.0 },
+                        "brine_inlet_temperature_c": { "type": "number", "default": 165.0 },
+                        "evaporator_pressure_bar": { "type": "number", "default": 18.5 }
+                    },
+                    "required": ["brine_mass_flow_kg_s", "brine_inlet_temperature_c"]
+                }),
+            },
+            McpToolDefinition {
+                name: "atlas_sim_structural_cable_stayed_bridge".into(),
+                description: "Calculates stay cable Irvine sag-extensible transverse eigenfrequencies, rain-wind induced vibration (RWIV) critical onset velocity, Scruton number, and external damper sizing per PTI criteria.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "cable_chord_length_m": { "type": "number", "default": 240.0 },
+                        "cable_pretension_kn": { "type": "number", "default": 3600.0 },
+                        "damper_distance_from_deck_m": { "type": "number", "default": 5.50 }
+                    },
+                    "required": ["cable_chord_length_m", "cable_pretension_kn"]
+                }),
+            },
         ]
     }
 

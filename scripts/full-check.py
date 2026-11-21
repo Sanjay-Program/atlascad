@@ -3253,6 +3253,129 @@ def simulation_section(studio: Studio) -> None:
     check(scrub_data.get("is_flooding_velocity_safe", False) is True, "flooding velocity safe")
     check(scrub_data.get("is_packed_bed_viable", False) is True, "packed bed scrubber viable")
 
+    # 135. Aircraft Landing Gear Oleo-Pneumatic Shock Strut & Dynamic Drop (FAR/CS 25.723 / Mil-L-8552 / Currey)
+    gear = studio.post("/api/sim/aerospace/aircraft_landing_gear", {
+        "metering_type": "TaperedContourPin",
+        "gear_landed_mass_kg": 18500.0,
+        "vertical_sink_velocity_m_s": 3.05,
+        "lift_to_weight_ratio": 0.85,
+        "available_stroke_mm": 420.0,
+        "piston_diameter_mm": 180.0,
+        "gas_precharge_pressure_mpa": 4.20,
+        "initial_gas_volume_liters": 14.50,
+        "polytropic_exponent": 1.35,
+        "orifice_diameter_mm": 34.0,
+        "orifice_discharge_coeff": 0.68,
+        "fluid_density_kg_m3": 885.0
+    })
+    check(gear.status == 200, f"landing gear drop returns 200 (got {gear.status})")
+    gear_data = gear.json()
+    check(250.0 < gear_data.get("max_strut_stroke_mm", 0.0) < 400.0, "max strut stroke 250-400 mm")
+    check(gear_data.get("peak_ground_reaction_force_kn", 0.0) > 200.0, "peak ground reaction force > 200 kN")
+    check(gear_data.get("vertical_load_factor_g", 0.0) <= 2.50, "vertical load factor <= 2.50 g")
+    check(gear_data.get("shock_strut_efficiency_pct", 0.0) >= 70.0, "shock strut efficiency >= 70%")
+    check(gear_data.get("is_stroke_margin_sufficient", False) is True, "stroke reserve margin sufficient")
+    check(gear_data.get("is_load_factor_compliant", False) is True, "load factor compliant with FAR 25.723")
+    check(gear_data.get("is_tire_deflection_acceptable", False) is True, "tire deflection acceptable")
+    check(gear_data.get("is_landing_gear_viable", False) is True, "landing gear shock absorber viable")
+
+    # 136. Pumped Storage Hydroelectric Plant Reversible Pump-Turbine & Water Conduit (IEC 60041 / IEC 61362 / IEEE 1207)
+    hydro = studio.post("/api/sim/energy/pumped_storage_hydro", {
+        "runner_type": "FrancisReversible",
+        "upper_reservoir_elevation_m": 1850.0,
+        "lower_reservoir_elevation_m": 1540.0,
+        "conduit_length_m": 1650.0,
+        "conduit_diameter_m": 3.80,
+        "darcy_friction_factor": 0.014,
+        "minor_loss_k_total": 1.85,
+        "pumping_discharge_m3_s": 32.0,
+        "generating_discharge_m3_s": 36.5,
+        "rotational_speed_rpm": 428.6,
+        "runner_submergence_depth_m": 35.0
+    })
+    check(hydro.status == 200, f"pumped storage hydro returns 200 (got {hydro.status})")
+    hydro_data = hydro.json()
+    check(hydro_data.get("total_dynamic_pumping_head_m", 0.0) > 311.0, "dynamic pumping head > 311 m")
+    check(hydro_data.get("pumping_electrical_power_mw", 0.0) > 90.0, "pumping electrical power > 90 MW")
+    check(hydro_data.get("generating_electrical_power_mw", 0.0) > 80.0, "generating electrical power > 80 MW")
+    check(hydro_data.get("round_trip_efficiency_pct", 0.0) >= 75.0, "round-trip cycle efficiency >= 75%")
+    check(hydro_data.get("cavitation_safety_factor", 0.0) >= 1.15, "cavitation safety factor >= 1.15")
+    check(hydro_data.get("is_cavitation_safe", False) is True, "cavitation safe under submergence")
+    check(hydro_data.get("is_round_trip_efficiency_competitive", False) is True, "RTE competitive")
+    check(hydro_data.get("is_pumped_storage_viable", False) is True, "pumped storage plant viable")
+
+    # 137. Semiconductor EUV Photolithography Multi-Layer Optics & Resolution (ASML / SEMI / Fresnel-Debye)
+    euv = studio.post("/api/sim/semiconductor/euv_lithography", {
+        "tool_generation": "StandardNa033",
+        "wavelength_nm": 13.50,
+        "numerical_aperture": 0.33,
+        "process_factor_k1": 0.32,
+        "dof_factor_k2": 0.60,
+        "bilayer_period_d_nm": 6.90,
+        "molybdenum_fraction_gamma": 0.40,
+        "bilayer_pair_count": 50,
+        "interface_roughness_nm": 0.15,
+        "incidence_angle_deg": 6.0,
+        "mirror_count_in_train": 11,
+        "resist_exposure_dose_mj_cm2": 45.0
+    })
+    check(euv.status == 200, f"semiconductor euv returns 200 (got {euv.status})")
+    euv_data = euv.json()
+    check(euv_data.get("net_mirror_reflectivity_pct", 0.0) >= 66.0, "net mirror reflectivity >= 66%")
+    check(euv_data.get("critical_dimension_resolution_nm", 0.0) <= 15.0, "critical dimension CD <= 15 nm")
+    check(euv_data.get("depth_of_focus_nm", 0.0) >= 60.0, "depth of focus DOF >= 60 nm")
+    check(euv_data.get("line_edge_roughness_3sigma_nm", 0.0) <= 3.0, "3-sigma LER <= 3 nm")
+    check(euv_data.get("is_mirror_reflectivity_sufficient", False) is True, "mirror reflectivity sufficient")
+    check(euv_data.get("is_resolution_advanced_node_capable", False) is True, "advanced node capable")
+    check(euv_data.get("is_depth_of_focus_manufacturable", False) is True, "DOF manufacturable")
+    check(euv_data.get("is_euv_system_viable", False) is True, "euv lithography system viable")
+
+    # 138. Geothermal Binary Organic Rankine Cycle (ORC) Power Plant (ASME PTC 46 / VDI 4670 / DiPippo)
+    orc = studio.post("/api/sim/renewable/geothermal_binary_orc", {
+        "working_fluid": "Isopentane",
+        "brine_mass_flow_kg_s": 85.0,
+        "brine_inlet_temperature_c": 165.0,
+        "min_reinjection_temperature_c": 72.0,
+        "pinch_point_temp_diff_c": 6.0,
+        "evaporator_pressure_bar": 18.5,
+        "condensing_temperature_c": 36.0,
+        "expander_isentropic_efficiency": 0.86,
+        "pump_isentropic_efficiency": 0.78,
+        "generator_efficiency": 0.97
+    })
+    check(orc.status == 200, f"geothermal binary orc returns 200 (got {orc.status})")
+    orc_data = orc.json()
+    check(orc_data.get("thermal_duty_extracted_mw", 0.0) > 25.0, "thermal duty extracted > 25 MWth")
+    check(orc_data.get("net_electrical_power_mw", 0.0) > 3.0, "net electrical power > 3 MWe")
+    check(orc_data.get("exergy_second_law_efficiency_pct", 0.0) >= 35.0, "second-law exergy efficiency >= 35%")
+    check(orc_data.get("is_silica_scaling_prevented", False) is True, "silica scaling prevented")
+    check(orc_data.get("is_exergy_efficiency_competitive", False) is True, "exergy efficiency competitive")
+    check(orc_data.get("is_geothermal_orc_viable", False) is True, "geothermal binary ORC viable")
+
+    # 139. Cable-Stayed Bridge Stay Cable Rain-Wind Induced Vibration & Damping (FHWA-HRT-05-072 / PTI / Eurocode 1)
+    stay = studio.post("/api/sim/structural/cable_stayed_bridge", {
+        "stay_class": "ParallelStrandSystemPSS",
+        "cable_chord_length_m": 240.0,
+        "outer_pipe_diameter_mm": 160.0,
+        "chord_inclination_deg": 32.0,
+        "cable_pretension_kn": 3600.0,
+        "total_linear_mass_kg_m": 52.0,
+        "elastic_modulus_gpa": 195.0,
+        "net_steel_area_mm2": 6400.0,
+        "inherent_damping_ratio": 0.0012,
+        "damper_distance_from_deck_m": 5.50,
+        "wind_speed_m_s": 14.5
+    })
+    check(stay.status == 200, f"cable-stayed bridge stay returns 200 (got {stay.status})")
+    stay_data = stay.json()
+    check(stay_data.get("midspan_static_sag_mm", 0.0) > 500.0, "midspan sag > 500 mm")
+    check(stay_data.get("fundamental_frequency_hz", 0.0) > 0.4, "fundamental frequency > 0.4 Hz")
+    check(stay_data.get("optimal_damper_coefficient_kn_s_m", 0.0) > 30.0, "optimal damping coefficient > 30 kN*s/m")
+    check(stay_data.get("attained_damping_ratio", 0.0) >= 0.0060, "attained damping ratio >= 0.0060")
+    check(stay_data.get("is_cable_sag_acceptable", False) is True, "cable sag acceptable")
+    check(stay_data.get("is_rwiv_mitigated", False) is True, "rain-wind vibration mitigated")
+    check(stay_data.get("is_stay_cable_viable", False) is True, "stay cable system viable")
+
     report("simulation")
 
 

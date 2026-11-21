@@ -4840,6 +4840,149 @@ def run_live_demo() -> None:
             check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
         print(f"  ✓ 41.7 Enterprise MCP Tool Calling: 5 Batch-26 Engineering MCP Tools verified via JSON-RPC 2.0")
 
+        # -------------------------------------------------------------------------
+        # 42. AEROSPACE LANDING GEAR, PUMPED STORAGE HYDRO, EUV LITHO, GEOTHERMAL ORC & CABLE-STAYED BRIDGES
+        # -------------------------------------------------------------------------
+        print("\n[42/42] MULTI-DISCIPLINARY PHYSICS (LANDING GEAR DROP, PUMPED STORAGE, EUV LITHO, GEOTHERMAL ORC, CABLE STAY)")
+
+        # 42.1 Aircraft Landing Gear Oleo-Pneumatic Shock Strut & Dynamic Drop (FAR/CS 25.723 / Mil-L-8552 / Currey)
+        gear_res = http_request(port, "POST", "/api/sim/aerospace/aircraft_landing_gear", body={
+            "metering_type": "TaperedContourPin",
+            "gear_landed_mass_kg": 18500.0,
+            "vertical_sink_velocity_m_s": 3.05,
+            "lift_to_weight_ratio": 0.85,
+            "available_stroke_mm": 420.0,
+            "piston_diameter_mm": 180.0,
+            "gas_precharge_pressure_mpa": 4.20,
+            "initial_gas_volume_liters": 14.50,
+            "polytropic_exponent": 1.35,
+            "orifice_diameter_mm": 34.0,
+            "orifice_discharge_coeff": 0.68,
+            "fluid_density_kg_m3": 885.0
+        })
+        check(250.0 < gear_res.get("max_strut_stroke_mm", 0.0) < 400.0, "Landing gear max strut stroke 250-400 mm")
+        check(gear_res.get("peak_ground_reaction_force_kn", 0.0) > 200.0, "Landing gear peak ground reaction force > 200 kN")
+        check(gear_res.get("vertical_load_factor_g", 0.0) <= 2.50, "Landing gear vertical load factor <= 2.50 g")
+        check(gear_res.get("shock_strut_efficiency_pct", 0.0) >= 70.0, "Landing gear shock strut efficiency >= 70%")
+        check(gear_res.get("is_landing_gear_viable") is True, "FAR 25.723 / Currey Landing Gear Shock Absorber Viable")
+        print(f"  ✓ 42.1 Aircraft Landing Gear Drop (FAR/CS 25.723 / Mil-L-8552 / Currey): 18.5t Main Gear @ 3.05 m/s Sink, Stroke S_max = {gear_res['max_strut_stroke_mm']:.1f} mm / 420 mm, Tire Deflection = {gear_res['max_tire_deflection_mm']:.1f} mm, Ground Reaction F_gr = {gear_res['peak_ground_reaction_force_kn']:.1f} kN (N_z = {gear_res['vertical_load_factor_g']:.2f} g <= 2.50 g), Strut Absorption Efficiency = {gear_res['shock_strut_efficiency_pct']:.1f}%, Peak Pressure = {gear_res['peak_internal_pressure_mpa']:.1f} MPa")
+
+        # 42.2 Pumped Storage Hydroelectric Plant Reversible Pump-Turbine & Water Conduit (IEC 60041 / IEC 61362 / IEEE 1207)
+        hydro_res = http_request(port, "POST", "/api/sim/energy/pumped_storage_hydro", body={
+            "runner_type": "FrancisReversible",
+            "upper_reservoir_elevation_m": 1850.0,
+            "lower_reservoir_elevation_m": 1540.0,
+            "conduit_length_m": 1650.0,
+            "conduit_diameter_m": 3.80,
+            "darcy_friction_factor": 0.014,
+            "minor_loss_k_total": 1.85,
+            "pumping_discharge_m3_s": 32.0,
+            "generating_discharge_m3_s": 36.5,
+            "rotational_speed_rpm": 428.6,
+            "runner_submergence_depth_m": 35.0
+        })
+        check(hydro_res.get("total_dynamic_pumping_head_m", 0.0) > 311.0, "Dynamic pumping head > 311 m")
+        check(hydro_res.get("pumping_electrical_power_mw", 0.0) > 90.0, "Pumping electrical power > 90 MW")
+        check(hydro_res.get("generating_electrical_power_mw", 0.0) > 80.0, "Generating electrical power > 80 MW")
+        check(hydro_res.get("round_trip_efficiency_pct", 0.0) >= 75.0, "Pumped storage round-trip efficiency >= 75%")
+        check(hydro_res.get("cavitation_safety_factor", 0.0) >= 1.15, "Cavitation safety factor >= 1.15")
+        check(hydro_res.get("is_pumped_storage_viable") is True, "IEC 60041 / 61362 Pumped Storage Plant Viable")
+        print(f"  ✓ 42.2 Pumped Storage Hydroelectric Plant (IEC 60041 / 61362 / IEEE 1207): Gross Head 310 m (1850m/1540m), Conduit 1650m x Ø3.8m, Pumping Mode: H_p = {hydro_res['total_dynamic_pumping_head_m']:.2f} m, P_in = {hydro_res['pumping_electrical_power_mw']:.1f} MWe; Generating Mode: H_net = {hydro_res['net_generating_head_m']:.2f} m, P_out = {hydro_res['generating_electrical_power_mw']:.1f} MWe; RTE = {hydro_res['round_trip_efficiency_pct']:.1f}%, Cavitation Safety Factor = {hydro_res['cavitation_safety_factor']:.3f} >= 1.15")
+
+        # 42.3 Semiconductor EUV Photolithography Multi-Layer Optics & Resolution (ASML / SEMI / Fresnel-Debye)
+        euv_res = http_request(port, "POST", "/api/sim/semiconductor/euv_lithography", body={
+            "tool_generation": "StandardNa033",
+            "wavelength_nm": 13.50,
+            "numerical_aperture": 0.33,
+            "process_factor_k1": 0.32,
+            "dof_factor_k2": 0.60,
+            "bilayer_period_d_nm": 6.90,
+            "molybdenum_fraction_gamma": 0.40,
+            "bilayer_pair_count": 50,
+            "interface_roughness_nm": 0.15,
+            "incidence_angle_deg": 6.0,
+            "mirror_count_in_train": 11,
+            "resist_exposure_dose_mj_cm2": 45.0
+        })
+        check(euv_res.get("net_mirror_reflectivity_pct", 0.0) >= 66.0, "Net mirror reflectivity >= 66%")
+        check(euv_res.get("critical_dimension_resolution_nm", 0.0) <= 15.0, "Rayleigh CD <= 15 nm")
+        check(euv_res.get("depth_of_focus_nm", 0.0) >= 60.0, "Depth of focus >= 60 nm")
+        check(euv_res.get("line_edge_roughness_3sigma_nm", 0.0) <= 3.0, "Photon shot-noise LER <= 3 nm")
+        check(euv_res.get("is_euv_system_viable") is True, "ASML / SEMI EUV Photolithography System Viable")
+        print(f"  ✓ 42.3 Semiconductor EUV Photolithography (ASML / SEMI / Fresnel-Debye): 13.5 nm EUV Radiation, 50-Pair Mo/Si Multi-Layer (d = 6.9 nm, σ = 0.15 nm), Single Mirror R = {euv_res['net_mirror_reflectivity_pct']:.1f}% (Debye-Waller DW = {euv_res['debye_waller_factor']:.3f}), 11-Mirror Train Transmission = {euv_res['optical_train_transmission_pct']:.2f}%, NA = 0.33 Resolution CD = {euv_res['critical_dimension_resolution_nm']:.2f} nm, DOF = {euv_res['depth_of_focus_nm']:.1f} nm, Stochastic 3σ LER = {euv_res['line_edge_roughness_3sigma_nm']:.2f} nm")
+
+        # 42.4 Geothermal Binary Organic Rankine Cycle (ORC) Power Plant (ASME PTC 46 / VDI 4670 / DiPippo)
+        orc_res = http_request(port, "POST", "/api/sim/renewable/geothermal_binary_orc", body={
+            "working_fluid": "Isopentane",
+            "brine_mass_flow_kg_s": 85.0,
+            "brine_inlet_temperature_c": 165.0,
+            "min_reinjection_temperature_c": 72.0,
+            "pinch_point_temp_diff_c": 6.0,
+            "evaporator_pressure_bar": 18.5,
+            "condensing_temperature_c": 36.0,
+            "expander_isentropic_efficiency": 0.86,
+            "pump_isentropic_efficiency": 0.78,
+            "generator_efficiency": 0.97
+        })
+        check(orc_res.get("thermal_duty_extracted_mw", 0.0) > 25.0, "Brine thermal duty > 25 MWth")
+        check(orc_res.get("net_electrical_power_mw", 0.0) > 3.0, "Net electrical power > 3 MWe")
+        check(orc_res.get("exergy_second_law_efficiency_pct", 0.0) >= 35.0, "Second-law exergy efficiency >= 35%")
+        check(orc_res.get("is_geothermal_orc_viable") is True, "ASME PTC 46 / DiPippo Geothermal Binary ORC Viable")
+        print(f"  ✓ 42.4 Geothermal Binary ORC Power Plant (ASME PTC 46 / VDI 4670 / DiPippo): 85 kg/s Liquid Brine @ 165°C -> 72°C (Silica Limit), Isopentane ORC @ 18.5 bar, Thermal Duty Q_th = {orc_res['thermal_duty_extracted_mw']:.2f} MWth, Expander Gross Power = {orc_res['gross_electrical_power_mw']:.2f} MWe, Net Power P_net = {orc_res['net_electrical_power_mw']:.2f} MWe, 1st-Law η_th = {orc_res['thermal_first_law_efficiency_pct']:.1f}%, 2nd-Law Exergy η_ex = {orc_res['exergy_second_law_efficiency_pct']:.1f}%")
+
+        # 42.5 Cable-Stayed Bridge Stay Cable Rain-Wind Induced Vibration & Damping (FHWA-HRT-05-072 / PTI / Eurocode 1)
+        stay_res = http_request(port, "POST", "/api/sim/structural/cable_stayed_bridge", body={
+            "stay_class": "ParallelStrandSystemPSS",
+            "cable_chord_length_m": 240.0,
+            "outer_pipe_diameter_mm": 160.0,
+            "chord_inclination_deg": 32.0,
+            "cable_pretension_kn": 3600.0,
+            "total_linear_mass_kg_m": 52.0,
+            "elastic_modulus_gpa": 195.0,
+            "net_steel_area_mm2": 6400.0,
+            "inherent_damping_ratio": 0.0012,
+            "damper_distance_from_deck_m": 5.50,
+            "wind_speed_m_s": 14.5
+        })
+        check(stay_res.get("midspan_static_sag_mm", 0.0) > 500.0, "Stay cable static sag > 500 mm")
+        check(stay_res.get("fundamental_frequency_hz", 0.0) > 0.4, "Fundamental frequency f_1 > 0.4 Hz")
+        check(stay_res.get("optimal_damper_coefficient_kn_s_m", 0.0) > 30.0, "Optimal damping coefficient > 30 kN*s/m")
+        check(stay_res.get("attained_damping_ratio", 0.0) >= 0.0060, "Attained modal damping >= 0.0060")
+        check(stay_res.get("is_stay_cable_viable") is True, "FHWA / PTI Cable-Stayed Bridge Dynamic Mitigation Viable")
+        print(f"  ✓ 42.5 Cable-Stayed Bridge Stay Cable Dynamics & RWIV (FHWA-HRT-05-072 / PTI): 240 m PSS Stay @ 32° Inclination, T_0 = 3600 kN, Sag δ = {stay_res['midspan_static_sag_mm']:.1f} mm, Irvine Modal Frequencies: f_1 = {stay_res['fundamental_frequency_hz']:.3f} Hz, f_2 = {stay_res['second_harmonic_freq_hz']:.3f} Hz, f_3 = {stay_res['third_harmonic_freq_hz']:.3f} Hz; RWIV Onset U_crit = {stay_res['critical_rwiv_wind_velocity_m_s']:.2f} m/s; Viscous Damper @ 5.5m: C_opt = {stay_res['optimal_damper_coefficient_kn_s_m']:.1f} kN·s/m, Modal Damping ζ_total = {stay_res['attained_damping_ratio']*100.0:.2f}% >= {stay_res['pti_required_damping_ratio']*100.0:.2f}% (PTI Compliant, RWIV Suppressed)")
+
+        # 42.6 Universal Commands Execution Verification (Batch 27 Domains)
+        for cmd_id, cmd_args in [
+            ("sim.aerospace.aircraft_landing_gear", {"gear_landed_mass_kg": 18500.0, "vertical_sink_velocity_m_s": 3.05}),
+            ("sim.energy.pumped_storage_hydro", {"upper_reservoir_elevation_m": 1850.0, "lower_reservoir_elevation_m": 1540.0}),
+            ("sim.semiconductor.euv_lithography", {"numerical_aperture": 0.33, "interface_roughness_nm": 0.15}),
+            ("sim.renewable.geothermal_binary_orc", {"brine_mass_flow_kg_s": 85.0, "brine_inlet_temperature_c": 165.0}),
+            ("sim.structural.cable_stayed_bridge", {"cable_chord_length_m": 240.0, "cable_pretension_kn": 3600.0}),
+        ]:
+            cmd_exec = http_request(port, "POST", "/api/commands/execute", body={
+                "command_id": cmd_id,
+                "arguments": cmd_args
+            })
+            check(cmd_exec.get("status") == "Success", f"Universal command {cmd_id} execution verified")
+        print(f"  ✓ 42.6 Universal Commands: All 5 Batch-27 Engineering Commands verified via typed schema engine")
+
+        # 42.7 Enterprise MCP Tool Calling (Batch 27 Domains)
+        for mcp_tool_name in [
+            "atlas_sim_aerospace_aircraft_landing_gear",
+            "atlas_sim_energy_pumped_storage_hydro",
+            "atlas_sim_semiconductor_euv_lithography",
+            "atlas_sim_renewable_geothermal_binary_orc",
+            "atlas_sim_structural_cable_stayed_bridge",
+        ]:
+            mcp_call = http_request(port, "POST", "/api/mcp", body={
+                "jsonrpc": "2.0",
+                "id": 996,
+                "method": "tools/call",
+                "params": {"name": mcp_tool_name, "arguments": {}}
+            })
+            check(mcp_call.get("result", {}).get("isError") == False, f"{mcp_tool_name} MCP tool call succeeded")
+        print(f"  ✓ 42.7 Enterprise MCP Tool Calling: 5 Batch-27 Engineering MCP Tools verified via JSON-RPC 2.0")
+
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
         print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")

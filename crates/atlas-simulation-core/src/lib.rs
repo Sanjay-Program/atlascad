@@ -171,6 +171,11 @@ pub mod offshore_wave_loading;
 pub mod spacecraft_adcs_attitude;
 pub mod battery_fast_charging;
 pub mod packed_bed_scrubber;
+pub mod aircraft_landing_gear;
+pub mod pumped_storage_hydro;
+pub mod semiconductor_euv_lithography;
+pub mod geothermal_binary_orc;
+pub mod cable_stayed_bridge;
 
 pub mod prelude {
     pub use crate::acoustics::{
@@ -791,5 +796,21 @@ pub mod prelude {
     pub use crate::packed_bed_scrubber::{
         PackedBedProblem, PackedBedResult, PackingTypeClass, ScrubberApplication,
         solve_packed_bed_scrubber,
+    };
+    pub use crate::aircraft_landing_gear::{
+        LandingGearProblem, LandingGearResult, MeteringPinType, solve_aircraft_landing_gear,
+    };
+    pub use crate::pumped_storage_hydro::{
+        PumpTurbineType, PumpedStorageProblem, PumpedStorageResult, solve_pumped_storage_hydro,
+    };
+    pub use crate::semiconductor_euv_lithography::{
+        EuvLithographyProblem, EuvLithographyResult, EuvToolGeneration,
+        solve_semiconductor_euv_lithography,
+    };
+    pub use crate::geothermal_binary_orc::{
+        GeothermalOrcProblem, GeothermalOrcResult, OrcWorkingFluid, solve_geothermal_binary_orc,
+    };
+    pub use crate::cable_stayed_bridge::{
+        CableStayProblem, CableStayResult, StayCableClass, solve_cable_stayed_bridge,
     };
 }

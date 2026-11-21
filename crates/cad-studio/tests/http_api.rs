@@ -8861,5 +8861,184 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 239. Aircraft Landing Gear Oleo-Pneumatic Shock Strut & Dynamic Drop (FAR/CS 25.723 / Mil-L-8552 / Currey)
+    let gear_res = post(
+        addr,
+        "/api/sim/aerospace/aircraft_landing_gear",
+        r#"{
+            "metering_type": "TaperedContourPin",
+            "gear_landed_mass_kg": 18500.0,
+            "vertical_sink_velocity_m_s": 3.05,
+            "lift_to_weight_ratio": 0.85,
+            "available_stroke_mm": 420.0,
+            "piston_diameter_mm": 180.0,
+            "gas_precharge_pressure_mpa": 4.20,
+            "initial_gas_volume_liters": 14.50,
+            "polytropic_exponent": 1.35,
+            "orifice_diameter_mm": 34.0,
+            "orifice_discharge_coeff": 0.68,
+            "fluid_density_kg_m3": 885.0
+        }"#,
+    )?;
+    assert_eq!(gear_res.status, 200);
+    let gear_json = json(&gear_res)?;
+    assert!(gear_json["max_strut_stroke_mm"].as_f64().unwrap() > 250.0);
+    assert!(gear_json["max_strut_stroke_mm"].as_f64().unwrap() < 400.0);
+    assert!(gear_json["peak_ground_reaction_force_kn"].as_f64().unwrap() > 200.0);
+    assert!(gear_json["vertical_load_factor_g"].as_f64().unwrap() <= 2.50);
+    assert!(gear_json["shock_strut_efficiency_pct"].as_f64().unwrap() >= 70.0);
+    assert!(gear_json["is_stroke_margin_sufficient"].as_bool().unwrap());
+    assert!(gear_json["is_load_factor_compliant"].as_bool().unwrap());
+    assert!(gear_json["is_tire_deflection_acceptable"].as_bool().unwrap());
+    assert!(gear_json["is_landing_gear_viable"].as_bool().unwrap());
+
+    // 240. Pumped Storage Hydroelectric Plant Reversible Pump-Turbine & Water Conduit (IEC 60041 / IEC 61362 / IEEE 1207)
+    let hydro_res = post(
+        addr,
+        "/api/sim/energy/pumped_storage_hydro",
+        r#"{
+            "runner_type": "FrancisReversible",
+            "upper_reservoir_elevation_m": 1850.0,
+            "lower_reservoir_elevation_m": 1540.0,
+            "conduit_length_m": 1650.0,
+            "conduit_diameter_m": 3.80,
+            "darcy_friction_factor": 0.014,
+            "minor_loss_k_total": 1.85,
+            "pumping_discharge_m3_s": 32.0,
+            "generating_discharge_m3_s": 36.5,
+            "rotational_speed_rpm": 428.6,
+            "runner_submergence_depth_m": 35.0
+        }"#,
+    )?;
+    assert_eq!(hydro_res.status, 200);
+    let hydro_json = json(&hydro_res)?;
+    assert!(hydro_json["total_dynamic_pumping_head_m"].as_f64().unwrap() > 311.0);
+    assert!(hydro_json["pumping_electrical_power_mw"].as_f64().unwrap() > 90.0);
+    assert!(hydro_json["generating_electrical_power_mw"].as_f64().unwrap() > 80.0);
+    assert!(hydro_json["round_trip_efficiency_pct"].as_f64().unwrap() >= 75.0);
+    assert!(hydro_json["cavitation_safety_factor"].as_f64().unwrap() >= 1.15);
+    assert!(hydro_json["is_cavitation_safe"].as_bool().unwrap());
+    assert!(hydro_json["is_round_trip_efficiency_competitive"].as_bool().unwrap());
+    assert!(hydro_json["is_pumped_storage_viable"].as_bool().unwrap());
+
+    // 241. Semiconductor EUV Photolithography Multi-Layer Optics & Resolution (ASML / SEMI / Fresnel-Debye)
+    let euv_res = post(
+        addr,
+        "/api/sim/semiconductor/euv_lithography",
+        r#"{
+            "tool_generation": "StandardNa033",
+            "wavelength_nm": 13.50,
+            "numerical_aperture": 0.33,
+            "process_factor_k1": 0.32,
+            "dof_factor_k2": 0.60,
+            "bilayer_period_d_nm": 6.90,
+            "molybdenum_fraction_gamma": 0.40,
+            "bilayer_pair_count": 50,
+            "interface_roughness_nm": 0.15,
+            "incidence_angle_deg": 6.0,
+            "mirror_count_in_train": 11,
+            "resist_exposure_dose_mj_cm2": 45.0
+        }"#,
+    )?;
+    assert_eq!(euv_res.status, 200);
+    let euv_json = json(&euv_res)?;
+    assert!(euv_json["net_mirror_reflectivity_pct"].as_f64().unwrap() >= 66.0);
+    assert!(euv_json["critical_dimension_resolution_nm"].as_f64().unwrap() <= 15.0);
+    assert!(euv_json["depth_of_focus_nm"].as_f64().unwrap() >= 60.0);
+    assert!(euv_json["line_edge_roughness_3sigma_nm"].as_f64().unwrap() <= 3.0);
+    assert!(euv_json["is_mirror_reflectivity_sufficient"].as_bool().unwrap());
+    assert!(euv_json["is_resolution_advanced_node_capable"].as_bool().unwrap());
+    assert!(euv_json["is_depth_of_focus_manufacturable"].as_bool().unwrap());
+    assert!(euv_json["is_euv_system_viable"].as_bool().unwrap());
+
+    // 242. Geothermal Binary Organic Rankine Cycle (ORC) Power Plant (ASME PTC 46 / VDI 4670 / DiPippo)
+    let orc_res = post(
+        addr,
+        "/api/sim/renewable/geothermal_binary_orc",
+        r#"{
+            "working_fluid": "Isopentane",
+            "brine_mass_flow_kg_s": 85.0,
+            "brine_inlet_temperature_c": 165.0,
+            "min_reinjection_temperature_c": 72.0,
+            "pinch_point_temp_diff_c": 6.0,
+            "evaporator_pressure_bar": 18.5,
+            "condensing_temperature_c": 36.0,
+            "expander_isentropic_efficiency": 0.86,
+            "pump_isentropic_efficiency": 0.78,
+            "generator_efficiency": 0.97
+        }"#,
+    )?;
+    assert_eq!(orc_res.status, 200);
+    let orc_json = json(&orc_res)?;
+    assert!(orc_json["thermal_duty_extracted_mw"].as_f64().unwrap() > 25.0);
+    assert!(orc_json["net_electrical_power_mw"].as_f64().unwrap() > 3.0);
+    assert!(orc_json["exergy_second_law_efficiency_pct"].as_f64().unwrap() >= 35.0);
+    assert!(orc_json["is_silica_scaling_prevented"].as_bool().unwrap());
+    assert!(orc_json["is_exergy_efficiency_competitive"].as_bool().unwrap());
+    assert!(orc_json["is_geothermal_orc_viable"].as_bool().unwrap());
+
+    // 243. Cable-Stayed Bridge Stay Cable Rain-Wind Induced Vibration & Damping (FHWA-HRT-05-072 / PTI / Eurocode 1)
+    let stay_res = post(
+        addr,
+        "/api/sim/structural/cable_stayed_bridge",
+        r#"{
+            "stay_class": "ParallelStrandSystemPSS",
+            "cable_chord_length_m": 240.0,
+            "outer_pipe_diameter_mm": 160.0,
+            "chord_inclination_deg": 32.0,
+            "cable_pretension_kn": 3600.0,
+            "total_linear_mass_kg_m": 52.0,
+            "elastic_modulus_gpa": 195.0,
+            "net_steel_area_mm2": 6400.0,
+            "inherent_damping_ratio": 0.0012,
+            "damper_distance_from_deck_m": 5.50,
+            "wind_speed_m_s": 14.5
+        }"#,
+    )?;
+    assert_eq!(stay_res.status, 200);
+    let stay_json = json(&stay_res)?;
+    assert!(stay_json["midspan_static_sag_mm"].as_f64().unwrap() > 500.0);
+    assert!(stay_json["fundamental_frequency_hz"].as_f64().unwrap() > 0.4);
+    assert!(stay_json["optimal_damper_coefficient_kn_s_m"].as_f64().unwrap() > 30.0);
+    assert!(stay_json["attained_damping_ratio"].as_f64().unwrap() >= 0.0060);
+    assert!(stay_json["is_cable_sag_acceptable"].as_bool().unwrap());
+    assert!(stay_json["is_rwiv_mitigated"].as_bool().unwrap());
+    assert!(stay_json["is_stay_cable_viable"].as_bool().unwrap());
+
+    // 244. Universal Commands Execution Verification (Batch 27 Domains)
+    for cmd_id in [
+        "sim.aerospace.aircraft_landing_gear",
+        "sim.energy.pumped_storage_hydro",
+        "sim.semiconductor.euv_lithography",
+        "sim.renewable.geothermal_binary_orc",
+        "sim.structural.cable_stayed_bridge",
+    ] {
+        let cmd_res = post(
+            addr,
+            "/api/commands/execute",
+            &format!(r#"{{"command_id": "{cmd_id}", "arguments": {{}}}}"#),
+        )?;
+        assert_eq!(cmd_res.status, 200);
+        assert_eq!(json(&cmd_res)?["status"], "Success");
+    }
+
+    // 245. Enterprise MCP Tool Calling (Batch 27 Domains)
+    for tool_name in [
+        "atlas_sim_aerospace_aircraft_landing_gear",
+        "atlas_sim_energy_pumped_storage_hydro",
+        "atlas_sim_semiconductor_euv_lithography",
+        "atlas_sim_renewable_geothermal_binary_orc",
+        "atlas_sim_structural_cable_stayed_bridge",
+    ] {
+        let mcp_res = post(
+            addr,
+            "/api/mcp",
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 245, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
+        )?;
+        assert_eq!(mcp_res.status, 200);
+    }
+
     Ok(())
 }
