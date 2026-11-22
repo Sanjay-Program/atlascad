@@ -7091,3 +7091,307 @@ textarea:focus-visible,
   outline-offset: 2px !important;
   box-shadow: 0 0 0 4px var(--atlas-accent-soft) !important;
 }
+
+
+/* --- Interactive 3D Airplane Flight Physics Simulator HUD --- */
+.flight-sim-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+  z-index: 120;
+  background: radial-gradient(circle at center, transparent 40%, rgba(5, 8, 17, 0.45) 90%);
+  padding: 12px 16px;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+}
+
+.fsim-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(13, 21, 39, 0.94);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--atlas-border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  pointer-events: auto;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  gap: 16px;
+}
+
+.fsim-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fsim-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+
+.fsim-badge {
+  background: rgba(34, 211, 238, 0.15);
+  color: #22d3ee;
+  border: 1px solid #22d3ee;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.fsim-quick-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fsim-stat-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 55px;
+}
+
+.fsim-stat-box .lbl {
+  font-size: 9px;
+  color: var(--atlas-text-muted);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.fsim-stat-box .val {
+  font-size: 12px;
+  color: #fff;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.fsim-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fsim-hud-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.fsim-hud-canvas {
+  width: 500px;
+  height: 350px;
+  pointer-events: none;
+}
+
+.fsim-stall-warning {
+  position: absolute;
+  top: 25%;
+  background: rgba(239, 68, 68, 0.85);
+  color: #fff;
+  padding: 6px 16px;
+  border-radius: 4px;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 1px;
+  animation: fsim-pulse 0.5s infinite alternate;
+}
+
+@keyframes fsim-pulse {
+  from { opacity: 0.6; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1.04); }
+}
+
+.fsim-speed-tape,
+.fsim-alt-tape {
+  position: absolute;
+  top: 45%;
+  transform: translateY(-50%);
+  background: rgba(13, 21, 39, 0.9);
+  border: 1px solid rgba(34, 211, 238, 0.4);
+  border-radius: 6px;
+  padding: 8px 12px;
+  pointer-events: auto;
+  text-align: center;
+  min-width: 90px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.fsim-speed-tape { left: 24px; }
+.fsim-alt-tape { right: 24px; }
+
+.fsim-speed-tape .tape-title,
+.fsim-alt-tape .tape-title {
+  font-size: 10px;
+  color: #22d3ee;
+  font-weight: 700;
+}
+
+.fsim-speed-tape .tape-value,
+.fsim-alt-tape .tape-value {
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  margin: 2px 0;
+}
+
+.fsim-speed-tape .tape-sub,
+.fsim-alt-tape .tape-sub {
+  font-size: 10px;
+  color: var(--atlas-text-muted);
+}
+
+.fsim-bottom-deck {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  background: rgba(13, 21, 39, 0.94);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--atlas-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  pointer-events: auto;
+  gap: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.fsim-control-cluster,
+.fsim-flight-stick-cluster,
+.fsim-telemetry-cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fsim-control-cluster { min-width: 260px; }
+.fsim-flight-stick-cluster { min-width: 220px; align-items: center; }
+.fsim-telemetry-cluster { flex: 1; max-width: 380px; }
+
+.cluster-title {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #22d3ee;
+  letter-spacing: 0.5px;
+}
+
+.fsim-throttle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fsim-slider {
+  flex: 1;
+  accent-color: #22d3ee;
+}
+
+.fsim-throttle-wrap .val {
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 34px;
+  color: #fff;
+}
+
+.afterburner-btn {
+  background: #ea580c !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  font-size: 10px !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
+  border: none !important;
+  cursor: pointer;
+}
+
+.afterburner-btn.active {
+  background: #ef4444 !important;
+  box-shadow: 0 0 10px #f97316 !important;
+}
+
+.fsim-thrust-metric {
+  font-size: 10px;
+  color: var(--atlas-text-muted);
+}
+
+.fsim-stick-pad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.fsim-stick-mid {
+  display: flex;
+  gap: 4px;
+}
+
+.fsim-ctrl-btn {
+  background: var(--atlas-surface-3);
+  color: var(--atlas-text);
+  border: 1px solid var(--atlas-border);
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  user-select: none;
+}
+
+.fsim-ctrl-btn:hover,
+.fsim-ctrl-btn:active {
+  background: var(--atlas-accent);
+  color: #fff;
+}
+
+.fsim-ctrl-btn.level-btn {
+  background: rgba(34, 211, 238, 0.2);
+  color: #22d3ee;
+  border-color: #22d3ee;
+}
+
+.fsim-telem-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+  font-size: 10.5px;
+}
+
+.fsim-telem-grid div {
+  display: flex;
+  justify-content: space-between;
+  color: var(--atlas-text-secondary);
+}
+
+.fsim-telem-grid strong {
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.topbar-action-btn.flight-sim-btn,
+.button.primary.small.flight-sim-btn {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+  color: #fff !important;
+  border: 1px solid #38bdf8 !important;
+  font-weight: 700 !important;
+  cursor: pointer;
+}
+
+.topbar-action-btn.flight-sim-btn:hover,
+.button.primary.small.flight-sim-btn:hover {
+  background: linear-gradient(135deg, #0369a1 0%, #075985 100%) !important;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.4) !important;
+}

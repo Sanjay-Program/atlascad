@@ -729,7 +729,10 @@
       <button id="simBtn" class="button ghost" title="Engineering Simulation & Multiphysics (FEA / Modal / Thermal / CAM)">Simulation</button>
       <button id="engineManagerBtn" class="button ghost" title="Open Engineering Engine Manager & Solvers">Engines</button>
       <button id="enterpriseSaasBtn" class="button ghost" title="Enterprise SaaS Suite (Audit Trail, Cert Reports, HPC Queue, Org & ECO)">Enterprise</button>
-      <button type="button" id="topbarJobsBtn" class="topbar-jobs-btn" title="HPC Job Queue & Telemetry">
+      <button type="button" id="topbarFlightSimBtn" class="button primary small flight-sim-btn" title="Launch Interactive 3D Airplane Flight Physics Simulator (F8)">
+        <svg class="atlas-icon" aria-hidden="true" style="margin-right:4px;"><use href="#icon-aerospace"/></svg><span>✈ Test Flight Sim</span>
+      </button>
+      <button type="button" id="topbarJobsBtn"  class="topbar-jobs-btn" title="HPC Job Queue & Telemetry">
         <svg class="atlas-icon" aria-hidden="true" style="margin-right:4px;"><use href="#icon-jobs"/></svg><span id="topbarJobsText">Idle</span>
       </button>
       <button id="paletteBtn" class="button command" title="Command palette (Ctrl+K)">
@@ -1665,6 +1668,95 @@
       </div>
 
       <canvas id="viewport" tabindex="0" aria-label="3D viewport. Drag to orbit, right-drag or Shift-drag to pan, scroll to zoom, click a face to inspect it. While drawing a polyline, click to place points on the z = 0 plane."></canvas>
+
+      <!-- Interactive 3D Mechanical Aircraft Flight Physics Simulator HUD -->
+      <div id="flightSimOverlay" class="flight-sim-overlay" hidden aria-label="3D Mechanical Aircraft Flight Physics Simulator">
+        <!-- Top Telemetry Ribbon -->
+        <div class="fsim-topbar">
+          <div class="fsim-brand">
+            <svg class="atlas-icon" aria-hidden="true"><use href="#icon-aerospace"/></svg>
+            <span class="fsim-title">Atlas AeroStrike Mach 2.4 Multirole Mechanical Aircraft</span>
+            <span class="fsim-badge" id="fsimStatusBadge">AUTONOMOUS 6-DOF FLIGHT SIMULATOR</span>
+          </div>
+          <div class="fsim-quick-stats">
+            <div class="fsim-stat-box"><span class="lbl">MACH</span><span class="val" id="fsimMach">M 0.85</span></div>
+            <div class="fsim-stat-box"><span class="lbl">AIRSPEED</span><span class="val" id="fsimSpeed">1,040 km/h</span></div>
+            <div class="fsim-stat-box"><span class="lbl">ALTITUDE</span><span class="val" id="fsimAlt">6,500 m</span></div>
+            <div class="fsim-stat-box"><span class="lbl">G-FORCE</span><span class="val" id="fsimG">1.02 G</span></div>
+            <div class="fsim-stat-box"><span class="lbl">CLIMB</span><span class="val" id="fsimClimb">+15.4 m/s</span></div>
+            <div class="fsim-stat-box"><span class="lbl">L/D RATIO</span><span class="val" id="fsimLd">11.4x</span></div>
+            <div class="fsim-stat-box"><span class="lbl">SPAR STRESS</span><span class="val" id="fsimStress">118 MPa</span></div>
+            <div class="fsim-stat-box"><span class="lbl">FoS</span><span class="val" id="fsimFos" style="color:var(--atlas-success, #22c55e);">7.45</span></div>
+          </div>
+          <div class="fsim-actions">
+            <button type="button" class="button small ghost" id="fsimCameraModeBtn" title="Toggle Cockpit / Chase / Orbit Camera">🎥 Camera</button>
+            <button type="button" class="button small ghost" id="fsimExportDxfBtn" title="Export 3-View Aircraft DXF">📄 DXF</button>
+            <button type="button" class="button small ghost" id="fsimExportStlBtn" title="Export 3D Aircraft STL">🧊 STL</button>
+            <button type="button" class="button small ghost" id="fsimCloseBtn" title="Exit Flight Simulator (Esc)"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-close"/></svg></button>
+          </div>
+        </div>
+
+        <!-- Central Flight Reticle / HUD (Canvas Artificial Horizon & Pitch Ladder) -->
+        <div class="fsim-hud-center">
+          <canvas id="fsimHudCanvas" class="fsim-hud-canvas" width="600" height="400"></canvas>
+          <div class="fsim-stall-warning" id="fsimStallWarning" hidden>⚠ STALL WARNING ⚠</div>
+        </div>
+
+        <!-- Left Speed Ladder & Right Altitude Ladder -->
+        <div class="fsim-speed-tape">
+          <div class="tape-title">KIAS</div>
+          <div class="tape-value" id="fsimKiasVal">560 kts</div>
+          <div class="tape-sub" id="fsimQVal">q: 28.4 kPa</div>
+        </div>
+        <div class="fsim-alt-tape">
+          <div class="tape-title">ALT (m)</div>
+          <div class="tape-value" id="fsimAltVal">6,500 m</div>
+          <div class="tape-sub" id="fsimVsiVal">VSI: +15 m/s</div>
+        </div>
+
+        <!-- Bottom Cockpit Interactive Controls & Aerodynamics Dashboard -->
+        <div class="fsim-bottom-deck">
+          <!-- Throttle & Engine Controls -->
+          <div class="fsim-control-cluster">
+            <span class="cluster-title">PROPULSION (GE F110 / SCRAMJET)</span>
+            <div class="fsim-throttle-wrap">
+              <label for="fsimThrottleSlider">THRUST:</label>
+              <input type="range" id="fsimThrottleSlider" min="0" max="100" value="75" class="fsim-slider">
+              <span class="val" id="fsimThrottleVal">75%</span>
+              <button type="button" class="fsim-btn afterburner-btn" id="fsimAbBtn">⚡ AFTERBURNER</button>
+            </div>
+            <div class="fsim-thrust-metric" id="fsimThrustText">Thrust: 98.4 kN · Net Fuel Flow: 1.42 kg/s</div>
+          </div>
+
+          <!-- On-Screen Flight Stick Touch / Click Controls -->
+          <div class="fsim-flight-stick-cluster">
+            <span class="cluster-title">AERODYNAMIC FLIGHT CONTROLS (W / A / S / D)</span>
+            <div class="fsim-stick-pad">
+              <button type="button" class="fsim-ctrl-btn" id="fsimPitchUpBtn" title="Pitch Up (S or Down Arrow)">▲ PITCH UP</button>
+              <div class="fsim-stick-mid">
+                <button type="button" class="fsim-ctrl-btn" id="fsimRollLeftBtn" title="Roll Left (A or Left Arrow)">◄ ROLL L</button>
+                <button type="button" class="fsim-ctrl-btn level-btn" id="fsimLevelBtn" title="Auto-Level Wings (Space)">⌂ LEVEL</button>
+                <button type="button" class="fsim-ctrl-btn" id="fsimRollRightBtn" title="Roll Right (D or Right Arrow)">ROLL R ►</button>
+              </div>
+              <button type="button" class="fsim-ctrl-btn" id="fsimPitchDownBtn" title="Pitch Down (W or Up Arrow)">▼ PITCH DN</button>
+            </div>
+          </div>
+
+          <!-- Live Aerodynamic Coefficients & FEA Stress Monitor -->
+          <div class="fsim-telemetry-cluster">
+            <span class="cluster-title">REAL-TIME AERODYNAMIC &amp; FEA DERIVATIVES</span>
+            <div class="fsim-telem-grid">
+              <div><span>Angle of Attack (&alpha;):</span> <strong id="fsimAoAVal">3.5°</strong></div>
+              <div><span>Lift Coeff (C<sub>L</sub>):</span> <strong id="fsimClVal">0.337</strong></div>
+              <div><span>Drag Coeff (C<sub>D</sub>):</span> <strong id="fsimCdVal">0.030</strong></div>
+              <div><span>Lift Force (L):</span> <strong id="fsimLiftVal">351.7 kN</strong></div>
+              <div><span>Drag Force (D):</span> <strong id="fsimDragVal">30.9 kN</strong></div>
+              <div><span>Wing Spar Bending:</span> <strong id="fsimSparVal">284 MPa</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       
       <!-- Interactive CAD Viewport Drop Overlay -->
       <div id="viewportDropOverlay" class="viewport-drop-overlay" hidden>

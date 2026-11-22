@@ -5662,6 +5662,9 @@ ${gcodeSample}`;
     { alias: "FEA", name: "STATIC", desc: "Run linear static FEA (stress & deflection)", run: () => runCaeStatic() },
     { alias: "MODAL", name: "VIBRATION", desc: "Run dynamic modal natural frequency analysis", run: () => runCaeModal() },
     { alias: "HEAT", name: "THERMAL", desc: "Run steady-state thermal conduction FEA", run: () => runCaeThermal() },
+    { alias: "FLIGHT", name: "FLIGHT", desc: "Interactive 3D Mechanical Airplane Flight Physics Simulator (F8)", run: () => launchFlightSimulator() },
+    { alias: "PLANE", name: "FLIGHT", desc: "Interactive 3D Mechanical Airplane Flight Physics Simulator (F8)", run: () => launchFlightSimulator() },
+    { alias: "AERO", name: "FLIGHT", desc: "Interactive 3D Mechanical Airplane Flight Physics Simulator (F8)", run: () => launchFlightSimulator() },
     { alias: "THERMAL", name: "THERMAL", desc: "Run steady-state thermal conduction FEA", run: () => runCaeThermal() },
     { alias: "SIM", name: "SIMULATION", desc: "Open Engineering Multiphysics & CAM simulation launcher", run: () => openSimLauncher() },
     { alias: "SIMULATION", name: "SIMULATION", desc: "Open Engineering Multiphysics & CAM simulation launcher", run: () => openSimLauncher() },
@@ -12207,6 +12210,525 @@ ${gcodeSample}`;
   // Boot and events
   // ---------------------------------------------------------------------------------------
 
+
+  // ============================================================================
+  // 3D MECHANICAL AIRCRAFT & 6-DOF AERODYNAMIC FLIGHT PHYSICS SIMULATOR
+  // ============================================================================
+
+  function buildSupersonicAircraftMesh() {
+    const positions = [];
+    const triangles = [];
+
+    function addQuad(p1, p2, p3, p4) {
+      const i1 = positions.length;
+      positions.push(p1, p2, p3, p4);
+      triangles.push([i1, i1 + 1, i1 + 2]);
+      triangles.push([i1, i1 + 2, i1 + 3]);
+    }
+
+    function addTri(p1, p2, p3) {
+      const i1 = positions.length;
+      positions.push(p1, p2, p3);
+      triangles.push([i1, i1 + 1, i1 + 2]);
+    }
+
+    // Geometry scaled in meters: Length 17.5m, Wingspan 12.4m, Height 3.1m
+    const nose = [0.0, 9.0, 0.2];
+    const cockpitTop = [0.0, 4.0, 1.3];
+    const cockpitL = [-0.7, 3.5, 0.4];
+    const cockpitR = [0.7, 3.5, 0.4];
+    const noseBottom = [0.0, 4.0, -0.4];
+
+    addTri(nose, cockpitL, cockpitTop);
+    addTri(nose, cockpitTop, cockpitR);
+    addTri(nose, noseBottom, cockpitL);
+    addTri(nose, cockpitR, noseBottom);
+
+    const midTop = [0.0, -1.0, 1.2];
+    const midL = [-1.3, -1.0, 0.3];
+    const midR = [1.3, -1.0, 0.3];
+    const midBottom = [0.0, -1.0, -0.5];
+
+    addQuad(cockpitTop, cockpitL, midL, midTop);
+    addQuad(cockpitTop, midTop, midR, cockpitR);
+    addQuad(noseBottom, midBottom, midL, cockpitL);
+    addQuad(noseBottom, cockpitR, midR, midBottom);
+
+    const aftTop = [0.0, -6.5, 0.9];
+    const aftL = [-1.4, -6.5, 0.2];
+    const aftR = [1.4, -6.5, 0.2];
+    const aftBottom = [0.0, -6.5, -0.4];
+
+    addQuad(midTop, midL, aftL, aftTop);
+    addQuad(midTop, aftTop, aftR, midR);
+    addQuad(midBottom, aftBottom, aftL, midL);
+    addQuad(midBottom, midR, aftR, aftBottom);
+
+    const nozL = [-0.7, -8.5, 0.1];
+    const nozR = [0.7, -8.5, 0.1];
+    addTri(aftTop, aftL, nozL);
+    addTri(aftTop, nozR, aftR);
+    addTri(aftBottom, nozL, aftL);
+    addTri(aftBottom, aftR, nozR);
+    addQuad(aftTop, nozL, nozR, aftTop);
+    addQuad(aftBottom, nozR, nozL, aftBottom);
+
+    // Left Main Wing (Swept Supersonic Delta)
+    const wRootLeL = [-1.3, 2.5, 0.2];
+    const wRootTeL = [-1.4, -5.0, 0.1];
+    const wTipLeL = [-6.2, -3.5, 0.3];
+    const wTipTeL = [-5.8, -4.8, 0.2];
+    const wRootBotL = [-1.3, -1.0, -0.1];
+    const wTipBotL = [-6.0, -4.1, 0.1];
+
+    addQuad(wRootLeL, wRootTeL, wTipTeL, wTipLeL);
+    addQuad(wRootLeL, wTipLeL, wTipBotL, wRootBotL);
+    addQuad(wRootBotL, wTipBotL, wTipTeL, wRootTeL);
+
+    // Right Main Wing
+    const wRootLeR = [1.3, 2.5, 0.2];
+    const wRootTeR = [1.4, -5.0, 0.1];
+    const wTipLeR = [6.2, -3.5, 0.3];
+    const wTipTeR = [5.8, -4.8, 0.2];
+    const wRootBotR = [1.3, -1.0, -0.1];
+    const wTipBotR = [6.0, -4.1, 0.1];
+
+    addQuad(wRootLeR, wTipLeR, wTipTeR, wRootTeR);
+    addQuad(wRootLeR, wRootBotR, wTipBotR, wTipLeR);
+    addQuad(wRootBotR, wRootTeR, wTipTeR, wTipBotR);
+
+    // Twin Canted Vertical Stabilizers
+    const tRootLeL = [-1.0, -3.5, 0.8];
+    const tRootTeL = [-1.2, -6.5, 0.7];
+    const tTipLeL = [-1.6, -5.8, 2.6];
+    const tTipTeL = [-1.8, -7.0, 2.4];
+    addQuad(tRootLeL, tRootTeL, tTipTeL, tTipLeL);
+    addQuad(tRootLeL, tTipLeL, tTipTeL, tRootTeL);
+
+    const tRootLeR = [1.0, -3.5, 0.8];
+    const tRootTeR = [1.2, -6.5, 0.7];
+    const tTipLeR = [1.6, -5.8, 2.6];
+    const tTipTeR = [1.8, -7.0, 2.4];
+    addQuad(tRootLeR, tTipLeR, tTipTeR, tRootTeR);
+    addQuad(tRootLeR, tRootTeR, tTipTeR, tTipLeR);
+
+    return {
+      positions,
+      triangles,
+      bounds: {
+        min: [-6.5, -9.0, -0.6],
+        max: [6.5, 9.5, 2.8],
+      },
+      outline: [
+        [0, 9, 0.2], [6.2, -3.5, 0.3], [5.8, -4.8, 0.2],
+        [1.4, -6.5, 0.2], [0.7, -8.5, 0.1], [-0.7, -8.5, 0.1],
+        [-1.4, -6.5, 0.2], [-5.8, -4.8, 0.2], [-6.2, -3.5, 0.3], [0, 9, 0.2]
+      ]
+    };
+  }
+
+  const flightSimState = {
+    active: false,
+    altitude: 4500.0,
+    speed: 260.0,
+    aoa: 3.2,
+    roll: 0.0,
+    pitch: 2.5,
+    heading: 45.0,
+    throttle: 75.0,
+    afterburner: false,
+    gForce: 1.02,
+    climbRate: 14.5,
+    sparStress: 118.0,
+    fos: 7.45,
+    cameraMode: "chase",
+    frameId: 0,
+    lastTime: 0,
+    keysDown: {},
+  };
+
+  function launchFlightSimulator() {
+    flightSimState.active = true;
+    const overlay = byId("flightSimOverlay");
+    if (overlay) overlay.hidden = false;
+
+    // Load aircraft 3D mesh into viewport
+    const aircraft = buildSupersonicAircraftMesh();
+    if (app.viewport) {
+      app.viewport.mesh = {
+        positions: aircraft.positions,
+        triangles: aircraft.triangles,
+      };
+      app.viewport.bounds = aircraft.bounds;
+      app.viewport.outline = aircraft.outline;
+      app.viewport.uploadGeometry();
+      app.viewport.camera.yaw = -Math.PI / 2;
+      app.viewport.camera.pitch = 0.28;
+      app.viewport.fit();
+      app.viewport.requestFrame();
+    }
+
+    // Switch workspace mode to mechanical / aero
+    const wsSelect = byId("workspaceSelect");
+    if (wsSelect && wsSelect.value !== "aerospace") {
+      wsSelect.value = "aerospace";
+      switchWorkspace("aerospace");
+    }
+
+    flightSimState.lastTime = performance.now();
+    cancelAnimationFrame(flightSimState.frameId);
+    flightSimState.frameId = requestAnimationFrame(flightSimLoop);
+
+    toast("✈ Flight Sim Started! W/S: Pitch, A/D: Roll, Shift/Ctrl: Throttle, Space: Level Wings, Esc: Exit");
+  }
+
+  function exitFlightSimulator() {
+    flightSimState.active = false;
+    cancelAnimationFrame(flightSimState.frameId);
+    const overlay = byId("flightSimOverlay");
+    if (overlay) overlay.hidden = true;
+    toast("Exited Flight Simulator.");
+  }
+
+  function flightSimLoop(time) {
+    if (!flightSimState.active) return;
+    const dt = Math.min((time - flightSimState.lastTime) / 1000.0, 0.1);
+    flightSimState.lastTime = time;
+
+    updateFlightPhysics(dt);
+    drawFlightHudCanvas();
+    updateFlightHudTelemetry();
+
+    flightSimState.frameId = requestAnimationFrame(flightSimLoop);
+  }
+
+  function updateFlightPhysics(dt) {
+    const keys = flightSimState.keysDown;
+
+    // User controls input processing
+    if (keys["KeyW"] || keys["ArrowUp"]) {
+      flightSimState.pitch = Math.max(-45.0, flightSimState.pitch - 25.0 * dt);
+      flightSimState.aoa = Math.max(-2.0, flightSimState.aoa - 4.0 * dt);
+    }
+    if (keys["KeyS"] || keys["ArrowDown"]) {
+      flightSimState.pitch = Math.min(60.0, flightSimState.pitch + 25.0 * dt);
+      flightSimState.aoa = Math.min(22.0, flightSimState.aoa + 6.0 * dt);
+    }
+    if (keys["KeyA"] || keys["ArrowLeft"]) {
+      flightSimState.roll = Math.max(-75.0, flightSimState.roll - 50.0 * dt);
+    }
+    if (keys["KeyD"] || keys["ArrowRight"]) {
+      flightSimState.roll = Math.min(75.0, flightSimState.roll + 50.0 * dt);
+    }
+    if (keys["ShiftLeft"] || keys["ShiftRight"]) {
+      flightSimState.throttle = Math.min(100.0, flightSimState.throttle + 25.0 * dt);
+    }
+    if (keys["ControlLeft"] || keys["ControlRight"]) {
+      flightSimState.throttle = Math.max(0.0, flightSimState.throttle - 25.0 * dt);
+    }
+    if (keys["Space"]) {
+      // Auto-level wings
+      flightSimState.roll *= Math.max(0.0, 1.0 - 5.0 * dt);
+      flightSimState.pitch = flightSimState.pitch * 0.95 + 1.5 * 0.05;
+      flightSimState.aoa = 3.2;
+    }
+
+    // Natural aerodynamic self-centering / damping
+    if (!keys["KeyA"] && !keys["KeyD"] && !keys["ArrowLeft"] && !keys["ArrowRight"]) {
+      flightSimState.roll *= Math.max(0.0, 1.0 - 1.2 * dt);
+    }
+    if (!keys["KeyW"] && !keys["KeyS"] && !keys["ArrowUp"] && !keys["ArrowDown"]) {
+      flightSimState.aoa = flightSimState.aoa * 0.96 + 3.2 * 0.04;
+    }
+
+    // Turn rate proportional to bank angle
+    const rollRad = (flightSimState.roll * Math.PI) / 180.0;
+    const pitchRad = (flightSimState.pitch * Math.PI) / 180.0;
+    const turnRate = (9.80665 * Math.tan(rollRad)) / Math.max(flightSimState.speed, 50.0);
+    flightSimState.heading = (flightSimState.heading + (turnRate * 180.0 / Math.PI) * dt + 360.0) % 360.0;
+
+    // Atmospheric Physics (US Standard Atmosphere 1976)
+    const h = flightSimState.altitude;
+    const T = h < 11000.0 ? 288.15 - 0.0065 * h : 216.65;
+    const p = h < 11000.0 ? 101325.0 * Math.pow(T / 288.15, 5.256) : 22632.0 * Math.exp(-9.80665 * (h - 11000.0) / (287.05 * 216.65));
+    const rho = p / (287.05 * T);
+    const a = Math.sqrt(1.4 * 287.05 * T);
+    const v = flightSimState.speed;
+    const mach = v / a;
+    const q = 0.5 * rho * v * v;
+
+    // Aerodynamic Coefficients
+    const aoaRad = (flightSimState.aoa * Math.PI) / 180.0;
+    let CL = 0.08 + 4.2 * aoaRad;
+    if (flightSimState.aoa > 16.0) {
+      CL *= Math.max(0.2, 1.0 - (flightSimState.aoa - 16.0) * 0.12);
+    }
+    let CD = 0.018 + (CL * CL) / (Math.PI * 0.82 * 3.8);
+    if (mach > 0.85) {
+      CD += 0.025 / (1.0 + Math.exp(-12.0 * (mach - 1.0)));
+    }
+
+    const S = 42.0;
+    const L = q * S * CL;
+    const D = q * S * CD;
+    const mass = 14500.0;
+    const W = mass * 9.80665;
+    const T_max = flightSimState.afterburner ? 185000.0 : 125000.0;
+    const thrust = T_max * (flightSimState.throttle / 100.0) * Math.pow(Math.max(rho, 0.05) / 1.225, 0.72);
+
+    // Longitudinal acceleration
+    const ax = (thrust - D - W * Math.sin(pitchRad)) / mass;
+    flightSimState.speed = Math.max(70.0, Math.min(850.0, flightSimState.speed + ax * dt));
+
+    // Climb rate and altitude
+    const climb = v * Math.sin(pitchRad);
+    flightSimState.climbRate = climb;
+    flightSimState.altitude = Math.max(10.0, Math.min(32000.0, flightSimState.altitude + climb * dt));
+
+    // G-force load factor and Wing Spar Bending Stress
+    const nz = Math.max(0.4, Math.min(9.0, (L * Math.cos(rollRad)) / W));
+    flightSimState.gForce = nz;
+    const sparStress = nz * 115.0;
+    flightSimState.sparStress = sparStress;
+    flightSimState.fos = Math.max(1.0, 880.0 / sparStress);
+
+    // Update 3D viewport camera to track aircraft banking & pitch
+    if (app.viewport) {
+      if (flightSimState.cameraMode === "chase") {
+        app.viewport.camera.yaw = -Math.PI / 2 - (rollRad * 0.45);
+        app.viewport.camera.pitch = 0.28 + (pitchRad * 0.35);
+      }
+      app.viewport.requestFrame();
+    }
+  }
+
+  function drawFlightHudCanvas() {
+    const canvas = byId("fsimHudCanvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    const cx = w / 2;
+    const cy = h / 2;
+
+    const rollRad = (flightSimState.roll * Math.PI) / 180.0;
+    const pitchOffset = flightSimState.pitch * 3.5;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    // Rotate artificial horizon by bank angle
+    ctx.rotate(-rollRad);
+
+    // Horizon line
+    ctx.strokeStyle = "rgba(34, 211, 238, 0.7)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-160, pitchOffset);
+    ctx.lineTo(160, pitchOffset);
+    ctx.stroke();
+
+    // Pitch ladder rungs (+20, +10, -10, -20 deg)
+    ctx.font = "bold 10px monospace";
+    ctx.fillStyle = "#22d3ee";
+    ctx.textAlign = "right";
+
+    const rungs = [20, 10, -10, -20];
+    for (const deg of rungs) {
+      const y = pitchOffset - deg * 3.5;
+      const isPositive = deg > 0;
+      ctx.beginPath();
+      if (isPositive) {
+        ctx.setLineDash([]);
+        ctx.moveTo(-60, y); ctx.lineTo(-25, y); ctx.lineTo(-25, y + 5);
+        ctx.moveTo(60, y); ctx.lineTo(25, y); ctx.lineTo(25, y + 5);
+      } else {
+        ctx.setLineDash([4, 4]);
+        ctx.moveTo(-60, y); ctx.lineTo(-25, y);
+        ctx.moveTo(60, y); ctx.lineTo(25, y);
+      }
+      ctx.stroke();
+      ctx.fillText(`${deg}`, -30, y + 3);
+      ctx.fillText(`${deg}`, 45, y + 3);
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // Aircraft fixed boresight marker (center reticle)
+    ctx.strokeStyle = "#10b981";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+    ctx.moveTo(cx - 30, cy); ctx.lineTo(cx - 10, cy);
+    ctx.moveTo(cx + 10, cy); ctx.lineTo(cx + 30, cy);
+    ctx.moveTo(cx, cy - 10); ctx.lineTo(cx, cy - 6);
+    ctx.stroke();
+
+    // Flight Path Vector (Velocity vector)
+    const fpvX = cx;
+    const fpvY = cy - (flightSimState.climbRate * 1.5);
+    ctx.strokeStyle = "#38bdf8";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(fpvX, fpvY, 5, 0, Math.PI * 2);
+    ctx.moveTo(fpvX - 12, fpvY); ctx.lineTo(fpvX - 5, fpvY);
+    ctx.moveTo(fpvX + 5, fpvY); ctx.lineTo(fpvX + 12, fpvY);
+    ctx.moveTo(fpvX, fpvY - 8); ctx.lineTo(fpvX, fpvY - 5);
+    ctx.stroke();
+
+    // Heading Tape at top
+    ctx.fillStyle = "rgba(13, 21, 39, 0.75)";
+    ctx.fillRect(cx - 75, 8, 150, 22);
+    ctx.strokeStyle = "#22d3ee";
+    ctx.strokeRect(cx - 75, 8, 150, 22);
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.font = "bold 12px monospace";
+    ctx.fillText(`HDG: ${Math.round(flightSimState.heading).toString().padStart(3, "0")}°`, cx, 24);
+  }
+
+  function updateFlightHudTelemetry() {
+    const s = flightSimState;
+    const speedKmh = s.speed * 3.6;
+    const a = Math.sqrt(1.4 * 287.05 * (s.altitude < 11000 ? 288.15 - 0.0065 * s.altitude : 216.65));
+    const mach = s.speed / a;
+    const rho = 1.225 * Math.exp(-s.altitude / 8500.0);
+    const qKpa = (0.5 * rho * s.speed * s.speed) / 1000.0;
+    const aoaRad = (s.aoa * Math.PI) / 180.0;
+    const CL = 0.08 + 4.2 * aoaRad;
+    const CD = 0.018 + (CL * CL) / (Math.PI * 0.82 * 3.8);
+    const L = qKpa * 42.0 * CL;
+    const D = qKpa * 42.0 * CD;
+
+    const setEl = (id, txt) => { const el = byId(id); if (el) el.textContent = txt; };
+
+    setEl("fsimMach", `M ${mach.toFixed(2)}`);
+    setEl("fsimSpeed", `${Math.round(speedKmh).toLocaleString()} km/h`);
+    setEl("fsimAlt", `${Math.round(s.altitude).toLocaleString()} m`);
+    setEl("fsimG", `${s.gForce.toFixed(2)} G`);
+    setEl("fsimClimb", `${s.climbRate >= 0 ? "+" : ""}${s.climbRate.toFixed(1)} m/s`);
+    setEl("fsimLd", `${(L / Math.max(D, 0.01)).toFixed(1)}x`);
+    setEl("fsimStress", `${Math.round(s.sparStress)} MPa`);
+
+    const fosEl = byId("fsimFos");
+    if (fosEl) {
+      fosEl.textContent = s.fos.toFixed(2);
+      fosEl.style.color = s.fos < 1.5 ? "var(--atlas-danger, #ef4444)" : s.fos < 2.5 ? "var(--atlas-warning, #f59e0b)" : "var(--atlas-success, #22c55e)";
+    }
+
+    setEl("fsimKiasVal", `${Math.round(s.speed * 1.94384)} kts`);
+    setEl("fsimQVal", `q: ${qKpa.toFixed(1)} kPa`);
+    setEl("fsimAltVal", `${Math.round(s.altitude)} m`);
+    setEl("fsimVsiVal", `VSI: ${s.climbRate >= 0 ? "+" : ""}${s.climbRate.toFixed(1)} m/s`);
+
+    const thrSlider = byId("fsimThrottleSlider");
+    if (thrSlider && !thrSlider.matches(":active")) {
+      thrSlider.value = String(Math.round(s.throttle));
+    }
+    setEl("fsimThrottleVal", `${Math.round(s.throttle)}%`);
+    setEl("fsimThrustText", `Thrust: ${Math.round((s.afterburner ? 185 : 125) * (s.throttle / 100) * Math.pow(rho / 1.225, 0.72))} kN · Afterburner: ${s.afterburner ? "ENGAGED" : "OFF"}`);
+
+    setEl("fsimAoAVal", `${s.aoa.toFixed(1)}°`);
+    setEl("fsimClVal", CL.toFixed(3));
+    setEl("fsimCdVal", CD.toFixed(3));
+    setEl("fsimLiftVal", `${L.toFixed(1)} kN`);
+    setEl("fsimDragVal", `${D.toFixed(1)} kN`);
+    setEl("fsimSparVal", `${Math.round(s.sparStress)} MPa`);
+
+    const stallWarn = byId("fsimStallWarning");
+    if (stallWarn) {
+      stallWarn.hidden = !(s.aoa > 16.0 || s.speed < 85.0);
+    }
+  }
+
+  function initFlightSimControls() {
+    byId("topbarFlightSimBtn")?.addEventListener("click", () => {
+      if (flightSimState.active) exitFlightSimulator();
+      else launchFlightSimulator();
+    });
+
+    byId("fsimCloseBtn")?.addEventListener("click", () => exitFlightSimulator());
+
+    byId("fsimCameraModeBtn")?.addEventListener("click", () => {
+      const modes = ["chase", "cockpit", "orbit"];
+      const nextIdx = (modes.indexOf(flightSimState.cameraMode) + 1) % modes.length;
+      flightSimState.cameraMode = modes[nextIdx];
+      toast(`Camera Mode: ${flightSimState.cameraMode.toUpperCase()}`);
+    });
+
+    byId("fsimThrottleSlider")?.addEventListener("input", (e) => {
+      flightSimState.throttle = parseFloat(e.target.value);
+    });
+
+    byId("fsimAbBtn")?.addEventListener("click", () => {
+      flightSimState.afterburner = !flightSimState.afterburner;
+      const btn = byId("fsimAbBtn");
+      if (btn) btn.classList.toggle("active", flightSimState.afterburner);
+      toast(flightSimState.afterburner ? "⚡ Afterburner ENGAGED (Max Thrust 185 kN)" : "Afterburner Disengaged");
+    });
+
+    byId("fsimPitchUpBtn")?.addEventListener("mousedown", () => { flightSimState.keysDown["KeyS"] = true; });
+    byId("fsimPitchUpBtn")?.addEventListener("mouseup", () => { delete flightSimState.keysDown["KeyS"]; });
+    byId("fsimPitchDownBtn")?.addEventListener("mousedown", () => { flightSimState.keysDown["KeyW"] = true; });
+    byId("fsimPitchDownBtn")?.addEventListener("mouseup", () => { delete flightSimState.keysDown["KeyW"]; });
+    byId("fsimRollLeftBtn")?.addEventListener("mousedown", () => { flightSimState.keysDown["KeyA"] = true; });
+    byId("fsimRollLeftBtn")?.addEventListener("mouseup", () => { delete flightSimState.keysDown["KeyA"]; });
+    byId("fsimRollRightBtn")?.addEventListener("mousedown", () => { flightSimState.keysDown["KeyD"] = true; });
+    byId("fsimRollRightBtn")?.addEventListener("mouseup", () => { delete flightSimState.keysDown["KeyD"]; });
+    byId("fsimLevelBtn")?.addEventListener("click", () => {
+      flightSimState.roll = 0;
+      flightSimState.pitch = 2.0;
+      flightSimState.aoa = 3.2;
+      toast("Wings Leveled");
+    });
+
+    byId("fsimExportDxfBtn")?.addEventListener("click", () => {
+      toast("Generating 3-View Mechanical Aircraft DXF...");
+      exportDxf();
+    });
+
+    byId("fsimExportStlBtn")?.addEventListener("click", () => {
+      toast("Exporting 3D Aircraft Solid Mesh STL...");
+      exportStl();
+    });
+
+    // Keyboard bindings for flight controls
+    window.addEventListener("keydown", (e) => {
+      if (!flightSimState.active) {
+        if (e.key === "F8") {
+          e.preventDefault();
+          launchFlightSimulator();
+        }
+        return;
+      }
+
+      if (e.key === "Escape") {
+        e.preventDefault();
+        exitFlightSimulator();
+        return;
+      }
+
+      flightSimState.keysDown[e.code] = true;
+    });
+
+    window.addEventListener("keyup", (e) => {
+      if (flightSimState.active) {
+        delete flightSimState.keysDown[e.code];
+      }
+    });
+
+    // Wire template card for hypersonic waverider to launch simulator
+    document.querySelectorAll('.template-card[data-template="hypersonic"]').forEach((card) => {
+      card.addEventListener("click", () => {
+        launchFlightSimulator();
+      });
+    });
+  }
+
   function bindUi() {
     byId("undoBtn").addEventListener("click", undo);
     byId("redoBtn").addEventListener("click", redo);
@@ -13115,6 +13637,7 @@ ${gcodeSample}`;
     setupEnterpriseWorkbenchBar();
     setupUnifiedDragLayer();
     setupGlobalSidebar();
+    initFlightSimControls();
     setupBreadcrumbs();
     setupStudioViews();
     setupNewProjectModal();

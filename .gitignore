@@ -33,6 +33,8 @@ Thumbs.db
 # Studio document autosave/backup sidecars created next to a `.zcad` project
 *.zcad.autosave
 *.zcad.backup
+*.atlas
+*.atlas.recovery
 *.tar.gz.sha256
 
 # Third-party upstream downloaded sources and build trees
