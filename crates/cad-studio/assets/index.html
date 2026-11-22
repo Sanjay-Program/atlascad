@@ -42,6 +42,14 @@
         <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/>
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" fill="none" stroke="currentColor" stroke-width="1.8"/>
       </symbol>
+      <symbol id="icon-user" viewBox="0 0 24 24">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="12" cy="7" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/>
+      </symbol>
+      <symbol id="icon-shield" viewBox="0 0 24 24">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="m9 12 2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
       <symbol id="icon-dev" viewBox="0 0 24 24">
         <path d="m8 9-5 3 5 3m8-6 5 3-5 3m-4-8-2 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
       </symbol>
@@ -735,6 +743,26 @@
       <button type="button" id="topbarFlightVideoBtn" class="button ghost small" title="Watch High-Def Video Demonstration of Supersonic Mechanical Aircraft">
         <svg class="atlas-icon" aria-hidden="true" style="margin-right:4px;"><use href="#icon-media"/></svg><span>▶ Flight Video</span>
       </button>
+      <button type="button" id="topbarAssetsHubBtn" class="button ghost small" title="Universal Multi-Tier Asset Store &amp; Catalog">
+        <svg class="atlas-icon" aria-hidden="true" style="margin-right:4px;"><use href="#icon-assets"/></svg><span>📦 Assets Hub</span>
+      </button>
+      <button type="button" id="topbarCollabCommentsBtn" class="button ghost small" title="Real-Time 3D Spatial Comments &amp; Design Review Threads">
+        <svg class="atlas-icon" aria-hidden="true" style="margin-right:4px;"><use href="#icon-workflows"/></svg><span>💬 Reviews (<span id="collabCommentsCount">2</span>)</span>
+      </button>
+      <div id="topbarPresenceCluster" class="topbar-presence-cluster" title="Active Multi-User Collaborators (Live Presence)">
+        <div class="presence-avatar" style="background:#6366f1;" title="Sanjay (Owner) · Active: 3D Extrude">S</div>
+        <div class="presence-avatar" style="background:#10b981;" title="Sarah Chen (Structural Lead) · Active: FEA Stress">SC</div>
+        <div class="presence-avatar" style="background:#0284c7;" title="Marcus Vance (Aerodynamics) · Active: Wave Drag">MV</div>
+        <span class="presence-count-badge">+3 Live</span>
+      </div>
+      <div id="topbarUserPill" class="topbar-user-pill" title="Active Enterprise Identity &amp; Role Management (Click to Manage Account)">
+        <div class="user-avatar-badge" id="topbarUserAvatar" style="background: linear-gradient(135deg, #00f0ff, #3b82f6);">S</div>
+        <div class="user-info-text">
+          <span class="user-display-name" id="topbarUserName">Sanjay</span>
+          <span class="user-role-badge" id="topbarUserRole">Chief Architect</span>
+        </div>
+        <span class="enterprise-verified-badge" title="$2,000/yr Enterprise License Active">✓</span>
+      </div>
       <button type="button" id="topbarJobsBtn"  class="topbar-jobs-btn" title="HPC Job Queue & Telemetry">
         <svg class="atlas-icon" aria-hidden="true" style="margin-right:4px;"><use href="#icon-jobs"/></svg><span id="topbarJobsText">Idle</span>
       </button>
@@ -5324,6 +5352,352 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
         </div>
         <div style="background:rgba(15,23,42,0.8); padding:10px 14px; border-radius:6px; border:1px solid rgba(51,65,85,0.6);">
           <strong style="color:#f59e0b;">Structural FEA:</strong> Wing Root Spar σvM: 118 MPa → 478 MPa under +4.2 G bank maneuver (FoS: 1.84).
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Universal Multi-Tier Asset Hub Modal -->
+  <dialog id="assetsHubModal" class="studio-dialog modal-lg" aria-labelledby="assetsHubTitle" style="max-width:860px; width:94vw;">
+    <div class="dialog-header" style="display:flex; justify-content:space-between; align-items:center; padding:12px 20px; border-bottom:1px solid var(--atlas-border); background:var(--atlas-surface-2);">
+      <div class="dialog-title-wrap" style="display:flex; align-items:center; gap:10px;">
+        <span class="dialog-icon"><svg class="atlas-icon" aria-hidden="true" style="color:#00f0ff;"><use href="#icon-assets"/></svg></span>
+        <div>
+          <h3 id="assetsHubTitle" style="margin:0; font-size:16px; font-weight:700;">Universal Component Hub &amp; Asset Store</h3>
+          <span style="font-size:11.5px; color:var(--atlas-text-secondary);">Enterprise Multi-Tier Engineering Catalog (Public, Team &amp; Private)</span>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <button type="button" class="button small primary" id="openPublishAssetBtn">➕ Publish New Asset</button>
+        <button type="button" class="icon-button" id="closeAssetsHubBtn">&times;</button>
+      </div>
+    </div>
+    <div class="dialog-body" style="padding:16px 20px; display:flex; flex-direction:column; gap:14px; max-height:80vh; overflow-y:auto;">
+      <!-- Search & Filters Toolbar -->
+      <div class="assets-toolbar" style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; background:var(--atlas-surface-1); padding:10px 14px; border-radius:6px; border:1px solid var(--atlas-border);">
+        <div style="display:flex; gap:6px;" class="asset-vis-filter-tabs">
+          <button type="button" class="button small ghost active asset-vis-tab" data-vis="all">All Assets</button>
+          <button type="button" class="button small ghost asset-vis-tab" data-vis="public">🌐 Public Store</button>
+          <button type="button" class="button small ghost asset-vis-tab" data-vis="team">🏢 Team Assets</button>
+          <button type="button" class="button small ghost asset-vis-tab" data-vis="private">🔒 My Private</button>
+        </div>
+        <div style="display:flex; gap:8px; flex:1; max-width:320px;">
+          <input type="search" id="assetSearchInput" class="input small" placeholder="Search standard components, bolts, motors..." style="width:100%;">
+        </div>
+      </div>
+
+      <!-- Categories row -->
+      <div class="asset-category-chips" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:4px;">
+        <button type="button" class="chip active asset-cat-chip" data-cat="">All Categories</button>
+        <button type="button" class="chip asset-cat-chip" data-cat="Aerospace">Aerospace</button>
+        <button type="button" class="chip asset-cat-chip" data-cat="Fasteners">Fasteners (ISO/DIN)</button>
+        <button type="button" class="chip asset-cat-chip" data-cat="Bearings">Bearings</button>
+        <button type="button" class="chip asset-cat-chip" data-cat="Actuators">Actuators &amp; Motors</button>
+        <button type="button" class="chip asset-cat-chip" data-cat="Power Transmission">Power Transmission</button>
+        <button type="button" class="chip asset-cat-chip" data-cat="Materials">Advanced Materials</button>
+      </div>
+
+      <!-- Asset Cards Grid -->
+      <div id="assetsHubGrid" class="assets-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:12px;">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Publish Asset Dialog Modal -->
+  <dialog id="publishAssetModal" class="studio-dialog modal-md" aria-labelledby="publishAssetTitle" style="max-width:520px; width:90vw;">
+    <div class="dialog-header" style="display:flex; justify-content:space-between; align-items:center; padding:12px 18px; border-bottom:1px solid var(--atlas-border); background:var(--atlas-surface-2);">
+      <h3 id="publishAssetTitle" style="margin:0; font-size:15px; font-weight:700;">Publish Component to Catalog</h3>
+      <button type="button" class="icon-button" id="closePublishAssetBtn">&times;</button>
+    </div>
+    <form id="publishAssetForm" class="dialog-body" style="padding:16px 18px; display:flex; flex-direction:column; gap:12px;">
+      <div>
+        <label for="pubNameInput" style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Asset Name:</label>
+        <input type="text" id="pubNameInput" class="input" placeholder="e.g. Scramjet Intake Cowl" required style="width:100%;">
+      </div>
+      <div>
+        <label for="pubDescInput" style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Description:</label>
+        <textarea id="pubDescInput" class="input" rows="2" placeholder="Engineering specs, operating temperature, yield stress..." style="width:100%;"></textarea>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div>
+          <label for="pubCategorySelect" style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Category:</label>
+          <select id="pubCategorySelect" class="input" style="width:100%;">
+            <option value="Aerospace">Aerospace</option>
+            <option value="Fasteners">Fasteners</option>
+            <option value="Bearings">Bearings</option>
+            <option value="Actuators">Actuators</option>
+            <option value="Power Transmission">Power Transmission</option>
+            <option value="Materials">Materials</option>
+            <option value="Custom Assembly">Custom Assembly</option>
+          </select>
+        </div>
+        <div>
+          <label for="pubVisibilitySelect" style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Visibility Tier:</label>
+          <select id="pubVisibilitySelect" class="input" style="width:100%;">
+            <option value="public">🌐 Public (All Users)</option>
+            <option value="team" selected>🏢 Team Internal</option>
+            <option value="private">🔒 Private (Confidential)</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label for="pubTagsInput" style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Tags (comma-separated):</label>
+        <input type="text" id="pubTagsInput" class="input" placeholder="iso, bracket, titanium, fea, aerospace" style="width:100%;">
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
+        <button type="button" class="button ghost" id="cancelPublishAssetBtn">Cancel</button>
+        <button type="submit" class="button primary">Publish Asset</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 3D Spatial Comments & Design Review Drawer Modal -->
+  <dialog id="collabCommentsDrawer" class="studio-dialog modal-md" aria-labelledby="collabCommentsTitle" style="max-width:620px; width:90vw;">
+    <div class="dialog-header" style="display:flex; justify-content:space-between; align-items:center; padding:12px 18px; border-bottom:1px solid var(--atlas-border); background:var(--atlas-surface-2);">
+      <div class="dialog-title-wrap" style="display:flex; align-items:center; gap:8px;">
+        <span class="dialog-icon"><svg class="atlas-icon" aria-hidden="true" style="color:#6366f1;"><use href="#icon-workflows"/></svg></span>
+        <div>
+          <h3 id="collabCommentsTitle" style="margin:0; font-size:14.5px; font-weight:700;">Design Review &amp; 3D Spatial Annotations</h3>
+          <span style="font-size:11px; color:var(--atlas-text-secondary);">Real-Time Collaborative Comments Anchored in 3D CAD Space</span>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button type="button" class="button small primary" id="toggleAddPinBtn">📍 Add 3D Pin</button>
+        <button type="button" class="icon-button" id="closeCollabCommentsBtn">&times;</button>
+      </div>
+    </div>
+    <div class="dialog-body" style="padding:14px 18px; max-height:75vh; overflow-y:auto; display:flex; flex-direction:column; gap:12px;">
+      <div id="collabCommentsList" style="display:flex; flex-direction:column; gap:10px;">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Enterprise Production Authentication & Access Control Modal -->
+  <dialog id="authModal" class="studio-dialog modal-md" aria-labelledby="authModalTitle" style="max-width:580px; width:92vw;">
+    <div class="dialog-header" style="display:flex; justify-content:space-between; align-items:center; padding:14px 20px; border-bottom:1px solid var(--atlas-border); background:var(--atlas-surface-2);">
+      <div class="dialog-title-wrap" style="display:flex; align-items:center; gap:10px;">
+        <span class="dialog-icon"><svg class="atlas-icon" aria-hidden="true" style="color:var(--atlas-accent);"><use href="#icon-shield"/></svg></span>
+        <div>
+          <h3 id="authModalTitle" style="margin:0; font-size:15px; font-weight:700;">Enterprise Authentication &amp; Identity</h3>
+          <span style="font-size:11px; color:var(--atlas-text-secondary);">$2,000/yr Plan Secure RBAC &amp; SSO Access Control</span>
+        </div>
+      </div>
+      <button type="button" class="icon-button" id="closeAuthModalBtn">&times;</button>
+    </div>
+    <div class="dialog-body" style="padding:16px 20px;">
+      <!-- Tab Bar -->
+      <div class="auth-tabs" style="display:flex; gap:6px; margin-bottom:16px; border-bottom:1px solid var(--atlas-border); padding-bottom:8px;">
+        <button type="button" class="auth-tab-btn active" data-tab="quick-switch" id="authTabQuickSwitchBtn" style="padding:6px 12px; border-radius:4px; font-size:12px; font-weight:600; cursor:pointer; background:var(--atlas-accent); color:#000; border:none;">⚡ Quick Switch Role</button>
+        <button type="button" class="auth-tab-btn" data-tab="signin" id="authTabSignInBtn" style="padding:6px 12px; border-radius:4px; font-size:12px; font-weight:600; cursor:pointer; background:transparent; color:var(--atlas-text); border:1px solid var(--atlas-border);">🔑 Sign In</button>
+        <button type="button" class="auth-tab-btn" data-tab="sso" id="authTabSsoBtn" style="padding:6px 12px; border-radius:4px; font-size:12px; font-weight:600; cursor:pointer; background:transparent; color:var(--atlas-text); border:1px solid var(--atlas-border);">🏢 Enterprise SSO</button>
+        <button type="button" class="auth-tab-btn" data-tab="register" id="authTabRegisterBtn" style="padding:6px 12px; border-radius:4px; font-size:12px; font-weight:600; cursor:pointer; background:transparent; color:var(--atlas-text); border:1px solid var(--atlas-border);">➕ Add Member</button>
+      </div>
+
+      <!-- Quick Switch Panel -->
+      <div id="authQuickSwitchPanel" class="auth-tab-panel active" style="display:flex; flex-direction:column; gap:10px;">
+        <p style="font-size:12px; color:var(--atlas-text-secondary); margin:0 0 6px 0;">Select an enterprise team member to test permissions, optimistic entity locks, and asset catalogs:</p>
+        <div class="quick-user-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <!-- Sanjay -->
+          <div class="quick-user-card" data-user="usr_sanjay" style="padding:10px; border:1px solid var(--atlas-border); border-radius:6px; cursor:pointer; background:var(--atlas-surface-1); transition:all 0.15s ease;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="width:36px; height:36px; border-radius:50%; background:#00f0ff; color:#000; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px;">S</div>
+              <div>
+                <div style="font-weight:700; font-size:13px;">Sanjay</div>
+                <div style="font-size:11px; color:#00f0ff;">Chief Architect &amp; Founder</div>
+              </div>
+            </div>
+            <div style="font-size:10.5px; color:var(--atlas-text-secondary); margin-top:6px;">Aerospace &amp; Hypersonic Structures</div>
+          </div>
+          <!-- Elena -->
+          <div class="quick-user-card" data-user="usr_elena" style="padding:10px; border:1px solid var(--atlas-border); border-radius:6px; cursor:pointer; background:var(--atlas-surface-1); transition:all 0.15s ease;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="width:36px; height:36px; border-radius:50%; background:#ec4899; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px;">ER</div>
+              <div>
+                <div style="font-weight:700; font-size:13px;">Dr. Elena Rostova</div>
+                <div style="font-size:11px; color:#ec4899;">Lead Propulsion Engineer</div>
+              </div>
+            </div>
+            <div style="font-size:10.5px; color:var(--atlas-text-secondary); margin-top:6px;">Scramjet &amp; Thermal Dynamics</div>
+          </div>
+          <!-- Marcus -->
+          <div class="quick-user-card" data-user="usr_marcus" style="padding:10px; border:1px solid var(--atlas-border); border-radius:6px; cursor:pointer; background:var(--atlas-surface-1); transition:all 0.15s ease;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="width:36px; height:36px; border-radius:50%; background:#3b82f6; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px;">MV</div>
+              <div>
+                <div style="font-weight:700; font-size:13px;">Marcus Vance</div>
+                <div style="font-size:11px; color:#3b82f6;">Autonomous Robotics Lead</div>
+              </div>
+            </div>
+            <div style="font-size:10.5px; color:var(--atlas-text-secondary); margin-top:6px;">Precision Kinematics &amp; Mechatronics</div>
+          </div>
+          <!-- Sara -->
+          <div class="quick-user-card" data-user="usr_sara" style="padding:10px; border:1px solid var(--atlas-border); border-radius:6px; cursor:pointer; background:var(--atlas-surface-1); transition:all 0.15s ease;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="width:36px; height:36px; border-radius:50%; background:#10b981; color:#000; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px;">SC</div>
+              <div>
+                <div style="font-weight:700; font-size:13px;">Sara Chen</div>
+                <div style="font-size:11px; color:#10b981;">Regulatory &amp; ISO Reviewer</div>
+              </div>
+            </div>
+            <div style="font-size:10.5px; color:var(--atlas-text-secondary); margin-top:6px;">External Airworthiness Audit</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sign In Form Panel -->
+      <form id="authSignInPanel" class="auth-tab-panel" style="display:none; flex-direction:column; gap:12px;">
+        <div>
+          <label for="authEmailInput" style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Work Email:</label>
+          <input type="email" id="authEmailInput" class="input" placeholder="engineer@enterprise.internal" required style="width:100%;">
+        </div>
+        <div>
+          <label for="authPasswordInput" style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Password / Security Key:</label>
+          <input type="password" id="authPasswordInput" class="input" placeholder="••••••••••••" style="width:100%;">
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:11.5px;">
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" checked id="authRememberCheckbox"> Keep session active (30 days)</label>
+          <a href="#" style="color:var(--atlas-accent); text-decoration:none;" onclick="alert('Password reset link sent to registered email'); return false;">Forgot password?</a>
+        </div>
+        <button type="submit" class="button primary" style="width:100%; margin-top:4px;">Sign In to Enterprise Workspace</button>
+      </form>
+
+      <!-- SSO Enterprise Panel -->
+      <div id="authSsoPanel" class="auth-tab-panel" style="display:none; flex-direction:column; gap:12px;">
+        <p style="font-size:12px; color:var(--atlas-text-secondary); margin:0;">Authenticate via your organization's centralized identity provider (SAML 2.0 / OIDC):</p>
+        <button type="button" class="sso-auth-btn" data-provider="Okta / SAML 2.0" style="display:flex; align-items:center; justify-content:center; gap:10px; padding:10px; border:1px solid #007dc1; background:#007dc122; color:#fff; border-radius:6px; cursor:pointer; font-weight:600;">
+          <span>🔵 Continue with Okta SSO</span>
+        </button>
+        <button type="button" class="sso-auth-btn" data-provider="Azure Active Directory" style="display:flex; align-items:center; justify-content:center; gap:10px; padding:10px; border:1px solid #008ad7; background:#008ad722; color:#fff; border-radius:6px; cursor:pointer; font-weight:600;">
+          <span>🟦 Continue with Microsoft Entra ID (Azure AD)</span>
+        </button>
+        <button type="button" class="sso-auth-btn" data-provider="Google Workspace" style="display:flex; align-items:center; justify-content:center; gap:10px; padding:10px; border:1px solid #ea4335; background:#ea433522; color:#fff; border-radius:6px; cursor:pointer; font-weight:600;">
+          <span>🔴 Continue with Google Workspace</span>
+        </button>
+      </div>
+
+      <!-- Add Team Member Panel -->
+      <form id="authRegisterPanel" class="auth-tab-panel" style="display:none; flex-direction:column; gap:12px;">
+        <div>
+          <label for="regNameInput" style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Full Name:</label>
+          <input type="text" id="regNameInput" class="input" placeholder="e.g. Alex Thorne" required style="width:100%;">
+        </div>
+        <div>
+          <label for="regEmailInput" style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Company Email:</label>
+          <input type="email" id="regEmailInput" class="input" placeholder="alex.thorne@company.internal" required style="width:100%;">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div>
+            <label for="regRoleSelect" style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Engineering Role:</label>
+            <select id="regRoleSelect" class="input" style="width:100%;">
+              <option value="Lead Engineer">Lead Engineer</option>
+              <option value="Design Engineer" selected>Design Engineer</option>
+              <option value="Airworthiness Reviewer">Reviewer / Inspector</option>
+            </select>
+          </div>
+          <div>
+            <label for="regTeamSelect" style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Team / Discipline:</label>
+            <select id="regTeamSelect" class="input" style="width:100%;">
+              <option value="team_aero_structures">Aerospace Structures</option>
+              <option value="team_propulsion">Propulsion &amp; CFD</option>
+              <option value="team_robotics">Robotics &amp; Kinematics</option>
+              <option value="team_compliance">Airworthiness Audit</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="button primary" style="width:100%; margin-top:4px;">Provision Enterprise Seat</button>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- Enterprise Account, License & Settings Modal -->
+  <dialog id="accountModal" class="studio-dialog modal-md" aria-labelledby="accountModalTitle" style="max-width:680px; width:94vw;">
+    <div class="dialog-header" style="display:flex; justify-content:space-between; align-items:center; padding:14px 20px; border-bottom:1px solid var(--atlas-border); background:var(--atlas-surface-2);">
+      <div class="dialog-title-wrap" style="display:flex; align-items:center; gap:10px;">
+        <span class="dialog-icon"><svg class="atlas-icon" aria-hidden="true" style="color:var(--atlas-accent);"><use href="#icon-settings"/></svg></span>
+        <div>
+          <h3 id="accountModalTitle" style="margin:0; font-size:15px; font-weight:700;">Enterprise Identity &amp; License Settings</h3>
+          <span style="font-size:11px; color:var(--atlas-text-secondary);">Manage Teams, Commercial SaaS License, and API Automation Keys</span>
+        </div>
+      </div>
+      <button type="button" class="icon-button" id="closeAccountModalBtn">&times;</button>
+    </div>
+    <div class="dialog-body" style="padding:16px 20px; display:flex; flex-direction:column; gap:16px; max-height:80vh; overflow-y:auto;">
+      <!-- Profile Header Card -->
+      <div class="account-profile-card" style="display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-radius:8px; background:var(--atlas-surface-1); border:1px solid var(--atlas-border);">
+        <div style="display:flex; align-items:center; gap:14px;">
+          <div id="accountUserAvatarLarge" style="width:50px; height:50px; border-radius:50%; background:linear-gradient(135deg, #00f0ff, #3b82f6); color:#000; font-size:20px; font-weight:800; display:flex; align-items:center; justify-content:center; box-shadow:0 0 12px rgba(0,240,255,0.3);">S</div>
+          <div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span id="accountUserName" style="font-weight:700; font-size:16px;">Sanjay</span>
+              <span id="accountUserRoleBadge" class="asset-badge asset-badge-public">Chief Architect</span>
+            </div>
+            <div id="accountUserEmail" style="font-size:12px; color:var(--atlas-text-secondary); margin-top:2px;">sanjay@atlascad.internal</div>
+            <div id="accountUserOrg" style="font-size:11px; color:var(--atlas-accent); margin-top:1px;">AtlasCAD Advanced Engineering Lab</div>
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
+          <button type="button" class="button small secondary" id="accountSwitchUserBtn">Switch User / Role</button>
+          <button type="button" class="button small ghost" id="accountLogoutBtn" style="color:#ef4444;">Sign Out</button>
+        </div>
+      </div>
+
+      <!-- Enterprise Commercial License Tier Box -->
+      <div class="account-license-box" style="padding:14px 18px; border-radius:8px; border:1px solid rgba(16, 185, 129, 0.4); background:rgba(16, 185, 129, 0.06);">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="color:#10b981; font-size:14px;">🛡️</span>
+              <span style="font-weight:700; font-size:13.5px; color:#10b981;">$2,000 / Year Commercial Enterprise License</span>
+              <span style="background:#10b981; color:#000; font-size:10px; font-weight:700; padding:2px 6px; border-radius:3px;">ACTIVE</span>
+            </div>
+            <div style="font-size:11.5px; color:var(--atlas-text-secondary); margin-top:4px;">
+              Enterprise Tier Compliant · License Key: <code id="accountLicenseKey" style="color:#10b981;">ATLAS-ENT-2026-X889-K992-FLIGHT</code>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:12px; font-weight:700;" id="accountSeatsUsage">4 of 10 Seats Used</div>
+            <div style="font-size:10.5px; color:var(--atlas-text-secondary);">Renews Nov 22, 2027</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Team Selector -->
+      <div>
+        <label for="accountTeamSelect" style="display:block; font-size:12px; font-weight:700; margin-bottom:6px;">Active Team Workspace:</label>
+        <div style="display:flex; gap:10px;">
+          <select id="accountTeamSelect" class="input" style="flex:1;">
+            <option value="team_aero_structures" selected>Aerospace &amp; Hypersonic Structures (Lead: Sanjay)</option>
+            <option value="team_propulsion">Scramjet &amp; Thermal Dynamics (Lead: Dr. Elena Rostova)</option>
+            <option value="team_robotics">Precision Kinematics &amp; Mechatronics (Lead: Marcus Vance)</option>
+            <option value="team_compliance">External Airworthiness Audit (Lead: Sara Chen)</option>
+            <option value="personal">Personal Private Sandbox</option>
+          </select>
+          <button type="button" class="button secondary" id="accountApplyTeamBtn">Switch Team</button>
+        </div>
+      </div>
+
+      <!-- Personal Access Tokens & Headless API Keys -->
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <div>
+            <span style="font-size:12px; font-weight:700;">Personal Access Tokens (PAT) &amp; Python SDK Keys:</span>
+            <div style="font-size:11px; color:var(--atlas-text-secondary);">Use in headless CLI batch scripts, Python SDK, and automated CI/CD pipelines.</div>
+          </div>
+          <button type="button" class="button small primary" id="accountGenerateApiKeyBtn">⚡ Generate Token</button>
+        </div>
+        <div id="accountApiKeysList" style="display:flex; flex-direction:column; gap:6px;">
+          <!-- Dynamically populated by app.js -->
+        </div>
+      </div>
+
+      <!-- Active Sessions & Security Audit -->
+      <div style="border-top:1px solid var(--atlas-border); padding-top:12px;">
+        <div style="font-size:12px; font-weight:700; margin-bottom:4px;">Active Enterprise Sessions:</div>
+        <div style="font-size:11px; color:var(--atlas-text-secondary); display:flex; justify-content:space-between;">
+          <span>Current Web Client · IP: 127.0.0.1 (Loopback Protected) · TLS 1.3 ChaCha20</span>
+          <span style="color:#10b981;">● Online Now</span>
         </div>
       </div>
     </div>

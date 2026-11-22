@@ -9214,5 +9214,216 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(video_res.headers.get("accept-ranges").map(String::as_str), Some("bytes"));
     assert!(video_res.body.len() > 1_000_000);
 
+    // 254. Multi-Tier Universal Asset Store & Component Hub Endpoints
+    let assets_res = get(addr, "/api/assets?visibility=public")?;
+    assert_eq!(assets_res.status, 200);
+    let assets_list: Vec<Value> = serde_json::from_slice(&assets_res.body)?;
+    assert!(!assets_list.is_empty());
+    assert!(assets_list.iter().any(|a| a["id"] == "ast_aero_waverider"));
+
+    let aero_filter_res = get(addr, "/api/assets?category=Aerospace")?;
+    assert_eq!(aero_filter_res.status, 200);
+    let aero_list: Vec<Value> = serde_json::from_slice(&aero_filter_res.body)?;
+    assert!(aero_list.iter().any(|a| a["id"] == "ast_aero_waverider"));
+
+    let asset_detail_res = get(addr, "/api/assets/ast_aero_waverider")?;
+    assert_eq!(asset_detail_res.status, 200);
+    let detail_val = json(&asset_detail_res)?;
+    assert_eq!(detail_val["record"]["name"], "Aerospace Supersonic Waverider");
+    assert!(!detail_val["record"]["parameters"].as_array().unwrap().is_empty());
+
+    // Publish New Custom Part Asset
+    let pub_res = post(
+        addr,
+        "/api/assets",
+        r#"{
+            "name": "Composite Flap Hinge Fitting",
+            "description": "Additive manufactured Ti-6Al-4V hinge bracket for supersonic elevon controls.",
+            "category": "Aerospace",
+            "visibility": "team",
+            "tags": ["hinge", "titanium", "additive", "elevon"],
+            "author_id": "usr_sanjay",
+            "author_name": "Sanjay (Chief Architect)",
+            "team_id": "team_aero_structures"
+        }"#,
+    )?;
+    assert_eq!(pub_res.status, 200);
+    let published_asset = json(&pub_res)?;
+    let published_id = published_asset["id"].as_str().unwrap();
+
+    // Fork Asset into Private Workspace
+    let fork_res = post(
+        addr,
+        &format!("/api/assets/{published_id}/fork"),
+        r#"{
+            "user_id": "usr_sanjay",
+            "user_name": "Sanjay (Chief Architect)",
+            "team_id": "team_aero_structures",
+            "visibility": "private"
+        }"#,
+    )?;
+    assert_eq!(fork_res.status, 200);
+    let forked_val = json(&fork_res)?;
+    assert_eq!(forked_val["author"]["user_id"], "usr_sanjay");
+    assert_eq!(forked_val["visibility"], "Private");
+
+    // Instantiate / Use Asset in Active Assembly
+    let use_res = post(
+        addr,
+        &format!("/api/assets/{published_id}/use"),
+        r#"{ "instance_name": "wing_left_hinge_inst", "parameters": { "pin_diameter": 12.0 } }"#,
+    )?;
+    assert_eq!(use_res.status, 200);
+    let use_val = json(&use_res)?;
+    assert_eq!(use_val["status"], "Instantiated");
+    assert_eq!(use_val["linked_dependency"], true);
+
+    // 255. Real-Time Multi-User Collaboration, Presence & 3D Spatial Comments
+    let presence_res = get(addr, "/api/collab/presence")?;
+    assert_eq!(presence_res.status, 200);
+    let presence_val = json(&presence_res)?;
+    assert!(presence_val["total_active"].as_u64().unwrap() >= 3);
+
+    let update_pres_res = post(
+        addr,
+        "/api/collab/presence",
+        r#"{
+            "user_id": "usr_sanjay",
+            "name": "Sanjay (Chief Architect)",
+            "role": "Owner",
+            "cursor_pos": [1.5, 4.0, 1.2],
+            "active_tool": "3D Chamfer",
+            "selected_entity": "hinge_fitting_edge_04"
+        }"#,
+    )?;
+    assert_eq!(update_pres_res.status, 200);
+
+    // Concurrency: Entity Lease / Optimistic Lock Acquisition and Release
+    let lock_res = post(
+        addr,
+        "/api/collab/lock",
+        r#"{ "entity_id": "body_fuselage_01", "user_id": "usr_sanjay", "duration_sec": 30 }"#,
+    )?;
+    assert_eq!(lock_res.status, 200);
+    assert_eq!(json(&lock_res)?["acquired"], true);
+
+    let unlock_res = post(
+        addr,
+        "/api/collab/unlock",
+        r#"{ "entity_id": "body_fuselage_01", "user_id": "usr_sanjay" }"#,
+    )?;
+    assert_eq!(unlock_res.status, 200);
+    assert_eq!(json(&unlock_res)?["released"], true);
+
+    // 3D Spatial Annotations & Design Review Comments
+    let comments_res = get(addr, "/api/collab/comments")?;
+    assert_eq!(comments_res.status, 200);
+    let comments_val = json(&comments_res)?;
+    assert!(!comments_val["comments"].as_array().unwrap().is_empty());
+
+    let create_cmt_res = post(
+        addr,
+        "/api/collab/comments",
+        r#"{
+            "pos_3d": [0.0, 4.0, 1.2],
+            "text": "Review fastener clearance and shear stress under Mach 3.5 shockwave impingement.",
+            "author_id": "usr_sarah",
+            "author_name": "Sarah Chen (Structural Lead)"
+        }"#,
+    )?;
+    assert_eq!(create_cmt_res.status, 200);
+    let cmt_val = json(&create_cmt_res)?;
+    let cmt_id = cmt_val["id"].as_str().unwrap();
+
+    let reply_res = post(
+        addr,
+        &format!("/api/collab/comments/{cmt_id}/reply"),
+        r#"{
+            "text": "Verified with ANSI/AIAA S-080 high-temp joint fastener standards.",
+            "author_id": "usr_sanjay",
+            "author_name": "Sanjay (Chief Architect)"
+        }"#,
+    )?;
+    assert_eq!(reply_res.status, 200);
+
+    let resolve_res = post(
+        addr,
+        &format!("/api/collab/comments/{cmt_id}/resolve"),
+        "{}",
+    )?;
+    assert_eq!(resolve_res.status, 200);
+    assert_eq!(json(&resolve_res)?["status"], "Resolved");
+
+    // 256. Production-Ready Enterprise Identity, RBAC, Multi-Tenant SSO & API Keys
+    let auth_me_res = get(addr, "/api/auth/me")?;
+    assert_eq!(auth_me_res.status, 200);
+    let auth_val = json(&auth_me_res)?;
+    assert_eq!(auth_val["authenticated"], true);
+    assert_eq!(auth_val["user"]["user_id"], "usr_sanjay");
+    assert_eq!(auth_val["enterprise_license"]["seats_allocated"], 4);
+    assert_eq!(auth_val["enterprise_license"]["seats_total"], 10);
+    assert_eq!(auth_val["teams"].as_array().unwrap().len(), 5);
+
+    // Switch active role/user to Dr. Elena Rostova
+    let switch_user_res = post(
+        addr,
+        "/api/auth/login",
+        r#"{ "user_id": "usr_elena" }"#,
+    )?;
+    assert_eq!(switch_user_res.status, 200);
+    let elena_val = json(&switch_user_res)?;
+    assert_eq!(elena_val["success"], true);
+    assert_eq!(elena_val["user"]["user_id"], "usr_elena");
+
+    // Switch active team
+    let switch_team_res = post(
+        addr,
+        "/api/auth/switch-team",
+        r#"{ "team_id": "team_propulsion" }"#,
+    )?;
+    assert_eq!(switch_team_res.status, 200);
+    assert_eq!(json(&switch_team_res)?["active_team_id"], "team_propulsion");
+
+    // Generate Headless CI/CD Personal Access Token (PAT)
+    let create_key_res = post(
+        addr,
+        "/api/auth/api-keys",
+        r#"{ "name": "Automated Hypersonic Meshing Pipeline", "scopes": ["cad:read", "cad:mutate", "sim:hypersonic"] }"#,
+    )?;
+    assert_eq!(create_key_res.status, 200);
+    let key_val = json(&create_key_res)?;
+    let key_id = key_val["key"]["id"].as_str().unwrap();
+    assert!(key_val["token"].as_str().unwrap().starts_with("atlas_pat_"));
+
+    // Verify key appears in list
+    let list_keys_res = get(addr, "/api/auth/api-keys")?;
+    assert_eq!(list_keys_res.status, 200);
+    assert!(json(&list_keys_res)?["api_keys"].as_array().unwrap().iter().any(|k| k["id"] == key_id));
+
+    // Revoke key
+    let revoke_res = post(
+        addr,
+        "/api/auth/api-keys/revoke",
+        &format!(r#"{{ "id": "{key_id}" }}"#),
+    )?;
+    assert_eq!(revoke_res.status, 200);
+
+    // Register a new enterprise team member
+    let reg_res = post(
+        addr,
+        "/api/auth/register",
+        r#"{ "name": "Dr. Hans Weber", "email": "hans.weber@atlascad.internal", "role": "Aerodynamics Lead", "team_id": "team_aero_structures" }"#,
+    )?;
+    assert_eq!(reg_res.status, 200);
+    let reg_val = json(&reg_res)?;
+    assert_eq!(reg_val["success"], true);
+    assert_eq!(reg_val["user"]["name"], "Dr. Hans Weber");
+
+    // Logout to guest
+    let logout_res = post(addr, "/api/auth/logout", "{}")?;
+    assert_eq!(logout_res.status, 200);
+    let auth_me_logged_out = get(addr, "/api/auth/me")?;
+    assert_eq!(json(&auth_me_logged_out)?["authenticated"], false);
+
     Ok(())
 }

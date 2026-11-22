@@ -12902,7 +12902,752 @@ ${gcodeSample}`;
     });
   }
 
+  // ============================================================================
+  // ENTERPRISE IDENTITY, AUTHENTICATION & MULTI-TENANT RBAC
+  // ============================================================================
+
+  const AtlasAuth = {
+    currentUser: {
+      user_id: "usr_sanjay",
+      name: "Sanjay",
+      email: "sanjay@atlascad.internal",
+      role: "Chief Architect & Founder",
+      team_id: "team_aero_structures",
+      team_name: "Aerospace & Hypersonic Structures",
+      avatar_color: "#00f0ff",
+      plan_tier: "$2,000/yr Commercial Enterprise Plan",
+      license_key: "ATLAS-ENT-2026-X889-K992-FLIGHT",
+      permissions: [
+        "cad:read",
+        "cad:mutate",
+        "cad:export",
+        "assets:publish_public",
+        "assets:publish_team",
+        "assets:publish_private",
+        "collab:lease_locks",
+        "collab:review_resolve",
+        "admin:manage_users",
+        "admin:api_keys",
+        "hpc:unlimited"
+      ],
+    },
+    teams: [],
+    users: [],
+    apiKeys: [],
+  };
+
+  async function syncAuthMe() {
+    try {
+      const res = await fetch("/api/auth/me");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          AtlasAuth.currentUser = data.user;
+          AtlasAuth.teams = data.teams || [];
+          AtlasAuth.users = data.users || [];
+          updateAuthUi();
+        }
+      }
+    } catch (e) {
+      console.warn("Auth sync fallback to default identity", e);
+    }
+  }
+
+  function updateAuthUi() {
+    const user = AtlasAuth.currentUser;
+    const nameEl = byId("topbarUserName");
+    const roleEl = byId("topbarUserRole");
+    const avatarEl = byId("topbarUserAvatar");
+    if (nameEl) nameEl.textContent = user.name;
+    if (roleEl) roleEl.textContent = user.role.split(" ")[0];
+    if (avatarEl) {
+      avatarEl.style.background = user.avatar_color || "#00f0ff";
+      avatarEl.textContent = user.name.split(" ").map(w => w[0]).join("").slice(0, 2);
+    }
+
+    const accName = byId("accountUserName");
+    const accRole = byId("accountUserRoleBadge");
+    const accEmail = byId("accountUserEmail");
+    const accOrg = byId("accountUserOrg");
+    const accAvatar = byId("accountUserAvatarLarge");
+    const accKey = byId("accountLicenseKey");
+    if (accName) accName.textContent = user.name;
+    if (accRole) accRole.textContent = user.role;
+    if (accEmail) accEmail.textContent = user.email;
+    if (accOrg) accOrg.textContent = user.org_name || "AtlasCAD Advanced Engineering Lab";
+    if (accAvatar) {
+      accAvatar.style.background = user.avatar_color || "#00f0ff";
+      accAvatar.textContent = user.name.split(" ").map(w => w[0]).join("").slice(0, 2);
+    }
+    if (accKey && user.license_key) accKey.textContent = user.license_key;
+
+    const teamSelect = byId("accountTeamSelect");
+    if (teamSelect && user.team_id) {
+      teamSelect.value = user.team_id;
+    }
+  }
+
+  async function loadApiKeys() {
+    try {
+      const res = await fetch("/api/auth/api-keys");
+      if (res.ok) {
+        const data = await res.json();
+        AtlasAuth.apiKeys = data.api_keys || [];
+        renderApiKeysList();
+      }
+    } catch (e) {}
+  }
+
+  function renderApiKeysList() {
+    const container = byId("accountApiKeysList");
+    if (!container) return;
+    if (AtlasAuth.apiKeys.length === 0) {
+      container.innerHTML = `<div style="font-size:11.5px; color:var(--atlas-text-secondary); padding:6px 0;">No API keys generated yet. Click 'Generate Token' to create a Personal Access Token.</div>`;
+      return;
+    }
+    container.innerHTML = AtlasAuth.apiKeys.map(k => `
+      <div class="api-key-item">
+        <div>
+          <div style="font-weight:600; font-size:12px;">${escapeHtml(k.name)}</div>
+          <div style="margin-top:2px;">
+            <code class="api-key-token-code">${escapeHtml(k.token)}</code>
+            <span style="font-size:10px; color:var(--atlas-text-secondary); margin-left:6px;">Scopes: ${escapeHtml((k.scopes || []).join(", "))}</span>
+          </div>
+        </div>
+        <button type="button" class="button small ghost revoke-key-btn" data-key-id="${escapeHtml(k.id)}" style="color:#ef4444; font-size:11px;">Revoke</button>
+      </div>
+    `).join("");
+
+    container.querySelectorAll(".revoke-key-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.keyId;
+        try {
+          const res = await fetch("/api/auth/api-keys/revoke", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id }),
+          });
+          if (res.ok) {
+            toast("API Key revoked");
+            await loadApiKeys();
+          }
+        } catch (e) {
+          toast("Failed to revoke key", true);
+        }
+      });
+    });
+  }
+
+  function initAuthSystem() {
+    const topbarPill = byId("topbarUserPill");
+    const accountModal = byId("accountModal");
+    const authModal = byId("authModal");
+
+    if (topbarPill && accountModal) {
+      topbarPill.addEventListener("click", () => {
+        loadApiKeys();
+        if (typeof accountModal.showModal === "function") accountModal.showModal();
+        else accountModal.setAttribute("open", "");
+      });
+    }
+
+    byId("closeAccountModalBtn")?.addEventListener("click", () => closeModal(accountModal));
+    byId("closeAuthModalBtn")?.addEventListener("click", () => closeModal(authModal));
+
+    byId("accountSwitchUserBtn")?.addEventListener("click", () => {
+      closeModal(accountModal);
+      if (typeof authModal.showModal === "function") authModal.showModal();
+      else authModal.setAttribute("open", "");
+    });
+
+    byId("accountLogoutBtn")?.addEventListener("click", async () => {
+      try {
+        await fetch("/api/auth/logout", { method: "POST", headers: { "Content-Type": "application/json" } });
+        AtlasAuth.currentUser = {
+          user_id: "usr_guest",
+          name: "Guest Engineer",
+          email: "guest@atlascad.internal",
+          role: "Viewer",
+          team_id: "personal",
+          team_name: "External Sandbox",
+          avatar_color: "#94a3b8",
+          plan_tier: "Evaluation Seat",
+          license_key: "ATLAS-GUEST-TRIAL",
+          permissions: ["cad:read", "cad:export", "collab:comment"],
+        };
+        updateAuthUi();
+        closeModal(accountModal);
+        toast("Signed out. Operating in Guest Reviewer mode.");
+      } catch (e) {
+        closeModal(accountModal);
+      }
+    });
+
+    byId("accountApplyTeamBtn")?.addEventListener("click", async () => {
+      const select = byId("accountTeamSelect");
+      if (!select) return;
+      const teamId = select.value;
+      try {
+        const res = await fetch("/api/auth/switch-team", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ team_id: teamId }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user) {
+            AtlasAuth.currentUser = data.user;
+            updateAuthUi();
+            toast(`Switched workspace to: ${data.team_name}`);
+            loadAndRenderAssets();
+          }
+        }
+      } catch (e) {
+        toast("Failed to switch team", true);
+      }
+    });
+
+    byId("accountGenerateApiKeyBtn")?.addEventListener("click", async () => {
+      const keyName = prompt("Enter a description for this Personal Access Token (PAT):", "Headless CI/CD Automation");
+      if (!keyName) return;
+      try {
+        const res = await fetch("/api/auth/api-keys", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: keyName, scopes: ["cad:read", "cad:mutate", "export:all"] }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          toast(`Created PAT: ${data.token}`);
+          await loadApiKeys();
+        }
+      } catch (e) {
+        toast("Failed to generate token", true);
+      }
+    });
+
+    // Auth Modal Tabs
+    const authTabBtns = document.querySelectorAll(".auth-tab-btn");
+    const authPanels = {
+      "quick-switch": byId("authQuickSwitchPanel"),
+      "signin": byId("authSignInPanel"),
+      "sso": byId("authSsoPanel"),
+      "register": byId("authRegisterPanel"),
+    };
+
+    authTabBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        authTabBtns.forEach(b => {
+          b.style.background = "transparent";
+          b.style.color = "var(--atlas-text)";
+          b.style.border = "1px solid var(--atlas-border)";
+        });
+        btn.style.background = "var(--atlas-accent)";
+        btn.style.color = "#000";
+        btn.style.border = "none";
+
+        const tabKey = btn.dataset.tab;
+        Object.entries(authPanels).forEach(([key, panel]) => {
+          if (panel) {
+            panel.style.display = (key === tabKey) ? "flex" : "none";
+          }
+        });
+      });
+    });
+
+    document.querySelectorAll(".quick-user-card").forEach(card => {
+      card.addEventListener("click", async () => {
+        const uid = card.dataset.user;
+        try {
+          const res = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: uid }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.user) {
+              AtlasAuth.currentUser = data.user;
+              updateAuthUi();
+              closeModal(authModal);
+              toast(`Authenticated as: ${data.user.name} (${data.user.role})`);
+              loadAndRenderAssets();
+              loadAndRenderComments();
+            }
+          }
+        } catch (e) {
+          toast("Login failed", true);
+        }
+      });
+    });
+
+    byId("authSignInPanel")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = byId("authEmailInput")?.value;
+      const password = byId("authPasswordInput")?.value;
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user) {
+            AtlasAuth.currentUser = data.user;
+            updateAuthUi();
+            closeModal(authModal);
+            toast(`Logged in as: ${data.user.name}`);
+            loadAndRenderAssets();
+          }
+        }
+      } catch (err) {
+        toast("Sign in failed", true);
+      }
+    });
+
+    document.querySelectorAll(".sso-auth-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const provider = btn.dataset.provider;
+        try {
+          const res = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sso_provider: provider }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.user) {
+              AtlasAuth.currentUser = data.user;
+              updateAuthUi();
+              closeModal(authModal);
+              toast(`SSO Connected via ${provider}`);
+              loadAndRenderAssets();
+            }
+          }
+        } catch (err) {
+          toast("SSO authentication failed", true);
+        }
+      });
+    });
+
+    byId("authRegisterPanel")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = byId("regNameInput")?.value;
+      const email = byId("regEmailInput")?.value;
+      const role = byId("regRoleSelect")?.value;
+      const team_id = byId("regTeamSelect")?.value;
+      try {
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, role, team_id }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user) {
+            AtlasAuth.currentUser = data.user;
+            updateAuthUi();
+            closeModal(authModal);
+            toast(`Enterprise seat provisioned for ${name}`);
+            loadAndRenderAssets();
+          }
+        }
+      } catch (err) {
+        toast("Registration failed", true);
+      }
+    });
+
+    syncAuthMe();
+  }
+
+  // ============================================================================
+  // MULTI-TIER ASSET STORE & COMPONENT HUB
+  // ============================================================================
+
+  const assetHubState = {
+    visibility: "all",
+    category: "all",
+    search: "",
+    assets: [],
+  };
+
+  async function loadAndRenderAssets() {
+    const grid = byId("assetsHubGrid") || byId("assetsGrid");
+    if (!grid) return;
+
+    try {
+      const uid = encodeURIComponent(AtlasAuth.currentUser.user_id);
+      const tid = encodeURIComponent(AtlasAuth.currentUser.team_id);
+      let url = `/api/assets?user_id=${uid}&team_id=${tid}`;
+      if (assetHubState.visibility !== "all") url += `&visibility=${encodeURIComponent(assetHubState.visibility)}`;
+      if (assetHubState.category !== "all") url += `&category=${encodeURIComponent(assetHubState.category)}`;
+      if (assetHubState.search.trim()) url += `&q=${encodeURIComponent(assetHubState.search.trim())}`;
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const assets = await res.json();
+      assetHubState.assets = assets;
+
+      if (!assets || assets.length === 0) {
+        grid.innerHTML = `<div style="grid-column:1/-1; padding:32px; text-align:center; color:var(--atlas-text-secondary);">
+          <div style="font-size:24px; margin-bottom:8px;">📦</div>
+          <div style="font-weight:600;">No assets found matching filters</div>
+          <div style="font-size:12px; margin-top:4px;">Try switching tabs or adjusting search query</div>
+        </div>`;
+        return;
+      }
+
+      grid.innerHTML = assets.map(a => {
+        const visClass = a.visibility === "Public" ? "asset-badge-public" : a.visibility === "Team" ? "asset-badge-team" : "asset-badge-private";
+        const visLabel = a.visibility === "Public" ? "🌐 Public" : a.visibility === "Team" ? "👥 Team Org" : "🔒 Private";
+        const paramsCount = (a.parameters && a.parameters.length) || 0;
+
+        return `
+          <div class="asset-card" data-asset-id="${escapeHtml(a.id)}">
+            <div class="asset-card-header">
+              <div>
+                <h4 class="asset-card-title">${escapeHtml(a.name)}</h4>
+                <span style="font-size:10.5px; color:#38bdf8; font-weight:600;">${escapeHtml(a.category)} · v${escapeHtml(a.version || "1.0.0")}</span>
+              </div>
+              <span class="${visClass}">${visLabel}</span>
+            </div>
+            <p class="asset-card-desc">${escapeHtml(a.description || "No description provided.")}</p>
+            <div class="asset-card-meta">
+              <span class="asset-author-pill">
+                <span style="width:10px; height:10px; border-radius:50%; background:${escapeHtml(a.author?.avatar_color || '#38bdf8')}; display:inline-block;"></span>
+                ${escapeHtml(a.author?.name || "Library")}
+              </span>
+              <span>⭐ ${a.stars || 0} · 📥 ${a.downloads || 0}</span>
+            </div>
+            ${paramsCount > 0 ? `<div style="font-size:10.5px; color:var(--atlas-text-secondary); background:rgba(0,0,0,0.25); padding:4px 8px; border-radius:4px;">⚡ ${paramsCount} Parametric Variable(s)</div>` : ''}
+            <div class="asset-card-actions">
+              <button type="button" class="button small primary insert-asset-btn" data-id="${escapeHtml(a.id)}">➕ Insert</button>
+              <button type="button" class="button small ghost fork-asset-btn" data-id="${escapeHtml(a.id)}" title="Fork into your personal private catalog">🍴 Fork</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      // Wire action buttons
+      grid.querySelectorAll(".insert-asset-btn").forEach(btn => {
+        btn.addEventListener("click", () => insertAssetComponent(btn.dataset.id));
+      });
+      grid.querySelectorAll(".fork-asset-btn").forEach(btn => {
+        btn.addEventListener("click", () => forkAssetToPrivate(btn.dataset.id));
+      });
+
+    } catch (err) {
+      grid.innerHTML = `<div style="grid-column:1/-1; padding:20px; color:#ef4444; text-align:center;">Failed to load assets: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  async function insertAssetComponent(assetId) {
+    const asset = assetHubState.assets.find(a => a.id === assetId);
+    const assetName = asset ? asset.name : assetId;
+    toast(`Instantiating component: ${assetName}...`);
+
+    try {
+      const res = await fetch(`/api/assets/${encodeURIComponent(assetId)}/use`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instance_name: `${assetName.replace(/\s+/g, '_').toLowerCase()}_inst` }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      toast(`✔ Inserted "${assetName}" into active assembly!`);
+      closeModal(byId("assetsHubModal"));
+    } catch (err) {
+      toast(`Error inserting asset: ${err.message}`);
+    }
+  }
+
+  async function forkAssetToPrivate(assetId) {
+    const asset = assetHubState.assets.find(a => a.id === assetId);
+    const assetName = asset ? asset.name : assetId;
+    toast(`Forking "${assetName}" into Private Assets...`);
+
+    try {
+      const res = await fetch(`/api/assets/${encodeURIComponent(assetId)}/fork`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: AtlasAuth.currentUser.user_id,
+          user_name: AtlasAuth.currentUser.name,
+          team_id: AtlasAuth.currentUser.team_id,
+          visibility: "private"
+        }),
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `HTTP ${res.status}`);
+      }
+      toast(`🍴 Forked "${assetName}" into your Private Catalog!`);
+      await loadAndRenderAssets();
+    } catch (err) {
+      toast(`Fork failed: ${err.message}`);
+    }
+  }
+
+  function initAssetHub() {
+    byId("topbarAssetsHubBtn")?.addEventListener("click", () => {
+      const modal = byId("assetsHubModal");
+      if (modal) {
+        if (typeof modal.showModal === "function") modal.showModal();
+        else modal.setAttribute("open", "");
+        loadAndRenderAssets();
+      }
+    });
+
+    byId("closeAssetsHubBtn")?.addEventListener("click", () => {
+      closeModal(byId("assetsHubModal"));
+    });
+
+    // Visibility tabs switching
+    document.querySelectorAll(".asset-tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".asset-tab-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        assetHubState.visibility = btn.dataset.vis || "all";
+        loadAndRenderAssets();
+      });
+    });
+
+    // Category chips
+    document.querySelectorAll(".asset-cat-chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        document.querySelectorAll(".asset-cat-chip").forEach(c => c.classList.remove("active"));
+        chip.classList.add("active");
+        assetHubState.category = chip.dataset.cat || "all";
+        loadAndRenderAssets();
+      });
+    });
+
+    // Search input
+    let searchTimeout = null;
+    byId("assetSearchInput")?.addEventListener("input", (e) => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        assetHubState.search = e.target.value;
+        loadAndRenderAssets();
+      }, 250);
+    });
+
+    // Open Publish Asset Modal
+    byId("openPublishAssetBtn")?.addEventListener("click", () => {
+      const modal = byId("publishAssetModal");
+      if (modal) {
+        if (typeof modal.showModal === "function") modal.showModal();
+        else modal.setAttribute("open", "");
+      }
+    });
+
+    byId("closePublishAssetBtn")?.addEventListener("click", () => closeModal(byId("publishAssetModal")));
+    byId("cancelPublishAssetBtn")?.addEventListener("click", () => closeModal(byId("publishAssetModal")));
+
+    // Submit Publish Asset Form
+    byId("publishAssetForm")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = byId("pubNameInput")?.value.trim();
+      const desc = byId("pubDescInput")?.value.trim();
+      const category = byId("pubCatSelect")?.value;
+      const visibility = byId("pubVisSelect")?.value;
+      const tags = (byId("pubTagsInput")?.value || "").split(",").map(t => t.trim()).filter(Boolean);
+
+      if (!name) return;
+      toast(`Publishing "${name}" as ${visibility.toUpperCase()} asset...`);
+
+      try {
+        const res = await fetch("/api/assets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            description: desc,
+            category,
+            visibility,
+            tags,
+            author_id: AtlasAuth.currentUser.user_id,
+            author_name: AtlasAuth.currentUser.name,
+            team_id: AtlasAuth.currentUser.team_id,
+            geometry_data: "ATLASCAD_PARAMETRIC_SOLID_MESH:V1.0:ACTIVE_MODEL"
+          }),
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        toast(`✔ Successfully published "${name}" to ${visibility.toUpperCase()} catalog!`);
+        closeModal(byId("publishAssetModal"));
+        loadAndRenderAssets();
+      } catch (err) {
+        toast(`Error publishing asset: ${err.message}`);
+      }
+    });
+  }
+
+  // ============================================================================
+  // REAL-TIME COLLABORATION & 3D SPATIAL REVIEWS
+  // ============================================================================
+
+  const collabState = {
+    presencePollTimer: null,
+    comments: [],
+  };
+
+  async function loadAndRenderComments() {
+    const list = byId("collabCommentsList");
+    if (!list) return;
+
+    try {
+      const res = await fetch("/api/collab/comments");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const comments = data.comments || [];
+      collabState.comments = comments;
+
+      const badge = byId("collabCommentsCount");
+      if (badge) badge.textContent = comments.length.toString();
+
+      if (comments.length === 0) {
+        list.innerHTML = `<div style="text-align:center; padding:24px; color:var(--atlas-text-secondary);">No active design review comments. Click "Add 3D Pin" to drop a spatial review note!</div>`;
+        return;
+      }
+
+      list.innerHTML = comments.map(c => {
+        const isOpen = c.status === "Open";
+        const replies = (c.replies || []).map(r => `
+          <div class="collab-reply-item">
+            <strong style="color:#38bdf8;">${escapeHtml(r.author_name)}:</strong>
+            <span style="color:#f8fafc; margin-left:4px;">${escapeHtml(r.text)}</span>
+          </div>
+        `).join("");
+
+        return `
+          <div class="collab-comment-card ${isOpen ? 'status-open' : 'status-resolved'}" data-comment-id="${escapeHtml(c.id)}">
+            <div class="collab-card-header">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="width:10px; height:10px; border-radius:50%; background:${escapeHtml(c.author_color || '#6366f1')}; display:inline-block;"></span>
+                <strong style="color:#f8fafc;">${escapeHtml(c.author_name)}</strong>
+              </div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span class="collab-pin-pos">[${c.pos_3d.map(n => n.toFixed(1)).join(", ")}]</span>
+                <span class="badge ${isOpen ? 'badge-warning' : 'badge-success'}">${escapeHtml(c.status)}</span>
+              </div>
+            </div>
+            <div style="font-size:12.5px; color:#e2e8f0; line-height:1.4;">${escapeHtml(c.text)}</div>
+            ${replies ? `<div class="collab-replies-list">${replies}</div>` : ''}
+            <div style="display:flex; gap:8px; align-items:center; margin-top:4px;">
+              <input type="text" class="input reply-input" placeholder="Reply to thread..." style="flex:1; font-size:11.5px; padding:4px 8px;">
+              <button type="button" class="button small ghost send-reply-btn" data-id="${escapeHtml(c.id)}">Reply</button>
+              <button type="button" class="button small ${isOpen ? 'primary' : 'ghost'} toggle-resolve-btn" data-id="${escapeHtml(c.id)}">${isOpen ? '✔ Resolve' : 'Reopen'}</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      // Wire reply & resolve actions
+      list.querySelectorAll(".send-reply-btn").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const card = btn.closest(".collab-comment-card");
+          const input = card?.querySelector(".reply-input");
+          const text = input?.value.trim();
+          if (!text) return;
+          try {
+            await fetch(`/api/collab/comments/${encodeURIComponent(btn.dataset.id)}/reply`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                text,
+                author_id: AtlasAuth.currentUser.user_id,
+                author_name: `${AtlasAuth.currentUser.name} (${AtlasAuth.currentUser.role})`,
+              }),
+            });
+            input.value = "";
+            loadAndRenderComments();
+          } catch (err) {
+            toast(`Reply failed: ${err.message}`);
+          }
+        });
+      });
+
+      list.querySelectorAll(".toggle-resolve-btn").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          try {
+            await fetch(`/api/collab/comments/${encodeURIComponent(btn.dataset.id)}/resolve`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({}),
+            });
+            loadAndRenderComments();
+          } catch (err) {
+            toast(`Failed to update status: ${err.message}`);
+          }
+        });
+      });
+
+    } catch (err) {
+      list.innerHTML = `<div style="color:#ef4444; padding:16px;">Failed to load comments: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  function initCollaboration() {
+    byId("topbarCollabCommentsBtn")?.addEventListener("click", () => {
+      const drawer = byId("collabCommentsDrawer");
+      if (drawer) {
+        if (typeof drawer.showModal === "function") drawer.showModal();
+        else drawer.setAttribute("open", "");
+        loadAndRenderComments();
+      }
+    });
+
+    byId("closeCollabCommentsBtn")?.addEventListener("click", () => closeModal(byId("collabCommentsDrawer")));
+
+    byId("toggleAddPinBtn")?.addEventListener("click", async () => {
+      const note = prompt("Enter 3D Spatial Design Note:", "Review fillet radius & fastener tolerance on this boundary");
+      if (!note) return;
+
+      try {
+        await fetch("/api/collab/comments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pos_3d: [0.0, 4.0, 1.2],
+            text: note,
+            author_id: AtlasAuth.currentUser.user_id,
+            author_name: `${AtlasAuth.currentUser.name} (${AtlasAuth.currentUser.role})`,
+            author_color: AtlasAuth.currentUser.avatar_color,
+          }),
+        });
+        toast("📍 Pinned 3D comment placed on model!");
+        loadAndRenderComments();
+      } catch (err) {
+        toast(`Error pinning comment: ${err.message}`);
+      }
+    });
+
+    // Start presence poll
+    clearInterval(collabState.presencePollTimer);
+    collabState.presencePollTimer = setInterval(async () => {
+      try {
+        const res = await fetch("/api/collab/presence");
+        if (res.ok) {
+          const data = await res.json();
+          const users = data.users || [];
+          const cluster = byId("topbarPresenceCluster");
+          if (cluster && users.length > 0) {
+            const avatarsHtml = users.slice(0, 3).map(u => {
+              const initials = u.name.split(" ").map(w => w[0]).join("").slice(0, 2);
+              return `<div class="presence-avatar" style="background:${escapeHtml(u.avatar_color || '#38bdf8')};" title="${escapeHtml(u.name)} (${escapeHtml(u.role)}) · Active: ${escapeHtml(u.active_tool)}">${escapeHtml(initials)}</div>`;
+            }).join("");
+            cluster.innerHTML = `${avatarsHtml}<span class="presence-count-badge">+${users.length} Live</span>`;
+          }
+        }
+      } catch (e) {}
+    }, 8000);
+  }
+
   function bindUi() {
+    initAuthSystem();
+    initAssetHub();
+    initCollaboration();
     byId("undoBtn").addEventListener("click", undo);
     byId("redoBtn").addEventListener("click", redo);
     byId("saveBtn").addEventListener("click", save);

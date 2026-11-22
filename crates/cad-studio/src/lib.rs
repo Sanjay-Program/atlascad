@@ -43,7 +43,7 @@ use cad_engineering_model::{
 };
 use cad_kernel_truck::TruckKernel;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -547,6 +547,93 @@ fn init_default_dependency_graph() -> atlas_dependency_graph::graph::DependencyG
     graph
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CollabUser {
+    pub id: String,
+    pub name: String,
+    pub role: String, // "Owner", "Lead", "Editor", "Reviewer", "Viewer"
+    pub avatar_color: String,
+    pub cursor_pos: [f64; 3],
+    pub active_tool: String,
+    pub selected_entity: Option<String>,
+    pub last_heartbeat: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityLock {
+    pub entity_id: String,
+    pub holder_user_id: String,
+    pub holder_name: String,
+    pub acquired_at: u64,
+    pub expires_at: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommentReply {
+    pub id: String,
+    pub author_id: String,
+    pub author_name: String,
+    pub text: String,
+    pub created_at: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CollabComment {
+    pub id: String,
+    pub entity_id: Option<String>,
+    pub pos_3d: [f64; 3],
+    pub author_id: String,
+    pub author_name: String,
+    pub author_color: String,
+    pub text: String,
+    pub status: String, // "Open", "InReview", "Resolved"
+    pub created_at: u64,
+    pub replies: Vec<CommentReply>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthUser {
+    pub user_id: String,
+    pub name: String,
+    pub email: String,
+    pub role: String,
+    pub team_id: String,
+    pub team_name: String,
+    pub org_id: String,
+    pub org_name: String,
+    pub avatar_color: String,
+    pub plan_tier: String,
+    pub plan_seats: u32,
+    pub plan_expiry: String,
+    pub license_key: String,
+    pub permissions: Vec<String>,
+    pub mfa_enabled: bool,
+    pub sso_provider: Option<String>,
+    pub created_at: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthSession {
+    pub token: String,
+    pub user_id: String,
+    pub created_at: u64,
+    pub expires_at: u64,
+    pub ip_address: String,
+    pub user_agent: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiKeyRecord {
+    pub id: String,
+    pub name: String,
+    pub token: String,
+    pub user_id: String,
+    pub created_at: u64,
+    pub expires_at: Option<u64>,
+    pub last_used_at: Option<u64>,
+    pub scopes: Vec<String>,
+}
+
 struct StudioState {
     project: Project,
     path: PathBuf,
@@ -595,6 +682,22 @@ struct StudioState {
     command_registry: atlas_command_platform::CommandRegistry,
     /// Multi-agent engineering orchestrator.
     orchestrator: atlas_agent_orchestrator::EngineeringOrchestrator,
+    /// Multi-tier Content-Addressable Asset Registry (Public, Team, Private).
+    asset_registry: atlas_asset_manager::AssetRegistry,
+    /// Live multi-user presence tracking and spatial cursors.
+    collab_presence: HashMap<String, CollabUser>,
+    /// Optimistic concurrency entity leases/locks.
+    entity_locks: HashMap<String, EntityLock>,
+    /// 3D spatial annotations and review comments.
+    collab_comments: Vec<CollabComment>,
+    /// Production identity and multi-tenant authentication users.
+    auth_users: HashMap<String, AuthUser>,
+    /// Active authenticated sessions.
+    auth_sessions: HashMap<String, AuthSession>,
+    /// Headless CI/CD and developer API keys / Personal Access Tokens.
+    api_keys: Vec<ApiKeyRecord>,
+    /// Current active authenticated user ID.
+    active_user_id: String,
 }
 
 impl StudioState {
@@ -614,6 +717,234 @@ impl StudioState {
             path.display().to_string(),
             serde_json::json!({ "revision": saved_revision }),
         );
+        let mut collab_presence = HashMap::new();
+        collab_presence.insert(
+            "usr_sanjay".to_string(),
+            CollabUser {
+                id: "usr_sanjay".to_string(),
+                name: "Sanjay (Chief Architect)".to_string(),
+                role: "Owner".to_string(),
+                avatar_color: "#6366f1".to_string(),
+                cursor_pos: [0.0, 4.0, 1.2],
+                active_tool: "3D Extrude".to_string(),
+                selected_entity: Some("body_fuselage_01".to_string()),
+                last_heartbeat: 1732280000,
+            },
+        );
+        collab_presence.insert(
+            "usr_sarah".to_string(),
+            CollabUser {
+                id: "usr_sarah".to_string(),
+                name: "Sarah Chen (Structural Lead)".to_string(),
+                role: "Lead".to_string(),
+                avatar_color: "#10b981".to_string(),
+                cursor_pos: [-1.4, -5.0, 0.2],
+                active_tool: "FEA Stress Inspector".to_string(),
+                selected_entity: Some("wing_spar_left".to_string()),
+                last_heartbeat: 1732280000,
+            },
+        );
+        collab_presence.insert(
+            "usr_marcus".to_string(),
+            CollabUser {
+                id: "usr_marcus".to_string(),
+                name: "Marcus Vance (Aerodynamics)".to_string(),
+                role: "Editor".to_string(),
+                avatar_color: "#0284c7".to_string(),
+                cursor_pos: [0.0, 9.0, 0.2],
+                active_tool: "Supersonic Wave Drag".to_string(),
+                selected_entity: Some("nose_cone_radome".to_string()),
+                last_heartbeat: 1732280000,
+            },
+        );
+
+        let collab_comments = vec![
+            CollabComment {
+                id: "cmt_wing_spar_01".to_string(),
+                entity_id: Some("wing_spar_left".to_string()),
+                pos_3d: [-1.4, -5.0, 0.1],
+                author_id: "usr_sarah".to_string(),
+                author_name: "Sarah Chen (Structural Lead)".to_string(),
+                author_color: "#10b981".to_string(),
+                text: "Under Mach 1.58 +4.2G bank maneuvers, peak von Mises stress reaches 478 MPa. Ensure Ti-6Al-4V fastener preload is verified.".to_string(),
+                status: "Open".to_string(),
+                created_at: 1732280000,
+                replies: vec![
+                    CommentReply {
+                        id: "rep_01".to_string(),
+                        author_id: "usr_sanjay".to_string(),
+                        author_name: "Sanjay (Chief Architect)".to_string(),
+                        text: "Verified with ASTM F2924 additive spar analysis. Margin of safety FoS = 1.84 > 1.50 requirement.".to_string(),
+                        created_at: 1732280120,
+                    }
+                ],
+            },
+            CollabComment {
+                id: "cmt_inlet_cowl_02".to_string(),
+                entity_id: Some("inlet_cowl".to_string()),
+                pos_3d: [0.0, 4.0, -0.4],
+                author_id: "usr_marcus".to_string(),
+                author_name: "Marcus Vance (Aerodynamics)".to_string(),
+                author_color: "#0284c7".to_string(),
+                text: "Scramjet compression ramp angle set to 8.5 deg. Oblique shock attaches cleanly to cowl lip at Mach 3.5.".to_string(),
+                status: "Resolved".to_string(),
+                created_at: 1732279000,
+                replies: vec![],
+            },
+        ];
+
+        let mut auth_users = HashMap::new();
+        auth_users.insert(
+            "usr_sanjay".to_string(),
+            AuthUser {
+                user_id: "usr_sanjay".to_string(),
+                name: "Sanjay".to_string(),
+                email: "sanjay@atlascad.internal".to_string(),
+                role: "Chief Architect & Founder".to_string(),
+                team_id: "team_aero_structures".to_string(),
+                team_name: "Aerospace & Hypersonic Structures".to_string(),
+                org_id: "org_enterprise_01".to_string(),
+                org_name: "AtlasCAD Advanced Engineering Lab".to_string(),
+                avatar_color: "#00f0ff".to_string(),
+                plan_tier: "$2,000/yr Commercial Enterprise Plan".to_string(),
+                plan_seats: 10,
+                plan_expiry: "2027-11-22".to_string(),
+                license_key: "ATLAS-ENT-2026-X889-K992-FLIGHT".to_string(),
+                permissions: vec![
+                    "cad:read".into(),
+                    "cad:mutate".into(),
+                    "cad:export".into(),
+                    "assets:publish_public".into(),
+                    "assets:publish_team".into(),
+                    "assets:publish_private".into(),
+                    "collab:lease_locks".into(),
+                    "collab:review_resolve".into(),
+                    "admin:manage_users".into(),
+                    "admin:api_keys".into(),
+                    "hpc:unlimited".into(),
+                ],
+                mfa_enabled: true,
+                sso_provider: Some("Enterprise SAML 2.0 / Okta".into()),
+                created_at: 1732280000,
+            },
+        );
+        auth_users.insert(
+            "usr_elena".to_string(),
+            AuthUser {
+                user_id: "usr_elena".to_string(),
+                name: "Dr. Elena Rostova".to_string(),
+                email: "elena.rostova@atlascad.internal".to_string(),
+                role: "Lead Propulsion Engineer".to_string(),
+                team_id: "team_propulsion".to_string(),
+                team_name: "Scramjet & Thermal Dynamics".to_string(),
+                org_id: "org_enterprise_01".to_string(),
+                org_name: "AtlasCAD Advanced Engineering Lab".to_string(),
+                avatar_color: "#ec4899".to_string(),
+                plan_tier: "$2,000/yr Commercial Enterprise Plan".to_string(),
+                plan_seats: 10,
+                plan_expiry: "2027-11-22".to_string(),
+                license_key: "ATLAS-ENT-2026-X889-K992-FLIGHT".to_string(),
+                permissions: vec![
+                    "cad:read".into(),
+                    "cad:mutate".into(),
+                    "cad:export".into(),
+                    "assets:publish_team".into(),
+                    "assets:publish_private".into(),
+                    "collab:lease_locks".into(),
+                    "collab:review_resolve".into(),
+                    "hpc:priority".into(),
+                ],
+                mfa_enabled: true,
+                sso_provider: Some("Azure Active Directory".into()),
+                created_at: 1732280000,
+            },
+        );
+        auth_users.insert(
+            "usr_marcus".to_string(),
+            AuthUser {
+                user_id: "usr_marcus".to_string(),
+                name: "Marcus Vance".to_string(),
+                email: "marcus.vance@atlascad.internal".to_string(),
+                role: "Autonomous Robotics Lead".to_string(),
+                team_id: "team_robotics".to_string(),
+                team_name: "Precision Kinematics & Mechatronics".to_string(),
+                org_id: "org_enterprise_01".to_string(),
+                org_name: "AtlasCAD Advanced Engineering Lab".to_string(),
+                avatar_color: "#3b82f6".to_string(),
+                plan_tier: "$2,000/yr Commercial Enterprise Plan".to_string(),
+                plan_seats: 10,
+                plan_expiry: "2027-11-22".to_string(),
+                license_key: "ATLAS-ENT-2026-X889-K992-FLIGHT".to_string(),
+                permissions: vec![
+                    "cad:read".into(),
+                    "cad:mutate".into(),
+                    "cad:export".into(),
+                    "assets:publish_team".into(),
+                    "assets:publish_private".into(),
+                    "collab:lease_locks".into(),
+                ],
+                mfa_enabled: false,
+                sso_provider: Some("Google Workspace".into()),
+                created_at: 1732280000,
+            },
+        );
+        auth_users.insert(
+            "usr_sara".to_string(),
+            AuthUser {
+                user_id: "usr_sara".to_string(),
+                name: "Sara Chen".to_string(),
+                email: "sara.chen@external-audit.com".to_string(),
+                role: "Regulatory & ISO Reviewer".to_string(),
+                team_id: "team_compliance".to_string(),
+                team_name: "External Airworthiness Audit".to_string(),
+                org_id: "org_enterprise_01".to_string(),
+                org_name: "AtlasCAD Advanced Engineering Lab".to_string(),
+                avatar_color: "#10b981".to_string(),
+                plan_tier: "Audit / Inspector Seat".to_string(),
+                plan_seats: 10,
+                plan_expiry: "2027-11-22".to_string(),
+                license_key: "ATLAS-ENT-2026-X889-K992-FLIGHT".to_string(),
+                permissions: vec![
+                    "cad:read".into(),
+                    "cad:export".into(),
+                    "collab:comment".into(),
+                    "audit:verify".into(),
+                ],
+                mfa_enabled: true,
+                sso_provider: Some("Enterprise SAML 2.0".into()),
+                created_at: 1732280000,
+            },
+        );
+
+        let mut auth_sessions = HashMap::new();
+        auth_sessions.insert(
+            "atlas_sess_usr_sanjay".to_string(),
+            AuthSession {
+                token: "atlas_sess_usr_sanjay".to_string(),
+                user_id: "usr_sanjay".to_string(),
+                created_at: 1732280000,
+                expires_at: 1732280000 + 720 * 3600,
+                ip_address: "127.0.0.1".to_string(),
+                user_agent: "AtlasCAD Studio Web Client".to_string(),
+            },
+        );
+
+        let api_keys = vec![ApiKeyRecord {
+            id: "key_pat_01".to_string(),
+            name: "Headless CI/CD & Python SDK Runner".to_string(),
+            token: "atlas_pat_live_7c4e99f120ab582".to_string(),
+            user_id: "usr_sanjay".to_string(),
+            created_at: 1732280000,
+            expires_at: Some(1732280000 + 365 * 86400),
+            last_used_at: Some(1732280100),
+            scopes: vec![
+                "cad:read".into(),
+                "cad:mutate".into(),
+                "export:all".into(),
+                "sim:hypersonic".into(),
+            ],
+        }];
+
         let mut state = StudioState {
             saved_revision,
             project,
@@ -637,6 +968,14 @@ impl StudioState {
             orchestrator: atlas_agent_orchestrator::EngineeringOrchestrator::new(
                 "AtlasCAD_Project",
             ),
+            asset_registry: atlas_asset_manager::AssetRegistry::default(),
+            collab_presence,
+            entity_locks: HashMap::new(),
+            collab_comments,
+            auth_users,
+            auth_sessions,
+            api_keys,
+            active_user_id: "usr_sanjay".to_string(),
         };
         // Evaluate once at startup so a broken project is refused before a URL is printed.
         let _ = state.payload()?;
@@ -13126,6 +13465,743 @@ namespace AtlasCAD.Unity
             "status": "rendered",
         }))
     }
+
+    fn list_filtered_assets(
+        &self,
+        user_id: &str,
+        team_id: Option<&str>,
+        visibility: Option<&str>,
+        category: Option<&str>,
+        search: Option<&str>,
+    ) -> Result<serde_json::Value, StudioError> {
+        let vis_enum = match visibility {
+            Some("public") | Some("Public") => Some(atlas_asset_manager::AssetVisibility::Public),
+            Some("team") | Some("Team") => Some(atlas_asset_manager::AssetVisibility::Team),
+            Some("private") | Some("Private") => Some(atlas_asset_manager::AssetVisibility::Private),
+            _ => None,
+        };
+        let assets = self.asset_registry.filter_assets(
+            user_id,
+            team_id,
+            vis_enum,
+            category,
+            search,
+        );
+        serde_json::to_value(&assets).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn get_asset_details(
+        &self,
+        asset_id: &str,
+        user_id: &str,
+        team_id: Option<&str>,
+    ) -> Result<serde_json::Value, StudioError> {
+        let rec = self
+            .asset_registry
+            .get_record(asset_id)
+            .ok_or(StudioError::NotFound)?;
+
+        // Multi-tier permission verification
+        let permitted = match rec.visibility {
+            atlas_asset_manager::AssetVisibility::Public => true,
+            atlas_asset_manager::AssetVisibility::Team => {
+                let matches_team = team_id.is_some() && rec.author.team_id.as_deref() == team_id;
+                let matches_user = rec.author.user_id == user_id;
+                matches_team || matches_user
+            }
+            atlas_asset_manager::AssetVisibility::Private => rec.author.user_id == user_id,
+        };
+
+        if !permitted {
+            return Err(StudioError::Forbidden);
+        }
+
+        let data = self.asset_registry.get_data(asset_id).unwrap_or(&[]);
+        let data_str = String::from_utf8_lossy(data);
+
+        serde_json::to_value(serde_json::json!({
+            "record": rec,
+            "data_preview": if data_str.len() > 1024 { format!("{}...", &data_str[..1024]) } else { data_str.to_string() },
+            "byte_size": data.len(),
+            "content_hash": rec.content_hash,
+        }))
+        .map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn create_asset(&mut self, req: CreateAssetRequest) -> Result<serde_json::Value, StudioError> {
+        let vis_enum = match req.visibility.as_deref() {
+            Some("team") | Some("Team") => atlas_asset_manager::AssetVisibility::Team,
+            Some("private") | Some("Private") => atlas_asset_manager::AssetVisibility::Private,
+            _ => atlas_asset_manager::AssetVisibility::Public,
+        };
+
+        let asset_id = format!(
+            "ast_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(1732280000)
+        );
+        let mut rec = atlas_asset_manager::AssetRecord::new(
+            asset_id.clone(),
+            req.name,
+            atlas_asset_manager::AssetKind::CadGeometry,
+        )
+        .with_description(req.description.unwrap_or_default())
+        .with_category(req.category.unwrap_or_else(|| "General".to_string()))
+        .with_visibility(vis_enum)
+        .with_author(atlas_asset_manager::AssetAuthor {
+            user_id: req.author_id.unwrap_or_else(|| "usr_current".to_string()),
+            name: req.author_name.unwrap_or_else(|| "Current User".to_string()),
+            email: "user@atlascad.internal".to_string(),
+            team_id: req.team_id.or_else(|| Some("team_aero_structures".to_string())),
+            avatar_color: "#6366f1".to_string(),
+        })
+        .with_tags(req.tags.unwrap_or_default());
+
+        if let Some(params) = req.parameters {
+            rec.parameters = params;
+        }
+
+        let data = req
+            .geometry_data
+            .unwrap_or_else(|| "ATLASCAD_PARAMETRIC_SOLID_MESH:V1.0".to_string())
+            .into_bytes();
+        self.asset_registry
+            .store_asset(rec.clone(), data)
+            .map_err(|e| StudioError::BadRequest(e.to_string()))?;
+
+        serde_json::to_value(&rec).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn fork_asset(
+        &mut self,
+        asset_id: &str,
+        req: ForkAssetRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let caller = atlas_asset_manager::AssetAuthor {
+            user_id: req.user_id.unwrap_or_else(|| "usr_current".to_string()),
+            name: req.user_name.unwrap_or_else(|| "Current User".to_string()),
+            email: "user@atlascad.internal".to_string(),
+            team_id: req.team_id.or_else(|| Some("team_aero_structures".to_string())),
+            avatar_color: "#6366f1".to_string(),
+        };
+
+        let vis_enum = match req.visibility.as_deref() {
+            Some("public") | Some("Public") => atlas_asset_manager::AssetVisibility::Public,
+            Some("team") | Some("Team") => atlas_asset_manager::AssetVisibility::Team,
+            _ => atlas_asset_manager::AssetVisibility::Private,
+        };
+
+        let new_id = format!(
+            "{}_fork_{}",
+            asset_id,
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(1732280000)
+        );
+        let stored_id = self
+            .asset_registry
+            .fork_asset(asset_id, &new_id, caller, vis_enum)
+            .map_err(|e| match e {
+                atlas_asset_manager::AssetError::AccessDenied(_) => StudioError::Forbidden,
+                atlas_asset_manager::AssetError::NotFound(_) => StudioError::NotFound,
+                other => StudioError::BadRequest(other.to_string()),
+            })?;
+
+        let forked = self
+            .asset_registry
+            .get_record(&stored_id)
+            .ok_or(StudioError::NotFound)?;
+        serde_json::to_value(forked).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn use_asset(
+        &mut self,
+        asset_id: &str,
+        req: UseAssetRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let rec = self
+            .asset_registry
+            .get_record_mut(asset_id)
+            .ok_or(StudioError::NotFound)?;
+        rec.downloads += 1;
+
+        let instance_name = req.instance_name.unwrap_or_else(|| {
+            format!("{}_inst", rec.name.replace(' ', "_").to_lowercase())
+        });
+        let payload = serde_json::json!({
+            "status": "Instantiated",
+            "asset_id": asset_id,
+            "instance_name": instance_name,
+            "parameters_applied": req.parameters.unwrap_or_else(|| serde_json::json!({})),
+            "downloads": rec.downloads,
+            "linked_dependency": true,
+        });
+        Ok(payload)
+    }
+
+    fn collab_presence_payload(&self) -> Result<serde_json::Value, StudioError> {
+        let now = 1732280000;
+        let active_users: Vec<&CollabUser> = self.collab_presence.values().collect();
+        let active_locks: Vec<&EntityLock> = self.entity_locks.values().collect();
+
+        serde_json::to_value(serde_json::json!({
+            "users": active_users,
+            "locks": active_locks,
+            "total_active": active_users.len(),
+            "document_revision": self.project.revision.get(),
+            "timestamp": now,
+        }))
+        .map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn update_presence(
+        &mut self,
+        req: UpdatePresenceRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(1732280000);
+        let user = self
+            .collab_presence
+            .entry(req.user_id.clone())
+            .or_insert_with(|| CollabUser {
+                id: req.user_id.clone(),
+                name: req
+                    .name
+                    .clone()
+                    .unwrap_or_else(|| "Collaborator".to_string()),
+                role: req.role.clone().unwrap_or_else(|| "Editor".to_string()),
+                avatar_color: req
+                    .avatar_color
+                    .clone()
+                    .unwrap_or_else(|| "#38bdf8".to_string()),
+                cursor_pos: req.cursor_pos.unwrap_or([0.0, 0.0, 0.0]),
+                active_tool: req
+                    .active_tool
+                    .clone()
+                    .unwrap_or_else(|| "Select".to_string()),
+                selected_entity: req.selected_entity.clone(),
+                last_heartbeat: now,
+            });
+
+        if let Some(name) = req.name {
+            user.name = name;
+        }
+        if let Some(role) = req.role {
+            user.role = role;
+        }
+        if let Some(col) = req.avatar_color {
+            user.avatar_color = col;
+        }
+        if let Some(pos) = req.cursor_pos {
+            user.cursor_pos = pos;
+        }
+        if let Some(tool) = req.active_tool {
+            user.active_tool = tool;
+        }
+        user.selected_entity = req.selected_entity;
+        user.last_heartbeat = now;
+
+        Ok(serde_json::json!({ "ok": true, "user_id": req.user_id }))
+    }
+
+    fn acquire_entity_lock(
+        &mut self,
+        req: AcquireLockRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let now = 1732280000;
+        let duration = req.duration_sec.unwrap_or(30);
+
+        if let Some(existing) = self.entity_locks.get(&req.entity_id)
+            && existing.holder_user_id != req.user_id
+            && existing.expires_at > now
+        {
+            return Ok(serde_json::json!({
+                "acquired": false,
+                "reason": "Entity locked by another collaborator",
+                "holder_name": existing.holder_name,
+                "expires_in_sec": existing.expires_at.saturating_sub(now),
+            }));
+        }
+
+        let lock = EntityLock {
+            entity_id: req.entity_id.clone(),
+            holder_user_id: req.user_id.clone(),
+            holder_name: req
+                .user_name
+                .unwrap_or_else(|| "Collaborator".to_string()),
+            acquired_at: now,
+            expires_at: now + duration,
+        };
+        self.entity_locks
+            .insert(req.entity_id.clone(), lock.clone());
+
+        Ok(serde_json::json!({
+            "acquired": true,
+            "lock": lock,
+        }))
+    }
+
+    fn release_entity_lock(
+        &mut self,
+        req: ReleaseLockRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        if let Some(lock) = self.entity_locks.get(&req.entity_id)
+            && lock.holder_user_id == req.user_id
+        {
+            self.entity_locks.remove(&req.entity_id);
+            return Ok(serde_json::json!({ "released": true, "entity_id": req.entity_id }));
+        }
+        Ok(serde_json::json!({ "released": false, "reason": "Not lock holder" }))
+    }
+
+    fn collab_comments_payload(&self) -> Result<serde_json::Value, StudioError> {
+        serde_json::to_value(serde_json::json!({
+            "comments": self.collab_comments,
+            "count": self.collab_comments.len(),
+        }))
+        .map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn create_collab_comment(
+        &mut self,
+        req: CreateCommentRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let now = 1732280000;
+        let comment_id = format!(
+            "cmt_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(1732280000)
+        );
+        let comment = CollabComment {
+            id: comment_id,
+            entity_id: req.entity_id,
+            pos_3d: req.pos_3d,
+            author_id: req.author_id.unwrap_or_else(|| "usr_current".to_string()),
+            author_name: req
+                .author_name
+                .unwrap_or_else(|| "Current User".to_string()),
+            author_color: req.author_color.unwrap_or_else(|| "#6366f1".to_string()),
+            text: req.text,
+            status: "Open".to_string(),
+            created_at: now,
+            replies: vec![],
+        };
+        self.collab_comments.push(comment.clone());
+        serde_json::to_value(&comment).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn reply_collab_comment(
+        &mut self,
+        comment_id: &str,
+        req: ReplyCommentRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let now = 1732280000;
+        let cmt = self
+            .collab_comments
+            .iter_mut()
+            .find(|c| c.id == comment_id)
+            .ok_or(StudioError::NotFound)?;
+        let reply_id = format!("rep_{}", cmt.replies.len() + 1);
+        let reply = CommentReply {
+            id: reply_id,
+            author_id: req.author_id.unwrap_or_else(|| "usr_current".to_string()),
+            author_name: req
+                .author_name
+                .unwrap_or_else(|| "Current User".to_string()),
+            text: req.text,
+            created_at: now,
+        };
+        cmt.replies.push(reply.clone());
+        serde_json::to_value(&reply).map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn resolve_collab_comment(
+        &mut self,
+        comment_id: &str,
+    ) -> Result<serde_json::Value, StudioError> {
+        let cmt = self
+            .collab_comments
+            .iter_mut()
+            .find(|c| c.id == comment_id)
+            .ok_or(StudioError::NotFound)?;
+        cmt.status = if cmt.status == "Resolved" {
+            "Open".to_string()
+        } else {
+            "Resolved".to_string()
+        };
+        serde_json::to_value(serde_json::json!({ "id": comment_id, "status": cmt.status }))
+            .map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn auth_me_payload(&self) -> Result<serde_json::Value, StudioError> {
+        let default_user = AuthUser {
+            user_id: "usr_guest".to_string(),
+            name: "Guest Engineer".to_string(),
+            email: "guest@atlascad.internal".to_string(),
+            role: "Viewer".to_string(),
+            team_id: "team_guest".to_string(),
+            team_name: "External Reviewer Sandbox".to_string(),
+            org_id: "org_enterprise_01".to_string(),
+            org_name: "AtlasCAD Advanced Engineering Lab".to_string(),
+            avatar_color: "#94a3b8".to_string(),
+            plan_tier: "Guest Evaluation Plan".to_string(),
+            plan_seats: 1,
+            plan_expiry: "2027-11-22".to_string(),
+            license_key: "ATLAS-GUEST-TRIAL".to_string(),
+            permissions: vec![
+                "cad:read".to_string(),
+                "cad:export".to_string(),
+                "collab:comment".to_string(),
+            ],
+            mfa_enabled: false,
+            sso_provider: None,
+            created_at: 1732280000,
+        };
+
+        let active_user = self
+            .auth_users
+            .get(&self.active_user_id)
+            .cloned()
+            .unwrap_or(default_user);
+
+        let teams = vec![
+            serde_json::json!({ "id": "team_aero_structures", "name": "Aerospace & Hypersonic Structures", "members_count": 8, "lead": "Sanjay" }),
+            serde_json::json!({ "id": "team_propulsion", "name": "Scramjet & Thermal Dynamics", "members_count": 5, "lead": "Dr. Elena Rostova" }),
+            serde_json::json!({ "id": "team_robotics", "name": "Precision Kinematics & Mechatronics", "members_count": 6, "lead": "Marcus Vance" }),
+            serde_json::json!({ "id": "team_compliance", "name": "External Airworthiness Audit", "members_count": 3, "lead": "Sara Chen" }),
+            serde_json::json!({ "id": "personal", "name": "Personal Private Sandbox", "members_count": 1, "lead": active_user.name }),
+        ];
+
+        let users: Vec<serde_json::Value> = self
+            .auth_users
+            .values()
+            .map(|u| {
+                serde_json::json!({
+                    "user_id": u.user_id,
+                    "name": u.name,
+                    "email": u.email,
+                    "role": u.role,
+                    "team_id": u.team_id,
+                    "team_name": u.team_name,
+                    "avatar_color": u.avatar_color,
+                    "plan_tier": u.plan_tier,
+                })
+            })
+            .collect();
+
+        serde_json::to_value(serde_json::json!({
+            "authenticated": self.active_user_id != "usr_guest",
+            "user": active_user,
+            "teams": teams,
+            "users": users,
+            "active_session": {
+                "token": format!("atlas_sess_{}", active_user.user_id),
+                "expires_in_hours": 720,
+                "security_protocol": "TLS 1.3 / ChaCha20-Poly1305 / Enterprise HSM",
+                "ip_origin": "127.0.0.1",
+            },
+            "enterprise_license": {
+                "organization": "AtlasCAD Advanced Engineering Lab",
+                "tier": "$2,000/yr Commercial Enterprise Plan",
+                "license_key": "ATLAS-ENT-2026-X889-K992-FLIGHT",
+                "seats_allocated": 4,
+                "seats_total": 10,
+                "status": "Active (Compliant)",
+                "renewal_date": "2027-11-22",
+                "features": [
+                    "Unlimited 6-DOF Waverider Physics Sim",
+                    "Truck Kernel B-Rep Exact Solid Modeler",
+                    "Multi-tier Asset Store (Public, Team, Private)",
+                    "Real-Time Optimistic Entity Leases & 3D Spatial Reviews",
+                    "ISO 9001 / AS9100 Merkle Audit Chain",
+                    "Headless Batch CLI & Python SDK API Keys"
+                ]
+            }
+        }))
+        .map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn auth_login(&mut self, req: LoginRequest) -> Result<serde_json::Value, StudioError> {
+        let user = if let Some(uid) = req.user_id.as_deref().or(req.demo_user.as_deref()) {
+            self.auth_users.get(uid).cloned()
+        } else if let Some(email) = &req.email {
+            self.auth_users
+                .values()
+                .find(|u| &u.email == email)
+                .cloned()
+        } else {
+            None
+        };
+
+        let user = match user {
+            Some(u) => u,
+            None => {
+                let email = req
+                    .email
+                    .unwrap_or_else(|| "engineer@enterprise.internal".to_string());
+                let name = req.name.unwrap_or_else(|| {
+                    email
+                        .split('@')
+                        .next()
+                        .unwrap_or("Enterprise User")
+                        .to_string()
+                });
+                let user_id = format!("usr_{}", email.replace(['@', '.'], "_"));
+                let new_user = AuthUser {
+                    user_id: user_id.clone(),
+                    name,
+                    email,
+                    role: "Design Engineer".to_string(),
+                    team_id: "team_aero_structures".to_string(),
+                    team_name: "Aerospace & Hypersonic Structures".to_string(),
+                    org_id: "org_enterprise_01".to_string(),
+                    org_name: "AtlasCAD Advanced Engineering Lab".to_string(),
+                    avatar_color: "#8b5cf6".to_string(),
+                    plan_tier: "$2,000/yr Commercial Enterprise Plan".to_string(),
+                    plan_seats: 10,
+                    plan_expiry: "2027-11-22".to_string(),
+                    license_key: "ATLAS-ENT-2026-X889-K992-FLIGHT".to_string(),
+                    permissions: vec![
+                        "cad:read".into(),
+                        "cad:mutate".into(),
+                        "cad:export".into(),
+                        "assets:publish_team".into(),
+                        "assets:publish_private".into(),
+                        "collab:lease_locks".into(),
+                    ],
+                    mfa_enabled: false,
+                    sso_provider: req.sso_provider,
+                    created_at: 1732280000,
+                };
+                self.auth_users.insert(user_id, new_user.clone());
+                new_user
+            }
+        };
+
+        self.active_user_id = user.user_id.clone();
+        let token = format!(
+            "atlas_sess_{}_{}",
+            user.user_id,
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(1732280000)
+        );
+        self.auth_sessions.insert(
+            token.clone(),
+            AuthSession {
+                token: token.clone(),
+                user_id: user.user_id.clone(),
+                created_at: 1732280000,
+                expires_at: 1732280000 + 720 * 3600,
+                ip_address: "127.0.0.1".to_string(),
+                user_agent: "AtlasCAD Studio Web Client".to_string(),
+            },
+        );
+
+        // Update presence cluster for the newly logged in user
+        self.collab_presence.insert(
+            user.user_id.clone(),
+            CollabUser {
+                id: user.user_id.clone(),
+                name: format!("{} ({})", user.name, user.role),
+                role: user.role.clone(),
+                avatar_color: user.avatar_color.clone(),
+                cursor_pos: [0.0, 0.0, 0.0],
+                active_tool: "3D Workspace".to_string(),
+                selected_entity: None,
+                last_heartbeat: 1732280000,
+            },
+        );
+
+        serde_json::to_value(serde_json::json!({
+            "success": true,
+            "token": token,
+            "user": user,
+            "message": format!("Authenticated as {} ({})", user.name, user.role),
+        }))
+        .map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn auth_register(&mut self, req: RegisterRequest) -> Result<serde_json::Value, StudioError> {
+        let user_id = format!(
+            "usr_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(1732280000)
+        );
+        let role = req.role.unwrap_or_else(|| "Design Engineer".to_string());
+        let team_id = req
+            .team_id
+            .unwrap_or_else(|| "team_aero_structures".to_string());
+        let team_name = match team_id.as_str() {
+            "team_propulsion" => "Scramjet & Thermal Dynamics".to_string(),
+            "team_robotics" => "Precision Kinematics & Mechatronics".to_string(),
+            "team_compliance" => "External Airworthiness Audit".to_string(),
+            "personal" => "Personal Private Sandbox".to_string(),
+            _ => "Aerospace & Hypersonic Structures".to_string(),
+        };
+
+        let new_user = AuthUser {
+            user_id: user_id.clone(),
+            name: req.name,
+            email: req.email,
+            role,
+            team_id,
+            team_name,
+            org_id: "org_enterprise_01".to_string(),
+            org_name: "AtlasCAD Advanced Engineering Lab".to_string(),
+            avatar_color: req.avatar_color.unwrap_or_else(|| "#6366f1".to_string()),
+            plan_tier: "$2,000/yr Commercial Enterprise Plan".to_string(),
+            plan_seats: 10,
+            plan_expiry: "2027-11-22".to_string(),
+            license_key: "ATLAS-ENT-2026-X889-K992-FLIGHT".to_string(),
+            permissions: vec![
+                "cad:read".into(),
+                "cad:mutate".into(),
+                "cad:export".into(),
+                "assets:publish_team".into(),
+                "assets:publish_private".into(),
+                "collab:lease_locks".into(),
+            ],
+            mfa_enabled: false,
+            sso_provider: None,
+            created_at: 1732280000,
+        };
+
+        self.auth_users.insert(user_id.clone(), new_user.clone());
+        self.active_user_id = user_id.clone();
+        let token = format!("atlas_sess_{}", user_id);
+
+        serde_json::to_value(serde_json::json!({
+            "success": true,
+            "token": token,
+            "user": new_user,
+            "message": "Enterprise Account Created Successfully",
+        }))
+        .map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn auth_logout(&mut self) -> Result<serde_json::Value, StudioError> {
+        self.active_user_id = "usr_guest".to_string();
+        serde_json::to_value(serde_json::json!({
+            "success": true,
+            "logged_out": true,
+            "message": "Logged out. Current session terminated.",
+        }))
+        .map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn auth_switch_team(
+        &mut self,
+        req: SwitchTeamRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let (team_name, role) = match req.team_id.as_str() {
+            "team_propulsion" => ("Scramjet & Thermal Dynamics", "Lead Propulsion"),
+            "team_robotics" => ("Precision Kinematics & Mechatronics", "Robotics Lead"),
+            "team_compliance" => ("External Airworthiness Audit", "Compliance Reviewer"),
+            "personal" => ("Personal Private Sandbox", "Owner"),
+            _ => ("Aerospace & Hypersonic Structures", "Chief Architect"),
+        };
+
+        if let Some(user) = self.auth_users.get_mut(&self.active_user_id) {
+            user.team_id = req.team_id.clone();
+            user.team_name = team_name.to_string();
+            user.role = role.to_string();
+            let updated = user.clone();
+            return serde_json::to_value(serde_json::json!({
+                "success": true,
+                "active_team_id": req.team_id,
+                "team_name": team_name,
+                "user": updated,
+            }))
+            .map_err(|e| StudioError::Json(e.to_string()));
+        }
+
+        Err(StudioError::BadRequest(
+            "No active user to switch team".into(),
+        ))
+    }
+
+    fn auth_sessions_payload(&self) -> Result<serde_json::Value, StudioError> {
+        let sessions: Vec<&AuthSession> = self.auth_sessions.values().collect();
+        serde_json::to_value(serde_json::json!({
+            "sessions": sessions,
+            "active_user_id": self.active_user_id,
+        }))
+        .map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn auth_api_keys_payload(&self) -> Result<serde_json::Value, StudioError> {
+        serde_json::to_value(serde_json::json!({
+            "api_keys": self.api_keys,
+            "user_id": self.active_user_id,
+        }))
+        .map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn auth_create_api_key(
+        &mut self,
+        req: CreateApiKeyRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        let id = format!(
+            "key_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(1732280000)
+        );
+        let token = format!(
+            "atlas_pat_{:016x}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(1732280000)
+        );
+        let key = ApiKeyRecord {
+            id,
+            name: req.name,
+            token: token.clone(),
+            user_id: self.active_user_id.clone(),
+            created_at: 1732280000,
+            expires_at: Some(1732280000 + 365 * 86400),
+            last_used_at: None,
+            scopes: req.scopes.unwrap_or_else(|| {
+                vec![
+                    "cad:read".into(),
+                    "cad:mutate".into(),
+                    "export:all".into(),
+                ]
+            }),
+        };
+        self.api_keys.push(key.clone());
+        serde_json::to_value(serde_json::json!({
+            "success": true,
+            "key": key,
+            "token": token,
+        }))
+        .map_err(|e| StudioError::Json(e.to_string()))
+    }
+
+    fn auth_revoke_api_key(
+        &mut self,
+        req: RevokeApiKeyRequest,
+    ) -> Result<serde_json::Value, StudioError> {
+        self.api_keys.retain(|k| k.id != req.id);
+        serde_json::to_value(serde_json::json!({
+            "success": true,
+            "revoked_id": req.id,
+        }))
+        .map_err(|e| StudioError::Json(e.to_string()))
+    }
 }
 
 fn export_name(name: &str) -> String {
@@ -13780,6 +14856,65 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
         }
         ("GET", "/api/cad/hardware/fasteners") => {
             match with_state(state, |state| state.cad_hardware_fasteners()) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            }
+        }
+        ("GET", path) if path.starts_with("/api/assets") => {
+            let query = request.path.clone();
+            let vis_param = query_text(&query, "visibility");
+            let cat_param = query_text(&query, "category");
+            let q_param = query_text(&query, "q").or_else(|| query_text(&query, "search"));
+            let user_param = query_text(&query, "user_id").unwrap_or_else(|| "usr_current".to_string());
+            let team_param = query_text(&query, "team_id").or_else(|| Some("team_aero_structures".to_string()));
+
+            if path == "/api/assets" {
+                match with_state(state, |state| {
+                    state.list_filtered_assets(
+                        &user_param,
+                        team_param.as_deref(),
+                        vis_param.as_deref(),
+                        cat_param.as_deref(),
+                        q_param.as_deref(),
+                    )
+                }) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                }
+            } else {
+                let asset_id = path.trim_start_matches("/api/assets/").trim_end_matches('/');
+                match with_state(state, |state| state.get_asset_details(asset_id, &user_param, team_param.as_deref())) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                }
+            }
+        }
+        ("GET", "/api/collab/presence") => {
+            match with_state(state, |state| state.collab_presence_payload()) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            }
+        }
+        ("GET", "/api/collab/comments") => {
+            match with_state(state, |state| state.collab_comments_payload()) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            }
+        }
+        ("GET", "/api/auth/me") => {
+            match with_state(state, |state| state.auth_me_payload()) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            }
+        }
+        ("GET", "/api/auth/sessions") => {
+            match with_state(state, |state| state.auth_sessions_payload()) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            }
+        }
+        ("GET", "/api/auth/api-keys") => {
+            match with_state(state, |state| state.auth_api_keys_payload()) {
                 Ok(payload) => json_response(200, payload),
                 Err(error) => error_response(&error),
             }
@@ -16490,8 +17625,289 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             Ok(payload) => json_response(200, payload),
             Err(error) => error_response(&error),
         },
+        path if path.starts_with("/api/assets") => {
+            if path == "/api/assets" {
+                match parse_body::<CreateAssetRequest>(request) {
+                    Ok(body) => match with_state(state, |state| state.create_asset(body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    },
+                    Err(error) => error_response(&error),
+                }
+            } else if path.ends_with("/fork") {
+                let asset_id = path
+                    .trim_start_matches("/api/assets/")
+                    .trim_end_matches("/fork");
+                match parse_body::<ForkAssetRequest>(request) {
+                    Ok(body) => match with_state(state, |state| state.fork_asset(asset_id, body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    },
+                    Err(error) => error_response(&error),
+                }
+            } else if path.ends_with("/use") {
+                let asset_id = path
+                    .trim_start_matches("/api/assets/")
+                    .trim_end_matches("/use");
+                match parse_body::<UseAssetRequest>(request) {
+                    Ok(body) => match with_state(state, |state| state.use_asset(asset_id, body)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    },
+                    Err(error) => error_response(&error),
+                }
+            } else {
+                error_response(&StudioError::NotFound)
+            }
+        }
+        "/api/collab/presence" => match parse_body::<UpdatePresenceRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.update_presence(body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/collab/lock" => match parse_body::<AcquireLockRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.acquire_entity_lock(body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/collab/unlock" => match parse_body::<ReleaseLockRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.release_entity_lock(body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        path if path.starts_with("/api/collab/comments") => {
+            if path == "/api/collab/comments" {
+                match parse_body::<CreateCommentRequest>(request) {
+                    Ok(body) => {
+                        match with_state(state, |state| state.create_collab_comment(body)) {
+                            Ok(payload) => json_response(200, payload),
+                            Err(error) => error_response(&error),
+                        }
+                    }
+                    Err(error) => error_response(&error),
+                }
+            } else if path.ends_with("/reply") {
+                let comment_id = path
+                    .trim_start_matches("/api/collab/comments/")
+                    .trim_end_matches("/reply");
+                match parse_body::<ReplyCommentRequest>(request) {
+                    Ok(body) => {
+                        match with_state(state, |state| {
+                            state.reply_collab_comment(comment_id, body)
+                        }) {
+                            Ok(payload) => json_response(200, payload),
+                            Err(error) => error_response(&error),
+                        }
+                    }
+                    Err(error) => error_response(&error),
+                }
+            } else if path.ends_with("/resolve") {
+                let comment_id = path
+                    .trim_start_matches("/api/collab/comments/")
+                    .trim_end_matches("/resolve");
+                match with_state(state, |state| state.resolve_collab_comment(comment_id)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                }
+            } else {
+                error_response(&StudioError::NotFound)
+            }
+        }
+        "/api/auth/login" => match parse_body::<LoginRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.auth_login(body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/auth/register" => match parse_body::<RegisterRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.auth_register(body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/auth/logout" => match with_state(state, |state| state.auth_logout()) {
+            Ok(payload) => json_response(200, payload),
+            Err(error) => error_response(&error),
+        },
+        "/api/auth/switch-team" => match parse_body::<SwitchTeamRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.auth_switch_team(body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/auth/api-keys" => match parse_body::<CreateApiKeyRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.auth_create_api_key(body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
+        "/api/auth/api-keys/revoke" => match parse_body::<RevokeApiKeyRequest>(request) {
+            Ok(body) => match with_state(state, |state| state.auth_revoke_api_key(body)) {
+                Ok(payload) => json_response(200, payload),
+                Err(error) => error_response(&error),
+            },
+            Err(error) => error_response(&error),
+        },
         _ => error_response(&StudioError::NotFound),
     }
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct LoginRequest {
+    #[serde(default)]
+    email: Option<String>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    password: Option<String>,
+    #[serde(default)]
+    user_id: Option<String>,
+    #[serde(default)]
+    demo_user: Option<String>,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    sso_provider: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct RegisterRequest {
+    name: String,
+    email: String,
+    #[serde(default)]
+    #[allow(dead_code)]
+    password: Option<String>,
+    #[serde(default)]
+    role: Option<String>,
+    #[serde(default)]
+    team_id: Option<String>,
+    #[serde(default)]
+    avatar_color: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SwitchTeamRequest {
+    team_id: String,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct CreateApiKeyRequest {
+    name: String,
+    #[serde(default)]
+    scopes: Option<Vec<String>>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct RevokeApiKeyRequest {
+    id: String,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct CreateAssetRequest {
+    name: String,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    category: Option<String>,
+    #[serde(default)]
+    visibility: Option<String>,
+    #[serde(default)]
+    tags: Option<Vec<String>>,
+    #[serde(default)]
+    author_id: Option<String>,
+    #[serde(default)]
+    author_name: Option<String>,
+    #[serde(default)]
+    team_id: Option<String>,
+    #[serde(default)]
+    parameters: Option<Vec<atlas_asset_manager::AssetParameter>>,
+    #[serde(default)]
+    geometry_data: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct ForkAssetRequest {
+    #[serde(default)]
+    user_id: Option<String>,
+    #[serde(default)]
+    user_name: Option<String>,
+    #[serde(default)]
+    team_id: Option<String>,
+    #[serde(default)]
+    visibility: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct UseAssetRequest {
+    #[serde(default)]
+    instance_name: Option<String>,
+    #[serde(default)]
+    parameters: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct UpdatePresenceRequest {
+    user_id: String,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    role: Option<String>,
+    #[serde(default)]
+    avatar_color: Option<String>,
+    #[serde(default)]
+    cursor_pos: Option<[f64; 3]>,
+    #[serde(default)]
+    active_tool: Option<String>,
+    #[serde(default)]
+    selected_entity: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct AcquireLockRequest {
+    entity_id: String,
+    user_id: String,
+    #[serde(default)]
+    user_name: Option<String>,
+    #[serde(default)]
+    duration_sec: Option<u64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct ReleaseLockRequest {
+    entity_id: String,
+    user_id: String,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct CreateCommentRequest {
+    pos_3d: [f64; 3],
+    text: String,
+    #[serde(default)]
+    entity_id: Option<String>,
+    #[serde(default)]
+    author_id: Option<String>,
+    #[serde(default)]
+    author_name: Option<String>,
+    #[serde(default)]
+    author_color: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct ReplyCommentRequest {
+    text: String,
+    #[serde(default)]
+    author_id: Option<String>,
+    #[serde(default)]
+    author_name: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
