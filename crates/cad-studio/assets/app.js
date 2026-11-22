@@ -12383,6 +12383,9 @@ ${gcodeSample}`;
   }
 
   function exitFlightSimulator() {
+    if (flightRecordingState.recording) {
+      stopFlightRecording();
+    }
     flightSimState.active = false;
     cancelAnimationFrame(flightSimState.frameId);
     const overlay = byId("flightSimOverlay");
@@ -12398,6 +12401,16 @@ ${gcodeSample}`;
     updateFlightPhysics(dt);
     drawFlightHudCanvas();
     updateFlightHudTelemetry();
+
+    if (flightRecordingState.recording && flightRecordingState.compositeCtx) {
+      const vpCanvas = byId("viewport");
+      const hudCanvas = byId("fsimHudCanvas");
+      const cCtx = flightRecordingState.compositeCtx;
+      const w = flightRecordingState.compositeCanvas.width;
+      const h = flightRecordingState.compositeCanvas.height;
+      if (vpCanvas) cCtx.drawImage(vpCanvas, 0, 0, w, h);
+      if (hudCanvas) cCtx.drawImage(hudCanvas, (w - hudCanvas.width) / 2, (h - hudCanvas.height) / 2);
+    }
 
     flightSimState.frameId = requestAnimationFrame(flightSimLoop);
   }
@@ -12645,11 +12658,171 @@ ${gcodeSample}`;
     }
   }
 
+  // ============================================================================
+  // FLIGHT SIMULATOR VIDEO RECORDING & VIDEO DEMONSTRATION MODAL
+  // ============================================================================
+
+  const flightRecordingState = {
+    recording: false,
+    mediaRecorder: null,
+    recordedChunks: [],
+    startTime: 0,
+    timerInterval: null,
+    compositeCanvas: null,
+    compositeCtx: null,
+  };
+
+  function openFlightVideoModal() {
+    const modal = byId("fsimVideoModal");
+    const video = byId("fsimVideoPlayer");
+    if (modal) {
+      if (typeof modal.showModal === "function") {
+        modal.showModal();
+      } else {
+        modal.setAttribute("open", "");
+      }
+      if (video) {
+        video.currentTime = 0;
+        video.play().catch(() => {});
+      }
+    }
+  }
+
+  function closeFlightVideoModal() {
+    const modal = byId("fsimVideoModal");
+    const video = byId("fsimVideoPlayer");
+    if (video) {
+      video.pause();
+    }
+    if (modal) {
+      if (typeof modal.close === "function" && modal.open) {
+        modal.close();
+      } else {
+        modal.removeAttribute("open");
+      }
+    }
+  }
+
+  function toggleFlightRecording() {
+    if (flightRecordingState.recording) {
+      stopFlightRecording();
+    } else {
+      startFlightRecording();
+    }
+  }
+
+  function startFlightRecording() {
+    const vpCanvas = byId("viewport");
+    const hudCanvas = byId("fsimHudCanvas");
+    if (!vpCanvas) {
+      toast("Error: 3D Viewport canvas not found");
+      return;
+    }
+
+    try {
+      const w = 1280;
+      const h = 720;
+      const cCanvas = document.createElement("canvas");
+      cCanvas.width = w;
+      cCanvas.height = h;
+      const cCtx = cCanvas.getContext("2d");
+      flightRecordingState.compositeCanvas = cCanvas;
+      flightRecordingState.compositeCtx = cCtx;
+
+      // Initial composite frame
+      cCtx.drawImage(vpCanvas, 0, 0, w, h);
+      if (hudCanvas) {
+        cCtx.drawImage(hudCanvas, (w - hudCanvas.width) / 2, (h - hudCanvas.height) / 2);
+      }
+
+      const stream = cCanvas.captureStream(60);
+      let mimeType = "video/webm;codecs=vp9";
+      if (typeof MediaRecorder !== "undefined") {
+        if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = "video/webm;codecs=vp8";
+        if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = "video/webm";
+      }
+
+      const mr = new MediaRecorder(stream, { mimeType });
+      flightRecordingState.mediaRecorder = mr;
+      flightRecordingState.recordedChunks = [];
+      flightRecordingState.recording = true;
+      flightRecordingState.startTime = Date.now();
+
+      mr.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          flightRecordingState.recordedChunks.push(e.data);
+        }
+      };
+
+      mr.onstop = () => {
+        const blob = new Blob(flightRecordingState.recordedChunks, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `atlascad-flight-recording-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 6000);
+        toast("✔ Flight video recorded & downloaded successfully!");
+      };
+
+      mr.start(250);
+
+      const recBtn = byId("fsimRecordBtn");
+      if (recBtn) {
+        recBtn.textContent = "⏹ Stop REC";
+        recBtn.classList.add("fsim-btn-recording");
+      }
+      const badge = byId("fsimRecordingBadge");
+      if (badge) badge.hidden = false;
+
+      clearInterval(flightRecordingState.timerInterval);
+      flightRecordingState.timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - flightRecordingState.startTime) / 1000);
+        const mins = Math.floor(elapsed / 60).toString().padStart(2, "0");
+        const secs = (elapsed % 60).toString().padStart(2, "0");
+        const timerEl = byId("fsimRecTimer");
+        if (timerEl) timerEl.textContent = `${mins}:${secs}`;
+      }, 1000);
+
+      toast("🔴 Recording Flight Demonstration (60 FPS)...");
+    } catch (err) {
+      console.error("Flight recording failed:", err);
+      toast(`Recording error: ${err.message}`);
+    }
+  }
+
+  function stopFlightRecording() {
+    if (!flightRecordingState.recording) return;
+    flightRecordingState.recording = false;
+    clearInterval(flightRecordingState.timerInterval);
+
+    if (flightRecordingState.mediaRecorder && flightRecordingState.mediaRecorder.state !== "inactive") {
+      flightRecordingState.mediaRecorder.stop();
+    }
+
+    const recBtn = byId("fsimRecordBtn");
+    if (recBtn) {
+      recBtn.textContent = "⏺ Record";
+      recBtn.classList.remove("fsim-btn-recording");
+    }
+    const badge = byId("fsimRecordingBadge");
+    if (badge) badge.hidden = true;
+    const timerEl = byId("fsimRecTimer");
+    if (timerEl) timerEl.textContent = "00:00";
+  }
+
   function initFlightSimControls() {
     byId("topbarFlightSimBtn")?.addEventListener("click", () => {
       if (flightSimState.active) exitFlightSimulator();
       else launchFlightSimulator();
     });
+
+    byId("topbarFlightVideoBtn")?.addEventListener("click", () => openFlightVideoModal());
+    byId("fsimWatchVideoBtn")?.addEventListener("click", () => openFlightVideoModal());
+    byId("closeFsimVideoModalBtn")?.addEventListener("click", () => closeFlightVideoModal());
+    byId("fsimRecordBtn")?.addEventListener("click", () => toggleFlightRecording());
 
     byId("fsimCloseBtn")?.addEventListener("click", () => exitFlightSimulator());
 

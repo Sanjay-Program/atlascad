@@ -732,6 +732,9 @@
       <button type="button" id="topbarFlightSimBtn" class="button primary small flight-sim-btn" title="Launch Interactive 3D Airplane Flight Physics Simulator (F8)">
         <svg class="atlas-icon" aria-hidden="true" style="margin-right:4px;"><use href="#icon-aerospace"/></svg><span>✈ Test Flight Sim</span>
       </button>
+      <button type="button" id="topbarFlightVideoBtn" class="button ghost small" title="Watch High-Def Video Demonstration of Supersonic Mechanical Aircraft">
+        <svg class="atlas-icon" aria-hidden="true" style="margin-right:4px;"><use href="#icon-media"/></svg><span>▶ Flight Video</span>
+      </button>
       <button type="button" id="topbarJobsBtn"  class="topbar-jobs-btn" title="HPC Job Queue & Telemetry">
         <svg class="atlas-icon" aria-hidden="true" style="margin-right:4px;"><use href="#icon-jobs"/></svg><span id="topbarJobsText">Idle</span>
       </button>
@@ -1690,10 +1693,17 @@
           </div>
           <div class="fsim-actions">
             <button type="button" class="button small ghost" id="fsimCameraModeBtn" title="Toggle Cockpit / Chase / Orbit Camera">🎥 Camera</button>
+            <button type="button" class="button small ghost" id="fsimRecordBtn" title="Record Flight Video (60 FPS WebM/MP4)">⏺ Record</button>
+            <button type="button" class="button small ghost" id="fsimWatchVideoBtn" title="Watch Supersonic Aircraft Video Demonstration">▶ Video</button>
             <button type="button" class="button small ghost" id="fsimExportDxfBtn" title="Export 3-View Aircraft DXF">📄 DXF</button>
             <button type="button" class="button small ghost" id="fsimExportStlBtn" title="Export 3D Aircraft STL">🧊 STL</button>
             <button type="button" class="button small ghost" id="fsimCloseBtn" title="Exit Flight Simulator (Esc)"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-close"/></svg></button>
           </div>
+        </div>
+
+        <!-- Recording Indicator Badge -->
+        <div id="fsimRecordingBadge" class="fsim-recording-badge" hidden>
+          <span class="rec-dot"></span> REC <span id="fsimRecTimer">00:00</span>
         </div>
 
         <!-- Central Flight Reticle / HUD (Canvas Artificial Horizon & Pitch Ladder) -->
@@ -5278,6 +5288,44 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
     </div>
     <div class="dialog-footer" style="padding:10px 16px; border-top:1px solid var(--atlas-border); background:var(--atlas-surface-2); display:flex; justify-content:flex-end;">
       <button type="button" class="button primary" id="okHelpModalBtn">Got It</button>
+    </div>
+  </dialog>
+
+  <!-- Supersonic Mechanical Aircraft Flight Simulator Video Demonstration Modal -->
+  <dialog id="fsimVideoModal" class="studio-dialog modal-lg" aria-labelledby="fsimVideoModalTitle" style="max-width:960px; width:92vw;">
+    <div class="dialog-header" style="display:flex; justify-content:space-between; align-items:center; padding:12px 18px; border-bottom:1px solid var(--atlas-border); background:var(--atlas-surface-2);">
+      <div class="dialog-title-wrap" style="display:flex; align-items:center; gap:10px;">
+        <span class="dialog-icon"><svg class="atlas-icon" aria-hidden="true" style="color:#22d3ee;"><use href="#icon-media"/></svg></span>
+        <div>
+          <h3 id="fsimVideoModalTitle" style="margin:0; font-size:15px; color:#f8fafc; font-weight:700;">AtlasCAD Supersonic Mechanical Aircraft · 6-DOF Flight Demonstration</h3>
+          <span style="font-size:11px; color:#94a3b8;">Full HD 60 FPS Video · Aerodynamic Physics, Shock Diamonds &amp; Tactical HUD Recording</span>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <a href="/atlascad-supersonic-flight.mp4" download="atlascad-supersonic-flight.mp4" class="button small ghost" title="Download High-Definition MP4 Video">
+          <svg class="atlas-icon" aria-hidden="true" style="margin-right:4px;"><use href="#icon-export-step"/></svg><span>Download MP4 (2.3 MB)</span>
+        </a>
+        <button type="button" class="icon-button" id="closeFsimVideoModalBtn" title="Close Video">&times;</button>
+      </div>
+    </div>
+    <div class="dialog-body" style="padding:16px; background:#070b14; text-align:center;">
+      <div style="position:relative; width:100%; border-radius:8px; overflow:hidden; border:1px solid rgba(34, 211, 238, 0.35); box-shadow:0 8px 32px rgba(0,0,0,0.6);">
+        <video id="fsimVideoPlayer" controls playsinline preload="auto" poster="/flight-demo-poster.png" style="width:100%; height:auto; display:block; aspect-ratio:16/9; background:#000;">
+          <source src="/atlascad-supersonic-flight.mp4" type="video/mp4">
+          Your browser does not support HTML5 video playback.
+        </video>
+      </div>
+      <div style="margin-top:14px; display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; text-align:left; font-size:12px; color:#cbd5e1;">
+        <div style="background:rgba(15,23,42,0.8); padding:10px 14px; border-radius:6px; border:1px solid rgba(51,65,85,0.6);">
+          <strong style="color:#22d3ee;">Aerodynamic Profile:</strong> Swept Delta Wings (b=12.4m, S=42m²), US Standard Atmosphere 1976, Mach 0.65 → 1.58.
+        </div>
+        <div style="background:rgba(15,23,42,0.8); padding:10px 14px; border-radius:6px; border:1px solid rgba(51,65,85,0.6);">
+          <strong style="color:#10b981;">Propulsion:</strong> GE F110 / Scramjet Hybrid, Afterburner Shock Diamonds (185 kN Max Thrust, N1: 99.4%).
+        </div>
+        <div style="background:rgba(15,23,42,0.8); padding:10px 14px; border-radius:6px; border:1px solid rgba(51,65,85,0.6);">
+          <strong style="color:#f59e0b;">Structural FEA:</strong> Wing Root Spar σvM: 118 MPa → 478 MPa under +4.2 G bank maneuver (FoS: 1.84).
+        </div>
+      </div>
     </div>
   </dialog>
 

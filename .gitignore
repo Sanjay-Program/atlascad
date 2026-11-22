@@ -36,6 +36,8 @@ Thumbs.db
 *.atlas
 *.atlas.recovery
 *.tar.gz.sha256
+/artifacts/
+/atlascad-supersonic-flight.mp4
 
 # Third-party upstream downloaded sources and build trees
 /third_party/sources/

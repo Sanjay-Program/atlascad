@@ -9202,5 +9202,17 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         assert_eq!(mcp_res.status, 200);
     }
 
+    // 253. Supersonic Aircraft Flight Simulation Video & Poster Binary Endpoints
+    let poster_res = get(addr, "/flight-demo-poster.png")?;
+    assert_eq!(poster_res.status, 200);
+    assert_eq!(poster_res.headers.get("content-type").map(String::as_str), Some("image/png"));
+    assert!(!poster_res.body.is_empty());
+
+    let video_res = get(addr, "/atlascad-supersonic-flight.mp4")?;
+    assert_eq!(video_res.status, 200);
+    assert_eq!(video_res.headers.get("content-type").map(String::as_str), Some("video/mp4"));
+    assert_eq!(video_res.headers.get("accept-ranges").map(String::as_str), Some("bytes"));
+    assert!(video_res.body.len() > 1_000_000);
+
     Ok(())
 }

@@ -60,6 +60,8 @@ const INDEX_HTML: &str = include_str!("../assets/index.html");
 const APP_CSS: &str = include_str!("../assets/app.css");
 const APP_JS: &str = include_str!("../assets/app.js");
 const FAVICON: &str = include_str!("../assets/favicon.svg");
+const FLIGHT_POSTER: &[u8] = include_bytes!("../assets/flight-demo-poster.png");
+const FLIGHT_VIDEO: &[u8] = include_bytes!("../assets/atlascad-supersonic-flight.mp4");
 
 /// Everything the studio can fail with.
 #[derive(Debug)]
@@ -13470,6 +13472,8 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
         ("GET", "/app.css") => asset(APP_CSS, "text/css; charset=utf-8"),
         ("GET", "/app.js") => asset(APP_JS, "text/javascript; charset=utf-8"),
         ("GET", "/favicon.svg") => asset(FAVICON, "image/svg+xml"),
+        ("GET", "/flight-demo-poster.png") => binary_asset(FLIGHT_POSTER, "image/png"),
+        ("GET", "/atlascad-supersonic-flight.mp4") => binary_asset(FLIGHT_VIDEO, "video/mp4"),
         ("GET", "/api/health") => json_response(
             200,
             serde_json::json!({ "ok": true, "version": env!("CARGO_PKG_VERSION") }),
@@ -17547,6 +17551,12 @@ fn asset(body: &str, content_type: &'static str) -> http::Response {
     // A share link carries its token in the query string; never hand that URL to another origin.
     http::Response::new(200, "OK", content_type, body.as_bytes().to_vec())
         .with_header("Referrer-Policy", "no-referrer")
+}
+
+fn binary_asset(body: &'static [u8], content_type: &'static str) -> http::Response {
+    http::Response::new(200, "OK", content_type, body.to_vec())
+        .with_header("Referrer-Policy", "no-referrer")
+        .with_header("Accept-Ranges", "bytes")
 }
 
 fn to_json<T: Serialize>(status: u16, payload: &T) -> http::Response {
