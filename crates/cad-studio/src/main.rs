@@ -36,11 +36,39 @@ fn run() -> Result<(), String> {
 
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
-            "--file" => {
+            "--file" | "--project" => {
                 let value = arguments
                     .next()
-                    .ok_or_else(|| "`--file` needs a path".to_string())?;
+                    .ok_or_else(|| "`--file` (or `--project`) needs a path".to_string())?;
                 file = Some(PathBuf::from(value));
+            }
+            "--listen" => {
+                let value = arguments
+                    .next()
+                    .ok_or_else(|| "`--listen` needs an address or port (e.g. 127.0.0.1:8080 or 8080)".to_string())?;
+                if let Some((ip_str, port_str)) = value.split_once(':') {
+                    bind = Some(
+                        ip_str
+                            .parse::<IpAddr>()
+                            .map_err(|_| format!("`--listen {value}` has an invalid IP address"))?,
+                    );
+                    let p = port_str
+                        .parse::<u16>()
+                        .map_err(|_| format!("`--listen {value}` has an invalid port number"))?;
+                    if p == 0 {
+                        return Err("port 0 is reserved for tests; choose a real port".into());
+                    }
+                    port = p;
+                } else if let Ok(p) = value.parse::<u16>() {
+                    if p == 0 {
+                        return Err("port 0 is reserved for tests; choose a real port".into());
+                    }
+                    port = p;
+                } else if let Ok(ip) = value.parse::<IpAddr>() {
+                    bind = Some(ip);
+                } else {
+                    return Err(format!("`--listen {value}` is not a valid address or port"));
+                }
             }
             "--new" => {
                 create = true;
@@ -281,12 +309,12 @@ fn usage() {
     println!();
     println!("USAGE:");
     println!(
-        "  cad-studio --file PATH [--port PORT] [--share] [--host IP] [--advertise HOST] [--token TOKEN]"
+        "  cad-studio --file PATH (or --project PATH) [--port PORT] [--listen [IP:]PORT] [--share] [--host IP] [--advertise HOST] [--token TOKEN]"
     );
     println!(
         "  cad-studio --file PATH --share --host IP --token-file PATH   (or ATLAS_STUDIO_TOKEN)"
     );
-    println!("  cad-studio --new PATH [--name NAME] [--size X,Y,Z] [--port PORT]");
+    println!("  cad-studio --new PATH [--name NAME] [--size X,Y,Z] [--port PORT] [--listen [IP:]PORT]");
     println!();
     println!("The studio binds 127.0.0.1 unless shared. `--share` binds 0.0.0.0 and prints a");
     println!(
