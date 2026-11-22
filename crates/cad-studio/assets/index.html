@@ -9,6 +9,526 @@
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
+  <!-- AtlasCAD Master Engineering Vector Icon Library (SVG Symbol Sprite) -->
+  <svg id="atlasIconSprite" style="display:none;" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <symbol id="icon-home" viewBox="0 0 24 24">
+        <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-projects" viewBox="0 0 24 24">
+        <path d="M3 6a2 2 0 0 1 2-2h4.5l2 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-workflows" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="6" height="6" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <rect x="15" y="3" width="6" height="6" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <rect x="9" y="15" width="6" height="6" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M6 9v3a3 3 0 0 0 3 3m9-6v3a3 3 0 0 1-3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-assets" viewBox="0 0 24 24">
+        <path d="M12 2.5 21 7.5v9L12 21.5 3 16.5v-9L12 2.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M12 2.5v19M3 7.5l9 5 9-5M3 16.5l9-4.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-jobs" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M12 7v5l3.5 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-collab" viewBox="0 0 24 24">
+        <circle cx="9" cy="7" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M3 19a6 6 0 0 1 12 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="17" cy="9" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M16 19a5 5 0 0 1 5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-settings" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+      </symbol>
+      <symbol id="icon-dev" viewBox="0 0 24 24">
+        <path d="m8 9-5 3 5 3m8-6 5 3-5 3m-4-8-2 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-select" viewBox="0 0 24 24">
+        <path d="M4 3.5 10 20.5l3-6 6-3L4 3.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-line" viewBox="0 0 24 24">
+        <circle cx="5" cy="19" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="19" cy="5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="7" y1="17" x2="17" y2="7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-rect" viewBox="0 0 24 24">
+        <rect x="3.5" y="5.5" width="17" height="13" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="3.5" cy="5.5" r="1.5" fill="currentColor"/>
+        <circle cx="20.5" cy="18.5" r="1.5" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-circle" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-extrude" viewBox="0 0 24 24">
+        <path d="M12 2 20 6.5v11L12 22 4 17.5v-11L12 2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M12 2v20M4 6.5l8 4.5 8-4.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M12 7V4m-2 1.5 2-2 2 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-cut" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="12" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="15" cy="15" r="6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="2 2"/>
+        <line x1="12" y1="15" x2="18" y2="15" stroke="currentColor" stroke-width="1.8"/>
+      </symbol>
+      <symbol id="icon-fillet" viewBox="0 0 24 24">
+        <path d="M4 20h6a10 10 0 0 0 10-10V4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="10" cy="10" r="1.5" fill="currentColor"/>
+        <line x1="10" y1="10" x2="17" y2="17" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2"/>
+      </symbol>
+      <symbol id="icon-fea" viewBox="0 0 24 24">
+        <path d="M3 19 8 5l8 3 5 11H3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <line x1="8" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="16" y1="8" x2="12" y2="19" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="5.5" y1="12" x2="18.5" y2="13.5" stroke="currentColor" stroke-width="1.2"/>
+      </symbol>
+      <symbol id="icon-materials" viewBox="0 0 24 24">
+        <ellipse cx="12" cy="6" rx="8" ry="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M4 6v12c0 1.93 3.58 3.5 8 3.5s8-1.57 8-3.5V6" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M4 12c0 1.93 3.58 3.5 8 3.5s8-1.57 8-3.5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      </symbol>
+      <symbol id="icon-ai-copilot" viewBox="0 0 24 24">
+        <path d="m12 2 2.5 6.5L21 11l-6.5 2.5L12 20l-2.5-6.5L3 11l6.5-2.5L12 2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="m19 16 1 2.5L22.5 19.5 20 20.5 19 23l-1-2.5-2.5-1 2.5-1 1-2.5z" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-drawing-sheet" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="3" y1="17" x2="21" y2="17" stroke="currentColor" stroke-width="1.4"/>
+        <line x1="13" y1="17" x2="13" y2="21" stroke="currentColor" stroke-width="1.4"/>
+        <circle cx="8" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/>
+        <rect x="13" y="6" width="5" height="4" fill="none" stroke="currentColor" stroke-width="1.2"/>
+      </symbol>
+      <symbol id="icon-quad-view" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="12" y1="3" x2="12" y2="21" stroke="currentColor" stroke-width="1.4"/>
+        <line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="1.4"/>
+      </symbol>
+      <symbol id="icon-gizmo" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="2" fill="currentColor"/>
+        <path d="M12 12V3m0 0-2 2m2-2 2 2M12 12l8 5m0 0-1-2.5m1 2.5-2.5-1M12 12l-8 5m0 0 2.5-1m-2.5 1 1-2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-help" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2 2-2 3.5m0 3v.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-measure" viewBox="0 0 24 24">
+        <path d="M3 15 15 3l6 6L9 21l-6-6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="m8 6 2 2m-1 1 2 2m-1 1 2 2m-1 1 2 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-fastener" viewBox="0 0 24 24">
+        <path d="M8 3h8v4H8z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M10 7v14l2 1 2-1V7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <line x1="10" y1="11" x2="14" y2="12" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="10" y1="14" x2="14" y2="15" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="10" y1="17" x2="14" y2="18" stroke="currentColor" stroke-width="1.2"/>
+      </symbol>
+      <symbol id="icon-gear" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M12 2v3m0 14v3M2 12h3m14 0h3m-3.05-6.95-2.12 2.12m-9.66 9.66-2.12 2.12m0-13.9 2.12 2.12m9.66 9.66 2.12 2.12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-bearing" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="12" cy="5" r="1.2" fill="currentColor"/>
+        <circle cx="12" cy="19" r="1.2" fill="currentColor"/>
+        <circle cx="5" cy="12" r="1.2" fill="currentColor"/>
+        <circle cx="19" cy="12" r="1.2" fill="currentColor"/>
+        <circle cx="7" cy="7" r="1.2" fill="currentColor"/>
+        <circle cx="17" cy="17" r="1.2" fill="currentColor"/>
+        <circle cx="7" cy="17" r="1.2" fill="currentColor"/>
+        <circle cx="17" cy="7" r="1.2" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-motor" viewBox="0 0 24 24">
+        <rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M12 2v3M9 22h6m-3-3v3M8 10v4l4-2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-structural" viewBox="0 0 24 24">
+        <rect x="4" y="4" width="16" height="16" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M8 4v4H4m12-4v4h4M4 16h4v4m12-4h-4v4" fill="none" stroke="currentColor" stroke-width="1.6"/>
+        <circle cx="12" cy="12" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      </symbol>
+      <symbol id="icon-aerospace" viewBox="0 0 24 24">
+        <path d="M12 2.5 14.5 12l6.5 4.5-6.5-1.5L12 21.5l-2.5-6.5L3 16.5l6.5-4.5L12 2.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-automotive" viewBox="0 0 24 24">
+        <rect x="3" y="11" width="18" height="6" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="7" cy="17" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="17" cy="17" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M5 11 8 5h8l3 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-marine" viewBox="0 0 24 24">
+        <path d="M3 15c2.5 0 2.5 2 5 2s2.5-2 5-2 2.5 2 5 2 2.5-2 5-2m-19 4c2.5 0 2.5 2 5 2s2.5-2 5-2 2.5 2 5 2 2.5-2 5-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M12 3v10m-3-7 3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-bim" viewBox="0 0 24 24">
+        <rect x="4" y="7" width="16" height="14" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="8" y1="7" x2="8" y2="21" stroke="currentColor" stroke-width="1.4"/>
+        <line x1="16" y1="7" x2="16" y2="21" stroke="currentColor" stroke-width="1.4"/>
+        <line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="1.4"/>
+        <line x1="4" y1="17" x2="20" y2="17" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M2 7h20L12 2 2 7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-chemical" viewBox="0 0 24 24">
+        <path d="M9 3h6m-3 0v6.5l6 10a1.5 1.5 0 0 1-1.3 2.5H7.3A1.5 1.5 0 0 1 6 19.5l6-10V3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M8 15h8" stroke="currentColor" stroke-width="1.4" stroke-dasharray="1.5 1.5"/>
+      </symbol>
+      <symbol id="icon-robotics" viewBox="0 0 24 24">
+        <rect x="4" y="8" width="16" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="9" cy="13" r="1.5" fill="currentColor"/>
+        <circle cx="15" cy="13" r="1.5" fill="currentColor"/>
+        <path d="M9 17h6M12 4v4m-3-2 3-2 3 2M2 13h2m16 0h2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-realtime" viewBox="0 0 24 24">
+        <rect x="2" y="6" width="20" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M6 12h4m-2-2v4m8-2h.01m3-2h.01m-3 4h.01m3-2h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-osnap" viewBox="0 0 24 24">
+        <rect x="5" y="5" width="14" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="12" y1="2" x2="12" y2="6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="12" y1="18" x2="12" y2="22" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="2" y1="12" x2="6" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="18" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-theme" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-shield" viewBox="0 0 24 24">
+        <path d="M12 2 4 5.5v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12v-6L12 2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="m9 12 2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+    
+      <symbol id="icon-menu" viewBox="0 0 24 24">
+        <line x1="3" y1="6" x2="21" y2="6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="3" y1="18" x2="21" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-poly" viewBox="0 0 24 24">
+        <polyline points="3,17 8,7 15,13 21,5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="3" cy="17" r="1.5" fill="currentColor"/>
+        <circle cx="8" cy="7" r="1.5" fill="currentColor"/>
+        <circle cx="15" cy="13" r="1.5" fill="currentColor"/>
+        <circle cx="21" cy="5" r="1.5" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-arc" viewBox="0 0 24 24">
+        <path d="M4 18A12 12 0 0 1 18 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="4" cy="18" r="1.5" fill="currentColor"/>
+        <circle cx="18" cy="4" r="1.5" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-polygon" viewBox="0 0 24 24">
+        <polygon points="12,2.5 20.5,7.5 20.5,16.5 12,21.5 3.5,16.5 3.5,7.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-ellipse" viewBox="0 0 24 24">
+        <ellipse cx="12" cy="12" rx="9" ry="5.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="12" y1="10" x2="12" y2="14" stroke="currentColor" stroke-width="1.4"/>
+        <line x1="10" y1="12" x2="14" y2="12" stroke="currentColor" stroke-width="1.4"/>
+      </symbol>
+      <symbol id="icon-spline" viewBox="0 0 24 24">
+        <path d="M3 17C7 17 6 7 12 7s5 10 9 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="3" cy="17" r="1.5" fill="currentColor"/>
+        <circle cx="12" cy="7" r="1.5" fill="currentColor"/>
+        <circle cx="21" cy="17" r="1.5" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-point" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="2.5" fill="currentColor"/>
+        <line x1="12" y1="4" x2="12" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="12" y1="16" x2="12" y2="20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="4" y1="12" x2="8" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="16" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-hatch" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="3" y1="9" x2="9" y2="3" stroke="currentColor" stroke-width="1.4"/>
+        <line x1="3" y1="17" x2="17" y2="3" stroke="currentColor" stroke-width="1.4"/>
+        <line x1="7" y1="21" x2="21" y2="7" stroke="currentColor" stroke-width="1.4"/>
+        <line x1="15" y1="21" x2="21" y2="15" stroke="currentColor" stroke-width="1.4"/>
+      </symbol>
+      <symbol id="icon-box" viewBox="0 0 24 24">
+        <path d="M12 2.5 21 7.5v9L12 21.5 3 16.5v-9L12 2.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <line x1="12" y1="21.5" x2="12" y2="12" stroke="currentColor" stroke-width="1.6"/>
+        <line x1="3" y1="7.5" x2="12" y2="12" stroke="currentColor" stroke-width="1.6"/>
+        <line x1="21" y1="7.5" x2="12" y2="12" stroke="currentColor" stroke-width="1.6"/>
+      </symbol>
+      <symbol id="icon-cylinder" viewBox="0 0 24 24">
+        <ellipse cx="12" cy="6" rx="8" ry="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M4 6v12c0 1.93 3.58 3.5 8 3.5s8-1.57 8-3.5V6" fill="none" stroke="currentColor" stroke-width="1.8"/>
+      </symbol>
+      <symbol id="icon-sphere" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <ellipse cx="12" cy="12" rx="9" ry="3.5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <ellipse cx="12" cy="12" rx="3.5" ry="9" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      </symbol>
+      <symbol id="icon-revolve" viewBox="0 0 24 24">
+        <line x1="5" y1="2" x2="5" y2="22" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3 2"/>
+        <path d="M10 7h6a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5h-6" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <polyline points="12,19 9,16.5 12,14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-chamfer" viewBox="0 0 24 24">
+        <path d="M4 20h8l8-8V4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="12" y1="20" x2="20" y2="12" stroke="currentColor" stroke-width="1.8"/>
+      </symbol>
+      <symbol id="icon-trim" viewBox="0 0 24 24">
+        <circle cx="6" cy="6" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="6" cy="18" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="8.5" y1="8.5" x2="20" y2="20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="8.5" y1="15.5" x2="20" y2="4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-extend" viewBox="0 0 24 24">
+        <line x1="20" y1="3" x2="20" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <line x1="3" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <polyline points="12,8 16,12 12,16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-offset" viewBox="0 0 24 24">
+        <path d="M4 16c4 0 6-4 10-4s4 4 6 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M4 8c4 0 6-4 10-4s4 4 6 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2 2"/>
+      </symbol>
+      <symbol id="icon-mirror" viewBox="0 0 24 24">
+        <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3 2"/>
+        <polygon points="4,7 10,12 4,17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <polygon points="20,7 14,12 20,17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-rotate" viewBox="0 0 24 24">
+        <path d="M21 12a9 9 0 1 1-2.6-6.4L21 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="21,3 21,8 16,8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-scale" viewBox="0 0 24 24">
+        <rect x="3" y="11" width="10" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <rect x="7" y="3" width="14" height="14" rx="1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="2 2"/>
+        <line x1="10" y1="14" x2="17" y2="7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <polyline points="13,7 17,7 17,11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-move" viewBox="0 0 24 24">
+        <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <polyline points="9,5 12,2 15,5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="9,19 12,22 15,19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="5,9 2,12 5,15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="19,9 22,12 19,15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-copy" viewBox="0 0 24 24">
+        <rect x="8" y="8" width="13" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M4 16H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v1" fill="none" stroke="currentColor" stroke-width="1.8"/>
+      </symbol>
+      <symbol id="icon-join" viewBox="0 0 24 24">
+        <circle cx="9" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="15" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="9" y1="12" x2="15" y2="12" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="12" y1="9" x2="12" y2="15" stroke="currentColor" stroke-width="1.8"/>
+      </symbol>
+      <symbol id="icon-explode" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="2.5" fill="currentColor"/>
+        <path d="M12 7V2m0 15v5M7 12H2m15 0h5M8.5 8.5 4.5 4.5m11 11 4 4m-11 0-4 4m11-11 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-array" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="4" height="4" rx="0.8" fill="currentColor"/>
+        <rect x="10" y="3" width="4" height="4" rx="0.8" fill="currentColor"/>
+        <rect x="17" y="3" width="4" height="4" rx="0.8" fill="currentColor"/>
+        <rect x="3" y="10" width="4" height="4" rx="0.8" fill="currentColor"/>
+        <rect x="10" y="10" width="4" height="4" rx="0.8" fill="currentColor"/>
+        <rect x="17" y="10" width="4" height="4" rx="0.8" fill="currentColor"/>
+        <rect x="3" y="17" width="4" height="4" rx="0.8" fill="currentColor"/>
+        <rect x="10" y="17" width="4" height="4" rx="0.8" fill="currentColor"/>
+        <rect x="17" y="17" width="4" height="4" rx="0.8" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-massprop" viewBox="0 0 24 24">
+        <line x1="12" y1="3" x2="12" y2="21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="4" y1="7" x2="20" y2="7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M4 7 2 13h4L4 7zM20 7l-2 6h4l-2-6zM8 21h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-bom" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="3" y1="8" x2="21" y2="8" stroke="currentColor" stroke-width="1.5"/>
+        <line x1="8" y1="3" x2="8" y2="21" stroke="currentColor" stroke-width="1.5"/>
+        <line x1="3" y1="13" x2="21" y2="13" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="3" y1="17" x2="21" y2="17" stroke="currentColor" stroke-width="1.2"/>
+      </symbol>
+      <symbol id="icon-warning" viewBox="0 0 24 24">
+        <path d="m12 3 10 18H2L12 3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <line x1="12" y1="9" x2="12" y2="13.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="12" cy="17" r="1" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-diameter" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="5" y1="19" x2="19" y2="5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-chart" viewBox="0 0 24 24">
+        <rect x="3" y="12" width="4" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <rect x="10" y="6" width="4" height="15" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <rect x="17" y="2" width="4" height="19" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/>
+      </symbol>
+      <symbol id="icon-modal" viewBox="0 0 24 24">
+        <path d="M2 12c2.5-7 5-7 7.5 0s5 7 7.5 0 5-7 5-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="1" stroke-dasharray="2 2"/>
+      </symbol>
+      <symbol id="icon-thermal" viewBox="0 0 24 24">
+        <path d="M12 2c1.5 3 4 5.5 4 8.5a6 6 0 1 1-12 0c0-3 2.5-5.5 4-8.5 1 2 2.5 3.5 4 0z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <circle cx="12" cy="16" r="2" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-viewport" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="7" y1="10" x2="17" y2="10" stroke="currentColor" stroke-width="1" stroke-dasharray="2 2"/>
+      </symbol>
+      <symbol id="icon-cam" viewBox="0 0 24 24">
+        <rect x="9" y="2" width="6" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M10 7v9l2 4 2-4V7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <line x1="10" y1="10" x2="14" y2="10" stroke="currentColor" stroke-width="1.4"/>
+        <line x1="10" y1="13" x2="14" y2="13" stroke="currentColor" stroke-width="1.4"/>
+      </symbol>
+      <symbol id="icon-additive" viewBox="0 0 24 24">
+        <path d="M6 3h12v4l-4 5v3h-4v-3L6 7V3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <line x1="3" y1="21" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <line x1="6" y1="18" x2="18" y2="18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-dxf" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <polyline points="14,2 14,8 20,8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M8 13h2a1.5 1.5 0 0 1 0 3H8v-3zM13 13v3m3-3 2 3m-2 0 2-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-pdf" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <polyline points="14,2 14,8 20,8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <line x1="8" y1="15" x2="16" y2="15" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        <line x1="8" y1="18" x2="13" y2="18" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-stl" viewBox="0 0 24 24">
+        <polygon points="12,3 21,19 3,19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <line x1="12" y1="3" x2="12" y2="19" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="7.5" y1="11" x2="16.5" y2="11" stroke="currentColor" stroke-width="1.2"/>
+      </symbol>
+      <symbol id="icon-step" viewBox="0 0 24 24">
+        <path d="M12 2 20 6.5v11L12 22 4 17.5v-11L12 2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M12 12 4 6.5M12 12l8-5.5M12 12v9.5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      </symbol>
+      <symbol id="icon-save" viewBox="0 0 24 24">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <polyline points="17,21 17,13 7,13 7,21" fill="none" stroke="currentColor" stroke-width="1.6"/>
+        <polyline points="7,3 7,8 15,8" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      </symbol>
+      <symbol id="icon-davinci" viewBox="0 0 24 24">
+        <circle cx="8" cy="8" r="4.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="16" cy="8" r="4.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="12" cy="15" r="4.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+      </symbol>
+      <symbol id="icon-unity" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="3" fill="currentColor"/>
+        <path d="M12 3v6m0 6v6M3 12h6m6 0h6M5.6 5.6l4.2 4.2m4.4 4.4 4.2 4.2M18.4 5.6l-4.2 4.2m-4.4 4.4-4.2 4.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-gltf" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M3 12h18M12 3a13 13 0 0 1 0 18M12 3a13 13 0 0 0 0 18" stroke="currentColor" stroke-width="1.4"/>
+      </symbol>
+      <symbol id="icon-cloud" viewBox="0 0 24 24">
+        <path d="M17.5 19H6.5A4.5 4.5 0 0 1 6.5 10c.3 0 .7.05 1 .1A6 6 0 0 1 19 12a4.5 4.5 0 0 1-1.5 7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="m12 11 3 3m-3-3-3 3m3-3v6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-electrical" viewBox="0 0 24 24">
+        <path d="M3 12h3l2-5 3 10 3-10 2 5h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-leaf" viewBox="0 0 24 24">
+        <path d="M11 20A10 10 0 0 1 4 9c0-5 5-6 8-6 6 0 9 4 9 10 0 4-4 7-7 7h-3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M7 16c2.5-3 5-6 10-9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-keyboard" viewBox="0 0 24 24">
+        <rect x="2" y="5" width="20" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="6" y1="9" x2="6.01" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <line x1="10" y1="9" x2="10.01" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <line x1="14" y1="9" x2="14.01" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <line x1="18" y1="9" x2="18.01" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <line x1="7" y1="15" x2="17" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-check" viewBox="0 0 24 24">
+        <polyline points="4,12 9,17 20,6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-close" viewBox="0 0 24 24">
+        <line x1="5" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <line x1="19" y1="5" x2="5" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-play" viewBox="0 0 24 24">
+        <polygon points="6,4 20,12 6,20" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-pause" viewBox="0 0 24 24">
+        <rect x="5" y="4" width="4" height="16" rx="1" fill="currentColor"/>
+        <rect x="15" y="4" width="4" height="16" rx="1" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-step-next" viewBox="0 0 24 24">
+        <polygon points="5,4 15,12 5,20" fill="currentColor"/>
+        <line x1="19" y1="4" x2="19" y2="20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-search" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-undo" viewBox="0 0 24 24">
+        <path d="M3 7v6h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M3 13a9 9 0 0 1 15.4-4.5A9 9 0 0 1 21 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-redo" viewBox="0 0 24 24">
+        <path d="M21 7v6h-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M21 13a9 9 0 0 0-15.4-4.5A9 9 0 0 0 3 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-table" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" stroke-width="1.6"/>
+        <line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" stroke-width="1.6"/>
+      </symbol>
+      <symbol id="icon-grid" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="9" y1="3" x2="9" y2="21" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="15" y1="3" x2="15" y2="21" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="3" y1="15" x2="21" y2="15" stroke="currentColor" stroke-width="1.2"/>
+      </symbol>
+      <symbol id="icon-layers" viewBox="0 0 24 24">
+        <polygon points="12,2 2,7 12,12 22,7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <polyline points="2,12 12,17 22,12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <polyline points="2,17 12,22 22,17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-eye" viewBox="0 0 24 24">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/>
+      </symbol>
+      <symbol id="icon-eye-off" viewBox="0 0 24 24">
+        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-freeze" viewBox="0 0 24 24">
+        <line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="3.3" y1="7" x2="20.7" y2="17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="3.3" y1="17" x2="20.7" y2="7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <polyline points="10,4 12,2 14,4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="10,20 12,22 14,20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-lock" viewBox="0 0 24 24">
+        <rect x="4" y="11" width="16" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="12" cy="16" r="1.5" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-unlock" viewBox="0 0 24 24">
+        <rect x="4" y="11" width="16" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M7 11V7a5 5 0 0 1 9.9-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="12" cy="16" r="1.5" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-creative" viewBox="0 0 24 24">
+        <path d="M12 2C6.5 2 2 6.5 2 12c0 3.6 2 6 5 6h1.5a1.5 1.5 0 0 0 1.5-1.5c0-.4-.1-.7-.3-.9-.2-.3-.3-.6-.3-1 0-.8.7-1.6 1.6-1.6H13c4.4 0 8-3.6 8-8 0-4.4-4-7-9-7z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="7" cy="8" r="1.5" fill="currentColor"/>
+        <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
+        <circle cx="17" cy="9" r="1.5" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-media" viewBox="0 0 24 24">
+        <rect x="2" y="4" width="20" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="2" y1="9" x2="22" y2="9" stroke="currentColor" stroke-width="1.8"/>
+        <polygon points="10,12 16,15 10,18" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-cfd" viewBox="0 0 24 24">
+        <path d="M2 7c4-2 7 2 11 0s5-4 9-2M2 12c4-2 7 2 11 0s5-4 9-2M2 17c4-2 7 2 11 0s5-4 9-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </symbol>
+
+    </defs>
+  </svg>
+
   <a class="skip-link" href="#viewport">Skip to viewport</a>
 
   <!-- Left Global Navigation Sidebar -->
@@ -18,17 +538,17 @@
         <img src="/favicon.svg" alt="AtlasCAD" class="sidebar-brand-img">
         <span class="sidebar-brand-title">AtlasCAD</span>
       </a>
-      <button type="button" class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Sidebar (Expand/Collapse)" aria-label="Toggle Navigation Sidebar">☰</button>
+      <button type="button" class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Sidebar (Expand/Collapse)" aria-label="Toggle Navigation Sidebar"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-menu"/></svg></button>
     </div>
 
     <!-- Core Navigation -->
     <div class="sidebar-nav-group">
       <button type="button" class="sidebar-item" id="navHome" data-view="home" title="Home / Welcome">
-        <span class="sidebar-item-icon">⌂</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-home"/></svg></span>
         <span class="sidebar-item-text">Home</span>
       </button>
       <button type="button" class="sidebar-item" id="navProjects" data-view="projects" title="Projects & Version History">
-        <span class="sidebar-item-icon">📁</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-projects"/></svg></span>
         <span class="sidebar-item-text">Projects</span>
       </button>
     </div>
@@ -37,36 +557,36 @@
     <div class="sidebar-nav-group">
       <span class="sidebar-group-title">Engineering Studios</span>
       <button type="button" class="sidebar-item active" id="navMechanical" data-ws="mechanical" title="Mechanical CAD & Parametric Modeling">
-        <span class="sidebar-item-icon">📐</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-drawing-sheet"/></svg></span>
         <span class="sidebar-item-text">Mechanical</span>
       </button>
       <button type="button" class="sidebar-item" id="navAssembly" data-ws="assembly" title="Assemblies & Mechanisms">
-        <span class="sidebar-item-icon">⚙</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-settings"/></svg></span>
         <span class="sidebar-item-text">Assemblies</span>
       </button>
       <button type="button" class="sidebar-item" id="navBim" data-ws="bim" title="Architecture & OpenBIM (IFC)">
-        <span class="sidebar-item-icon">🏛</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-bim"/></svg></span>
         <span class="sidebar-item-text">Architecture</span>
       </button>
       <button type="button" class="sidebar-item" id="navElectronics" data-ws="electronics" title="Electronics & ECAD (SPICE / PCB)">
-        <span class="sidebar-item-icon">⚡</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-electrical"/></svg></span>
         <span class="sidebar-item-text">Electronics</span>
       </button>
       <button type="button" class="sidebar-item" id="navSimulation" data-ws="simulation" title="Simulation Studio (140+ Multiphysics Solvers)">
-        <span class="sidebar-item-icon">🌊</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-cfd"/></svg></span>
         <span class="sidebar-item-text">Simulation</span>
         <span class="sidebar-badge">140+</span>
       </button>
       <button type="button" class="sidebar-item" id="navManufacturing" data-ws="manufacturing" title="Manufacturing & CNC CAM / Slicing">
-        <span class="sidebar-item-icon">🏭</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-cam"/></svg></span>
         <span class="sidebar-item-text">Manufacturing</span>
       </button>
       <button type="button" class="sidebar-item" id="navScience" data-ws="chemical" title="Science & Process Engineering">
-        <span class="sidebar-item-icon">🧪</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-chemical"/></svg></span>
         <span class="sidebar-item-text">Science</span>
       </button>
       <button type="button" class="sidebar-item" id="navRobotics" data-ws="robotics" title="Robotics & Kinematics (ROS Bridge)">
-        <span class="sidebar-item-icon">🤖</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-robotics"/></svg></span>
         <span class="sidebar-item-text">Robotics</span>
       </button>
     </div>
@@ -75,15 +595,15 @@
     <div class="sidebar-nav-group">
       <span class="sidebar-group-title">Creative & Media</span>
       <button type="button" class="sidebar-item" id="navCreate" data-ws="create" title="Create 3D Studio (SubD, Sculpt, PBR)">
-        <span class="sidebar-item-icon">🎨</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-creative"/></svg></span>
         <span class="sidebar-item-text">Create 3D</span>
       </button>
       <button type="button" class="sidebar-item" id="navRealtime" data-ws="realtime" title="RealTime Studio & Unity Digital Twin">
-        <span class="sidebar-item-icon">🎮</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-realtime"/></svg></span>
         <span class="sidebar-item-text">RealTime</span>
       </button>
       <button type="button" class="sidebar-item" id="navMedia" data-ws="media" title="Media Studio & DaVinci Resolve NLE">
-        <span class="sidebar-item-icon">🎬</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-media"/></svg></span>
         <span class="sidebar-item-text">Media NLE</span>
       </button>
     </div>
@@ -92,33 +612,33 @@
     <div class="sidebar-nav-group">
       <span class="sidebar-group-title">Platform</span>
       <button type="button" class="sidebar-item" id="navAgents" data-ws="agents" title="AI Engineering Agents (44 Specialists)">
-        <span class="sidebar-item-icon">🧠</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-ai-copilot"/></svg></span>
         <span class="sidebar-item-text">AI Agents</span>
         <span class="sidebar-badge">44</span>
       </button>
       <button type="button" class="sidebar-item" id="navWorkflows" data-view="workflows" title="Workflow Automation & Pipelines">
-        <span class="sidebar-item-icon">🔀</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-workflows"/></svg></span>
         <span class="sidebar-item-text">Workflows</span>
       </button>
       <button type="button" class="sidebar-item" id="navAssets" data-view="assets" title="Assets & Standard Hardware Library">
-        <span class="sidebar-item-icon">📦</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-assets"/></svg></span>
         <span class="sidebar-item-text">Assets</span>
       </button>
       <button type="button" class="sidebar-item" id="navJobs" data-view="jobs" title="HPC Job Queue & Simulation Results">
-        <span class="sidebar-item-icon">⏱</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-jobs"/></svg></span>
         <span class="sidebar-item-text">Jobs</span>
         <span class="sidebar-badge pulse" id="sidebarJobsBadge">0</span>
       </button>
       <button type="button" class="sidebar-item" id="navCollab" data-view="collab" title="Enterprise Collaboration, ECOs & Audit">
-        <span class="sidebar-item-icon">👥</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-collab"/></svg></span>
         <span class="sidebar-item-text">Team & ECO</span>
       </button>
       <button type="button" class="sidebar-item" id="navSettings" data-view="settings" title="System Settings & Engine Config">
-        <span class="sidebar-item-icon">⚙</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-settings"/></svg></span>
         <span class="sidebar-item-text">Settings</span>
       </button>
       <button type="button" class="sidebar-item" id="navDev" data-view="dev" title="Developer Portal & MCP Tool Testing">
-        <span class="sidebar-item-icon">💻</span>
+        <span class="sidebar-item-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-dev"/></svg></span>
         <span class="sidebar-item-text">Developer</span>
       </button>
     </div>
@@ -210,13 +730,13 @@
       <button id="engineManagerBtn" class="button ghost" title="Open Engineering Engine Manager & Solvers">Engines</button>
       <button id="enterpriseSaasBtn" class="button ghost" title="Enterprise SaaS Suite (Audit Trail, Cert Reports, HPC Queue, Org & ECO)">Enterprise</button>
       <button type="button" id="topbarJobsBtn" class="topbar-jobs-btn" title="HPC Job Queue & Telemetry">
-        <span>⚡</span><span id="topbarJobsText">Idle</span>
+        <svg class="atlas-icon" aria-hidden="true" style="margin-right:4px;"><use href="#icon-jobs"/></svg><span id="topbarJobsText">Idle</span>
       </button>
       <button id="paletteBtn" class="button command" title="Command palette (Ctrl+K)">
         <span>Commands</span><kbd>Ctrl K</kbd>
       </button>
-      <button id="helpShortcutsBtn" class="icon-button" title="Shortcuts & Ergonomics Guide (F1 / ?)" aria-label="Shortcuts & Help">❓</button>
-      <button id="themeBtn" class="icon-button" title="Toggle light/dark theme" aria-label="Toggle theme">◐</button>
+      <button id="helpShortcutsBtn" class="icon-button" title="Shortcuts & Ergonomics Guide (F1 / ?)" aria-label="Shortcuts & Help"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-help"/></svg></button>
+      <button id="themeBtn" class="icon-button" title="Toggle light/dark theme" aria-label="Toggle theme"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-theme"/></svg></button>
     </nav>
   </header>
 
@@ -244,16 +764,16 @@
           <div class="ribbon-group-title">Draw</div>
           <div class="ribbon-buttons">
             <button type="button" class="ribbon-btn" id="rbLineBtn" title="Line (L)">
-              <span class="rb-icon">╱</span><span>Line</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-line"/></svg></span><span>Line</span>
             </button>
             <button type="button" class="ribbon-btn" id="rbPolyBtn" title="Polyline (PL)">
-              <span class="rb-icon">⎍</span><span>Poly</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-poly"/></svg></span><span>Poly</span>
             </button>
             <button type="button" class="ribbon-btn" id="rbCircleBtn" title="Circle (C)">
-              <span class="rb-icon">◯</span><span>Circle</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-circle"/></svg></span><span>Circle</span>
             </button>
             <button type="button" class="ribbon-btn" id="rbRectBtn" title="Rectangle (REC)">
-              <span class="rb-icon">▭</span><span>Rect</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-rect"/></svg></span><span>Rect</span>
             </button>
           </div>
         </div>
@@ -262,16 +782,16 @@
           <div class="ribbon-group-title">3D Modeling</div>
           <div class="ribbon-buttons">
             <button type="button" class="ribbon-btn primary" id="rbExtrudeBtn" title="Extrude (EXT)">
-              <span class="rb-icon">⬡</span><span>Extrude</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-extrude"/></svg></span><span>Extrude</span>
             </button>
             <button type="button" class="ribbon-btn" id="rbCutBtn" title="Cut / Subtract (SU)">
-              <span class="rb-icon">⊖</span><span>Cut</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-cut"/></svg></span><span>Cut</span>
             </button>
             <button type="button" class="ribbon-btn" id="rbRevolveBtn" title="Revolve (REV)">
-              <span class="rb-icon">↻</span><span>Revolve</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-revolve"/></svg></span><span>Revolve</span>
             </button>
             <button type="button" class="ribbon-btn" id="rbBoxBtn" title="3D Box (BOX)">
-              <span class="rb-icon">⊞</span><span>Box</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-box"/></svg></span><span>Box</span>
             </button>
           </div>
         </div>
@@ -280,16 +800,16 @@
           <div class="ribbon-group-title">Modify</div>
           <div class="ribbon-buttons">
             <button type="button" class="ribbon-btn" id="rbOffsetBtn" title="Offset (O)">
-              <span class="rb-icon">⇉</span><span>Offset</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-offset"/></svg></span><span>Offset</span>
             </button>
             <button type="button" class="ribbon-btn" id="rbFilletBtn" title="Fillet (F)">
-              <span class="rb-icon">╭</span><span>Fillet</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-fillet"/></svg></span><span>Fillet</span>
             </button>
             <button type="button" class="ribbon-btn" id="rbTrimBtn" title="Trim (TR)">
-              <span class="rb-icon">✂</span><span>Trim</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-trim"/></svg></span><span>Trim</span>
             </button>
             <button type="button" class="ribbon-btn" id="rbMirrorBtn" title="Mirror (MI)">
-              <span class="rb-icon">⇋</span><span>Mirror</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-mirror"/></svg></span><span>Mirror</span>
             </button>
           </div>
         </div>
@@ -298,16 +818,16 @@
           <div class="ribbon-group-title">Annotate & Engineering</div>
           <div class="ribbon-buttons">
             <button type="button" class="ribbon-btn" id="rbDimBtn" title="Dimension (DIM)">
-              <span class="rb-icon">↔</span><span>Dim</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-measure"/></svg></span><span>Dim</span>
             </button>
             <button type="button" class="ribbon-btn" id="rbMassPropBtn" title="Mass Properties (MASSPROP)">
-              <span class="rb-icon">⚖</span><span>MassProp</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-massprop"/></svg></span><span>MassProp</span>
             </button>
             <button type="button" class="ribbon-btn" id="rbBomBtn" title="Bill of Materials (BOM)">
-              <span class="rb-icon">📋</span><span>BOM</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-bom"/></svg></span><span>BOM</span>
             </button>
             <button type="button" class="ribbon-btn" id="rbFeaBtn" title="FEA Simulation (FEA)">
-              <span class="rb-icon">⚡</span><span>FEA</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-fea"/></svg></span><span>FEA</span>
             </button>
           </div>
         </div>
@@ -316,10 +836,10 @@
           <div class="ribbon-group-title">Layers</div>
           <div class="ribbon-buttons">
             <button type="button" class="ribbon-btn" id="rbLayersBtn" title="Layer Properties Manager (LA / LAYER)">
-              <span class="rb-icon">◫</span><span>Layers</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-layers"/></svg></span><span>Layers</span>
             </button>
             <button type="button" class="ribbon-btn" id="rbLayerIsoBtn" title="Isolate Active Layer (LAYISO)">
-              <span class="rb-icon">👁</span><span>Isolate</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-eye"/></svg></span><span>Isolate</span>
             </button>
           </div>
         </div>
@@ -328,10 +848,10 @@
           <div class="ribbon-group-title">Blocks & Views</div>
           <div class="ribbon-buttons">
             <button type="button" class="ribbon-btn" id="rbBlockLibBtn" title="Component & Block Library (B / INSERT)">
-              <span class="rb-icon">▦</span><span>Library</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-assets"/></svg></span><span>Library</span>
             </button>
             <button type="button" class="ribbon-btn" id="rbNamedViewsBtn" title="Camera Bookmarks & Named Views (VIEW)">
-              <span class="rb-icon">📹</span><span>Views</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-viewport"/></svg></span><span>Views</span>
             </button>
           </div>
         </div>
@@ -340,7 +860,7 @@
           <div class="ribbon-group-title">AI</div>
           <div class="ribbon-buttons">
             <button type="button" class="ribbon-btn primary" id="rbAiDraftBtn" title="AI CAD Drafting Assistant (AI)">
-              <span class="rb-icon">✨</span><span>AI Assist</span>
+              <span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-ai-copilot"/></svg></span><span>AI Assist</span>
             </button>
           </div>
         </div>
@@ -349,27 +869,27 @@
         <div class="ribbon-group">
           <div class="ribbon-group-title">Primitives</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn" id="rbSolidBoxBtn" title="Box (BOX)"><span class="rb-icon">⊞</span><span>Box</span></button>
-            <button type="button" class="ribbon-btn" id="rbSolidCylBtn" title="Cylinder (CYL)"><span class="rb-icon">◓</span><span>Cylinder</span></button>
+            <button type="button" class="ribbon-btn" id="rbSolidBoxBtn" title="Box (BOX)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-box"/></svg></span><span>Box</span></button>
+            <button type="button" class="ribbon-btn" id="rbSolidCylBtn" title="Cylinder (CYL)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-cylinder"/></svg></span><span>Cylinder</span></button>
           </div>
         </div>
         <div class="ribbon-separator"></div>
         <div class="ribbon-group">
           <div class="ribbon-group-title">Features</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn primary" id="rbSolidExtrudeBtn" title="Extrude (EXT)"><span class="rb-icon">⬡</span><span>Extrude</span></button>
-            <button type="button" class="ribbon-btn" id="rbSolidCutBtn" title="Cut / Subtract (SU)"><span class="rb-icon">⊖</span><span>Cut</span></button>
-            <button type="button" class="ribbon-btn" id="rbSolidJoinBtn" title="Join / Union (UNI)"><span class="rb-icon">⊕</span><span>Join</span></button>
-            <button type="button" class="ribbon-btn" id="rbSolidRevolveBtn" title="Revolve (REV)"><span class="rb-icon">↻</span><span>Revolve</span></button>
+            <button type="button" class="ribbon-btn primary" id="rbSolidExtrudeBtn" title="Extrude (EXT)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-extrude"/></svg></span><span>Extrude</span></button>
+            <button type="button" class="ribbon-btn" id="rbSolidCutBtn" title="Cut / Subtract (SU)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-cut"/></svg></span><span>Cut</span></button>
+            <button type="button" class="ribbon-btn" id="rbSolidJoinBtn" title="Join / Union (UNI)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-join"/></svg></span><span>Join</span></button>
+            <button type="button" class="ribbon-btn" id="rbSolidRevolveBtn" title="Revolve (REV)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-revolve"/></svg></span><span>Revolve</span></button>
           </div>
         </div>
         <div class="ribbon-separator"></div>
         <div class="ribbon-group">
           <div class="ribbon-group-title">Inquiry</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn" id="rbSolidMpBtn" title="Mass Properties (MASSPROP)"><span class="rb-icon">⚖</span><span>MassProp</span></button>
-            <button type="button" class="ribbon-btn" id="rbSolidInfBtn" title="Interference Detection (INTERFERE)"><span class="rb-icon">⚠</span><span>Interfere</span></button>
-            <button type="button" class="ribbon-btn" id="rbSolidBomBtn" title="Bill of Materials (BOM)"><span class="rb-icon">📋</span><span>BOM</span></button>
+            <button type="button" class="ribbon-btn" id="rbSolidMpBtn" title="Mass Properties (MASSPROP)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-massprop"/></svg></span><span>MassProp</span></button>
+            <button type="button" class="ribbon-btn" id="rbSolidInfBtn" title="Interference Detection (INTERFERE)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-warning"/></svg></span><span>Interfere</span></button>
+            <button type="button" class="ribbon-btn" id="rbSolidBomBtn" title="Bill of Materials (BOM)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-bom"/></svg></span><span>BOM</span></button>
           </div>
         </div>
       </div>
@@ -377,16 +897,16 @@
         <div class="ribbon-group">
           <div class="ribbon-group-title">2D Draw Entities</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn" id="rbDrawLineBtn" title="Line (L)"><span class="rb-icon">╱</span><span>Line</span></button>
-            <button type="button" class="ribbon-btn" id="rbDrawPolyBtn" title="Polyline (PL)"><span class="rb-icon">⎍</span><span>Poly</span></button>
-            <button type="button" class="ribbon-btn" id="rbDrawCircleBtn" title="Circle (C)"><span class="rb-icon">◯</span><span>Circle</span></button>
-            <button type="button" class="ribbon-btn" id="rbDrawArcBtn" title="Arc (A)"><span class="rb-icon">◠</span><span>Arc</span></button>
-            <button type="button" class="ribbon-btn" id="rbDrawRectBtn" title="Rectangle (REC)"><span class="rb-icon">▭</span><span>Rect</span></button>
-            <button type="button" class="ribbon-btn" id="rbDrawPolygonBtn" title="Polygon (POL)"><span class="rb-icon">⬡</span><span>Polygon</span></button>
-            <button type="button" class="ribbon-btn" id="rbDrawEllipseBtn" title="Ellipse (EL)"><span class="rb-icon">⬭</span><span>Ellipse</span></button>
-            <button type="button" class="ribbon-btn" id="rbDrawSplineBtn" title="Spline (SPL)"><span class="rb-icon">∿</span><span>Spline</span></button>
-            <button type="button" class="ribbon-btn" id="rbDrawPointBtn" title="Point (PO)"><span class="rb-icon">•</span><span>Point</span></button>
-            <button type="button" class="ribbon-btn" id="rbDrawHatchBtn" title="Hatch (H)"><span class="rb-icon">▦</span><span>Hatch</span></button>
+            <button type="button" class="ribbon-btn" id="rbDrawLineBtn" title="Line (L)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-line"/></svg></span><span>Line</span></button>
+            <button type="button" class="ribbon-btn" id="rbDrawPolyBtn" title="Polyline (PL)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-poly"/></svg></span><span>Poly</span></button>
+            <button type="button" class="ribbon-btn" id="rbDrawCircleBtn" title="Circle (C)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-circle"/></svg></span><span>Circle</span></button>
+            <button type="button" class="ribbon-btn" id="rbDrawArcBtn" title="Arc (A)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-arc"/></svg></span><span>Arc</span></button>
+            <button type="button" class="ribbon-btn" id="rbDrawRectBtn" title="Rectangle (REC)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-rect"/></svg></span><span>Rect</span></button>
+            <button type="button" class="ribbon-btn" id="rbDrawPolygonBtn" title="Polygon (POL)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-polygon"/></svg></span><span>Polygon</span></button>
+            <button type="button" class="ribbon-btn" id="rbDrawEllipseBtn" title="Ellipse (EL)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-ellipse"/></svg></span><span>Ellipse</span></button>
+            <button type="button" class="ribbon-btn" id="rbDrawSplineBtn" title="Spline (SPL)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-spline"/></svg></span><span>Spline</span></button>
+            <button type="button" class="ribbon-btn" id="rbDrawPointBtn" title="Point (PO)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-point"/></svg></span><span>Point</span></button>
+            <button type="button" class="ribbon-btn" id="rbDrawHatchBtn" title="Hatch (H)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-hatch"/></svg></span><span>Hatch</span></button>
           </div>
         </div>
       </div>
@@ -394,19 +914,19 @@
         <div class="ribbon-group">
           <div class="ribbon-group-title">Modify Tools</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn" id="rbModOffsetBtn" title="Offset (O)"><span class="rb-icon">⇉</span><span>Offset</span></button>
-            <button type="button" class="ribbon-btn" id="rbModFilletBtn" title="Fillet (F)"><span class="rb-icon">╭</span><span>Fillet</span></button>
-            <button type="button" class="ribbon-btn" id="rbModChamferBtn" title="Chamfer (CHA)"><span class="rb-icon">╱</span><span>Chamfer</span></button>
-            <button type="button" class="ribbon-btn" id="rbModTrimBtn" title="Trim (TR)"><span class="rb-icon">✂</span><span>Trim</span></button>
-            <button type="button" class="ribbon-btn" id="rbModExtendBtn" title="Extend (EX)"><span class="rb-icon">⇥</span><span>Extend</span></button>
-            <button type="button" class="ribbon-btn" id="rbModMirrorBtn" title="Mirror (MI)"><span class="rb-icon">⇋</span><span>Mirror</span></button>
-            <button type="button" class="ribbon-btn" id="rbModRotateBtn" title="Rotate (RO)"><span class="rb-icon">⟳</span><span>Rotate</span></button>
-            <button type="button" class="ribbon-btn" id="rbModScaleBtn" title="Scale (SC)"><span class="rb-icon">⤢</span><span>Scale</span></button>
-            <button type="button" class="ribbon-btn" id="rbModMoveBtn" title="Move (M)"><span class="rb-icon">✥</span><span>Move</span></button>
-            <button type="button" class="ribbon-btn" id="rbModCopyBtn" title="Copy (CO)"><span class="rb-icon">⧉</span><span>Copy</span></button>
-            <button type="button" class="ribbon-btn" id="rbModJoinBtn" title="Join (J)"><span class="rb-icon">⚯</span><span>Join</span></button>
-            <button type="button" class="ribbon-btn" id="rbModExplodeBtn" title="Explode (X)"><span class="rb-icon">💥</span><span>Explode</span></button>
-            <button type="button" class="ribbon-btn" id="rbModArrayBtn" title="Array (AR)"><span class="rb-icon">⊞</span><span>Array</span></button>
+            <button type="button" class="ribbon-btn" id="rbModOffsetBtn" title="Offset (O)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-offset"/></svg></span><span>Offset</span></button>
+            <button type="button" class="ribbon-btn" id="rbModFilletBtn" title="Fillet (F)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-fillet"/></svg></span><span>Fillet</span></button>
+            <button type="button" class="ribbon-btn" id="rbModChamferBtn" title="Chamfer (CHA)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-chamfer"/></svg></span><span>Chamfer</span></button>
+            <button type="button" class="ribbon-btn" id="rbModTrimBtn" title="Trim (TR)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-trim"/></svg></span><span>Trim</span></button>
+            <button type="button" class="ribbon-btn" id="rbModExtendBtn" title="Extend (EX)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-extend"/></svg></span><span>Extend</span></button>
+            <button type="button" class="ribbon-btn" id="rbModMirrorBtn" title="Mirror (MI)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-mirror"/></svg></span><span>Mirror</span></button>
+            <button type="button" class="ribbon-btn" id="rbModRotateBtn" title="Rotate (RO)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-rotate"/></svg></span><span>Rotate</span></button>
+            <button type="button" class="ribbon-btn" id="rbModScaleBtn" title="Scale (SC)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-scale"/></svg></span><span>Scale</span></button>
+            <button type="button" class="ribbon-btn" id="rbModMoveBtn" title="Move (M)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-move"/></svg></span><span>Move</span></button>
+            <button type="button" class="ribbon-btn" id="rbModCopyBtn" title="Copy (CO)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-copy"/></svg></span><span>Copy</span></button>
+            <button type="button" class="ribbon-btn" id="rbModJoinBtn" title="Join (J)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-join"/></svg></span><span>Join</span></button>
+            <button type="button" class="ribbon-btn" id="rbModExplodeBtn" title="Explode (X)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-explode"/></svg></span><span>Explode</span></button>
+            <button type="button" class="ribbon-btn" id="rbModArrayBtn" title="Array (AR)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-array"/></svg></span><span>Array</span></button>
           </div>
         </div>
       </div>
@@ -414,13 +934,13 @@
         <div class="ribbon-group">
           <div class="ribbon-group-title">Dimensions & Text</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn" id="rbAnnDimBtn" title="Linear Dimension (DIM)"><span class="rb-icon">↔</span><span>Dim</span></button>
-            <button type="button" class="ribbon-btn" id="rbAnnRadBtn" title="Radius Dimension (DRA)"><span class="rb-icon">⊘</span><span>RadDim</span></button>
-            <button type="button" class="ribbon-btn" id="rbAnnDiaBtn" title="Diameter Dimension (DDI)"><span class="rb-icon">⌀</span><span>DiaDim</span></button>
+            <button type="button" class="ribbon-btn" id="rbAnnDimBtn" title="Linear Dimension (DIM)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-measure"/></svg></span><span>Dim</span></button>
+            <button type="button" class="ribbon-btn" id="rbAnnRadBtn" title="Radius Dimension (DRA)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-measure"/></svg></span><span>RadDim</span></button>
+            <button type="button" class="ribbon-btn" id="rbAnnDiaBtn" title="Diameter Dimension (DDI)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-diameter"/></svg></span><span>DiaDim</span></button>
             <button type="button" class="ribbon-btn" id="rbAnnTextBtn" title="Text (TEXT)"><span class="rb-icon">T</span><span>Text</span></button>
-            <button type="button" class="ribbon-btn" id="rbAnnDistBtn" title="Distance (DI)"><span class="rb-icon">📏</span><span>Dist</span></button>
-            <button type="button" class="ribbon-btn" id="rbAnnAreaBtn" title="Area (AA)"><span class="rb-icon">📐</span><span>Area</span></button>
-            <button type="button" class="ribbon-btn" id="rbAnnSecBtn" title="Section Properties (SEC)"><span class="rb-icon">📊</span><span>SecProps</span></button>
+            <button type="button" class="ribbon-btn" id="rbAnnDistBtn" title="Distance (DI)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-measure"/></svg></span><span>Dist</span></button>
+            <button type="button" class="ribbon-btn" id="rbAnnAreaBtn" title="Area (AA)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-rect"/></svg></span><span>Area</span></button>
+            <button type="button" class="ribbon-btn" id="rbAnnSecBtn" title="Section Properties (SEC)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-chart"/></svg></span><span>SecProps</span></button>
           </div>
         </div>
       </div>
@@ -428,11 +948,11 @@
         <div class="ribbon-group">
           <div class="ribbon-group-title">Simulation & CAE</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn primary" id="rbSimFeaBtn" title="Static FEA (FEA)"><span class="rb-icon">⚡</span><span>Linear FEA</span></button>
-            <button type="button" class="ribbon-btn" id="rbSimModalBtn" title="Modal Dynamic Vibration (MODAL)"><span class="rb-icon">〰</span><span>Modal</span></button>
-            <button type="button" class="ribbon-btn" id="rbSimThermalBtn" title="Steady Thermal Conduction (HEAT)"><span class="rb-icon">🔥</span><span>Thermal</span></button>
-            <button type="button" class="ribbon-btn" id="rbSimHudBtn" title="Open Simulation HUD"><span class="rb-icon">🖥</span><span>HUD</span></button>
-            <button type="button" class="ribbon-btn" id="rbSimCamBtn" title="3-Axis CNC Toolpaths (CAM)"><span class="rb-icon">⚙</span><span>CAM G-code</span></button>
+            <button type="button" class="ribbon-btn primary" id="rbSimFeaBtn" title="Static FEA (FEA)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-fea"/></svg></span><span>Linear FEA</span></button>
+            <button type="button" class="ribbon-btn" id="rbSimModalBtn" title="Modal Dynamic Vibration (MODAL)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-modal"/></svg></span><span>Modal</span></button>
+            <button type="button" class="ribbon-btn" id="rbSimThermalBtn" title="Steady Thermal Conduction (HEAT)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-thermal"/></svg></span><span>Thermal</span></button>
+            <button type="button" class="ribbon-btn" id="rbSimHudBtn" title="Open Simulation HUD"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-viewport"/></svg></span><span>HUD</span></button>
+            <button type="button" class="ribbon-btn" id="rbSimCamBtn" title="3-Axis CNC Toolpaths (CAM)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-cam"/></svg></span><span>CAM G-code</span></button>
           </div>
         </div>
       </div>
@@ -440,20 +960,20 @@
         <div class="ribbon-group">
           <div class="ribbon-group-title">Export & Plot</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn" id="rbOutDxfBtn" title="Export AutoCAD R12 DXF (DXF)"><span class="rb-icon">📄</span><span>DXF</span></button>
-            <button type="button" class="ribbon-btn" id="rbOutPdfBtn" title="Plot PDF Sheet (PLOT)"><span class="rb-icon">🖨</span><span>Plot PDF</span></button>
-            <button type="button" class="ribbon-btn" id="rbOutStlBtn" title="Export Binary 3D STL (STL)"><span class="rb-icon">🧊</span><span>Export STL</span></button>
-            <button type="button" class="ribbon-btn" id="rbOutSaveBtn" title="Save Project (QSAVE)"><span class="rb-icon">💾</span><span>Save</span></button>
-            <button type="button" class="ribbon-btn" id="rbOutMultiviewBtn" title="4-View Orthographic Drawing"><span class="rb-icon">⊞</span><span>Multi-View</span></button>
+            <button type="button" class="ribbon-btn" id="rbOutDxfBtn" title="Export AutoCAD R12 DXF (DXF)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-dxf"/></svg></span><span>DXF</span></button>
+            <button type="button" class="ribbon-btn" id="rbOutPdfBtn" title="Plot PDF Sheet (PLOT)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-pdf"/></svg></span><span>Plot PDF</span></button>
+            <button type="button" class="ribbon-btn" id="rbOutStlBtn" title="Export Binary 3D STL (STL)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-stl"/></svg></span><span>Export STL</span></button>
+            <button type="button" class="ribbon-btn" id="rbOutSaveBtn" title="Save Project (QSAVE)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-save"/></svg></span><span>Save</span></button>
+            <button type="button" class="ribbon-btn" id="rbOutMultiviewBtn" title="4-View Orthographic Drawing"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-quad-view"/></svg></span><span>Multi-View</span></button>
           </div>
         </div>
         <div class="ribbon-separator"></div>
         <div class="ribbon-group">
           <div class="ribbon-group-title">Film & Real-Time 3D Engines</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn primary" id="rbOutDavinciBtn" title="Export DaVinci Resolve Timeline & 3D LUT (FCPXML/EDL/CUBE/USD)"><span class="rb-icon">🎬</span><span>DaVinci Resolve</span></button>
-            <button type="button" class="ribbon-btn primary" id="rbOutUnityBtn" title="Export Unity 3D Engine Digital Twin & C# Flight Controllers"><span class="rb-icon">🎮</span><span>Unity 3D</span></button>
-            <button type="button" class="ribbon-btn primary" id="rbOutGltfBtn" title="Export glTF 2.0 PBR Scene Model"><span class="rb-icon">🌐</span><span>glTF 2.0</span></button>
+            <button type="button" class="ribbon-btn primary" id="rbOutDavinciBtn" title="Export DaVinci Resolve Timeline & 3D LUT (FCPXML/EDL/CUBE/USD)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-davinci"/></svg></span><span>DaVinci Resolve</span></button>
+            <button type="button" class="ribbon-btn primary" id="rbOutUnityBtn" title="Export Unity 3D Engine Digital Twin & C# Flight Controllers"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-unity"/></svg></span><span>Unity 3D</span></button>
+            <button type="button" class="ribbon-btn primary" id="rbOutGltfBtn" title="Export glTF 2.0 PBR Scene Model"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-gltf"/></svg></span><span>glTF 2.0</span></button>
           </div>
         </div>
       </div>
@@ -461,27 +981,27 @@
         <div class="ribbon-group">
           <div class="ribbon-group-title">AI Assistance</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn primary" id="rbAutomateAiBtn" title="AI CAD Drafting Assistant (AI)"><span class="rb-icon">✨</span><span>AI Assist</span></button>
-            <button type="button" class="ribbon-btn" id="rbAutomateMacroBtn" title="Run Command Script (SCR)"><span class="rb-icon">📜</span><span>Script</span></button>
+            <button type="button" class="ribbon-btn primary" id="rbAutomateAiBtn" title="AI CAD Drafting Assistant (AI)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-ai-copilot"/></svg></span><span>AI Assist</span></button>
+            <button type="button" class="ribbon-btn" id="rbAutomateMacroBtn" title="Run Command Script (SCR)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-dev"/></svg></span><span>Script</span></button>
           </div>
         </div>
         <div class="ribbon-separator"></div>
         <div class="ribbon-group">
           <div class="ribbon-group-title">Parametric & Solver</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn" id="rbAutomateSolveBtn" title="Solve 2D Constraints (CON / DOF)"><span class="rb-icon">⚙</span><span>Solve DOF</span></button>
-            <button type="button" class="ribbon-btn" id="rbAutomateOverkillBtn" title="Clean Overkill & Duplicates (OV)"><span class="rb-icon">🧹</span><span>Overkill</span></button>
-            <button type="button" class="ribbon-btn" id="rbAutomatePurgeBtn" title="Purge Unused Blocks & Layers (PU)"><span class="rb-icon">🗑</span><span>Purge</span></button>
+            <button type="button" class="ribbon-btn" id="rbAutomateSolveBtn" title="Solve 2D Constraints (CON / DOF)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-gear"/></svg></span><span>Solve DOF</span></button>
+            <button type="button" class="ribbon-btn" id="rbAutomateOverkillBtn" title="Clean Overkill & Duplicates (OV)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-trim"/></svg></span><span>Overkill</span></button>
+            <button type="button" class="ribbon-btn" id="rbAutomatePurgeBtn" title="Purge Unused Blocks & Layers (PU)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-close"/></svg></span><span>Purge</span></button>
           </div>
         </div>
         <div class="ribbon-separator"></div>
         <div class="ribbon-group">
           <div class="ribbon-group-title">Enterprise $10k Suite</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn" id="rbEnterpriseAuditBtn" title="Cryptographic Immutable Audit Trail (AUDIT)"><span class="rb-icon">🔒</span><span>Audit Trail</span></button>
-            <button type="button" class="ribbon-btn" id="rbEnterpriseReportBtn" title="Automated Regulatory Certification Dossier (CERT)"><span class="rb-icon">📋</span><span>Cert Report</span></button>
-            <button type="button" class="ribbon-btn" id="rbEnterpriseJobsBtn" title="HPC Simulation Job Scheduler & Queue (JOBS)"><span class="rb-icon">⚡</span><span>HPC Queue</span></button>
-            <button type="button" class="ribbon-btn" id="rbEnterpriseOrgBtn" title="Organization Quotas & Engineering Change Orders (ECO)"><span class="rb-icon">🏢</span><span>Org & ECO</span></button>
+            <button type="button" class="ribbon-btn" id="rbEnterpriseAuditBtn" title="Cryptographic Immutable Audit Trail (AUDIT)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-shield"/></svg></span><span>Audit Trail</span></button>
+            <button type="button" class="ribbon-btn" id="rbEnterpriseReportBtn" title="Automated Regulatory Certification Dossier (CERT)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-bom"/></svg></span><span>Cert Report</span></button>
+            <button type="button" class="ribbon-btn" id="rbEnterpriseJobsBtn" title="HPC Simulation Job Scheduler & Queue (JOBS)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-jobs"/></svg></span><span>HPC Queue</span></button>
+            <button type="button" class="ribbon-btn" id="rbEnterpriseOrgBtn" title="Organization Quotas & Engineering Change Orders (ECO)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-collab"/></svg></span><span>Org & ECO</span></button>
           </div>
         </div>
       </div>
@@ -489,21 +1009,21 @@
         <div class="ribbon-group">
           <div class="ribbon-group-title">BIM Elements</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn primary" id="rbBimWallBtn" title="Architectural Wall (WALL)"><span class="rb-icon">🧱</span><span>Wall</span></button>
-            <button type="button" class="ribbon-btn" id="rbBimSlabBtn" title="Floor Slab (SLAB)"><span class="rb-icon">▬</span><span>Slab</span></button>
-            <button type="button" class="ribbon-btn" id="rbBimColumnBtn" title="Structural Column (COL)"><span class="rb-icon">🏛</span><span>Column</span></button>
-            <button type="button" class="ribbon-btn" id="rbBimBeamBtn" title="Structural Beam (BEAM)"><span class="rb-icon">━</span><span>Beam</span></button>
-            <button type="button" class="ribbon-btn" id="rbBimDoorBtn" title="Door Opening (DOOR)"><span class="rb-icon">🚪</span><span>Door</span></button>
-            <button type="button" class="ribbon-btn" id="rbBimWindowBtn" title="Window Opening (WIN)"><span class="rb-icon">🪟</span><span>Window</span></button>
+            <button type="button" class="ribbon-btn primary" id="rbBimWallBtn" title="Architectural Wall (WALL)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-rect"/></svg></span><span>Wall</span></button>
+            <button type="button" class="ribbon-btn" id="rbBimSlabBtn" title="Floor Slab (SLAB)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-rect"/></svg></span><span>Slab</span></button>
+            <button type="button" class="ribbon-btn" id="rbBimColumnBtn" title="Structural Column (COL)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-bim"/></svg></span><span>Column</span></button>
+            <button type="button" class="ribbon-btn" id="rbBimBeamBtn" title="Structural Beam (BEAM)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-line"/></svg></span><span>Beam</span></button>
+            <button type="button" class="ribbon-btn" id="rbBimDoorBtn" title="Door Opening (DOOR)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-box"/></svg></span><span>Door</span></button>
+            <button type="button" class="ribbon-btn" id="rbBimWindowBtn" title="Window Opening (WIN)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-quad-view"/></svg></span><span>Window</span></button>
           </div>
         </div>
         <div class="ribbon-separator"></div>
         <div class="ribbon-group">
           <div class="ribbon-group-title">IFC & Energy</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn" id="rbBimIfcImportBtn" title="Import IFC Model (IfcOpenShell)"><span class="rb-icon">📥</span><span>Import IFC</span></button>
-            <button type="button" class="ribbon-btn" id="rbBimIfcExportBtn" title="Export IFC4 Standard (IFC)"><span class="rb-icon">📤</span><span>Export IFC</span></button>
-            <button type="button" class="ribbon-btn primary" id="rbBimEnergyBtn" title="Run EnergyPlus Thermal Building Simulation"><span class="rb-icon">☀️</span><span>EnergyPlus</span></button>
+            <button type="button" class="ribbon-btn" id="rbBimIfcImportBtn" title="Import IFC Model (IfcOpenShell)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-cloud"/></svg></span><span>Import IFC</span></button>
+            <button type="button" class="ribbon-btn" id="rbBimIfcExportBtn" title="Export IFC4 Standard (IFC)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-step"/></svg></span><span>Export IFC</span></button>
+            <button type="button" class="ribbon-btn primary" id="rbBimEnergyBtn" title="Run EnergyPlus Thermal Building Simulation"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-thermal"/></svg></span><span>EnergyPlus</span></button>
           </div>
         </div>
       </div>
@@ -511,21 +1031,21 @@
         <div class="ribbon-group">
           <div class="ribbon-group-title">Schematic Components</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn" id="rbEcadResistorBtn" title="Resistor (R)"><span class="rb-icon">⚡</span><span>Resistor</span></button>
-            <button type="button" class="ribbon-btn" id="rbEcadCapacitorBtn" title="Capacitor (C)"><span class="rb-icon">⫴</span><span>Capacitor</span></button>
-            <button type="button" class="ribbon-btn" id="rbEcadInductorBtn" title="Inductor (L)"><span class="rb-icon">∿</span><span>Inductor</span></button>
-            <button type="button" class="ribbon-btn" id="rbEcadDiodeBtn" title="Diode / Transistor"><span class="rb-icon">⏵|</span><span>Diode</span></button>
-            <button type="button" class="ribbon-btn" id="rbEcadGndBtn" title="Ground Node (GND)"><span class="rb-icon">⏚</span><span>GND</span></button>
-            <button type="button" class="ribbon-btn" id="rbEcadNetBtn" title="Electrical Net / Wire (WIRE)"><span class="rb-icon">〰</span><span>Net Wire</span></button>
+            <button type="button" class="ribbon-btn" id="rbEcadResistorBtn" title="Resistor (R)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-electrical"/></svg></span><span>Resistor</span></button>
+            <button type="button" class="ribbon-btn" id="rbEcadCapacitorBtn" title="Capacitor (C)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-electrical"/></svg></span><span>Capacitor</span></button>
+            <button type="button" class="ribbon-btn" id="rbEcadInductorBtn" title="Inductor (L)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-spline"/></svg></span><span>Inductor</span></button>
+            <button type="button" class="ribbon-btn" id="rbEcadDiodeBtn" title="Diode / Transistor"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-electrical"/></svg></span><span>Diode</span></button>
+            <button type="button" class="ribbon-btn" id="rbEcadGndBtn" title="Ground Node (GND)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-electrical"/></svg></span><span>GND</span></button>
+            <button type="button" class="ribbon-btn" id="rbEcadNetBtn" title="Electrical Net / Wire (WIRE)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-line"/></svg></span><span>Net Wire</span></button>
           </div>
         </div>
         <div class="ribbon-separator"></div>
         <div class="ribbon-group">
           <div class="ribbon-group-title">Simulation & ECAD</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn primary" id="rbNgspiceRunBtn" title="Run ngspice AC/DC/Transient Solver (SPICE)"><span class="rb-icon">📊</span><span>Run SPICE</span></button>
-            <button type="button" class="ribbon-btn" id="rbKicadDrcBtn" title="Run KiCad Design Rule Check (DRC)"><span class="rb-icon">✓</span><span>KiCad DRC</span></button>
-            <button type="button" class="ribbon-btn" id="rbEcadNetlistBtn" title="Generate SPICE / KiCad Netlist"><span class="rb-icon">📋</span><span>Netlist</span></button>
+            <button type="button" class="ribbon-btn primary" id="rbNgspiceRunBtn" title="Run ngspice AC/DC/Transient Solver (SPICE)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-chart"/></svg></span><span>Run SPICE</span></button>
+            <button type="button" class="ribbon-btn" id="rbKicadDrcBtn" title="Run KiCad Design Rule Check (DRC)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-check"/></svg></span><span>KiCad DRC</span></button>
+            <button type="button" class="ribbon-btn" id="rbEcadNetlistBtn" title="Generate SPICE / KiCad Netlist"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-bom"/></svg></span><span>Netlist</span></button>
           </div>
         </div>
       </div>
@@ -533,20 +1053,20 @@
         <div class="ribbon-group">
           <div class="ribbon-group-title">Grid Network</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn" id="rbPowerBusBtn" title="Substation Bus Node"><span class="rb-icon">▮</span><span>Bus</span></button>
-            <button type="button" class="ribbon-btn" id="rbPowerBranchBtn" title="Transmission Line / Cable"><span class="rb-icon">━━</span><span>Line</span></button>
-            <button type="button" class="ribbon-btn" id="rbPowerTrafoBtn" title="2-Winding Transformer"><span class="rb-icon">ꝏ</span><span>Transformer</span></button>
-            <button type="button" class="ribbon-btn" id="rbPowerGenBtn" title="Generator / PV / Wind Source"><span class="rb-icon">⚙</span><span>Generator</span></button>
-            <button type="button" class="ribbon-btn" id="rbPowerLoadBtn" title="Grid Load / Consumer"><span class="rb-icon">⬇</span><span>Load</span></button>
+            <button type="button" class="ribbon-btn" id="rbPowerBusBtn" title="Substation Bus Node"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-rect"/></svg></span><span>Bus</span></button>
+            <button type="button" class="ribbon-btn" id="rbPowerBranchBtn" title="Transmission Line / Cable"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-line"/></svg></span><span>Line</span></button>
+            <button type="button" class="ribbon-btn" id="rbPowerTrafoBtn" title="2-Winding Transformer"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-motor"/></svg></span><span>Transformer</span></button>
+            <button type="button" class="ribbon-btn" id="rbPowerGenBtn" title="Generator / PV / Wind Source"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-motor"/></svg></span><span>Generator</span></button>
+            <button type="button" class="ribbon-btn" id="rbPowerLoadBtn" title="Grid Load / Consumer"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-electrical"/></svg></span><span>Load</span></button>
           </div>
         </div>
         <div class="ribbon-separator"></div>
         <div class="ribbon-group">
           <div class="ribbon-group-title">Power Flow & Solvers</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn primary" id="rbPandaRunBtn" title="Run pandapower AC Load Flow Analysis (POWER)"><span class="rb-icon">⚡</span><span>pandapower</span></button>
-            <button type="button" class="ribbon-btn" id="rbOpendssRunBtn" title="Run OpenDSS Distribution Simulation"><span class="rb-icon">🔌</span><span>OpenDSS</span></button>
-            <button type="button" class="ribbon-btn" id="rbPowerShortCircuitBtn" title="IEC 60909 Short-Circuit Analysis"><span class="rb-icon">💥</span><span>Short-Circuit</span></button>
+            <button type="button" class="ribbon-btn primary" id="rbPandaRunBtn" title="Run pandapower AC Load Flow Analysis (POWER)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-electrical"/></svg></span><span>pandapower</span></button>
+            <button type="button" class="ribbon-btn" id="rbOpendssRunBtn" title="Run OpenDSS Distribution Simulation"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-electrical"/></svg></span><span>OpenDSS</span></button>
+            <button type="button" class="ribbon-btn" id="rbPowerShortCircuitBtn" title="IEC 60909 Short-Circuit Analysis"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-warning"/></svg></span><span>Short-Circuit</span></button>
           </div>
         </div>
       </div>
@@ -554,20 +1074,20 @@
         <div class="ribbon-group">
           <div class="ribbon-group-title">Process Flowsheet</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn" id="rbChemStreamBtn" title="Material / Energy Stream"><span class="rb-icon">➔</span><span>Stream</span></button>
-            <button type="button" class="ribbon-btn" id="rbChemMixerBtn" title="Mixer / Splitter Unit"><span class="rb-icon">⋈</span><span>Mixer</span></button>
-            <button type="button" class="ribbon-btn" id="rbChemReactorBtn" title="Chemical Reactor (CSTR / PFR)"><span class="rb-icon">⚗</span><span>Reactor</span></button>
-            <button type="button" class="ribbon-btn" id="rbChemColumnBtn" title="Distillation / Absorption Column"><span class="rb-icon">▯</span><span>Column</span></button>
-            <button type="button" class="ribbon-btn" id="rbChemHeatExBtn" title="Heat Exchanger Unit"><span class="rb-icon">♨</span><span>Heat Ex</span></button>
+            <button type="button" class="ribbon-btn" id="rbChemStreamBtn" title="Material / Energy Stream"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-poly"/></svg></span><span>Stream</span></button>
+            <button type="button" class="ribbon-btn" id="rbChemMixerBtn" title="Mixer / Splitter Unit"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-chemical"/></svg></span><span>Mixer</span></button>
+            <button type="button" class="ribbon-btn" id="rbChemReactorBtn" title="Chemical Reactor (CSTR / PFR)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-chemical"/></svg></span><span>Reactor</span></button>
+            <button type="button" class="ribbon-btn" id="rbChemColumnBtn" title="Distillation / Absorption Column"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-cylinder"/></svg></span><span>Column</span></button>
+            <button type="button" class="ribbon-btn" id="rbChemHeatExBtn" title="Heat Exchanger Unit"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-thermal"/></svg></span><span>Heat Ex</span></button>
           </div>
         </div>
         <div class="ribbon-separator"></div>
         <div class="ribbon-group">
           <div class="ribbon-group-title">Thermodynamics & Kinetics</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn primary" id="rbChemicalRunBtn" title="Run Cantera Chemical Kinetics & Combustion"><span class="rb-icon">🧪</span><span>Cantera</span></button>
-            <button type="button" class="ribbon-btn" id="rbDwsimEqBtn" title="Run DWSIM Thermodynamic VLE Equilibrium"><span class="rb-icon">⚖</span><span>DWSIM</span></button>
-            <button type="button" class="ribbon-btn" id="rbChemPhaseBtn" title="Phase Envelope & Flash Calculation"><span class="rb-icon">📈</span><span>Flash Calc</span></button>
+            <button type="button" class="ribbon-btn primary" id="rbChemicalRunBtn" title="Run Cantera Chemical Kinetics & Combustion"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-chemical"/></svg></span><span>Cantera</span></button>
+            <button type="button" class="ribbon-btn" id="rbDwsimEqBtn" title="Run DWSIM Thermodynamic VLE Equilibrium"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-massprop"/></svg></span><span>DWSIM</span></button>
+            <button type="button" class="ribbon-btn" id="rbChemPhaseBtn" title="Phase Envelope & Flash Calculation"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-chart"/></svg></span><span>Flash Calc</span></button>
           </div>
         </div>
       </div>
@@ -575,20 +1095,20 @@
         <div class="ribbon-group">
           <div class="ribbon-group-title">Kinematics & Links</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn" id="rbRobotBaseBtn" title="Base Robot Link"><span class="rb-icon">⚓</span><span>Base Link</span></button>
-            <button type="button" class="ribbon-btn" id="rbRobotRevJointBtn" title="Revolute / Rotary Joint"><span class="rb-icon">🔄</span><span>Revolute</span></button>
-            <button type="button" class="ribbon-btn" id="rbRobotPrismJointBtn" title="Prismatic / Sliding Joint"><span class="rb-icon">⇥</span><span>Prismatic</span></button>
-            <button type="button" class="ribbon-btn" id="rbRobotGripperBtn" title="End Effector / Gripper"><span class="rb-icon">🤏</span><span>End Effector</span></button>
-            <button type="button" class="ribbon-btn" id="rbRobotUrdfBtn" title="Import / Export URDF Robot Description"><span class="rb-icon">🤖</span><span>URDF</span></button>
+            <button type="button" class="ribbon-btn" id="rbRobotBaseBtn" title="Base Robot Link"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-box"/></svg></span><span>Base Link</span></button>
+            <button type="button" class="ribbon-btn" id="rbRobotRevJointBtn" title="Revolute / Rotary Joint"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-rotate"/></svg></span><span>Revolute</span></button>
+            <button type="button" class="ribbon-btn" id="rbRobotPrismJointBtn" title="Prismatic / Sliding Joint"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-extend"/></svg></span><span>Prismatic</span></button>
+            <button type="button" class="ribbon-btn" id="rbRobotGripperBtn" title="End Effector / Gripper"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-robotics"/></svg></span><span>End Effector</span></button>
+            <button type="button" class="ribbon-btn" id="rbRobotUrdfBtn" title="Import / Export URDF Robot Description"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-robotics"/></svg></span><span>URDF</span></button>
           </div>
         </div>
         <div class="ribbon-separator"></div>
         <div class="ribbon-group">
           <div class="ribbon-group-title">Physics & Motion</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn primary" id="rbRobotRunBtn" title="Run MuJoCo Forward Dynamics & Contact Physics"><span class="rb-icon">🏃</span><span>MuJoCo Sim</span></button>
-            <button type="button" class="ribbon-btn" id="rbRobotIkBtn" title="Analytical & Numerical Inverse Kinematics (IK)"><span class="rb-icon">🎯</span><span>Inverse Kin</span></button>
-            <button type="button" class="ribbon-btn" id="rbRobotTrajBtn" title="Trajectory Optimization & Collision Avoidance"><span class="rb-icon">🛣</span><span>Trajectory</span></button>
+            <button type="button" class="ribbon-btn primary" id="rbRobotRunBtn" title="Run MuJoCo Forward Dynamics & Contact Physics"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-play"/></svg></span><span>MuJoCo Sim</span></button>
+            <button type="button" class="ribbon-btn" id="rbRobotIkBtn" title="Analytical & Numerical Inverse Kinematics (IK)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-gizmo"/></svg></span><span>Inverse Kin</span></button>
+            <button type="button" class="ribbon-btn" id="rbRobotTrajBtn" title="Trajectory Optimization & Collision Avoidance"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-spline"/></svg></span><span>Trajectory</span></button>
           </div>
         </div>
       </div>
@@ -596,19 +1116,19 @@
         <div class="ribbon-group">
           <div class="ribbon-group-title">Aero Geometry</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn primary" id="rbAeroAirfoilBtn" title="Parametric NACA 4/5-Digit Airfoil"><span class="rb-icon">🪽</span><span>NACA Foil</span></button>
-            <button type="button" class="ribbon-btn" id="rbAeroWingBtn" title="Swept & Tapered 3D Wing Surface"><span class="rb-icon">✈</span><span>Wing</span></button>
-            <button type="button" class="ribbon-btn" id="rbAeroFuselageBtn" title="Fuselage Lofting"><span class="rb-icon">🚀</span><span>Fuselage</span></button>
-            <button type="button" class="ribbon-btn" id="rbAeroVspBtn" title="OpenVSP Parametric Vehicle (.vsp3)"><span class="rb-icon">📐</span><span>OpenVSP</span></button>
+            <button type="button" class="ribbon-btn primary" id="rbAeroAirfoilBtn" title="Parametric NACA 4/5-Digit Airfoil"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-spline"/></svg></span><span>NACA Foil</span></button>
+            <button type="button" class="ribbon-btn" id="rbAeroWingBtn" title="Swept & Tapered 3D Wing Surface"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-aerospace"/></svg></span><span>Wing</span></button>
+            <button type="button" class="ribbon-btn" id="rbAeroFuselageBtn" title="Fuselage Lofting"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-aerospace"/></svg></span><span>Fuselage</span></button>
+            <button type="button" class="ribbon-btn" id="rbAeroVspBtn" title="OpenVSP Parametric Vehicle (.vsp3)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-drawing-sheet"/></svg></span><span>OpenVSP</span></button>
           </div>
         </div>
         <div class="ribbon-separator"></div>
         <div class="ribbon-group">
           <div class="ribbon-group-title">CFD & Aerodynamics</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn primary" id="rbAeroRunBtn" title="Run SU2 Compressible Navier-Stokes Solver"><span class="rb-icon">💨</span><span>SU2 Solver</span></button>
-            <button type="button" class="ribbon-btn" id="rbAeroPolarBtn" title="Compute Lift/Drag Polar Curve (Cl vs Cd)"><span class="rb-icon">📉</span><span>Lift/Drag Polar</span></button>
-            <button type="button" class="ribbon-btn" id="rbAeroPanelBtn" title="3D Vortex Lattice / Panel Method"><span class="rb-icon">🌐</span><span>Panel Method</span></button>
+            <button type="button" class="ribbon-btn primary" id="rbAeroRunBtn" title="Run SU2 Compressible Navier-Stokes Solver"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-cfd"/></svg></span><span>SU2 Solver</span></button>
+            <button type="button" class="ribbon-btn" id="rbAeroPolarBtn" title="Compute Lift/Drag Polar Curve (Cl vs Cd)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-chart"/></svg></span><span>Lift/Drag Polar</span></button>
+            <button type="button" class="ribbon-btn" id="rbAeroPanelBtn" title="3D Vortex Lattice / Panel Method"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-gltf"/></svg></span><span>Panel Method</span></button>
           </div>
         </div>
       </div>
@@ -616,20 +1136,20 @@
         <div class="ribbon-group">
           <div class="ribbon-group-title">Water Network Elements</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn" id="rbEnvJunctionBtn" title="Water Junction Node"><span class="rb-icon">◉</span><span>Junction</span></button>
-            <button type="button" class="ribbon-btn" id="rbEnvPipeBtn" title="Pressurized Water Pipe"><span class="rb-icon">━</span><span>Pipe</span></button>
-            <button type="button" class="ribbon-btn" id="rbEnvTankBtn" title="Storage Reservoir / Tank"><span class="rb-icon">🛢</span><span>Tank</span></button>
-            <button type="button" class="ribbon-btn" id="rbEnvPumpBtn" title="Booster Pump"><span class="rb-icon">⚙</span><span>Pump</span></button>
-            <button type="button" class="ribbon-btn" id="rbEnvValveBtn" title="Pressure Reducing Valve (PRV)"><span class="rb-icon">⧓</span><span>Valve</span></button>
+            <button type="button" class="ribbon-btn" id="rbEnvJunctionBtn" title="Water Junction Node"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-circle"/></svg></span><span>Junction</span></button>
+            <button type="button" class="ribbon-btn" id="rbEnvPipeBtn" title="Pressurized Water Pipe"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-line"/></svg></span><span>Pipe</span></button>
+            <button type="button" class="ribbon-btn" id="rbEnvTankBtn" title="Storage Reservoir / Tank"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-cylinder"/></svg></span><span>Tank</span></button>
+            <button type="button" class="ribbon-btn" id="rbEnvPumpBtn" title="Booster Pump"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-motor"/></svg></span><span>Pump</span></button>
+            <button type="button" class="ribbon-btn" id="rbEnvValveBtn" title="Pressure Reducing Valve (PRV)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-gear"/></svg></span><span>Valve</span></button>
           </div>
         </div>
         <div class="ribbon-separator"></div>
         <div class="ribbon-group">
           <div class="ribbon-group-title">Hydraulic & Water Quality</div>
           <div class="ribbon-buttons">
-            <button type="button" class="ribbon-btn primary" id="rbEpanetRunBtn" title="Run EPANET Pressurized Water Distribution Solver"><span class="rb-icon">💧</span><span>EPANET Run</span></button>
-            <button type="button" class="ribbon-btn" id="rbSwmmRunBtn" title="Run EPA SWMM Stormwater & Urban Drainage"><span class="rb-icon">🌧</span><span>SWMM Runoff</span></button>
-            <button type="button" class="ribbon-btn" id="rbEnvWaterAgeBtn" title="Simulate Water Age & Chlorine Residual"><span class="rb-icon">🔬</span><span>Water Quality</span></button>
+            <button type="button" class="ribbon-btn primary" id="rbEpanetRunBtn" title="Run EPANET Pressurized Water Distribution Solver"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-marine"/></svg></span><span>EPANET Run</span></button>
+            <button type="button" class="ribbon-btn" id="rbSwmmRunBtn" title="Run EPA SWMM Stormwater & Urban Drainage"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-marine"/></svg></span><span>SWMM Runoff</span></button>
+            <button type="button" class="ribbon-btn" id="rbEnvWaterAgeBtn" title="Simulate Water Age & Chlorine Residual"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-chemical"/></svg></span><span>Water Quality</span></button>
           </div>
         </div>
       </div>
@@ -644,40 +1164,40 @@
     </div>
     <div class="wb-tabs-list">
       <button type="button" class="wb-tab active" data-workbench="cad3d" role="tab" aria-selected="true" title="3D Parametric CAD & Solid Modeling">
-        <span class="wb-icon">🧊</span><span class="wb-text">3D CAD Modeling</span>
+        <span class="wb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-extrude"/></svg></span><span class="wb-text">3D CAD Modeling</span>
       </button>
       <button type="button" class="wb-tab" data-workbench="drafting2d" role="tab" aria-selected="false" title="2D Drafting, Detailing & Multi-Sheet Layouts">
-        <span class="wb-icon">📐</span><span class="wb-text">2D Drafting &amp; Sheets</span>
+        <span class="wb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-drawing-sheet"/></svg></span><span class="wb-text">2D Drafting &amp; Sheets</span>
       </button>
       <button type="button" class="wb-tab" data-workbench="cae" role="tab" aria-selected="false" title="CAE Multiphysics Simulation (FEA, Modal, Thermal, CFD)">
-        <span class="wb-icon">⚡</span><span class="wb-text">CAE Simulation</span>
+        <span class="wb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-fea"/></svg></span><span class="wb-text">CAE Simulation</span>
       </button>
       <button type="button" class="wb-tab" data-workbench="cam" role="tab" aria-selected="false" title="CAM & CNC Machining (Toolpaths, Feeds & Speeds, G-Code)">
-        <span class="wb-icon">⚙️</span><span class="wb-text">CAM Machining</span>
+        <span class="wb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-cam"/></svg></span><span class="wb-text">CAM Machining</span>
       </button>
       <button type="button" class="wb-tab" data-workbench="additive" role="tab" aria-selected="false" title="3D Slicing & Additive Manufacturing (Infill, Layers, G-Code)">
-        <span class="wb-icon">🖨️</span><span class="wb-text">3D Slicing &amp; Additive</span>
+        <span class="wb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-additive"/></svg></span><span class="wb-text">3D Slicing &amp; Additive</span>
       </button>
       <button type="button" class="wb-tab" data-workbench="bim" role="tab" aria-selected="false" title="OpenBIM Architectural Studio (IFC4, Schedules, Takeoffs)">
-        <span class="wb-icon">🏛️</span><span class="wb-text">OpenBIM Studio</span>
+        <span class="wb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-bim"/></svg></span><span class="wb-text">OpenBIM Studio</span>
       </button>
       <button type="button" class="wb-tab" data-workbench="ecad" role="tab" aria-selected="false" title="ECAD & SPICE Circuit Simulator (Schematics, Oscilloscope)">
-        <span class="wb-icon">🔌</span><span class="wb-text">ECAD &amp; SPICE</span>
+        <span class="wb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-electrical"/></svg></span><span class="wb-text">ECAD &amp; SPICE</span>
       </button>
       <button type="button" class="wb-tab" data-workbench="enterprise" role="tab" aria-selected="false" title="Enterprise SaaS Hub (Audit Trail, Cert Reports, HPC Queue, Org & ECO)">
-        <span class="wb-icon">🛡️</span><span class="wb-text">Enterprise Hub</span>
+        <span class="wb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-shield"/></svg></span><span class="wb-text">Enterprise Hub</span>
       </button>
       <button type="button" class="wb-tab" data-workbench="agent" role="tab" aria-selected="false" title="Autonomous Engineering Agent Console (44 Specialists, DAG Orchestration, MCP)">
-        <span class="wb-icon">🤖</span><span class="wb-text">Agent Console</span>
+        <span class="wb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-ai-copilot"/></svg></span><span class="wb-text">Agent Console</span>
       </button>
       <button type="button" class="wb-tab" data-workbench="atlas_create" role="tab" aria-selected="false" title="Atlas Create: Blender-Class 3D Modeling, Sculpting, UV Unwrapping & MaterialX Shaders">
-        <span class="wb-icon">🎨</span><span class="wb-text">Atlas Create</span>
+        <span class="wb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-creative"/></svg></span><span class="wb-text">Atlas Create</span>
       </button>
       <button type="button" class="wb-tab" data-workbench="atlas_realtime" role="tab" aria-selected="false" title="Atlas RealTime: Unity-Class Interactive 3D, ECS Scene Graph, Physics & Digital Twin">
-        <span class="wb-icon">🎮</span><span class="wb-text">Atlas RealTime</span>
+        <span class="wb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-realtime"/></svg></span><span class="wb-text">Atlas RealTime</span>
       </button>
       <button type="button" class="wb-tab" data-workbench="atlas_media" role="tab" aria-selected="false" title="Atlas Media: DaVinci Resolve-Class Multi-Track NLE, 3-Way Color Wheels & Fairlight Audio">
-        <span class="wb-icon">🎬</span><span class="wb-text">Atlas Media</span>
+        <span class="wb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-media"/></svg></span><span class="wb-text">Atlas Media</span>
       </button>
     </div>
   </nav>
@@ -882,63 +1402,63 @@
       <!-- Floating Quick-Action Dock (Zero-Friction Ergonomics) -->
       <div class="quick-action-dock" id="quickActionDock" role="toolbar" aria-label="Quick Actions">
         <button type="button" class="dock-btn active" id="dockSelectBtn" title="Select / Inspect Tool (S)">
-          <span class="dock-icon">↖</span>
+          <span class="dock-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-select"/></svg></span>
           <span class="dock-label">Select</span>
         </button>
         <div class="dock-sep"></div>
         <button type="button" class="dock-btn" id="dockLineBtn" title="Draw 2D Line (L)">
-          <span class="dock-icon">╱</span>
+          <span class="dock-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-line"/></svg></span>
           <span class="dock-label">Line</span>
         </button>
         <button type="button" class="dock-btn" id="dockRectBtn" title="Draw Rectangle (REC)">
-          <span class="dock-icon">▭</span>
+          <span class="dock-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-rect"/></svg></span>
           <span class="dock-label">Rect</span>
         </button>
         <button type="button" class="dock-btn" id="dockCircleBtn" title="Draw Circle (C)">
-          <span class="dock-icon">◯</span>
+          <span class="dock-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-circle"/></svg></span>
           <span class="dock-label">Circle</span>
         </button>
         <div class="dock-sep"></div>
         <button type="button" class="dock-btn primary" id="dockExtrudeBtn" title="Extrude 3D Solid (EXT / E)">
-          <span class="dock-icon">⬡</span>
+          <span class="dock-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-extrude"/></svg></span>
           <span class="dock-label">Extrude</span>
         </button>
         <button type="button" class="dock-btn" id="dockCutBtn" title="Cut / Subtract (SU)">
-          <span class="dock-icon">⊖</span>
+          <span class="dock-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-cut"/></svg></span>
           <span class="dock-label">Cut</span>
         </button>
         <button type="button" class="dock-btn" id="dockFilletBtn" title="3D Fillet Edge (F)">
-          <span class="dock-icon">╭</span>
+          <span class="dock-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-fillet"/></svg></span>
           <span class="dock-label">Fillet</span>
         </button>
         <div class="dock-sep"></div>
         <button type="button" class="dock-btn" id="dockMaterialBarBtn" title="Toggle Drag & Drop Material Swatches (M)">
-          <span class="dock-icon">🎨</span>
+          <span class="dock-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-materials"/></svg></span>
           <span class="dock-label">Materials</span>
         </button>
         <button type="button" class="dock-btn primary" id="dockAiBtn" title="Autonomous AI Engineering Copilot (Alt+A / Ctrl+Space)">
-          <span class="dock-icon">✨</span>
+          <span class="dock-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-ai-copilot"/></svg></span>
           <span class="dock-label">AI Copilot</span>
         </button>
         <button type="button" class="dock-btn" id="dock2dSheetBtn" title="1-Click 2D Drawing Sheet Generator (Paper Space Layout)">
-          <span class="dock-icon">📐</span>
+          <span class="dock-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-drawing-sheet"/></svg></span>
           <span class="dock-label">2D Sheet</span>
         </button>
         <button type="button" class="dock-btn" id="dockFeaBtn" title="Quick Linear FEA Simulation">
-          <span class="dock-icon">⚡</span>
+          <span class="dock-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-fea"/></svg></span>
           <span class="dock-label">FEA</span>
         </button>
         <button type="button" class="dock-btn" id="dockQuadBtn" title="Toggle Quad View 4-Up (Alt+Q)">
-          <span class="dock-icon">⊞</span>
+          <span class="dock-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-quad-view"/></svg></span>
           <span class="dock-label">4-Up</span>
         </button>
         <div class="dock-sep"></div>
         <button type="button" class="dock-btn" id="dockGizmoBtn" title="Toggle 3D Transform Gizmo HUD">
-          <span class="dock-icon">✦</span>
+          <span class="dock-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-gizmo"/></svg></span>
           <span class="dock-label">Gizmo</span>
         </button>
         <button type="button" class="dock-btn" id="dockHelpBtn" title="Shortcuts & Help Guide (F1 / ?)">
-          <span class="dock-icon">❓</span>
+          <span class="dock-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-help"/></svg></span>
           <span class="dock-label">Help</span>
         </button>
       </div>
@@ -946,7 +1466,7 @@
       <!-- Interactive Drag & Drop Material Swatch Bar -->
       <div class="quick-material-bar" id="quickMaterialBar" hidden aria-label="Quick Material Swatches">
         <div class="mat-bar-header">
-          <span class="mat-bar-title">📦 Drag Material onto 3D Body</span>
+          <span class="mat-bar-title"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-materials"/></svg> Drag Material onto 3D Body</span>
           <button type="button" class="icon-button small" id="closeMatBarBtn" title="Close Material Bar">&times;</button>
         </div>
         <div class="mat-swatches-grid">
@@ -1021,7 +1541,7 @@
       <div class="ai-copilot-dock" id="aiCopilotDock" hidden aria-label="AI Engineering Copilot">
         <div class="ai-copilot-head">
           <div class="ai-copilot-title">
-            <span class="ai-sparkle-icon">✨</span>
+            <span class="ai-sparkle-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-ai-copilot"/></svg></span>
             <div class="ai-title-wrap">
               <strong>AtlasCAD Autonomous AI Copilot</strong>
               <span class="ai-tagline">Natural Language to Parametric 3D CAD &amp; Multiphysics</span>
@@ -1033,18 +1553,18 @@
         <div class="ai-copilot-prompts-bar">
           <span class="ai-prompts-label">Quick Actions:</span>
           <div class="ai-pills-scroll">
-            <button type="button" class="ai-prompt-pill" data-prompt="holes">🔩 Add 4x M6 Hole Pattern</button>
+            <button type="button" class="ai-prompt-pill" data-prompt="holes"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-fastener"/></svg> Add 4x M6 Hole Pattern</button>
             <button type="button" class="ai-prompt-pill" data-prompt="fillet">╭ Fillet Top Edges (3mm)</button>
-            <button type="button" class="ai-prompt-pill" data-prompt="fea">⚡ Linear Static FEA (5 kN)</button>
-            <button type="button" class="ai-prompt-pill" data-prompt="sheet">📐 1-Click 2D Drawing Sheet</button>
-            <button type="button" class="ai-prompt-pill" data-prompt="mass">⚖ Inspect Mass &amp; Inertia</button>
-            <button type="button" class="ai-prompt-pill" data-prompt="step">📤 Download STEP AP214</button>
+            <button type="button" class="ai-prompt-pill" data-prompt="fea"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-fea"/></svg> Linear Static FEA (5 kN)</button>
+            <button type="button" class="ai-prompt-pill" data-prompt="sheet"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-drawing-sheet"/></svg> 1-Click 2D Drawing Sheet</button>
+            <button type="button" class="ai-prompt-pill" data-prompt="mass"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-massprop"/></svg> Inspect Mass &amp; Inertia</button>
+            <button type="button" class="ai-prompt-pill" data-prompt="step"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-step"/></svg> Download STEP AP214</button>
           </div>
         </div>
 
         <div class="ai-copilot-body" id="aiCopilotLog">
           <div class="ai-message assistant">
-            <span class="ai-avatar">🤖</span>
+            <span class="ai-avatar"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-ai-copilot"/></svg></span>
             <div class="ai-msg-bubble">
               <strong>AI Engineering Agent online.</strong><br>
               I can execute parametric 3D features, run finite element simulations, assign certified materials, or generate 2D orthographic shop floor drawings. Click a quick action above or describe your design requirement.
@@ -1064,7 +1584,7 @@
       <div class="direct-inspection-hud" id="directInspectionHud" hidden aria-label="3D Entity Inspection">
         <div class="inspection-head">
           <div class="inspection-title-wrap">
-            <span class="inspection-icon">✦</span>
+            <span class="inspection-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-ai-copilot"/></svg></span>
             <span class="inspection-title" id="inspEntityName">Solid Body #1</span>
           </div>
           <button type="button" class="icon-button small" id="closeInspectionBtn" title="Close HUD">&times;</button>
@@ -1089,9 +1609,9 @@
             </div>
           </div>
           <div class="insp-actions-row">
-            <button type="button" class="insp-btn primary" id="inspQuickFeaBtn">⚡ Quick FEA</button>
+            <button type="button" class="insp-btn primary" id="inspQuickFeaBtn"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-fea"/></svg> Quick FEA</button>
             <button type="button" class="insp-btn" id="inspFilletBtn">╭ Fillet</button>
-            <button type="button" class="insp-btn" id="inspExportStepBtn">📤 STEP</button>
+            <button type="button" class="insp-btn" id="inspExportStepBtn"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-step"/></svg> STEP</button>
           </div>
         </div>
       </div>
@@ -1099,7 +1619,7 @@
       <!-- OSNAP Snapping Modes Quick Popup -->
       <div class="osnap-quick-popup" id="osnapQuickPopup" hidden aria-label="OSNAP Settings">
         <div class="osnap-popup-head">
-          <span>🧲 Object Snap Modes (F3)</span>
+          <span><svg class="atlas-icon" aria-hidden="true"><use href="#icon-osnap"/></svg> Object Snap Modes (F3)</span>
           <button type="button" class="icon-button small" id="closeOsnapPopupBtn" title="Close">&times;</button>
         </div>
         <div class="osnap-modes-list">
@@ -1124,7 +1644,7 @@
       <!-- 3D On-Canvas Transform Gizmo HUD -->
       <div class="transform-gizmo-hud" id="transformGizmoHud" hidden aria-label="3D Transform Gizmo">
         <div class="gizmo-head">
-          <span class="gizmo-title"><span>✦</span> Transform Manipulator</span>
+          <span class="gizmo-title"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-gizmo"/></svg> Transform Manipulator</span>
           <button type="button" class="icon-button small" id="gizmoCloseBtn" title="Close Gizmo">&times;</button>
         </div>
         <div class="gizmo-scrub-row">
@@ -1148,7 +1668,7 @@
       
       <!-- Interactive CAD Viewport Drop Overlay -->
       <div id="viewportDropOverlay" class="viewport-drop-overlay" hidden>
-        <span class="drop-icon">📥</span>
+        <span class="drop-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-cloud"/></svg></span>
         <span class="drop-title">Drop 3D CAD or Project Files to Import</span>
         <span class="drop-sub">Supports ISO 10303-21 STEP (.step/.stp), 3MF (.3mf), STL (.stl), OBJ, JSON, and DXF</span>
       </div>
@@ -1161,7 +1681,7 @@
 
       <!-- Autodesk 3D ViewCube Navigation Widget -->
       <div class="autodesk-viewcube-container" id="viewCubeContainer" title="Autodesk ViewCube: Click faces to align view">
-        <button type="button" class="viewcube-home-btn" id="viewCubeHomeBtn" title="Home View (Isometric ISO)">⌂</button>
+        <button type="button" class="viewcube-home-btn" id="viewCubeHomeBtn" title="Home View (Isometric ISO)" aria-label="Home View"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-home"/></svg></button>
         <div class="viewcube-compass-ring">
           <span class="compass-label compass-n">N</span>
           <span class="compass-label compass-s">S</span>
@@ -1183,25 +1703,25 @@
       <!-- AutoCAD Floating Navigation Bar (NavBar) -->
       <nav class="autocad-navbar" id="autocadNavbar" role="toolbar" aria-label="AutoCAD Navigation Bar">
         <button type="button" class="navbar-btn" id="navHomeBtn" title="Home View (Isometric ISO - H)">
-          <span class="nav-icon">⌂</span>
+          <span class="nav-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-home"/></svg></span>
         </button>
         <button type="button" class="navbar-btn" id="navFitBtn" title="Zoom Extents (Fit Model - F)">
-          <span class="nav-icon">⛶</span>
+          <span class="nav-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-viewport"/></svg></span>
         </button>
         <button type="button" class="navbar-btn" id="navPanBtn" title="Pan Navigation (Shift+Drag / MMB)">
-          <span class="nav-icon">✋</span>
+          <span class="nav-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-move"/></svg></span>
         </button>
         <button type="button" class="navbar-btn" id="navOrbitBtn" title="Orbit View (Drag LMB)">
           <span class="nav-icon">↻</span>
         </button>
         <button type="button" class="navbar-btn" id="navStyleBtn" title="Visual Style (Shaded / Wire / Blueprint / Clay / X-Ray / Realistic / Gooch)">
-          <span class="nav-icon">🎨</span>
+          <span class="nav-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-materials"/></svg></span>
         </button>
         <button type="button" class="navbar-btn" id="navOrthoToggleBtn" title="Toggle Orthographic / Perspective Projection (O)">
           <span class="nav-icon">⧉</span>
         </button>
         <button type="button" class="navbar-btn" id="navMeasureBtn" title="3D Measurement & Inspection HUD (M / I)">
-          <span class="nav-icon">📏</span>
+          <span class="nav-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-measure"/></svg></span>
         </button>
         <button type="button" class="navbar-btn" id="navCleanScreenBtn" title="AutoCAD Clean Screen Focus Mode (Ctrl+0 / F11)">
           <span class="nav-icon">⤢</span>
@@ -1221,9 +1741,9 @@
 
       <!-- AutoCAD Clean Screen Banner (Focus Mode) -->
       <div class="clean-screen-banner" id="cleanScreenBanner" hidden>
-        <span class="cs-indicator">⚡ CLEAN SCREEN (IMMERSIVE DRAFTING)</span>
+        <span class="cs-indicator"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-viewport"/></svg> CLEAN SCREEN (IMMERSIVE DRAFTING)</span>
         <span class="cs-hint">Press Esc or Ctrl+0 to restore panels</span>
-        <button type="button" class="cs-exit-btn" id="exitCleanScreenBtn" title="Restore panels and ribbons">✕ Restore UI</button>
+        <button type="button" class="cs-exit-btn" id="exitCleanScreenBtn" title="Restore panels and ribbons"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-close"/></svg> Restore UI</button>
       </div>
 
       <!-- On-Canvas Parametric Feature HUD (Fusion 360 / Inventor Style) -->
@@ -1233,7 +1753,7 @@
             <span class="hud-icon" id="featureHudIcon">⬡</span>
             <h3 id="featureHudTitle">Extrude Feature</h3>
           </div>
-          <button type="button" class="hud-close-btn" id="featureHudCloseBtn" title="Close (Esc)">✕</button>
+          <button type="button" class="hud-close-btn" id="featureHudCloseBtn" title="Close (Esc)" aria-label="Close"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-close"/></svg></button>
         </div>
         <div class="hud-body">
           <div class="hud-field">
@@ -1276,10 +1796,10 @@
       <div id="measureHud" class="measure-hud" hidden role="dialog" aria-labelledby="measureHudTitle">
         <div class="hud-header">
           <div class="hud-title-wrap">
-            <span class="hud-icon">📏</span>
+            <span class="hud-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-measure"/></svg></span>
             <h3 id="measureHudTitle">3D Measurement</h3>
           </div>
-          <button type="button" class="hud-close-btn" id="measureHudCloseBtn" title="Close">✕</button>
+          <button type="button" class="hud-close-btn" id="measureHudCloseBtn" title="Close" aria-label="Close"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-close"/></svg></button>
         </div>
         <div class="hud-body">
           <p class="hud-guide-text" id="measureGuideText">Click any 3D face to inspect surface area, normal vector, and dimensions.</p>
@@ -1437,10 +1957,10 @@
       <div id="feature-timeline" class="feature-timeline" aria-label="Feature history timeline" role="toolbar">
         <span class="timeline-label">TIMELINE</span>
         <div class="timeline-nav-group">
-          <button type="button" class="timeline-nav-btn" id="timelineJumpStart" title="Jump to Beginning (Home)">⏮</button>
+          <button type="button" class="timeline-nav-btn" id="timelineJumpStart" title="Jump to Beginning (Home)" aria-label="Jump to Beginning"><svg class="atlas-icon" aria-hidden="true" style="transform:scaleX(-1);"><use href="#icon-step-next"/></svg></button>
           <button type="button" class="timeline-nav-btn" id="timelineStepUndo" title="Step Back / Undo (Ctrl+Z)">◀</button>
           <button type="button" class="timeline-nav-btn" id="timelineStepRedo" title="Step Forward / Redo (Ctrl+Y)">▶</button>
-          <button type="button" class="timeline-nav-btn" id="timelineJumpEnd" title="Jump to End (End)">⏭</button>
+          <button type="button" class="timeline-nav-btn" id="timelineJumpEnd" title="Jump to End (End)" aria-label="Jump to End"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-step-next"/></svg></button>
         </div>
         <div id="feature-timeline-pills" class="feature-timeline-pills"></div>
       </div>
@@ -1449,39 +1969,39 @@
       <div id="radialMarkingMenu" class="radial-marking-menu" hidden aria-label="Marking Menu Wheel">
         <div class="radial-wheel">
           <button type="button" class="radial-slice slice-n" data-action="extrude" title="Extrude 3D Solid (EXT)">
-            <span class="slice-icon">⬡</span>
+            <span class="slice-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-extrude"/></svg></span>
             <span class="slice-label">Extrude</span>
           </button>
           <button type="button" class="radial-slice slice-ne" data-action="fea" title="Quick Stress FEA">
-            <span class="slice-icon">⚡</span>
+            <span class="slice-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-fea"/></svg></span>
             <span class="slice-label">FEA</span>
           </button>
           <button type="button" class="radial-slice slice-e" data-action="fillet" title="3D Fillet Edge (F)">
-            <span class="slice-icon">╭</span>
+            <span class="slice-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-fillet"/></svg></span>
             <span class="slice-label">Fillet</span>
           </button>
           <button type="button" class="radial-slice slice-se" data-action="measure" title="3D Measure (M)">
-            <span class="slice-icon">📏</span>
+            <span class="slice-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-measure"/></svg></span>
             <span class="slice-label">Measure</span>
           </button>
           <button type="button" class="radial-slice slice-s" data-action="sheet" title="1-Click 2D Drawing Sheet">
-            <span class="slice-icon">📐</span>
+            <span class="slice-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-drawing-sheet"/></svg></span>
             <span class="slice-label">2D Sheet</span>
           </button>
           <button type="button" class="radial-slice slice-sw" data-action="cut" title="Cut / Subtract (SU)">
-            <span class="slice-icon">⊖</span>
+            <span class="slice-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-cut"/></svg></span>
             <span class="slice-label">Cut</span>
           </button>
           <button type="button" class="radial-slice slice-w" data-action="line" title="Draw Line (L)">
-            <span class="slice-icon">╱</span>
+            <span class="slice-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-line"/></svg></span>
             <span class="slice-label">Line</span>
           </button>
           <button type="button" class="radial-slice slice-nw" data-action="circle" title="Draw Circle (C)">
-            <span class="slice-icon">◯</span>
+            <span class="slice-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-circle"/></svg></span>
             <span class="slice-label">Circle</span>
           </button>
-          <button type="button" class="radial-center-btn" id="radialCenterCancelBtn" title="Cancel (Esc)">
-            ✕
+          <button type="button" class="radial-center-btn" id="radialCenterCancelBtn" title="Cancel (Esc)" aria-label="Cancel">
+            <svg class="atlas-icon" aria-hidden="true"><use href="#icon-close"/></svg>
           </button>
         </div>
       </div>
@@ -1490,27 +2010,27 @@
       <div id="ctx-menu" class="ctx-menu" hidden aria-label="Viewport context menu" role="menu">
         <ul class="ctx-menu-list" id="ctx-menu-list">
           <li class="ctx-menu-section-label" id="ctx-menu-label">Actions</li>
-          <li role="menuitem" class="ctx-menu-item" id="ctxEditSketch">📐 Edit sketch on this face</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxEditSketch"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-drawing-sheet"/></svg> Edit sketch on this face</li>
           <li role="menuitem" class="ctx-menu-item" id="ctxCreateFeature">⬆ Create feature here</li>
-          <li role="menuitem" class="ctx-menu-item" id="ctxMeasureFace">📏 Measure face</li>
-          <li role="menuitem" class="ctx-menu-item" id="ctxIsolateFace">👁 Isolate face</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxMeasureFace"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-measure"/></svg> Measure face</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxIsolateFace"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-eye"/></svg> Isolate face</li>
           <li role="separator" class="ctx-menu-sep"></li>
-          <li role="menuitem" class="ctx-menu-item" id="ctxExtrudeJoin">➕ Extrude Join (EXT)</li>
-          <li role="menuitem" class="ctx-menu-item" id="ctxExtrudeCut">✂ Cut / Subtract (CUT)</li>
-          <li role="menuitem" class="ctx-menu-item" id="ctxRevolve">🔄 Revolve Solid (REV)</li>
-          <li role="menuitem" class="ctx-menu-item" id="ctxFillet3D">⌒ 3D Fillet (FILLET)</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxExtrudeJoin"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-extrude"/></svg> Extrude Join (EXT)</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxExtrudeCut"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-cut"/></svg> Cut / Subtract (CUT)</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxRevolve"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-revolve"/></svg> Revolve Solid (REV)</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxFillet3D"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-fillet"/></svg> 3D Fillet (FILLET)</li>
           <li role="menuitem" class="ctx-menu-item" id="ctxChamfer3D">⊿ 3D Chamfer (CHAMFER)</li>
-          <li role="menuitem" class="ctx-menu-item" id="ctxAssignMaterial">🧪 Assign Material...</li>
-          <li role="menuitem" class="ctx-menu-item" id="ctxQuickFEA">⚡ Run Quick Stress FEA</li>
-          <li role="menuitem" class="ctx-menu-item" id="ctxExportStep">📦 Export STEP (ISO 10303)</li>
-          <li role="menuitem" class="ctx-menu-item" id="ctxExport3mf">🖨 Export 3MF Additive</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxAssignMaterial"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-materials"/></svg> Assign Material...</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxQuickFEA"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-fea"/></svg> Run Quick Stress FEA</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxExportStep"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-step"/></svg> Export STEP (ISO 10303)</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxExport3mf"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-additive"/></svg> Export 3MF Additive</li>
           <li role="menuitem" class="ctx-menu-item" id="ctxQuadView">⊞ Toggle Quad View (Alt+Q)</li>
           <li role="separator" class="ctx-menu-sep"></li>
-          <li role="menuitem" class="ctx-menu-item" id="ctxZoomExtents">🔍 Zoom extents (F)</li>
-          <li role="menuitem" class="ctx-menu-item" id="ctxNewSketch">📐 New sketch here</li>
-          <li role="menuitem" class="ctx-menu-item" id="ctxVisualStyle">🎨 Change visual style</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxZoomExtents"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-search"/></svg> Zoom extents (F)</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxNewSketch"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-line"/></svg> New sketch here</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxVisualStyle"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-materials"/></svg> Change visual style</li>
           <li role="menuitem" class="ctx-menu-item" id="ctxCleanScreen">⤢ Clean screen mode (Ctrl+0)</li>
-          <li role="menuitem" class="ctx-menu-item" id="ctxHomeView">🏠 Home view (H)</li>
+          <li role="menuitem" class="ctx-menu-item" id="ctxHomeView"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-home"/></svg> Home view (H)</li>
         </ul>
       </div>
 
@@ -1518,14 +2038,14 @@
       <div id="resultViewerHud" class="result-viewer-hud" hidden role="region" aria-label="Simulation & Solver Results">
         <div class="hud-header">
           <div class="hud-title-wrap">
-            <span class="hud-icon" id="rvHudIcon">📊</span>
+            <span class="hud-icon" id="rvHudIcon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-chart"/></svg></span>
             <h3 id="rvHudTitle">Simulation Result</h3>
           </div>
-          <button type="button" class="hud-close-btn" id="rvHudCloseBtn" title="Close (Esc)">✕</button>
+          <button type="button" class="hud-close-btn" id="rvHudCloseBtn" title="Close (Esc)" aria-label="Close"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-close"/></svg></button>
         </div>
         <div class="hud-body">
           <div class="rv-stale-banner" id="rvStaleBanner" hidden>
-            <span class="rv-stale-text" id="rvStaleText">⚠️ Results Stale — Geometry Modified</span>
+            <span class="rv-stale-text" id="rvStaleText"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-warning"/></svg> Results Stale — Geometry Modified</span>
             <button type="button" class="rv-recompute-btn" id="rvRecomputeBtn" title="Recompute Stale Engines">Recompute</button>
           </div>
           <div class="rv-meta-row">
@@ -1576,7 +2096,7 @@
       <div id="caeWorkbenchView" class="workbench-view cae-workbench-view" hidden role="region" aria-label="CAE Simulation Workbench">
         <div class="wb-header">
           <div class="wb-title-wrap">
-            <span class="wb-title-icon">⚡</span>
+            <span class="wb-title-icon"><svg class="atlas-icon title-icon" aria-hidden="true"><use href="#icon-fea"/></svg></span>
             <div>
               <h3>CAE Multiphysics Simulation Studio</h3>
               <span class="wb-subtitle">Linear Static FEA · Modal Frequencies · Steady-State Thermal · CFD Fluid Flow</span>
@@ -1585,7 +2105,7 @@
           <div class="wb-header-actions">
             <span class="wb-status-badge" id="caeStatusBadge">Mesh Ready</span>
             <button type="button" class="button primary small" id="caeRunSolveBtn">▶ Solve Multiphysics Study</button>
-            <button type="button" class="button secondary small" id="caeRunAllSuiteBtn">⚡ Run 27-Domain Suite</button>
+            <button type="button" class="button secondary small" id="caeRunAllSuiteBtn"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-fea"/></svg> Run 27-Domain Suite</button>
             <button type="button" class="button ghost small" id="caeDispatchClusterBtn">Dispatch to HPC Cluster</button>
           </div>
         </div>
@@ -1749,14 +2269,14 @@
       <div id="camWorkbenchView" class="workbench-view cam-workbench-view" hidden role="region" aria-label="CAM & CNC Machining Workbench">
         <div class="wb-header">
           <div class="wb-title-wrap">
-            <span class="wb-title-icon">⚙️</span>
+            <span class="wb-title-icon"><svg class="atlas-icon title-icon" aria-hidden="true"><use href="#icon-cam"/></svg></span>
             <div>
               <h3>CAM &amp; CNC Machining Studio</h3>
               <span class="wb-subtitle">3-Axis Milling · 3D Surface Contouring · Toolpaths · Feeds &amp; Speeds · G-Code</span>
             </div>
           </div>
           <div class="wb-header-actions">
-            <button type="button" class="button primary small" id="camGenerateToolpathsBtn">⚙ Generate Toolpaths</button>
+            <button type="button" class="button primary small" id="camGenerateToolpathsBtn"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-cam"/></svg> Generate Toolpaths</button>
             <button type="button" class="button ghost small" id="camDownloadGcodeBtn">Download G-Code (.nc)</button>
             <button type="button" class="button ghost small" id="camCopyGcodeBtn">Copy G-Code</button>
           </div>
@@ -1872,7 +2392,7 @@
       <div id="bimWorkbenchView" class="workbench-view bim-workbench-view" hidden role="region" aria-label="OpenBIM Architectural Studio">
         <div class="wb-header">
           <div class="wb-title-wrap">
-            <span class="wb-title-icon">🏛️</span>
+            <span class="wb-title-icon"><svg class="atlas-icon title-icon" aria-hidden="true"><use href="#icon-bim"/></svg></span>
             <div>
               <h3>OpenBIM Architectural Studio</h3>
               <span class="wb-subtitle">IFC4 Project Schema · Spatial Hierarchy · Component Schedules · Quantity Takeoff</span>
@@ -1888,14 +2408,14 @@
             <div class="wb-group">
               <label>IFC4 Spatial Structure</label>
               <div class="wb-bim-tree" id="bimSpatialTree">
-                <div class="bim-node root">🏢 Project: AtlasCAD High-Rise Facility</div>
-                <div class="bim-node site">├── 🌍 Site: Urban Commercial Sector 7</div>
-                <div class="bim-node building">│   ├── 🏛 Building: Tower A (Engineering Lab)</div>
-                <div class="bim-node storey active">│   │   ├── 📐 Storey 1: Ground Floor (Elevation +0.000m)</div>
-                <div class="bim-node leaf">│   │   │   ├── 🧱 IfcWallStandardCase [8 Elements]</div>
+                <div class="bim-node root"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-bim"/></svg> Project: AtlasCAD High-Rise Facility</div>
+                <div class="bim-node site">├── <svg class="atlas-icon" aria-hidden="true"><use href="#icon-gltf"/></svg> Site: Urban Commercial Sector 7</div>
+                <div class="bim-node building">│   ├── <svg class="atlas-icon" aria-hidden="true"><use href="#icon-bim"/></svg> Building: Tower A (Engineering Lab)</div>
+                <div class="bim-node storey active">│   │   ├── <svg class="atlas-icon" aria-hidden="true"><use href="#icon-drawing-sheet"/></svg> Storey 1: Ground Floor (Elevation +0.000m)</div>
+                <div class="bim-node leaf">│   │   │   ├── <svg class="atlas-icon" aria-hidden="true"><use href="#icon-rect"/></svg> IfcWallStandardCase [8 Elements]</div>
                 <div class="bim-node leaf">│   │   │   ├── ▬ IfcSlab [2 Slabs - 200mm Concrete]</div>
-                <div class="bim-node leaf">│   │   │   ├── 🏛 IfcColumn [12 Columns - W310x107]</div>
-                <div class="bim-node leaf">│   │   │   └── 🚪 IfcDoor [6 Double-Leaf Fire Doors]</div>
+                <div class="bim-node leaf">│   │   │   ├── <svg class="atlas-icon" aria-hidden="true"><use href="#icon-bim"/></svg> IfcColumn [12 Columns - W310x107]</div>
+                <div class="bim-node leaf">│   │   │   └── <svg class="atlas-icon" aria-hidden="true"><use href="#icon-box"/></svg> IfcDoor [6 Double-Leaf Fire Doors]</div>
               </div>
             </div>
             <div class="wb-group">
@@ -1951,7 +2471,7 @@
       <div id="ecadWorkbenchView" class="workbench-view ecad-workbench-view" hidden role="region" aria-label="ECAD & SPICE Circuit Studio">
         <div class="wb-header">
           <div class="wb-title-wrap">
-            <span class="wb-title-icon">🔌</span>
+            <span class="wb-title-icon"><svg class="atlas-icon title-icon" aria-hidden="true"><use href="#icon-electrical"/></svg></span>
             <div>
               <h3>ECAD &amp; SPICE Electronic Circuit Studio</h3>
               <span class="wb-subtitle">Schematic Capture · Netlist Synthesizer · Dual-Trace Oscilloscope · Bode Frequency Analyzer</span>
@@ -2057,7 +2577,7 @@ C1 out 0 100n
       <div id="additiveWorkbenchView" class="workbench-view additive-workbench-view" hidden role="region" aria-label="3D Slicing & Additive Manufacturing Studio">
         <div class="wb-header">
           <div class="wb-title-wrap">
-            <span class="wb-title-icon">🖨️</span>
+            <span class="wb-title-icon"><svg class="atlas-icon title-icon" aria-hidden="true"><use href="#icon-additive"/></svg></span>
             <div>
               <h3>3D Slicing &amp; Additive Manufacturing Studio</h3>
               <span class="wb-subtitle">Cross-Sectional Slicing · Volumetric Extrusion · TPMS Gyroid Infill · Multi-Dialect G-Code</span>
@@ -2065,9 +2585,9 @@ C1 out 0 100n
           </div>
           <div class="wb-header-actions">
             <span class="wb-status-badge" id="additiveStatusBadge">Geometry Loaded</span>
-            <button type="button" class="button secondary small" id="additiveSupportsBtn">🛡 Overhang &amp; Supports</button>
-            <button type="button" class="button primary small" id="additiveSliceBtn">⚡ Slice 3D Solid</button>
-            <button type="button" class="button ghost small" id="additiveDownloadGcodeBtn">💾 Download G-Code</button>
+            <button type="button" class="button secondary small" id="additiveSupportsBtn"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-shield"/></svg> Overhang &amp; Supports</button>
+            <button type="button" class="button primary small" id="additiveSliceBtn"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-additive"/></svg> Slice 3D Solid</button>
+            <button type="button" class="button ghost small" id="additiveDownloadGcodeBtn"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-save"/></svg> Download G-Code</button>
           </div>
         </div>
         <div class="wb-body-split">
@@ -2183,7 +2703,7 @@ C1 out 0 100n
       <div id="agentWorkbenchView" class="workbench-view agent-workbench-view" hidden role="region" aria-label="Autonomous Engineering Agent Console">
         <div class="wb-header">
           <div class="wb-title-wrap">
-            <span class="wb-title-icon">🤖</span>
+            <span class="wb-title-icon"><svg class="atlas-icon title-icon" aria-hidden="true"><use href="#icon-ai-copilot"/></svg></span>
             <div>
               <h3>Autonomous Engineering Agent Console</h3>
               <span class="wb-subtitle">44-Specialist Agent Ecosystem · Autonomous Generative Execution · DAG Task Scheduling · Human Safety Gate · MCP Server</span>
@@ -2191,9 +2711,9 @@ C1 out 0 100n
           </div>
           <div class="wb-header-actions">
             <span class="wb-status-badge" id="agentStatusBadge">44 Specialists Online</span>
-            <button type="button" class="button primary small" id="agentRunAllBtn" style="background: #059669;" title="Execute entire multi-agent DAG to completion with live solver verification">⚡ Run All Tasks</button>
+            <button type="button" class="button primary small" id="agentRunAllBtn" style="background: #059669;" title="Execute entire multi-agent DAG to completion with live solver verification"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-play"/></svg> Run All Tasks</button>
             <button type="button" class="button primary small" id="agentRunOrchestrationBtn">▶ Execute Task Graph</button>
-            <button type="button" class="button secondary small" id="agentStepBtn">⏯ Single Step</button>
+            <button type="button" class="button secondary small" id="agentStepBtn"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-step-next"/></svg> Single Step</button>
             <button type="button" class="button ghost small" id="agentClearLogBtn">Clear Log</button>
           </div>
         </div>
@@ -2203,13 +2723,13 @@ C1 out 0 100n
               <label for="agentRequirementInput">Natural Language Engineering Requirement</label>
               <textarea id="agentRequirementInput" class="wb-input" rows="3" style="width: 100%; font-size: 12px; resize: vertical;" placeholder="e.g. Design a titanium wing bracket for 45 kN load with 35% weight reduction for 5-axis CNC machining"></textarea>
               <div style="display: flex; gap: 6px; margin-top: 6px;">
-                <button type="button" class="button secondary small" id="agentAnalyzeReqBtn" style="flex: 1;">🔍 Analyze Requirements</button>
-                <button type="button" class="button primary small" id="agentSynthesizePlanBtn" style="flex: 1;">⚡ Synthesize DAG Plan</button>
+                <button type="button" class="button secondary small" id="agentAnalyzeReqBtn" style="flex: 1;"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-search"/></svg> Analyze Requirements</button>
+                <button type="button" class="button primary small" id="agentSynthesizePlanBtn" style="flex: 1;"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-ai-copilot"/></svg> Synthesize DAG Plan</button>
               </div>
             </div>
 
             <div class="wb-group" id="agentMissingConstraintsGroup" style="display: none;">
-              <label style="color: #f59e0b;">⚠️ Missing Critical Engineering Constraints</label>
+              <label style="color: #f59e0b;"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-warning"/></svg> Missing Critical Engineering Constraints</label>
               <div class="wb-fixtures-box" id="agentMissingConstraintsBox" style="font-size: 11px;">
                 <!-- Dynamically populated missing constraint questions & inputs -->
               </div>
@@ -2250,7 +2770,7 @@ C1 out 0 100n
                   <input type="number" id="agentMaxIterInput" value="5" step="1" class="wb-input compact">
                 </div>
               </div>
-              <button type="button" class="button primary small" id="agentRunOptimizeBtn" style="width: 100%; margin-top: 6px;">🔄 Run Iterative Optimization Loop</button>
+              <button type="button" class="button primary small" id="agentRunOptimizeBtn" style="width: 100%; margin-top: 6px;"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-rotate"/></svg> Run Iterative Optimization Loop</button>
             </div>
 
             <div class="wb-group">
@@ -2267,13 +2787,13 @@ C1 out 0 100n
             <!-- Human Safety Approval Gate -->
             <div id="agentApprovalGateCard" class="wb-cam-metrics-card" style="border: 1px solid #f59e0b; background: rgba(245, 158, 11, 0.08); display: none;">
               <div class="wb-card-title" style="color: #f59e0b; display: flex; justify-content: space-between;">
-                <span>⚠️ HUMAN ENGINEERING APPROVAL GATE REQUIRED</span>
+                <span><svg class="atlas-icon" aria-hidden="true"><use href="#icon-warning"/></svg> HUMAN ENGINEERING APPROVAL GATE REQUIRED</span>
                 <span class="wb-status-badge" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;" id="agentApprovalRiskBadge">High Risk</span>
               </div>
               <div style="font-size: 12px; margin: 8px 0;" id="agentApprovalIntentText">Intent: Execute sensitive operation</div>
               <div style="display: flex; gap: 8px;">
-                <button type="button" class="button primary small" id="agentApproveBtn" style="background: #10b981;">✓ Approve &amp; Execute</button>
-                <button type="button" class="button ghost small" id="agentRejectBtn" style="color: #ef4444;">✕ Reject Action</button>
+                <button type="button" class="button primary small" id="agentApproveBtn" style="background: #10b981;"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-check"/></svg> Approve &amp; Execute</button>
+                <button type="button" class="button ghost small" id="agentRejectBtn" style="color: #ef4444;"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-close"/></svg> Reject Action</button>
               </div>
             </div>
 
@@ -2658,7 +3178,7 @@ FPS Target: 60 fps | Spatial BVH Built | Telemetry Port Bound.</pre>
       <div id="aerospaceWorkbenchView" class="workbench-view aerospace-workbench-view" hidden role="region" aria-label="Aerospace & Hypersonic Flight Dynamics Studio">
         <div class="wb-header">
           <div class="wb-title-wrap">
-            <span class="wb-title-icon">🚀</span>
+            <span class="wb-title-icon"><svg class="atlas-icon title-icon" aria-hidden="true"><use href="#icon-aerospace"/></svg></span>
             <div>
               <h3>Aerospace &amp; Hypersonic Waverider Studio</h3>
               <span class="wb-subtitle">Mach 11+ Nonequilibrium Aerothermodynamics · Scramjet Propulsion · Active Supercritical LH2 Cooling · Q-INS</span>
@@ -2667,7 +3187,7 @@ FPS Target: 60 fps | Spatial BVH Built | Telemetry Port Bound.</pre>
           <div class="wb-header-actions">
             <span class="wb-status-badge" id="aeroStatusBadge">Mach 11 Flight Envelope Certified</span>
             <button type="button" class="button primary small" id="aeroRunSolveBtn">▶ Solve Hypersonic Flight</button>
-            <button type="button" class="button secondary small" id="aeroRunMasterDagBtn">⚡ Run Autonomous Master DAG</button>
+            <button type="button" class="button secondary small" id="aeroRunMasterDagBtn"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-aerospace"/></svg> Run Autonomous Master DAG</button>
           </div>
         </div>
         <div class="wb-body-split">
@@ -2736,7 +3256,7 @@ Select a solver or trigger full autonomous master execution.</pre>
       <div id="civilWorkbenchView" class="workbench-view civil-workbench-view" hidden role="region" aria-label="Civil & Structural Frames Studio">
         <div class="wb-header">
           <div class="wb-title-wrap">
-            <span class="wb-title-icon">🏛️</span>
+            <span class="wb-title-icon"><svg class="atlas-icon title-icon" aria-hidden="true"><use href="#icon-bim"/></svg></span>
             <div>
               <h3>Civil Structural &amp; Geotechnical Studio</h3>
               <span class="wb-subtitle">Space Frames · Euler/Johnson Column Buckling · Rankine Earth Pressures · ISO 6946 Building Envelope</span>
@@ -2804,7 +3324,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
       <div id="powerWorkbenchView" class="workbench-view power-workbench-view" hidden role="region" aria-label="Electrical Power Systems Studio">
         <div class="wb-header">
           <div class="wb-title-wrap">
-            <span class="wb-title-icon">🔌</span>
+            <span class="wb-title-icon"><svg class="atlas-icon title-icon" aria-hidden="true"><use href="#icon-electrical"/></svg></span>
             <div>
               <h3>Electrical Power Systems &amp; AC Grid Studio</h3>
               <span class="wb-subtitle">Newton-Raphson Power Flow · Admittance Matrix (Y_bus) · Voltage Stability &amp; Transmission Losses</span>
@@ -2865,7 +3385,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
       <div id="chemicalWorkbenchView" class="workbench-view chemical-workbench-view" hidden role="region" aria-label="Chemical & Molecular Process Studio">
         <div class="wb-header">
           <div class="wb-title-wrap">
-            <span class="wb-title-icon">⚗️</span>
+            <span class="wb-title-icon"><svg class="atlas-icon title-icon" aria-hidden="true"><use href="#icon-chemical"/></svg></span>
             <div>
               <h3>Chemical &amp; Molecular Engineering Studio</h3>
               <span class="wb-subtitle">Analytical Acid-Base Equilibria · Henderson-Hasselbalch Buffers · Rachford-Rice VLE · Lennard-Jones MD</span>
@@ -2881,9 +3401,9 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
 
         <!-- Workbench Sub-Tabs -->
         <div class="wb-tabs-bar">
-          <button type="button" class="wb-tab-btn active" id="chemTabAcidBase">🧪 Acid-Base Equilibria &amp; Titration</button>
-          <button type="button" class="wb-tab-btn" id="chemTabVle">⚗️ VLE Flash Separator</button>
-          <button type="button" class="wb-tab-btn" id="chemTabSpecies">📋 Chemical Species Catalog</button>
+          <button type="button" class="wb-tab-btn active" id="chemTabAcidBase"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-chemical"/></svg> Acid-Base Equilibria &amp; Titration</button>
+          <button type="button" class="wb-tab-btn" id="chemTabVle"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-chemical"/></svg> VLE Flash Separator</button>
+          <button type="button" class="wb-tab-btn" id="chemTabSpecies"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-bom"/></svg> Chemical Species Catalog</button>
         </div>
 
         <!-- Section 1: Acid-Base Equilibria & Titration -->
@@ -3063,7 +3583,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
       <div id="cfdWorkbenchView" class="workbench-view cfd-workbench-view" hidden role="region" aria-label="CFD & Hydraulics Studio">
         <div class="wb-header">
           <div class="wb-title-wrap">
-            <span class="wb-title-icon">🌊</span>
+            <span class="wb-title-icon"><svg class="atlas-icon title-icon" aria-hidden="true"><use href="#icon-marine"/></svg></span>
             <div>
               <h3>Fluid Dynamics &amp; Hydraulic Networks Studio</h3>
               <span class="wb-subtitle">Navier-Stokes Hydraulics · Darcy-Weisbach / Colebrook-White · Architectural Acoustics (STC)</span>
@@ -3125,7 +3645,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
       <div id="roboticsWorkbenchView" class="workbench-view robotics-workbench-view" hidden role="region" aria-label="Robotics & Kinematics Studio">
         <div class="wb-header">
           <div class="wb-title-wrap">
-            <span class="wb-title-icon">🤖</span>
+            <span class="wb-title-icon"><svg class="atlas-icon title-icon" aria-hidden="true"><use href="#icon-ai-copilot"/></svg></span>
             <div>
               <h3>Robotics &amp; Motion Planning Studio</h3>
               <span class="wb-subtitle">Denavit-Hartenberg (DH) Kinematics · Damped Least Squares (DLS) IK · Quintic Minimum-Jerk Splines</span>
@@ -3187,7 +3707,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
       <div id="environmentalWorkbenchView" class="workbench-view environmental-workbench-view" hidden role="region" aria-label="Environmental & Marine Studio">
         <div class="wb-header">
           <div class="wb-title-wrap">
-            <span class="wb-title-icon">🌱</span>
+            <span class="wb-title-icon"><svg class="atlas-icon title-icon" aria-hidden="true"><use href="#icon-leaf"/></svg></span>
             <div>
               <h3>Geoscience, Marine &amp; Environmental Studio</h3>
               <span class="wb-subtitle">Gaussian Air Plume Dispersion · Marine Hydrostatics (GM) &amp; Airy Waves · Building Solar PV Yield</span>
@@ -3302,7 +3822,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
           <button type="button" class="tool-button" data-tool="centermark" aria-pressed="false" title="Center Mark (CM): select a circle/arc, or click its centre and an arm point">Center</button>
           <button type="button" class="tool-button" data-tool="text" aria-pressed="false" title="Text: type a value, then click where it goes">Text</button>
           <button type="button" class="tool-button" id="drawUndoBtn" title="Undo the last drawing edit">↶</button>
-          <button type="button" class="tool-button" id="drawDeleteBtn" title="Delete the selected entity">✕</button>
+          <button type="button" class="tool-button" id="drawDeleteBtn" title="Delete selected entity (Del)" aria-label="Delete selected entity"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-close"/></svg></button>
         </div>
         <div class="draw-tools modify-tools" role="toolbar" aria-label="AutoCAD modify and 3D tools">
           <button type="button" class="tool-button" id="toolOffsetBtn" title="Offset (O): parallel line, concentric circle, or expanded rectangle">Offset</button>
@@ -3473,7 +3993,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
       <!-- Active Project Card -->
       <div class="studio-card">
         <div class="studio-card-header">
-          <span class="studio-card-title"><span>📁</span> Active Project</span>
+          <span class="studio-card-title"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-projects"/></svg> Active Project</span>
           <span class="save-status-indicator" id="homeProjectSaveBadge"><span class="save-dot"></span> <span id="homeProjectSaveText">Saved</span></span>
         </div>
         <div>
@@ -3490,7 +4010,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
       <!-- HPC Solvers & Jobs Summary -->
       <div class="studio-card">
         <div class="studio-card-header">
-          <span class="studio-card-title"><span>⚡</span> High-Performance Compute</span>
+          <span class="studio-card-title"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-jobs"/></svg> High-Performance Compute</span>
           <span class="honest-state-badge native">140+ Solvers Ready</span>
         </div>
         <div style="font-size:12.5px; line-height:1.6; color:var(--atlas-text-muted);">
@@ -3507,7 +4027,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
       <!-- System Governance & Integrity -->
       <div class="studio-card">
         <div class="studio-card-header">
-          <span class="studio-card-title"><span>🛡</span> Provenance &amp; Integrity</span>
+          <span class="studio-card-title"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-shield"/></svg> Provenance &amp; Integrity</span>
           <span class="honest-state-badge native">Cryptographic SHA-256</span>
         </div>
         <div style="font-size:12.5px; line-height:1.6; color:var(--atlas-text-muted);">
@@ -3527,43 +4047,43 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
       <h3 style="margin:0 0 14px 0; font-size:16px; color:var(--atlas-text);">Quick-Start Engineering Templates</h3>
       <div class="template-card-grid">
         <div class="template-card" data-template="hypersonic">
-          <div class="template-icon">🚀</div>
+          <div class="template-icon"><svg class="atlas-icon template-svg" aria-hidden="true"><use href="#icon-aerospace"/></svg></div>
           <div class="template-name">Hypersonic Wave-Rider Airframe</div>
           <div class="template-desc">Mach 5–10 waverider aerodynamics, TPS aerothermal ablation, and scramjet inlet shock wave interaction.</div>
           <div class="template-tag">Aerospace &bull; Multiphysics</div>
         </div>
         <div class="template-card" data-template="ev-powertrain">
-          <div class="template-icon">⚡</div>
+          <div class="template-icon"><svg class="atlas-icon template-svg" aria-hidden="true"><use href="#icon-automotive"/></svg></div>
           <div class="template-name">EV Dual-Motor AWD Powertrain</div>
           <div class="template-desc">ISO 8855 vehicle dynamics, Pacejka magic formula tire slip, and active yaw moment torque vectoring.</div>
           <div class="template-tag">Automotive &bull; Dynamics</div>
         </div>
         <div class="template-card" data-template="subsea-riser">
-          <div class="template-icon">🌊</div>
+          <div class="template-icon"><svg class="atlas-icon template-svg" aria-hidden="true"><use href="#icon-marine"/></svg></div>
           <div class="template-name">Ultra-Deepwater Subsea Riser</div>
           <div class="template-desc">DNV-RP-F204 vortex-induced vibration (VIV), helical strakes suppression, and multi-year fatigue damage.</div>
           <div class="template-tag">Marine &bull; Structural</div>
         </div>
         <div class="template-card" data-template="openbim-frame">
-          <div class="template-icon">🏛</div>
+          <div class="template-icon"><svg class="atlas-icon template-svg" aria-hidden="true"><use href="#icon-bim"/></svg></div>
           <div class="template-name">OpenBIM Multi-Story Frame</div>
           <div class="template-desc">IFC4 architectural columns, slabs, structural steel joints, and seismic base isolation analysis.</div>
           <div class="template-tag">Architecture &bull; BIM</div>
         </div>
         <div class="template-card" data-template="biopharma-chrom">
-          <div class="template-icon">🧪</div>
+          <div class="template-icon"><svg class="atlas-icon template-svg" aria-hidden="true"><use href="#icon-chemical"/></svg></div>
           <div class="template-name">Biopharma Chromatography Column</div>
           <div class="template-desc">FDA cGMP / ASME BPE axial dispersion, Langmuir isotherm adsorption, and resin bed yield kinetics.</div>
           <div class="template-tag">Science &bull; Chemical</div>
         </div>
         <div class="template-card" data-template="robotics-6dof">
-          <div class="template-icon">🤖</div>
+          <div class="template-icon"><svg class="atlas-icon template-svg" aria-hidden="true"><use href="#icon-robotics"/></svg></div>
           <div class="template-name">6-DOF Robotic Manipulator Cell</div>
           <div class="template-desc">Denavit-Hartenberg kinematics, singularity avoidance, obstacle collision detection, and ROS bridge.</div>
           <div class="template-tag">Robotics &bull; Kinematics</div>
         </div>
         <div class="template-card" data-template="unity-realtime">
-          <div class="template-icon">🎮</div>
+          <div class="template-icon"><svg class="atlas-icon template-svg" aria-hidden="true"><use href="#icon-realtime"/></svg></div>
           <div class="template-name">Unity Interactive Digital Twin</div>
           <div class="template-desc">Exportable Unity package with C# client, telemetry streaming, flight dynamics HUD, and glTF 2.0 asset.</div>
           <div class="template-tag">RealTime &bull; XR</div>
@@ -3639,7 +4159,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
       <div class="studio-view-actions">
         <div class="view-mode-toggle" id="assetsViewModeToggle" role="radiogroup" aria-label="View Mode">
           <button type="button" class="view-mode-btn active" id="assetsGridModeBtn" data-mode="grid" title="Visual Cards View">▦ Grid</button>
-          <button type="button" class="view-mode-btn" id="assetsTableModeBtn" data-mode="table" title="Detailed Table View">☵ Table</button>
+          <button type="button" class="view-mode-btn" id="assetsTableModeBtn" data-mode="table" title="Detailed Table View"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-table"/></svg> Table</button>
         </div>
         <button type="button" class="button ghost" id="assetsRefreshBtn">Refresh Catalog</button>
       </div>
@@ -3659,13 +4179,13 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
     </div>
 
     <div class="category-pills-bar" id="assetsCategoryPills">
-      <button type="button" class="cat-pill active" data-cat="all">All Assets</button>
-      <button type="button" class="cat-pill" data-cat="fastener">🔩 Fasteners</button>
-      <button type="button" class="cat-pill" data-cat="gear">⚙ Transmission</button>
-      <button type="button" class="cat-pill" data-cat="bearing">🔘 Bearings</button>
-      <button type="button" class="cat-pill" data-cat="motor">⚡ Motors</button>
-      <button type="button" class="cat-pill" data-cat="structural">🏗 Frames</button>
-      <button type="button" class="cat-pill" data-cat="material">📦 Materials</button>
+      <button type="button" class="cat-pill active" data-cat="all"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-assets"/></svg> All Assets</button>
+      <button type="button" class="cat-pill" data-cat="fastener"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-fastener"/></svg> Fasteners</button>
+      <button type="button" class="cat-pill" data-cat="gear"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-gear"/></svg> Transmission</button>
+      <button type="button" class="cat-pill" data-cat="bearing"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-bearing"/></svg> Bearings</button>
+      <button type="button" class="cat-pill" data-cat="motor"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-motor"/></svg> Motors</button>
+      <button type="button" class="cat-pill" data-cat="structural"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-structural"/></svg> Frames</button>
+      <button type="button" class="cat-pill" data-cat="material"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-materials"/></svg> Materials</button>
     </div>
 
     <!-- Visual Asset Cards Grid -->
@@ -3813,25 +4333,25 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
           <span class="dag-node-desc">Parametric STEP Body</span>
           <span class="honest-state-badge native">Verified</span>
         </div>
-        <span class="dag-arrow">➔</span>
+        <span class="dag-arrow"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-step-next"/></svg></span>
         <div class="dag-node active" id="dagNodeMesh">
           <span class="dag-node-title">2. Mesh Generation</span>
           <span class="dag-node-desc">Tet10 Adaptive Mesh</span>
           <span class="honest-state-badge unconfigured" id="dagNodeMeshStatus">Active</span>
         </div>
-        <span class="dag-arrow">➔</span>
+        <span class="dag-arrow"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-step-next"/></svg></span>
         <div class="dag-node" id="dagNodeSolver">
           <span class="dag-node-title">3. Multiphysics</span>
           <span class="dag-node-desc">SU2 &bull; Aerothermal</span>
           <span class="honest-state-badge" style="background:var(--atlas-surface-3); color:var(--atlas-text-dim);">Queued</span>
         </div>
-        <span class="dag-arrow">➔</span>
+        <span class="dag-arrow"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-step-next"/></svg></span>
         <div class="dag-node" id="dagNodeOpt">
           <span class="dag-node-title">4. AI Optimization</span>
           <span class="dag-node-desc">Gradient Descent Loop</span>
           <span class="honest-state-badge" style="background:var(--atlas-surface-3); color:var(--atlas-text-dim);">Pending</span>
         </div>
-        <span class="dag-arrow">➔</span>
+        <span class="dag-arrow"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-step-next"/></svg></span>
         <div class="dag-node" id="dagNodeCert">
           <span class="dag-node-title">5. Cryptographic Signoff</span>
           <span class="dag-node-desc">SHA-256 Merkle Block</span>
@@ -4180,7 +4700,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
     <div class="palette-card ai-assistant-card">
       <div class="section-head">
         <div class="ai-head-wrap">
-          <span class="ai-sparkle-icon">✨</span>
+          <span class="ai-sparkle-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-ai-copilot"/></svg></span>
           <h2 id="aiAssistantTitle">AI CAD Drafting & Modeling Assistant</h2>
         </div>
         <button type="button" class="link" id="aiAssistantCloseBtn">close</button>
@@ -4315,7 +4835,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
       <div class="enterprise-view active" id="entViewAudit">
         <div class="ent-audit-header-banner">
           <div class="ent-integrity-status" id="entAuditIntegrity">
-            <span class="ent-status-icon">🛡️</span>
+            <span class="ent-status-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-shield"/></svg></span>
             <div>
               <strong>Cryptographic Chain Integrity: <span id="entChainStatusText">VERIFIED</span></strong>
               <div class="ent-subtext">FNV-1a 128-bit cryptographic hash chain guaranteeing non-repudiation</div>
@@ -4463,22 +4983,22 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
           <span style="font-size:12px; color:var(--atlas-text-muted); display:block; margin-bottom:6px;">Quick-Start Parametric Template:</span>
           <div class="quick-template-grid" id="quickTemplateCards">
             <button type="button" class="quick-tpl-btn active" data-tpl="bracket">
-              <span class="tpl-icon">🔩</span>
+              <span class="tpl-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-fastener"/></svg></span>
               <span class="tpl-title">Mounting Bracket</span>
               <span class="tpl-desc">6061-T6 Aluminum bracket with 4 mounting holes</span>
             </button>
             <button type="button" class="quick-tpl-btn" data-tpl="scramjet">
-              <span class="tpl-icon">🚀</span>
+              <span class="tpl-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-aerospace"/></svg></span>
               <span class="tpl-title">Scramjet Nacelle</span>
               <span class="tpl-desc">Mach 6+ Ti-6Al-4V waverider cowl geometry</span>
             </button>
             <button type="button" class="quick-tpl-btn" data-tpl="drone">
-              <span class="tpl-icon">🛸</span>
+              <span class="tpl-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-aerospace"/></svg></span>
               <span class="tpl-title">Quadcopter Arm</span>
               <span class="tpl-desc">Lightweight carbon-fiber hollow tubular beam</span>
             </button>
             <button type="button" class="quick-tpl-btn" data-tpl="enclosure">
-              <span class="tpl-icon">🖲</span>
+              <span class="tpl-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-settings"/></svg></span>
               <span class="tpl-title">PCB Enclosure</span>
               <span class="tpl-desc">Electronics housing with standoffs and port cutouts</span>
             </button>
@@ -4594,14 +5114,14 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
   <dialog id="helpShortcutsModal" class="studio-dialog modal-lg" aria-labelledby="helpModalTitle" style="max-width:760px;">
     <div class="dialog-header" style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--atlas-border); background:var(--atlas-surface-2);">
       <div class="dialog-title-wrap" style="display:flex; align-items:center; gap:8px;">
-        <span class="dialog-icon" style="font-size:16px;">⌨</span>
+        <span class="dialog-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-keyboard"/></svg></span>
         <h3 id="helpModalTitle" style="margin:0; font-size:14.5px;">AtlasCAD Shortcuts & Ergonomics Guide</h3>
       </div>
       <button type="button" class="icon-button" id="closeHelpModalBtn">&times;</button>
     </div>
     <div class="dialog-body shortcuts-guide-grid">
       <div class="shortcut-section">
-        <h4>⚡ Core Controls & Navigation</h4>
+        <h4><svg class="atlas-icon" aria-hidden="true"><use href="#icon-settings"/></svg> Core Controls & Navigation</h4>
         <table class="shortcuts-table">
           <tr><td><kbd>Ctrl</kbd> + <kbd>S</kbd></td><td>Save Project (.zcad)</td></tr>
           <tr><td><kbd>Ctrl</kbd> + <kbd>K</kbd></td><td>Command Palette / Fuzzy Search</td></tr>
@@ -4613,7 +5133,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
         </table>
       </div>
       <div class="shortcut-section">
-        <h4>🖱 3D Viewport Navigation</h4>
+        <h4><svg class="atlas-icon" aria-hidden="true"><use href="#icon-viewport"/></svg> 3D Viewport Navigation</h4>
         <table class="shortcuts-table">
           <tr><td><kbd>Left Drag</kbd></td><td>3D Orbit / Rotate Camera</td></tr>
           <tr><td><kbd>Right Drag</kbd> or <kbd>Shift</kbd>+<kbd>Left</kbd></td><td>Pan Camera Across Plane</td></tr>
@@ -4624,7 +5144,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
         </table>
       </div>
       <div class="shortcut-section">
-        <h4>✏ 2D Drafting & Modeling</h4>
+        <h4><svg class="atlas-icon" aria-hidden="true"><use href="#icon-drawing-sheet"/></svg> 2D Drafting & Modeling</h4>
         <table class="shortcuts-table">
           <tr><td><kbd>L</kbd></td><td>Draw Line</td></tr>
           <tr><td><kbd>PL</kbd></td><td>Draw Polyline</td></tr>
@@ -4637,7 +5157,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
         </table>
       </div>
       <div class="shortcut-section">
-        <h4>📦 Drag & Drop Ergonomics</h4>
+        <h4><svg class="atlas-icon" aria-hidden="true"><use href="#icon-assets"/></svg> Drag & Drop Ergonomics</h4>
         <table class="shortcuts-table">
           <tr><td><span class="badge-subtle">Drop Files</span></td><td>Drag STEP, DXF, STL, OBJ, JSON from OS desktop straight onto 3D viewport to import</td></tr>
           <tr><td><span class="badge-subtle">Drop Material</span></td><td>Drag material swatches from the palette onto 3D part to assign density, modulus & yield stress</td></tr>
@@ -4646,7 +5166,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
         </table>
       </div>
       <div class="shortcut-section full-span">
-        <h4>🌐 Studio Switching Hotkeys</h4>
+        <h4><svg class="atlas-icon" aria-hidden="true"><use href="#icon-workflows"/></svg> Studio Switching Hotkeys</h4>
         <div class="studio-hotkeys-row">
           <span><kbd>Alt</kbd>+<kbd>0</kbd> Home</span>
           <span><kbd>Alt</kbd>+<kbd>1</kbd> Drafting</span>

@@ -47,6 +47,10 @@
     return node;
   }
 
+  function svgIcon(name, extraClass = "") {
+    return `<svg class="atlas-icon ${extraClass}" aria-hidden="true"><use href="#${name}"/></svg>`;
+  }
+
   function setStatus(message, tone = "") {
     const status = byId("statusMessage");
     status.textContent = message;
@@ -1589,11 +1593,11 @@
       return;
     }
 
-    const icons = {
-      extrude: "⬆",
-      revolve: "↺",
-      cut: "✂",
-      join: "⊞",
+    const iconNames = {
+      extrude: "icon-extrude",
+      revolve: "icon-revolve",
+      cut: "icon-cut",
+      join: "icon-box",
     };
 
     project.features.forEach((feature) => {
@@ -1604,13 +1608,13 @@
       pill.draggable = true;
       pill.dataset.featureId = feature.id;
       const kind = (feature.kind || "extrude").toLowerCase();
-      let icon = icons[kind] || "⬡";
-      if (feature.operation === "cut") icon = icons.cut;
-      else if (feature.operation === "join") icon = icons.join;
+      let icon = iconNames[kind] || "icon-extrude";
+      if (feature.operation === "cut") icon = iconNames.cut;
+      else if (feature.operation === "join") icon = iconNames.join;
 
       const label = feature.kind === "revolve" ? "Revolve" : "Extrude";
       const name = `${label} ${feature.id}`;
-      pill.innerHTML = `<span class="pill-icon">${icon}</span> <span class="pill-name">${name}</span>`;
+      pill.innerHTML = `<span class="pill-icon">${svgIcon(icon)}</span> <span class="pill-name">${name}</span>`;
       pill.title = `${name} (${feature.operation}) - Click to inspect, drag to reorder`;
       pill.addEventListener("click", () => {
         select("feature", feature.id);
@@ -4526,7 +4530,7 @@
         ? data.pairs.map((p) => `
             <tr>
               <td><strong>${p.body_a} ↔ ${p.body_b}</strong></td>
-              <td><span style="color: ${p.interferes ? 'var(--danger, #ff4444)' : 'var(--success, #00c853)'}; font-weight: bold;">${p.interferes ? '⚠ CLASH' : '✓ CLEAR'}</span></td>
+              <td><span style="color: ${p.interferes ? 'var(--danger, #ff4444)' : 'var(--success, #00c853)'}; font-weight: bold;">${p.interferes ? `${svgIcon('icon-warning')} CLASH` : `${svgIcon('icon-check')} CLEAR`}</span></td>
               <td>${p.clearance_mm.toFixed(3)} mm</td>
               <td>${p.approximate_clash_volume_mm3 ? p.approximate_clash_volume_mm3.toFixed(2) + ' mm³' : '—'}</td>
             </tr>
@@ -6378,8 +6382,8 @@ ${gcodeSample}`;
     }
     const item = document.createElement("div");
     item.className = `toast-item toast-${type}`;
-    const icon = type === "success" ? "✓" : type === "error" ? "✕" : type === "warning" ? "⚠" : "ℹ";
-    item.innerHTML = `<span class="toast-item-icon">${icon}</span> <span class="toast-item-msg">${message}</span>`;
+    const iconName = type === "success" ? "icon-check" : type === "error" ? "icon-close" : type === "warning" ? "icon-warning" : "icon-help";
+    item.innerHTML = `<span class="toast-item-icon">${svgIcon(iconName)}</span> <span class="toast-item-msg">${message}</span>`;
     container.appendChild(item);
     window.setTimeout(() => {
       item.classList.add("fade-out");
@@ -6683,7 +6687,7 @@ ${gcodeSample}`;
       if (layer.name === drawState.layer) tr.className = "current-layer";
 
       const tdStatus = document.createElement("td");
-      tdStatus.textContent = layer.name === drawState.layer ? "✔" : "";
+      tdStatus.innerHTML = layer.name === drawState.layer ? svgIcon("icon-check") : "";
       tdStatus.style.textAlign = "center";
       tdStatus.style.color = "#4caf50";
 
@@ -6694,8 +6698,9 @@ ${gcodeSample}`;
       const btnOn = document.createElement("button");
       btnOn.type = "button";
       btnOn.className = `layer-toggle-icon ${layer.visible === false ? "off" : ""}`;
-      btnOn.textContent = layer.visible === false ? "⚪" : "💡";
+      btnOn.innerHTML = layer.visible === false ? svgIcon("icon-eye-off") : svgIcon("icon-eye");
       btnOn.title = "Toggle Layer Visibility";
+      btnOn.setAttribute("aria-label", "Toggle Layer Visibility");
       btnOn.addEventListener("click", () => {
         layer.visible = layer.visible === false ? true : false;
         renderLayerManagerTable(byId("lmSearchInput")?.value || "");
@@ -6707,8 +6712,9 @@ ${gcodeSample}`;
       const btnFreeze = document.createElement("button");
       btnFreeze.type = "button";
       btnFreeze.className = `layer-toggle-icon ${layer.frozen ? "" : "off"}`;
-      btnFreeze.textContent = layer.frozen ? "❄️" : "☀️";
+      btnFreeze.innerHTML = layer.frozen ? svgIcon("icon-freeze") : svgIcon("icon-theme");
       btnFreeze.title = "Freeze / Thaw Layer";
+      btnFreeze.setAttribute("aria-label", "Freeze or Thaw Layer");
       btnFreeze.addEventListener("click", () => {
         layer.frozen = !layer.frozen;
         renderLayerManagerTable(byId("lmSearchInput")?.value || "");
@@ -6720,7 +6726,8 @@ ${gcodeSample}`;
       const btnLock = document.createElement("button");
       btnLock.type = "button";
       btnLock.className = `layer-toggle-icon ${layer.locked ? "" : "off"}`;
-      btnLock.textContent = layer.locked ? "🔒" : "🔓";
+      btnLock.innerHTML = layer.locked ? svgIcon("icon-lock") : svgIcon("icon-unlock");
+      btnLock.setAttribute("aria-label", "Lock or Unlock Layer");
       btnLock.title = "Lock / Unlock Layer";
       btnLock.addEventListener("click", () => {
         layer.locked = !layer.locked;
@@ -7165,7 +7172,7 @@ ${gcodeSample}`;
           if (placeholder) placeholder.remove();
           const li = document.createElement("li");
           li.className = "ai-history-item";
-          li.innerHTML = `<span>✔ ${plannedAiOperation.opName}</span><span class="hint">${new Date().toLocaleTimeString()}</span>`;
+          li.innerHTML = `<span>${svgIcon("icon-check")} ${plannedAiOperation.opName}</span><span class="hint">${new Date().toLocaleTimeString()}</span>`;
           historyList.prepend(li);
         }
         toast(`Executed: ${plannedAiOperation.opName}`);
@@ -7248,7 +7255,8 @@ ${gcodeSample}`;
         const btnDel = document.createElement("button");
         btnDel.type = "button";
         btnDel.className = "button small ghost";
-        btnDel.textContent = "✕";
+        btnDel.innerHTML = svgIcon("icon-close");
+        btnDel.setAttribute("aria-label", "Delete Saved View");
         btnDel.title = "Delete Saved View";
         btnDel.addEventListener("click", () => {
           const updated = userViews.filter((_, i) => i !== idx - defaults.length);
@@ -7486,7 +7494,7 @@ ${gcodeSample}`;
       banner.hidden = false;
       const count = graph.stale_count || 0;
       const text = byId("rvStaleText");
-      if (text) text.textContent = `⚠️ ${count} Results Stale — Geometry Modified`;
+      if (text) text.innerHTML = `${svgIcon("icon-warning")} ${count} Results Stale — Geometry Modified`;
     } else {
       banner.hidden = true;
     }
@@ -9243,7 +9251,7 @@ ${gcodeSample}`;
         statusBadge.style.background = "rgba(59, 130, 246, 0.2)";
         statusBadge.style.color = "#3b82f6";
       }
-      toast("⚡ Executing 27-Domain Enterprise Multiphysics Suite…");
+      toast("Executing 27-Domain Enterprise Multiphysics Suite…");
       try {
         const res = await api("/api/sim/multiphysics_suite", {
           method: "POST",
@@ -9265,7 +9273,7 @@ ${gcodeSample}`;
             if (d.validation) {
               valInfo = `${d.validation.metric_name}: error=${d.validation.error_percent?.toFixed(3)}%`;
             }
-            log += `  ✓ [${key.padEnd(20)}] ${status.padEnd(10)} (${exec.padStart(6)}) — ${valInfo}\n`;
+            log += `  [PASS] [${key.padEnd(20)}] ${status.padEnd(10)} (${exec.padStart(6)}) — ${valInfo}\n`;
           }
           log += "------------------------------------------------------------------------------\n";
           log += "  STANDARDS CERTIFICATION AUDIT:\n";
@@ -9290,7 +9298,7 @@ ${gcodeSample}`;
           statusBadge.style.background = "rgba(16, 185, 129, 0.2)";
           statusBadge.style.color = "#10b981";
         }
-        toast("⚡ 27-Domain Enterprise Multiphysics Suite: All 27 Domains Passed ($10,000/mo Tier)");
+        toast("27-Domain Enterprise Multiphysics Suite: All 27 Domains Passed ($10,000/mo Tier)");
       } catch (err) {
         toast(`Multiphysics suite error: ${err.message}`, true);
         if (consoleOut) {
@@ -9434,7 +9442,7 @@ ${gcodeSample}`;
       if (spatialTree) {
         const div = document.createElement("div");
         div.className = "bim-node leaf";
-        div.textContent = `│   │   │   ├── ➕ Ifc${elType.charAt(0).toUpperCase() + elType.slice(1)} [${param}mm custom]`;
+        div.innerHTML = `│   │   │   ├── ${svgIcon("icon-rect")} Ifc${elType.charAt(0).toUpperCase() + elType.slice(1)} [${param}mm custom]`;
         spatialTree.appendChild(div);
       }
     });
@@ -13413,7 +13421,7 @@ ${gcodeSample}`;
       toggleBtn.addEventListener("click", () => {
         document.body.classList.toggle("sidebar-expanded");
         const expanded = document.body.classList.contains("sidebar-expanded");
-        toggleBtn.textContent = expanded ? "«" : "☰";
+        toggleBtn.innerHTML = expanded ? svgIcon("icon-close") : svgIcon("icon-menu");
       });
     }
 
@@ -13811,30 +13819,30 @@ ${gcodeSample}`;
 
   const CATALOG_ITEMS = [
     // Fasteners
-    { id: "din_912_m6", name: "DIN 912 Socket Head Screw", cat: "fastener", icon: "🔩", badge: "Fastener", std: "DIN 912 / ISO 4762", spec: "M6 × 20 mm (P 1.0)", mat: "316 Stainless / Grade 8.8", load: "640 MPa Yield" },
-    { id: "iso_4014_m8", name: "ISO 4014 Hex Head Bolt", cat: "fastener", icon: "🔩", badge: "Fastener", std: "ISO 4014 / DIN 931", spec: "M8 × 35 mm (P 1.25)", mat: "High-Strength 10.9 Steel", load: "900 MPa Yield" },
-    { id: "din_934_m6", name: "DIN 934 Hex Nut", cat: "fastener", icon: "🔩", badge: "Fastener", std: "DIN 934 / ISO 4032", spec: "M6 Hexagon Nut", mat: "Zinc-Plated Steel Grade 8", load: "Proof Load 16.1 kN" },
-    { id: "din_7991_m5", name: "DIN 7991 Countersunk Screw", cat: "fastener", icon: "🔩", badge: "Fastener", std: "DIN 7991 / ISO 10642", spec: "M5 × 16 mm Flat Head", mat: "A4 Marine Stainless", load: "500 MPa Yield" },
+    { id: "din_912_m6", name: "DIN 912 Socket Head Screw", cat: "fastener", icon: "icon-fastener", badge: "Fastener", std: "DIN 912 / ISO 4762", spec: "M6 × 20 mm (P 1.0)", mat: "316 Stainless / Grade 8.8", load: "640 MPa Yield" },
+    { id: "iso_4014_m8", name: "ISO 4014 Hex Head Bolt", cat: "fastener", icon: "icon-fastener", badge: "Fastener", std: "ISO 4014 / DIN 931", spec: "M8 × 35 mm (P 1.25)", mat: "High-Strength 10.9 Steel", load: "900 MPa Yield" },
+    { id: "din_934_m6", name: "DIN 934 Hex Nut", cat: "fastener", icon: "icon-fastener", badge: "Fastener", std: "DIN 934 / ISO 4032", spec: "M6 Hexagon Nut", mat: "Zinc-Plated Steel Grade 8", load: "Proof Load 16.1 kN" },
+    { id: "din_7991_m5", name: "DIN 7991 Countersunk Screw", cat: "fastener", icon: "icon-fastener", badge: "Fastener", std: "DIN 7991 / ISO 10642", spec: "M5 × 16 mm Flat Head", mat: "A4 Marine Stainless", load: "500 MPa Yield" },
     // Transmission
-    { id: "gear_spur_m15", name: "ISO 6336 Spur Gear 24T", cat: "gear", icon: "⚙", badge: "Transmission", std: "ISO 6336 / DIN 3962", spec: "m=1.5, z=24, α=20°", mat: "Alloy Steel 42CrMo4", load: "Pitting Limit 1,450 MPa" },
-    { id: "gear_helical_m2", name: "Helical Pinion Gear 18T", cat: "gear", icon: "⚙", badge: "Transmission", std: "AGMA 2001-D04", spec: "m=2.0, z=18, β=15°", mat: "Case-Hardened 20MnCr5", load: "Bending Limit 850 MPa" },
-    { id: "pulley_gt2_20t", name: "GT2 Timing Pulley 20T", cat: "gear", icon: "⚙", badge: "Transmission", std: "Gates GT2 Standard", spec: "20 Teeth, 6 mm Belt, 5 mm Bore", mat: "6061-T6 Anodized Aluminum", load: "Max Torque 3.2 N·m" },
+    { id: "gear_spur_m15", name: "ISO 6336 Spur Gear 24T", cat: "gear", icon: "icon-gear", badge: "Transmission", std: "ISO 6336 / DIN 3962", spec: "m=1.5, z=24, α=20°", mat: "Alloy Steel 42CrMo4", load: "Pitting Limit 1,450 MPa" },
+    { id: "gear_helical_m2", name: "Helical Pinion Gear 18T", cat: "gear", icon: "icon-gear", badge: "Transmission", std: "AGMA 2001-D04", spec: "m=2.0, z=18, β=15°", mat: "Case-Hardened 20MnCr5", load: "Bending Limit 850 MPa" },
+    { id: "pulley_gt2_20t", name: "GT2 Timing Pulley 20T", cat: "gear", icon: "icon-gear", badge: "Transmission", std: "Gates GT2 Standard", spec: "20 Teeth, 6 mm Belt, 5 mm Bore", mat: "6061-T6 Anodized Aluminum", load: "Max Torque 3.2 N·m" },
     // Bearings
-    { id: "brg_608_2rs", name: "608-2RS Deep Groove Bearing", cat: "bearing", icon: "🔘", badge: "Bearing", std: "ISO 15 / ABEC-5", spec: "8 × 22 × 7 mm Rubber Sealed", mat: "Chrome Steel GCr15 / 52100", load: "Dynamic C = 3.3 kN" },
-    { id: "brg_6204_zz", name: "6204-ZZ Shielded Bearing", cat: "bearing", icon: "🔘", badge: "Bearing", std: "ISO 15 / ABEC-3", spec: "20 × 47 × 14 mm Metal Shield", mat: "High-Carbon Chromium Steel", load: "Dynamic C = 12.8 kN" },
-    { id: "bushing_bronze_10", name: "Sintered Bronze Bushing", cat: "bearing", icon: "🔘", badge: "Bearing", std: "SAE 841 / DIN 1850", spec: "10 × 14 × 12 mm Flanged", mat: "Oil-Impregnated Bronze", load: "Max pv = 1.75 MPa·m/s" },
+    { id: "brg_608_2rs", name: "608-2RS Deep Groove Bearing", cat: "bearing", icon: "icon-bearing", badge: "Bearing", std: "ISO 15 / ABEC-5", spec: "8 × 22 × 7 mm Rubber Sealed", mat: "Chrome Steel GCr15 / 52100", load: "Dynamic C = 3.3 kN" },
+    { id: "brg_6204_zz", name: "6204-ZZ Shielded Bearing", cat: "bearing", icon: "icon-bearing", badge: "Bearing", std: "ISO 15 / ABEC-3", spec: "20 × 47 × 14 mm Metal Shield", mat: "High-Carbon Chromium Steel", load: "Dynamic C = 12.8 kN" },
+    { id: "bushing_bronze_10", name: "Sintered Bronze Bushing", cat: "bearing", icon: "icon-bearing", badge: "Bearing", std: "SAE 841 / DIN 1850", spec: "10 × 14 × 12 mm Flanged", mat: "Oil-Impregnated Bronze", load: "Max pv = 1.75 MPa·m/s" },
     // Motors & Actuators
-    { id: "motor_nema_17", name: "NEMA 17 Stepper Motor", cat: "motor", icon: "⚡", badge: "Actuator", std: "NEMA ICS 16-2001", spec: "1.8° Step, 42 × 42 × 40 mm", mat: "Neodymium Magnets / Cu Coils", load: "Holding Torque 0.45 N·m" },
-    { id: "motor_bldc_2212", name: "BLDC Outrunner 2212 920KV", cat: "motor", icon: "⚡", badge: "Actuator", std: "Brushless Multirotor", spec: "22 × 12 mm Stator, 3S-4S LiPo", mat: "Aircraft Alum / NdFeB", load: "Peak Thrust 850 g" },
+    { id: "motor_nema_17", name: "NEMA 17 Stepper Motor", cat: "motor", icon: "icon-motor", badge: "Actuator", std: "NEMA ICS 16-2001", spec: "1.8° Step, 42 × 42 × 40 mm", mat: "Neodymium Magnets / Cu Coils", load: "Holding Torque 0.45 N·m" },
+    { id: "motor_bldc_2212", name: "BLDC Outrunner 2212 920KV", cat: "motor", icon: "icon-motor", badge: "Actuator", std: "Brushless Multirotor", spec: "22 × 12 mm Stator, 3S-4S LiPo", mat: "Aircraft Alum / NdFeB", load: "Peak Thrust 850 g" },
     // Structural Frames
-    { id: "ext_alum_2020", name: "2020 T-Slot Extrusion", cat: "structural", icon: "🏗", badge: "Frame", std: "Modular Framing DIN 17615", spec: "20 × 20 mm, 6 mm Slot", mat: "Alloy 6063-T5 Clear Anodized", load: "Ix = Iy = 0.72 cm⁴" },
-    { id: "ext_alum_4040", name: "4040 Heavy Extrusion", cat: "structural", icon: "🏗", badge: "Frame", std: "Modular Framing DIN 17615", spec: "40 × 40 mm, 8 mm Slot", mat: "Alloy 6063-T5 Clear Anodized", load: "Ix = Iy = 9.85 cm⁴" },
+    { id: "ext_alum_2020", name: "2020 T-Slot Extrusion", cat: "structural", icon: "icon-structural", badge: "Frame", std: "Modular Framing DIN 17615", spec: "20 × 20 mm, 6 mm Slot", mat: "Alloy 6063-T5 Clear Anodized", load: "Ix = Iy = 0.72 cm⁴" },
+    { id: "ext_alum_4040", name: "4040 Heavy Extrusion", cat: "structural", icon: "icon-structural", badge: "Frame", std: "Modular Framing DIN 17615", spec: "40 × 40 mm, 8 mm Slot", mat: "Alloy 6063-T5 Clear Anodized", load: "Ix = Iy = 9.85 cm⁴" },
     // Materials
-    { id: "mat_ti6al4v", name: "Titanium Ti-6Al-4V Grade 5", cat: "material", icon: "📦", badge: "Material", std: "ASTM B348 / AMS 4928", spec: "Alpha-Beta High-Strength Alloy", mat: "Ti-6Al-4V", load: "Yield 880 MPa, E=114 GPa", density: 4.43, yield: 880, youngs: 114 },
-    { id: "mat_al6061t6", name: "Aluminium 6061-T6", cat: "material", icon: "📦", badge: "Material", std: "ASTM B209 / AMS 4027", spec: "Precipitation-Hardened Alloy", mat: "Al-Mg-Si-Cu", load: "Yield 276 MPa, E=68.9 GPa", density: 2.70, yield: 276, youngs: 68.9 },
-    { id: "mat_steel_a36", name: "Structural Steel A36", cat: "material", icon: "📦", badge: "Material", std: "ASTM A36 / ASME SA36", spec: "Carbon Structural Steel Plate", mat: "Fe-C-Mn Low Carbon", load: "Yield 250 MPa, E=200 GPa", density: 7.85, yield: 250, youngs: 200 },
-    { id: "mat_cfrp_peek", name: "Carbon Fiber / PEEK Matrix", cat: "material", icon: "📦", badge: "Material", std: "ASTM D3039 Composite", spec: "Continuous Fiber Thermoplastic", mat: "CF / Polyetheretherketone", load: "Tensile 650 MPa, E=140 GPa", density: 1.55, yield: 650, youngs: 140 },
-    { id: "mat_inconel_718", name: "Inconel 718 Superalloy", cat: "material", icon: "📦", badge: "Material", std: "AMS 5662 / ASTM B637", spec: "Precipitation-Hardened Ni-Cr", mat: "Ni-Cr-Fe-Nb-Mo", load: "Yield 1,100 MPa, E=211 GPa", density: 8.19, yield: 1100, youngs: 211 }
+    { id: "mat_ti6al4v", name: "Titanium Ti-6Al-4V Grade 5", cat: "material", icon: "icon-materials", badge: "Material", std: "ASTM B348 / AMS 4928", spec: "Alpha-Beta High-Strength Alloy", mat: "Ti-6Al-4V", load: "Yield 880 MPa, E=114 GPa", density: 4.43, yield: 880, youngs: 114 },
+    { id: "mat_al6061t6", name: "Aluminium 6061-T6", cat: "material", icon: "icon-materials", badge: "Material", std: "ASTM B209 / AMS 4027", spec: "Precipitation-Hardened Alloy", mat: "Al-Mg-Si-Cu", load: "Yield 276 MPa, E=68.9 GPa", density: 2.70, yield: 276, youngs: 68.9 },
+    { id: "mat_steel_a36", name: "Structural Steel A36", cat: "material", icon: "icon-materials", badge: "Material", std: "ASTM A36 / ASME SA36", spec: "Carbon Structural Steel Plate", mat: "Fe-C-Mn Low Carbon", load: "Yield 250 MPa, E=200 GPa", density: 7.85, yield: 250, youngs: 200 },
+    { id: "mat_cfrp_peek", name: "Carbon Fiber / PEEK Matrix", cat: "material", icon: "icon-materials", badge: "Material", std: "ASTM D3039 Composite", spec: "Continuous Fiber Thermoplastic", mat: "CF / Polyetheretherketone", load: "Tensile 650 MPa, E=140 GPa", density: 1.55, yield: 650, youngs: 140 },
+    { id: "mat_inconel_718", name: "Inconel 718 Superalloy", cat: "material", icon: "icon-materials", badge: "Material", std: "AMS 5662 / ASTM B637", spec: "Precipitation-Hardened Ni-Cr", mat: "Ni-Cr-Fe-Nb-Mo", load: "Yield 1,100 MPa, E=211 GPa", density: 8.19, yield: 1100, youngs: 211 }
   ];
 
   async function loadAssetsCatalog() {
@@ -13876,7 +13884,7 @@ ${gcodeSample}`;
 
         card.innerHTML = `
           <div class="asset-card-top">
-            <div class="asset-icon-box">${item.icon}</div>
+            <div class="asset-icon-box"><svg class="atlas-icon" aria-hidden="true"><use href="#${item.icon}"/></svg></div>
             <span class="asset-badge">${item.badge}</span>
           </div>
           <div class="asset-card-title">${item.name}</div>
@@ -14126,7 +14134,7 @@ ${gcodeSample}`;
       const msg = document.createElement("div");
       msg.className = `ai-message ${sender}`;
       if (sender === "assistant") {
-        msg.innerHTML = `<span class="ai-avatar">🤖</span><div class="ai-msg-bubble">${text}</div>`;
+        msg.innerHTML = `<span class="ai-avatar"><svg class="atlas-icon" style="color:var(--atlas-accent); width:18px; height:18px;" aria-hidden="true"><use href="#icon-ai-copilot"/></svg></span><div class="ai-msg-bubble">${text}</div>`;
       } else {
         msg.innerHTML = `<div class="ai-msg-bubble">${text}</div>`;
       }

@@ -6937,3 +6937,157 @@ button:active:not(:disabled) {
 .triad-origin-group:hover rect {
   fill: var(--atlas-accent) !important;
 }
+
+/* --- AtlasCAD Engineering SVG Vector Icon System --- */
+.atlas-icon {
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.15em;
+  display: inline-block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.sidebar-item-icon .atlas-icon,
+.dock-icon .atlas-icon,
+.slice-icon .atlas-icon {
+  width: 1.25em;
+  height: 1.25em;
+}
+
+.template-icon .atlas-icon,
+.template-svg {
+  width: 28px !important;
+  height: 28px !important;
+  color: var(--atlas-accent) !important;
+  margin-bottom: 4px;
+}
+
+.asset-icon-box .atlas-icon {
+  width: 20px !important;
+  height: 20px !important;
+  color: var(--atlas-accent-secondary) !important;
+}
+
+.cat-pill .atlas-icon {
+  margin-right: 4px;
+}
+
+.rb-icon .atlas-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  margin: 0 auto;
+}
+
+.wb-icon .atlas-icon {
+  width: 16px;
+  height: 16px;
+  vertical-align: -2px;
+  margin-right: 6px;
+}
+
+.wb-title-icon .atlas-icon,
+.wb-title-icon .title-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--atlas-accent);
+}
+
+.ctx-menu-item .atlas-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  vertical-align: -2px;
+  color: var(--atlas-accent-secondary);
+}
+
+.button .atlas-icon,
+.button.small .atlas-icon,
+.btn .atlas-icon,
+.ai-prompt-pill .atlas-icon,
+.insp-btn .atlas-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+.hud-close-btn .atlas-icon,
+.tool-button .atlas-icon,
+.radial-center-btn .atlas-icon {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  vertical-align: middle;
+}
+
+.toast-item-icon .atlas-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.bim-node .atlas-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  vertical-align: -2px;
+  color: var(--atlas-accent);
+}
+
+.layer-toggle-icon .atlas-icon {
+  width: 14px;
+  height: 14px;
+  vertical-align: middle;
+}
+
+.pill-icon .atlas-icon {
+  width: 13px;
+  height: 13px;
+  vertical-align: -1px;
+}
+
+.cs-indicator .atlas-icon,
+.rv-stale-text .atlas-icon {
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+.dialog-icon .atlas-icon,
+.ent-status-icon .atlas-icon,
+.studio-card-title .atlas-icon {
+  margin-right: 8px;
+  vertical-align: -2px;
+}
+
+/* WCAG 2.1 AA Accessibility Utilities & Focus Indicators */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.layout-tab:focus-visible,
+.sidebar-item:focus-visible,
+.template-card:focus-visible,
+.asset-grid-card:focus-visible {
+  outline: 2px solid var(--atlas-accent) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px var(--atlas-accent-soft) !important;
+}
