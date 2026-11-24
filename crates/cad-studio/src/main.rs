@@ -33,9 +33,11 @@ fn run() -> Result<(), String> {
     let mut advertise: Option<String> = None;
     let mut token: Option<String> = None;
     let mut token_file: Option<PathBuf> = None;
+    let mut auto_open = false;
 
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
+            "--open" => auto_open = true,
             "--file" | "--project" => {
                 let value = arguments
                     .next()
@@ -148,8 +150,63 @@ fn run() -> Result<(), String> {
         }
     }
 
-    let path = file
-        .ok_or_else(|| "a project file is required: `cad-studio --file part.zcad`".to_string())?;
+    // Check environment variables for SaaS / Cloud container deployments:
+    if port == DEFAULT_PORT {
+        if let Ok(val) = std::env::var("PORT").or_else(|_| std::env::var("ATLAS_PORT")) {
+            if let Ok(p) = val.trim().parse::<u16>() {
+                if p > 0 {
+                    port = p;
+                }
+            }
+        }
+    }
+
+    if bind.is_none() {
+        if let Ok(val) = std::env::var("HOST").or_else(|_| std::env::var("ATLAS_HOST")) {
+            if let Ok(ip) = val.trim().parse::<IpAddr>() {
+                bind = Some(ip);
+            }
+        } else if let Ok(val) = std::env::var("ATLAS_LISTEN") {
+            if let Some((ip_str, port_str)) = val.split_once(':') {
+                if let Ok(ip) = ip_str.parse::<IpAddr>() {
+                    bind = Some(ip);
+                }
+                if let Ok(p) = port_str.parse::<u16>() {
+                    if p > 0 {
+                        port = p;
+                    }
+                }
+            } else if let Ok(p) = val.trim().parse::<u16>() {
+                if p > 0 {
+                    port = p;
+                }
+            } else if let Ok(ip) = val.trim().parse::<IpAddr>() {
+                bind = Some(ip);
+            }
+        }
+    }
+
+    if advertise.is_none() {
+        if let Ok(val) =
+            std::env::var("STUDIO_PUBLIC_HOST").or_else(|_| std::env::var("ATLAS_PUBLIC_HOST"))
+        {
+            if !val.trim().is_empty() {
+                advertise = Some(val.trim().to_string());
+            }
+        }
+    }
+
+    if file.is_none() {
+        if let Ok(val) = std::env::var("ATLAS_PROJECT").or_else(|_| std::env::var("PROJECT_FILE"))
+        {
+            if !val.trim().is_empty() {
+                file = Some(PathBuf::from(val.trim()));
+            }
+        }
+    }
+
+    let is_default_fallback = file.is_none();
+    let path = file.unwrap_or_else(|| PathBuf::from("workspace.atlas"));
 
     if share && bind.is_none() {
         bind = Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED));
@@ -205,7 +262,7 @@ fn run() -> Result<(), String> {
 
     let mut recovered = None;
     let project = if path.exists() {
-        if create {
+        if create && !is_default_fallback {
             return Err(format!(
                 "{} already exists; refusing to overwrite it with --new",
                 path.display()
@@ -218,12 +275,6 @@ fn run() -> Result<(), String> {
         recovered = info;
         project
     } else {
-        if !create {
-            return Err(format!(
-                "{} does not exist; pass --new to create it",
-                path.display()
-            ));
-        }
         let name = name.unwrap_or_else(|| file_stem(&path));
         let project = default_project(&name, size).map_err(|error| error.to_string())?;
         project
@@ -271,8 +322,27 @@ fn run() -> Result<(), String> {
     println!("  stop: Ctrl+C");
     println!();
 
+    if auto_open {
+        open_browser(&handle.url());
+    }
+
     loop {
         std::thread::park();
+    }
+}
+
+fn open_browser(url: &str) {
+    #[cfg(target_os = "linux")]
+    {
+        let _ = std::process::Command::new("xdg-open").arg(url).spawn();
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open").arg(url).spawn();
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("cmd").args(["/C", "start", url]).spawn();
     }
 }
 
@@ -308,20 +378,29 @@ fn usage() {
     println!("cad-studio {}", env!("CARGO_PKG_VERSION"));
     println!();
     println!("USAGE:");
-    println!(
-        "  cad-studio --file PATH (or --project PATH) [--port PORT] [--listen [IP:]PORT] [--share] [--host IP] [--advertise HOST] [--token TOKEN]"
-    );
-    println!(
-        "  cad-studio --file PATH --share --host IP --token-file PATH   (or ATLAS_STUDIO_TOKEN)"
-    );
+    println!("  cad-studio [--open] [--file PATH] [--port PORT] [--listen [IP:]PORT] [--share]");
     println!("  cad-studio --new PATH [--name NAME] [--size X,Y,Z] [--port PORT] [--listen [IP:]PORT]");
     println!();
-    println!("The studio binds 127.0.0.1 unless shared. `--share` binds 0.0.0.0 and prints a");
-    println!(
-        "tokenised link a colleague on the same network can open; `--advertise HOST` sets the"
-    );
-    println!("host in that link (a DNS name, for example). Anyone with the link can edit the open");
-    println!("document until the studio stops; do not expose it to the internet.");
+    println!("OPTIONS:");
+    println!("  --open                 Automatically open the studio in the default web browser");
+    println!("  --file, --project PATH Open an existing engineering project (default: workspace.atlas)");
+    println!("  --new [PATH]           Create a new project file (optionally with --name and --size)");
+    println!("  --listen [IP:]PORT     Bind address and port (e.g. 127.0.0.1:8080 or 8080)");
+    println!("  --port PORT            Set port (default: 7519, or $PORT / $ATLAS_PORT)");
+    println!("  --host IP              Set bind IP address (default: 127.0.0.1, or $HOST / $ATLAS_HOST)");
+    println!("  --share                Bind 0.0.0.0 with secure token for LAN / remote collaboration");
+    println!("  --advertise HOST       Set public hostname in generated share link ($STUDIO_PUBLIC_HOST)");
+    println!("  --token TOKEN          Specify security token ($ATLAS_STUDIO_TOKEN)");
+    println!("  --token-file PATH      Load security token from file");
+    println!("  --help, -h             Print this help guide");
+    println!();
+    println!("ENVIRONMENT VARIABLES:");
+    println!("  PORT, ATLAS_PORT       Listening port");
+    println!("  HOST, ATLAS_HOST       Bind IP address");
+    println!("  ATLAS_LISTEN           Full listen string (e.g. 0.0.0.0:8080)");
+    println!("  ATLAS_PROJECT          Default project path to open or create");
+    println!("  ATLAS_STUDIO_TOKEN     Bearer security token for shared instances");
+    println!("  STUDIO_PUBLIC_HOST     Public domain / URL for reverse proxy (Caddy / Nginx)");
 }
 
 /// The host to advertise for a shared session: the explicit `--host`, or this machine's address on

@@ -1,0 +1,29 @@
+name: atlascad
+
+services:
+  atlascad:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: atlascad:latest
+    container_name: atlascad-studio
+    restart: unless-stopped
+    ports:
+      - "${PORT:-7519}:7519"
+    environment:
+      - PORT=7519
+      - HOST=0.0.0.0
+      - ATLAS_PROJECT=/data/workspace.atlas
+      - ATLAS_STUDIO_TOKEN=${ATLAS_STUDIO_TOKEN:-}
+    volumes:
+      - atlascad-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:7519/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  atlascad-data:
+    name: atlascad_data

@@ -138,44 +138,44 @@ AtlasCAD is organized as an atomic Cargo workspace consisting of 43 modular Rust
 
 ---
 
-## 4. Quick Start & Usage
+## 4. Quick Start & Deployment
 
-### 4.1 Prerequisites
-- **Rust Toolchain**: 1.94+ (stable).
-- **C/C++ Toolchain**: GCC or Clang (for native dependencies).
-- **FFmpeg**: (Optional) required only for generating headless demonstration videos via Python.
-- **Google Chrome / Firefox**: Any modern web browser with WebGL 2.0 support.
+### 4.1 One-Command Instant Launch
+```bash
+# Clone and launch immediately in your default browser:
+git clone https://github.com/Sanjay-Program/atlascad.git
+cd atlascad
+./run.sh --open
+```
+*No project path required: automatically initializes and opens `workspace.atlas` at `http://127.0.0.1:7519`.*
 
-### 4.2 Building from Source
+### 4.2 One-Command Docker Compose
+```bash
+docker compose up -d
+```
+*Starts AtlasCAD containerized with healthchecks and persistent storage mounted on `/data`.*
+
+### 4.3 Building from Source & CLI Usage
 
 ```bash
 # Build the optimized release binary
 cargo build --release -p cad-studio -p cad-cli
 
-# Run the complete test suite
+# Run complete test suites & 1,206-assertion verification harness
 cargo test --workspace
-
-# Run the exhaustive functional verification harness (1,206 assertions)
 python3 scripts/full-check.py
-```
 
-### 4.3 Running AtlasCAD Studio
+# Launch cad-studio with auto-browser launch:
+./target/release/cad-studio --open
 
-```bash
-# Start AtlasCAD with a new project
-./target/release/cad-studio --new ~/project.atlas --size 50,30,15
+# Open an existing CAD project or custom bind:
+./target/release/cad-studio --file ~/project.atlas --listen 0.0.0.0:8080
 
-# Open an existing CAD project
-./target/release/cad-studio --file ~/project.atlas
-
-# Convenience alias for opening a project on a custom host/port
-./target/release/cad-studio --project ~/project.atlas --listen 0.0.0.0:8080
-
-# Share with team on local LAN with secure session token
+# Share with team on local LAN with secure session token:
 ./target/release/cad-studio --file ~/project.atlas --share
 ```
 
-Once running, navigate to `http://127.0.0.1:7519` (or the configured port) in your web browser.
+For complete production server setup (Systemd, Caddy/Nginx reverse proxies with SSL/TLS, Kubernetes Helm manifests, and Cloud SaaS hosting economics), see the [Production Deployment & Operations Guide](docs/PRODUCTION_DEPLOYMENT_GUIDE.md).
 
 ---
 

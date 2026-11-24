@@ -14556,7 +14556,14 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
         ("GET", "/atlascad-supersonic-flight.mp4") => binary_asset(FLIGHT_VIDEO, "video/mp4"),
         ("GET", "/api/health") => json_response(
             200,
-            serde_json::json!({ "ok": true, "version": env!("CARGO_PKG_VERSION") }),
+            serde_json::json!({
+                "ok": true,
+                "status": "healthy",
+                "version": env!("CARGO_PKG_VERSION"),
+                "service": "atlascad-studio",
+                "solvers_ready": 140,
+                "deterministic": true
+            }),
         ),
         ("GET", "/api/state") => match with_state(state, |state| state.payload()) {
             Ok(payload) => to_json(200, &payload),
