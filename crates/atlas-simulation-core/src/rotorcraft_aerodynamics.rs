@@ -125,7 +125,9 @@ pub fn solve_rotorcraft_aerodynamics(
         return Err("Gross weight must be between 100 and 60000 kg".to_string());
     }
     if problem.rotor_radius_m <= 1.0 || problem.blade_chord_m <= 0.05 {
-        return Err("Rotor radius and blade chord must be realistic rotary wing dimensions".to_string());
+        return Err(
+            "Rotor radius and blade chord must be realistic rotary wing dimensions".to_string(),
+        );
     }
     if problem.number_of_blades < 2 || problem.number_of_blades > 8 {
         return Err("Number of blades must be between 2 and 8".to_string());
@@ -139,7 +141,8 @@ pub fn solve_rotorcraft_aerodynamics(
     let disk_area_m2 = std::f64::consts::PI * problem.rotor_radius_m * problem.rotor_radius_m;
 
     // Rotor solidity: sigma = (N_b * c) / (pi * R)
-    let total_blade_span_area = (problem.number_of_blades as f64) * problem.blade_chord_m * problem.rotor_radius_m;
+    let total_blade_span_area =
+        (problem.number_of_blades as f64) * problem.blade_chord_m * problem.rotor_radius_m;
     let sigma = total_blade_span_area / disk_area_m2;
 
     // Angular velocity and tip speed:
@@ -182,7 +185,8 @@ pub fn solve_rotorcraft_aerodynamics(
     // Profile power:
     // Hover: P_0 = (1/8) * rho * sigma * C_d0 * A * V_tip^3
     // Forward flight: P_0(mu) = P_0 * (1 + 4.65 * mu^2)
-    let p_0_hover_w = 0.125 * rho * sigma * problem.blade_profile_cd0 * disk_area_m2 * v_tip_m_s.powi(3);
+    let p_0_hover_w =
+        0.125 * rho * sigma * problem.blade_profile_cd0 * disk_area_m2 * v_tip_m_s.powi(3);
     let p_0_w = p_0_hover_w * (1.0 + 4.65 * mu * mu);
     let p_0_kw = p_0_w / 1000.0;
 
@@ -254,7 +258,10 @@ mod tests {
         assert!(hover_res.blade_tip_speed_m_s > 220.0 && hover_res.blade_tip_speed_m_s < 250.0);
         assert!(hover_res.induced_velocity_m_s > 10.0 && hover_res.induced_velocity_m_s < 14.0);
         assert!(hover_res.figure_of_merit > 0.65 && hover_res.figure_of_merit < 0.82);
-        assert!(hover_res.total_engine_shaft_power_kw > 600.0 && hover_res.total_engine_shaft_power_kw < 950.0);
+        assert!(
+            hover_res.total_engine_shaft_power_kw > 600.0
+                && hover_res.total_engine_shaft_power_kw < 950.0
+        );
         assert!(hover_res.is_blade_loading_within_limits);
         assert!(hover_res.is_tip_mach_non_critical);
 
@@ -270,7 +277,10 @@ mod tests {
         assert!(cruise_res.advance_ratio_mu > 0.25 && cruise_res.advance_ratio_mu < 0.35);
         assert!(cruise_res.induced_power_kw < hover_res.induced_power_kw); // Induced power drop in cruise
         assert!(cruise_res.parasite_power_kw > 150.0); // High parasite drag in cruise
-        assert!(cruise_res.advancing_tip_mach_number > 0.80 && cruise_res.advancing_tip_mach_number < 0.89);
+        assert!(
+            cruise_res.advancing_tip_mach_number > 0.80
+                && cruise_res.advancing_tip_mach_number < 0.89
+        );
         Ok(())
     }
 }

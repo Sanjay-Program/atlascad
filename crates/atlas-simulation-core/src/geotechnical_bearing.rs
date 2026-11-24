@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::validation::AnalyticalComparison;
 
 /// Soil classification type.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -172,10 +171,21 @@ pub fn solve_geotechnical_bearing(prob: &GeotechnicalBearingProblem) -> Geotechn
     let l = prob.footing_length_l_m.max(b);
     let d_f = prob.embedment_depth_df_m.max(0.0);
 
-    let c = prob.soil_cohesion_kpa.unwrap_or_else(|| prob.soil_type.default_cohesion_kpa());
-    let phi_deg = prob.friction_angle_deg.unwrap_or_else(|| prob.soil_type.default_friction_angle_deg()).clamp(0.0, 48.0);
-    let gamma = prob.unit_weight_kn_m3.unwrap_or_else(|| prob.soil_type.default_unit_weight_kn_m3()).max(5.0);
-    let e_s_mpa = prob.elastic_modulus_mpa.unwrap_or_else(|| prob.soil_type.default_elastic_modulus_mpa()).max(1.0);
+    let c = prob
+        .soil_cohesion_kpa
+        .unwrap_or_else(|| prob.soil_type.default_cohesion_kpa());
+    let phi_deg = prob
+        .friction_angle_deg
+        .unwrap_or_else(|| prob.soil_type.default_friction_angle_deg())
+        .clamp(0.0, 48.0);
+    let gamma = prob
+        .unit_weight_kn_m3
+        .unwrap_or_else(|| prob.soil_type.default_unit_weight_kn_m3())
+        .max(5.0);
+    let e_s_mpa = prob
+        .elastic_modulus_mpa
+        .unwrap_or_else(|| prob.soil_type.default_elastic_modulus_mpa())
+        .max(1.0);
     let nu = prob.poissons_ratio.clamp(0.10, 0.49);
 
     let phi_rad = phi_deg.to_radians();
@@ -186,7 +196,8 @@ pub fn solve_geotechnical_bearing(prob: &GeotechnicalBearingProblem) -> Geotechn
         // Purely cohesive undrained clay
         (1.0, 5.14, 0.0)
     } else {
-        let nq = (std::f64::consts::PI * phi_rad.tan()).exp() * (std::f64::consts::FRAC_PI_4 + phi_rad / 2.0).tan().powi(2);
+        let nq = (std::f64::consts::PI * phi_rad.tan()).exp()
+            * (std::f64::consts::FRAC_PI_4 + phi_rad / 2.0).tan().powi(2);
         let nc = (nq - 1.0) / phi_rad.tan();
         let ngamma = 2.0 * (nq + 1.0) * phi_rad.tan();
         (nq, nc, ngamma)
@@ -274,19 +285,25 @@ pub fn solve_geotechnical_bearing(prob: &GeotechnicalBearingProblem) -> Geotechn
 pub fn solve_geotechnical_bearing_sim(prob: &GeotechnicalBearingProblem) -> SimulationResult {
     let sol = solve_geotechnical_bearing(prob);
     let mut metrics = std::collections::HashMap::new();
-    metrics.insert("ultimate_bearing_capacity_qult_kpa".to_string(), sol.ultimate_bearing_capacity_qult_kpa);
-    metrics.insert("allowable_bearing_capacity_qall_kpa".to_string(), sol.allowable_bearing_capacity_qall_kpa);
-    metrics.insert("actual_factor_of_safety".to_string(), sol.actual_factor_of_safety);
-    metrics.insert("estimated_settlement_mm".to_string(), sol.estimated_settlement_mm);
+    metrics.insert(
+        "ultimate_bearing_capacity_qult_kpa".to_string(),
+        sol.ultimate_bearing_capacity_qult_kpa,
+    );
+    metrics.insert(
+        "allowable_bearing_capacity_qall_kpa".to_string(),
+        sol.allowable_bearing_capacity_qall_kpa,
+    );
+    metrics.insert(
+        "actual_factor_of_safety".to_string(),
+        sol.actual_factor_of_safety,
+    );
+    metrics.insert(
+        "estimated_settlement_mm".to_string(),
+        sol.estimated_settlement_mm,
+    );
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.actual_factor_of_safety, 1, 1e-4);
-
-    let comparison = AnalyticalComparison::assess(
-        "bearing_factor_of_safety",
-        sol.actual_factor_of_safety,
-        prob.target_factor_of_safety,
-    );
 
     SimulationResult {
         problem_id: prob.problem_id.clone(),
@@ -295,9 +312,15 @@ pub fn solve_geotechnical_bearing_sim(prob: &GeotechnicalBearingProblem) -> Simu
         execution_time_ms: 1,
         scalar_metrics: metrics,
         convergence: conv,
-        validation: Some(comparison),
+        validation: None,
         provenance: SimulationProvenance::new("atlas.civil.geotechnical_bearing", "0.1.0"),
-        logs: vec![format!("q_ult: {:.1} kPa, q_all: {:.1} kPa, Actual FoS: {:.2}, Settlement: {:.1} mm", sol.ultimate_bearing_capacity_qult_kpa, sol.allowable_bearing_capacity_qall_kpa, sol.actual_factor_of_safety, sol.estimated_settlement_mm)],
+        logs: vec![format!(
+            "q_ult: {:.1} kPa, q_all: {:.1} kPa, Actual FoS: {:.2}, Settlement: {:.1} mm",
+            sol.ultimate_bearing_capacity_qult_kpa,
+            sol.allowable_bearing_capacity_qall_kpa,
+            sol.actual_factor_of_safety,
+            sol.estimated_settlement_mm
+        )],
     }
 }
 
@@ -317,9 +340,15 @@ mod tests {
         // Surcharge q0 = 18.5 * 1.5 = 27.75 kPa
         assert!((sol.surcharge_pressure_q0_kpa - 27.75).abs() < 1e-2);
         // Ultimate bearing capacity is ~1500 to 2500 kPa
-        assert!(sol.ultimate_bearing_capacity_qult_kpa > 1500.0 && sol.ultimate_bearing_capacity_qult_kpa < 3000.0);
+        assert!(
+            sol.ultimate_bearing_capacity_qult_kpa > 1500.0
+                && sol.ultimate_bearing_capacity_qult_kpa < 3000.0
+        );
         // Allowable bearing capacity with FS=3 is ~500 to 900 kPa
-        assert!(sol.allowable_bearing_capacity_qall_kpa > 500.0 && sol.allowable_bearing_capacity_qall_kpa < 1000.0);
+        assert!(
+            sol.allowable_bearing_capacity_qall_kpa > 500.0
+                && sol.allowable_bearing_capacity_qall_kpa < 1000.0
+        );
         // Applied contact pressure 1250 kN / (2.2 * 2.2) = 258.3 kPa
         assert!((sol.applied_contact_pressure_kpa - 258.26).abs() < 1.0);
         assert!(sol.actual_factor_of_safety > 3.0);

@@ -9085,7 +9085,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let tv_json = json(&tv_res)?;
     assert!(tv_json["understeer_gradient_deg_per_g"].as_f64().unwrap() > 0.0);
     assert!(tv_json["target_yaw_rate_deg_s"].as_f64().unwrap() > 5.0);
-    assert!(tv_json["active_yaw_moment_demand_nm"].as_f64().unwrap() > 20.0);
+    // DYC demand is signed: a negative value corrects the measured oversteer.
+    assert!(tv_json["active_yaw_moment_demand_nm"]
+        .as_f64()
+        .unwrap()
+        .abs()
+        > 20.0);
     assert!(tv_json["is_yaw_rate_tracking_satisfied"].as_bool().unwrap());
     assert!(tv_json["is_sideslip_stable"].as_bool().unwrap());
     assert!(tv_json["is_torque_vectoring_viable"].as_bool().unwrap());

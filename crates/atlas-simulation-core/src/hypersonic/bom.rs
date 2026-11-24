@@ -248,7 +248,8 @@ pub fn build_hypersonic_bom() -> HypersonicBomSummary {
     // 12. Quad-Redundant Fly-By-Light & Quantum INS Unit
     c.push(HypersonicComponent {
         part_id: "AVION-01-QINS".into(),
-        name: "Cold-Atom Rubidium-87 Quantum Gyro & Quad-Redundant ARINC-818 Flight Computer".into(),
+        name: "Cold-Atom Rubidium-87 Quantum Gyro & Quad-Redundant ARINC-818 Flight Computer"
+            .into(),
         material: "Beryllium-Copper Housing / Laser-Cooled Vacuum Cavity".into(),
         mass_kg: 195.0,
         dimensions_m: [0.65, 0.55, 0.40],
@@ -315,9 +316,12 @@ pub fn build_hypersonic_bom() -> HypersonicBomSummary {
 
     let mtow_kg = total_dry_mass + fuel_mass_kg + payload_capacity_kg;
 
-    let global_cg_x = (sum_mx + (fuel_mass_kg * fuel_cg[0]) + (payload_capacity_kg * payload_cg[0])) / mtow_kg;
-    let global_cg_y = (sum_my + (fuel_mass_kg * fuel_cg[1]) + (payload_capacity_kg * payload_cg[1])) / mtow_kg;
-    let global_cg_z = (sum_mz + (fuel_mass_kg * fuel_cg[2]) + (payload_capacity_kg * payload_cg[2])) / mtow_kg;
+    let global_cg_x =
+        (sum_mx + (fuel_mass_kg * fuel_cg[0]) + (payload_capacity_kg * payload_cg[0])) / mtow_kg;
+    let global_cg_y =
+        (sum_my + (fuel_mass_kg * fuel_cg[1]) + (payload_capacity_kg * payload_cg[1])) / mtow_kg;
+    let global_cg_z =
+        (sum_mz + (fuel_mass_kg * fuel_cg[2]) + (payload_capacity_kg * payload_cg[2])) / mtow_kg;
 
     let subsystem_names = vec![
         "Thermal Protection System".into(),

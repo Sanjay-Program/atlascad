@@ -5,11 +5,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Emitter pressure-compensation mechanism.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -27,8 +27,8 @@ impl EmitterType {
     pub fn discharge_exponent(&self) -> f64 {
         match self {
             Self::NonCompensatingOrifice => 0.50,
-            Self::PressureCompensating   => 0.08,
-            Self::MicroSprayNozzle       => 0.45,
+            Self::PressureCompensating => 0.08,
+            Self::MicroSprayNozzle => 0.45,
         }
     }
 }
@@ -149,7 +149,10 @@ pub struct IrrigationHydraulicsResult {
 pub fn solve_irrigation_hydraulics(
     problem: &IrrigationHydraulicsProblem,
 ) -> Result<IrrigationHydraulicsResult, String> {
-    if problem.pipe_inside_diameter_mm <= 0.0 || problem.lateral_length_m <= 0.0 || problem.emitter_spacing_m <= 0.0 {
+    if problem.pipe_inside_diameter_mm <= 0.0
+        || problem.lateral_length_m <= 0.0
+        || problem.emitter_spacing_m <= 0.0
+    {
         return Err("Dimensions must be positive".to_string());
     }
     if problem.nominal_discharge_l_h <= 0.0 || problem.inlet_pressure_head_m <= 0.0 {
@@ -173,7 +176,9 @@ pub fn solve_irrigation_hydraulics(
     // F_m = 1/(m + 1) + 1/(2*N) + sqrt(m - 1)/(6*N^2)
     // For Hazen-Williams m = 1.852:
     let m_hw = 1.852;
-    let f_m = (1.0 / (m_hw + 1.0)) + (1.0 / (2.0 * n_float)) + ((m_hw - 1.0).sqrt() / (6.0 * n_float.powi(2)));
+    let f_m = (1.0 / (m_hw + 1.0))
+        + (1.0 / (2.0 * n_float))
+        + ((m_hw - 1.0).sqrt() / (6.0 * n_float.powi(2)));
 
     // 4. Hazen-Williams Pipe Friction Loss for Continuous Flow (SI formula):
     // h_f_cont = 10.67 * L * Q^1.852 / (C^1.852 * D_m^4.87)
@@ -246,9 +251,7 @@ pub fn solve_irrigation_hydraulics(
 }
 
 /// Executes irrigation hydraulics simulation and packages into SimulationResult envelope.
-pub fn solve_irrigation_hydraulics_sim(
-    problem: &IrrigationHydraulicsProblem,
-) -> SimulationResult {
+pub fn solve_irrigation_hydraulics_sim(problem: &IrrigationHydraulicsProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_irrigation_hydraulics(problem) {
         Ok(res) => {
@@ -258,9 +261,18 @@ pub fn solve_irrigation_hydraulics_sim(
             metrics.insert("friction_head_loss_m".to_string(), res.friction_head_loss_m);
             metrics.insert("min_pressure_head_m".to_string(), res.min_pressure_head_m);
             metrics.insert("max_pressure_head_m".to_string(), res.max_pressure_head_m);
-            metrics.insert("discharge_variation_pct".to_string(), res.discharge_variation_pct);
-            metrics.insert("christiansen_uniformity_pct".to_string(), res.christiansen_uniformity_pct);
-            metrics.insert("emission_uniformity_pct".to_string(), res.emission_uniformity_pct);
+            metrics.insert(
+                "discharge_variation_pct".to_string(),
+                res.discharge_variation_pct,
+            );
+            metrics.insert(
+                "christiansen_uniformity_pct".to_string(),
+                res.christiansen_uniformity_pct,
+            );
+            metrics.insert(
+                "emission_uniformity_pct".to_string(),
+                res.emission_uniformity_pct,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, res.christiansen_uniformity_pct, 1, 1e-4);
@@ -282,10 +294,18 @@ pub fn solve_irrigation_hydraulics_sim(
                 provenance: SimulationProvenance::new("atlas.agri.irrigation_hydraulics", "0.1.0"),
                 logs: vec![format!(
                     "Irrigation Hydraulics (Christiansen / ISO 9261): {} emitters, Qin = {:.0} L/h ({:.2} m/s), Fm = {:.3}, h_f = {:.2} m, H = [{:.2}, {:.2}] m, q = [{:.2}, {:.2}] L/h (var = {:.1}%), CU = {:.1}%, EU = {:.1}%, Acceptable: {}",
-                    res.total_emitter_count, res.total_inlet_flow_l_h, res.inlet_velocity_m_s,
-                    res.christiansen_factor_fm, res.friction_head_loss_m, res.min_pressure_head_m,
-                    res.max_pressure_head_m, res.min_emitter_discharge_l_h, res.max_emitter_discharge_l_h,
-                    res.discharge_variation_pct, res.christiansen_uniformity_pct, res.emission_uniformity_pct,
+                    res.total_emitter_count,
+                    res.total_inlet_flow_l_h,
+                    res.inlet_velocity_m_s,
+                    res.christiansen_factor_fm,
+                    res.friction_head_loss_m,
+                    res.min_pressure_head_m,
+                    res.max_pressure_head_m,
+                    res.min_emitter_discharge_l_h,
+                    res.max_emitter_discharge_l_h,
+                    res.discharge_variation_pct,
+                    res.christiansen_uniformity_pct,
+                    res.emission_uniformity_pct,
                     res.is_discharge_variation_acceptable
                 )],
             }
@@ -320,9 +340,14 @@ mod tests {
         let res = solve_irrigation_hydraulics(&prob).expect("irrigation solver failed");
         println!(
             "Irrigation: N = {}, Qin = {:.0} L/h, v = {:.2} m/s, Fm = {:.3}, h_f = {:.2} m, dQ = {:.1}%, CU = {:.1}%, EU = {:.1}%",
-            res.total_emitter_count, res.total_inlet_flow_l_h, res.inlet_velocity_m_s,
-            res.christiansen_factor_fm, res.friction_head_loss_m, res.discharge_variation_pct,
-            res.christiansen_uniformity_pct, res.emission_uniformity_pct
+            res.total_emitter_count,
+            res.total_inlet_flow_l_h,
+            res.inlet_velocity_m_s,
+            res.christiansen_factor_fm,
+            res.friction_head_loss_m,
+            res.discharge_variation_pct,
+            res.christiansen_uniformity_pct,
+            res.emission_uniformity_pct
         );
 
         assert_eq!(res.total_emitter_count, 300);

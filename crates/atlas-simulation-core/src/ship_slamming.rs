@@ -100,9 +100,7 @@ pub struct ShipSlammingResult {
 }
 
 /// Solves Wagner/Chuang hydrodynamic water entry, slamming pressure, and DNV shell plating thickness.
-pub fn solve_ship_slamming(
-    problem: &ShipSlammingProblem,
-) -> Result<ShipSlammingResult, String> {
+pub fn solve_ship_slamming(problem: &ShipSlammingProblem) -> Result<ShipSlammingResult, String> {
     if problem.relative_impact_velocity_m_s <= 0.5 {
         return Err("Relative impact velocity must exceed 0.5 m/s".to_string());
     }
@@ -168,7 +166,10 @@ pub fn solve_ship_slamming(
     let c_a = (1.0 - 0.5 * s_over_l).clamp(0.70, 1.0);
     let sigma_perm_mpa = 0.90 * problem.steel_yield_strength_mpa;
     let t_corr_mm = 2.5; // standard marine corrosion addition
-    let t_req_mm = (problem.frame_spacing_m * 1000.0) * c_a * (p_stat_kpa / (2.0 * 1000.0 * sigma_perm_mpa)).sqrt() + t_corr_mm;
+    let t_req_mm = (problem.frame_spacing_m * 1000.0)
+        * c_a
+        * (p_stat_kpa / (2.0 * 1000.0 * sigma_perm_mpa)).sqrt()
+        + t_corr_mm;
 
     // Elastic bending stress in existing plate:
     // sigma = beta_stress * P_stat * (s / t)^2
@@ -217,7 +218,10 @@ mod tests {
         };
 
         let res = solve_ship_slamming(&prob)?;
-        assert!(res.slamming_pressure_coefficient_cp > 10.0 && res.slamming_pressure_coefficient_cp < 35.0);
+        assert!(
+            res.slamming_pressure_coefficient_cp > 10.0
+                && res.slamming_pressure_coefficient_cp < 35.0
+        );
         assert!(res.peak_localized_pressure_kpa > 250.0 && res.peak_localized_pressure_kpa < 900.0);
         assert!(res.space_averaged_pressure_kpa > 150.0);
         assert!(res.slamming_pulse_duration_ms > 5.0 && res.slamming_pulse_duration_ms < 25.0);

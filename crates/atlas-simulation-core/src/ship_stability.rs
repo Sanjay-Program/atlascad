@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
 use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Standard seawater mass density in tonnes per cubic meter (t/m³).
 pub const SEAWATER_DENSITY_T_M3: f64 = 1.025;
@@ -94,9 +94,7 @@ pub struct ShipStabilityResult {
 }
 
 /// Solves ship hydrostatics, initial metacentric height, GZ righting curve, and IMO 2008 criteria.
-pub fn solve_ship_stability(
-    problem: &ShipStabilityProblem,
-) -> Result<ShipStabilityResult, String> {
+pub fn solve_ship_stability(problem: &ShipStabilityProblem) -> Result<ShipStabilityResult, String> {
     if problem.length_between_perpendiculars_m <= 0.0 || problem.molded_beam_m <= 0.0 {
         return Err("Ship length and beam must be positive".to_string());
     }
@@ -139,7 +137,10 @@ pub fn solve_ship_stability(
     let km = kb + bm;
     let gm0 = km - kg;
     if gm0 <= 0.0 {
-        return Err(format!("Unstable upright equilibrium: GM0 = {:.3} m <= 0.0", gm0));
+        return Err(format!(
+            "Unstable upright equilibrium: GM0 = {:.3} m <= 0.0",
+            gm0
+        ));
     }
 
     // 5. GZ Righting Arm curve computation via Wall-sided formula:
@@ -231,12 +232,30 @@ pub fn solve_ship_stability_sim(problem: &ShipStabilityProblem) -> SimulationRes
     match solve_ship_stability(problem) {
         Ok(result) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("initial_metacentric_height_gm0_m".to_string(), result.initial_metacentric_height_gm0_m);
-            metrics.insert("max_gz_righting_arm_m".to_string(), result.max_gz_righting_arm_m);
-            metrics.insert("angle_of_max_gz_deg".to_string(), result.angle_of_max_gz_deg);
-            metrics.insert("area_under_gz_30deg_m_rad".to_string(), result.area_under_gz_30deg_m_rad);
-            metrics.insert("area_under_gz_40deg_m_rad".to_string(), result.area_under_gz_40deg_m_rad);
-            metrics.insert("area_between_30_and_40deg_m_rad".to_string(), result.area_between_30_and_40deg_m_rad);
+            metrics.insert(
+                "initial_metacentric_height_gm0_m".to_string(),
+                result.initial_metacentric_height_gm0_m,
+            );
+            metrics.insert(
+                "max_gz_righting_arm_m".to_string(),
+                result.max_gz_righting_arm_m,
+            );
+            metrics.insert(
+                "angle_of_max_gz_deg".to_string(),
+                result.angle_of_max_gz_deg,
+            );
+            metrics.insert(
+                "area_under_gz_30deg_m_rad".to_string(),
+                result.area_under_gz_30deg_m_rad,
+            );
+            metrics.insert(
+                "area_under_gz_40deg_m_rad".to_string(),
+                result.area_under_gz_40deg_m_rad,
+            );
+            metrics.insert(
+                "area_between_30_and_40deg_m_rad".to_string(),
+                result.area_between_30_and_40deg_m_rad,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, result.initial_metacentric_height_gm0_m, 1, 1e-4);
@@ -255,7 +274,10 @@ pub fn solve_ship_stability_sim(problem: &ShipStabilityProblem) -> SimulationRes
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.marine.ship_stability_imo2008", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.marine.ship_stability_imo2008",
+                    "0.1.0",
+                ),
                 logs: vec![format!(
                     "Ship Stability (IMO 2008): GM0 = {:.2} m, GZ_max = {:.2} m @ {:.1}°, A30 = {:.3} m·rad, A40 = {:.3} m·rad (IMO Pass: {})",
                     result.initial_metacentric_height_gm0_m,
@@ -278,7 +300,10 @@ pub fn solve_ship_stability_sim(problem: &ShipStabilityProblem) -> SimulationRes
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.marine.ship_stability_imo2008", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.marine.ship_stability_imo2008",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Ship stability simulation failed: {}", err)],
             }
         }
@@ -294,15 +319,25 @@ mod tests {
     fn test_ship_stability_nominal() {
         let prob = ShipStabilityProblem::default();
         let res = solve_ship_stability(&prob).expect("solver failed");
-        println!("Ship stability: Disp = {}, KB = {}, BM = {}, KM = {}, GM0 = {}, GZ_max = {}, A30 = {}, A40 = {}",
-            res.displacement_mass_tonnes, res.center_of_buoyancy_kb_m, res.metacentric_radius_bm_m,
-            res.transverse_metacenter_km_m, res.initial_metacentric_height_gm0_m, res.max_gz_righting_arm_m,
-            res.area_under_gz_30deg_m_rad, res.area_under_gz_40deg_m_rad);
+        println!(
+            "Ship stability: Disp = {}, KB = {}, BM = {}, KM = {}, GM0 = {}, GZ_max = {}, A30 = {}, A40 = {}",
+            res.displacement_mass_tonnes,
+            res.center_of_buoyancy_kb_m,
+            res.metacentric_radius_bm_m,
+            res.transverse_metacenter_km_m,
+            res.initial_metacentric_height_gm0_m,
+            res.max_gz_righting_arm_m,
+            res.area_under_gz_30deg_m_rad,
+            res.area_under_gz_40deg_m_rad
+        );
 
         assert!(res.displacement_mass_tonnes > 15000.0 && res.displacement_mass_tonnes < 18000.0);
         assert!(res.center_of_buoyancy_kb_m > 4.0 && res.center_of_buoyancy_kb_m < 5.5);
         assert!(res.metacentric_radius_bm_m > 4.0 && res.metacentric_radius_bm_m < 6.5);
-        assert!(res.initial_metacentric_height_gm0_m > 1.0 && res.initial_metacentric_height_gm0_m < 4.0);
+        assert!(
+            res.initial_metacentric_height_gm0_m > 1.0
+                && res.initial_metacentric_height_gm0_m < 4.0
+        );
         assert!(res.max_gz_righting_arm_m > 0.5 && res.max_gz_righting_arm_m < 3.5);
         assert!(res.angle_of_max_gz_deg >= 25.0);
         assert!(res.area_under_gz_30deg_m_rad >= 0.055);

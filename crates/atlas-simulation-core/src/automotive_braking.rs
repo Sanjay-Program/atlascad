@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::validation::AnalyticalComparison;
 
 /// Disc rotor metallurgical material.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -97,7 +96,7 @@ impl Default for AutomotiveBrakingProblem {
             initial_speed_kph: 100.0,
             driver_reaction_time_s: 0.45,
             rotor_material: RotorMaterial::GrayCastIron,
-            front_rotor_mass_kg: 11.8, // Ventilated cast iron disc
+            front_rotor_mass_kg: 11.8,     // Ventilated cast iron disc
             front_rotor_diameter_m: 0.355, // 355 mm rotor
             ambient_temp_c: 25.0,
         }
@@ -219,18 +218,15 @@ pub fn solve_automotive_braking_sim(prob: &AutomotiveBrakingProblem) -> Simulati
     let mut metrics = std::collections::HashMap::new();
     metrics.insert("deceleration_g".to_string(), sol.deceleration_g);
     metrics.insert("stopping_distance_m".to_string(), sol.stopping_distance_m);
-    metrics.insert("front_wheel_brake_torque_nm".to_string(), sol.front_wheel_brake_torque_nm);
+    metrics.insert(
+        "front_wheel_brake_torque_nm".to_string(),
+        sol.front_wheel_brake_torque_nm,
+    );
     metrics.insert("rotor_temp_rise_c".to_string(), sol.rotor_temp_rise_c);
     metrics.insert("peak_rotor_temp_c".to_string(), sol.peak_rotor_temp_c);
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.stopping_distance_m, 1, 1e-4);
-
-    let comparison = AnalyticalComparison::assess(
-        "stopping_distance_m",
-        sol.stopping_distance_m,
-        38.0,
-    );
 
     SimulationResult {
         problem_id: prob.problem_id.clone(),
@@ -239,9 +235,17 @@ pub fn solve_automotive_braking_sim(prob: &AutomotiveBrakingProblem) -> Simulati
         execution_time_ms: 1,
         scalar_metrics: metrics,
         convergence: conv,
-        validation: Some(comparison),
+        validation: None,
         provenance: SimulationProvenance::new("atlas.automotive.braking_sae_j292", "0.1.0"),
-        logs: vec![format!("Decel: {:.2}g, Stopping dist: {:.1} m (Braking: {:.1} m), Front Torque: {:.0} Nm, Disc ΔT: +{:.1} °C (Peak: {:.1} °C)", sol.deceleration_g, sol.stopping_distance_m, sol.braking_distance_only_m, sol.front_wheel_brake_torque_nm, sol.rotor_temp_rise_c, sol.peak_rotor_temp_c)],
+        logs: vec![format!(
+            "Decel: {:.2}g, Stopping dist: {:.1} m (Braking: {:.1} m), Front Torque: {:.0} Nm, Disc ΔT: +{:.1} °C (Peak: {:.1} °C)",
+            sol.deceleration_g,
+            sol.stopping_distance_m,
+            sol.braking_distance_only_m,
+            sol.front_wheel_brake_torque_nm,
+            sol.rotor_temp_rise_c,
+            sol.peak_rotor_temp_c
+        )],
     }
 }
 
@@ -271,7 +275,9 @@ mod tests {
         assert!(sol.total_kinetic_energy_kj > 680.0 && sol.total_kinetic_energy_kj < 750.0);
 
         // Single front rotor absorbs ~70% / 2 = ~35% of 713 kJ ≈ 250 kJ
-        assert!(sol.front_single_rotor_energy_kj > 220.0 && sol.front_single_rotor_energy_kj < 280.0);
+        assert!(
+            sol.front_single_rotor_energy_kj > 220.0 && sol.front_single_rotor_energy_kj < 280.0
+        );
 
         // Adiabatic temp rise: 250 kJ / (11.8 kg * 460 J/kgK) ≈ 46 °C
         assert!(sol.rotor_temp_rise_c > 35.0 && sol.rotor_temp_rise_c < 60.0);

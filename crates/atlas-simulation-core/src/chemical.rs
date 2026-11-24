@@ -558,7 +558,10 @@ pub fn solve_acid_base_titration(
             "Buffer Half-Equivalence Point: V_1/2 = {:.2} mL, pH = {:.2}",
             half_v_eq, half_eq_ph
         ),
-        format!("Auto-ionization Kw at {:.1} °C: {:.2e}", prob.temperature_c, kw),
+        format!(
+            "Auto-ionization Kw at {:.1} °C: {:.2e}",
+            prob.temperature_c, kw
+        ),
     ];
 
     Ok(AcidBaseEquilibriumResult {
@@ -620,8 +623,7 @@ fn compute_acid_titration_point(
         // Before Equivalence (Buffer region or strong acid neutralization)
         match analyte.nature {
             AcidBaseNature::StrongAcid => {
-                let n_acid_rem =
-                    ca * (va / 1000.0) * (analyte.valence as f64) - cb * (vb / 1000.0);
+                let n_acid_rem = ca * (va / 1000.0) * (analyte.valence as f64) - cb * (vb / 1000.0);
                 let h = (n_acid_rem / (v_total / 1000.0)).max(1e-14);
                 (-h.log10(), "Acid Neutralization Region".to_string())
             }
@@ -687,8 +689,7 @@ fn compute_base_titration_point(
     } else if va < v_eq {
         match analyte.nature {
             AcidBaseNature::StrongBase => {
-                let n_base_rem =
-                    cb * (vb / 1000.0) * (analyte.valence as f64) - ca * (va / 1000.0);
+                let n_base_rem = cb * (vb / 1000.0) * (analyte.valence as f64) - ca * (va / 1000.0);
                 let oh = (n_base_rem / (v_total / 1000.0)).max(1e-14);
                 let poh = -oh.log10();
                 (pkw - poh, "Base Neutralization Region".to_string())
@@ -715,14 +716,15 @@ fn compute_base_titration_point(
 }
 
 /// Simulation harness adapter returning a standardized `SimulationResult`.
-pub fn solve_chemical_titration_sim(
-    prob: &AcidBaseProblem,
-) -> Result<SimulationResult, String> {
+pub fn solve_chemical_titration_sim(prob: &AcidBaseProblem) -> Result<SimulationResult, String> {
     let sol = solve_acid_base_titration(prob)?;
 
     let mut metrics = HashMap::new();
     metrics.insert("initial_ph".to_string(), sol.initial_ph);
-    metrics.insert("equivalence_volume_ml".to_string(), sol.equivalence_volume_ml);
+    metrics.insert(
+        "equivalence_volume_ml".to_string(),
+        sol.equivalence_volume_ml,
+    );
     metrics.insert("equivalence_ph".to_string(), sol.equivalence_ph);
     metrics.insert("half_equivalence_ph".to_string(), sol.half_equivalence_ph);
     metrics.insert("max_buffer_capacity".to_string(), sol.max_buffer_capacity);
@@ -793,13 +795,13 @@ impl Default for ReactionKineticsProblem {
             order: ReactionOrder::FirstOrder,
             initial_concentration_m: 1.0,
             rate_constant_k: None,
-            pre_exponential_a: Some(1.0e13),     // Typical frequency factor
+            pre_exponential_a: Some(1.0e13), // Typical frequency factor
             activation_energy_j_mol: Some(85000.0), // 85 kJ/mol
             temperature_k: 350.0,
             time_seconds: Some(120.0),
             equilibrium_constant_kc: Some(5.0),
-            volumetric_flow_m3_s: Some(0.01),    // 10 L/s
-            target_conversion: Some(0.90),       // 90% conversion
+            volumetric_flow_m3_s: Some(0.01), // 10 L/s
+            target_conversion: Some(0.90),    // 90% conversion
             heat_of_reaction_kj_mol: Some(-50.0),
         }
     }
@@ -893,36 +895,37 @@ pub fn solve_reaction_kinetics(
     };
 
     // Reactor sizing for specified target conversion
-    let (cstr_vol, pfr_vol, da_num) = if let (Some(x_target), Some(v0)) = (prob.target_conversion, prob.volumetric_flow_m3_s) {
-        let x = x_target.clamp(0.01, 0.999);
-        let (tau_cstr, tau_pfr) = match prob.order {
-            ReactionOrder::FirstOrder => {
-                let tc = x / (k * (1.0 - x));
-                let tp = (1.0 / k) * (1.0 / (1.0 - x)).ln();
-                (tc, tp)
-            }
-            ReactionOrder::SecondOrder => {
-                let tc = x / (k * c0 * (1.0 - x) * (1.0 - x));
-                let tp = (1.0 / (k * c0)) * (x / (1.0 - x));
-                (tc, tp)
-            }
-            ReactionOrder::ReversibleFirstOrder => {
-                let kc = prob.equilibrium_constant_kc.unwrap_or(1.0).max(1e-6);
-                let x_eq = kc / (1.0 + kc);
-                let x_eff = x.min(x_eq * 0.99);
-                let k_tot = k * (1.0 + 1.0 / kc);
-                let tc = x_eff / (k_tot * (x_eq - x_eff));
-                let tp = (1.0 / k_tot) * (x_eq / (x_eq - x_eff)).ln();
-                (tc, tp)
-            }
+    let (cstr_vol, pfr_vol, da_num) =
+        if let (Some(x_target), Some(v0)) = (prob.target_conversion, prob.volumetric_flow_m3_s) {
+            let x = x_target.clamp(0.01, 0.999);
+            let (tau_cstr, tau_pfr) = match prob.order {
+                ReactionOrder::FirstOrder => {
+                    let tc = x / (k * (1.0 - x));
+                    let tp = (1.0 / k) * (1.0 / (1.0 - x)).ln();
+                    (tc, tp)
+                }
+                ReactionOrder::SecondOrder => {
+                    let tc = x / (k * c0 * (1.0 - x) * (1.0 - x));
+                    let tp = (1.0 / (k * c0)) * (x / (1.0 - x));
+                    (tc, tp)
+                }
+                ReactionOrder::ReversibleFirstOrder => {
+                    let kc = prob.equilibrium_constant_kc.unwrap_or(1.0).max(1e-6);
+                    let x_eq = kc / (1.0 + kc);
+                    let x_eff = x.min(x_eq * 0.99);
+                    let k_tot = k * (1.0 + 1.0 / kc);
+                    let tc = x_eff / (k_tot * (x_eq - x_eff));
+                    let tp = (1.0 / k_tot) * (x_eq / (x_eq - x_eff)).ln();
+                    (tc, tp)
+                }
+            };
+            let vc = v0 * tau_cstr;
+            let vp = v0 * tau_pfr;
+            let da = k * tau_pfr;
+            (Some(vc), Some(vp), Some(da))
+        } else {
+            (None, None, None)
         };
-        let vc = v0 * tau_cstr;
-        let vp = v0 * tau_pfr;
-        let da = k * tau_pfr;
-        (Some(vc), Some(vp), Some(da))
-    } else {
-        (None, None, None)
-    };
 
     // Heat release rate in kW: Q_dot = r_A * V * (-Delta H)
     let heat_kw = if let (Some(dh), Some(v_cstr)) = (prob.heat_of_reaction_kj_mol, cstr_vol) {
@@ -956,9 +959,21 @@ pub fn solve_reaction_kinetics(
     }
 
     let mut notes = vec![
-        format!("Reaction Kinetics: {} (Order: {:?})", prob.reaction_name, prob.order),
-        format!("Temperature: {:.1} K, Rate constant k = {:.4e}", prob.temperature_k, k),
-        format!("Initial [A]_0 = {:.3} M, Final [A] = {:.4} M at t = {:.1} s (Conversion = {:.2}%)", c0, c_final, t, conversion * 100.0),
+        format!(
+            "Reaction Kinetics: {} (Order: {:?})",
+            prob.reaction_name, prob.order
+        ),
+        format!(
+            "Temperature: {:.1} K, Rate constant k = {:.4e}",
+            prob.temperature_k, k
+        ),
+        format!(
+            "Initial [A]_0 = {:.3} M, Final [A] = {:.4} M at t = {:.1} s (Conversion = {:.2}%)",
+            c0,
+            c_final,
+            t,
+            conversion * 100.0
+        ),
         format!("Reaction Half-Life t_1/2 = {:.2} s", half_life),
     ];
     if let (Some(vc), Some(vp)) = (cstr_vol, pfr_vol) {
@@ -997,7 +1012,10 @@ pub fn solve_reaction_kinetics_sim(
     let mut metrics = HashMap::new();
     metrics.insert("rate_constant_k".to_string(), sol.rate_constant_k);
     metrics.insert("half_life_seconds".to_string(), sol.half_life_seconds);
-    metrics.insert("final_concentration_m".to_string(), sol.final_concentration_m);
+    metrics.insert(
+        "final_concentration_m".to_string(),
+        sol.final_concentration_m,
+    );
     metrics.insert("conversion_fraction".to_string(), sol.conversion_fraction);
     metrics.insert("reaction_rate_m_s".to_string(), sol.reaction_rate_m_s);
     if let Some(vc) = sol.cstr_volume_m3 {

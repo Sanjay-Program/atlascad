@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Vacuum magnetic permeability mu_0 in H/m (T·m/A).
 pub const MU_0: f64 = 4.0 * std::f64::consts::PI * 1e-7;
@@ -146,9 +146,7 @@ pub struct CryoMagnetResult {
 }
 
 /// Solves superconducting magnet magnetics, critical currents, Lorentz stress, and quench discharge.
-pub fn solve_cryo_magnet(
-    problem: &CryoMagnetProblem,
-) -> Result<CryoMagnetResult, String> {
+pub fn solve_cryo_magnet(problem: &CryoMagnetProblem) -> Result<CryoMagnetResult, String> {
     if problem.inner_radius_m <= 0.0 || problem.outer_radius_m <= problem.inner_radius_m {
         return Err("Outer radius must exceed inner radius and both must be positive".to_string());
     }
@@ -189,7 +187,8 @@ pub fn solve_cryo_magnet(
     // L = mu_0 * N^2 * pi * R_mean^2 / L_coil * K_nagaoka
     // Nagaoka approximation: K_nagaoka = 1 / (1 + 0.9 * (2 * R_mean / L_coil))
     let k_nagaoka = 1.0 / (1.0 + 0.90 * (2.0 * r_mean / l_coil));
-    let inductance_h = MU_0 * n_turns.powi(2) * std::f64::consts::PI * r_mean.powi(2) / l_coil * k_nagaoka;
+    let inductance_h =
+        MU_0 * n_turns.powi(2) * std::f64::consts::PI * r_mean.powi(2) / l_coil * k_nagaoka;
 
     // 4. Stored magnetic energy:
     // E_mag = 0.5 * L * I^2
@@ -267,15 +266,16 @@ pub fn solve_cryo_magnet(
 }
 
 /// Executes superconducting magnet simulation and packages into SimulationResult envelope.
-pub fn solve_cryo_magnet_sim(
-    problem: &CryoMagnetProblem,
-) -> SimulationResult {
+pub fn solve_cryo_magnet_sim(problem: &CryoMagnetProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_cryo_magnet(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
             metrics.insert("central_field_t".to_string(), res.central_field_t);
-            metrics.insert("peak_conductor_field_t".to_string(), res.peak_conductor_field_t);
+            metrics.insert(
+                "peak_conductor_field_t".to_string(),
+                res.peak_conductor_field_t,
+            );
             metrics.insert("coil_inductance_h".to_string(), res.coil_inductance_h);
             metrics.insert("stored_energy_mj".to_string(), res.stored_energy_mj);
             metrics.insert("critical_current_a".to_string(), res.critical_current_a);
@@ -283,16 +283,16 @@ pub fn solve_cryo_magnet_sim(
             metrics.insert("hoop_stress_mpa".to_string(), res.hoop_stress_mpa);
             metrics.insert("dump_resistor_ohm".to_string(), res.dump_resistor_ohm);
             metrics.insert("dump_time_constant_s".to_string(), res.dump_time_constant_s);
-            metrics.insert("adiabatic_hotspot_temperature_k".to_string(), res.adiabatic_hotspot_temperature_k);
+            metrics.insert(
+                "adiabatic_hotspot_temperature_k".to_string(),
+                res.adiabatic_hotspot_temperature_k,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, res.central_field_t, 1, 1e-4);
 
-            let comparison = AnalyticalComparison::assess(
-                "central_field_t",
-                res.central_field_t,
-                3.25,
-            );
+            let comparison =
+                AnalyticalComparison::assess("central_field_t", res.central_field_t, 3.25);
 
             SimulationResult {
                 problem_id: problem.problem_id.clone(),
@@ -302,14 +302,26 @@ pub fn solve_cryo_magnet_sim(
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.science.superconducting_magnet", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.science.superconducting_magnet",
+                    "0.1.0",
+                ),
                 logs: vec![format!(
                     "Superconducting Magnet (Wilson / CERN): B0 = {:.2} T (B_peak = {:.2} T), L = {:.3} H, E_mag = {:.2} MJ, Margin = {:.1}% (I_op = {:.0} A, Ic = {:.0} A), Hoop = {:.1} MPa, R_dump = {:.2} Ohm (tau = {:.2} s, V_dump = {:.0} V), T_hot = {:.1} K, Quench Safe: {}, Margin Adequate: {}",
-                    res.central_field_t, res.peak_conductor_field_t, res.coil_inductance_h,
-                    res.stored_energy_mj, res.load_line_margin_pct, problem.operating_current_a,
-                    res.critical_current_a, res.hoop_stress_mpa, res.dump_resistor_ohm,
-                    res.dump_time_constant_s, res.dump_voltage_v, res.adiabatic_hotspot_temperature_k,
-                    res.is_quench_safe, res.is_margin_adequate
+                    res.central_field_t,
+                    res.peak_conductor_field_t,
+                    res.coil_inductance_h,
+                    res.stored_energy_mj,
+                    res.load_line_margin_pct,
+                    problem.operating_current_a,
+                    res.critical_current_a,
+                    res.hoop_stress_mpa,
+                    res.dump_resistor_ohm,
+                    res.dump_time_constant_s,
+                    res.dump_voltage_v,
+                    res.adiabatic_hotspot_temperature_k,
+                    res.is_quench_safe,
+                    res.is_margin_adequate
                 )],
             }
         }
@@ -325,7 +337,10 @@ pub fn solve_cryo_magnet_sim(
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.science.superconducting_magnet", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.science.superconducting_magnet",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Superconducting magnet simulation failed: {}", err)],
             }
         }
@@ -343,9 +358,14 @@ mod tests {
         let res = solve_cryo_magnet(&prob).expect("magnet solver failed");
         println!(
             "Magnet: B0 = {:.2} T, Bpeak = {:.2} T, L = {:.3} H, Emag = {:.2} MJ, Ic = {:.0} A, Margin = {:.1}%, Hoop = {:.1} MPa, Thot = {:.1} K",
-            res.central_field_t, res.peak_conductor_field_t, res.coil_inductance_h,
-            res.stored_energy_mj, res.critical_current_a, res.load_line_margin_pct,
-            res.hoop_stress_mpa, res.adiabatic_hotspot_temperature_k
+            res.central_field_t,
+            res.peak_conductor_field_t,
+            res.coil_inductance_h,
+            res.stored_energy_mj,
+            res.critical_current_a,
+            res.load_line_margin_pct,
+            res.hoop_stress_mpa,
+            res.adiabatic_hotspot_temperature_k
         );
 
         assert!(res.central_field_t > 2.5 && res.central_field_t < 4.5);
@@ -354,7 +374,10 @@ mod tests {
         assert!(res.stored_energy_mj > 1.8 && res.stored_energy_mj < 5.0);
         assert!(res.load_line_margin_pct > 40.0 && res.load_line_margin_pct < 75.0);
         assert!(res.hoop_stress_mpa > 10.0 && res.hoop_stress_mpa < 45.0);
-        assert!(res.adiabatic_hotspot_temperature_k > 60.0 && res.adiabatic_hotspot_temperature_k < 180.0);
+        assert!(
+            res.adiabatic_hotspot_temperature_k > 60.0
+                && res.adiabatic_hotspot_temperature_k < 180.0
+        );
         assert!(res.is_quench_safe);
         assert!(res.is_margin_adequate);
     }

@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Airway rock wall surface roughness type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -27,9 +27,9 @@ impl AirwayLiningType {
     /// Returns nominal Atkinson friction factor k in N·s²/m⁴ at standard air density 1.20 kg/m³.
     pub fn friction_factor_k(&self) -> f64 {
         match self {
-            Self::SmoothConcrete   => 0.0035,
+            Self::SmoothConcrete => 0.0035,
             Self::RoughBlastedRock => 0.0095,
-            Self::TimberedRock     => 0.0160,
+            Self::TimberedRock => 0.0160,
         }
     }
 }
@@ -157,7 +157,10 @@ pub struct MineVentilationResult {
 pub fn solve_mine_ventilation(
     problem: &MineVentilationProblem,
 ) -> Result<MineVentilationResult, String> {
-    if problem.airway_length_m <= 0.0 || problem.airway_area_m2 <= 0.0 || problem.airway_perimeter_m <= 0.0 {
+    if problem.airway_length_m <= 0.0
+        || problem.airway_area_m2 <= 0.0
+        || problem.airway_perimeter_m <= 0.0
+    {
         return Err("Airway dimensions must be positive".to_string());
     }
     if problem.airflow_rate_m3_s <= 0.0 || problem.air_density_kg_m3 <= 0.0 {
@@ -239,18 +242,28 @@ pub fn solve_mine_ventilation(
 }
 
 /// Executes mine ventilation simulation and packages into SimulationResult envelope.
-pub fn solve_mine_ventilation_sim(
-    problem: &MineVentilationProblem,
-) -> SimulationResult {
+pub fn solve_mine_ventilation_sim(problem: &MineVentilationProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_mine_ventilation(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
             metrics.insert("air_velocity_m_s".to_string(), res.air_velocity_m_s);
-            metrics.insert("atkinson_resistance_ns2_m8".to_string(), res.atkinson_resistance_ns2_m8);
-            metrics.insert("total_airway_pressure_drop_pa".to_string(), res.total_airway_pressure_drop_pa);
-            metrics.insert("natural_ventilation_pressure_pa".to_string(), res.natural_ventilation_pressure_pa);
-            metrics.insert("required_fan_pressure_pa".to_string(), res.required_fan_pressure_pa);
+            metrics.insert(
+                "atkinson_resistance_ns2_m8".to_string(),
+                res.atkinson_resistance_ns2_m8,
+            );
+            metrics.insert(
+                "total_airway_pressure_drop_pa".to_string(),
+                res.total_airway_pressure_drop_pa,
+            );
+            metrics.insert(
+                "natural_ventilation_pressure_pa".to_string(),
+                res.natural_ventilation_pressure_pa,
+            );
+            metrics.insert(
+                "required_fan_pressure_pa".to_string(),
+                res.required_fan_pressure_pa,
+            );
             metrics.insert("fan_shaft_power_kw".to_string(), res.fan_shaft_power_kw);
             metrics.insert("return_methane_pct".to_string(), res.return_methane_pct);
 
@@ -274,10 +287,17 @@ pub fn solve_mine_ventilation_sim(
                 provenance: SimulationProvenance::new("atlas.mining.mine_ventilation", "0.1.0"),
                 logs: vec![format!(
                     "Mine Ventilation (Atkinson / MSHA): v = {:.2} m/s, R = {:.5} N·s²/m⁸, dP_total = {:.1} Pa (fric = {:.1}, shock = {:.1}), NVE = {:.1} Pa, Fan dP = {:.1} Pa, P_shaft = {:.1} kW (air = {:.1} kW), CH4 = {:.2}%, Safe: {}",
-                    res.air_velocity_m_s, res.atkinson_resistance_ns2_m8, res.total_airway_pressure_drop_pa,
-                    res.friction_pressure_drop_pa, res.shock_pressure_drop_pa, res.natural_ventilation_pressure_pa,
-                    res.required_fan_pressure_pa, res.fan_shaft_power_kw, res.air_power_kw,
-                    res.return_methane_pct, res.is_methane_safe
+                    res.air_velocity_m_s,
+                    res.atkinson_resistance_ns2_m8,
+                    res.total_airway_pressure_drop_pa,
+                    res.friction_pressure_drop_pa,
+                    res.shock_pressure_drop_pa,
+                    res.natural_ventilation_pressure_pa,
+                    res.required_fan_pressure_pa,
+                    res.fan_shaft_power_kw,
+                    res.air_power_kw,
+                    res.return_methane_pct,
+                    res.is_methane_safe
                 )],
             }
         }
@@ -311,15 +331,24 @@ mod tests {
         let res = solve_mine_ventilation(&prob).expect("solver failed");
         println!(
             "Mine Vent: v = {:.2} m/s, R = {:.5}, dP = {:.1} Pa, NVE = {:.1} Pa, Fan dP = {:.1} Pa, Pshaft = {:.1} kW, CH4 = {:.2}%",
-            res.air_velocity_m_s, res.atkinson_resistance_ns2_m8, res.total_airway_pressure_drop_pa,
-            res.natural_ventilation_pressure_pa, res.required_fan_pressure_pa, res.fan_shaft_power_kw,
+            res.air_velocity_m_s,
+            res.atkinson_resistance_ns2_m8,
+            res.total_airway_pressure_drop_pa,
+            res.natural_ventilation_pressure_pa,
+            res.required_fan_pressure_pa,
+            res.fan_shaft_power_kw,
             res.return_methane_pct
         );
 
         assert!(res.air_velocity_m_s > 3.5 && res.air_velocity_m_s < 5.0);
         assert!(res.atkinson_resistance_ns2_m8 > 0.020 && res.atkinson_resistance_ns2_m8 < 0.045);
-        assert!(res.total_airway_pressure_drop_pa > 180.0 && res.total_airway_pressure_drop_pa < 320.0);
-        assert!(res.natural_ventilation_pressure_pa > 50.0 && res.natural_ventilation_pressure_pa < 120.0);
+        assert!(
+            res.total_airway_pressure_drop_pa > 180.0 && res.total_airway_pressure_drop_pa < 320.0
+        );
+        assert!(
+            res.natural_ventilation_pressure_pa > 50.0
+                && res.natural_ventilation_pressure_pa < 120.0
+        );
         assert!(res.required_fan_pressure_pa > 120.0 && res.required_fan_pressure_pa < 220.0);
         assert!(res.fan_shaft_power_kw > 12.0 && res.fan_shaft_power_kw < 30.0);
         assert!(res.return_methane_pct > 0.05 && res.return_methane_pct < 0.50);

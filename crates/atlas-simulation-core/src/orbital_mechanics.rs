@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Earth planetary physical and gravitational constants.
 pub const EARTH_MU_M3_S2: f64 = 3.986004418e14;
@@ -47,10 +47,10 @@ impl Default for OrbitalMechanicsProblem {
     fn default() -> Self {
         Self {
             problem_id: default_problem_id(),
-            initial_altitude_km: 400.0,    // LEO parking orbit
-            target_altitude_km: 35786.0,   // Geostationary Earth Orbit (GEO)
+            initial_altitude_km: 400.0,  // LEO parking orbit
+            target_altitude_km: 35786.0, // Geostationary Earth Orbit (GEO)
             spacecraft_wet_mass_kg: 3500.0,
-            propulsion_isp_s: 318.0,       // Apogee Kick Motor (MMH/NTO)
+            propulsion_isp_s: 318.0, // Apogee Kick Motor (MMH/NTO)
             inclination_deg: 28.5,
         }
     }
@@ -108,10 +108,15 @@ pub fn solve_orbital_mechanics(
     problem: &OrbitalMechanicsProblem,
 ) -> Result<OrbitalMechanicsResult, String> {
     if problem.initial_altitude_km < 120.0 {
-        return Err("Initial orbit altitude must exceed atmospheric reentry threshold (120 km)".to_string());
+        return Err(
+            "Initial orbit altitude must exceed atmospheric reentry threshold (120 km)".to_string(),
+        );
     }
     if problem.target_altitude_km <= problem.initial_altitude_km {
-        return Err("Target orbit altitude must exceed initial orbit altitude for ascent transfer".to_string());
+        return Err(
+            "Target orbit altitude must exceed initial orbit altitude for ascent transfer"
+                .to_string(),
+        );
     }
     if problem.spacecraft_wet_mass_kg <= 0.0 || problem.propulsion_isp_s <= 0.0 {
         return Err("Spacecraft wet mass and specific impulse must be positive".to_string());
@@ -154,7 +159,8 @@ pub fn solve_orbital_mechanics(
     // Combined apogee plane change + circularization:
     // dv2_combined = sqrt(v_apogee^2 + v2^2 - 2 * v_apogee * v2 * cos(delta_i))
     let inc_rad = problem.inclination_deg.to_radians();
-    let dv2_plane_change = (v_apogee * v_apogee + v2 * v2 - 2.0 * v_apogee * v2 * inc_rad.cos()).sqrt();
+    let dv2_plane_change =
+        (v_apogee * v_apogee + v2 * v2 - 2.0 * v_apogee * v2 * inc_rad.cos()).sqrt();
     let dv_total_with_plane_change = dv1.abs() + dv2_plane_change;
 
     // 6. Transfer time of flight (TOF): half of transfer ellipse period
@@ -207,20 +213,36 @@ pub fn solve_orbital_mechanics(
 }
 
 /// Executes orbital mechanics simulation and packages into SimulationResult envelope.
-pub fn solve_orbital_mechanics_sim(
-    problem: &OrbitalMechanicsProblem,
-) -> SimulationResult {
+pub fn solve_orbital_mechanics_sim(problem: &OrbitalMechanicsProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_orbital_mechanics(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("initial_orbital_speed_m_s".to_string(), res.initial_orbital_speed_m_s);
-            metrics.insert("target_orbital_speed_m_s".to_string(), res.target_orbital_speed_m_s);
+            metrics.insert(
+                "initial_orbital_speed_m_s".to_string(),
+                res.initial_orbital_speed_m_s,
+            );
+            metrics.insert(
+                "target_orbital_speed_m_s".to_string(),
+                res.target_orbital_speed_m_s,
+            );
             metrics.insert("total_delta_v_m_s".to_string(), res.total_delta_v_m_s);
-            metrics.insert("total_delta_v_with_plane_change_m_s".to_string(), res.total_delta_v_with_plane_change_m_s);
-            metrics.insert("transfer_time_of_flight_h".to_string(), res.transfer_time_of_flight_h);
-            metrics.insert("required_propellant_mass_kg".to_string(), res.required_propellant_mass_kg);
-            metrics.insert("propellant_mass_fraction".to_string(), res.propellant_mass_fraction);
+            metrics.insert(
+                "total_delta_v_with_plane_change_m_s".to_string(),
+                res.total_delta_v_with_plane_change_m_s,
+            );
+            metrics.insert(
+                "transfer_time_of_flight_h".to_string(),
+                res.transfer_time_of_flight_h,
+            );
+            metrics.insert(
+                "required_propellant_mass_kg".to_string(),
+                res.required_propellant_mass_kg,
+            );
+            metrics.insert(
+                "propellant_mass_fraction".to_string(),
+                res.propellant_mass_fraction,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, res.total_delta_v_with_plane_change_m_s, 1, 1e-4);
@@ -239,12 +261,20 @@ pub fn solve_orbital_mechanics_sim(
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.aerospace.orbital_mechanics_kepler", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.aerospace.orbital_mechanics_kepler",
+                    "0.1.0",
+                ),
                 logs: vec![format!(
                     "Keplerian Hohmann: r1 = {:.1} km -> r2 = {:.1} km, dv_tot = {:.1} m/s (incl = {:.1} m/s), TOF = {:.2} h, Prop = {:.1} kg ({:.1}%), Safe: {}",
-                    res.initial_radius_km, res.target_radius_km, res.total_delta_v_m_s,
-                    res.total_delta_v_with_plane_change_m_s, res.transfer_time_of_flight_h,
-                    res.required_propellant_mass_kg, res.propellant_mass_fraction * 100.0, res.is_safe
+                    res.initial_radius_km,
+                    res.target_radius_km,
+                    res.total_delta_v_m_s,
+                    res.total_delta_v_with_plane_change_m_s,
+                    res.transfer_time_of_flight_h,
+                    res.required_propellant_mass_kg,
+                    res.propellant_mass_fraction * 100.0,
+                    res.is_safe
                 )],
             }
         }
@@ -260,7 +290,10 @@ pub fn solve_orbital_mechanics_sim(
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.aerospace.orbital_mechanics_kepler", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.aerospace.orbital_mechanics_kepler",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Orbital mechanics simulation failed: {}", err)],
             }
         }
@@ -276,17 +309,28 @@ mod tests {
     fn test_orbital_mechanics_nominal() {
         let prob = OrbitalMechanicsProblem::default();
         let res = solve_orbital_mechanics(&prob).expect("solver failed");
-        println!("Orbital Hohmann (LEO->GEO): r1 = {:.1} km, r2 = {:.1} km, v1 = {:.1} m/s, v2 = {:.1} m/s, dv_tot = {:.1} m/s (with plane change = {:.1} m/s), TOF = {:.2} h, Prop = {:.1} kg ({:.1}%)",
-            res.initial_radius_km, res.target_radius_km, res.initial_orbital_speed_m_s, res.target_orbital_speed_m_s,
-            res.total_delta_v_m_s, res.total_delta_v_with_plane_change_m_s, res.transfer_time_of_flight_h,
-            res.required_propellant_mass_kg, res.propellant_mass_fraction * 100.0);
+        println!(
+            "Orbital Hohmann (LEO->GEO): r1 = {:.1} km, r2 = {:.1} km, v1 = {:.1} m/s, v2 = {:.1} m/s, dv_tot = {:.1} m/s (with plane change = {:.1} m/s), TOF = {:.2} h, Prop = {:.1} kg ({:.1}%)",
+            res.initial_radius_km,
+            res.target_radius_km,
+            res.initial_orbital_speed_m_s,
+            res.target_orbital_speed_m_s,
+            res.total_delta_v_m_s,
+            res.total_delta_v_with_plane_change_m_s,
+            res.transfer_time_of_flight_h,
+            res.required_propellant_mass_kg,
+            res.propellant_mass_fraction * 100.0
+        );
 
         assert!(res.initial_orbital_speed_m_s > 7600.0 && res.initial_orbital_speed_m_s < 7800.0);
         assert!(res.target_orbital_speed_m_s > 3000.0 && res.target_orbital_speed_m_s < 3150.0);
         assert!(res.target_orbital_period_h > 23.5 && res.target_orbital_period_h < 24.5);
         assert!(res.delta_v1_m_s > 2350.0 && res.delta_v1_m_s < 2450.0);
         assert!(res.total_delta_v_m_s > 3800.0 && res.total_delta_v_m_s < 4000.0);
-        assert!(res.total_delta_v_with_plane_change_m_s > 4100.0 && res.total_delta_v_with_plane_change_m_s < 4400.0);
+        assert!(
+            res.total_delta_v_with_plane_change_m_s > 4100.0
+                && res.total_delta_v_with_plane_change_m_s < 4400.0
+        );
         assert!(res.transfer_time_of_flight_h > 5.0 && res.transfer_time_of_flight_h < 5.5);
         assert!(res.propellant_mass_fraction > 0.65 && res.propellant_mass_fraction < 0.80);
         assert!(res.is_safe);

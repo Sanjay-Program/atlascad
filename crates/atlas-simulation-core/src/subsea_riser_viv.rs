@@ -113,19 +113,19 @@ impl Default for SubseaRiserVivProblem {
             riser_type: MarineRiserType::TopTensionedProductionRiser,
             current_profile: OceanCurrentProfile::LinearShearCurrent,
             suppression_device: VivSuppressionDevice::HelicalStrakesTripleStart,
-            water_depth_m: 1800.0,                   // 1800 m ultra-deepwater
-            riser_length_m: 1850.0,                  // 1850 m riser string
-            outer_diameter_mm: 533.4,                // 21.0 inch standard marine riser
-            wall_thickness_mm: 25.4,                 // 1.0 inch wall thickness
-            top_tension_kn: 6500.0,                  // 6500 kN top tension
-            steel_elastic_modulus_gpa: 207.0,        // 207 GPa X-65 linepipe steel
-            steel_density_kg_m3: 7850.0,             // Carbon steel
-            internal_fluid_density_kg_m3: 1250.0,    // 10.4 ppg weighted drilling mud
-            seawater_density_kg_m3: 1025.0,          // Seawater
-            surface_current_velocity_m_s: 1.65,      // 1.65 m/s Loop Current / Gulf Stream
-            bottom_current_velocity_m_s: 0.25,       // 0.25 m/s bottom current
-            strouhal_number: 0.20,                   // Strouhal number 0.20
-            design_fatigue_life_years: 25.0,         // 25-year service life
+            water_depth_m: 1800.0,                // 1800 m ultra-deepwater
+            riser_length_m: 1850.0,               // 1850 m riser string
+            outer_diameter_mm: 533.4,             // 21.0 inch standard marine riser
+            wall_thickness_mm: 25.4,              // 1.0 inch wall thickness
+            top_tension_kn: 6500.0,               // 6500 kN top tension
+            steel_elastic_modulus_gpa: 207.0,     // 207 GPa X-65 linepipe steel
+            steel_density_kg_m3: 7850.0,          // Carbon steel
+            internal_fluid_density_kg_m3: 1250.0, // 10.4 ppg weighted drilling mud
+            seawater_density_kg_m3: 1025.0,       // Seawater
+            surface_current_velocity_m_s: 1.65,   // 1.65 m/s Loop Current / Gulf Stream
+            bottom_current_velocity_m_s: 0.25,    // 0.25 m/s bottom current
+            strouhal_number: 0.20,                // Strouhal number 0.20
+            design_fatigue_life_years: 25.0,      // 25-year service life
         }
     }
 }
@@ -172,18 +172,27 @@ pub struct SubseaRiserVivResult {
 }
 
 /// Solves subsea marine riser VIV dynamics, lock-in, and fatigue damage per DNV-RP-F204 / API 16Q.
-pub fn solve_subsea_riser_viv(problem: &SubseaRiserVivProblem) -> Result<SubseaRiserVivResult, String> {
+pub fn solve_subsea_riser_viv(
+    problem: &SubseaRiserVivProblem,
+) -> Result<SubseaRiserVivResult, String> {
     if problem.riser_length_m <= 100.0 {
         return Err("Riser length must be greater than 100 m".to_string());
     }
     if problem.outer_diameter_mm <= 50.0 {
         return Err("Outer diameter must be greater than 50 mm".to_string());
     }
-    if problem.wall_thickness_mm <= 2.0 || problem.wall_thickness_mm * 2.0 >= problem.outer_diameter_mm {
-        return Err("Wall thickness must be positive and less than half the outer diameter".to_string());
+    if problem.wall_thickness_mm <= 2.0
+        || problem.wall_thickness_mm * 2.0 >= problem.outer_diameter_mm
+    {
+        return Err(
+            "Wall thickness must be positive and less than half the outer diameter".to_string(),
+        );
     }
     if problem.top_tension_kn <= 100.0 {
-        return Err("Top tension must be greater than 100 kN to prevent riser compression collapse".to_string());
+        return Err(
+            "Top tension must be greater than 100 kN to prevent riser compression collapse"
+                .to_string(),
+        );
     }
 
     let g = 9.80665;
@@ -218,13 +227,17 @@ pub fn solve_subsea_riser_viv(problem: &SubseaRiserVivProblem) -> Result<SubseaR
     let t_avg_n = (t_top_n + t_bottom_n) / 2.0;
 
     if t_bottom_n <= 0.0 {
-        return Err("Riser suffers compression buckling at seabed; increase top tension".to_string());
+        return Err(
+            "Riser suffers compression buckling at seabed; increase top tension".to_string(),
+        );
     }
 
     // 2. Natural modal frequencies of tensioned beam-column:
     // f_n = (n / (2*L)) * sqrt(T_avg / m_total) * sqrt(1 + (n*pi)^2 * EI / (T_avg * L^2))
     let c_wave = (t_avg_n / m_total).sqrt();
-    let f_1 = (1.0 / (2.0 * l_m)) * c_wave * (1.0 + std::f64::consts::PI.powi(2) * ei_n_m2 / (t_avg_n * l_m.powi(2))).sqrt();
+    let f_1 = (1.0 / (2.0 * l_m))
+        * c_wave
+        * (1.0 + std::f64::consts::PI.powi(2) * ei_n_m2 / (t_avg_n * l_m.powi(2))).sqrt();
 
     // 3. Vortex shedding excitation frequencies:
     // f_vs(z) = St * U(z) / D_out
@@ -238,7 +251,9 @@ pub fn solve_subsea_riser_viv(problem: &SubseaRiserVivProblem) -> Result<SubseaR
         n_lockin = 1;
     }
     let n_f = n_lockin as f64;
-    let f_lockin = (n_f / (2.0 * l_m)) * c_wave * (1.0 + (n_f * std::f64::consts::PI).powi(2) * ei_n_m2 / (t_avg_n * l_m.powi(2))).sqrt();
+    let f_lockin = (n_f / (2.0 * l_m))
+        * c_wave
+        * (1.0 + (n_f * std::f64::consts::PI).powi(2) * ei_n_m2 / (t_avg_n * l_m.powi(2))).sqrt();
 
     // 4. Cross-flow lock-in amplitude and drag amplification:
     // Bare pipe unsuppressed lock-in amplitude A/D ~ 1.0 to 1.2
@@ -252,8 +267,10 @@ pub fn solve_subsea_riser_viv(problem: &SubseaRiserVivProblem) -> Result<SubseaR
 
     // 5. Total hydrodynamic drag and base shear force:
     // Average current velocity squared:
-    let u_eff_m_s = (problem.surface_current_velocity_m_s + problem.bottom_current_velocity_m_s) / 2.0;
-    let drag_force_per_meter = 0.5 * problem.seawater_density_kg_m3 * cd_amplified * d_out_m * u_eff_m_s.powi(2);
+    let u_eff_m_s =
+        (problem.surface_current_velocity_m_s + problem.bottom_current_velocity_m_s) / 2.0;
+    let drag_force_per_meter =
+        0.5 * problem.seawater_density_kg_m3 * cd_amplified * d_out_m * u_eff_m_s.powi(2);
     let total_drag_force_n = drag_force_per_meter * l_m;
     let peak_base_shear_kn = (total_drag_force_n * 0.55) / 1000.0;
 
@@ -284,8 +301,9 @@ pub fn solve_subsea_riser_viv(problem: &SubseaRiserVivProblem) -> Result<SubseaR
     let is_viv_amplitude_acceptable = a_over_d <= 0.25;
     let is_fatigue_life_compliant = fdf >= 10.0; // DNV-RP-F204 uninspectable subsea threshold
     let is_tensioner_capacity_sufficient = t_bottom_n >= (0.10 * t_top_n);
-    let is_subsea_riser_viable =
-        is_viv_amplitude_acceptable && is_fatigue_life_compliant && is_tensioner_capacity_sufficient;
+    let is_subsea_riser_viable = is_viv_amplitude_acceptable
+        && is_fatigue_life_compliant
+        && is_tensioner_capacity_sufficient;
 
     Ok(SubseaRiserVivResult {
         problem_id: problem.problem_id.clone(),

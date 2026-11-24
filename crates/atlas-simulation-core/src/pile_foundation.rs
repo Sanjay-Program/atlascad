@@ -20,7 +20,10 @@ pub enum SoilLayerType {
     /// Undrained cohesive clay (alpha-method) with undrained shear strength cu in kPa.
     CohesiveClay { cu_kpa: f64 },
     /// Drained cohesionless sand/gravel (beta-method) with effective friction angle in degrees and bulk unit weight in kN/m³.
-    CohesionlessSand { friction_angle_deg: f64, unit_weight_kn_m3: f64 },
+    CohesionlessSand {
+        friction_angle_deg: f64,
+        unit_weight_kn_m3: f64,
+    },
 }
 
 /// Stratified soil layer specification along pile shaft.
@@ -78,11 +81,17 @@ impl Default for PileFoundationProblem {
                 },
                 SoilLayerSpec {
                     layer_thickness_m: 6.0,
-                    soil_type: SoilLayerType::CohesionlessSand { friction_angle_deg: 35.0, unit_weight_kn_m3: 19.5 },
+                    soil_type: SoilLayerType::CohesionlessSand {
+                        friction_angle_deg: 35.0,
+                        unit_weight_kn_m3: 19.5,
+                    },
                 },
             ],
             groundwater_depth_m: 3.0,
-            base_soil_type: SoilLayerType::CohesionlessSand { friction_angle_deg: 36.0, unit_weight_kn_m3: 20.0 },
+            base_soil_type: SoilLayerType::CohesionlessSand {
+                friction_angle_deg: 36.0,
+                unit_weight_kn_m3: 20.0,
+            },
             partial_factor_base: 1.30,
             partial_factor_shaft: 1.15,
             max_allowable_settlement_mm: 15.0,
@@ -124,7 +133,9 @@ pub struct PileFoundationResult {
 }
 
 /// Solves deep pile capacity and settlement according to Eurocode 7 / API RP 2A.
-pub fn solve_pile_foundation(problem: &PileFoundationProblem) -> Result<PileFoundationResult, String> {
+pub fn solve_pile_foundation(
+    problem: &PileFoundationProblem,
+) -> Result<PileFoundationResult, String> {
     if problem.pile_diameter_m <= 0.0 {
         return Err("Pile diameter must be positive".to_string());
     }
@@ -153,7 +164,9 @@ pub fn solve_pile_foundation(problem: &PileFoundationProblem) -> Result<PileFoun
         // Effective vertical stress integration:
         let unit_wt = match layer.soil_type {
             SoilLayerType::CohesiveClay { .. } => 18.5,
-            SoilLayerType::CohesionlessSand { unit_weight_kn_m3, .. } => unit_weight_kn_m3,
+            SoilLayerType::CohesionlessSand {
+                unit_weight_kn_m3, ..
+            } => unit_weight_kn_m3,
         };
 
         let eff_wt = if z_mid > problem.groundwater_depth_m {
@@ -171,7 +184,9 @@ pub fn solve_pile_foundation(problem: &PileFoundationProblem) -> Result<PileFoun
                 let alpha = (0.55 * (100.0 / cu).sqrt()).clamp(0.35, 1.0);
                 alpha * cu
             }
-            SoilLayerType::CohesionlessSand { friction_angle_deg, .. } => {
+            SoilLayerType::CohesionlessSand {
+                friction_angle_deg, ..
+            } => {
                 // API beta-method: beta = (1 - sin(phi)) * tan(0.75 * phi)
                 let phi_rad = friction_angle_deg.clamp(25.0, 45.0) * PI / 180.0;
                 let beta = (1.0 - phi_rad.sin()) * (0.75 * phi_rad).tan();
@@ -190,10 +205,13 @@ pub fn solve_pile_foundation(problem: &PileFoundationProblem) -> Result<PileFoun
             // Skempton / EC7 base factor: qb = 9 * cu
             9.0 * cu_kpa.clamp(20.0, 400.0)
         }
-        SoilLayerType::CohesionlessSand { friction_angle_deg, .. } => {
+        SoilLayerType::CohesionlessSand {
+            friction_angle_deg, ..
+        } => {
             // Berezantsev / Meyerhof deep bearing factor Nq*
             let phi_rad = friction_angle_deg.clamp(28.0, 45.0) * PI / 180.0;
-            let n_q_star = (PI * phi_rad.tan()).exp() * (PI / 4.0 + phi_rad / 2.0).tan().powi(2) * 0.65;
+            let n_q_star =
+                (PI * phi_rad.tan()).exp() * (PI / 4.0 + phi_rad / 2.0).tan().powi(2) * 0.65;
             let q_b_calc = sigma_v_eff * n_q_star;
             q_b_calc.min(10000.0) // 10 MPa truncation limit for bored piles
         }
@@ -214,7 +232,8 @@ pub fn solve_pile_foundation(problem: &PileFoundationProblem) -> Result<PileFoun
 
     // Elastic shortening: Ss = (Q_app - 0.55 * Rs) * L / (Ap * Ep)
     let effective_shaft_load = 0.55 * ultimate_shaft_kn.min(q_app);
-    let s_shortening_m = ((q_app - effective_shaft_load) * problem.pile_length_m) / (a_b_m2 * ep_kpa);
+    let s_shortening_m =
+        ((q_app - effective_shaft_load) * problem.pile_length_m) / (a_b_m2 * ep_kpa);
     let s_shortening_mm = (s_shortening_m * 1000.0).max(0.5);
 
     // Base settlement from transferred load:
@@ -245,7 +264,11 @@ pub fn solve_pile_foundation(problem: &PileFoundationProblem) -> Result<PileFoun
         s_shortening_mm,
         s_base_mm,
         problem.max_allowable_settlement_mm,
-        if is_safe { "PASS ULS & SLS VERIFIED" } else { "INSUFFICIENT PILE CAPACITY OR EXCESSIVE SETTLEMENT" }
+        if is_safe {
+            "PASS ULS & SLS VERIFIED"
+        } else {
+            "INSUFFICIENT PILE CAPACITY OR EXCESSIVE SETTLEMENT"
+        }
     );
 
     Ok(PileFoundationResult {
@@ -271,10 +294,19 @@ pub fn solve_pile_foundation_sim(problem: &PileFoundationProblem) -> SimulationR
     match solve_pile_foundation(problem) {
         Ok(result) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("ultimate_total_capacity_kn".to_string(), result.ultimate_total_capacity_kn);
-            metrics.insert("design_bearing_resistance_kn".to_string(), result.design_bearing_resistance_kn);
+            metrics.insert(
+                "ultimate_total_capacity_kn".to_string(),
+                result.ultimate_total_capacity_kn,
+            );
+            metrics.insert(
+                "design_bearing_resistance_kn".to_string(),
+                result.design_bearing_resistance_kn,
+            );
             metrics.insert("overdesign_factor".to_string(), result.overdesign_factor);
-            metrics.insert("total_working_settlement_mm".to_string(), result.total_working_settlement_mm);
+            metrics.insert(
+                "total_working_settlement_mm".to_string(),
+                result.total_working_settlement_mm,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, result.design_bearing_resistance_kn, 1, 1e-4);
@@ -325,8 +357,12 @@ mod tests {
         let prob = PileFoundationProblem::default();
         let sol = solve_pile_foundation(&prob).expect("Nominal pile solve should succeed");
 
-        assert!(sol.ultimate_shaft_resistance_kn > 2000.0 && sol.ultimate_shaft_resistance_kn < 3500.0);
-        assert!(sol.ultimate_base_resistance_kn > 2500.0 && sol.ultimate_base_resistance_kn < 7000.0);
+        assert!(
+            sol.ultimate_shaft_resistance_kn > 2000.0 && sol.ultimate_shaft_resistance_kn < 3500.0
+        );
+        assert!(
+            sol.ultimate_base_resistance_kn > 2500.0 && sol.ultimate_base_resistance_kn < 7000.0
+        );
         assert!(sol.design_bearing_resistance_kn > prob.applied_axial_load_kn);
         assert!(sol.overdesign_factor > 1.1);
         assert!(sol.total_working_settlement_mm < prob.max_allowable_settlement_mm);

@@ -144,7 +144,8 @@ pub fn solve_ebw_welding(problem: &EbwWeldingProblem) -> Result<EbwWeldingResult
     };
 
     // Gross beam electrical power: P = V * I [kW]
-    let p_gross_kw = (problem.acceleration_voltage_kv * 1000.0 * problem.beam_current_ma / 1000.0) / 1000.0;
+    let p_gross_kw =
+        (problem.acceleration_voltage_kv * 1000.0 * problem.beam_current_ma / 1000.0) / 1000.0;
     // Net absorbed power accounting for backscattered electrons in vacuum chamber:
     let p_net_kw = p_gross_kw * eta_eb;
     let p_net_w = p_net_kw * 1000.0;
@@ -160,7 +161,8 @@ pub fn solve_ebw_welding(problem: &EbwWeldingProblem) -> Result<EbwWeldingResult
     // For high power density EBW: Depth d_p ~ 0.85 * (P_net / (v * d_spot * H_fusion))
     let delta_t_melt = t_melt_c - problem.ambient_temperature_c;
     let enthalpy_melt_j_mm3 = c_vol * delta_t_melt * 1.35; // including latent heat of fusion ~ 35%
-    let nominal_penetration_mm = p_net_w / (problem.travel_speed_mm_s * problem.beam_focal_diameter_mm * enthalpy_melt_j_mm3 * 2.8);
+    let nominal_penetration_mm = p_net_w
+        / (problem.travel_speed_mm_s * problem.beam_focal_diameter_mm * enthalpy_melt_j_mm3 * 2.8);
     let penetration_depth_mm = nominal_penetration_mm.min(problem.plate_thickness_mm * 1.15);
 
     // Goldak 3D double-ellipsoid semi-axes:
@@ -189,7 +191,9 @@ pub fn solve_ebw_welding(problem: &EbwWeldingProblem) -> Result<EbwWeldingResult
     // t_8/5 = (Q_net / (2 * pi * k * v)) * (1 / (500 - T_0) - 1 / (800 - T_0))
     let t_0 = problem.ambient_temperature_c;
     let inv_diff = (1.0 / (500.0 - t_0)) - (1.0 / (800.0 - t_0));
-    let t8_5_seconds = (p_net_w / (2.0 * std::f64::consts::PI * (k_th_w_m_k / 1000.0))) * inv_diff * (1.0 / (problem.travel_speed_mm_s * 45.0));
+    let t8_5_seconds = (p_net_w / (2.0 * std::f64::consts::PI * (k_th_w_m_k / 1000.0)))
+        * inv_diff
+        * (1.0 / (problem.travel_speed_mm_s * 45.0));
     let t8_5_clamped = t8_5_seconds.clamp(0.05, 12.0);
 
     // Cooling rate at 600 °C: dT/dt ~ (800 - 500) / t_8/5 = 300 / t8_5
@@ -239,7 +243,10 @@ mod tests {
         assert!(res.net_absorbed_power_kw > 4.5);
         assert!(res.linear_heat_input_j_per_mm >= 250.0 && res.linear_heat_input_j_per_mm <= 500.0);
         assert!(res.penetration_depth_mm >= 15.0);
-        assert!(res.weld_aspect_ratio >= 4.0, "EBW should achieve deep narrow aspect ratio >= 4.0");
+        assert!(
+            res.weld_aspect_ratio >= 4.0,
+            "EBW should achieve deep narrow aspect ratio >= 4.0"
+        );
         assert!(res.fusion_zone_width_mm < 3.0);
         assert!(res.cooling_time_t8_5_seconds > 0.10 && res.cooling_time_t8_5_seconds < 5.0);
         assert!(res.is_narrow_keyhole_achieved);

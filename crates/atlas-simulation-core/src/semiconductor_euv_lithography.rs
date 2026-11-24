@@ -111,7 +111,9 @@ pub struct EuvLithographyResult {
 }
 
 /// Solves semiconductor EUV lithography multi-layer optics, Rayleigh resolution, and stochastics.
-pub fn solve_semiconductor_euv_lithography(problem: &EuvLithographyProblem) -> Result<EuvLithographyResult, String> {
+pub fn solve_semiconductor_euv_lithography(
+    problem: &EuvLithographyProblem,
+) -> Result<EuvLithographyResult, String> {
     if problem.wavelength_nm < 10.0 || problem.wavelength_nm > 16.0 {
         return Err("EUV wavelength must be between 10.0 and 16.0 nm".to_string());
     }
@@ -130,7 +132,8 @@ pub fn solve_semiconductor_euv_lithography(problem: &EuvLithographyProblem) -> R
 
     // 1. Bragg condition: lambda = 2 * d * cos(theta) * sqrt(1 - 2*delta / sin^2(theta))
     // Mean refractive index decrement delta_bar for Mo/Si ~ 0.027:
-    let delta_bar = 0.027 * problem.molybdenum_fraction_gamma + 0.0018 * (1.0 - problem.molybdenum_fraction_gamma);
+    let delta_bar = 0.027 * problem.molybdenum_fraction_gamma
+        + 0.0018 * (1.0 - problem.molybdenum_fraction_gamma);
     let sin_theta = theta_rad.sin().max(0.01);
     let refraction_corr = (1.0 - 2.0 * delta_bar / sin_theta.powi(2)).max(0.90).sqrt();
     let lambda_bragg = 2.0 * problem.bilayer_period_d_nm * cos_theta * refraction_corr;
@@ -141,7 +144,8 @@ pub fn solve_semiconductor_euv_lithography(problem: &EuvLithographyProblem) -> R
     let r_fresnel_ideal = 0.742 * saturation_factor;
 
     // 3. Debye-Waller roughness factor: DW = exp( - (4 * pi * sigma * cos(theta) / lambda)^2 )
-    let arg_dw = (4.0 * std::f64::consts::PI * problem.interface_roughness_nm * cos_theta) / problem.wavelength_nm;
+    let arg_dw = (4.0 * std::f64::consts::PI * problem.interface_roughness_nm * cos_theta)
+        / problem.wavelength_nm;
     let debye_waller = (-arg_dw.powi(2)).exp();
 
     // Net reflectivity per mirror:
@@ -153,15 +157,17 @@ pub fn solve_semiconductor_euv_lithography(problem: &EuvLithographyProblem) -> R
     let tau_train_pct = tau_train * 100.0;
 
     // 5. Rayleigh imaging resolution: CD = k_1 * lambda / NA:
-    let cd_res_nm = problem.process_factor_k1 * (problem.wavelength_nm / problem.numerical_aperture);
+    let cd_res_nm =
+        problem.process_factor_k1 * (problem.wavelength_nm / problem.numerical_aperture);
 
     // 6. Rayleigh Depth of Focus: DOF = k_2 * lambda / NA²:
-    let dof_nm = problem.dof_factor_k2 * (problem.wavelength_nm / problem.numerical_aperture.powi(2));
+    let dof_nm =
+        problem.dof_factor_k2 * (problem.wavelength_nm / problem.numerical_aperture.powi(2));
 
     // 7. Photon stochastics and Line-Edge Roughness (LER):
     // Energy per 13.5 nm photon: E_ph = h * c / lambda [J]
     let h_planck = 6.62607015e-34; // J*s
-    let c_light = 2.99792458e8;    // m/s
+    let c_light = 2.99792458e8; // m/s
     let lambda_m = problem.wavelength_nm * 1.0e-9;
     let e_photon_j = (h_planck * c_light) / lambda_m; // ~ 1.47e-17 J = 91.8 eV
 
@@ -175,8 +181,8 @@ pub fn solve_semiconductor_euv_lithography(problem: &EuvLithographyProblem) -> R
 
     // 8. Quality assessments:
     let is_mirror_reflectivity_sufficient = r_mirror_pct >= 66.0; // Commercial ASML spec >= 66%
-    let is_resolution_advanced_node_capable = cd_res_nm <= 15.0;  // Sub-15 nm resolution
-    let is_depth_of_focus_manufacturable = dof_nm >= 60.0;        // >= 60 nm wafer budget
+    let is_resolution_advanced_node_capable = cd_res_nm <= 15.0; // Sub-15 nm resolution
+    let is_depth_of_focus_manufacturable = dof_nm >= 60.0; // >= 60 nm wafer budget
     let is_euv_system_viable = is_mirror_reflectivity_sufficient
         && is_resolution_advanced_node_capable
         && is_depth_of_focus_manufacturable;
@@ -210,7 +216,9 @@ mod tests {
 
         assert!(res.bragg_wavelength_nm > 13.0 && res.bragg_wavelength_nm < 14.0);
         assert!(res.net_mirror_reflectivity_pct >= 66.0 && res.net_mirror_reflectivity_pct <= 72.0);
-        assert!(res.optical_train_transmission_pct > 0.8 && res.optical_train_transmission_pct < 5.0);
+        assert!(
+            res.optical_train_transmission_pct > 0.8 && res.optical_train_transmission_pct < 5.0
+        );
         assert!(res.critical_dimension_resolution_nm <= 14.0);
         assert!(res.depth_of_focus_nm >= 60.0);
         assert!(res.photon_density_per_nm2 > 2.0);

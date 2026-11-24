@@ -192,7 +192,11 @@ pub fn solve_steam_rankine(problem: &SteamRankineProblem) -> Result<SteamRankine
         q_cond_mw,
         m_dot_cw,
         plant_heat_rate,
-        if is_safe { "PASS HIGH-EFFICIENCY SAFE" } else { "EXCESSIVE MOISTURE EROSION RISK" }
+        if is_safe {
+            "PASS HIGH-EFFICIENCY SAFE"
+        } else {
+            "EXCESSIVE MOISTURE EROSION RISK"
+        }
     );
 
     Ok(SteamRankineResult {
@@ -220,11 +224,26 @@ pub fn solve_steam_rankine_sim(problem: &SteamRankineProblem) -> SimulationResul
     match solve_steam_rankine(problem) {
         Ok(result) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("cycle_thermal_efficiency_pct".to_string(), result.cycle_thermal_efficiency_pct);
-            metrics.insert("gross_electric_power_mw".to_string(), result.gross_electric_power_mw);
-            metrics.insert("turbine_exhaust_dryness_fraction".to_string(), result.turbine_exhaust_dryness_fraction);
-            metrics.insert("condenser_thermal_duty_mw".to_string(), result.condenser_thermal_duty_mw);
-            metrics.insert("plant_heat_rate_kj_kwh".to_string(), result.plant_heat_rate_kj_kwh);
+            metrics.insert(
+                "cycle_thermal_efficiency_pct".to_string(),
+                result.cycle_thermal_efficiency_pct,
+            );
+            metrics.insert(
+                "gross_electric_power_mw".to_string(),
+                result.gross_electric_power_mw,
+            );
+            metrics.insert(
+                "turbine_exhaust_dryness_fraction".to_string(),
+                result.turbine_exhaust_dryness_fraction,
+            );
+            metrics.insert(
+                "condenser_thermal_duty_mw".to_string(),
+                result.condenser_thermal_duty_mw,
+            );
+            metrics.insert(
+                "plant_heat_rate_kj_kwh".to_string(),
+                result.plant_heat_rate_kj_kwh,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, result.gross_electric_power_mw, 1, 1e-4);
@@ -275,7 +294,9 @@ mod tests {
         let prob = SteamRankineProblem::default();
         let sol = solve_steam_rankine(&prob).expect("Nominal steam cycle should solve");
 
-        assert!(sol.turbine_inlet_enthalpy_kj_kg > 3300.0 && sol.turbine_inlet_enthalpy_kj_kg < 3800.0);
+        assert!(
+            sol.turbine_inlet_enthalpy_kj_kg > 3300.0 && sol.turbine_inlet_enthalpy_kj_kg < 3800.0
+        );
         assert!(sol.cycle_thermal_efficiency_pct > 32.0 && sol.cycle_thermal_efficiency_pct < 45.0);
         assert!(sol.gross_electric_power_mw > 100.0 && sol.gross_electric_power_mw < 180.0);
         assert!(sol.turbine_exhaust_dryness_fraction >= 0.85); // Safe against droplet erosion

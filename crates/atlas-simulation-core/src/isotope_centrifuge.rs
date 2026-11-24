@@ -52,14 +52,14 @@ impl Default for IsotopeCentrifugeProblem {
         Self {
             problem_id: "commercial_cfrp_uf6_gas_centrifuge".to_string(),
             rotor_material: CentrifugeRotorMaterial::CarbonFiberCfrp,
-            rotor_radius_m: 0.10,               // Ø200 mm rotor
-            rotor_length_m: 3.50,               // 3.5 m active length
-            rotational_speed_rpm: 65000.0,      // 65,000 RPM (v_tip ~ 680 m/s)
-            operating_temperature_c: 60.0,      // 60 °C (333.15 K)
-            feed_mass_flow_kg_h: 0.45,          // 0.45 kg/h UF6 feed
-            feed_assay_u235_fraction: 0.00711,  // 0.711% U-235 natural feed
-            stage_cut_theta: 0.50,              // Symmetric stage cut (theta = 0.50)
-            circulation_efficiency: 0.75,       // 75% Cohen axial circulation efficiency
+            rotor_radius_m: 0.10,              // Ø200 mm rotor
+            rotor_length_m: 3.50,              // 3.5 m active length
+            rotational_speed_rpm: 65000.0,     // 65,000 RPM (v_tip ~ 680 m/s)
+            operating_temperature_c: 60.0,     // 60 °C (333.15 K)
+            feed_mass_flow_kg_h: 0.45,         // 0.45 kg/h UF6 feed
+            feed_assay_u235_fraction: 0.00711, // 0.711% U-235 natural feed
+            stage_cut_theta: 0.50,             // Symmetric stage cut (theta = 0.50)
+            circulation_efficiency: 0.75,      // 75% Cohen axial circulation efficiency
         }
     }
 }
@@ -110,7 +110,9 @@ fn dirac_peierls_value(x: f64) -> f64 {
 }
 
 /// Solves uranium hexafluoride gas centrifuge separation, Cohen-Onsager dynamics, and SWU capacity.
-pub fn solve_isotope_centrifuge(problem: &IsotopeCentrifugeProblem) -> Result<IsotopeCentrifugeResult, String> {
+pub fn solve_isotope_centrifuge(
+    problem: &IsotopeCentrifugeProblem,
+) -> Result<IsotopeCentrifugeResult, String> {
     if problem.rotor_radius_m <= 0.02 || problem.rotor_radius_m > 0.50 {
         return Err("Rotor radius must be between 0.02 and 0.50 m".to_string());
     }
@@ -134,7 +136,7 @@ pub fn solve_isotope_centrifuge(problem: &IsotopeCentrifugeProblem) -> Result<Is
     let (rho_mat, sigma_ult_mpa) = match problem.rotor_material {
         CentrifugeRotorMaterial::CarbonFiberCfrp => (1550.0, 3600.0), // Toray T1000 carbon fiber
         CentrifugeRotorMaterial::MaragingSteel350 => (8050.0, 2450.0), // Vascomax 350
-        CentrifugeRotorMaterial::Aluminum7075 => (2810.0, 570.0),      // Al 7075-T6
+        CentrifugeRotorMaterial::Aluminum7075 => (2810.0, 570.0),     // Al 7075-T6
     };
 
     let omega = (2.0 * std::f64::consts::PI * problem.rotational_speed_rpm) / 60.0; // rad/s
@@ -151,7 +153,7 @@ pub fn solve_isotope_centrifuge(problem: &IsotopeCentrifugeProblem) -> Result<Is
     // UF6 molecular masses: 235-UF6 = 349.03 g/mol, 238-UF6 = 352.04 g/mol
     // Delta M = 3.01 g/mol = 0.00301 kg/mol
     let delta_m = 0.00301; // kg/mol
-    let r_gas = 8.31446;   // J/(mol*K)
+    let r_gas = 8.31446; // J/(mol*K)
     let t_kelvin = problem.operating_temperature_c + 273.15;
 
     // Elementary radial equilibrium separation factor:
@@ -194,7 +196,8 @@ pub fn solve_isotope_centrifuge(problem: &IsotopeCentrifugeProblem) -> Result<Is
     // delta_U_max = rho * D * [(Delta_M * v^2) / (2 * R * T)]^2 * (pi * L / 2) [kg/s -> kg/year]
     // For UF6 gas: rho * D ~ 2.35e-5 kg/(m*s) at 60 °C
     let rho_d = 2.35e-5; // kg/(m*s)
-    let max_cohen_w_rate = rho_d * exp_radial.powi(2) * (std::f64::consts::PI * problem.rotor_length_m / 2.0);
+    let max_cohen_w_rate =
+        rho_d * exp_radial.powi(2) * (std::f64::consts::PI * problem.rotor_length_m / 2.0);
     let delta_u_max_swu_yr = max_cohen_w_rate * 3600.0 * hours_per_year;
 
     let swu_eff_pct = if delta_u_max_swu_yr > 0.0 {
@@ -241,7 +244,10 @@ mod tests {
 
         assert!(res.rotor_peripheral_speed_m_s > 600.0 && res.rotor_peripheral_speed_m_s < 750.0);
         assert!(res.centrifugal_acceleration_g > 350000.0);
-        assert!(res.rotor_burst_safety_factor >= 1.30, "CFRP rotor should have safety factor >= 1.30");
+        assert!(
+            res.rotor_burst_safety_factor >= 1.30,
+            "CFRP rotor should have safety factor >= 1.30"
+        );
         assert!(res.elementary_separation_factor_alpha0 > 1.05);
         assert!(res.overall_stage_separation_factor_alpha > 1.10);
         assert!(res.product_assay_u235_fraction > prob.feed_assay_u235_fraction);

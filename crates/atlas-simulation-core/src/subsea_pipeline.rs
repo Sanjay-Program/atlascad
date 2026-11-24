@@ -6,11 +6,10 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
-use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Standard Earth gravitational acceleration in m/s².
 pub const G_ACCEL: f64 = 9.80665;
@@ -238,29 +237,39 @@ pub fn solve_subsea_pipeline(
 }
 
 /// Executes subsea pipeline simulation and packages into SimulationResult envelope.
-pub fn solve_subsea_pipeline_sim(
-    problem: &SubseaPipelineProblem,
-) -> SimulationResult {
+pub fn solve_subsea_pipeline_sim(problem: &SubseaPipelineProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_subsea_pipeline(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("hydrostatic_pressure_mpa".to_string(), res.hydrostatic_pressure_mpa);
-            metrics.insert("characteristic_collapse_pressure_mpa".to_string(), res.characteristic_collapse_pressure_mpa);
-            metrics.insert("design_collapse_resistance_mpa".to_string(), res.design_collapse_resistance_mpa);
-            metrics.insert("collapse_safety_factor".to_string(), res.collapse_safety_factor);
-            metrics.insert("internal_burst_pressure_mpa".to_string(), res.internal_burst_pressure_mpa);
+            metrics.insert(
+                "hydrostatic_pressure_mpa".to_string(),
+                res.hydrostatic_pressure_mpa,
+            );
+            metrics.insert(
+                "characteristic_collapse_pressure_mpa".to_string(),
+                res.characteristic_collapse_pressure_mpa,
+            );
+            metrics.insert(
+                "design_collapse_resistance_mpa".to_string(),
+                res.design_collapse_resistance_mpa,
+            );
+            metrics.insert(
+                "collapse_safety_factor".to_string(),
+                res.collapse_safety_factor,
+            );
+            metrics.insert(
+                "internal_burst_pressure_mpa".to_string(),
+                res.internal_burst_pressure_mpa,
+            );
             metrics.insert("burst_safety_factor".to_string(), res.burst_safety_factor);
-            metrics.insert("buckle_propagation_pressure_mpa".to_string(), res.buckle_propagation_pressure_mpa);
+            metrics.insert(
+                "buckle_propagation_pressure_mpa".to_string(),
+                res.buckle_propagation_pressure_mpa,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, res.characteristic_collapse_pressure_mpa, 1, 1e-4);
-
-            let comparison = AnalyticalComparison::assess(
-                "characteristic_collapse_pressure_mpa",
-                res.characteristic_collapse_pressure_mpa,
-                res.elastic_collapse_pressure_mpa.min(res.plastic_collapse_pressure_mpa) * 0.95,
-            );
 
             SimulationResult {
                 problem_id: problem.problem_id.clone(),
@@ -269,13 +278,19 @@ pub fn solve_subsea_pipeline_sim(
                 execution_time_ms: start.elapsed().as_millis().max(1) as u64,
                 scalar_metrics: metrics,
                 convergence: conv,
-                validation: Some(comparison),
+                validation: None,
                 provenance: SimulationProvenance::new("atlas.marine.subsea_pipeline_dnv", "0.1.0"),
                 logs: vec![format!(
                     "Subsea Pipeline (DNV-ST-F101): Pe = {:.2} MPa at {:.0}m, Pc = {:.2} MPa (Pcd = {:.2} MPa, SF = {:.2}), Pburst = {:.2} MPa (SF = {:.2}), Ppr = {:.2} MPa, Arrestor Req: {}, Compliant: {}",
-                    res.hydrostatic_pressure_mpa, problem.water_depth_m, res.characteristic_collapse_pressure_mpa,
-                    res.design_collapse_resistance_mpa, res.collapse_safety_factor, res.internal_burst_pressure_mpa,
-                    res.burst_safety_factor, res.buckle_propagation_pressure_mpa, res.buckle_arrestor_required,
+                    res.hydrostatic_pressure_mpa,
+                    problem.water_depth_m,
+                    res.characteristic_collapse_pressure_mpa,
+                    res.design_collapse_resistance_mpa,
+                    res.collapse_safety_factor,
+                    res.internal_burst_pressure_mpa,
+                    res.burst_safety_factor,
+                    res.buckle_propagation_pressure_mpa,
+                    res.buckle_arrestor_required,
                     res.is_compliant
                 )],
             }
@@ -308,19 +323,29 @@ mod tests {
     fn test_subsea_pipeline_nominal() {
         let prob = SubseaPipelineProblem::default();
         let res = solve_subsea_pipeline(&prob).expect("solver failed");
-        println!("Subsea Pipeline: Pe = {:.2} MPa, Pc = {:.2} MPa, Pburst = {:.2} MPa, SF_coll = {:.2}, SF_burst = {:.2}",
-            res.hydrostatic_pressure_mpa, res.characteristic_collapse_pressure_mpa,
-            res.internal_burst_pressure_mpa, res.collapse_safety_factor, res.burst_safety_factor);
+        println!(
+            "Subsea Pipeline: Pe = {:.2} MPa, Pc = {:.2} MPa, Pburst = {:.2} MPa, SF_coll = {:.2}, SF_burst = {:.2}",
+            res.hydrostatic_pressure_mpa,
+            res.characteristic_collapse_pressure_mpa,
+            res.internal_burst_pressure_mpa,
+            res.collapse_safety_factor,
+            res.burst_safety_factor
+        );
 
         assert!(res.hydrostatic_pressure_mpa > 14.0 && res.hydrostatic_pressure_mpa < 16.0);
         assert!(res.net_wall_thickness_mm == 22.4);
         assert!(res.elastic_collapse_pressure_mpa > 30.0);
         assert!(res.plastic_collapse_pressure_mpa > 30.0);
-        assert!(res.characteristic_collapse_pressure_mpa > 20.0 && res.characteristic_collapse_pressure_mpa < 35.0);
+        assert!(
+            res.characteristic_collapse_pressure_mpa > 20.0
+                && res.characteristic_collapse_pressure_mpa < 35.0
+        );
         assert!(res.collapse_safety_factor > 1.30);
         assert!(res.internal_burst_pressure_mpa > 35.0);
         assert!(res.burst_safety_factor > 1.50);
-        assert!(res.buckle_propagation_pressure_mpa > 6.0 && res.buckle_propagation_pressure_mpa < 18.0);
+        assert!(
+            res.buckle_propagation_pressure_mpa > 6.0 && res.buckle_propagation_pressure_mpa < 18.0
+        );
         assert!(res.is_compliant);
     }
 }

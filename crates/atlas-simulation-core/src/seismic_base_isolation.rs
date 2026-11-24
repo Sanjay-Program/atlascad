@@ -209,7 +209,8 @@ pub fn solve_seismic_base_isolation(
         b_d = (beta_clamped / 0.05).powf(0.30);
 
         // Design displacement: D_D = (g * S_D1 * T_eff) / (4 * pi^2 * B_D)
-        let d_next_m = (g * s_d1 * t_eff) / (4.0 * std::f64::consts::PI * std::f64::consts::PI * b_d);
+        let d_next_m =
+            (g * s_d1 * t_eff) / (4.0 * std::f64::consts::PI * std::f64::consts::PI * b_d);
 
         if (d_next_m - d_curr_m).abs() < 1e-4 {
             d_curr_m = d_next_m;
@@ -288,11 +289,17 @@ mod tests {
 
         let res = solve_seismic_base_isolation(&prob)?;
         assert!(res.total_seismic_weight_kn > 40000.0);
-        assert!(res.single_bearing_yield_force_qd_kn > 150.0 && res.single_bearing_yield_force_qd_kn < 300.0);
+        assert!(
+            res.single_bearing_yield_force_qd_kn > 150.0
+                && res.single_bearing_yield_force_qd_kn < 300.0
+        );
         assert!(res.total_system_yield_force_qd_kn > 2500.0);
         assert!(res.effective_isolated_period_s > 2.0 && res.effective_isolated_period_s < 3.5);
         assert!(res.effective_damping_ratio_pct > 15.0 && res.effective_damping_ratio_pct < 45.0);
-        assert!(res.design_horizontal_displacement_dd_mm > 100.0 && res.design_horizontal_displacement_dd_mm < 350.0);
+        assert!(
+            res.design_horizontal_displacement_dd_mm > 100.0
+                && res.design_horizontal_displacement_dd_mm < 350.0
+        );
         assert!(res.rubber_total_shear_strain_pct < 150.0);
         assert!(res.base_shear_coefficient < 0.15);
         assert!(res.base_shear_reduction_ratio < 0.35);

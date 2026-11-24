@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// ASCE 7-22 Seismic Site Class (soil conditions).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -171,7 +171,9 @@ pub fn solve_seismic_analysis(
     if problem.total_seismic_weight_kn <= 0.0 {
         return Err("Seismic weight must be positive".to_string());
     }
-    if problem.short_period_spectral_accel_ss_g <= 0.0 || problem.one_second_spectral_accel_s1_g <= 0.0 {
+    if problem.short_period_spectral_accel_ss_g <= 0.0
+        || problem.one_second_spectral_accel_s1_g <= 0.0
+    {
         return Err("Spectral acceleration parameters must be positive".to_string());
     }
     if problem.importance_factor_ie <= 0.0 {
@@ -270,11 +272,13 @@ pub fn solve_seismic_analysis(
 
     // 8. Elastic and inelastic roof displacement estimate:
     // Approx roof drift ratio ~ 0.0035 for standard code-level elastic lateral force
-    let delta_elastic_mm = (v_base_kn / (problem.total_seismic_weight_kn / 100.0)) * (hn / 30.0) * 15.0;
+    let delta_elastic_mm =
+        (v_base_kn / (problem.total_seismic_weight_kn / 100.0)) * (hn / 30.0) * 15.0;
     let delta_inelastic_mm = delta_elastic_mm * cd / ie;
 
     // 9. Safety compliance check:
-    let is_safe = cs >= cs_min && ta_s > 0.1 && ta_s < 5.0 && (delta_inelastic_mm / (hn * 1000.0)) <= 0.020;
+    let is_safe =
+        cs >= cs_min && ta_s > 0.1 && ta_s < 5.0 && (delta_inelastic_mm / (hn * 1000.0)) <= 0.020;
 
     Ok(SeismicAnalysisResult {
         problem_id: problem.problem_id.clone(),
@@ -298,21 +302,37 @@ pub fn solve_seismic_analysis(
 }
 
 /// Executes seismic analysis simulation and packages into SimulationResult envelope.
-pub fn solve_seismic_analysis_sim(
-    problem: &SeismicAnalysisProblem,
-) -> SimulationResult {
+pub fn solve_seismic_analysis_sim(problem: &SeismicAnalysisProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_seismic_analysis(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("design_spectral_accel_sds_g".to_string(), res.design_spectral_accel_sds_g);
-            metrics.insert("design_spectral_accel_sd1_g".to_string(), res.design_spectral_accel_sd1_g);
-            metrics.insert("fundamental_period_ta_s".to_string(), res.fundamental_period_ta_s);
-            metrics.insert("seismic_response_coefficient_cs".to_string(), res.seismic_response_coefficient_cs);
+            metrics.insert(
+                "design_spectral_accel_sds_g".to_string(),
+                res.design_spectral_accel_sds_g,
+            );
+            metrics.insert(
+                "design_spectral_accel_sd1_g".to_string(),
+                res.design_spectral_accel_sd1_g,
+            );
+            metrics.insert(
+                "fundamental_period_ta_s".to_string(),
+                res.fundamental_period_ta_s,
+            );
+            metrics.insert(
+                "seismic_response_coefficient_cs".to_string(),
+                res.seismic_response_coefficient_cs,
+            );
             metrics.insert("total_base_shear_kn".to_string(), res.total_base_shear_kn);
             metrics.insert("base_shear_ratio_pct".to_string(), res.base_shear_ratio_pct);
-            metrics.insert("base_overturning_moment_kn_m".to_string(), res.base_overturning_moment_kn_m);
-            metrics.insert("roof_displacement_inelastic_mm".to_string(), res.roof_displacement_inelastic_mm);
+            metrics.insert(
+                "base_overturning_moment_kn_m".to_string(),
+                res.base_overturning_moment_kn_m,
+            );
+            metrics.insert(
+                "roof_displacement_inelastic_mm".to_string(),
+                res.roof_displacement_inelastic_mm,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, res.total_base_shear_kn, 1, 1e-4);
@@ -334,9 +354,13 @@ pub fn solve_seismic_analysis_sim(
                 provenance: SimulationProvenance::new("atlas.civil.seismic_asce7_22", "0.1.0"),
                 logs: vec![format!(
                     "ASCE 7-22 Seismic: Ta = {:.2}s, SDS = {:.2}g, Cs = {:.4}, Vb = {:.1} kN ({:.2}%), OTM = {:.0} kN·m, Safe: {}",
-                    res.fundamental_period_ta_s, res.design_spectral_accel_sds_g,
-                    res.seismic_response_coefficient_cs, res.total_base_shear_kn,
-                    res.base_shear_ratio_pct, res.base_overturning_moment_kn_m, res.is_safe
+                    res.fundamental_period_ta_s,
+                    res.design_spectral_accel_sds_g,
+                    res.seismic_response_coefficient_cs,
+                    res.total_base_shear_kn,
+                    res.base_shear_ratio_pct,
+                    res.base_overturning_moment_kn_m,
+                    res.is_safe
                 )],
             }
         }
@@ -368,15 +392,25 @@ mod tests {
     fn test_seismic_analysis_nominal() {
         let prob = SeismicAnalysisProblem::default();
         let res = solve_seismic_analysis(&prob).expect("solver failed");
-        println!("Seismic ASCE 7: SDS = {:.2}g, SD1 = {:.2}g, Ta = {:.2}s, Cs = {:.4}, Vb = {:.1} kN ({:.2}%), OTM = {:.0} kN·m, Roof Δ = {:.1} mm",
-            res.design_spectral_accel_sds_g, res.design_spectral_accel_sd1_g, res.fundamental_period_ta_s,
-            res.seismic_response_coefficient_cs, res.total_base_shear_kn, res.base_shear_ratio_pct,
-            res.base_overturning_moment_kn_m, res.roof_displacement_inelastic_mm);
+        println!(
+            "Seismic ASCE 7: SDS = {:.2}g, SD1 = {:.2}g, Ta = {:.2}s, Cs = {:.4}, Vb = {:.1} kN ({:.2}%), OTM = {:.0} kN·m, Roof Δ = {:.1} mm",
+            res.design_spectral_accel_sds_g,
+            res.design_spectral_accel_sd1_g,
+            res.fundamental_period_ta_s,
+            res.seismic_response_coefficient_cs,
+            res.total_base_shear_kn,
+            res.base_shear_ratio_pct,
+            res.base_overturning_moment_kn_m,
+            res.roof_displacement_inelastic_mm
+        );
 
         assert!(res.design_spectral_accel_sds_g > 0.8 && res.design_spectral_accel_sds_g < 1.3);
         assert!(res.design_spectral_accel_sd1_g > 0.4 && res.design_spectral_accel_sd1_g < 0.8);
         assert!(res.fundamental_period_ta_s > 0.8 && res.fundamental_period_ta_s < 2.0);
-        assert!(res.seismic_response_coefficient_cs > 0.03 && res.seismic_response_coefficient_cs < 0.20);
+        assert!(
+            res.seismic_response_coefficient_cs > 0.03
+                && res.seismic_response_coefficient_cs < 0.20
+        );
         assert!(res.total_base_shear_kn > 2000.0 && res.total_base_shear_kn < 10000.0);
         assert!(res.base_overturning_moment_kn_m > 50000.0);
         assert_eq!(res.story_forces.len(), 10);

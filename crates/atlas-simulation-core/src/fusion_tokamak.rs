@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Permeability of free space mu_0 in H/m.
 pub const MU_0: f64 = 1.25663706212e-6;
@@ -59,16 +59,16 @@ impl Default for FusionTokamakProblem {
     fn default() -> Self {
         Self {
             problem_id: default_problem_id(),
-            major_radius_r0_m: 6.20,         // ITER baseline
+            major_radius_r0_m: 6.20, // ITER baseline
             minor_radius_a_m: 2.00,
             elongation_kappa: 1.75,
             triangularity_delta: 0.33,
             toroidal_magnetic_field_t: 5.30,
             plasma_current_ma: 15.0,
             electron_density_10e20_m3: 1.01,
-            plasma_temperature_kev: 13.0,    // ~150 million Kelvin
+            plasma_temperature_kev: 13.0, // ~150 million Kelvin
             auxiliary_heating_power_mw: 50.0,
-            average_ion_mass_amu: 2.50,      // 50% D + 50% T
+            average_ion_mass_amu: 2.50, // 50% D + 50% T
         }
     }
 }
@@ -113,9 +113,7 @@ pub struct FusionTokamakResult {
 }
 
 /// Solves thermonuclear D-T tokamak plasma equilibrium, confinement, and fusion power.
-pub fn solve_fusion_tokamak(
-    problem: &FusionTokamakProblem,
-) -> Result<FusionTokamakResult, String> {
+pub fn solve_fusion_tokamak(problem: &FusionTokamakProblem) -> Result<FusionTokamakResult, String> {
     if problem.major_radius_r0_m <= problem.minor_radius_a_m || problem.minor_radius_a_m <= 0.0 {
         return Err("Major radius must exceed positive minor radius".to_string());
     }
@@ -147,7 +145,8 @@ pub fn solve_fusion_tokamak(
 
     // 2. Edge safety factor q95 per ITER / Wesson formulation:
     // q95 = (5 * a^2 * Bt / (R0 * Ip)) * ((1 + kappa^2 * (1 + 2*delta^2 - 1.2*delta^3)) / 2) * (1.17 - 0.65*epsilon) / (1 - epsilon^2)^2
-    let shape_factor = (1.0 + kappa * kappa * (1.0 + 2.0 * delta * delta - 1.2 * delta.powi(3))) / 2.0;
+    let shape_factor =
+        (1.0 + kappa * kappa * (1.0 + 2.0 * delta * delta - 1.2 * delta.powi(3))) / 2.0;
     let eps_corr = (1.17 - 0.65 * epsilon) / (1.0 - epsilon * epsilon).powi(2);
     let q95 = (5.0 * a * a * bt / (r0 * ip)) * shape_factor * eps_corr;
 
@@ -176,7 +175,8 @@ pub fn solve_fusion_tokamak(
     // 6. D-T Thermonuclear Fusion Reactivity <sigma*v>:
     // Parameterization for 10 - 25 keV range (Bosch & Hale):
     // <sigma*v> ~ 1.1e-24 * T_kev^2 / (1 + 0.01 * T_kev^2) in m3/s
-    let reactivity_m3_s = (1.15e-22 * (t_kev / 10.0).powf(2.4)) / (1.0 + 0.04 * (t_kev / 10.0).powi(2));
+    let reactivity_m3_s =
+        (1.15e-22 * (t_kev / 10.0).powf(2.4)) / (1.0 + 0.04 * (t_kev / 10.0).powi(2));
 
     // Fusion power density: p_fus = n_D * n_T * <sigma*v> * E_fus
     // For 50:50 D-T: n_D = n_T = 0.5 * n_e_si
@@ -211,10 +211,8 @@ pub fn solve_fusion_tokamak(
     // q95 >= 3.0 (kink limit)
     // greenwald_fraction <= 1.05 (density limit)
     // troyon_beta_n <= 3.5 (Troyon beta limit)
-    let is_safe = q95 >= 2.80
-        && greenwald_fraction <= 1.10
-        && troyon_beta_n <= 3.50
-        && tau_e_s > 0.5;
+    let is_safe =
+        q95 >= 2.80 && greenwald_fraction <= 1.10 && troyon_beta_n <= 3.50 && tau_e_s > 0.5;
 
     Ok(FusionTokamakResult {
         problem_id: problem.problem_id.clone(),
@@ -238,9 +236,7 @@ pub fn solve_fusion_tokamak(
 }
 
 /// Executes fusion tokamak simulation and packages into SimulationResult envelope.
-pub fn solve_fusion_tokamak_sim(
-    problem: &FusionTokamakProblem,
-) -> SimulationResult {
+pub fn solve_fusion_tokamak_sim(problem: &FusionTokamakProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_fusion_tokamak(problem) {
         Ok(res) => {
@@ -248,11 +244,20 @@ pub fn solve_fusion_tokamak_sim(
             metrics.insert("plasma_volume_m3".to_string(), res.plasma_volume_m3);
             metrics.insert("safety_factor_q95".to_string(), res.safety_factor_q95);
             metrics.insert("greenwald_fraction".to_string(), res.greenwald_fraction);
-            metrics.insert("stored_thermal_energy_mj".to_string(), res.stored_thermal_energy_mj);
-            metrics.insert("energy_confinement_time_s".to_string(), res.energy_confinement_time_s);
+            metrics.insert(
+                "stored_thermal_energy_mj".to_string(),
+                res.stored_thermal_energy_mj,
+            );
+            metrics.insert(
+                "energy_confinement_time_s".to_string(),
+                res.energy_confinement_time_s,
+            );
             metrics.insert("fusion_power_mw".to_string(), res.fusion_power_mw);
             metrics.insert("fusion_gain_factor_q".to_string(), res.fusion_gain_factor_q);
-            metrics.insert("lawson_triple_product_10e21_kev_s_m3".to_string(), res.lawson_triple_product_10e21_kev_s_m3);
+            metrics.insert(
+                "lawson_triple_product_10e21_kev_s_m3".to_string(),
+                res.lawson_triple_product_10e21_kev_s_m3,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, res.fusion_power_mw, 1, 1e-4);
@@ -274,9 +279,15 @@ pub fn solve_fusion_tokamak_sim(
                 provenance: SimulationProvenance::new("atlas.science.fusion_tokamak_iter", "0.1.0"),
                 logs: vec![format!(
                     "Fusion Tokamak (ITER-class): V = {:.1} m3, q95 = {:.2}, n/nG = {:.2}, W_th = {:.1} MJ, tau_E = {:.2}s, P_fus = {:.1} MW, Q = {:.1}, Lawson = {:.2}e21, Safe: {}",
-                    res.plasma_volume_m3, res.safety_factor_q95, res.greenwald_fraction,
-                    res.stored_thermal_energy_mj, res.energy_confinement_time_s, res.fusion_power_mw,
-                    res.fusion_gain_factor_q, res.lawson_triple_product_10e21_kev_s_m3, res.is_safe
+                    res.plasma_volume_m3,
+                    res.safety_factor_q95,
+                    res.greenwald_fraction,
+                    res.stored_thermal_energy_mj,
+                    res.energy_confinement_time_s,
+                    res.fusion_power_mw,
+                    res.fusion_gain_factor_q,
+                    res.lawson_triple_product_10e21_kev_s_m3,
+                    res.is_safe
                 )],
             }
         }
@@ -308,10 +319,18 @@ mod tests {
     fn test_fusion_tokamak_nominal() {
         let prob = FusionTokamakProblem::default();
         let res = solve_fusion_tokamak(&prob).expect("solver failed");
-        println!("Fusion Tokamak (ITER-class): V = {:.1} m3, q95 = {:.2}, n/nG = {:.2}, W_th = {:.1} MJ, beta_N = {:.2}, tau_E = {:.2}s, P_fus = {:.1} MW, Q = {:.1}, Lawson = {:.2}e21",
-            res.plasma_volume_m3, res.safety_factor_q95, res.greenwald_fraction,
-            res.stored_thermal_energy_mj, res.troyon_normalized_beta, res.energy_confinement_time_s,
-            res.fusion_power_mw, res.fusion_gain_factor_q, res.lawson_triple_product_10e21_kev_s_m3);
+        println!(
+            "Fusion Tokamak (ITER-class): V = {:.1} m3, q95 = {:.2}, n/nG = {:.2}, W_th = {:.1} MJ, beta_N = {:.2}, tau_E = {:.2}s, P_fus = {:.1} MW, Q = {:.1}, Lawson = {:.2}e21",
+            res.plasma_volume_m3,
+            res.safety_factor_q95,
+            res.greenwald_fraction,
+            res.stored_thermal_energy_mj,
+            res.troyon_normalized_beta,
+            res.energy_confinement_time_s,
+            res.fusion_power_mw,
+            res.fusion_gain_factor_q,
+            res.lawson_triple_product_10e21_kev_s_m3
+        );
 
         assert!(res.safety_factor_q95 > 2.8 && res.safety_factor_q95 < 4.5);
         assert!(res.greenwald_fraction > 0.70 && res.greenwald_fraction < 1.05);

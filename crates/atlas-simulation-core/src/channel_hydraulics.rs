@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
 use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Standard acceleration due to gravity in m/s².
 pub const G_ACCEL: f64 = 9.80665;
@@ -215,11 +215,9 @@ pub fn solve_channel_hydraulics(
 
     // 3. Hydraulic Jump Analysis:
     // Upstream initial supercritical depth y1
-    let y1 = problem.upstream_jump_depth_m.unwrap_or(if fr_n > 1.0 {
-        y_n
-    } else {
-        y_c * 0.5
-    });
+    let y1 = problem
+        .upstream_jump_depth_m
+        .unwrap_or(if fr_n > 1.0 { y_n } else { y_c * 0.5 });
 
     let a1 = channel_area(b, z, y1);
     let t1 = channel_top_width(b, z, y1);
@@ -241,7 +239,8 @@ pub fn solve_channel_hydraulics(
         }
         let dy = 1e-4;
         let a2_plus = channel_area(b, z, y2 + dy);
-        let m2_plus = (q.powi(2) / (G_ACCEL * a2_plus)) + ((y2 + dy).powi(2) * (b / 2.0 + z * (y2 + dy) / 3.0));
+        let m2_plus = (q.powi(2) / (G_ACCEL * a2_plus))
+            + ((y2 + dy).powi(2) * (b / 2.0 + z * (y2 + dy) / 3.0));
         let df_dy = (m2_plus - m2) / dy;
         if df_dy.abs() < 1e-12 {
             break;
@@ -303,19 +302,25 @@ pub fn solve_channel_hydraulics_sim(problem: &ChannelHydraulicsProblem) -> Simul
             let mut metrics = std::collections::HashMap::new();
             metrics.insert("normal_depth_m".to_string(), result.normal_depth_m);
             metrics.insert("critical_depth_m".to_string(), result.critical_depth_m);
-            metrics.insert("normal_velocity_m_s".to_string(), result.normal_velocity_m_s);
-            metrics.insert("normal_froude_number".to_string(), result.normal_froude_number);
+            metrics.insert(
+                "normal_velocity_m_s".to_string(),
+                result.normal_velocity_m_s,
+            );
+            metrics.insert(
+                "normal_froude_number".to_string(),
+                result.normal_froude_number,
+            );
             metrics.insert("jump_head_loss_m".to_string(), result.jump_head_loss_m);
-            metrics.insert("jump_power_dissipated_kw".to_string(), result.jump_power_dissipated_kw);
+            metrics.insert(
+                "jump_power_dissipated_kw".to_string(),
+                result.jump_power_dissipated_kw,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, result.normal_depth_m, 1, 1e-4);
 
-            let comparison = AnalyticalComparison::assess(
-                "normal_depth_m",
-                result.normal_depth_m,
-                2.0,
-            );
+            let comparison =
+                AnalyticalComparison::assess("normal_depth_m", result.normal_depth_m, 2.0);
 
             SimulationResult {
                 problem_id: problem.problem_id.clone(),
@@ -325,7 +330,10 @@ pub fn solve_channel_hydraulics_sim(problem: &ChannelHydraulicsProblem) -> Simul
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.civil.channel_hydraulics_manning", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.civil.channel_hydraulics_manning",
+                    "0.1.0",
+                ),
                 logs: vec![format!(
                     "Channel Hydraulics: yn = {:.2} m, yc = {:.2} m, vn = {:.2} m/s (Fr = {:.2}, {:?}), Jump ΔE = {:.2} m (P_diss = {:.1} kW, Safe: {})",
                     result.normal_depth_m,
@@ -350,7 +358,10 @@ pub fn solve_channel_hydraulics_sim(problem: &ChannelHydraulicsProblem) -> Simul
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.civil.channel_hydraulics_manning", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.civil.channel_hydraulics_manning",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Channel hydraulics simulation failed: {}", err)],
             }
         }

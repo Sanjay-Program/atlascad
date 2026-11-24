@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
 use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Universal gas constant in J/(mol·K).
 pub const R_MOL: f64 = 8.314462618;
@@ -108,7 +108,9 @@ fn arrhenius_k(a: f64, ea_j_mol: f64, t_k: f64) -> f64 {
 }
 
 /// Solves CSTR chemical reactor material/energy balance and thermal stability.
-pub fn solve_chemical_reactor(problem: &ChemicalReactorProblem) -> Result<ChemicalReactorResult, String> {
+pub fn solve_chemical_reactor(
+    problem: &ChemicalReactorProblem,
+) -> Result<ChemicalReactorResult, String> {
     if problem.reactor_volume_m3 <= 0.0 || problem.feed_volumetric_flow_m3_h <= 0.0 {
         return Err("Reactor volume and feed flow rate must be positive".to_string());
     }
@@ -145,13 +147,9 @@ pub fn solve_chemical_reactor(problem: &ChemicalReactorProblem) -> Result<Chemic
         v0_m3_s * problem.feed_reactant_concentration_mol_m3 * x * heat_rxn_pos
     };
 
-    let q_rem = |t_k: f64| -> f64 {
-        cp_flow_w_k * (t_k - t_feed_k) + ua_w_k * (t_k - t_cool_k)
-    };
+    let q_rem = |t_k: f64| -> f64 { cp_flow_w_k * (t_k - t_feed_k) + ua_w_k * (t_k - t_cool_k) };
 
-    let f_net = |t_k: f64| -> f64 {
-        q_gen(t_k) - q_rem(t_k)
-    };
+    let f_net = |t_k: f64| -> f64 { q_gen(t_k) - q_rem(t_k) };
 
     // Bisection search on T_k in range [T_min, T_max]
     let mut low_k = t_cool_k.min(t_feed_k) - 5.0;
@@ -218,12 +216,27 @@ pub fn solve_chemical_reactor_sim(problem: &ChemicalReactorProblem) -> Simulatio
     match solve_chemical_reactor(problem) {
         Ok(result) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("reactor_temperature_c".to_string(), result.reactor_temperature_c);
-            metrics.insert("fractional_conversion".to_string(), result.fractional_conversion);
+            metrics.insert(
+                "reactor_temperature_c".to_string(),
+                result.reactor_temperature_c,
+            );
+            metrics.insert(
+                "fractional_conversion".to_string(),
+                result.fractional_conversion,
+            );
             metrics.insert("damkohler_number".to_string(), result.damkohler_number);
-            metrics.insert("heat_generation_rate_kw".to_string(), result.heat_generation_rate_kw);
-            metrics.insert("jacket_cooling_duty_kw".to_string(), result.jacket_cooling_duty_kw);
-            metrics.insert("thermal_stability_margin_w_k".to_string(), result.thermal_stability_margin_w_k);
+            metrics.insert(
+                "heat_generation_rate_kw".to_string(),
+                result.heat_generation_rate_kw,
+            );
+            metrics.insert(
+                "jacket_cooling_duty_kw".to_string(),
+                result.jacket_cooling_duty_kw,
+            );
+            metrics.insert(
+                "thermal_stability_margin_w_k".to_string(),
+                result.thermal_stability_margin_w_k,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, result.reactor_temperature_c, 1, 1e-4);
@@ -242,7 +255,10 @@ pub fn solve_chemical_reactor_sim(problem: &ChemicalReactorProblem) -> Simulatio
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.chemical.cstr_thermal_stability", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.chemical.cstr_thermal_stability",
+                    "0.1.0",
+                ),
                 logs: vec![format!(
                     "CSTR Reactor: T = {:.1} °C, X = {:.1}%, Da = {:.2}, Q_gen = {:.1} kW, Margin = {:.1} W/K (Safe: {})",
                     result.reactor_temperature_c,
@@ -265,7 +281,10 @@ pub fn solve_chemical_reactor_sim(problem: &ChemicalReactorProblem) -> Simulatio
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.chemical.cstr_thermal_stability", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.chemical.cstr_thermal_stability",
+                    "0.1.0",
+                ),
                 logs: vec![format!("CSTR chemical reactor simulation failed: {}", err)],
             }
         }

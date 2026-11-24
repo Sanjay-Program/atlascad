@@ -52,13 +52,13 @@ impl Default for PropellerProblem {
         Self {
             problem_id: "handymax_bulk_carrier_propeller".to_string(),
             blade_count: BladeCount::FourBlades,
-            propeller_diameter_m: 5.60,         // Ø5.60 m 4-bladed manganese-bronze screw
-            pitch_diameter_ratio: 0.95,         // P/D = 0.95
-            expanded_area_ratio: 0.62,          // A_E / A_0 = 0.62
-            speed_of_advance_m_s: 7.20,         // 7.20 m/s (~14.0 knots ship speed with wake fraction w = 0.28)
-            rotational_speed_rpm: 105.0,        // 105 RPM slow-speed diesel direct drive
-            shaft_immersion_depth_m: 5.20,      // 5.20 m immersion depth
-            water_density_kg_m3: 1025.0,        // Seawater
+            propeller_diameter_m: 5.60, // Ø5.60 m 4-bladed manganese-bronze screw
+            pitch_diameter_ratio: 0.95, // P/D = 0.95
+            expanded_area_ratio: 0.62,  // A_E / A_0 = 0.62
+            speed_of_advance_m_s: 7.20, // 7.20 m/s (~14.0 knots ship speed with wake fraction w = 0.28)
+            rotational_speed_rpm: 105.0, // 105 RPM slow-speed diesel direct drive
+            shaft_immersion_depth_m: 5.20, // 5.20 m immersion depth
+            water_density_kg_m3: 1025.0, // Seawater
         }
     }
 }
@@ -103,7 +103,9 @@ pub struct PropellerResult {
 }
 
 /// Solves Wageningen B-screw open-water hydrodynamics, thrust, torque, and Keller cavitation.
-pub fn solve_propeller_hydrodynamics(problem: &PropellerProblem) -> Result<PropellerResult, String> {
+pub fn solve_propeller_hydrodynamics(
+    problem: &PropellerProblem,
+) -> Result<PropellerResult, String> {
     if problem.propeller_diameter_m <= 0.5 {
         return Err("Propeller diameter must exceed 0.5 m".to_string());
     }
@@ -183,7 +185,8 @@ pub fn solve_propeller_hydrodynamics(problem: &PropellerProblem) -> Result<Prope
     // (A_E / A_0)_min = [(1.3 + 0.3 * Z) * T] / [(p_0 - p_v) * D^2] + k_constant
     // k_constant ~ 0.20 for single-screw merchant ships
     let k_constant = 0.20;
-    let keller_min_aea0 = ((1.3 + 0.3 * z) * thrust_n) / ((p_shaft_pa - p_v) * d.powi(2)) + k_constant;
+    let keller_min_aea0 =
+        ((1.3 + 0.3 * z) * thrust_n) / ((p_shaft_pa - p_v) * d.powi(2)) + k_constant;
 
     // Cavitation inception numbers:
     // sigma_0 = (p_0 - p_v) / (0.5 * rho * v_a^2)
@@ -191,7 +194,9 @@ pub fn solve_propeller_hydrodynamics(problem: &PropellerProblem) -> Result<Prope
     let sigma_0 = (p_shaft_pa - p_v) / q_dyn_va.max(1.0);
 
     // Resultant velocity at 0.7R: V_07 = sqrt(v_a^2 + (0.7 * pi * n * D)^2)
-    let v_07 = (problem.speed_of_advance_m_s.powi(2) + (0.7 * std::f64::consts::PI * n_rps * d).powi(2)).sqrt();
+    let v_07 = (problem.speed_of_advance_m_s.powi(2)
+        + (0.7 * std::f64::consts::PI * n_rps * d).powi(2))
+    .sqrt();
     let q_dyn_07 = 0.5 * problem.water_density_kg_m3 * v_07.powi(2);
     let sigma_07 = (p_shaft_pa - p_v) / q_dyn_07.max(1.0);
 
@@ -238,7 +243,10 @@ mod tests {
         assert!(res.thrust_force_kn > 400.0 && res.thrust_force_kn < 900.0);
         assert!(res.delivered_power_kw > 3000.0 && res.delivered_power_kw < 10000.0);
         assert!(res.blade_tip_speed_m_s > 25.0 && res.blade_tip_speed_m_s <= 40.0);
-        assert!(res.is_keller_criterion_satisfied, "Expanded area ratio should satisfy Keller criterion");
+        assert!(
+            res.is_keller_criterion_satisfied,
+            "Expanded area ratio should satisfy Keller criterion"
+        );
         assert!(res.is_efficiency_satisfactory);
         assert!(res.is_tip_speed_acceptable);
         assert!(res.is_propeller_design_viable);

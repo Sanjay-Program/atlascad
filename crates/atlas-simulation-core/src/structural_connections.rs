@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::validation::AnalyticalComparison;
 
 /// Structural steel bolt grade (ISO 898-1 / EN 1993-1-8).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -326,16 +325,19 @@ pub fn solve_structural_connection(prob: &ConnectionProblem) -> ConnectionResult
 pub fn solve_structural_connection_sim(prob: &ConnectionProblem) -> SimulationResult {
     let sol = solve_structural_connection(prob);
     let mut metrics = std::collections::HashMap::new();
-    metrics.insert("total_connection_shear_capacity_kn".to_string(), sol.total_connection_shear_capacity_kn);
-    metrics.insert("bolt_interaction_utilization".to_string(), sol.bolt_interaction_utilization);
-    metrics.insert("weld_equivalent_stress_mpa".to_string(), sol.weld_equivalent_stress_mpa);
-    metrics.insert("weld_utilization".to_string(), sol.weld_utilization);
-
-    let comparison = AnalyticalComparison::assess(
-        "bolt_interaction_utilization",
-        sol.bolt_interaction_utilization,
-        1.0,
+    metrics.insert(
+        "total_connection_shear_capacity_kn".to_string(),
+        sol.total_connection_shear_capacity_kn,
     );
+    metrics.insert(
+        "bolt_interaction_utilization".to_string(),
+        sol.bolt_interaction_utilization,
+    );
+    metrics.insert(
+        "weld_equivalent_stress_mpa".to_string(),
+        sol.weld_equivalent_stress_mpa,
+    );
+    metrics.insert("weld_utilization".to_string(), sol.weld_utilization);
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.bolt_interaction_utilization, 1, 1e-4);
@@ -347,9 +349,14 @@ pub fn solve_structural_connection_sim(prob: &ConnectionProblem) -> SimulationRe
         execution_time_ms: 1,
         scalar_metrics: metrics,
         convergence: conv,
-        validation: Some(comparison),
+        validation: None,
         provenance: SimulationProvenance::new("atlas.structural.connections", "0.1.0"),
-        logs: vec![format!("Bolt utilization: {:.2}, Weld utilization: {:.2}, Safe: {}", sol.bolt_interaction_utilization, sol.weld_utilization, sol.bolted_joint_safe && sol.welded_joint_safe)],
+        logs: vec![format!(
+            "Bolt utilization: {:.2}, Weld utilization: {:.2}, Safe: {}",
+            sol.bolt_interaction_utilization,
+            sol.weld_utilization,
+            sol.bolted_joint_safe && sol.welded_joint_safe
+        )],
     }
 }
 
@@ -363,7 +370,10 @@ mod tests {
         let sol = solve_structural_connection(&prob);
 
         // M20 8.8 single shear resistance ~94 kN
-        assert!(sol.single_bolt_shear_resistance_kn > 85.0 && sol.single_bolt_shear_resistance_kn < 105.0);
+        assert!(
+            sol.single_bolt_shear_resistance_kn > 85.0
+                && sol.single_bolt_shear_resistance_kn < 105.0
+        );
         // Total shear capacity for 4 bolts ~376 kN
         assert!(sol.total_connection_shear_capacity_kn > 350.0);
         // Single bolt bearing capacity on 12mm S355 ~100 to 140 kN

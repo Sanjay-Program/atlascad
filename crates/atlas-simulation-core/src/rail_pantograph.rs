@@ -169,8 +169,14 @@ pub fn solve_rail_pantograph(
     } else {
         // Abramowitz & Stegun normal CDF tail:
         let t_param = 1.0 / (1.0 + 0.2316419 * z_tail);
-        let poly = t_param * (0.319381530 + t_param * (-0.356563782 + t_param * (1.781477937 + t_param * (-1.821255978 + t_param * 1.330274429))));
-        let phi_tail = (1.0 / (2.0 * std::f64::consts::PI).sqrt()) * (-0.5 * z_tail * z_tail).exp() * poly;
+        let poly = t_param
+            * (0.319381530
+                + t_param
+                    * (-0.356563782
+                        + t_param
+                            * (1.781477937 + t_param * (-1.821255978 + t_param * 1.330274429))));
+        let phi_tail =
+            (1.0 / (2.0 * std::f64::consts::PI).sqrt()) * (-0.5 * z_tail * z_tail).exp() * poly;
         (phi_tail * 100.0).clamp(0.0001, 15.0)
     };
 
@@ -224,7 +230,10 @@ mod tests {
         let res = solve_rail_pantograph(&prob)?;
         assert!(res.mean_contact_force_n > 140.0 && res.mean_contact_force_n < 200.0);
         assert!(res.contact_force_std_dev_n > 20.0 && res.contact_force_std_dev_n < 60.0);
-        assert!(res.statistical_max_contact_force_n > 220.0 && res.statistical_max_contact_force_n < 350.0);
+        assert!(
+            res.statistical_max_contact_force_n > 220.0
+                && res.statistical_max_contact_force_n < 350.0
+        );
         assert!(res.contact_wire_wave_speed_m_s > 130.0 && res.contact_wire_wave_speed_m_s < 160.0);
         assert!(res.doppler_speed_ratio_alpha > 0.50 && res.doppler_speed_ratio_alpha <= 0.70);
         assert!(res.contact_wire_uplift_mm > 40.0 && res.contact_wire_uplift_mm < 90.0);

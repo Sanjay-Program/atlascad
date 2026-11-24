@@ -7,11 +7,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
 use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Standard acceleration due to gravity on Earth in m/s².
 pub const G0: f64 = 9.80665;
@@ -126,7 +126,9 @@ pub fn solve_rocket_nozzle(problem: &RocketNozzleProblem) -> Result<RocketNozzle
         return Err("Throat diameter must be positive and expansion ratio >= 1.0".to_string());
     }
     if problem.specific_heat_ratio_gamma <= 1.0 || problem.molecular_weight_g_mol <= 0.0 {
-        return Err("Specific heat ratio gamma must be > 1.0 and molecular weight positive".to_string());
+        return Err(
+            "Specific heat ratio gamma must be > 1.0 and molecular weight positive".to_string(),
+        );
     }
 
     let gamma = problem.specific_heat_ratio_gamma;
@@ -140,7 +142,8 @@ pub fn solve_rocket_nozzle(problem: &RocketNozzleProblem) -> Result<RocketNozzle
 
     // Characteristic velocity c* = sqrt(gamma * R * Tc) / (gamma * sqrt((2/(gamma+1))^((gamma+1)/(gamma-1))))
     let gamma_factor = (2.0 / (gamma + 1.0)).powf((gamma + 1.0) / (gamma - 1.0));
-    let c_star = (gamma * r_spec * problem.chamber_temperature_k).sqrt() / (gamma * gamma_factor.sqrt());
+    let c_star =
+        (gamma * r_spec * problem.chamber_temperature_k).sqrt() / (gamma * gamma_factor.sqrt());
 
     // Propellant mass flow rate: m_dot = Cd * (Pc * At) / c*
     let m_dot = problem.discharge_coefficient_cd * (p_c_pa * a_t) / c_star;
@@ -243,10 +246,19 @@ pub fn solve_rocket_nozzle_sim(problem: &RocketNozzleProblem) -> SimulationResul
             let mut metrics = std::collections::HashMap::new();
             metrics.insert("exit_mach_number".to_string(), result.exit_mach_number);
             metrics.insert("net_thrust_kn".to_string(), result.net_thrust_kn);
-            metrics.insert("operating_specific_impulse_s".to_string(), result.operating_specific_impulse_s);
-            metrics.insert("vacuum_specific_impulse_s".to_string(), result.vacuum_specific_impulse_s);
+            metrics.insert(
+                "operating_specific_impulse_s".to_string(),
+                result.operating_specific_impulse_s,
+            );
+            metrics.insert(
+                "vacuum_specific_impulse_s".to_string(),
+                result.vacuum_specific_impulse_s,
+            );
             metrics.insert("exit_pressure_bar".to_string(), result.exit_pressure_bar);
-            metrics.insert("propellant_mass_flow_kg_s".to_string(), result.propellant_mass_flow_kg_s);
+            metrics.insert(
+                "propellant_mass_flow_kg_s".to_string(),
+                result.propellant_mass_flow_kg_s,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, result.exit_mach_number, 1, 1e-4);
@@ -265,7 +277,10 @@ pub fn solve_rocket_nozzle_sim(problem: &RocketNozzleProblem) -> SimulationResul
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.aerospace.rocket_nozzle_delaval", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.aerospace.rocket_nozzle_delaval",
+                    "0.1.0",
+                ),
                 logs: vec![format!(
                     "Rocket Nozzle: Mach {:.2}, Thrust = {:.1} kN, Isp = {:.1}s (Vac: {:.1}s), Pe = {:.3} bar (Safe: {})",
                     result.exit_mach_number,
@@ -288,7 +303,10 @@ pub fn solve_rocket_nozzle_sim(problem: &RocketNozzleProblem) -> SimulationResul
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.aerospace.rocket_nozzle_delaval", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.aerospace.rocket_nozzle_delaval",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Rocket nozzle simulation failed: {}", err)],
             }
         }
@@ -305,12 +323,16 @@ mod tests {
         let prob = RocketNozzleProblem::default();
         let res = solve_rocket_nozzle(&prob).expect("solver failed");
 
-        assert!(res.characteristic_velocity_m_s > 1700.0 && res.characteristic_velocity_m_s < 2000.0);
+        assert!(
+            res.characteristic_velocity_m_s > 1700.0 && res.characteristic_velocity_m_s < 2000.0
+        );
         assert!(res.propellant_mass_flow_kg_s > 50.0 && res.propellant_mass_flow_kg_s < 70.0);
         assert!(res.exit_mach_number > 3.0 && res.exit_mach_number < 4.0);
         assert!(res.exit_pressure_bar > 0.40 && res.exit_pressure_bar < 0.90);
         assert!(res.net_thrust_kn > 150.0 && res.net_thrust_kn < 220.0);
-        assert!(res.operating_specific_impulse_s > 260.0 && res.operating_specific_impulse_s < 330.0);
+        assert!(
+            res.operating_specific_impulse_s > 260.0 && res.operating_specific_impulse_s < 330.0
+        );
         assert!(res.vacuum_specific_impulse_s > res.operating_specific_impulse_s);
         assert!(res.is_safe);
         assert_eq!(res.expansion_regime, NozzleExpansionRegime::Overexpanded);

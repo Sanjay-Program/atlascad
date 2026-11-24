@@ -60,16 +60,16 @@ impl Default for SpacecraftAdcsProblem {
         Self {
             problem_id: "earth_observation_leo_satellite".to_string(),
             orbit_regime: SpacecraftOrbitRegime::LowEarthOrbitLEO,
-            orbit_altitude_km: 550.0,           // 550 km Sun-Synchronous LEO
-            spacecraft_mass_kg: 350.0,          // 350 kg smallsat
-            inertia_ixx_kg_m2: 85.0,            // Roll inertia
-            inertia_iyy_kg_m2: 120.0,           // Pitch inertia
-            inertia_izz_kg_m2: 75.0,            // Yaw inertia
-            cp_cg_offset_arm_m: 0.08,           // 8 cm CP-CG offset
-            projected_surface_area_m2: 2.40,    // 2.4 m² solar array + bus cross-section
-            solar_reflectance_q: 0.60,          // 60% reflective multi-layer insulation / solar cells
-            residual_magnetic_dipole_a_m2: 0.50,// 0.50 A·m² residual magnetic dipole
-            target_slew_accel_deg_s2: 1.50,     // 1.5 deg/s² slew agility
+            orbit_altitude_km: 550.0,        // 550 km Sun-Synchronous LEO
+            spacecraft_mass_kg: 350.0,       // 350 kg smallsat
+            inertia_ixx_kg_m2: 85.0,         // Roll inertia
+            inertia_iyy_kg_m2: 120.0,        // Pitch inertia
+            inertia_izz_kg_m2: 75.0,         // Yaw inertia
+            cp_cg_offset_arm_m: 0.08,        // 8 cm CP-CG offset
+            projected_surface_area_m2: 2.40, // 2.4 m² solar array + bus cross-section
+            solar_reflectance_q: 0.60,       // 60% reflective multi-layer insulation / solar cells
+            residual_magnetic_dipole_a_m2: 0.50, // 0.50 A·m² residual magnetic dipole
+            target_slew_accel_deg_s2: 1.50,  // 1.5 deg/s² slew agility
         }
     }
 }
@@ -112,14 +112,19 @@ pub struct SpacecraftAdcsResult {
 }
 
 /// Solves spacecraft three-axis environmental disturbance torques and ADCS actuator sizing.
-pub fn solve_spacecraft_adcs_attitude(problem: &SpacecraftAdcsProblem) -> Result<SpacecraftAdcsResult, String> {
+pub fn solve_spacecraft_adcs_attitude(
+    problem: &SpacecraftAdcsProblem,
+) -> Result<SpacecraftAdcsResult, String> {
     if problem.orbit_altitude_km < 150.0 || problem.orbit_altitude_km > 50000.0 {
         return Err("Orbit altitude must be between 150 and 50,000 km".to_string());
     }
     if problem.spacecraft_mass_kg <= 0.0 {
         return Err("Spacecraft mass must be positive".to_string());
     }
-    if problem.inertia_ixx_kg_m2 <= 0.0 || problem.inertia_iyy_kg_m2 <= 0.0 || problem.inertia_izz_kg_m2 <= 0.0 {
+    if problem.inertia_ixx_kg_m2 <= 0.0
+        || problem.inertia_iyy_kg_m2 <= 0.0
+        || problem.inertia_izz_kg_m2 <= 0.0
+    {
         return Err("Moments of inertia must be strictly positive".to_string());
     }
 
@@ -139,7 +144,8 @@ pub fn solve_spacecraft_adcs_attitude(problem: &SpacecraftAdcsProblem) -> Result
 
     // 1. Gravity gradient torque: T_gg = (3 * mu / 2*r^3) * |I_z - I_x| * sin(2*theta):
     // Max occurs at theta = 45° where sin(2*theta) = 1.0:
-    let delta_i = (problem.inertia_izz_kg_m2 - problem.inertia_ixx_kg_m2).abs()
+    let delta_i = (problem.inertia_izz_kg_m2 - problem.inertia_ixx_kg_m2)
+        .abs()
         .max((problem.inertia_iyy_kg_m2 - problem.inertia_ixx_kg_m2).abs());
     let t_gg_nm = 1.5 * (mu_earth / r_orb.powi(3)) * delta_i;
 
@@ -183,7 +189,10 @@ pub fn solve_spacecraft_adcs_attitude(problem: &SpacecraftAdcsProblem) -> Result
     let h_rw_rec_nms = (2.0 * h_accum_nms).max(0.02);
 
     // Required motor slew torque for fast attitude agility: T = I_max * alpha_slew [N*m]:
-    let max_i = problem.inertia_ixx_kg_m2.max(problem.inertia_iyy_kg_m2).max(problem.inertia_izz_kg_m2);
+    let max_i = problem
+        .inertia_ixx_kg_m2
+        .max(problem.inertia_iyy_kg_m2)
+        .max(problem.inertia_izz_kg_m2);
     let alpha_slew_rad_s2 = problem.target_slew_accel_deg_s2.to_radians();
     let t_slew_nm = max_i * alpha_slew_rad_s2;
     let t_slew_mn_m = t_slew_nm * 1000.0;
@@ -234,7 +243,10 @@ mod tests {
         assert!(res.orbital_velocity_m_s > 7400.0 && res.orbital_velocity_m_s < 7800.0);
         assert!(res.local_magnetic_field_tesla > 2.0e-5 && res.local_magnetic_field_tesla < 3.5e-5);
         assert!(res.peak_disturbance_torque_un_m > 5.0 && res.peak_disturbance_torque_un_m < 200.0);
-        assert!(res.accumulated_momentum_per_orbit_nms > 0.01 && res.accumulated_momentum_per_orbit_nms < 0.50);
+        assert!(
+            res.accumulated_momentum_per_orbit_nms > 0.01
+                && res.accumulated_momentum_per_orbit_nms < 0.50
+        );
         assert!(res.recommended_wheel_momentum_nms >= 0.05);
         assert!(res.required_slew_torque_mn_m > 500.0 && res.required_slew_torque_mn_m < 5000.0);
         assert!(res.required_mtq_dipole_a_m2 > 0.1 && res.required_mtq_dipole_a_m2 < 20.0);

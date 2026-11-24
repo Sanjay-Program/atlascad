@@ -7,11 +7,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Universal gas constant R in J/(mol·K).
 pub const R_GAS: f64 = 8.314462618;
@@ -114,14 +114,14 @@ pub struct PemFuelCellResult {
 }
 
 /// Solves PEMFC electrochemistry, polarization losses, stack power, and hydrogen consumption.
-pub fn solve_pem_fuel_cell(
-    problem: &PemFuelCellProblem,
-) -> Result<PemFuelCellResult, String> {
+pub fn solve_pem_fuel_cell(problem: &PemFuelCellProblem) -> Result<PemFuelCellResult, String> {
     if problem.cell_count == 0 || problem.active_cell_area_cm2 <= 0.0 {
         return Err("Cell count and active area must be positive".to_string());
     }
     if problem.operating_temperature_c < 0.0 || problem.operating_temperature_c > 120.0 {
-        return Err("Operating temperature must be between 0 and 120 °C for low-temp PEMFC".to_string());
+        return Err(
+            "Operating temperature must be between 0 and 120 °C for low-temp PEMFC".to_string(),
+        );
     }
     if problem.anode_pressure_bar <= 0.0 || problem.cathode_pressure_bar <= 0.0 {
         return Err("Gas pressures must be positive".to_string());
@@ -225,9 +225,7 @@ pub fn solve_pem_fuel_cell(
 }
 
 /// Executes PEM fuel cell simulation and packages into SimulationResult envelope.
-pub fn solve_pem_fuel_cell_sim(
-    problem: &PemFuelCellProblem,
-) -> SimulationResult {
+pub fn solve_pem_fuel_cell_sim(problem: &PemFuelCellProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_pem_fuel_cell(problem) {
         Ok(res) => {
@@ -235,8 +233,14 @@ pub fn solve_pem_fuel_cell_sim(
             metrics.insert("cell_voltage_v".to_string(), res.cell_voltage_v);
             metrics.insert("stack_voltage_v".to_string(), res.stack_voltage_v);
             metrics.insert("stack_power_kw".to_string(), res.stack_power_kw);
-            metrics.insert("hydrogen_consumption_kg_h".to_string(), res.hydrogen_consumption_kg_h);
-            metrics.insert("electrical_efficiency_lhv_pct".to_string(), res.electrical_efficiency_lhv_pct);
+            metrics.insert(
+                "hydrogen_consumption_kg_h".to_string(),
+                res.hydrogen_consumption_kg_h,
+            );
+            metrics.insert(
+                "electrical_efficiency_lhv_pct".to_string(),
+                res.electrical_efficiency_lhv_pct,
+            );
             metrics.insert("heat_generation_kw".to_string(), res.heat_generation_kw);
 
             let mut conv = ConvergenceMonitor::new(1e-6);
@@ -259,10 +263,18 @@ pub fn solve_pem_fuel_cell_sim(
                 provenance: SimulationProvenance::new("atlas.energy.pem_fuel_cell", "0.1.0"),
                 logs: vec![format!(
                     "PEM Fuel Cell (Barbir / Larminie): V_cell = {:.3} V (E_nernst = {:.3} V, act = {:.3} V, ohm = {:.3} V, conc = {:.3} V), P_stack = {:.1} kW ({:.1} V @ {:.1} A), H2 = {:.2} kg/h, Q_heat = {:.1} kW, eta_lhv = {:.1}%, Operable: {}",
-                    res.cell_voltage_v, res.nernst_potential_v, res.activation_overpotential_v,
-                    res.ohmic_overpotential_v, res.concentration_overpotential_v, res.stack_power_kw,
-                    res.stack_voltage_v, res.stack_current_a, res.hydrogen_consumption_kg_h,
-                    res.heat_generation_kw, res.electrical_efficiency_lhv_pct, res.is_operable
+                    res.cell_voltage_v,
+                    res.nernst_potential_v,
+                    res.activation_overpotential_v,
+                    res.ohmic_overpotential_v,
+                    res.concentration_overpotential_v,
+                    res.stack_power_kw,
+                    res.stack_voltage_v,
+                    res.stack_current_a,
+                    res.hydrogen_consumption_kg_h,
+                    res.heat_generation_kw,
+                    res.electrical_efficiency_lhv_pct,
+                    res.is_operable
                 )],
             }
         }
@@ -294,15 +306,23 @@ mod tests {
     fn test_pem_fuel_cell_nominal() {
         let prob = PemFuelCellProblem::default();
         let res = solve_pem_fuel_cell(&prob).expect("solver failed");
-        println!("PEMFC Stack: Vcell = {:.3} V, Vstack = {:.1} V, Istack = {:.1} A, Pstack = {:.1} kW, H2 = {:.2} kg/h, eta = {:.1}%",
-            res.cell_voltage_v, res.stack_voltage_v, res.stack_current_a, res.stack_power_kw,
-            res.hydrogen_consumption_kg_h, res.electrical_efficiency_lhv_pct);
+        println!(
+            "PEMFC Stack: Vcell = {:.3} V, Vstack = {:.1} V, Istack = {:.1} A, Pstack = {:.1} kW, H2 = {:.2} kg/h, eta = {:.1}%",
+            res.cell_voltage_v,
+            res.stack_voltage_v,
+            res.stack_current_a,
+            res.stack_power_kw,
+            res.hydrogen_consumption_kg_h,
+            res.electrical_efficiency_lhv_pct
+        );
 
         assert!(res.nernst_potential_v > 1.15 && res.nernst_potential_v < 1.25);
         assert!(res.cell_voltage_v > 0.65 && res.cell_voltage_v < 0.88);
         assert!(res.stack_power_kw > 70.0 && res.stack_power_kw < 110.0);
         assert!(res.hydrogen_consumption_kg_h > 4.0 && res.hydrogen_consumption_kg_h < 6.5);
-        assert!(res.electrical_efficiency_lhv_pct > 50.0 && res.electrical_efficiency_lhv_pct < 70.0);
+        assert!(
+            res.electrical_efficiency_lhv_pct > 50.0 && res.electrical_efficiency_lhv_pct < 70.0
+        );
         assert!(res.heat_generation_kw > 60.0 && res.heat_generation_kw < 115.0);
         assert!(res.is_operable);
     }

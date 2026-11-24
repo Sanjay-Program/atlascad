@@ -29,26 +29,44 @@ impl VesselMaterial {
     pub fn allowable_stress_mpa(&self, temp_c: f64) -> f64 {
         match self {
             Self::Sa516Gr70 => {
-                if temp_c <= 150.0 { 138.0 }
-                else if temp_c <= 250.0 { 135.0 }
-                else if temp_c <= 350.0 { 120.0 }
-                else { 95.0 }
+                if temp_c <= 150.0 {
+                    138.0
+                } else if temp_c <= 250.0 {
+                    135.0
+                } else if temp_c <= 350.0 {
+                    120.0
+                } else {
+                    95.0
+                }
             }
             Self::Sa240Type304 => {
-                if temp_c <= 100.0 { 115.0 }
-                else if temp_c <= 200.0 { 103.0 }
-                else if temp_c <= 300.0 { 92.0 }
-                else { 82.0 }
+                if temp_c <= 100.0 {
+                    115.0
+                } else if temp_c <= 200.0 {
+                    103.0
+                } else if temp_c <= 300.0 {
+                    92.0
+                } else {
+                    82.0
+                }
             }
             Self::Sa387Gr11 => {
-                if temp_c <= 300.0 { 142.0 }
-                else if temp_c <= 400.0 { 138.0 }
-                else { 125.0 }
+                if temp_c <= 300.0 {
+                    142.0
+                } else if temp_c <= 400.0 {
+                    138.0
+                } else {
+                    125.0
+                }
             }
             Self::Sb168Inconel600 => {
-                if temp_c <= 200.0 { 160.0 }
-                else if temp_c <= 400.0 { 152.0 }
-                else { 140.0 }
+                if temp_c <= 200.0 {
+                    160.0
+                } else if temp_c <= 400.0 {
+                    152.0
+                } else {
+                    140.0
+                }
             }
         }
     }
@@ -168,19 +186,26 @@ pub struct PressureVesselResult {
 }
 
 /// Solves ASME Section VIII Div 1 cylindrical shell and formed heads thicknesses and MAWP.
-pub fn solve_asme_pressure_vessel(prob: &PressureVesselProblem) -> Result<PressureVesselResult, String> {
+pub fn solve_asme_pressure_vessel(
+    prob: &PressureVesselProblem,
+) -> Result<PressureVesselResult, String> {
     let p_bar = prob.design_pressure_bar;
     let d_inside = prob.inside_diameter_d_mm;
     let l_cyl = prob.tangent_length_l_mm;
 
     if p_bar <= 0.0 || d_inside <= 50.0 || l_cyl <= 50.0 {
-        return Err("Design pressure, diameter (>50mm), and tangent length must be strictly positive.".to_string());
+        return Err(
+            "Design pressure, diameter (>50mm), and tangent length must be strictly positive."
+                .to_string(),
+        );
     }
 
     // Convert P to MPa: 1 bar = 0.1 MPa
     let p_mpa = p_bar * 0.10;
     let r_inside = d_inside / 2.0;
-    let s_mpa = prob.material.allowable_stress_mpa(prob.design_temperature_c);
+    let s_mpa = prob
+        .material
+        .allowable_stress_mpa(prob.design_temperature_c);
     let s_amb = prob.material.ambient_allowable_stress_mpa();
     let e = prob.joint_efficiency.factor();
     let ca = prob.corrosion_allowance_mm.max(0.0);
@@ -189,13 +214,19 @@ pub fn solve_asme_pressure_vessel(prob: &PressureVesselProblem) -> Result<Pressu
     // t_req = (P * R) / (S * E - 0.6 * P) + CA
     let denom_cyl = s_mpa * e - 0.6 * p_mpa;
     if denom_cyl <= 0.0 {
-        return Err("Internal design pressure exceeds maximum material allowable limit (S*E <= 0.6*P).".to_string());
+        return Err(
+            "Internal design pressure exceeds maximum material allowable limit (S*E <= 0.6*P)."
+                .to_string(),
+        );
     }
     let t_cyl_corroded = (p_mpa * r_inside) / denom_cyl;
     let t_cyl_min = t_cyl_corroded + ca;
 
     // Actual shell thickness:
-    let t_cyl_actual = prob.nominal_shell_thickness_mm.unwrap_or(t_cyl_min.ceil()).max(t_cyl_min);
+    let t_cyl_actual = prob
+        .nominal_shell_thickness_mm
+        .unwrap_or(t_cyl_min.ceil())
+        .max(t_cyl_min);
     let t_cyl_eff = (t_cyl_actual - ca).max(0.1);
 
     // Shell MAWP corroded (UG-27(c)(1) inverted):
@@ -209,10 +240,15 @@ pub fn solve_asme_pressure_vessel(prob: &PressureVesselProblem) -> Result<Pressu
             // UG-32(d): t = (P * D) / (2 * S * E - 0.2 * P)
             let denom_head = 2.0 * s_mpa * e - 0.2 * p_mpa;
             if denom_head <= 0.0 {
-                return Err("Internal design pressure exceeds head allowable stress limit.".to_string());
+                return Err(
+                    "Internal design pressure exceeds head allowable stress limit.".to_string(),
+                );
             }
             let t_req = (p_mpa * d_inside) / denom_head;
-            let t_head_actual = prob.nominal_head_thickness_mm.unwrap_or((t_req + ca).ceil()).max(t_req + ca);
+            let t_head_actual = prob
+                .nominal_head_thickness_mm
+                .unwrap_or((t_req + ca).ceil())
+                .max(t_req + ca);
             let t_head_eff = (t_head_actual - ca).max(0.1);
             let mawp = (2.0 * s_mpa * e * t_head_eff) / (d_inside + 0.2 * t_head_eff);
             (t_req, mawp)
@@ -224,10 +260,15 @@ pub fn solve_asme_pressure_vessel(prob: &PressureVesselProblem) -> Result<Pressu
             let m_factor = 0.25 * (3.0 + (l_crown / r_knuckle).sqrt());
             let denom_tori = 2.0 * s_mpa * e - 0.2 * p_mpa;
             if denom_tori <= 0.0 {
-                return Err("Internal design pressure exceeds torispherical allowable limit.".to_string());
+                return Err(
+                    "Internal design pressure exceeds torispherical allowable limit.".to_string(),
+                );
             }
             let t_req = (p_mpa * l_crown * m_factor) / denom_tori;
-            let t_head_actual = prob.nominal_head_thickness_mm.unwrap_or((t_req + ca).ceil()).max(t_req + ca);
+            let t_head_actual = prob
+                .nominal_head_thickness_mm
+                .unwrap_or((t_req + ca).ceil())
+                .max(t_req + ca);
             let t_head_eff = (t_head_actual - ca).max(0.1);
             let mawp = (2.0 * s_mpa * e * t_head_eff) / (m_factor * l_crown + 0.2 * t_head_eff);
             (t_req, mawp)
@@ -236,10 +277,15 @@ pub fn solve_asme_pressure_vessel(prob: &PressureVesselProblem) -> Result<Pressu
             // UG-32(f): t = (P * R) / (2 * S * E - 0.2 * P)
             let denom_hemi = 2.0 * s_mpa * e - 0.2 * p_mpa;
             if denom_hemi <= 0.0 {
-                return Err("Internal design pressure exceeds hemispherical allowable limit.".to_string());
+                return Err(
+                    "Internal design pressure exceeds hemispherical allowable limit.".to_string(),
+                );
             }
             let t_req = (p_mpa * r_inside) / denom_hemi;
-            let t_head_actual = prob.nominal_head_thickness_mm.unwrap_or((t_req + ca).ceil()).max(t_req + ca);
+            let t_head_actual = prob
+                .nominal_head_thickness_mm
+                .unwrap_or((t_req + ca).ceil())
+                .max(t_req + ca);
             let t_head_eff = (t_head_actual - ca).max(0.1);
             let mawp = (2.0 * s_mpa * e * t_head_eff) / (r_inside + 0.2 * t_head_eff);
             (t_req, mawp)
@@ -247,7 +293,10 @@ pub fn solve_asme_pressure_vessel(prob: &PressureVesselProblem) -> Result<Pressu
     };
 
     let t_head_min = t_head_corroded + ca;
-    let t_head_actual = prob.nominal_head_thickness_mm.unwrap_or(t_head_min.ceil()).max(t_head_min);
+    let t_head_actual = prob
+        .nominal_head_thickness_mm
+        .unwrap_or(t_head_min.ceil())
+        .max(t_head_min);
     let mawp_head_bar = mawp_head_mpa * 10.0;
 
     // Overall vessel MAWP is governed by the weaker component:
@@ -273,7 +322,8 @@ pub fn solve_asme_pressure_vessel(prob: &PressureVesselProblem) -> Result<Pressu
     // Metal Mass Estimation:
     let rho = prob.material.density_kg_m3();
     let shell_mid_rad_m = (r_inside + t_cyl_actual * 0.5) / 1000.0;
-    let shell_steel_vol_m3 = 2.0 * std::f64::consts::PI * shell_mid_rad_m * l_m * (t_cyl_actual / 1000.0);
+    let shell_steel_vol_m3 =
+        2.0 * std::f64::consts::PI * shell_mid_rad_m * l_m * (t_cyl_actual / 1000.0);
     // Head surface area (approx 1.084 * D^2 for 2:1 ellip each):
     let head_area_m2 = match prob.head_type {
         HeadType::Ellipsoidal2to1 => 1.084 * (2.0 * r_m).powi(2),
@@ -283,15 +333,34 @@ pub fn solve_asme_pressure_vessel(prob: &PressureVesselProblem) -> Result<Pressu
     let heads_steel_vol_m3 = 2.0 * head_area_m2 * (t_head_actual / 1000.0);
     let empty_mass_kg = (shell_steel_vol_m3 + heads_steel_vol_m3) * rho;
 
-    let is_ok = t_cyl_actual >= t_cyl_min && t_head_actual >= t_head_min && vessel_mawp_bar >= p_bar;
+    let is_ok =
+        t_cyl_actual >= t_cyl_min && t_head_actual >= t_head_min && vessel_mawp_bar >= p_bar;
 
     let notes = vec![
-        format!("ASME BPVC Sec. VIII Div. 1: '{}' (ID = {:.0} mm, Length = {:.0} mm, Design P = {:.1} bar @ {:.0}°C)", prob.vessel_name, d_inside, l_cyl, p_bar, prob.design_temperature_c),
-        format!("Material: Allowable Stress S = {:.1} MPa, Joint Efficiency E = {:.2}, Corrosion Allowance = {:.1} mm", s_mpa, e, ca),
-        format!("Cylindrical Shell: Min Required t = {:.2} mm, Nominal t = {:.1} mm -> Shell MAWP = {:.2} bar", t_cyl_min, t_cyl_actual, mawp_cyl_bar),
-        format!("Formed Heads: Min Required t = {:.2} mm, Nominal t = {:.1} mm -> Head MAWP = {:.2} bar", t_head_min, t_head_actual, mawp_head_bar),
-        format!("Governing Vessel MAWP = {:.2} bar, Hydrostatic Proof Test Pressure = {:.2} bar (UG-99(b))", vessel_mawp_bar, hydro_test_bar),
-        format!("Capacity: Internal Volume = {:.3} m³, Empty Shell & Heads Mass = {:.1} kg", total_internal_vol_m3, empty_mass_kg),
+        format!(
+            "ASME BPVC Sec. VIII Div. 1: '{}' (ID = {:.0} mm, Length = {:.0} mm, Design P = {:.1} bar @ {:.0}°C)",
+            prob.vessel_name, d_inside, l_cyl, p_bar, prob.design_temperature_c
+        ),
+        format!(
+            "Material: Allowable Stress S = {:.1} MPa, Joint Efficiency E = {:.2}, Corrosion Allowance = {:.1} mm",
+            s_mpa, e, ca
+        ),
+        format!(
+            "Cylindrical Shell: Min Required t = {:.2} mm, Nominal t = {:.1} mm -> Shell MAWP = {:.2} bar",
+            t_cyl_min, t_cyl_actual, mawp_cyl_bar
+        ),
+        format!(
+            "Formed Heads: Min Required t = {:.2} mm, Nominal t = {:.1} mm -> Head MAWP = {:.2} bar",
+            t_head_min, t_head_actual, mawp_head_bar
+        ),
+        format!(
+            "Governing Vessel MAWP = {:.2} bar, Hydrostatic Proof Test Pressure = {:.2} bar (UG-99(b))",
+            vessel_mawp_bar, hydro_test_bar
+        ),
+        format!(
+            "Capacity: Internal Volume = {:.3} m³, Empty Shell & Heads Mass = {:.1} kg",
+            total_internal_vol_m3, empty_mass_kg
+        ),
     ];
 
     Ok(PressureVesselResult {
@@ -324,14 +393,32 @@ pub fn solve_pressure_vessel_sim(prob: &PressureVesselProblem) -> Result<Simulat
     let sol = solve_asme_pressure_vessel(prob)?;
 
     let mut metrics = HashMap::new();
-    metrics.insert("min_required_shell_thickness_mm".to_string(), sol.min_required_shell_thickness_mm);
-    metrics.insert("actual_shell_thickness_mm".to_string(), sol.actual_shell_thickness_mm);
-    metrics.insert("min_required_head_thickness_mm".to_string(), sol.min_required_head_thickness_mm);
-    metrics.insert("actual_head_thickness_mm".to_string(), sol.actual_head_thickness_mm);
+    metrics.insert(
+        "min_required_shell_thickness_mm".to_string(),
+        sol.min_required_shell_thickness_mm,
+    );
+    metrics.insert(
+        "actual_shell_thickness_mm".to_string(),
+        sol.actual_shell_thickness_mm,
+    );
+    metrics.insert(
+        "min_required_head_thickness_mm".to_string(),
+        sol.min_required_head_thickness_mm,
+    );
+    metrics.insert(
+        "actual_head_thickness_mm".to_string(),
+        sol.actual_head_thickness_mm,
+    );
     metrics.insert("vessel_mawp_bar".to_string(), sol.vessel_mawp_bar);
-    metrics.insert("hydrostatic_test_pressure_bar".to_string(), sol.hydrostatic_test_pressure_bar);
+    metrics.insert(
+        "hydrostatic_test_pressure_bar".to_string(),
+        sol.hydrostatic_test_pressure_bar,
+    );
     metrics.insert("internal_volume_m3".to_string(), sol.internal_volume_m3);
-    metrics.insert("estimated_empty_mass_kg".to_string(), sol.estimated_empty_mass_kg);
+    metrics.insert(
+        "estimated_empty_mass_kg".to_string(),
+        sol.estimated_empty_mass_kg,
+    );
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.vessel_mawp_bar, 1, 1e-4);

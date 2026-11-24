@@ -60,16 +60,16 @@ impl Default for CableStayProblem {
         Self {
             problem_id: "long_span_navigational_stay_cable".to_string(),
             stay_class: StayCableClass::ParallelStrandSystemPSS,
-            cable_chord_length_m: 240.0,             // 240 m long stay cable
-            outer_pipe_diameter_mm: 160.0,           // 160 mm outer HDPE pipe
-            chord_inclination_deg: 32.0,             // 32 deg inclination
-            cable_pretension_kn: 3600.0,             // 3600 kN service tension
-            total_linear_mass_kg_m: 52.0,            // 52 kg/m linear mass
-            elastic_modulus_gpa: 195.0,              // 195 GPa strand modulus
-            net_steel_area_mm2: 6400.0,              // 6400 mm² metallic area
-            inherent_damping_ratio: 0.0012,          // 0.12% inherent structural damping
-            damper_distance_from_deck_m: 5.50,       // 5.5 m from lower anchorage (~2.3% of span)
-            wind_speed_m_s: 14.5,                    // 14.5 m/s critical RWIV wind range
+            cable_chord_length_m: 240.0,       // 240 m long stay cable
+            outer_pipe_diameter_mm: 160.0,     // 160 mm outer HDPE pipe
+            chord_inclination_deg: 32.0,       // 32 deg inclination
+            cable_pretension_kn: 3600.0,       // 3600 kN service tension
+            total_linear_mass_kg_m: 52.0,      // 52 kg/m linear mass
+            elastic_modulus_gpa: 195.0,        // 195 GPa strand modulus
+            net_steel_area_mm2: 6400.0,        // 6400 mm² metallic area
+            inherent_damping_ratio: 0.0012,    // 0.12% inherent structural damping
+            damper_distance_from_deck_m: 5.50, // 5.5 m from lower anchorage (~2.3% of span)
+            wind_speed_m_s: 14.5,              // 14.5 m/s critical RWIV wind range
         }
     }
 }
@@ -191,7 +191,8 @@ pub fn solve_cable_stayed_bridge(problem: &CableStayProblem) -> Result<CableStay
     let is_damper_sizing_practical = (5.0..=300.0).contains(&c_opt_kn_s_m);
     let max_allowable_sag_m = l_chord / 250.0;
     let is_cable_sag_acceptable = delta_sag_m <= max_allowable_sag_m;
-    let is_stay_cable_viable = is_rwiv_mitigated && is_damper_sizing_practical && is_cable_sag_acceptable;
+    let is_stay_cable_viable =
+        is_rwiv_mitigated && is_damper_sizing_practical && is_cable_sag_acceptable;
 
     Ok(CableStayResult {
         problem_id: problem.problem_id.clone(),
@@ -225,10 +226,15 @@ mod tests {
         assert!(res.midspan_static_sag_mm > 500.0 && res.midspan_static_sag_mm < 950.0);
         assert!(res.fundamental_frequency_hz > 0.40 && res.fundamental_frequency_hz < 1.40);
         assert!(res.second_harmonic_freq_hz > res.fundamental_frequency_hz);
-        assert!(res.critical_rwiv_wind_velocity_m_s > 2.0 && res.critical_rwiv_wind_velocity_m_s < 12.0);
+        assert!(
+            res.critical_rwiv_wind_velocity_m_s > 2.0 && res.critical_rwiv_wind_velocity_m_s < 12.0
+        );
         assert!(res.inherent_scruton_number < 5.0); // Baseline un-damped cable fails PTI threshold
         assert!(res.pti_required_damping_ratio > 0.004 && res.pti_required_damping_ratio < 0.010);
-        assert!(res.optimal_damper_coefficient_kn_s_m > 20.0 && res.optimal_damper_coefficient_kn_s_m < 200.0);
+        assert!(
+            res.optimal_damper_coefficient_kn_s_m > 20.0
+                && res.optimal_damper_coefficient_kn_s_m < 200.0
+        );
         assert!(res.attained_damping_ratio > res.pti_required_damping_ratio);
         assert!(res.is_rwiv_mitigated);
         assert!(res.is_damper_sizing_practical);

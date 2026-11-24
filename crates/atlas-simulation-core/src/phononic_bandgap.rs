@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Phononic crystal material layer specification.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -145,7 +145,8 @@ pub fn solve_phononic_bandgap(
 
     // 2. Homogenized effective longitudinal sound speed:
     // a / c_eff = d_A / c_A + d_B / c_B
-    let acoustic_delay_s = (d_a_m / problem.layer_a.sound_speed_m_s) + (d_b_m / problem.layer_b.sound_speed_m_s);
+    let acoustic_delay_s =
+        (d_a_m / problem.layer_a.sound_speed_m_s) + (d_b_m / problem.layer_b.sound_speed_m_s);
     let c_eff = a_lattice_m / acoustic_delay_s;
 
     // 3. Bragg central bandgap frequency:
@@ -232,20 +233,30 @@ pub fn solve_phononic_bandgap(
 }
 
 /// Executes phononic crystal simulation and packages into SimulationResult envelope.
-pub fn solve_phononic_bandgap_sim(
-    problem: &PhononicCrystalProblem,
-) -> SimulationResult {
+pub fn solve_phononic_bandgap_sim(problem: &PhononicCrystalProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_phononic_bandgap(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
             metrics.insert("lattice_constant_mm".to_string(), res.lattice_constant_mm);
-            metrics.insert("impedance_contrast_ratio".to_string(), res.impedance_contrast_ratio);
-            metrics.insert("effective_sound_speed_m_s".to_string(), res.effective_sound_speed_m_s);
-            metrics.insert("bragg_center_frequency_hz".to_string(), res.bragg_center_frequency_hz);
+            metrics.insert(
+                "impedance_contrast_ratio".to_string(),
+                res.impedance_contrast_ratio,
+            );
+            metrics.insert(
+                "effective_sound_speed_m_s".to_string(),
+                res.effective_sound_speed_m_s,
+            );
+            metrics.insert(
+                "bragg_center_frequency_hz".to_string(),
+                res.bragg_center_frequency_hz,
+            );
             metrics.insert("bandgap_lower_hz".to_string(), res.bandgap_lower_hz);
             metrics.insert("bandgap_upper_hz".to_string(), res.bandgap_upper_hz);
-            metrics.insert("relative_bandgap_width_pct".to_string(), res.relative_bandgap_width_pct);
+            metrics.insert(
+                "relative_bandgap_width_pct".to_string(),
+                res.relative_bandgap_width_pct,
+            );
             metrics.insert("transmission_loss_db".to_string(), res.transmission_loss_db);
 
             let mut conv = ConvergenceMonitor::new(1e-6);
@@ -268,9 +279,15 @@ pub fn solve_phononic_bandgap_sim(
                 provenance: SimulationProvenance::new("atlas.acoustics.phononic_bandgap", "0.1.0"),
                 logs: vec![format!(
                     "Phononic Bandgap (Floquet-Bloch / Mead): Lattice a = {:.1} mm, Contrast = {:.1}:1, c_eff = {:.1} m/s, Bragg f0 = {:.1} Hz, Gap = [{:.1}, {:.1}] Hz ({:.1}%), In Gap: {}, TL = {:.1} dB, Effective: {}",
-                    res.lattice_constant_mm, res.impedance_contrast_ratio, res.effective_sound_speed_m_s,
-                    res.bragg_center_frequency_hz, res.bandgap_lower_hz, res.bandgap_upper_hz,
-                    res.relative_bandgap_width_pct, res.is_in_bandgap, res.transmission_loss_db,
+                    res.lattice_constant_mm,
+                    res.impedance_contrast_ratio,
+                    res.effective_sound_speed_m_s,
+                    res.bragg_center_frequency_hz,
+                    res.bandgap_lower_hz,
+                    res.bandgap_upper_hz,
+                    res.relative_bandgap_width_pct,
+                    res.is_in_bandgap,
+                    res.transmission_loss_db,
                     res.is_isolation_effective
                 )],
             }
@@ -305,9 +322,14 @@ mod tests {
         let res = solve_phononic_bandgap(&prob).expect("phononic solver failed");
         println!(
             "Phononic Crystal: a = {:.1} mm, Contrast = {:.1}:1, f0 = {:.1} Hz, Gap = [{:.1}, {:.1}] Hz ({:.1}%), In Gap = {}, TL = {:.1} dB",
-            res.lattice_constant_mm, res.impedance_contrast_ratio,
-            res.bragg_center_frequency_hz, res.bandgap_lower_hz, res.bandgap_upper_hz,
-            res.relative_bandgap_width_pct, res.is_in_bandgap, res.transmission_loss_db
+            res.lattice_constant_mm,
+            res.impedance_contrast_ratio,
+            res.bragg_center_frequency_hz,
+            res.bandgap_lower_hz,
+            res.bandgap_upper_hz,
+            res.relative_bandgap_width_pct,
+            res.is_in_bandgap,
+            res.transmission_loss_db
         );
 
         assert!(res.lattice_constant_mm > 35.0 && res.lattice_constant_mm < 45.0);

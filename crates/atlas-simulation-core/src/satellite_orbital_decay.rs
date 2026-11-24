@@ -57,7 +57,7 @@ impl Default for SatelliteOrbitalDecayProblem {
         Self {
             problem_id: "cubesat_leo_orbital_decay".to_string(),
             solar_activity: SolarActivityLevel::ModerateMean,
-            satellite_mass_kg: 12.0, // 3U/6U CubeSat
+            satellite_mass_kg: 12.0,           // 3U/6U CubeSat
             drag_cross_section_area_m2: 0.045, // 0.045 m² drag face
             drag_coefficient_cd: 2.20,
             initial_perigee_altitude_km: 420.0, // ISS / Starlink disposal orbit
@@ -128,7 +128,8 @@ pub fn solve_satellite_orbital_decay(
     let period_min = period_s / 60.0;
 
     // Ballistic coefficient: B = C_D * A / M
-    let b_m2_kg = (problem.drag_coefficient_cd * problem.drag_cross_section_area_m2) / problem.satellite_mass_kg;
+    let b_m2_kg = (problem.drag_coefficient_cd * problem.drag_cross_section_area_m2)
+        / problem.satellite_mass_kg;
     let inv_b = 1.0 / b_m2_kg;
 
     // Atmospheric density model (Jacchia / King-Hele exponential fit):
@@ -206,9 +207,16 @@ mod tests {
         };
 
         let res = solve_satellite_orbital_decay(&prob)?;
-        assert!(res.ballistic_coefficient_m2_per_kg > 0.006 && res.ballistic_coefficient_m2_per_kg < 0.012);
-        assert!(res.initial_orbital_period_minutes > 90.0 && res.initial_orbital_period_minutes < 96.0);
-        assert!(res.initial_decay_rate_m_per_day > 10.0 && res.initial_decay_rate_m_per_day < 100.0);
+        assert!(
+            res.ballistic_coefficient_m2_per_kg > 0.006
+                && res.ballistic_coefficient_m2_per_kg < 0.012
+        );
+        assert!(
+            res.initial_orbital_period_minutes > 90.0 && res.initial_orbital_period_minutes < 96.0
+        );
+        assert!(
+            res.initial_decay_rate_m_per_day > 10.0 && res.initial_decay_rate_m_per_day < 100.0
+        );
         assert!(res.orbital_lifetime_years > 1.0 && res.orbital_lifetime_years < 10.0);
         assert!(res.is_iadc_25yr_compliant);
         Ok(())

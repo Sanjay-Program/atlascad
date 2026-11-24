@@ -69,15 +69,15 @@ impl Default for PackedBedProblem {
             problem_id: "flue_gas_desulfurization_scrubber".to_string(),
             application: ScrubberApplication::AcidGasAbatement,
             packing_type: PackingTypeClass::PallRings25mm,
-            flue_gas_flow_rate_m3_h: 8500.0,     // 8,500 m³/h industrial flue gas
+            flue_gas_flow_rate_m3_h: 8500.0, // 8,500 m³/h industrial flue gas
             inlet_pollutant_mole_fraction: 0.0120, // 12,000 ppmv SO2
             target_outlet_mole_fraction: 0.00024, // 240 ppmv (98.0% removal efficiency)
-            operating_temperature_c: 45.0,      // 45 °C scrubber quench temperature
-            operating_pressure_kpa: 101.325,    // Atmospheric
+            operating_temperature_c: 45.0,   // 45 °C scrubber quench temperature
+            operating_pressure_kpa: 101.325, // Atmospheric
             liquid_to_gas_ratio_multiplier: 1.50, // 1.5 * (L/G)_min
-            liquid_density_kg_m3: 1020.0,       // Dilute aqueous sodium hydroxide / carbonate
-            liquid_viscosity_cp: 1.05,          // ~1 cP water-like
-            henrys_law_slope_m: 0.45,           // Henry slope for reactive caustic scrubbing
+            liquid_density_kg_m3: 1020.0,    // Dilute aqueous sodium hydroxide / carbonate
+            liquid_viscosity_cp: 1.05,       // ~1 cP water-like
+            henrys_law_slope_m: 0.45,        // Henry slope for reactive caustic scrubbing
         }
     }
 }
@@ -150,11 +150,13 @@ pub fn solve_packed_bed_scrubber(problem: &PackedBedProblem) -> Result<PackedBed
 
     // Actual pollutant removal efficiency:
     let eta_rem = ((problem.inlet_pollutant_mole_fraction - problem.target_outlet_mole_fraction)
-        / problem.inlet_pollutant_mole_fraction) * 100.0;
+        / problem.inlet_pollutant_mole_fraction)
+        * 100.0;
 
     // Minimum liquid-to-gas molar ratio: (L_m / G_m)_min = m * (y_in - y_out) / (y_in - m*x_in)
     // With pure incoming solvent (x_in = 0): (L_m / G_m)_min = m * (1 - y_out/y_in)
-    let lm_gm_min = problem.henrys_law_slope_m * (1.0 - (problem.target_outlet_mole_fraction / problem.inlet_pollutant_mole_fraction));
+    let lm_gm_min = problem.henrys_law_slope_m
+        * (1.0 - (problem.target_outlet_mole_fraction / problem.inlet_pollutant_mole_fraction));
     let lm_gm = lm_gm_min * problem.liquid_to_gas_ratio_multiplier;
 
     // Mass flow of gas: V_gas [m³/h] -> m_dot_g [kg/s]:
@@ -168,7 +170,8 @@ pub fn solve_packed_bed_scrubber(problem: &PackedBedProblem) -> Result<PackedBed
 
     // Sherwood-Leva-Eckert Generalized Pressure Drop Correlation (GPDC) for flooding velocity:
     // Flow parameter X = (L/G) * sqrt(rho_G / rho_L):
-    let flow_param_x = (m_dot_l_kg_s / m_dot_g_kg_s) * (rho_g / problem.liquid_density_kg_m3).sqrt();
+    let flow_param_x =
+        (m_dot_l_kg_s / m_dot_g_kg_s) * (rho_g / problem.liquid_density_kg_m3).sqrt();
 
     // Capacity parameter at flooding Y_flood:
     // log10(Y_flood) ~ -1.02 - 1.05 * log10(X) - 0.22 * log10(X)^2 (standard curve fit)
@@ -216,7 +219,8 @@ pub fn solve_packed_bed_scrubber(problem: &PackedBedProblem) -> Result<PackedBed
         PackingTypeClass::IntaloxSaddles38mm => 0.68,
         PackingTypeClass::StructuredPacking250Y => 0.42,
     };
-    let htu_og = htu_base * (g_oper / 1.5).powf(0.3) * (problem.liquid_viscosity_cp / 1.0).powf(0.15);
+    let htu_og =
+        htu_base * (g_oper / 1.5).powf(0.3) * (problem.liquid_viscosity_cp / 1.0).powf(0.15);
 
     // Active packed bed height: Z = HTU_OG * NTU_OG [m]:
     let z_bed = (htu_og * ntu_og).max(0.5);
@@ -265,7 +269,9 @@ mod tests {
         assert!(res.column_diameter_m > 1.0 && res.column_diameter_m < 2.5);
         assert!(res.operating_gas_velocity_m_s > 0.8 && res.operating_gas_velocity_m_s < 3.2);
         assert!(res.number_of_transfer_units_ntu > 5.0 && res.number_of_transfer_units_ntu < 12.0);
-        assert!(res.height_of_transfer_unit_htu_m > 0.35 && res.height_of_transfer_unit_htu_m < 0.95);
+        assert!(
+            res.height_of_transfer_unit_htu_m > 0.35 && res.height_of_transfer_unit_htu_m < 0.95
+        );
         assert!(res.active_bed_height_m > 2.0 && res.active_bed_height_m < 7.5);
         assert!(res.total_gas_pressure_drop_pa > 500.0 && res.total_gas_pressure_drop_pa < 4000.0);
         assert!(res.pollutant_removal_efficiency_pct >= 95.0);

@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
 use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Standard acceleration due to gravity in m/s².
 pub const G_ACCEL: f64 = 9.80665;
@@ -247,18 +247,24 @@ pub fn solve_transmission_line_sim(problem: &TransmissionLineProblem) -> Simulat
             let mut metrics = std::collections::HashMap::new();
             metrics.insert("everyday_sag_m".to_string(), result.everyday_sag_m);
             metrics.insert("max_hot_sag_m".to_string(), result.max_hot_sag_m);
-            metrics.insert("peak_storm_clamp_tension_kn".to_string(), result.peak_storm_clamp_tension_kn);
-            metrics.insert("storm_safety_factor".to_string(), result.storm_safety_factor);
-            metrics.insert("available_hot_ground_clearance_m".to_string(), result.available_hot_ground_clearance_m);
+            metrics.insert(
+                "peak_storm_clamp_tension_kn".to_string(),
+                result.peak_storm_clamp_tension_kn,
+            );
+            metrics.insert(
+                "storm_safety_factor".to_string(),
+                result.storm_safety_factor,
+            );
+            metrics.insert(
+                "available_hot_ground_clearance_m".to_string(),
+                result.available_hot_ground_clearance_m,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, result.max_hot_sag_m, 1, 1e-4);
 
-            let comparison = AnalyticalComparison::assess(
-                "max_hot_sag_m",
-                result.max_hot_sag_m,
-                10.0,
-            );
+            let comparison =
+                AnalyticalComparison::assess("max_hot_sag_m", result.max_hot_sag_m, 10.0);
 
             SimulationResult {
                 problem_id: problem.problem_id.clone(),
@@ -268,7 +274,10 @@ pub fn solve_transmission_line_sim(problem: &TransmissionLineProblem) -> Simulat
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.electrical.transmission_catenary_ieee738", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.electrical.transmission_catenary_ieee738",
+                    "0.1.0",
+                ),
                 logs: vec![format!(
                     "Transmission Line: Hot Sag = {:.2} m (Clearance = {:.2} m), Storm T_max = {:.1} kN (SF = {:.2} >= 2.0, Safe: {})",
                     result.max_hot_sag_m,
@@ -290,7 +299,10 @@ pub fn solve_transmission_line_sim(problem: &TransmissionLineProblem) -> Simulat
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.electrical.transmission_catenary_ieee738", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.electrical.transmission_catenary_ieee738",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Transmission line simulation failed: {}", err)],
             }
         }
@@ -306,8 +318,15 @@ mod tests {
     fn test_transmission_line_nominal() {
         let prob = TransmissionLineProblem::default();
         let res = solve_transmission_line(&prob).expect("solver failed");
-        println!("Transmission line: everyday_sag = {}, max_hot_sag = {}, storm_sag = {}, H_hot = {}, H_storm = {}, SF = {}",
-            res.everyday_sag_m, res.max_hot_sag_m, res.storm_sag_m, res.hot_operating_tension_kn, res.storm_horizontal_tension_kn, res.storm_safety_factor);
+        println!(
+            "Transmission line: everyday_sag = {}, max_hot_sag = {}, storm_sag = {}, H_hot = {}, H_storm = {}, SF = {}",
+            res.everyday_sag_m,
+            res.max_hot_sag_m,
+            res.storm_sag_m,
+            res.hot_operating_tension_kn,
+            res.storm_horizontal_tension_kn,
+            res.storm_safety_factor
+        );
 
         assert!((res.bare_weight_n_m - 15.96).abs() < 0.1);
         assert!(res.storm_ice_weight_n_m > 10.0);

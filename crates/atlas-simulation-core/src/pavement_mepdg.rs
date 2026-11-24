@@ -123,7 +123,8 @@ pub fn solve_pavement_mepdg(problem: &PavementMepdgProblem) -> Result<PavementMe
         return Err("Design traffic must be positive".to_string());
     }
 
-    let total_h_mm = problem.asphalt_thickness_mm + problem.base_thickness_mm + problem.subbase_thickness_mm;
+    let total_h_mm =
+        problem.asphalt_thickness_mm + problem.base_thickness_mm + problem.subbase_thickness_mm;
 
     // Contact geometry for standard 40 kN dual wheel (20 kN per tire at 720 kPa):
     let p_tire_n = 20000.0;
@@ -151,24 +152,33 @@ pub fn solve_pavement_mepdg(problem: &PavementMepdgProblem) -> Result<PavementMe
     let e1 = problem.asphalt_dynamic_modulus_mpa * 1e6;
     let modular_ratio_12 = problem.asphalt_dynamic_modulus_mpa / problem.base_resilient_modulus_mpa;
     let h_over_r = (problem.asphalt_thickness_mm / 1000.0) / (2.0 * r_contact_m);
-    let epsilon_t_mag = (q_contact_pa / e1) * (0.85 + 0.45 * modular_ratio_12.powf(0.28)) / (1.0 + h_over_r.powf(1.4));
+    let epsilon_t_mag = (q_contact_pa / e1) * (0.85 + 0.45 * modular_ratio_12.powf(0.28))
+        / (1.0 + h_over_r.powf(1.4));
     let epsilon_t_ue = epsilon_t_mag * 1e6; // in microstrains
 
     // 2. Subgrade top vertical compressive strain epsilon_v (Boussinesq on equivalent halfspace):
     // epsilon_v = (q / E_sub) * [ 1 - z^3 / (r^2 + z^2)^1.5 ]
     let e_sub_pa = problem.subgrade_resilient_modulus_mpa * 1e6;
     let z_eq = h_e_total_m;
-    let epsilon_v_mag = (q_contact_pa / e_sub_pa) * (1.0 - z_eq.powi(3) / (r_contact_m.powi(2) + z_eq.powi(2)).powf(1.5));
+    let epsilon_v_mag = (q_contact_pa / e_sub_pa)
+        * (1.0 - z_eq.powi(3) / (r_contact_m.powi(2) + z_eq.powi(2)).powf(1.5));
     let epsilon_v_ue = epsilon_v_mag * 1e6; // in microstrains
 
     // Asphalt Institute Volumetric Correction Factor C_vol:
     // C_vol = 10^M, M = 4.84 * (V_be / (V_a + V_be) - 0.69)
-    let m_factor = 4.84 * (problem.effective_binder_volume_pct / (problem.air_voids_pct + problem.effective_binder_volume_pct) - 0.69);
+    let m_factor = 4.84
+        * (problem.effective_binder_volume_pct
+            / (problem.air_voids_pct + problem.effective_binder_volume_pct)
+            - 0.69);
     let c_vol = 10.0_f64.powf(m_factor);
 
     // Asphalt Institute Fatigue Cracking Life N_f:
     // N_f = 0.0796 * (epsilon_t)^-3.291 * (E1 / 1e6)^-0.854 * C_vol
-    let n_f_reps = 0.0796 * epsilon_t_mag.powf(-3.291) * (problem.asphalt_dynamic_modulus_mpa * 145.038 / 1e6).powf(-0.854) * c_vol * 1.5;
+    let n_f_reps = 0.0796
+        * epsilon_t_mag.powf(-3.291)
+        * (problem.asphalt_dynamic_modulus_mpa * 145.038 / 1e6).powf(-0.854)
+        * c_vol
+        * 1.5;
     let n_f_millions = n_f_reps / 1e6;
 
     // Asphalt Institute Subgrade Rutting Life N_d:
@@ -230,8 +240,14 @@ mod tests {
 
         let res = solve_pavement_mepdg(&prob)?;
         assert_eq!(res.total_structure_thickness_mm, 600.0);
-        assert!(res.asphalt_bottom_tensile_strain_ue > 50.0 && res.asphalt_bottom_tensile_strain_ue < 250.0);
-        assert!(res.subgrade_top_compressive_strain_ue > 100.0 && res.subgrade_top_compressive_strain_ue < 350.0);
+        assert!(
+            res.asphalt_bottom_tensile_strain_ue > 50.0
+                && res.asphalt_bottom_tensile_strain_ue < 250.0
+        );
+        assert!(
+            res.subgrade_top_compressive_strain_ue > 100.0
+                && res.subgrade_top_compressive_strain_ue < 350.0
+        );
         assert!(res.allowable_fatigue_repetitions_millions > 8.50);
         assert!(res.allowable_rutting_repetitions_millions > 8.50);
         assert!(res.fatigue_damage_ratio <= 1.0);

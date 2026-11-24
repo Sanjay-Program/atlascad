@@ -106,9 +106,7 @@ pub struct DaylightingResult {
 }
 
 /// Solves CIE Overcast Sky Daylight Factor adhering to the BRE split-flux method and EN 17037.
-pub fn solve_cie_daylight_factor(
-    prob: &DaylightingProblem,
-) -> Result<DaylightingResult, String> {
+pub fn solve_cie_daylight_factor(prob: &DaylightingProblem) -> Result<DaylightingResult, String> {
     let depth = prob.room_depth_m;
     let width = prob.room_width_m;
     let height = prob.room_height_m;
@@ -116,7 +114,10 @@ pub fn solve_cie_daylight_factor(
     let tau = prob.visual_transmittance;
 
     if depth <= 0.5 || width <= 0.5 || height <= 1.0 || a_glass <= 0.1 || tau <= 0.05 {
-        return Err("Room dimensions, glazing area, and visual transmittance must be strictly positive.".to_string());
+        return Err(
+            "Room dimensions, glazing area, and visual transmittance must be strictly positive."
+                .to_string(),
+        );
     }
 
     let floor_area = depth * width;
@@ -133,7 +134,10 @@ pub fn solve_cie_daylight_factor(
     let r_mean = total_refl_sum / total_room_area;
 
     // Net effective glass transmittance accounting for framing/dirt:
-    let k_glass = prob.glazing_correction_factor.unwrap_or(0.85).clamp(0.5, 1.0);
+    let k_glass = prob
+        .glazing_correction_factor
+        .unwrap_or(0.85)
+        .clamp(0.5, 1.0);
     let tau_eff = tau * k_glass;
 
     // External obstruction angle theta_obs (degrees above horizon)
@@ -141,7 +145,10 @@ pub fn solve_cie_daylight_factor(
     let theta_obs_rad = theta_obs_deg.to_radians();
 
     // 1. Sky Component (SC) at target workplane distance D_p from window wall:
-    let d_p = prob.workplane_distance_from_window_m.unwrap_or(depth * 0.5).clamp(0.5, depth);
+    let d_p = prob
+        .workplane_distance_from_window_m
+        .unwrap_or(depth * 0.5)
+        .clamp(0.5, depth);
     // Window head height above desk workplane (0.75m desk height)
     let h_head = (height - 0.75).max(0.5);
     // Visible sky vertical angle subtended at point:
@@ -189,7 +196,8 @@ pub fn solve_cie_daylight_factor(
     // Average Daylight Factor across entire room (Crisp & Littlefair formula):
     // ADF = (A_glass * tau_eff * theta_sky_deg * M) / (A_room * (1 - R_mean^2))
     let theta_sky_deg = (90.0 - theta_obs_deg).max(0.0);
-    let adf = (a_glass * tau_eff * theta_sky_deg) / (total_room_area * (1.0 - r_mean * r_mean).max(0.1));
+    let adf =
+        (a_glass * tau_eff * theta_sky_deg) / (total_room_area * (1.0 - r_mean * r_mean).max(0.1));
 
     let target_df = prob.target_daylight_factor_percent.unwrap_or(2.0);
     let is_ok = average_df_compliance(adf, target_df);
@@ -205,12 +213,32 @@ pub fn solve_cie_daylight_factor(
     };
 
     let notes = vec![
-        format!("Daylighting Analysis: '{}' ({:.1}m x {:.1}m x {:.1}m, Floor = {:.1} m²)", prob.room_name, width, depth, height, floor_area),
-        format!("Glazing: Net Glass Area = {:.2} m², VLT = {:.2} (Effective Transmittance = {:.3})", a_glass, tau, tau_eff),
-        format!("Room Reflectances: Walls = {:.2}, Ceiling = {:.2}, Floor = {:.2} -> Mean R = {:.3}", rw, rc, rf, r_mean),
-        format!("Illuminance Components at {:.1}m from window: Sky SC = {:.2}%, External ERC = {:.2}%, Internal IRC = {:.2}%", d_p, sc, erc, irc),
-        format!("Point Daylight Factor: DF = {:.2}% (at desk level)", point_df),
-        format!("Average Daylight Factor: ADF = {:.2}% vs Target {:.1}% -> [{}]", adf, target_df, if is_ok { "COMPLIANT" } else { "NON-COMPLIANT" }),
+        format!(
+            "Daylighting Analysis: '{}' ({:.1}m x {:.1}m x {:.1}m, Floor = {:.1} m²)",
+            prob.room_name, width, depth, height, floor_area
+        ),
+        format!(
+            "Glazing: Net Glass Area = {:.2} m², VLT = {:.2} (Effective Transmittance = {:.3})",
+            a_glass, tau, tau_eff
+        ),
+        format!(
+            "Room Reflectances: Walls = {:.2}, Ceiling = {:.2}, Floor = {:.2} -> Mean R = {:.3}",
+            rw, rc, rf, r_mean
+        ),
+        format!(
+            "Illuminance Components at {:.1}m from window: Sky SC = {:.2}%, External ERC = {:.2}%, Internal IRC = {:.2}%",
+            d_p, sc, erc, irc
+        ),
+        format!(
+            "Point Daylight Factor: DF = {:.2}% (at desk level)",
+            point_df
+        ),
+        format!(
+            "Average Daylight Factor: ADF = {:.2}% vs Target {:.1}% -> [{}]",
+            adf,
+            target_df,
+            if is_ok { "COMPLIANT" } else { "NON-COMPLIANT" }
+        ),
         format!("Visual Comfort Classification: {}", rating),
     ];
 
@@ -241,13 +269,34 @@ pub fn solve_daylighting_sim(prob: &DaylightingProblem) -> Result<SimulationResu
     let sol = solve_cie_daylight_factor(prob)?;
 
     let mut metrics = HashMap::new();
-    metrics.insert("point_daylight_factor_percent".to_string(), sol.point_daylight_factor_percent);
-    metrics.insert("average_daylight_factor_percent".to_string(), sol.average_daylight_factor_percent);
-    metrics.insert("sky_component_percent".to_string(), sol.sky_component_percent);
-    metrics.insert("internally_reflected_percent".to_string(), sol.internally_reflected_component_percent);
-    metrics.insert("externally_reflected_percent".to_string(), sol.externally_reflected_component_percent);
-    metrics.insert("area_weighted_mean_reflectance".to_string(), sol.area_weighted_mean_reflectance);
-    metrics.insert("is_compliant".to_string(), if sol.is_compliant { 1.0 } else { 0.0 });
+    metrics.insert(
+        "point_daylight_factor_percent".to_string(),
+        sol.point_daylight_factor_percent,
+    );
+    metrics.insert(
+        "average_daylight_factor_percent".to_string(),
+        sol.average_daylight_factor_percent,
+    );
+    metrics.insert(
+        "sky_component_percent".to_string(),
+        sol.sky_component_percent,
+    );
+    metrics.insert(
+        "internally_reflected_percent".to_string(),
+        sol.internally_reflected_component_percent,
+    );
+    metrics.insert(
+        "externally_reflected_percent".to_string(),
+        sol.externally_reflected_component_percent,
+    );
+    metrics.insert(
+        "area_weighted_mean_reflectance".to_string(),
+        sol.area_weighted_mean_reflectance,
+    );
+    metrics.insert(
+        "is_compliant".to_string(),
+        if sol.is_compliant { 1.0 } else { 0.0 },
+    );
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.average_daylight_factor_percent, 1, 1e-4);
@@ -255,7 +304,9 @@ pub fn solve_daylighting_sim(prob: &DaylightingProblem) -> Result<SimulationResu
     let val = AnalyticalComparison::assess(
         "Daylight Factor Point Sum SC+ERC+IRC (%)",
         sol.point_daylight_factor_percent,
-        sol.sky_component_percent + sol.externally_reflected_component_percent + sol.internally_reflected_component_percent,
+        sol.sky_component_percent
+            + sol.externally_reflected_component_percent
+            + sol.internally_reflected_component_percent,
     );
 
     Ok(SimulationResult {
@@ -285,12 +336,18 @@ mod tests {
         // Total area = 2 * 30 + 2 * (6 + 5) * 3 = 60 + 66 = 126 m²
         assert_eq!(sol.total_internal_surface_area_m2, 126.0);
         // Mean reflectance ~ 0.45 - 0.55
-        assert!(sol.area_weighted_mean_reflectance > 0.40 && sol.area_weighted_mean_reflectance < 0.60);
+        assert!(
+            sol.area_weighted_mean_reflectance > 0.40 && sol.area_weighted_mean_reflectance < 0.60
+        );
         // Point DF = SC + ERC + IRC
-        let expected_point = sol.sky_component_percent + sol.externally_reflected_component_percent + sol.internally_reflected_component_percent;
+        let expected_point = sol.sky_component_percent
+            + sol.externally_reflected_component_percent
+            + sol.internally_reflected_component_percent;
         assert!((sol.point_daylight_factor_percent - expected_point).abs() < 1e-6);
         // Average daylight factor should be around 2.0 - 3.5%
-        assert!(sol.average_daylight_factor_percent > 1.8 && sol.average_daylight_factor_percent < 4.0);
+        assert!(
+            sol.average_daylight_factor_percent > 1.8 && sol.average_daylight_factor_percent < 4.0
+        );
         assert!(sol.is_compliant);
 
         let sim = solve_daylighting_sim(&prob)?;

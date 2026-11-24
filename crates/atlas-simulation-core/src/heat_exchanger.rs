@@ -142,14 +142,14 @@ pub fn solve_heat_exchanger(prob: &HeatExchangerProblem) -> Result<SimulationRes
         0.0
     };
 
-    // Analytical verification: Hot side loss Q_h vs Cold side gain Q_c
-    let q_hot = ch * (th_in - th_out);
-    let q_cold = cc * (tc_out - tc_in);
-    let val = AnalyticalComparison::assess(
-        "First Law Thermal Energy Balance (Q_hot == Q_cold)",
-        q_hot,
-        q_cold,
-    );
+    // Cross-method verification: the ε-NTU duty must equal the LMTD duty for
+    // arrangements where the plain LMTD is exact (counter-flow and parallel-flow).
+    let val = match prob.arrangement {
+        FlowArrangement::CounterFlow | FlowArrangement::ParallelFlow => Some(
+            AnalyticalComparison::assess("ε-NTU vs LMTD Heat Duty (W)", q_actual_watts, ua * lmtd),
+        ),
+        FlowArrangement::CrossFlowUnmixed => None,
+    };
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, q_actual_kw, 1, 1e-4);
@@ -205,7 +205,7 @@ pub fn solve_heat_exchanger(prob: &HeatExchangerProblem) -> Result<SimulationRes
         execution_time_ms: 1,
         scalar_metrics: metrics,
         convergence: conv,
-        validation: Some(val),
+        validation: val,
         provenance: SimulationProvenance::new("atlas-thermal-hx", "0.1.0"),
         logs,
     })

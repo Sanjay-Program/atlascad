@@ -145,7 +145,12 @@ pub fn solve_wind_turbine(problem: &WindTurbineProblem) -> Result<WindTurbineRes
             let p_aero_w = 0.5 * rho * swept_area_m2 * v.powi(3) * cp_peak;
             let p_elec_mw = (p_aero_w * eta_drive) / 1.0e6;
             let t_aero_n = 0.5 * rho * swept_area_m2 * v.powi(2) * ct_peak;
-            (p_elec_mw.min(problem.rated_power_mw), t_aero_n / 1000.0, cp_peak, ct_peak)
+            (
+                p_elec_mw.min(problem.rated_power_mw),
+                t_aero_n / 1000.0,
+                cp_peak,
+                ct_peak,
+            )
         } else {
             // Region 3: Constant rated power via blade pitching
             let p_elec_mw = problem.rated_power_mw;
@@ -160,7 +165,10 @@ pub fn solve_wind_turbine(problem: &WindTurbineProblem) -> Result<WindTurbineRes
         }
     };
 
-    let v_eval = problem.operating_wind_speed_m_s.unwrap_or(9.0).clamp(0.0, 50.0);
+    let v_eval = problem
+        .operating_wind_speed_m_s
+        .unwrap_or(9.0)
+        .clamp(0.0, 50.0);
     let (p_op_mw, t_op_kn, cp_op, ct_op) = evaluate_wind_speed(v_eval);
 
     // Operating torque: Q = P_aero / omega
@@ -180,7 +188,7 @@ pub fn solve_wind_turbine(problem: &WindTurbineProblem) -> Result<WindTurbineRes
         if v <= 0.0 {
             0.0
         } else {
-            (k / c) * (v / c).powf(k - 1.0) * (- (v / c).powf(k)).exp()
+            (k / c) * (v / c).powf(k - 1.0) * (-(v / c).powf(k)).exp()
         }
     };
 
@@ -222,7 +230,11 @@ pub fn solve_wind_turbine(problem: &WindTurbineProblem) -> Result<WindTurbineRes
         aep_gwh,
         capacity_factor_pct,
         flh,
-        if is_safe { "PASS IEC 61400-1" } else { "EXCEEDS TIP SPEED OR LOW YIELD" }
+        if is_safe {
+            "PASS IEC 61400-1"
+        } else {
+            "EXCEEDS TIP SPEED OR LOW YIELD"
+        }
     );
 
     Ok(WindTurbineResult {
@@ -252,19 +264,28 @@ pub fn solve_wind_turbine_sim(problem: &WindTurbineProblem) -> SimulationResult 
         Ok(result) => {
             let mut metrics = std::collections::HashMap::new();
             metrics.insert("operating_power_mw".to_string(), result.operating_power_mw);
-            metrics.insert("operating_thrust_kn".to_string(), result.operating_thrust_kn);
-            metrics.insert("annual_energy_production_gwh".to_string(), result.annual_energy_production_gwh);
-            metrics.insert("capacity_factor_pct".to_string(), result.capacity_factor_pct);
-            metrics.insert("blade_tip_speed_m_s".to_string(), result.blade_tip_speed_m_s);
+            metrics.insert(
+                "operating_thrust_kn".to_string(),
+                result.operating_thrust_kn,
+            );
+            metrics.insert(
+                "annual_energy_production_gwh".to_string(),
+                result.annual_energy_production_gwh,
+            );
+            metrics.insert(
+                "capacity_factor_pct".to_string(),
+                result.capacity_factor_pct,
+            );
+            metrics.insert(
+                "blade_tip_speed_m_s".to_string(),
+                result.blade_tip_speed_m_s,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, result.operating_power_mw, 1, 1e-4);
 
-            let comparison = AnalyticalComparison::assess(
-                "operating_power_mw",
-                result.operating_power_mw,
-                2.5,
-            );
+            let comparison =
+                AnalyticalComparison::assess("operating_power_mw", result.operating_power_mw, 2.5);
 
             SimulationResult {
                 problem_id: problem.problem_id.clone(),
@@ -274,7 +295,10 @@ pub fn solve_wind_turbine_sim(problem: &WindTurbineProblem) -> SimulationResult 
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.renewable.wind_turbine_iec61400", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.renewable.wind_turbine_iec61400",
+                    "0.1.0",
+                ),
                 logs: vec![result.design_assessment],
             }
         }
@@ -289,7 +313,10 @@ pub fn solve_wind_turbine_sim(problem: &WindTurbineProblem) -> SimulationResult 
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.renewable.wind_turbine_iec61400", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.renewable.wind_turbine_iec61400",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Wind turbine simulation failed: {}", err)],
             }
         }

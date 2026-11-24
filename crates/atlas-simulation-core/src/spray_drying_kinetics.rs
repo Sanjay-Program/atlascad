@@ -212,7 +212,8 @@ pub fn solve_spray_drying_kinetics(
     let t_g_water = -135.0;
     let w_water = moisture_frac;
     let w_solid = 1.0 - w_water;
-    let t_g_powder_c = (w_solid * t_g_solid + k_gt * w_water * t_g_water) / (w_solid + k_gt * w_water);
+    let t_g_powder_c =
+        (w_solid * t_g_solid + k_gt * w_water * t_g_water) / (w_solid + k_gt * w_water);
 
     let stickiness_margin_c = problem.outlet_air_temperature_c - t_g_powder_c;
 
@@ -251,10 +252,17 @@ mod tests {
         assert!(res.atomizer_tip_speed_m_s > 180.0 && res.atomizer_tip_speed_m_s < 220.0);
         assert!(res.sauter_mean_diameter_d32_um > 40.0 && res.sauter_mean_diameter_d32_um < 95.0);
         assert!(res.droplet_drying_time_seconds > 0.05 && res.droplet_drying_time_seconds < 1.50);
-        assert!(res.water_evaporation_rate_kg_h > 1200.0 && res.water_evaporation_rate_kg_h < 1350.0);
-        assert!(res.dry_powder_production_rate_kg_h > 1200.0 && res.dry_powder_production_rate_kg_h < 1300.0);
+        assert!(
+            res.water_evaporation_rate_kg_h > 1200.0 && res.water_evaporation_rate_kg_h < 1350.0
+        );
+        assert!(
+            res.dry_powder_production_rate_kg_h > 1200.0
+                && res.dry_powder_production_rate_kg_h < 1300.0
+        );
         assert!(res.air_heater_thermal_duty_kw > 1000.0 && res.air_heater_thermal_duty_kw < 1800.0);
-        assert!(res.powder_glass_transition_temp_c > 45.0 && res.powder_glass_transition_temp_c < 65.0);
+        assert!(
+            res.powder_glass_transition_temp_c > 45.0 && res.powder_glass_transition_temp_c < 65.0
+        );
         assert!(res.is_drying_time_adequate);
         assert!(res.is_stickiness_risk_acceptable);
         assert!(res.is_thermal_efficiency_acceptable);

@@ -112,7 +112,9 @@ pub struct InductionMotorResult {
 }
 
 /// Solves three-phase induction motor electromechanics and torque-speed performance.
-pub fn solve_induction_motor(problem: &InductionMotorProblem) -> Result<InductionMotorResult, String> {
+pub fn solve_induction_motor(
+    problem: &InductionMotorProblem,
+) -> Result<InductionMotorResult, String> {
     if problem.rated_power_kw <= 0.0 {
         return Err("Rated power must be positive".to_string());
     }
@@ -156,7 +158,8 @@ pub fn solve_induction_motor(problem: &InductionMotorProblem) -> Result<Inductio
     };
 
     let s_max = r2 / (r_th * r_th + (x_th + x2).powi(2)).sqrt();
-    let t_max = (3.0 / (2.0 * omega_s)) * (v_th * v_th) / (r_th + (r_th * r_th + (x_th + x2).powi(2)).sqrt());
+    let t_max = (3.0 / (2.0 * omega_s)) * (v_th * v_th)
+        / (r_th + (r_th * r_th + (x_th + x2).powi(2)).sqrt());
 
     let t_start = torque_at_slip(1.0);
 
@@ -245,7 +248,11 @@ pub fn solve_induction_motor(problem: &InductionMotorProblem) -> Result<Inductio
         efficiency_pct,
         pf,
         nema_class,
-        if is_safe { "PASS COMPLIANT" } else { "MARGINAL / CHECK APPLICATION" }
+        if is_safe {
+            "PASS COMPLIANT"
+        } else {
+            "MARGINAL / CHECK APPLICATION"
+        }
     );
 
     Ok(InductionMotorResult {
@@ -279,10 +286,19 @@ pub fn solve_induction_motor_sim(problem: &InductionMotorProblem) -> SimulationR
     match solve_induction_motor(problem) {
         Ok(result) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("operating_speed_rpm".to_string(), result.operating_speed_rpm);
-            metrics.insert("operating_torque_nm".to_string(), result.operating_torque_nm);
+            metrics.insert(
+                "operating_speed_rpm".to_string(),
+                result.operating_speed_rpm,
+            );
+            metrics.insert(
+                "operating_torque_nm".to_string(),
+                result.operating_torque_nm,
+            );
             metrics.insert("efficiency_pct".to_string(), result.efficiency_pct);
-            metrics.insert("torque_ratio_breakdown_rated".to_string(), result.torque_ratio_breakdown_rated);
+            metrics.insert(
+                "torque_ratio_breakdown_rated".to_string(),
+                result.torque_ratio_breakdown_rated,
+            );
             metrics.insert("starting_current_a".to_string(), result.starting_current_a);
 
             let mut conv = ConvergenceMonitor::new(1e-6);
@@ -302,7 +318,10 @@ pub fn solve_induction_motor_sim(problem: &InductionMotorProblem) -> SimulationR
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.electrical.induction_motor_ieee112", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.electrical.induction_motor_ieee112",
+                    "0.1.0",
+                ),
                 logs: vec![result.design_assessment],
             }
         }
@@ -317,7 +336,10 @@ pub fn solve_induction_motor_sim(problem: &InductionMotorProblem) -> SimulationR
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.electrical.induction_motor_ieee112", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.electrical.induction_motor_ieee112",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Induction motor simulation failed: {}", err)],
             }
         }

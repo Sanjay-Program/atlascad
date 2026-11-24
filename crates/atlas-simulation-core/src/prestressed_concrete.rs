@@ -187,7 +187,8 @@ pub fn solve_prestressed_concrete(
 
     // Friction along tendon to midspan (ACI 318 / AASHTO):
     // P(x) = P_jack * exp(-(mu * theta + K * x))
-    let exponent_mid = problem.friction_curvature_coeff_mu * theta_half + problem.friction_wobble_coeff_k * l_half;
+    let exponent_mid =
+        problem.friction_curvature_coeff_mu * theta_half + problem.friction_wobble_coeff_k * l_half;
     let p_mid_fric_kn = p_jack_kn * (-exponent_mid).exp();
     let friction_loss_pct = ((p_jack_kn - p_mid_fric_kn) / p_jack_kn) * 100.0;
 
@@ -223,14 +224,19 @@ pub fn solve_prestressed_concrete(
     // Delta_f_pES = (N - 1)/(2N) * (E_ps / E_ci) * f_cgp
     // For post-tensioned tendons stressed sequentially (average ~ 0.5):
     let f_cgp_transfer = (p_mid_post_seat_kn * 1000.0) / (problem.concrete_area_m2 * 1e6)
-        + ((p_mid_post_seat_kn * 1000.0) * problem.midspan_eccentricity_m.powi(2)) / (problem.concrete_moment_of_inertia_m4 * 1e12);
+        + ((p_mid_post_seat_kn * 1000.0) * problem.midspan_eccentricity_m.powi(2))
+            / (problem.concrete_moment_of_inertia_m4 * 1e12);
     let delta_f_pes = 0.5 * (problem.tendon_modulus_mpa / e_c_mpa) * f_cgp_transfer;
 
     // Long-Term Losses (AASHTO LRFD Refined Method):
     // 1. Concrete Shrinkage (SH):
     // V/S ratio (volume to surface ratio ~ A / Perimeter ~ 0.12 m standard)
     let v_s_ratio_mm = 120.0;
-    let delta_f_psh = 8.2e-6 * problem.tendon_modulus_mpa * (1.0 - 0.0024 * v_s_ratio_mm) * (100.0 - problem.ambient_relative_humidity_pct).max(10.0) / 30.0;
+    let delta_f_psh = 8.2e-6
+        * problem.tendon_modulus_mpa
+        * (1.0 - 0.0024 * v_s_ratio_mm)
+        * (100.0 - problem.ambient_relative_humidity_pct).max(10.0)
+        / 30.0;
 
     // 2. Concrete Creep (CR):
     let delta_f_pcr = 1.6 * (problem.tendon_modulus_mpa / e_c_mpa) * f_cgp_transfer * 0.85;
@@ -334,8 +340,13 @@ mod tests {
         assert!(res.tendon_angular_change_rad > 0.04 && res.tendon_angular_change_rad < 0.10);
         assert!(res.friction_loss_pct > 1.5 && res.friction_loss_pct < 6.0);
         assert!(res.anchorage_seating_length_m > 8.0 && res.anchorage_seating_length_m < 32.0);
-        assert!(res.total_final_prestress_loss_pct > 10.0 && res.total_final_prestress_loss_pct < 25.0);
-        assert!(res.final_effective_midspan_force_kn > 3000.0 && res.final_effective_midspan_force_kn < 3600.0);
+        assert!(
+            res.total_final_prestress_loss_pct > 10.0 && res.total_final_prestress_loss_pct < 25.0
+        );
+        assert!(
+            res.final_effective_midspan_force_kn > 3000.0
+                && res.final_effective_midspan_force_kn < 3600.0
+        );
         assert!(res.midspan_bottom_fiber_stress_mpa < res.aashto_allowable_tension_mpa);
         assert!(res.midspan_top_fiber_stress_mpa > res.aashto_allowable_compression_mpa);
         assert!(res.is_service_tension_compliant);

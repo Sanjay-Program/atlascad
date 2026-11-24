@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
 use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Refrigerant working fluid type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -31,8 +31,8 @@ impl RefrigerantType {
         match self {
             Self::R410A => (1.05, 1.75, 1.18, 220.0),
             Self::R134a => (0.90, 1.45, 1.12, 198.0),
-            Self::R32   => (1.25, 1.95, 1.25, 305.0),
-            Self::R290  => (1.70, 2.55, 1.16, 375.0),
+            Self::R32 => (1.25, 1.95, 1.25, 305.0),
+            Self::R290 => (1.70, 2.55, 1.16, 375.0),
         }
     }
 
@@ -42,8 +42,8 @@ impl RefrigerantType {
         match self {
             Self::R410A => (10.80 - 2380.0 / t_k).exp(),
             Self::R134a => (9.90 - 2450.0 / t_k).exp(),
-            Self::R32   => (10.40 - 2150.0 / t_k).exp(),
-            Self::R290  => (9.50 - 2200.0 / t_k).exp(),
+            Self::R32 => (10.40 - 2150.0 / t_k).exp(),
+            Self::R290 => (9.50 - 2200.0 / t_k).exp(),
         }
     }
 }
@@ -146,8 +146,12 @@ pub fn solve_refrigeration_cycle(
         return Err("Isentropic efficiency must be between 0.0 and 1.0".to_string());
     }
 
-    let p_evap = problem.refrigerant.saturation_pressure_bar(problem.evaporating_temperature_c);
-    let p_cond = problem.refrigerant.saturation_pressure_bar(problem.condensing_temperature_c);
+    let p_evap = problem
+        .refrigerant
+        .saturation_pressure_bar(problem.evaporating_temperature_c);
+    let p_cond = problem
+        .refrigerant
+        .saturation_pressure_bar(problem.condensing_temperature_c);
     let rp = p_cond / p_evap;
 
     let (cp_v, cp_l, gamma, h_fg) = problem.refrigerant.properties();
@@ -173,7 +177,8 @@ pub fn solve_refrigeration_cycle(
     let t2_c = t2_k - 273.15;
 
     // State 3: Subcooled liquid leaving condenser
-    let h_f_cond = h_g1 + cp_v * (problem.condensing_temperature_c - problem.evaporating_temperature_c) - h_fg;
+    let h_f_cond =
+        h_g1 + cp_v * (problem.condensing_temperature_c - problem.evaporating_temperature_c) - h_fg;
     let h3 = h_f_cond - cp_l * problem.subcooling_k;
 
     // State 4: Isenthalpic throttling across expansion valve: h4 = h3
@@ -185,7 +190,7 @@ pub fn solve_refrigeration_cycle(
         return Err("Thermodynamic parameters yield non-positive refrigerating effect".to_string());
     }
     let q_comp = w_actual; // kJ/kg
-    let q_cond = h2 - h3;  // kJ/kg
+    let q_cond = h2 - h3; // kJ/kg
 
     // Mass flow rate: m_dot = Q_cooling / q_evap
     let m_dot = problem.design_cooling_capacity_kw / q_evap;
@@ -228,11 +233,26 @@ pub fn solve_refrigeration_cycle_sim(problem: &RefrigerationCycleProblem) -> Sim
         Ok(result) => {
             let mut metrics = std::collections::HashMap::new();
             metrics.insert("pressure_ratio".to_string(), result.pressure_ratio);
-            metrics.insert("coefficient_of_performance_cooling".to_string(), result.coefficient_of_performance_cooling);
-            metrics.insert("coefficient_of_performance_heating".to_string(), result.coefficient_of_performance_heating);
-            metrics.insert("compressor_electrical_power_kw".to_string(), result.compressor_electrical_power_kw);
-            metrics.insert("compressor_discharge_temperature_c".to_string(), result.compressor_discharge_temperature_c);
-            metrics.insert("refrigerant_mass_flow_kg_s".to_string(), result.refrigerant_mass_flow_kg_s);
+            metrics.insert(
+                "coefficient_of_performance_cooling".to_string(),
+                result.coefficient_of_performance_cooling,
+            );
+            metrics.insert(
+                "coefficient_of_performance_heating".to_string(),
+                result.coefficient_of_performance_heating,
+            );
+            metrics.insert(
+                "compressor_electrical_power_kw".to_string(),
+                result.compressor_electrical_power_kw,
+            );
+            metrics.insert(
+                "compressor_discharge_temperature_c".to_string(),
+                result.compressor_discharge_temperature_c,
+            );
+            metrics.insert(
+                "refrigerant_mass_flow_kg_s".to_string(),
+                result.refrigerant_mass_flow_kg_s,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, result.coefficient_of_performance_cooling, 1, 1e-4);
@@ -251,7 +271,10 @@ pub fn solve_refrigeration_cycle_sim(problem: &RefrigerationCycleProblem) -> Sim
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.thermal.refrigeration_cycle_ashrae", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.thermal.refrigeration_cycle_ashrae",
+                    "0.1.0",
+                ),
                 logs: vec![format!(
                     "Refrigeration Cycle (ASHRAE): COP_R = {:.2}, COP_HP = {:.2}, P_comp = {:.1} kW, rp = {:.2}, T_dis = {:.1} °C (Safe: {})",
                     result.coefficient_of_performance_cooling,
@@ -274,7 +297,10 @@ pub fn solve_refrigeration_cycle_sim(problem: &RefrigerationCycleProblem) -> Sim
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.thermal.refrigeration_cycle_ashrae", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.thermal.refrigeration_cycle_ashrae",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Refrigeration cycle simulation failed: {}", err)],
             }
         }
@@ -290,20 +316,33 @@ mod tests {
     fn test_refrigeration_cycle_nominal() {
         let prob = RefrigerationCycleProblem::default();
         let res = solve_refrigeration_cycle(&prob).expect("solver failed");
-        println!("Refrigeration: P_evap = {}, P_cond = {}, rp = {}, COP_R = {}, COP_HP = {}, T_dis = {}",
-            res.evaporating_pressure_bar, res.condensing_pressure_bar, res.pressure_ratio,
-            res.coefficient_of_performance_cooling, res.coefficient_of_performance_heating,
-            res.compressor_discharge_temperature_c);
+        println!(
+            "Refrigeration: P_evap = {}, P_cond = {}, rp = {}, COP_R = {}, COP_HP = {}, T_dis = {}",
+            res.evaporating_pressure_bar,
+            res.condensing_pressure_bar,
+            res.pressure_ratio,
+            res.coefficient_of_performance_cooling,
+            res.coefficient_of_performance_heating,
+            res.compressor_discharge_temperature_c
+        );
 
         assert!(res.evaporating_pressure_bar > 5.0 && res.evaporating_pressure_bar < 12.0);
         assert!(res.condensing_pressure_bar > 15.0 && res.condensing_pressure_bar < 35.0);
         assert!(res.pressure_ratio > 2.0 && res.pressure_ratio < 5.0);
         assert!(res.specific_refrigerating_effect_kj_kg > 100.0);
         assert!(res.refrigerant_mass_flow_kg_s > 0.3 && res.refrigerant_mass_flow_kg_s < 1.2);
-        assert!(res.compressor_electrical_power_kw > 15.0 && res.compressor_electrical_power_kw < 50.0);
-        assert!(res.coefficient_of_performance_cooling > 2.0 && res.coefficient_of_performance_cooling < 6.0);
+        assert!(
+            res.compressor_electrical_power_kw > 15.0 && res.compressor_electrical_power_kw < 50.0
+        );
+        assert!(
+            res.coefficient_of_performance_cooling > 2.0
+                && res.coefficient_of_performance_cooling < 6.0
+        );
         assert!(res.coefficient_of_performance_heating > res.coefficient_of_performance_cooling);
-        assert!(res.compressor_discharge_temperature_c > 40.0 && res.compressor_discharge_temperature_c < 110.0);
+        assert!(
+            res.compressor_discharge_temperature_c > 40.0
+                && res.compressor_discharge_temperature_c < 110.0
+        );
         assert!(res.is_safe);
     }
 }

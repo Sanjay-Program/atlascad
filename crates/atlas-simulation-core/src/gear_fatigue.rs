@@ -206,12 +206,24 @@ pub fn solve_gear_fatigue(problem: &GearFatigueProblem) -> Result<GearFatigueRes
         sigma_h,
         s_h,
         problem.required_safety_factor_pitting,
-        if is_pitting_safe { "PASS" } else { "PITTING RISK" },
+        if is_pitting_safe {
+            "PASS"
+        } else {
+            "PITTING RISK"
+        },
         sigma_f,
         s_f,
         problem.required_safety_factor_bending,
-        if is_bending_safe { "PASS" } else { "TOOTH BREAKAGE RISK" },
-        if is_safe { "PASS ISO 6336 COMPLIANT" } else { "REDESIGN REQUIRED" }
+        if is_bending_safe {
+            "PASS"
+        } else {
+            "TOOTH BREAKAGE RISK"
+        },
+        if is_safe {
+            "PASS ISO 6336 COMPLIANT"
+        } else {
+            "REDESIGN REQUIRED"
+        }
     );
 
     Ok(GearFatigueResult {
@@ -238,11 +250,26 @@ pub fn solve_gear_fatigue_sim(problem: &GearFatigueProblem) -> SimulationResult 
     match solve_gear_fatigue(problem) {
         Ok(result) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("effective_contact_stress_mpa".to_string(), result.effective_contact_stress_mpa);
-            metrics.insert("safety_factor_pitting".to_string(), result.safety_factor_pitting);
-            metrics.insert("effective_bending_stress_mpa".to_string(), result.effective_bending_stress_mpa);
-            metrics.insert("safety_factor_bending".to_string(), result.safety_factor_bending);
-            metrics.insert("pitch_line_velocity_m_s".to_string(), result.pitch_line_velocity_m_s);
+            metrics.insert(
+                "effective_contact_stress_mpa".to_string(),
+                result.effective_contact_stress_mpa,
+            );
+            metrics.insert(
+                "safety_factor_pitting".to_string(),
+                result.safety_factor_pitting,
+            );
+            metrics.insert(
+                "effective_bending_stress_mpa".to_string(),
+                result.effective_bending_stress_mpa,
+            );
+            metrics.insert(
+                "safety_factor_bending".to_string(),
+                result.safety_factor_bending,
+            );
+            metrics.insert(
+                "pitch_line_velocity_m_s".to_string(),
+                result.pitch_line_velocity_m_s,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, result.safety_factor_pitting, 1, 1e-4);
@@ -261,7 +288,10 @@ pub fn solve_gear_fatigue_sim(problem: &GearFatigueProblem) -> SimulationResult 
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.mechanical.gear_fatigue_iso6336", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.mechanical.gear_fatigue_iso6336",
+                    "0.1.0",
+                ),
                 logs: vec![result.design_assessment],
             }
         }
@@ -276,7 +306,10 @@ pub fn solve_gear_fatigue_sim(problem: &GearFatigueProblem) -> SimulationResult 
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.mechanical.gear_fatigue_iso6336", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.mechanical.gear_fatigue_iso6336",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Gear fatigue simulation failed: {}", err)],
             }
         }
@@ -297,7 +330,9 @@ mod tests {
         assert!(sol.pinion_pitch_diameter_mm > 80.0 && sol.pinion_pitch_diameter_mm < 95.0);
         assert!(sol.pitch_line_velocity_m_s > 6.0 && sol.pitch_line_velocity_m_s < 8.0);
         assert!(sol.tangential_force_n > 7000.0 && sol.tangential_force_n < 10000.0);
-        assert!(sol.effective_contact_stress_mpa > 800.0 && sol.effective_contact_stress_mpa < 1300.0);
+        assert!(
+            sol.effective_contact_stress_mpa > 800.0 && sol.effective_contact_stress_mpa < 1300.0
+        );
         assert!(sol.safety_factor_pitting >= prob.required_safety_factor_pitting);
         assert!(sol.safety_factor_bending >= prob.required_safety_factor_bending);
         assert!(sol.is_safe);

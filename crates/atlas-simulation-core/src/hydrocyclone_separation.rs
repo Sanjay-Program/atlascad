@@ -58,16 +58,16 @@ impl Default for HydrocycloneProblem {
         Self {
             problem_id: "copper_grinding_circuit_hydrocyclone".to_string(),
             application: SlurryApplicationType::HardRockGrindingCircuit,
-            cyclone_diameter_mm: 350.0,            // 350 mm (14-inch) commercial cyclone
-            inlet_diameter_mm: 75.0,               // 75 mm inlet
-            vortex_finder_diameter_mm: 115.0,      // 115 mm vortex finder
-            apex_diameter_mm: 55.0,                // 55 mm apex
-            free_vortex_height_mm: 1400.0,         // 1400 mm height
-            feed_flow_rate_m3_h: 120.0,            // 120 m³/h slurry feed
+            cyclone_diameter_mm: 350.0, // 350 mm (14-inch) commercial cyclone
+            inlet_diameter_mm: 75.0,    // 75 mm inlet
+            vortex_finder_diameter_mm: 115.0, // 115 mm vortex finder
+            apex_diameter_mm: 55.0,     // 55 mm apex
+            free_vortex_height_mm: 1400.0, // 1400 mm height
+            feed_flow_rate_m3_h: 120.0, // 120 m³/h slurry feed
             solids_volumetric_concentration_pct: 18.0, // 18% volumetric solids
-            solid_density_kg_m3: 2800.0,           // Porphyry ore
-            liquid_density_kg_m3: 1000.0,          // Water
-            target_evaluation_size_um: 75.0,       // P80 ~ 75 µm target grind size
+            solid_density_kg_m3: 2800.0, // Porphyry ore
+            liquid_density_kg_m3: 1000.0, // Water
+            target_evaluation_size_um: 75.0, // P80 ~ 75 µm target grind size
         }
     }
 }
@@ -110,18 +110,25 @@ pub struct HydrocycloneResult {
 }
 
 /// Solves hydrocyclone solid-liquid classification, cut size, and Plitt partition dynamics.
-pub fn solve_hydrocyclone_separation(problem: &HydrocycloneProblem) -> Result<HydrocycloneResult, String> {
+pub fn solve_hydrocyclone_separation(
+    problem: &HydrocycloneProblem,
+) -> Result<HydrocycloneResult, String> {
     if problem.cyclone_diameter_mm <= 25.0 {
         return Err("Cyclone diameter must be at least 25 mm".to_string());
     }
     if problem.feed_flow_rate_m3_h <= 0.0 {
         return Err("Feed flow rate must be positive".to_string());
     }
-    if problem.inlet_diameter_mm <= 0.0 || problem.vortex_finder_diameter_mm <= 0.0 || problem.apex_diameter_mm <= 0.0 {
+    if problem.inlet_diameter_mm <= 0.0
+        || problem.vortex_finder_diameter_mm <= 0.0
+        || problem.apex_diameter_mm <= 0.0
+    {
         return Err("Nozzle diameters must be positive".to_string());
     }
     if problem.solid_density_kg_m3 <= problem.liquid_density_kg_m3 {
-        return Err("Solid density must exceed liquid density for centrifugal separation".to_string());
+        return Err(
+            "Solid density must exceed liquid density for centrifugal separation".to_string(),
+        );
     }
 
     let d_c_cm = problem.cyclone_diameter_mm / 10.0;
@@ -152,15 +159,9 @@ pub fn solve_hydrocyclone_separation(problem: &HydrocycloneProblem) -> Result<Hy
 
     // Plitt cut size d50c model (in µm, with Q in L/min per Plitt formulation):
     let q_l_min = q_m3_h * (1000.0 / 60.0);
-    let d50_num = 50.5
-        * d_c_cm.powf(0.46)
-        * d_i_cm.powf(0.60)
-        * d_o_cm.powf(1.21)
-        * (0.063 * c_v).exp();
-    let d50_den = d_u_cm.powf(0.71)
-        * h_cm.powf(0.38)
-        * q_l_min.powf(0.45)
-        * delta_rho.sqrt();
+    let d50_num =
+        50.5 * d_c_cm.powf(0.46) * d_i_cm.powf(0.60) * d_o_cm.powf(1.21) * (0.063 * c_v).exp();
+    let d50_den = d_u_cm.powf(0.71) * h_cm.powf(0.38) * q_l_min.powf(0.45) * delta_rho.sqrt();
     let d50c_um = (d50_num / d50_den).clamp(5.0, 500.0);
 
     // Liquid recovery to underflow (bypass fraction Rf):
@@ -233,7 +234,10 @@ mod tests {
         assert!(res.pressure_drop_kpa >= 50.0 && res.pressure_drop_kpa <= 180.0);
         assert!(res.corrected_cut_size_d50c_um > 20.0 && res.corrected_cut_size_d50c_um < 150.0);
         assert!(res.sharpness_index_m >= 1.5 && res.sharpness_index_m <= 4.0);
-        assert!(res.liquid_recovery_to_underflow_pct > 8.0 && res.liquid_recovery_to_underflow_pct < 35.0);
+        assert!(
+            res.liquid_recovery_to_underflow_pct > 8.0
+                && res.liquid_recovery_to_underflow_pct < 35.0
+        );
         assert!(res.is_discharge_in_spray_regime);
         assert!(res.is_pressure_drop_acceptable);
         assert!(res.is_inlet_velocity_optimal);

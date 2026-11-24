@@ -149,7 +149,9 @@ pub fn solve_helical_compression_spring(
     let l0 = prob.free_length_l0_mm;
 
     if d <= 0.1 || big_d <= d {
-        return Err("Mean diameter D must be strictly greater than wire diameter d > 0.1 mm".to_string());
+        return Err(
+            "Mean diameter D must be strictly greater than wire diameter d > 0.1 mm".to_string(),
+        );
     }
     if na <= 0.5 {
         return Err("Active coils na must be at least 0.5".to_string());
@@ -228,8 +230,8 @@ pub fn solve_helical_compression_spring(
     let d_m = d * 1e-3;
     let big_d_m = big_d * 1e-3;
     let g_pa = g * 1e6;
-    let f0_hz = (d_m / (2.0 * std::f64::consts::PI * big_d_m.powi(2) * na))
-        * (g_pa / (2.0 * rho)).sqrt();
+    let f0_hz =
+        (d_m / (2.0 * std::f64::consts::PI * big_d_m.powi(2) * na)) * (g_pa / (2.0 * rho)).sqrt();
 
     // Slenderness lambda = L0 / D. If lambda > 4.0, spring is prone to lateral buckling
     let slenderness = l0 / big_d;
@@ -249,15 +251,38 @@ pub fn solve_helical_compression_spring(
     };
 
     let notes = vec![
-        format!("Helical Spring: '{}' ({:?}, End Style: {:?})", prob.spring_name, prob.material, prob.end_type),
-        format!("Geometry: Wire d = {:.2} mm, Mean D = {:.2} mm (OD = {:.2} mm, ID = {:.2} mm), C = {:.2}", d, big_d, de, di, c),
-        format!("Coils: Active na = {:.2}, Total nt = {:.2}, Free Length L0 = {:.1} mm, Solid Ls = {:.1} mm (sn = {:.1} mm)", na, nt, l0, ls, sn),
-        format!("Spring Stiffness: k = {:.3} N/mm (Wahl Factor kw = {:.3})", k_rate, kw),
-        format!("Solid Capacity: Fn = {:.1} N -> Solid Stress τn = {:.1} MPa vs Permissible {:.1} MPa (FoS = {:.2})", fn_n, tau_n, tau_perm, solid_fos),
-        format!("Dynamics: Natural Surge Frequency f0 = {:.1} Hz, Active Mass = {:.1} g", f0_hz, active_mass_g),
-        format!("Buckling Stability: Slenderness L0/D = {:.2} -> [{}]",
+        format!(
+            "Helical Spring: '{}' ({:?}, End Style: {:?})",
+            prob.spring_name, prob.material, prob.end_type
+        ),
+        format!(
+            "Geometry: Wire d = {:.2} mm, Mean D = {:.2} mm (OD = {:.2} mm, ID = {:.2} mm), C = {:.2}",
+            d, big_d, de, di, c
+        ),
+        format!(
+            "Coils: Active na = {:.2}, Total nt = {:.2}, Free Length L0 = {:.1} mm, Solid Ls = {:.1} mm (sn = {:.1} mm)",
+            na, nt, l0, ls, sn
+        ),
+        format!(
+            "Spring Stiffness: k = {:.3} N/mm (Wahl Factor kw = {:.3})",
+            k_rate, kw
+        ),
+        format!(
+            "Solid Capacity: Fn = {:.1} N -> Solid Stress τn = {:.1} MPa vs Permissible {:.1} MPa (FoS = {:.2})",
+            fn_n, tau_n, tau_perm, solid_fos
+        ),
+        format!(
+            "Dynamics: Natural Surge Frequency f0 = {:.1} Hz, Active Mass = {:.1} g",
+            f0_hz, active_mass_g
+        ),
+        format!(
+            "Buckling Stability: Slenderness L0/D = {:.2} -> [{}]",
             slenderness,
-            if is_buckling_safe { "Stable (No guide pin required)" } else { "Buckling Hazard (Internal mandrel / external sleeve mandatory)" }
+            if is_buckling_safe {
+                "Stable (No guide pin required)"
+            } else {
+                "Buckling Hazard (Internal mandrel / external sleeve mandatory)"
+            }
         ),
     ];
 
@@ -302,11 +327,23 @@ pub fn solve_helical_spring_sim(prob: &HelicalSpringProblem) -> Result<Simulatio
     metrics.insert("solid_length_ls_mm".to_string(), sol.solid_length_ls_mm);
     metrics.insert("max_deflection_sn_mm".to_string(), sol.max_deflection_sn_mm);
     metrics.insert("solid_force_fn_n".to_string(), sol.solid_force_fn_n);
-    metrics.insert("solid_shear_stress_taun_mpa".to_string(), sol.solid_shear_stress_taun_mpa);
-    metrics.insert("solid_stress_safety_factor".to_string(), sol.solid_stress_safety_factor);
-    metrics.insert("fundamental_frequency_hz".to_string(), sol.fundamental_frequency_hz);
+    metrics.insert(
+        "solid_shear_stress_taun_mpa".to_string(),
+        sol.solid_shear_stress_taun_mpa,
+    );
+    metrics.insert(
+        "solid_stress_safety_factor".to_string(),
+        sol.solid_stress_safety_factor,
+    );
+    metrics.insert(
+        "fundamental_frequency_hz".to_string(),
+        sol.fundamental_frequency_hz,
+    );
     metrics.insert("active_mass_grams".to_string(), sol.active_mass_grams);
-    metrics.insert("is_buckling_safe".to_string(), if sol.is_buckling_safe { 1.0 } else { 0.0 });
+    metrics.insert(
+        "is_buckling_safe".to_string(),
+        if sol.is_buckling_safe { 1.0 } else { 0.0 },
+    );
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.spring_rate_k_n_mm, 1, 1e-4);

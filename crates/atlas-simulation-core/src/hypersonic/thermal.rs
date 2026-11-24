@@ -51,7 +51,7 @@ pub fn evaluate_active_cooling(
     let num_channels = 120.0;
     let ch_width_m = 0.0012; // 1.2 mm
     let ch_height_m = 0.0025; // 2.5 mm
-    let ch_length_m = 2.4;    // 2.4 m jacket length
+    let ch_length_m = 2.4; // 2.4 m jacket length
 
     let ch_cross_area_m2 = ch_width_m * ch_height_m;
     let ch_perimeter_m = 2.0 * (ch_width_m + ch_height_m);
@@ -59,9 +59,10 @@ pub fn evaluate_active_cooling(
 
     // Thermophysical properties of supercritical hydrogen at ~4.5 MPa, 40 K - 200 K
     let cp_coolant = 14_500.0; // J/(kg*K)
-    let rho_coolant = (coolant_inlet_pressure_mpa * 1.0e6) / (4124.0 * coolant_inlet_temp_k.max(25.0)); // ~25-45 kg/m^3
+    let rho_coolant =
+        (coolant_inlet_pressure_mpa * 1.0e6) / (4124.0 * coolant_inlet_temp_k.max(25.0)); // ~25-45 kg/m^3
     let mu_coolant = 4.5e-6; // Pa*s
-    let k_coolant = 0.185;   // W/(m*K)
+    let k_coolant = 0.185; // W/(m*K)
     let pr_coolant = (cp_coolant * mu_coolant) / k_coolant; // ~0.35
 
     // Total coolant flow divided across channels
@@ -100,7 +101,8 @@ pub fn evaluate_active_cooling(
 
     // Pressure drop via Darcy-Weisbach: Delta_P = f * (L / Dh) * (0.5 * rho * v^2)
     let f_friction = 0.3164 / reynolds.powf(0.25); // Blasius formula
-    let delta_p_pa = f_friction * (ch_length_m / hydraulic_diam_m) * (0.5 * rho_coolant * flow_velocity.powi(2));
+    let delta_p_pa =
+        f_friction * (ch_length_m / hydraulic_diam_m) * (0.5 * rho_coolant * flow_velocity.powi(2));
     let delta_p_kpa = delta_p_pa / 1000.0;
 
     // Substrate thermal limit (GRCop-84 maximum continuous operating temperature is 700 C)

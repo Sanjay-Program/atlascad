@@ -66,18 +66,18 @@ impl Default for ChromatographyColumnProblem {
         Self {
             problem_id: "mab_capture_protein_a_column".to_string(),
             chromatography_mode: ChromatographyMode::ProteinAAffinity,
-            column_diameter_mm: 300.0,              // 300 mm pilot/manufacturing column (30 cm)
-            bed_height_mm: 200.0,                   // 200 mm (20 cm) packed bed height
-            linear_velocity_cm_h: 300.0,            // 300 cm/h process operating linear flow rate
-            resin_particle_diameter_um: 50.0,       // 50 µm agarose/polymer Protein A beads
-            bed_void_fraction: 0.36,                // 36% interstitial voidage
-            intraparticle_porosity: 0.65,           // 65% particle internal pore volume
-            feed_protein_concentration_g_l: 3.50,   // 3.5 g/L mAb cell culture harvest titer
-            max_binding_capacity_g_l: 55.0,         // 55 g mAb / L resin maximum static capacity
-            langmuir_constant_l_g: 12.0,            // 12.0 L/g strong affinity binding constant
-            molecular_diffusivity_m2_s: 4.8e-11,    // 4.8e-11 m²/s typical IgG mAb diffusivity
-            buffer_viscosity_mpa_s: 1.05,           // PBS equilibration buffer viscosity
-            buffer_density_kg_m3: 1010.0,           // Buffer density
+            column_diameter_mm: 300.0, // 300 mm pilot/manufacturing column (30 cm)
+            bed_height_mm: 200.0,      // 200 mm (20 cm) packed bed height
+            linear_velocity_cm_h: 300.0, // 300 cm/h process operating linear flow rate
+            resin_particle_diameter_um: 50.0, // 50 µm agarose/polymer Protein A beads
+            bed_void_fraction: 0.36,   // 36% interstitial voidage
+            intraparticle_porosity: 0.65, // 65% particle internal pore volume
+            feed_protein_concentration_g_l: 3.50, // 3.5 g/L mAb cell culture harvest titer
+            max_binding_capacity_g_l: 55.0, // 55 g mAb / L resin maximum static capacity
+            langmuir_constant_l_g: 12.0, // 12.0 L/g strong affinity binding constant
+            molecular_diffusivity_m2_s: 4.8e-11, // 4.8e-11 m²/s typical IgG mAb diffusivity
+            buffer_viscosity_mpa_s: 1.05, // PBS equilibration buffer viscosity
+            buffer_density_kg_m3: 1010.0, // Buffer density
         }
     }
 }
@@ -184,11 +184,12 @@ pub fn solve_chromatography_column(
 
     // 5. Plate height HETP (van Deemter / Horvath-Lin equation for preparative chromatography):
     // H = A * d_p + B * D_m / u + C * (d_p^2 / D_pore) * (k' / (1 + k')^2) * u
-    let term_a = 1.5 * d_p_m;                                         // Eddy diffusion
+    let term_a = 1.5 * d_p_m; // Eddy diffusion
     let term_b = 2.0 * problem.molecular_diffusivity_m2_s / u_inter_m_s; // Longitudinal diffusion
-    let d_pore = problem.molecular_diffusivity_m2_s * 0.25;            // Hindered pore diffusion
+    let d_pore = problem.molecular_diffusivity_m2_s * 0.25; // Hindered pore diffusion
     // Retention factor k' = ((1 - eps_b) / eps_b) * K_L * q_max:
-    let k_prime = ((1.0 - eps_b) / eps_b) * problem.langmuir_constant_l_g * problem.max_binding_capacity_g_l;
+    let k_prime =
+        ((1.0 - eps_b) / eps_b) * problem.langmuir_constant_l_g * problem.max_binding_capacity_g_l;
     let retention_weight = (k_prime / (1.0 + k_prime).powi(2)).max(0.004);
     let term_c = 0.10 * (d_p_m.powi(2) / d_pore) * retention_weight * u_inter_m_s; // Intraparticle pore mass transfer resistance
     let hetp_m = term_a + term_b + term_c;
@@ -200,9 +201,21 @@ pub fn solve_chromatography_column(
     // At 10% breakthrough (C/C0 = 0.10):
     // ln(C0/C - 1) = ln(9.0) = 2.1972
     // DBC_10% = q_max * (1 - (2.1972 / N_Thomas))
-    let k_th_rate = k_film_m_s * (6.0 / d_p_m); // Volumetric rate parameter
-    let n_thomas = (k_th_rate * l_bed_m) / u_inter_m_s;
-    let dbc_factor = (1.0 - (2.1972 / n_thomas.max(4.0))).clamp(0.60, 0.96);
+    //
+    // The overall linear-driving-force rate combines the external film and the
+    // intraparticle pore resistances in series (Glueckauf LDF):
+    //   k_f = 6 k_film / d_p,   k_p = 40 D_pore / d_p^2,   1/k_eff = 1/k_f + 1/k_p.
+    // The previous film-only rate ignored pore diffusion, over-predicted N_Thomas
+    // (and therefore DBC), and then hid the error behind a 0.60-0.96 clamp.
+    let k_film_volumetric_s_inv = k_film_m_s * (6.0 / d_p_m);
+    let d_pore_eff_m2_s =
+        (problem.molecular_diffusivity_m2_s * problem.intraparticle_porosity).max(1.0e-14);
+    let k_pore_volumetric_s_inv = (40.0 * d_pore_eff_m2_s) / d_p_m.powi(2);
+    let k_eff_s_inv = 1.0
+        / ((1.0 / k_film_volumetric_s_inv.max(1.0e-12))
+            + (1.0 / k_pore_volumetric_s_inv.max(1.0e-12)));
+    let n_thomas = (k_eff_s_inv * l_bed_m) / u_inter_m_s.max(1.0e-9);
+    let dbc_factor = (1.0 - (2.1972 / n_thomas.max(1.0))).clamp(0.0, 1.0);
     let dbc_10pct = problem.max_binding_capacity_g_l * dbc_factor;
     let dbc_utilization_pct = (dbc_10pct / problem.max_binding_capacity_g_l) * 100.0;
 
@@ -222,11 +235,13 @@ pub fn solve_chromatography_column(
     let is_pressure_drop_acceptable = dp_kpa <= 300.0; // Typical 3 bar column rating
     let is_dbc_utilization_competitive = dbc_utilization_pct >= 75.0;
     let is_plate_count_satisfactory = hetp_mm <= 1.5;
-    let is_chromatography_column_viable =
-        is_pressure_drop_acceptable && is_dbc_utilization_competitive && is_plate_count_satisfactory;
+    let is_chromatography_column_viable = is_pressure_drop_acceptable
+        && is_dbc_utilization_competitive
+        && is_plate_count_satisfactory;
 
     // Thomas rate constant in mL/(min*mg):
-    let k_th_convenient = (k_th_rate * 60.0 * 1000.0) / (problem.feed_protein_concentration_g_l * 1000.0);
+    let k_th_convenient =
+        (k_eff_s_inv * 60.0 * 1000.0) / (problem.feed_protein_concentration_g_l * 1000.0);
 
     Ok(ChromatographyColumnResult {
         problem_id: problem.problem_id.clone(),
@@ -264,8 +279,13 @@ mod tests {
         assert!(res.column_bed_volume_liters > 12.0 && res.column_bed_volume_liters < 16.0); // ~14.1 L bed
         assert!(res.volumetric_flow_rate_l_h > 180.0 && res.volumetric_flow_rate_l_h < 240.0);
         assert!(res.residence_time_minutes > 3.0 && res.residence_time_minutes < 5.0);
-        assert!(res.dynamic_binding_capacity_10pct_g_l > 40.0 && res.dynamic_binding_capacity_10pct_g_l < 55.0);
+        assert!(
+            res.dynamic_binding_capacity_10pct_g_l > 40.0
+                && res.dynamic_binding_capacity_10pct_g_l < 55.0
+        );
         assert!(res.capacity_utilization_pct >= 75.0);
+        assert!(res.dynamic_binding_capacity_10pct_g_l < problem.max_binding_capacity_g_l);
+        assert!(res.capacity_utilization_pct <= 100.0);
         assert!(res.hetp_mm > 0.05 && res.hetp_mm < 1.0);
         assert!(res.column_pressure_drop_kpa > 20.0 && res.column_pressure_drop_kpa < 250.0);
         assert!(res.is_pressure_drop_acceptable);

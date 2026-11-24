@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// DC-DC Buck converter problem specification.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,7 +59,7 @@ impl Default for DcDcConverterProblem {
             input_voltage_v: 12.0,
             output_voltage_v: 3.3,
             rated_output_current_a: 20.0,
-            switching_frequency_hz: 500_000.0, // 500 kHz
+            switching_frequency_hz: 500_000.0,  // 500 kHz
             inductor_ripple_ratio: 0.30,        // 30% ripple
             inductor_dcr_ohms: 0.0025,          // 2.5 mΩ
             high_side_rds_on_ohms: 0.0045,      // 4.5 mΩ
@@ -68,8 +68,8 @@ impl Default for DcDcConverterProblem {
             low_side_qg_nc: 32.0,               // 32 nC
             switching_transition_time_ns: 18.0, // 18 ns
             gate_drive_voltage_v: 5.0,
-            output_capacitance_uf: 200.0,       // 200 μF
-            output_capacitor_esr_ohms: 0.002,   // 2 mΩ
+            output_capacitance_uf: 200.0,     // 200 μF
+            output_capacitor_esr_ohms: 0.002, // 2 mΩ
         }
     }
 }
@@ -120,7 +120,9 @@ pub fn solve_dc_dc_converter(
     problem: &DcDcConverterProblem,
 ) -> Result<DcDcConverterResult, String> {
     if problem.input_voltage_v <= problem.output_voltage_v {
-        return Err("Input voltage must exceed regulated output voltage for buck topology".to_string());
+        return Err(
+            "Input voltage must exceed regulated output voltage for buck topology".to_string(),
+        );
     }
     if problem.output_voltage_v <= 0.0 || problem.rated_output_current_a <= 0.0 {
         return Err("Output voltage and load current must be positive".to_string());
@@ -218,16 +220,20 @@ pub fn solve_dc_dc_converter(
 }
 
 /// Executes DC-DC converter simulation and packages into SimulationResult envelope.
-pub fn solve_dc_dc_converter_sim(
-    problem: &DcDcConverterProblem,
-) -> SimulationResult {
+pub fn solve_dc_dc_converter_sim(problem: &DcDcConverterProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_dc_dc_converter(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
             metrics.insert("duty_cycle".to_string(), res.duty_cycle);
-            metrics.insert("required_inductance_uh".to_string(), res.required_inductance_uh);
-            metrics.insert("total_output_voltage_ripple_mv".to_string(), res.total_output_voltage_ripple_mv);
+            metrics.insert(
+                "required_inductance_uh".to_string(),
+                res.required_inductance_uh,
+            );
+            metrics.insert(
+                "total_output_voltage_ripple_mv".to_string(),
+                res.total_output_voltage_ripple_mv,
+            );
             metrics.insert("output_power_w".to_string(), res.output_power_w);
             metrics.insert("total_power_loss_w".to_string(), res.total_power_loss_w);
             metrics.insert("efficiency_pct".to_string(), res.efficiency_pct);
@@ -252,8 +258,13 @@ pub fn solve_dc_dc_converter_sim(
                 provenance: SimulationProvenance::new("atlas.electronics.dc_dc_buck_smps", "0.1.0"),
                 logs: vec![format!(
                     "DC-DC Buck: D = {:.3}, L = {:.2} uH, V_rip = {:.1} mV, P_out = {:.1} W, P_loss = {:.2} W, Eff = {:.2}%, Safe: {}",
-                    res.duty_cycle, res.required_inductance_uh, res.total_output_voltage_ripple_mv,
-                    res.output_power_w, res.total_power_loss_w, res.efficiency_pct, res.is_safe
+                    res.duty_cycle,
+                    res.required_inductance_uh,
+                    res.total_output_voltage_ripple_mv,
+                    res.output_power_w,
+                    res.total_power_loss_w,
+                    res.efficiency_pct,
+                    res.is_safe
                 )],
             }
         }
@@ -285,10 +296,16 @@ mod tests {
     fn test_dc_dc_converter_nominal() {
         let prob = DcDcConverterProblem::default();
         let res = solve_dc_dc_converter(&prob).expect("solver failed");
-        println!("DC-DC Buck: D = {:.3}, L = {:.2} uH, I_pk = {:.2} A, V_ripple = {:.1} mV, P_out = {:.1} W, P_loss = {:.2} W, Eff = {:.2}%",
-            res.duty_cycle, res.required_inductance_uh, res.peak_inductor_current_a,
-            res.total_output_voltage_ripple_mv, res.output_power_w, res.total_power_loss_w,
-            res.efficiency_pct);
+        println!(
+            "DC-DC Buck: D = {:.3}, L = {:.2} uH, I_pk = {:.2} A, V_ripple = {:.1} mV, P_out = {:.1} W, P_loss = {:.2} W, Eff = {:.2}%",
+            res.duty_cycle,
+            res.required_inductance_uh,
+            res.peak_inductor_current_a,
+            res.total_output_voltage_ripple_mv,
+            res.output_power_w,
+            res.total_power_loss_w,
+            res.efficiency_pct
+        );
 
         assert!(res.duty_cycle > 0.25 && res.duty_cycle < 0.30);
         assert!(res.required_inductance_uh > 0.5 && res.required_inductance_uh < 2.0);

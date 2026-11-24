@@ -53,14 +53,14 @@ impl Default for BatteryFastChargeProblem {
         Self {
             problem_id: "ev_800v_pack_fast_charge".to_string(),
             cathode_chemistry: BatteryCathodeChemistry::Nmc811HighEnergy,
-            nominal_capacity_ah: 75.0,          // 75 Ah prismatic EV cell
-            initial_soc_fraction: 0.10,         // 10% SOC empty battery
-            target_soc_fraction: 0.80,          // 80% SOC DC fast charge benchmark
-            charge_c_rate: 2.50,                // 2.5C fast charging (187.5 A)
-            internal_resistance_mohms: 0.85,    // 0.85 mΩ internal ohmic resistance
-            diffusion_time_constant_s: 95.0,    // 95 s diffusion relaxation
-            charge_cutoff_voltage_v: 4.20,      // 4.20 V upper voltage ceiling
-            ambient_temperature_c: 25.0,        // 25 °C nominal cooling pack inlet
+            nominal_capacity_ah: 75.0,       // 75 Ah prismatic EV cell
+            initial_soc_fraction: 0.10,      // 10% SOC empty battery
+            target_soc_fraction: 0.80,       // 80% SOC DC fast charge benchmark
+            charge_c_rate: 2.50,             // 2.5C fast charging (187.5 A)
+            internal_resistance_mohms: 0.85, // 0.85 mΩ internal ohmic resistance
+            diffusion_time_constant_s: 95.0, // 95 s diffusion relaxation
+            charge_cutoff_voltage_v: 4.20,   // 4.20 V upper voltage ceiling
+            ambient_temperature_c: 25.0,     // 25 °C nominal cooling pack inlet
         }
     }
 }
@@ -107,11 +107,15 @@ pub struct BatteryFastChargeResult {
 }
 
 /// Solves lithium-ion cell fast-charging electro-thermal kinetics and degradation.
-pub fn solve_battery_fast_charging(problem: &BatteryFastChargeProblem) -> Result<BatteryFastChargeResult, String> {
+pub fn solve_battery_fast_charging(
+    problem: &BatteryFastChargeProblem,
+) -> Result<BatteryFastChargeResult, String> {
     if problem.nominal_capacity_ah <= 0.5 || problem.nominal_capacity_ah > 1000.0 {
         return Err("Nominal capacity must be between 0.5 and 1000.0 Ah".to_string());
     }
-    if problem.initial_soc_fraction < 0.0 || problem.initial_soc_fraction >= problem.target_soc_fraction {
+    if problem.initial_soc_fraction < 0.0
+        || problem.initial_soc_fraction >= problem.target_soc_fraction
+    {
         return Err("Initial SOC must be less than target SOC".to_string());
     }
     if problem.charge_c_rate <= 0.1 || problem.charge_c_rate > 10.0 {
@@ -130,9 +134,7 @@ pub fn solve_battery_fast_charging(problem: &BatteryFastChargeProblem) -> Result
         BatteryCathodeChemistry::NcaHighPower => (3.55, 0.68, -0.07),
     };
 
-    let ocv_fn = |soc: f64| -> f64 {
-        v_0 + v_1 * soc + v_2 * soc.powi(2)
-    };
+    let ocv_fn = |soc: f64| -> f64 { v_0 + v_1 * soc + v_2 * soc.powi(2) };
 
     // Voltage under load: V_term(soc) = OCV(soc) + I_cc * R_0 + I_cc * R_pol (polarization)
     let r_pol = 0.50 * r_ohm; // diffusion overpotential at transition
@@ -152,7 +154,11 @@ pub fn solve_battery_fast_charging(problem: &BatteryFastChargeProblem) -> Result
 
     // If soc_trans > target_soc, then the entire charge occurs in CC phase:
     let is_cv_needed = soc_trans < problem.target_soc_fraction;
-    let soc_cc_end = if is_cv_needed { soc_trans } else { problem.target_soc_fraction };
+    let soc_cc_end = if is_cv_needed {
+        soc_trans
+    } else {
+        problem.target_soc_fraction
+    };
 
     // Duration of CC phase: delta_SOC_cc * Q_nom / I_cc [hours] -> [minutes]:
     let delta_soc_cc = (soc_cc_end - problem.initial_soc_fraction).max(0.0);
@@ -201,7 +207,8 @@ pub fn solve_battery_fast_charging(problem: &BatteryFastChargeProblem) -> Result
 
     // Capacity loss per cycle: Q_loss = k_fade * delta_SEI * Q_nom:
     let q_loss_mah_per_cycle = 55.0 * delta_sei_nm * (problem.nominal_capacity_ah / 75.0);
-    let cycle_life = (0.20 * problem.nominal_capacity_ah * 1000.0 / q_loss_mah_per_cycle.max(0.01)).round() as u32;
+    let cycle_life = (0.20 * problem.nominal_capacity_ah * 1000.0 / q_loss_mah_per_cycle.max(0.01))
+        .round() as u32;
 
     // Lithium plating overpotential margin:
     // Plating occurs when anode potential drops below 0.0 V vs Li/Li+:
@@ -215,7 +222,7 @@ pub fn solve_battery_fast_charging(problem: &BatteryFastChargeProblem) -> Result
     // Design assessments:
     let is_plating_safe = anode_margin_mv >= 0.0;
     let is_time_fast = t_total_min <= 25.0; // 10-80% in <= 25 min benchmark
-    let is_thermal_ok = peak_q_w <= 60.0;   // Liquid-cooled pack capacity (< 60 W/cell)
+    let is_thermal_ok = peak_q_w <= 60.0; // Liquid-cooled pack capacity (< 60 W/cell)
     let is_overall_ok = is_plating_safe && is_time_fast && (t_total_min > 0.0);
 
     Ok(BatteryFastChargeResult {
@@ -256,8 +263,13 @@ mod tests {
         assert!(res.peak_heat_generation_w > 25.0 && res.peak_heat_generation_w < 60.0);
         assert!(res.total_heat_dissipated_kj > 20.0 && res.total_heat_dissipated_kj < 75.0);
         assert!(res.sei_layer_growth_nm > 0.05 && res.sei_layer_growth_nm < 0.40);
-        assert!(res.estimated_cycle_life_to_80_soh > 1000 && res.estimated_cycle_life_to_80_soh < 2500);
-        assert!(res.min_anode_plating_margin_mv >= 0.0, "Anode potential should remain above lithium plating threshold (0 mV)");
+        assert!(
+            res.estimated_cycle_life_to_80_soh > 1000 && res.estimated_cycle_life_to_80_soh < 2500
+        );
+        assert!(
+            res.min_anode_plating_margin_mv >= 0.0,
+            "Anode potential should remain above lithium plating threshold (0 mV)"
+        );
         assert!(res.is_lithium_plating_prevented);
         assert!(res.is_fast_charge_time_competitive);
         assert!(res.is_thermal_dissipation_manageable);

@@ -141,7 +141,8 @@ pub fn solve_solder_thermal_fatigue(
 
     // Distance to Neutral Point (DNP) for corner-most ball:
     // DNP = 0.5 * sqrt(W^2 + L^2)  [mm]
-    let dnp_mm = 0.5 * (problem.package_width_mm.powi(2) + problem.package_length_mm.powi(2)).sqrt();
+    let dnp_mm =
+        0.5 * (problem.package_width_mm.powi(2) + problem.package_length_mm.powi(2)).sqrt();
 
     // CTE mismatch Delta_alpha in 1/K:
     let delta_alpha_ppm = (problem.pcb_cte_ppm_k - problem.package_cte_ppm_k).abs();
@@ -173,8 +174,8 @@ pub fn solve_solder_thermal_fatigue(
 
     // Solder metallurgy parameters (Engelmaier / Lau):
     let (epsilon_f_prime, c_offset) = match problem.alloy_type {
-        SolderAlloyType::Sac305 => (0.325, -0.442),  // SAC305 lead-free: higher creep resistance
-        SolderAlloyType::Sac405 => (0.340, -0.440),  // SAC405 lead-free
+        SolderAlloyType::Sac305 => (0.325, -0.442), // SAC305 lead-free: higher creep resistance
+        SolderAlloyType::Sac405 => (0.340, -0.440), // SAC405 lead-free
         SolderAlloyType::Sn63Pb37 => (0.325, -0.442), // Classical eutectic SnPb
         SolderAlloyType::Sn42Bi58 => (0.220, -0.480), // Brittle BiSn
     };
@@ -251,13 +252,18 @@ mod tests {
         };
 
         let res = solve_solder_thermal_fatigue(&prob)?;
-        assert!(res.distance_to_neutral_point_dnp_mm > 20.0 && res.distance_to_neutral_point_dnp_mm < 30.0);
+        assert!(
+            res.distance_to_neutral_point_dnp_mm > 20.0
+                && res.distance_to_neutral_point_dnp_mm < 30.0
+        );
         assert!((res.cte_mismatch_ppm_k - 9.5).abs() < 1e-4);
         assert_eq!(res.temperature_swing_delta_t_c, 165.0);
         assert_eq!(res.mean_cycle_temperature_c, 42.5);
         assert!(res.cyclic_shear_strain_pct > 1.5 && res.cyclic_shear_strain_pct < 5.0);
         assert!(res.engelmaier_fatigue_exponent < -0.40 && res.engelmaier_fatigue_exponent > -0.50);
-        assert!(res.median_cycles_to_failure_n50 > 500.0 && res.median_cycles_to_failure_n50 < 3000.0);
+        assert!(
+            res.median_cycles_to_failure_n50 > 500.0 && res.median_cycles_to_failure_n50 < 3000.0
+        );
         assert!(res.weibull_characteristic_life_eta > res.median_cycles_to_failure_n50);
         assert!(res.first_failure_cycles_n001 > 100.0);
         assert!(res.is_ipc_9701_compliant);

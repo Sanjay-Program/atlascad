@@ -79,10 +79,10 @@ impl Default for PumpedStorageProblem {
             minor_loss_k_total: 1.85,
             pumping_discharge_m3_s: 32.0,
             generating_discharge_m3_s: 36.5,
-            rotational_speed_rpm: 428.6,     // Standard 14-pole 50 Hz synchronous speed
+            rotational_speed_rpm: 428.6, // Standard 14-pole 50 Hz synchronous speed
             runner_diameter_m: 3.45,
-            runner_submergence_depth_m: 35.0,// 35 m cavern submergence below tailwater
-            atmospheric_pressure_kpa: 86.5,  // Mountain altitude barometric pressure
+            runner_submergence_depth_m: 35.0, // 35 m cavern submergence below tailwater
+            atmospheric_pressure_kpa: 86.5,   // Mountain altitude barometric pressure
             water_vapor_pressure_kpa: 1.75,   // ~15°C cold mountain water
             pump_hydraulic_efficiency: 0.912,
             turbine_hydraulic_efficiency: 0.928,
@@ -137,9 +137,13 @@ pub struct PumpedStorageResult {
 }
 
 /// Solves pumped storage reversible pump-turbine hydraulics, cavitation, and power per IEC 60041 / IEC 61362.
-pub fn solve_pumped_storage_hydro(problem: &PumpedStorageProblem) -> Result<PumpedStorageResult, String> {
+pub fn solve_pumped_storage_hydro(
+    problem: &PumpedStorageProblem,
+) -> Result<PumpedStorageResult, String> {
     if problem.upper_reservoir_elevation_m <= problem.lower_reservoir_elevation_m {
-        return Err("Upper reservoir elevation must be strictly higher than lower reservoir".to_string());
+        return Err(
+            "Upper reservoir elevation must be strictly higher than lower reservoir".to_string(),
+        );
     }
     if problem.conduit_diameter_m <= 0.2 || problem.conduit_diameter_m > 15.0 {
         return Err("Conduit diameter must be between 0.2 and 15.0 meters".to_string());
@@ -163,7 +167,8 @@ pub fn solve_pumped_storage_hydro(problem: &PumpedStorageProblem) -> Result<Pump
     let v_t = problem.generating_discharge_m3_s / a_cond;
 
     // Head losses: h_loss = (f * L / D + K) * v² / (2g)
-    let loss_coeff = problem.darcy_friction_factor * (problem.conduit_length_m / problem.conduit_diameter_m)
+    let loss_coeff = problem.darcy_friction_factor
+        * (problem.conduit_length_m / problem.conduit_diameter_m)
         + problem.minor_loss_k_total;
     let h_loss_p = loss_coeff * v_p.powi(2) / (2.0 * g);
     let h_loss_t = loss_coeff * v_t.powi(2) / (2.0 * g);
@@ -175,7 +180,8 @@ pub fn solve_pumped_storage_hydro(problem: &PumpedStorageProblem) -> Result<Pump
     let h_t = (h_stat - h_loss_t).max(1.0);
 
     // 4. Specific speed in pumping mode: N_qp = n * sqrt(Q) / H^(3/4)
-    let n_qp = problem.rotational_speed_rpm * problem.pumping_discharge_m3_s.sqrt() / h_p.powf(0.75);
+    let n_qp =
+        problem.rotational_speed_rpm * problem.pumping_discharge_m3_s.sqrt() / h_p.powf(0.75);
 
     // 5. Pumping power:
     // Hydraulic fluid power: P_hyd = rho * g * Q * H
@@ -212,7 +218,8 @@ pub fn solve_pumped_storage_hydro(problem: &PumpedStorageProblem) -> Result<Pump
     // eta_rt = E_gen / E_pump for equal water volume:
     // Volume V = Q_p * t_p = Q_t * t_t => t_t / t_p = Q_p / Q_t
     // eta_rt = (P_turb_elec * t_t) / (P_pump_elec * t_p) = (P_turb_elec / P_pump_elec) * (Q_p / Q_t)
-    let round_trip_eff = (p_turb_elec_mw / p_pump_elec_mw) * (problem.pumping_discharge_m3_s / problem.generating_discharge_m3_s);
+    let round_trip_eff = (p_turb_elec_mw / p_pump_elec_mw)
+        * (problem.pumping_discharge_m3_s / problem.generating_discharge_m3_s);
     let round_trip_efficiency_pct = (round_trip_eff * 100.0).clamp(50.0, 95.0);
 
     // 9. Engineering criteria:
@@ -258,10 +265,14 @@ mod tests {
         let res = solve_pumped_storage_hydro(&prob)?;
 
         assert_eq!(res.static_head_m, 310.0);
-        assert!(res.total_dynamic_pumping_head_m > 311.0 && res.total_dynamic_pumping_head_m < 325.0);
+        assert!(
+            res.total_dynamic_pumping_head_m > 311.0 && res.total_dynamic_pumping_head_m < 325.0
+        );
         assert!(res.net_generating_head_m > 290.0 && res.net_generating_head_m < 310.0);
         assert!(res.pumping_electrical_power_mw > 100.0 && res.pumping_electrical_power_mw < 130.0);
-        assert!(res.generating_electrical_power_mw > 85.0 && res.generating_electrical_power_mw < 120.0);
+        assert!(
+            res.generating_electrical_power_mw > 85.0 && res.generating_electrical_power_mw < 120.0
+        );
         assert!(res.npsha_m > 30.0);
         assert!(res.cavitation_safety_factor >= 1.15);
         assert!(res.round_trip_efficiency_pct >= 75.0 && res.round_trip_efficiency_pct <= 85.0);

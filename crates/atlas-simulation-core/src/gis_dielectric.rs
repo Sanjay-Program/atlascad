@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Insulating gas dielectric medium.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -27,9 +27,9 @@ impl GisInsulatingGas {
     /// Returns (critical_reduced_field_kv_mm_bar, relative_dielectric_strength_vs_sf6, gwp_index)
     pub fn properties(&self) -> (f64, f64, f64) {
         match self {
-            Self::PureSf6      => (8.90, 1.00, 23500.0),
+            Self::PureSf6 => (8.90, 1.00, 23500.0),
             Self::Sf6N2Mixture => (6.10, 0.68, 7000.0),
-            Self::EcoGasC4Fn   => (8.50, 0.95, 350.0),
+            Self::EcoGasC4Fn => (8.50, 0.95, 350.0),
         }
     }
 }
@@ -117,9 +117,7 @@ pub struct GisDielectricResult {
 }
 
 /// Solves GIS coaxial electric field, Paschen breakdown, and lightning impulse margin.
-pub fn solve_gis_dielectric(
-    problem: &GisDielectricProblem,
-) -> Result<GisDielectricResult, String> {
+pub fn solve_gis_dielectric(problem: &GisDielectricProblem) -> Result<GisDielectricResult, String> {
     if problem.conductor_radius_mm <= 0.0 || problem.enclosure_radius_mm <= 0.0 {
         return Err("Conductor and enclosure radii must be positive".to_string());
     }
@@ -177,9 +175,8 @@ pub fn solve_gis_dielectric(
     // - Continuous safety factor >= 2.5
     // - Lightning impulse safety factor >= 1.25
     // - Radius ratio within optimal dielectric window 2.2 <= r2/r1 <= 3.5
-    let is_iec_compliant = sf_cont >= 2.50
-        && sf_impulse >= 1.25
-        && (2.20..=3.50).contains(&r_ratio);
+    let is_iec_compliant =
+        sf_cont >= 2.50 && sf_impulse >= 1.25 && (2.20..=3.50).contains(&r_ratio);
 
     Ok(GisDielectricResult {
         problem_id: problem.problem_id.clone(),
@@ -199,20 +196,36 @@ pub fn solve_gis_dielectric(
 }
 
 /// Executes GIS dielectric simulation and packages into SimulationResult envelope.
-pub fn solve_gis_dielectric_sim(
-    problem: &GisDielectricProblem,
-) -> SimulationResult {
+pub fn solve_gis_dielectric_sim(problem: &GisDielectricProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_gis_dielectric(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
             metrics.insert("radius_ratio".to_string(), res.radius_ratio);
-            metrics.insert("field_utilization_factor".to_string(), res.field_utilization_factor);
-            metrics.insert("max_continuous_e_field_kv_mm".to_string(), res.max_continuous_e_field_kv_mm);
-            metrics.insert("max_impulse_e_field_kv_mm".to_string(), res.max_impulse_e_field_kv_mm);
-            metrics.insert("effective_breakdown_field_kv_mm".to_string(), res.effective_breakdown_field_kv_mm);
-            metrics.insert("continuous_safety_factor".to_string(), res.continuous_safety_factor);
-            metrics.insert("impulse_safety_factor".to_string(), res.impulse_safety_factor);
+            metrics.insert(
+                "field_utilization_factor".to_string(),
+                res.field_utilization_factor,
+            );
+            metrics.insert(
+                "max_continuous_e_field_kv_mm".to_string(),
+                res.max_continuous_e_field_kv_mm,
+            );
+            metrics.insert(
+                "max_impulse_e_field_kv_mm".to_string(),
+                res.max_impulse_e_field_kv_mm,
+            );
+            metrics.insert(
+                "effective_breakdown_field_kv_mm".to_string(),
+                res.effective_breakdown_field_kv_mm,
+            );
+            metrics.insert(
+                "continuous_safety_factor".to_string(),
+                res.continuous_safety_factor,
+            );
+            metrics.insert(
+                "impulse_safety_factor".to_string(),
+                res.impulse_safety_factor,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, res.impulse_safety_factor, 1, 1e-4);
@@ -234,9 +247,14 @@ pub fn solve_gis_dielectric_sim(
                 provenance: SimulationProvenance::new("atlas.electrical.gis_dielectric", "0.1.0"),
                 logs: vec![format!(
                     "GIS Dielectric (IEC 62271-203): Gas = {:?}, R/r = {:.2}, eta = {:.3}, E_cont = {:.2} kV/mm, E_bil = {:.2} kV/mm, E_crit = {:.2} kV/mm, SF_bil = {:.2} (>= 1.25), Compliant: {}",
-                    res.insulating_gas, res.radius_ratio, res.field_utilization_factor,
-                    res.max_continuous_e_field_kv_mm, res.max_impulse_e_field_kv_mm,
-                    res.effective_breakdown_field_kv_mm, res.impulse_safety_factor, res.is_iec_compliant
+                    res.insulating_gas,
+                    res.radius_ratio,
+                    res.field_utilization_factor,
+                    res.max_continuous_e_field_kv_mm,
+                    res.max_impulse_e_field_kv_mm,
+                    res.effective_breakdown_field_kv_mm,
+                    res.impulse_safety_factor,
+                    res.is_iec_compliant
                 )],
             }
         }
@@ -268,15 +286,24 @@ mod tests {
     fn test_gis_dielectric_nominal() {
         let prob = GisDielectricProblem::default();
         let res = solve_gis_dielectric(&prob).expect("solver failed");
-        println!("GIS Dielectric: R/r = {:.2}, eta = {:.3}, E_cont = {:.2} kV/mm, E_bil = {:.2} kV/mm, E_crit = {:.2} kV/mm, SF_bil = {:.2}",
-            res.radius_ratio, res.field_utilization_factor, res.max_continuous_e_field_kv_mm,
-            res.max_impulse_e_field_kv_mm, res.effective_breakdown_field_kv_mm, res.impulse_safety_factor);
+        println!(
+            "GIS Dielectric: R/r = {:.2}, eta = {:.3}, E_cont = {:.2} kV/mm, E_bil = {:.2} kV/mm, E_crit = {:.2} kV/mm, SF_bil = {:.2}",
+            res.radius_ratio,
+            res.field_utilization_factor,
+            res.max_continuous_e_field_kv_mm,
+            res.max_impulse_e_field_kv_mm,
+            res.effective_breakdown_field_kv_mm,
+            res.impulse_safety_factor
+        );
 
         assert!(res.radius_ratio == 2.75);
         assert!(res.field_utilization_factor > 0.55 && res.field_utilization_factor < 0.62);
         assert!(res.max_continuous_e_field_kv_mm > 5.0 && res.max_continuous_e_field_kv_mm < 6.0);
         assert!(res.max_impulse_e_field_kv_mm > 22.0 && res.max_impulse_e_field_kv_mm < 25.0);
-        assert!(res.effective_breakdown_field_kv_mm > 30.0 && res.effective_breakdown_field_kv_mm < 40.0);
+        assert!(
+            res.effective_breakdown_field_kv_mm > 30.0
+                && res.effective_breakdown_field_kv_mm < 40.0
+        );
         assert!(res.continuous_safety_factor > 5.0);
         assert!(res.impulse_safety_factor >= 1.25);
         assert!(res.is_iec_compliant);

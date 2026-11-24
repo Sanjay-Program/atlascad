@@ -184,9 +184,11 @@ pub fn solve_mining_excavator(
     // 8. Overturning moment and stability factor:
     // Dynamic digging load acting downward and laterally at boom tip:
     let g = 9.80665;
-    let wheel_effective_weight_kn = (problem.bucket_nominal_volume_m3 * 1.65 * g * (problem.bucket_count as f64) * 0.45)
-        + 180.0; // structural wheel mass ~ 180 kN
-    let m_digging_kn_m = (wheel_effective_weight_kn + f_tangential_kn * 0.5) * problem.boom_length_m;
+    let wheel_effective_weight_kn =
+        (problem.bucket_nominal_volume_m3 * 1.65 * g * (problem.bucket_count as f64) * 0.45)
+            + 180.0; // structural wheel mass ~ 180 kN
+    let m_digging_kn_m =
+        (wheel_effective_weight_kn + f_tangential_kn * 0.5) * problem.boom_length_m;
     let m_lateral_kn_m = f_lateral_kn * problem.boom_length_m * 0.35;
     let total_overturning_moment_kn_m = m_digging_kn_m + m_lateral_kn_m;
 
@@ -222,12 +224,21 @@ mod tests {
         let prob = MiningExcavatorProblem::default();
         let res = solve_mining_excavator(&prob)?;
 
-        assert!(res.theoretical_capacity_m3_per_h > 7000.0 && res.theoretical_capacity_m3_per_h < 8500.0);
-        assert!(res.circumferential_cutting_speed_m_s > 2.50 && res.circumferential_cutting_speed_m_s < 3.80);
+        assert!(
+            res.theoretical_capacity_m3_per_h > 7000.0
+                && res.theoretical_capacity_m3_per_h < 8500.0
+        );
+        assert!(
+            res.circumferential_cutting_speed_m_s > 2.50
+                && res.circumferential_cutting_speed_m_s < 3.80
+        );
         assert!(res.tangential_digging_force_kn > 200.0 && res.tangential_digging_force_kn < 350.0);
         assert!(res.wheel_drive_torque_kn_m > 1200.0 && res.wheel_drive_torque_kn_m < 2200.0);
         assert!(res.required_drive_power_kw > 700.0 && res.required_drive_power_kw < 1500.0);
-        assert!(res.specific_excavation_energy_mj_per_m3 > 0.25 && res.specific_excavation_energy_mj_per_m3 < 0.85);
+        assert!(
+            res.specific_excavation_energy_mj_per_m3 > 0.25
+                && res.specific_excavation_energy_mj_per_m3 < 0.85
+        );
         assert!(res.stability_safety_factor >= 1.30);
         assert!(res.is_cutting_speed_acceptable);
         assert!(res.is_drive_power_feasible);

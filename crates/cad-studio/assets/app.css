@@ -168,6 +168,80 @@ body.sidebar-expanded {
   --atlas-sidebar-width: var(--atlas-sidebar-expanded-width);
 }
 
+/* Ergonomic Layout Density Tokens */
+html[data-density="comfortable"] body {
+  font-size: 14px;
+  --topbar: 52px;
+  --statusbar: 32px;
+}
+html[data-density="comfortable"] .button,
+html[data-density="comfortable"] .input,
+html[data-density="comfortable"] .select {
+  padding: 6px 12px;
+  font-size: 13.5px;
+}
+
+html[data-density="compact"] body {
+  font-size: 12.5px;
+  --topbar: 46px;
+  --statusbar: 28px;
+}
+
+html[data-density="expert"] body {
+  font-size: 11.5px;
+  --topbar: 40px;
+  --statusbar: 24px;
+}
+html[data-density="expert"] .button,
+html[data-density="expert"] .input,
+html[data-density="expert"] .select {
+  padding: 3px 6px;
+  font-size: 11px;
+}
+
+/* Tabular Numerals for Engineering Precision */
+.tabular-nums,
+.fsim-stat-box .val,
+.tape-value,
+.tape-sub,
+.hud-coord-val,
+.cae-legend-val,
+.cae-model-probe,
+.status-bar,
+.inspector-prop-val {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Reduced Motion Respect */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* CAE 3D Model Probe Indicator Dots */
+.cae-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.cae-dot-max {
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+}
+.cae-dot-min {
+  background: #3b82f6;
+  box-shadow: 0 0 6px #3b82f6;
+}
+
 .app-workspace-container {
   display: grid;
   grid-template-rows: var(--topbar) auto minmax(0, 1fr) auto var(--statusbar);
@@ -2543,6 +2617,390 @@ kbd {
 .vc-back   { transform: rotateY(180deg) translateZ(22px); }
 .vc-left   { transform: rotateY(-90deg) translateZ(22px); }
 .vc-right  { transform: rotateY(90deg) translateZ(22px); }
+
+/* ViewCube Compass Spin Buttons & Labels */
+.compass-spin-btn {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: auto;
+  z-index: 12;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+.compass-spin-btn:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.compass-spin-ccw { top: 0px; left: 8px; }
+.compass-spin-cw { top: 0px; right: 8px; }
+.compass-label { pointer-events: auto; cursor: pointer; transition: color 0.15s ease; }
+.compass-label:hover { color: var(--accent); }
+
+/* ViewCube 8 Isometric Corners (Top-Front-Left, Top-Front-Right, etc.) */
+.vc-corner {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: rgba(144, 202, 249, 0.22);
+  border: 1px solid rgba(144, 202, 249, 0.4);
+  z-index: 2;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.vc-corner:hover {
+  background: rgba(255, 179, 0, 0.85);
+  border-color: #ffd54f;
+  box-shadow: 0 0 8px rgba(255, 179, 0, 0.8);
+}
+.vc-corner-tfl { transform: translate3d(-2px, -2px, 22px); }
+.vc-corner-tfr { transform: translate3d(32px, -2px, 22px); }
+.vc-corner-tbl { transform: translate3d(-2px, -2px, -22px); }
+.vc-corner-tbr { transform: translate3d(32px, -2px, -22px); }
+.vc-corner-bfl { transform: translate3d(-2px, 32px, 22px); }
+.vc-corner-bfr { transform: translate3d(32px, 32px, 22px); }
+.vc-corner-bbl { transform: translate3d(-2px, 32px, -22px); }
+.vc-corner-bbr { transform: translate3d(32px, 32px, -22px); }
+
+/* ViewCube 12 Edges */
+.vc-edge {
+  position: absolute;
+  background: rgba(144, 202, 249, 0.15);
+  z-index: 1;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.vc-edge:hover {
+  background: rgba(33, 150, 243, 0.7);
+}
+.vc-edge-tf { width: 30px; height: 10px; transform: translate3d(7px, -5px, 22px); }
+.vc-edge-tb { width: 30px; height: 10px; transform: translate3d(7px, -5px, -22px); }
+.vc-edge-tl { width: 10px; height: 30px; transform: translate3d(-5px, 7px, -22px) rotateY(90deg); }
+.vc-edge-tr { width: 10px; height: 30px; transform: translate3d(39px, 7px, -22px) rotateY(90deg); }
+.vc-edge-bf { width: 30px; height: 10px; transform: translate3d(7px, 39px, 22px); }
+.vc-edge-bb { width: 30px; height: 10px; transform: translate3d(7px, 39px, -22px); }
+.vc-edge-bl { width: 10px; height: 30px; transform: translate3d(-5px, 7px, 22px) rotateY(90deg); }
+.vc-edge-br { width: 10px; height: 30px; transform: translate3d(39px, 7px, 22px) rotateY(90deg); }
+.vc-edge-fl { width: 10px; height: 30px; transform: translate3d(-5px, 7px, 22px); }
+.vc-edge-fr { width: 10px; height: 30px; transform: translate3d(39px, 7px, 22px); }
+.vc-edge-bl-vert { width: 10px; height: 30px; transform: translate3d(-5px, 7px, -22px); }
+.vc-edge-br-vert { width: 10px; height: 30px; transform: translate3d(39px, 7px, -22px); }
+
+/* =====================================================================
+   WORLD-CLASS CAE SIMULATION POST-PROCESSOR FLOATING HUD & COLORBAR
+   ===================================================================== */
+.cae-legend-overlay {
+  position: absolute;
+  top: 48px;
+  right: 120px;
+  z-index: 15;
+  pointer-events: auto;
+  user-select: none;
+  font-family: var(--font-sans, system-ui, sans-serif);
+}
+
+.cae-legend-card {
+  background: rgba(18, 25, 38, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(144, 202, 249, 0.3);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  padding: 12px 14px;
+  width: 220px;
+  color: var(--text, #e2e8f0);
+}
+
+.cae-legend-head {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.cae-legend-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.cae-legend-icon {
+  color: #38bdf8;
+  display: flex;
+  align-items: center;
+}
+
+.cae-legend-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #f8fafc;
+  flex: 1;
+}
+
+.cae-legend-close {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: all 0.15s ease;
+}
+.cae-legend-close:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.cae-legend-unit {
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-left: 20px;
+}
+
+.cae-spectrum-container {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.cae-spectrum-bar {
+  width: 22px;
+  height: 140px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Scientific Palettes */
+.cae-spectrum-bar[data-palette="jet"] {
+  background: linear-gradient(to bottom, #ff0000 0%, #ffff00 25%, #00ff00 50%, #00ffff 75%, #0000ff 100%);
+}
+.cae-spectrum-bar[data-palette="turbo"] {
+  background: linear-gradient(to bottom, #7a0403 0%, #f74309 20%, #e29d0b 40%, #7cf032 60%, #20b5f1 80%, #3042b3 100%);
+}
+.cae-spectrum-bar[data-palette="viridis"] {
+  background: linear-gradient(to bottom, #fde725 0%, #5ec962 30%, #21918c 60%, #3b528b 85%, #440154 100%);
+}
+.cae-spectrum-bar[data-palette="inferno"] {
+  background: linear-gradient(to bottom, #fcffa4 0%, #fca50a 25%, #dd513a 50%, #932667 75%, #000004 100%);
+}
+.cae-spectrum-bar[data-palette="coolwarm"] {
+  background: linear-gradient(to bottom, #b40426 0%, #e68673 30%, #ffffff 50%, #7ba1e3 70%, #3b4cc0 100%);
+}
+
+.cae-spectrum-ticks {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-family: monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.cae-metric-pills {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.cae-metric-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.pill-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.max-dot { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+.min-dot { background: #3b82f6; box-shadow: 0 0 6px #3b82f6; }
+.probe-dot { background: #10b981; box-shadow: 0 0 6px #10b981; }
+
+.pill-lbl {
+  font-weight: 700;
+  color: #94a3b8;
+  font-size: 10px;
+}
+.pill-val {
+  font-family: monospace;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.cae-controls-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 8px;
+}
+
+.cae-ctrl-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cae-ctrl-label-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.cae-ctrl-val {
+  font-family: monospace;
+  font-weight: 600;
+  color: #38bdf8;
+}
+
+.cae-select {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(144, 202, 249, 0.3);
+  border-radius: 4px;
+  color: #f8fafc;
+  font-size: 11px;
+  padding: 3px 6px;
+  outline: none;
+}
+.cae-select:focus {
+  border-color: #38bdf8;
+}
+
+.cae-slider {
+  width: 100%;
+  accent-color: #38bdf8;
+  height: 4px;
+  cursor: pointer;
+}
+
+.cae-modal-btn-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.cae-section-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.cae-segmented {
+  display: flex;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.cae-segmented .seg-btn {
+  flex: 1;
+  background: rgba(15, 23, 42, 0.7);
+  border: none;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.cae-segmented .seg-btn.active {
+  background: #38bdf8;
+  color: #0f172a;
+}
+
+/* 3D Model Pinned Callout Probes */
+.cae-model-probe {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  z-index: 14;
+  transform: translate(-50%, -100%);
+  transition: opacity 0.15s ease;
+}
+
+.probe-pin-stem {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 8px;
+  background: #f8fafc;
+}
+
+.probe-badge-content {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.cae-probe-max .probe-badge-content {
+  background: rgba(220, 38, 38, 0.9);
+  border: 1px solid #ef4444;
+}
+.cae-probe-min .probe-badge-content {
+  background: rgba(37, 99, 235, 0.9);
+  border: 1px solid #3b82f6;
+}
+
+/* Dynamic Input HUD polar coordinate row */
+.dyn-coord-row {
+  display: flex;
+  align-items: center;
+}
+.dyn-polar-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+.dyn-polar-val {
+  font-family: monospace;
+  font-size: 10.5px;
+  color: #38bdf8;
+  font-weight: 600;
+}
+.dyn-snap-badge {
+  display: inline-block;
+  background: #10b981;
+  color: #ffffff;
+  font-size: 8.5px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 2px;
+  margin-right: 4px;
+  letter-spacing: 0.05em;
+}
 
 /* =====================================================================
    WORKSPACE MODE SEPARATION (Model Space vs Paper Space Layouts)

@@ -116,7 +116,9 @@ pub fn solve_nuclear_fuel_pin(
         return Err("Linear heat rate must be between 1.0 and 80.0 kW/m".to_string());
     }
     if problem.pellet_radius_mm <= 1.0 || problem.clad_thickness_mm <= 0.10 {
-        return Err("Pellet radius and cladding thickness must be physically realistic".to_string());
+        return Err(
+            "Pellet radius and cladding thickness must be physically realistic".to_string(),
+        );
     }
     if problem.coolant_pressure_mpa <= 1.0 || problem.coolant_pressure_mpa >= 22.0 {
         return Err("Coolant pressure must be between 1.0 and 22.0 MPa".to_string());
@@ -168,7 +170,8 @@ pub fn solve_nuclear_fuel_pin(
     // k_clad ~ 16.5 W/(m.K)
     // Delta_T_clad = (q' * ln(r_co / r_ci)) / (2 * pi * k_clad)
     let k_clad = 16.5;
-    let delta_t_clad = (q_prime_w_m * (r_co_m / r_ci_m).ln()) / (2.0 * std::f64::consts::PI * k_clad);
+    let delta_t_clad =
+        (q_prime_w_m * (r_co_m / r_ci_m).ln()) / (2.0 * std::f64::consts::PI * k_clad);
     let t_clad_inner_c = t_clad_outer_c + delta_t_clad;
 
     // Gap conductance h_gap:
@@ -198,7 +201,8 @@ pub fn solve_nuclear_fuel_pin(
     // q''_CHF = (2.022 - 0.0004302 * P_psia) + (0.1722 - 0.0000984 * P_psia) * exp[(18.177 - 0.004129 * P_psia) * x] ...
     // Engineering closed-form equivalent for PWR typical regime (15.5 MPa, subcooled):
     // q''_CHF ~ (3.80 - 0.0065 * (T_bulk - 280.0) + 0.00035 * (problem.coolant_mass_flux_kg_m2_s - 3000.0))
-    let chf_base_mw_m2 = 3.65 - 0.0072 * (t_bulk_c - 290.0) + 0.00028 * (problem.coolant_mass_flux_kg_m2_s - 3000.0);
+    let chf_base_mw_m2 =
+        3.65 - 0.0072 * (t_bulk_c - 290.0) + 0.00028 * (problem.coolant_mass_flux_kg_m2_s - 3000.0);
     let q_chf_mw_m2 = chf_base_mw_m2.clamp(1.80, 5.50);
 
     let dnbr = q_chf_mw_m2 / q_double_prime_mw_m2;

@@ -82,15 +82,15 @@ impl Default for MaglevSuspensionProblem {
             problem_id: "transrapid_ems_levitation_module".to_string(),
             core_material: MaglevCoreMaterial::SiliconSteelFeSi,
             disturbance_type: GuidewayDisturbanceType::ExpansionJointStep,
-            mass_supported_per_magnet_kg: 1250.0,    // 1.25 tonnes per levitation module
-            nominal_airgap_mm: 12.0,                 // 12.0 mm Transrapid standard airgap
-            coil_turns: 320,                         // 320 turns
-            pole_face_area_mm2: 58000.0,             // 58,000 mm² pole area (0.058 m²)
-            coil_resistance_ohms: 0.38,              // 0.38 Ohms coil resistance
-            max_inverter_voltage_v: 350.0,           // 350 V DC chopper rail
-            max_continuous_current_a: 85.0,          // 85 A peak continuous current
+            mass_supported_per_magnet_kg: 1250.0, // 1.25 tonnes per levitation module
+            nominal_airgap_mm: 12.0,              // 12.0 mm Transrapid standard airgap
+            coil_turns: 320,                      // 320 turns
+            pole_face_area_mm2: 58000.0,          // 58,000 mm² pole area (0.058 m²)
+            coil_resistance_ohms: 0.38,           // 0.38 Ohms coil resistance
+            max_inverter_voltage_v: 350.0,        // 350 V DC chopper rail
+            max_continuous_current_a: 85.0,       // 85 A peak continuous current
             target_controller_bandwidth_rad_s: 65.0, // 65 rad/s bandwidth (~10.3 Hz)
-            disturbance_amplitude_mm: 2.50,          // 2.5 mm joint step irregularity
+            disturbance_amplitude_mm: 2.50,       // 2.5 mm joint step irregularity
         }
     }
 }
@@ -201,15 +201,28 @@ pub fn solve_maglev_guideway_suspension(
     // Electromagnet electrical equation: V = R*i + L_0*di/dt + k_i*(dz/dt)
     // Gains:
     let r_coil = problem.coil_resistance_ohms;
+    // Substituting u = -k_p z - k_d dz/dt - k_i_gain i into the linearized plant
+    //       m z'' = k_i i - k_z z + f,
+    //       L di/dt = u - R i - k_i z',
+    // gives the characteristic polynomial
+    //   s^3 + (R + k_i_gain)/L s^2
+    //       + [k_z/m + k_i(k_i + k_d)/(m L)] s
+    //       + [k_z(R + k_i_gain)/(m L) + k_i k_p/(m L)].
+    // Matching it term-by-term to (s + omega_c)^3 yields the gains below.
+    // The earlier formulas omitted the -k_i and -3 k_z L omega_c terms, so the
+    // closed-loop poles were not at -omega_c even though the doc claimed they were.
     let k_i_gain = (l_0_h * a1_des) - r_coil;
-    let k_d_gain = (m_car * l_0_h * a2_des - k_z_n_per_m * l_0_h) / k_i_n_per_a;
-    let k_p_gain = (m_car * l_0_h * a3_des) / k_i_n_per_a;
+    let k_d_gain = ((m_car * l_0_h * a2_des - k_z_n_per_m * l_0_h) / k_i_n_per_a) - k_i_n_per_a;
+    let k_p_gain = ((m_car * l_0_h * a3_des) - (3.0 * k_z_n_per_m * l_0_h * omega_c)) / k_i_n_per_a;
 
     // 5. Dynamic response to track disturbance:
-    // Closed-loop sensitivity to track step disturbance:
+    // A guideway step is a base-motion input: at t = 0+ the airgap changes by the
+    // full step amplitude before the controller can measure it. The peak
+    // transient error is therefore the step itself; the controller only sets how
+    // fast that error is rejected. An earlier (omega_unstable/omega_c)^2 clamp had
+    // no physical basis and under-reported the required airgap.
     let delta_z_dist_m = problem.disturbance_amplitude_mm * 0.001;
-    // Dynamic peak airgap error attenuation factor ~ (omega_unstable / omega_c)^2
-    let peak_error_factor = (omega_unstable / omega_c).powi(2).clamp(0.15, 0.65);
+    let peak_error_factor = 1.0;
     let peak_dynamic_error_m = delta_z_dist_m * peak_error_factor;
     let peak_dynamic_error_mm = peak_dynamic_error_m * 1000.0;
     let min_airgap_mm = problem.nominal_airgap_mm - peak_dynamic_error_mm;
@@ -261,7 +274,9 @@ mod tests {
         assert!(res.equilibrium_current_a > 30.0 && res.equilibrium_current_a < 60.0); // ~43.7 A
         assert!(res.equilibrium_flux_density_t > 0.40 && res.equilibrium_flux_density_t < 0.85); // ~0.515 T
         assert!(res.nominal_inductance_mh > 200.0 && res.nominal_inductance_mh < 450.0); // ~311.0 mH
-        assert!(res.open_loop_unstable_pole_rad_s > 30.0 && res.open_loop_unstable_pole_rad_s < 55.0); // ~40.4 rad/s
+        assert!(
+            res.open_loop_unstable_pole_rad_s > 30.0 && res.open_loop_unstable_pole_rad_s < 55.0
+        ); // ~40.4 rad/s
         assert!(res.min_transient_airgap_mm > 5.0 && res.min_transient_airgap_mm < 12.0);
         assert!(res.steady_state_coil_power_kw > 0.20 && res.steady_state_coil_power_kw < 1.0); // ~0.36 kW
         assert!(res.is_core_saturation_prevented);

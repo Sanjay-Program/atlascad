@@ -102,7 +102,7 @@ impl Default for GasCompressionProblem {
         Self {
             problem_id: "industrial_multistage_air_compressor".to_string(),
             gas: ProcessGas::Air,
-            mass_flow_kg_s: 4.5, // ~16,200 kg/hr
+            mass_flow_kg_s: 4.5,       // ~16,200 kg/hr
             suction_pressure_bar: 1.0, // Ambient suction
             suction_temp_c: 20.0,
             target_discharge_pressure_bar: 30.0, // 30 bar discharge
@@ -183,7 +183,11 @@ pub fn solve_gas_compression(prob: &GasCompressionProblem) -> GasCompressionResu
 
         // Specific stage polytropic work:
         // w_stage = (n / (n - 1)) * Z * R * T_suc * [ (r_p)^((n-1)/n) - 1 ] in J/kg
-        let w_stage_j_kg = (1.0 / poly_ratio) * prob.compressibility_factor_z * r_gas * t_suc_k * (rp_stage.powf(poly_ratio) - 1.0);
+        let w_stage_j_kg = (1.0 / poly_ratio)
+            * prob.compressibility_factor_z
+            * r_gas
+            * t_suc_k
+            * (rp_stage.powf(poly_ratio) - 1.0);
         let power_kw = (prob.mass_flow_kg_s * w_stage_j_kg / 1000.0) / eta_m;
         total_power_kw += power_kw;
 
@@ -208,10 +212,15 @@ pub fn solve_gas_compression(prob: &GasCompressionProblem) -> GasCompressionResu
 
     // Equivalent single-stage uncooled adiabatic compression:
     let isentropic_ratio = (k - 1.0) / k;
-    let single_stage_w_j_kg = (k / (k - 1.0)) * prob.compressibility_factor_z * r_gas * t_in_k * (overall_rp.powf(isentropic_ratio) - 1.0);
+    let single_stage_w_j_kg = (k / (k - 1.0))
+        * prob.compressibility_factor_z
+        * r_gas
+        * t_in_k
+        * (overall_rp.powf(isentropic_ratio) - 1.0);
     let single_stage_power = (prob.mass_flow_kg_s * single_stage_w_j_kg / 1000.0) / (eta_p * eta_m);
 
-    let energy_savings = ((single_stage_power - total_power_kw) / single_stage_power).max(0.0) * 100.0;
+    let energy_savings =
+        ((single_stage_power - total_power_kw) / single_stage_power).max(0.0) * 100.0;
 
     GasCompressionResult {
         problem_id: prob.problem_id.clone(),
@@ -232,9 +241,15 @@ pub fn solve_gas_compression_sim(prob: &GasCompressionProblem) -> SimulationResu
     let sol = solve_gas_compression(prob);
     let mut metrics = std::collections::HashMap::new();
     metrics.insert("total_brake_power_kw".to_string(), sol.total_brake_power_kw);
-    metrics.insert("total_intercooler_duty_kw".to_string(), sol.total_intercooler_duty_kw);
+    metrics.insert(
+        "total_intercooler_duty_kw".to_string(),
+        sol.total_intercooler_duty_kw,
+    );
     metrics.insert("energy_savings_pct".to_string(), sol.energy_savings_pct);
-    metrics.insert("stage_discharge_temp_c".to_string(), sol.stage_discharge_temp_c);
+    metrics.insert(
+        "stage_discharge_temp_c".to_string(),
+        sol.stage_discharge_temp_c,
+    );
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.total_brake_power_kw, 1, 1e-4);
@@ -254,7 +269,13 @@ pub fn solve_gas_compression_sim(prob: &GasCompressionProblem) -> SimulationResu
         convergence: conv,
         validation: Some(comparison),
         provenance: SimulationProvenance::new("atlas.thermal.gas_compression", "0.1.0"),
-        logs: vec![format!("Overall ratio: {:.1}:1, 3-Stage Power: {:.1} kW (vs {:.1} kW single stage, Savings: {:.1}%)", sol.overall_pressure_ratio, sol.total_brake_power_kw, sol.single_stage_uncooled_power_kw, sol.energy_savings_pct)],
+        logs: vec![format!(
+            "Overall ratio: {:.1}:1, 3-Stage Power: {:.1} kW (vs {:.1} kW single stage, Savings: {:.1}%)",
+            sol.overall_pressure_ratio,
+            sol.total_brake_power_kw,
+            sol.single_stage_uncooled_power_kw,
+            sol.energy_savings_pct
+        )],
     }
 }
 

@@ -134,7 +134,10 @@ pub fn solve_lefm_and_paris_growth(prob: &FractureProblem) -> Result<FractureRes
     let w_mm = prob.plate_width_w_mm;
 
     if s_max <= 0.0 || a0_mm <= 0.05 || w_mm <= a0_mm {
-        return Err("Max stress, initial crack depth (>0.05mm), and plate width (>a0) must be positive.".to_string());
+        return Err(
+            "Max stress, initial crack depth (>0.05mm), and plate width (>a0) must be positive."
+                .to_string(),
+        );
     }
 
     let delta_sigma = (s_max - s_min).max(1.0);
@@ -151,7 +154,8 @@ pub fn solve_lefm_and_paris_growth(prob: &FractureProblem) -> Result<FractureRes
     let y0 = match prob.crack_type {
         CrackConfiguration::EdgeCrackInTension => {
             // Y(alpha) = 1.12 - 0.231*alpha + 10.55*alpha^2 - 21.72*alpha^3 + 30.39*alpha^4
-            1.12 - 0.231 * alpha0 + 10.55 * alpha0.powi(2) - 21.72 * alpha0.powi(3) + 30.39 * alpha0.powi(4)
+            1.12 - 0.231 * alpha0 + 10.55 * alpha0.powi(2) - 21.72 * alpha0.powi(3)
+                + 30.39 * alpha0.powi(4)
         }
         CrackConfiguration::CenterCrackInTension => {
             // Y(alpha) = sqrt(sec(pi * alpha / 2))
@@ -201,12 +205,30 @@ pub fn solve_lefm_and_paris_growth(prob: &FractureProblem) -> Result<FractureRes
     };
 
     let notes = vec![
-        format!("Fracture Mechanics: '{}' (Material = {:?}, K_IC = {:.1} MPa·m^0.5)", prob.component_name, prob.material, kic),
-        format!("Loading: σ_max = {:.1} MPa, σ_min = {:.1} MPa (Δσ = {:.1} MPa, R = {:.2})", s_max, s_min, delta_sigma, s_min / s_max),
-        format!("Initial Flaw: a0 = {:.2} mm (Y = {:.3}) -> Initial K_I = {:.2} MPa·m^0.5 (Toughness Margin = {:.2}x)", a0_mm, y0, k1_initial, kic_margin),
-        format!("Fatigue Threshold: ΔK_initial = {:.2} MPa·m^0.5 vs ΔK_th = {:.2} MPa·m^0.5 (Active Propagation: {})", delta_k_initial, dk_th, is_propagating),
+        format!(
+            "Fracture Mechanics: '{}' (Material = {:?}, K_IC = {:.1} MPa·m^0.5)",
+            prob.component_name, prob.material, kic
+        ),
+        format!(
+            "Loading: σ_max = {:.1} MPa, σ_min = {:.1} MPa (Δσ = {:.1} MPa, R = {:.2})",
+            s_max,
+            s_min,
+            delta_sigma,
+            s_min / s_max
+        ),
+        format!(
+            "Initial Flaw: a0 = {:.2} mm (Y = {:.3}) -> Initial K_I = {:.2} MPa·m^0.5 (Toughness Margin = {:.2}x)",
+            a0_mm, y0, k1_initial, kic_margin
+        ),
+        format!(
+            "Fatigue Threshold: ΔK_initial = {:.2} MPa·m^0.5 vs ΔK_th = {:.2} MPa·m^0.5 (Active Propagation: {})",
+            delta_k_initial, dk_th, is_propagating
+        ),
         format!("Critical Crack: Fast Fracture a_c = {:.2} mm", ac_mm),
-        format!("Paris Crack Life: N_f = {:.0} cycles -> Mandated Inspection Interval = {:.0} cycles (Safety 2.0x)", nf_cycles, inspect_cycles),
+        format!(
+            "Paris Crack Life: N_f = {:.0} cycles -> Mandated Inspection Interval = {:.0} cycles (Safety 2.0x)",
+            nf_cycles, inspect_cycles
+        ),
     ];
 
     Ok(FractureResult {
@@ -232,11 +254,26 @@ pub fn solve_fracture_sim(prob: &FractureProblem) -> Result<SimulationResult, St
     let sol = solve_lefm_and_paris_growth(prob)?;
 
     let mut metrics = HashMap::new();
-    metrics.insert("initial_stress_intensity_k1_mpa_m05".to_string(), sol.initial_stress_intensity_k1_mpa_m05);
-    metrics.insert("delta_k1_initial_mpa_m05".to_string(), sol.delta_k1_initial_mpa_m05);
-    metrics.insert("critical_crack_length_ac_mm".to_string(), sol.critical_crack_length_ac_mm);
-    metrics.insert("fatigue_cycles_to_failure_nf".to_string(), sol.fatigue_cycles_to_failure_nf);
-    metrics.insert("recommended_inspection_interval_cycles".to_string(), sol.recommended_inspection_interval_cycles);
+    metrics.insert(
+        "initial_stress_intensity_k1_mpa_m05".to_string(),
+        sol.initial_stress_intensity_k1_mpa_m05,
+    );
+    metrics.insert(
+        "delta_k1_initial_mpa_m05".to_string(),
+        sol.delta_k1_initial_mpa_m05,
+    );
+    metrics.insert(
+        "critical_crack_length_ac_mm".to_string(),
+        sol.critical_crack_length_ac_mm,
+    );
+    metrics.insert(
+        "fatigue_cycles_to_failure_nf".to_string(),
+        sol.fatigue_cycles_to_failure_nf,
+    );
+    metrics.insert(
+        "recommended_inspection_interval_cycles".to_string(),
+        sol.recommended_inspection_interval_cycles,
+    );
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.initial_stress_intensity_k1_mpa_m05, 1, 1e-4);
@@ -244,7 +281,9 @@ pub fn solve_fracture_sim(prob: &FractureProblem) -> Result<SimulationResult, St
     let val = AnalyticalComparison::assess(
         "Initial Stress Intensity K_I (MPa*m^0.5)",
         sol.initial_stress_intensity_k1_mpa_m05,
-        sol.geometry_factor_y0 * prob.max_stress_mpa * (std::f64::consts::PI * prob.initial_crack_depth_a0_mm / 1000.0).sqrt(),
+        sol.geometry_factor_y0
+            * prob.max_stress_mpa
+            * (std::f64::consts::PI * prob.initial_crack_depth_a0_mm / 1000.0).sqrt(),
     );
 
     Ok(SimulationResult {
@@ -281,9 +320,15 @@ mod tests {
         // Critical crack size ac ~ 6.0 - 8.0 mm
         assert!(sol.critical_crack_length_ac_mm > 5.0 && sol.critical_crack_length_ac_mm < 10.0);
         // Fatigue cycles to failure ~ 2,000 to 10,000 cycles
-        assert!(sol.fatigue_cycles_to_failure_nf > 1500.0 && sol.fatigue_cycles_to_failure_nf < 15000.0);
+        assert!(
+            sol.fatigue_cycles_to_failure_nf > 1500.0 && sol.fatigue_cycles_to_failure_nf < 15000.0
+        );
         // Recommended inspection interval is half of life
-        assert!((sol.recommended_inspection_interval_cycles - sol.fatigue_cycles_to_failure_nf * 0.5).abs() < 1.0);
+        assert!(
+            (sol.recommended_inspection_interval_cycles - sol.fatigue_cycles_to_failure_nf * 0.5)
+                .abs()
+                < 1.0
+        );
 
         let sim = solve_fracture_sim(&prob)?;
         assert_eq!(sim.status, SimulationStatus::Converged);

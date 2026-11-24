@@ -5020,7 +5020,7 @@ def run_live_demo() -> None:
         })
         check(tv_res.get("understeer_gradient_deg_per_g", 0.0) > 0.0, "Understeer gradient K_us > 0 (inherently stable)")
         check(tv_res.get("target_yaw_rate_deg_s", 0.0) > 5.0, "Target yaw rate r_des > 5 deg/s")
-        check(tv_res.get("active_yaw_moment_demand_nm", 0.0) > 20.0, "Active yaw moment demand M_yaw > 20 N*m")
+        check(abs(tv_res.get("active_yaw_moment_demand_nm", 0.0)) > 20.0, "Active yaw moment demand M_yaw > 20 N*m")
         check(tv_res.get("is_torque_vectoring_viable") is True, "ISO 8855 / Pacejka EV Torque Vectoring Viable")
         print(f"  ✓ 43.2 EV Dual-Motor Torque Vectoring (ISO 8855 / Pacejka MF-Tyre): 2150 kg EV @ 90 km/h, Steering delta_f = 1.2°, K_us = {tv_res['understeer_gradient_deg_per_g']:.2f}°/g, Desired Yaw Rate r_des = {tv_res['target_yaw_rate_deg_s']:.2f}°/s, Lateral Accel a_y = {tv_res['lateral_acceleration_g']:.3f} g, Sideslip beta = {tv_res['vehicle_sideslip_angle_deg']:.2f}°, Motor Torque Split: Front = {tv_res['front_motor_torque_nm']:.1f} N·m / Rear = {tv_res['rear_motor_torque_nm']:.1f} N·m, Corrective Yaw Moment M_yaw = {tv_res['active_yaw_moment_demand_nm']:.1f} N·m (ΔT_wheel = {tv_res['lateral_differential_torque_nm']:.1f} N·m)")
 

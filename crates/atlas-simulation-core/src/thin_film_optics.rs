@@ -140,7 +140,9 @@ pub struct ThinFilmOpticsResult {
 }
 
 /// Solves thin-film multilayer reflectance and transmittance using the Transfer-Matrix Method (TMM).
-pub fn solve_thin_film_optics(problem: &ThinFilmOpticsProblem) -> Result<ThinFilmOpticsResult, String> {
+pub fn solve_thin_film_optics(
+    problem: &ThinFilmOpticsProblem,
+) -> Result<ThinFilmOpticsResult, String> {
     if problem.wavelength_nm <= 10.0 {
         return Err("Wavelength must be at least 10 nm".to_string());
     }
@@ -169,8 +171,16 @@ pub fn solve_thin_film_optics(problem: &ThinFilmOpticsProblem) -> Result<ThinFil
     // Helper closure to calculate TMM for a given polarization:
     let calc_tmm = |is_tm: bool| -> (f64, f64, f64) {
         // Effective admittances of ambient and substrate:
-        let eta_0 = if is_tm { n_0 / theta_0.cos() } else { n_0 * theta_0.cos() };
-        let eta_sub = if is_tm { n_sub / cos_theta_sub } else { n_sub * cos_theta_sub };
+        let eta_0 = if is_tm {
+            n_0 / theta_0.cos()
+        } else {
+            n_0 * theta_0.cos()
+        };
+        let eta_sub = if is_tm {
+            n_sub / cos_theta_sub
+        } else {
+            n_sub * cos_theta_sub
+        };
 
         // System 2x2 transfer matrix initialized to identity:
         // [m11, m12]
@@ -193,7 +203,11 @@ pub fn solve_thin_film_optics(problem: &ThinFilmOpticsProblem) -> Result<ThinFil
             };
 
             let eta_j = if is_tm {
-                if cos_theta_j > 1e-6 { n_j / cos_theta_j } else { n_j }
+                if cos_theta_j > 1e-6 {
+                    n_j / cos_theta_j
+                } else {
+                    n_j
+                }
             } else {
                 n_j * cos_theta_j
             };
@@ -204,7 +218,11 @@ pub fn solve_thin_film_optics(problem: &ThinFilmOpticsProblem) -> Result<ThinFil
             let sin_delta = delta_j.sin();
 
             let l11 = cos_delta;
-            let l12_im = if eta_j.abs() > 1e-9 { sin_delta / eta_j } else { 0.0 };
+            let l12_im = if eta_j.abs() > 1e-9 {
+                sin_delta / eta_j
+            } else {
+                0.0
+            };
             let l21_im = eta_j * sin_delta;
             let l22 = cos_delta;
 
@@ -240,8 +258,16 @@ pub fn solve_thin_film_optics(problem: &ThinFilmOpticsProblem) -> Result<ThinFil
         let num_mag2 = num_re * num_re + num_im * num_im;
         let den_mag2 = den_re * den_re + den_im * den_im;
 
-        let r = if den_mag2 > 1e-15 { num_mag2 / den_mag2 } else { 0.0 };
-        let t = if den_mag2 > 1e-15 { (4.0 * eta_0 * eta_sub) / den_mag2 } else { 0.0 };
+        let r = if den_mag2 > 1e-15 {
+            num_mag2 / den_mag2
+        } else {
+            0.0
+        };
+        let t = if den_mag2 > 1e-15 {
+            (4.0 * eta_0 * eta_sub) / den_mag2
+        } else {
+            0.0
+        };
         let y_eq = if (b_re.powi(2) + b_im.powi(2)) > 1e-15 {
             (c_re * b_re + c_im * b_im) / (b_re.powi(2) + b_im.powi(2))
         } else {
@@ -257,7 +283,11 @@ pub fn solve_thin_film_optics(problem: &ThinFilmOpticsProblem) -> Result<ThinFil
         OpticalPolarization::UnpolarizedAverage => {
             let (r_te, t_te, y_te) = calc_tmm(false);
             let (r_tm, t_tm, y_tm) = calc_tmm(true);
-            (0.5 * (r_te + r_tm), 0.5 * (t_te + t_tm), 0.5 * (y_te + y_tm))
+            (
+                0.5 * (r_te + r_tm),
+                0.5 * (t_te + t_tm),
+                0.5 * (y_te + y_tm),
+            )
         }
     };
 
@@ -279,8 +309,16 @@ pub fn solve_thin_film_optics(problem: &ThinFilmOpticsProblem) -> Result<ThinFil
 
     // DBR stopband bandwidth estimation:
     let dbr_bandwidth = if problem.layers.len() >= 2 {
-        let n_h = problem.layers.iter().map(|l| l.refractive_index).fold(0.0_f64, f64::max);
-        let n_l = problem.layers.iter().map(|l| l.refractive_index).fold(f64::INFINITY, f64::min);
+        let n_h = problem
+            .layers
+            .iter()
+            .map(|l| l.refractive_index)
+            .fold(0.0_f64, f64::max);
+        let n_l = problem
+            .layers
+            .iter()
+            .map(|l| l.refractive_index)
+            .fold(f64::INFINITY, f64::min);
         if n_h > n_l {
             (4.0 * lambda / std::f64::consts::PI) * ((n_h - n_l) / (n_h + n_l)).asin()
         } else {
@@ -293,7 +331,8 @@ pub fn solve_thin_film_optics(problem: &ThinFilmOpticsProblem) -> Result<ThinFil
     let is_energy_ok = (r_pct + t_pct + a_pct - 100.0).abs() < 0.10;
 
     let is_target_ok = match problem.coating_type {
-        OpticalCoatingType::SingleLayerAntiReflective | OpticalCoatingType::DualLayerAntiReflective => r_pct <= 2.50,
+        OpticalCoatingType::SingleLayerAntiReflective
+        | OpticalCoatingType::DualLayerAntiReflective => r_pct <= 2.50,
         OpticalCoatingType::DistributedBraggReflector => r_pct >= 95.0,
         OpticalCoatingType::BandpassFilter => t_pct >= 80.0 || r_pct >= 90.0,
     };
@@ -329,8 +368,14 @@ mod tests {
         let prob = ThinFilmOpticsProblem::default();
         let res = solve_thin_film_optics(&prob)?;
 
-        assert!(res.reflectance_pct > 95.0, "DBR reflectance should exceed 95%");
-        assert!(res.transmittance_pct < 5.0, "DBR transmittance should be below 5%");
+        assert!(
+            res.reflectance_pct > 95.0,
+            "DBR reflectance should exceed 95%"
+        );
+        assert!(
+            res.transmittance_pct < 5.0,
+            "DBR transmittance should be below 5%"
+        );
         assert!(res.is_energy_conserved);
         assert!(res.is_target_reflectance_achieved);
         assert!(res.dbr_stopband_bandwidth_nm > 50.0);
@@ -361,7 +406,10 @@ mod tests {
         };
 
         let res = solve_thin_film_optics(&prob)?;
-        assert!(res.reflectance_pct < 1.50, "AR coating should reduce reflectance below 1.5%");
+        assert!(
+            res.reflectance_pct < 1.50,
+            "AR coating should reduce reflectance below 1.5%"
+        );
         assert!(res.transmittance_pct > 98.50);
         assert!(res.is_target_reflectance_achieved);
         assert!(res.bare_substrate_reflectance_pct > 4.0);

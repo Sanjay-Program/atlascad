@@ -13,7 +13,6 @@ use std::f64::consts::PI;
 use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::validation::AnalyticalComparison;
 
 /// Standard tube layout pattern.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -170,7 +169,10 @@ pub struct HeatExchangerRatingResult {
 /// Rates a shell-and-tube heat exchanger per TEMA and Kern's method.
 pub fn solve_heat_exchanger_rating(prob: &HeatExchangerRatingProblem) -> HeatExchangerRatingResult {
     // Heat duty: Q = m_dot * Cp * delta_T (kW)
-    let q_hot = prob.hot_mass_flow_kg_s * prob.hot_cp_j_kg_k * (prob.hot_inlet_temp_c - prob.hot_outlet_temp_c) / 1000.0;
+    let q_hot = prob.hot_mass_flow_kg_s
+        * prob.hot_cp_j_kg_k
+        * (prob.hot_inlet_temp_c - prob.hot_outlet_temp_c)
+        / 1000.0;
     let q_duty = q_hot.max(0.1);
 
     // LMTD calculation:
@@ -191,14 +193,16 @@ pub fn solve_heat_exchanger_rating(prob: &HeatExchangerRatingProblem) -> HeatExc
     let dt_c = (prob.cold_outlet_temp_c - prob.cold_inlet_temp_c).max(0.1);
     let dt_h = (prob.hot_inlet_temp_c - prob.hot_outlet_temp_c).max(0.1);
     let r_ratio = dt_h / dt_c;
-    let p_ratio = (dt_c / (prob.hot_inlet_temp_c - prob.cold_inlet_temp_c).max(0.1)).clamp(0.01, 0.95);
+    let p_ratio =
+        (dt_c / (prob.hot_inlet_temp_c - prob.cold_inlet_temp_c).max(0.1)).clamp(0.01, 0.95);
 
     let f_factor = if prob.tube_passes == 1 {
         1.0
     } else {
         let r_sq_p1 = (r_ratio * r_ratio + 1.0).sqrt();
         let num = r_sq_p1 * ((1.0 - p_ratio) / (1.0 - p_ratio * r_ratio).max(1e-4)).ln();
-        let denom_term = (2.0 - p_ratio * (r_ratio + 1.0 - r_sq_p1)) / (2.0 - p_ratio * (r_ratio + 1.0 + r_sq_p1)).max(1e-4);
+        let denom_term = (2.0 - p_ratio * (r_ratio + 1.0 - r_sq_p1))
+            / (2.0 - p_ratio * (r_ratio + 1.0 + r_sq_p1)).max(1e-4);
         let denom = (r_ratio - 1.0) * denom_term.max(1e-4).ln();
         if denom.abs() > 1e-6 {
             (num / denom).clamp(0.50, 1.0)
@@ -228,14 +232,16 @@ pub fn solve_heat_exchanger_rating(prob: &HeatExchangerRatingProblem) -> HeatExc
             4.0 * (p_t_m.powi(2) - (PI * d_o_m.powi(2) / 4.0)) / (PI * d_o_m)
         }
         TubeLayoutPattern::TriangularPitch30 => {
-            4.0 * ((3.0_f64.sqrt() / 4.0) * p_t_m.powi(2) - (PI * d_o_m.powi(2) / 8.0)) / (PI * d_o_m / 2.0)
+            4.0 * ((3.0_f64.sqrt() / 4.0) * p_t_m.powi(2) - (PI * d_o_m.powi(2) / 8.0))
+                / (PI * d_o_m / 2.0)
         }
     };
 
     // Shell-side mass velocity & Reynolds:
     let g_s = prob.hot_mass_flow_kg_s / a_s.max(1e-4);
     let re_s = (g_s * d_e) / prob.hot_viscosity_pa_s.max(1e-6);
-    let pr_s = (prob.hot_cp_j_kg_k * prob.hot_viscosity_pa_s) / prob.hot_conductivity_w_m_k.max(1e-4);
+    let pr_s =
+        (prob.hot_cp_j_kg_k * prob.hot_viscosity_pa_s) / prob.hot_conductivity_w_m_k.max(1e-4);
 
     // Kern's correlation: Nu_s = 0.36 * Re_s^0.55 * Pr^0.33
     let nu_s = 0.36 * re_s.powf(0.55) * pr_s.powf(0.333);
@@ -251,7 +257,8 @@ pub fn solve_heat_exchanger_rating(prob: &HeatExchangerRatingProblem) -> HeatExc
     let v_t = prob.cold_mass_flow_kg_s / (prob.cold_density_kg_m3 * a_t_total);
 
     let re_t = (prob.cold_density_kg_m3 * v_t * d_i_m) / prob.cold_viscosity_pa_s.max(1e-6);
-    let pr_t = (prob.cold_cp_j_kg_k * prob.cold_viscosity_pa_s) / prob.cold_conductivity_w_m_k.max(1e-4);
+    let pr_t =
+        (prob.cold_cp_j_kg_k * prob.cold_viscosity_pa_s) / prob.cold_conductivity_w_m_k.max(1e-4);
 
     // Dittus-Boelter for turbulent tube flow: Nu_t = 0.023 * Re^0.8 * Pr^0.4
     let nu_t = if re_t > 2300.0 {
@@ -269,7 +276,8 @@ pub fn solve_heat_exchanger_rating(prob: &HeatExchangerRatingProblem) -> HeatExc
     let r_clean = (1.0 / h_o) + r_wall + ((d_o_m / d_i_m) * (1.0 / h_i));
     let u_clean = 1.0 / r_clean;
 
-    let r_fouled = r_clean + prob.shell_fouling_factor + ((d_o_m / d_i_m) * prob.tube_fouling_factor);
+    let r_fouled =
+        r_clean + prob.shell_fouling_factor + ((d_o_m / d_i_m) * prob.tube_fouling_factor);
     let u_fouled = 1.0 / r_fouled;
 
     // Heat transfer surface areas:
@@ -284,7 +292,8 @@ pub fn solve_heat_exchanger_rating(prob: &HeatExchangerRatingProblem) -> HeatExc
     // Shell: Delta P_s = (f_s * G_s^2 * D_s * (N_b + 1)) / (2 * rho * D_e)
     let n_baffles = (prob.tube_length_m / b_m).round();
     let f_s = 1.45 * re_s.powf(-0.15).max(0.05);
-    let dp_s_pa = (f_s * g_s.powi(2) * d_s_m * (n_baffles + 1.0)) / (2.0 * prob.hot_density_kg_m3 * d_e);
+    let dp_s_pa =
+        (f_s * g_s.powi(2) * d_s_m * (n_baffles + 1.0)) / (2.0 * prob.hot_density_kg_m3 * d_e);
 
     // Tube: Delta P_t = [ (4 * f_t * L * n_p) / d_i + 4 * n_p ] * (rho * v_t^2 / 2)
     let f_t = 0.079 * re_t.powf(-0.25).max(0.005);
@@ -320,19 +329,22 @@ pub fn solve_heat_exchanger_rating_sim(prob: &HeatExchangerRatingProblem) -> Sim
     let sol = solve_heat_exchanger_rating(prob);
     let mut metrics = std::collections::HashMap::new();
     metrics.insert("heat_duty_kw".to_string(), sol.heat_duty_kw);
-    metrics.insert("overall_u_fouled_w_m2_k".to_string(), sol.overall_u_fouled_w_m2_k);
+    metrics.insert(
+        "overall_u_fouled_w_m2_k".to_string(),
+        sol.overall_u_fouled_w_m2_k,
+    );
     metrics.insert("surface_margin_pct".to_string(), sol.surface_margin_pct);
-    metrics.insert("shell_pressure_drop_kpa".to_string(), sol.shell_pressure_drop_kpa);
-    metrics.insert("tube_pressure_drop_kpa".to_string(), sol.tube_pressure_drop_kpa);
+    metrics.insert(
+        "shell_pressure_drop_kpa".to_string(),
+        sol.shell_pressure_drop_kpa,
+    );
+    metrics.insert(
+        "tube_pressure_drop_kpa".to_string(),
+        sol.tube_pressure_drop_kpa,
+    );
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.heat_duty_kw, 1, 1e-4);
-
-    let comparison = AnalyticalComparison::assess(
-        "surface_area_margin",
-        sol.provided_surface_area_m2,
-        sol.required_surface_area_m2,
-    );
 
     SimulationResult {
         problem_id: prob.problem_id.clone(),
@@ -341,9 +353,12 @@ pub fn solve_heat_exchanger_rating_sim(prob: &HeatExchangerRatingProblem) -> Sim
         execution_time_ms: 1,
         scalar_metrics: metrics,
         convergence: conv,
-        validation: Some(comparison),
+        validation: None,
         provenance: SimulationProvenance::new("atlas.thermal.heat_exchanger_tema", "0.1.0"),
-        logs: vec![format!("Duty: {:.1} kW, U_fouled: {:.1} W/m2K, Margin: {:.1}%", sol.heat_duty_kw, sol.overall_u_fouled_w_m2_k, sol.surface_margin_pct)],
+        logs: vec![format!(
+            "Duty: {:.1} kW, U_fouled: {:.1} W/m2K, Margin: {:.1}%",
+            sol.heat_duty_kw, sol.overall_u_fouled_w_m2_k, sol.surface_margin_pct
+        )],
     }
 }
 

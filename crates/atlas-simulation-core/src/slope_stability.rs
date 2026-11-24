@@ -97,7 +97,9 @@ pub struct SlopeStabilityResult {
 }
 
 /// Solves slope stability using Bishop's Simplified Method of Slices.
-pub fn solve_slope_stability(problem: &SlopeStabilityProblem) -> Result<SlopeStabilityResult, String> {
+pub fn solve_slope_stability(
+    problem: &SlopeStabilityProblem,
+) -> Result<SlopeStabilityResult, String> {
     if problem.slope_height_m <= 0.0 {
         return Err("Slope height must be positive".to_string());
     }
@@ -156,7 +158,9 @@ pub fn solve_slope_stability(problem: &SlopeStabilityProblem) -> Result<SlopeSta
     }
 
     if !found_exit || x_entry <= x_exit {
-        return Err("Trial circle does not intersect slope profile to form a valid slip mass".to_string());
+        return Err(
+            "Trial circle does not intersect slope profile to form a valid slip mass".to_string(),
+        );
     }
 
     struct SliceData {
@@ -278,7 +282,11 @@ pub fn solve_slope_stability(problem: &SlopeStabilityProblem) -> Result<SlopeSta
         slices.len(),
         total_sliding_weight,
         seismic_moment,
-        if is_stable { "PASS STABLE" } else { "UNSTABLE / REINFORCEMENT REQUIRED" }
+        if is_stable {
+            "PASS STABLE"
+        } else {
+            "UNSTABLE / REINFORCEMENT REQUIRED"
+        }
     );
 
     Ok(SlopeStabilityResult {
@@ -303,13 +311,30 @@ pub fn solve_slope_stability_sim(problem: &SlopeStabilityProblem) -> SimulationR
     match solve_slope_stability(problem) {
         Ok(result) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("factor_of_safety_bishop".to_string(), result.factor_of_safety_bishop);
-            metrics.insert("factor_of_safety_fellenius".to_string(), result.factor_of_safety_fellenius);
-            metrics.insert("total_sliding_weight_kn".to_string(), result.total_sliding_weight_kn);
-            metrics.insert("disturbing_moment_kn_m".to_string(), result.disturbing_moment_kn_m);
+            metrics.insert(
+                "factor_of_safety_bishop".to_string(),
+                result.factor_of_safety_bishop,
+            );
+            metrics.insert(
+                "factor_of_safety_fellenius".to_string(),
+                result.factor_of_safety_fellenius,
+            );
+            metrics.insert(
+                "total_sliding_weight_kn".to_string(),
+                result.total_sliding_weight_kn,
+            );
+            metrics.insert(
+                "disturbing_moment_kn_m".to_string(),
+                result.disturbing_moment_kn_m,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
-            conv.record(result.iteration_count as u32, result.factor_of_safety_bishop, 1, 1e-5);
+            conv.record(
+                result.iteration_count as u32,
+                result.factor_of_safety_bishop,
+                1,
+                1e-5,
+            );
 
             let comparison = AnalyticalComparison::assess(
                 "factor_of_safety_bishop",
@@ -325,7 +350,10 @@ pub fn solve_slope_stability_sim(problem: &SlopeStabilityProblem) -> SimulationR
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.geotechnical.slope_stability_bishop", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.geotechnical.slope_stability_bishop",
+                    "0.1.0",
+                ),
                 logs: vec![result.design_assessment],
             }
         }
@@ -340,7 +368,10 @@ pub fn solve_slope_stability_sim(problem: &SlopeStabilityProblem) -> SimulationR
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.geotechnical.slope_stability_bishop", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.geotechnical.slope_stability_bishop",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Slope stability simulation failed: {}", err)],
             }
         }

@@ -7,8 +7,8 @@
 
 #![forbid(unsafe_code)]
 
-use std::f64::consts::PI;
 use serde::{Deserialize, Serialize};
+use std::f64::consts::PI;
 
 use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
@@ -122,22 +122,19 @@ pub struct MarinePropellerResult {
 }
 
 /// Evaluates Wageningen B-Series KT and KQ based on MARIN regression equations.
-pub fn evaluate_wageningen_b(
-    j: f64,
-    p_d: f64,
-    ae_a0: f64,
-    z: usize,
-) -> (f64, f64) {
+pub fn evaluate_wageningen_b(j: f64, p_d: f64, ae_a0: f64, z: usize) -> (f64, f64) {
     let z_f = z as f64;
     let j_clamped = j.clamp(0.01, 1.40);
 
     // Oosterveld and van Oossanen B-series regression representation:
     let kt = (0.320 * p_d - 0.240 * j_clamped - 0.040 * j_clamped.powi(2)
-        + 0.020 * (z_f - 4.0) + 0.030 * (ae_a0 - 0.55))
+        + 0.020 * (z_f - 4.0)
+        + 0.030 * (ae_a0 - 0.55))
         .max(0.005);
 
     let kq = (0.048 * p_d.powf(1.20) - 0.030 * j_clamped - 0.006 * j_clamped.powi(2)
-        + 0.003 * (z_f - 4.0) + 0.004 * (ae_a0 - 0.55))
+        + 0.003 * (z_f - 4.0)
+        + 0.004 * (ae_a0 - 0.55))
         .max(0.001);
 
     (kt, kq)
@@ -214,20 +211,23 @@ pub fn solve_marine_propeller(prob: &MarinePropellerProblem) -> MarinePropellerR
 pub fn solve_marine_propeller_sim(prob: &MarinePropellerProblem) -> SimulationResult {
     let sol = solve_marine_propeller(prob);
     let mut metrics = std::collections::HashMap::new();
-    metrics.insert("advance_coefficient_j".to_string(), sol.advance_coefficient_j);
+    metrics.insert(
+        "advance_coefficient_j".to_string(),
+        sol.advance_coefficient_j,
+    );
     metrics.insert("thrust_kn".to_string(), sol.thrust_kn);
     metrics.insert("delivered_power_kw".to_string(), sol.delivered_power_kw);
-    metrics.insert("open_water_efficiency".to_string(), sol.open_water_efficiency);
+    metrics.insert(
+        "open_water_efficiency".to_string(),
+        sol.open_water_efficiency,
+    );
     metrics.insert("keller_margin".to_string(), sol.keller_margin);
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.thrust_kn, 1, 1e-4);
 
-    let comparison = AnalyticalComparison::assess(
-        "open_water_efficiency",
-        sol.open_water_efficiency,
-        0.65,
-    );
+    let comparison =
+        AnalyticalComparison::assess("open_water_efficiency", sol.open_water_efficiency, 0.65);
 
     SimulationResult {
         problem_id: prob.problem_id.clone(),
@@ -238,7 +238,14 @@ pub fn solve_marine_propeller_sim(prob: &MarinePropellerProblem) -> SimulationRe
         convergence: conv,
         validation: Some(comparison),
         provenance: SimulationProvenance::new("atlas.marine.propeller_wageningen", "0.1.0"),
-        logs: vec![format!("J: {:.3}, Thrust: {:.1} kN, Delivered Power: {:.1} kW, eta_0: {:.1}%, Keller safe: {}", sol.advance_coefficient_j, sol.thrust_kn, sol.delivered_power_kw, sol.open_water_efficiency * 100.0, sol.cavitation_safe)],
+        logs: vec![format!(
+            "J: {:.3}, Thrust: {:.1} kN, Delivered Power: {:.1} kW, eta_0: {:.1}%, Keller safe: {}",
+            sol.advance_coefficient_j,
+            sol.thrust_kn,
+            sol.delivered_power_kw,
+            sol.open_water_efficiency * 100.0,
+            sol.cavitation_safe
+        )],
     }
 }
 

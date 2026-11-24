@@ -179,7 +179,7 @@ pub fn solve_atmospheric_dispersion(
             // Stability parameter s = (g / T_a) * (d_theta / dz)
             let d_theta_dz = match problem.stability_class {
                 AtmosphericStabilityClass::ClassESlightlyStable => 0.020, // K/m
-                _ => 0.035, // K/m
+                _ => 0.035,                                               // K/m
             };
             let s_stab = (g_accel / t_a_k) * d_theta_dz;
             let delta_h_buoyant = 2.6 * (f_b / (u_s * s_stab)).powf(0.3333);
@@ -228,10 +228,10 @@ pub fn solve_atmospheric_dispersion(
 
     // 6. EPA NAAQS Clean Air Thresholds:
     let naaqs_limit = match problem.pollutant {
-        AirPollutantType::SulfurDioxideSO2 => 196.0,   // 1-hour primary
+        AirPollutantType::SulfurDioxideSO2 => 196.0, // 1-hour primary
         AirPollutantType::NitrogenDioxideNO2 => 188.0, // 1-hour primary
         AirPollutantType::CarbonMonoxideCO => 40000.0, // 1-hour primary
-        AirPollutantType::ParticulatePM25 => 35.0,     // 24-hour primary
+        AirPollutantType::ParticulatePM25 => 35.0,   // 24-hour primary
     };
 
     let naaqs_ratio = c_max_ug_m3 / naaqs_limit;
@@ -291,8 +291,14 @@ mod tests {
         assert!(res.effective_stack_height_m > 150.0 && res.effective_stack_height_m < 280.0);
         assert!(res.sigma_y_m > 120.0 && res.sigma_y_m < 250.0);
         assert!(res.sigma_z_m > 40.0 && res.sigma_z_m < 120.0);
-        assert!(res.distance_to_max_concentration_m > 5000.0 && res.distance_to_max_concentration_m < 12000.0);
-        assert!(res.peak_max_ground_concentration_ug_per_m3 > 10.0 && res.peak_max_ground_concentration_ug_per_m3 < 50.0);
+        assert!(
+            res.distance_to_max_concentration_m > 5000.0
+                && res.distance_to_max_concentration_m < 12000.0
+        );
+        assert!(
+            res.peak_max_ground_concentration_ug_per_m3 > 10.0
+                && res.peak_max_ground_concentration_ug_per_m3 < 50.0
+        );
         assert!(res.naaqs_compliance_ratio < 1.0);
         assert!(res.is_naaqs_compliant);
         assert!(res.is_plume_rise_adequate);

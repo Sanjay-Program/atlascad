@@ -156,7 +156,8 @@ pub fn solve_centrifugal_compressor(
     let r_1s = problem.inducer_shroud_diameter_m / 2.0;
     let r_1h = problem.inducer_hub_diameter_m / 2.0;
     let a_inlet_m2 = std::f64::consts::PI * (r_1s * r_1s - r_1h * r_1h);
-    let rho_inlet = (problem.inlet_total_pressure_kpa * 1000.0) / (r_gas * problem.inlet_total_temperature_k);
+    let rho_inlet =
+        (problem.inlet_total_pressure_kpa * 1000.0) / (r_gas * problem.inlet_total_temperature_k);
     let c_a1 = problem.mass_flow_rate_kg_s / (rho_inlet * a_inlet_m2);
     let u_1s = omega_rad_s * r_1s;
     let w_1s = (c_a1 * c_a1 + u_1s * u_1s).sqrt();
@@ -194,7 +195,10 @@ pub fn solve_centrifugal_compressor(
     // Aerodynamic surge margin:
     // SM = [(Pi_surge / m_surge) / (Pi_design / m_design) - 1] * 100%
     // In typical centrifugal stage, surge occurs at ~ 75% of design flow with ~ 1.04x pressure ratio:
-    let surge_margin_pct = (((1.04 * pi_tt) / (0.78 * problem.mass_flow_rate_kg_s)) / (pi_tt / problem.mass_flow_rate_kg_s) - 1.0) * 100.0;
+    let surge_margin_pct = (((1.04 * pi_tt) / (0.78 * problem.mass_flow_rate_kg_s))
+        / (pi_tt / problem.mass_flow_rate_kg_s)
+        - 1.0)
+        * 100.0;
 
     // Peak disk centrifugal hoop stress (solid disk approximation):
     // sigma_hoop ~ 0.40 * rho_metal * U2^2 [Pa]

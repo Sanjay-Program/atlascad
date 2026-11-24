@@ -99,7 +99,9 @@ pub struct JournalBearingResult {
 }
 
 /// Solves hydrodynamic journal bearing lubrication according to ISO 7902 / DIN 31652.
-pub fn solve_journal_bearing(problem: &JournalBearingProblem) -> Result<JournalBearingResult, String> {
+pub fn solve_journal_bearing(
+    problem: &JournalBearingProblem,
+) -> Result<JournalBearingResult, String> {
     if problem.journal_diameter_mm <= 0.0 {
         return Err("Journal diameter must be positive".to_string());
     }
@@ -202,7 +204,11 @@ pub fn solve_journal_bearing(problem: &JournalBearingProblem) -> Result<JournalB
         delta_t_c,
         problem.inlet_oil_temp_c + delta_t_c,
         p_max_mpa,
-        if is_safe { "PASS FULL HYDRODYNAMIC" } else { "MARGINAL / CHECK CLEARANCE OR VISCOSITY" }
+        if is_safe {
+            "PASS FULL HYDRODYNAMIC"
+        } else {
+            "MARGINAL / CHECK CLEARANCE OR VISCOSITY"
+        }
     );
 
     Ok(JournalBearingResult {
@@ -232,10 +238,22 @@ pub fn solve_journal_bearing_sim(problem: &JournalBearingProblem) -> SimulationR
         Ok(result) => {
             let mut metrics = std::collections::HashMap::new();
             metrics.insert("sommerfeld_number".to_string(), result.sommerfeld_number);
-            metrics.insert("minimum_film_thickness_um".to_string(), result.minimum_film_thickness_um);
-            metrics.insert("hydrodynamic_power_loss_kw".to_string(), result.hydrodynamic_power_loss_kw);
-            metrics.insert("lubricant_temp_rise_c".to_string(), result.lubricant_temp_rise_c);
-            metrics.insert("maximum_film_pressure_mpa".to_string(), result.maximum_film_pressure_mpa);
+            metrics.insert(
+                "minimum_film_thickness_um".to_string(),
+                result.minimum_film_thickness_um,
+            );
+            metrics.insert(
+                "hydrodynamic_power_loss_kw".to_string(),
+                result.hydrodynamic_power_loss_kw,
+            );
+            metrics.insert(
+                "lubricant_temp_rise_c".to_string(),
+                result.lubricant_temp_rise_c,
+            );
+            metrics.insert(
+                "maximum_film_pressure_mpa".to_string(),
+                result.maximum_film_pressure_mpa,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, result.minimum_film_thickness_um, 1, 1e-4);
@@ -254,7 +272,10 @@ pub fn solve_journal_bearing_sim(problem: &JournalBearingProblem) -> SimulationR
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.tribology.journal_bearing_iso7902", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.tribology.journal_bearing_iso7902",
+                    "0.1.0",
+                ),
                 logs: vec![result.design_assessment],
             }
         }
@@ -269,7 +290,10 @@ pub fn solve_journal_bearing_sim(problem: &JournalBearingProblem) -> SimulationR
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.tribology.journal_bearing_iso7902", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.tribology.journal_bearing_iso7902",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Journal bearing simulation failed: {}", err)],
             }
         }
@@ -284,7 +308,8 @@ mod tests {
     #[test]
     fn test_journal_bearing_nominal() {
         let prob = JournalBearingProblem::default();
-        let sol = solve_journal_bearing(&prob).expect("Nominal journal bearing sizing should succeed");
+        let sol =
+            solve_journal_bearing(&prob).expect("Nominal journal bearing sizing should succeed");
 
         assert_eq!(sol.length_to_diameter_ratio, 0.70);
         assert!(sol.mean_bearing_pressure_mpa > 1.5 && sol.mean_bearing_pressure_mpa < 2.0);
@@ -300,7 +325,7 @@ mod tests {
     #[test]
     fn test_journal_bearing_heavy_load_failure() {
         let prob = JournalBearingProblem {
-            radial_load_n: 150000.0, // excessive load
+            radial_load_n: 150000.0,     // excessive load
             rotational_speed_rpm: 300.0, // low speed
             ..Default::default()
         };

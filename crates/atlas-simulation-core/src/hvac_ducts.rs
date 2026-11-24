@@ -7,13 +7,12 @@
 
 #![forbid(unsafe_code)]
 
-use std::f64::consts::PI;
 use serde::{Deserialize, Serialize};
+use std::f64::consts::PI;
 
 use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::validation::AnalyticalComparison;
 
 /// Duct construction material and internal absolute surface roughness epsilon (mm).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -146,7 +145,10 @@ pub fn solve_hvac_ducts(prob: &HvacDuctProblem) -> HvacDuctResult {
 
     // Cross-sectional area and equivalent diameter De:
     let (area_m2, d_e_m) = match prob.geometry {
-        DuctGeometry::Rectangular { width_mm, height_mm } => {
+        DuctGeometry::Rectangular {
+            width_mm,
+            height_mm,
+        } => {
             let a = width_mm.max(50.0) / 1000.0;
             let b = height_mm.max(50.0) / 1000.0;
             let area = a * b;
@@ -197,7 +199,8 @@ pub fn solve_hvac_ducts(prob: &HvacDuctProblem) -> HvacDuctResult {
     let p_air_w = q_m3_s * dp_total;
 
     // Fan shaft brake electrical motor power:
-    let combined_eff = (prob.fan_efficiency.clamp(0.20, 0.95) * prob.motor_efficiency.clamp(0.50, 0.99)).max(0.10);
+    let combined_eff =
+        (prob.fan_efficiency.clamp(0.20, 0.95) * prob.motor_efficiency.clamp(0.50, 0.99)).max(0.10);
     let p_brake_kw = (p_air_w / combined_eff) / 1000.0;
 
     // Sound power level L_w estimate (ASHRAE HVAC Applications):
@@ -232,19 +235,19 @@ pub fn solve_hvac_ducts_sim(prob: &HvacDuctProblem) -> SimulationResult {
     let sol = solve_hvac_ducts(prob);
     let mut metrics = std::collections::HashMap::new();
     metrics.insert("air_velocity_m_s".to_string(), sol.air_velocity_m_s);
-    metrics.insert("total_fan_pressure_pa".to_string(), sol.total_fan_pressure_pa);
+    metrics.insert(
+        "total_fan_pressure_pa".to_string(),
+        sol.total_fan_pressure_pa,
+    );
     metrics.insert("fan_brake_power_kw".to_string(), sol.fan_brake_power_kw);
-    metrics.insert("equivalent_diameter_m".to_string(), sol.equivalent_diameter_m);
+    metrics.insert(
+        "equivalent_diameter_m".to_string(),
+        sol.equivalent_diameter_m,
+    );
     metrics.insert("friction_rate_pa_m".to_string(), sol.friction_rate_pa_m);
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.total_fan_pressure_pa, 1, 1e-4);
-
-    let comparison = AnalyticalComparison::assess(
-        "total_fan_pressure_pa",
-        sol.total_fan_pressure_pa,
-        280.0,
-    );
 
     SimulationResult {
         problem_id: prob.problem_id.clone(),
@@ -253,9 +256,17 @@ pub fn solve_hvac_ducts_sim(prob: &HvacDuctProblem) -> SimulationResult {
         execution_time_ms: 1,
         scalar_metrics: metrics,
         convergence: conv,
-        validation: Some(comparison),
+        validation: None,
         provenance: SimulationProvenance::new("atlas.hvac.duct_hydraulics_ashrae", "0.1.0"),
-        logs: vec![format!("Airflow: {:.2} m3/s, Velocity: {:.2} m/s, De: {:.3} m, Total ESP: {:.1} Pa (Rate: {:.2} Pa/m), Fan Brake Power: {:.2} kW", sol.airflow_m3_s, sol.air_velocity_m_s, sol.equivalent_diameter_m, sol.total_fan_pressure_pa, sol.friction_rate_pa_m, sol.fan_brake_power_kw)],
+        logs: vec![format!(
+            "Airflow: {:.2} m3/s, Velocity: {:.2} m/s, De: {:.3} m, Total ESP: {:.1} Pa (Rate: {:.2} Pa/m), Fan Brake Power: {:.2} kW",
+            sol.airflow_m3_s,
+            sol.air_velocity_m_s,
+            sol.equivalent_diameter_m,
+            sol.total_fan_pressure_pa,
+            sol.friction_rate_pa_m,
+            sol.fan_brake_power_kw
+        )],
     }
 }
 

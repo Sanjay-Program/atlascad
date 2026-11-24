@@ -135,11 +135,11 @@ pub struct EvPowertrainResult {
 }
 
 /// Solves EV longitudinal road load, motor torque-power envelope, cruising range, acceleration, and regen braking.
-pub fn solve_ev_powertrain(
-    problem: &EvPowertrainProblem,
-) -> Result<EvPowertrainResult, String> {
+pub fn solve_ev_powertrain(problem: &EvPowertrainProblem) -> Result<EvPowertrainResult, String> {
     if problem.vehicle_mass_kg <= 200.0 || problem.tire_radius_m <= 0.10 {
-        return Err("Vehicle mass and tire radius must be positive realistic dimensions".to_string());
+        return Err(
+            "Vehicle mass and tire radius must be positive realistic dimensions".to_string(),
+        );
     }
     if problem.gear_ratio <= 1.0 || problem.driveline_efficiency <= 0.50 {
         return Err("Gear ratio and driveline efficiency must be realistic".to_string());
@@ -162,7 +162,12 @@ pub fn solve_ev_powertrain(
     let f_roll = problem.rolling_resistance_coeff * problem.vehicle_mass_kg * g;
 
     // 2. Aerodynamic drag force: F_aero = 0.5 * rho * Cd * A * v^2
-    let f_aero = 0.5 * rho_air * problem.drag_coefficient * problem.frontal_area_m2 * v_cruise_m_s * v_cruise_m_s;
+    let f_aero = 0.5
+        * rho_air
+        * problem.drag_coefficient
+        * problem.frontal_area_m2
+        * v_cruise_m_s
+        * v_cruise_m_s;
 
     let f_road_load = f_roll + f_aero;
 
@@ -191,7 +196,9 @@ pub fn solve_ev_powertrain(
 
     // Maximum tractive force at wheels in constant torque region:
     // F_trac_max = (T_motor_max * i_gear * eta_drive) / r_tire
-    let f_trac_max = (problem.motor_peak_torque_nm * problem.gear_ratio * problem.driveline_efficiency) / problem.tire_radius_m;
+    let f_trac_max =
+        (problem.motor_peak_torque_nm * problem.gear_ratio * problem.driveline_efficiency)
+            / problem.tire_radius_m;
 
     // Rotational mass inertia factor (typically 1.05 for EV with single-speed gearbox)
     let mass_factor = 1.05;
@@ -212,7 +219,9 @@ pub fn solve_ev_powertrain(
     let mut t_accel = 0.0;
     let dt = 0.02; // 20 ms time step
     while v_curr < v_target && t_accel < 30.0 {
-        let n_motor = (v_curr / (2.0 * std::f64::consts::PI * problem.tire_radius_m)) * 60.0 * problem.gear_ratio;
+        let n_motor = (v_curr / (2.0 * std::f64::consts::PI * problem.tire_radius_m))
+            * 60.0
+            * problem.gear_ratio;
         let t_motor = if n_motor <= problem.motor_base_speed_rpm {
             problem.motor_peak_torque_nm
         } else {
@@ -220,8 +229,10 @@ pub fn solve_ev_powertrain(
             let omega = (2.0 * std::f64::consts::PI * n_motor.max(1.0)) / 60.0;
             ((p_motor_peak_kw * 1000.0) / omega).min(problem.motor_peak_torque_nm)
         };
-        let f_trac = (t_motor * problem.gear_ratio * problem.driveline_efficiency) / problem.tire_radius_m;
-        let f_aero_t = 0.5 * rho_air * problem.drag_coefficient * problem.frontal_area_m2 * v_curr * v_curr;
+        let f_trac =
+            (t_motor * problem.gear_ratio * problem.driveline_efficiency) / problem.tire_radius_m;
+        let f_aero_t =
+            0.5 * rho_air * problem.drag_coefficient * problem.frontal_area_m2 * v_curr * v_curr;
         let f_net = (f_trac - f_roll - f_aero_t).max(10.0);
         let a = f_net / effective_mass;
         v_curr += a * dt;
@@ -243,7 +254,8 @@ pub fn solve_ev_powertrain(
     let f_brake_on_driven_axle = f_brake_demand * front_axle_fraction;
     // Motor regen torque limit:
     let max_regen_torque = problem.motor_peak_torque_nm * 0.85; // 85% peak in regen mode
-    let max_regen_tractive_force = (max_regen_torque * problem.gear_ratio) / (problem.tire_radius_m * problem.driveline_efficiency);
+    let max_regen_tractive_force = (max_regen_torque * problem.gear_ratio)
+        / (problem.tire_radius_m * problem.driveline_efficiency);
 
     let actual_regen_braking_force = f_brake_on_driven_axle.min(max_regen_tractive_force);
     // Mechanical braking power absorbed at 60 km/h standard evaluation speed
@@ -252,7 +264,8 @@ pub fn solve_ev_powertrain(
     // Electrical power returned to battery: eta_gen (~0.90) * eta_inv (~0.95) * eta_batt (~0.96)
     let p_regen_elec_kw = p_regen_mech_kw * (0.90 * 0.95 * 0.96);
 
-    let regen_capture_pct = (actual_regen_braking_force / f_brake_demand) * (0.90 * 0.95 * 0.96) * 100.0;
+    let regen_capture_pct =
+        (actual_regen_braking_force / f_brake_demand) * (0.90 * 0.95 * 0.96) * 100.0;
 
     let is_cruise_attainable = max_vehicle_speed_km_h >= problem.cruising_speed_km_h;
     let is_sport_accel = t_accel <= 7.5; // Under 7.5s to 100 km/h

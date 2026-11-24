@@ -118,7 +118,9 @@ pub struct ContainmentLocaResult {
 }
 
 /// Solves post-LOCA containment thermodynamics, Dalton partial pressures, and Tagami/Uchida heat removal.
-pub fn solve_containment_loca(problem: &ContainmentLocaProblem) -> Result<ContainmentLocaResult, String> {
+pub fn solve_containment_loca(
+    problem: &ContainmentLocaProblem,
+) -> Result<ContainmentLocaResult, String> {
     if problem.containment_free_volume_m3 <= 1000.0 {
         return Err("Containment free volume must be at least 1000 m³".to_string());
     }
@@ -138,7 +140,8 @@ pub fn solve_containment_loca(problem: &ContainmentLocaProblem) -> Result<Contai
 
     // 1. Initial dry air mass in containment:
     // P_air_0 = P_0 - P_sat(T_0) * RH
-    let p_sat_init_kpa = 0.61078 * (17.27 * problem.initial_temperature_c / (problem.initial_temperature_c + 237.3)).exp();
+    let p_sat_init_kpa = 0.61078
+        * (17.27 * problem.initial_temperature_c / (problem.initial_temperature_c + 237.3)).exp();
     let p_v_init_pa = (p_sat_init_kpa * 1000.0) * (problem.initial_relative_humidity_pct / 100.0);
     let p_air_init_pa = (problem.initial_pressure_bar_a * 1e5) - p_v_init_pa;
 
@@ -161,8 +164,8 @@ pub fn solve_containment_loca(problem: &ContainmentLocaProblem) -> Result<Contai
 
     // 4. Equilibrium Temperature Estimation:
     // For large dry PWR containment, peak post-blowdown temperature typically reaches 125 - 142 °C:
-    let peak_t_c = 40.0 + 88.0 * (q_blowdown_j / (m_coolant_kg * 2.2e6)).min(1.20)
-        * (60000.0 / v_c).powf(0.35);
+    let peak_t_c = 40.0
+        + 88.0 * (q_blowdown_j / (m_coolant_kg * 2.2e6)).min(1.20) * (60000.0 / v_c).powf(0.35);
     let peak_t_k = peak_t_c + 273.15;
 
     // Dalton's Law of Partial Pressures at Peak:
@@ -200,12 +203,14 @@ pub fn solve_containment_loca(problem: &ContainmentLocaProblem) -> Result<Contai
 
     // Post-LOCA 24h pressure reduction with continuous spray and active fan coolers:
     // Depressurization factor typically 0.35 to 0.45 of peak pressure:
-    let p_24h_bar = problem.initial_pressure_bar_a + (p_peak_bar - problem.initial_pressure_bar_a) * 0.38;
+    let p_24h_bar =
+        problem.initial_pressure_bar_a + (p_peak_bar - problem.initial_pressure_bar_a) * 0.38;
 
     let is_press_margin_ok = margin_pct >= 10.0 && p_peak_bar < problem.design_pressure_bar_a;
     let is_temp_ok = peak_t_c <= problem.design_temperature_c;
     // 10 CFR 50 App A: 50% reduction in peak pressure rise (gage pressure) within 24 hours:
-    let is_24h_ok = (p_24h_bar - problem.initial_pressure_bar_a) <= (0.50 * (p_peak_bar - problem.initial_pressure_bar_a));
+    let is_24h_ok = (p_24h_bar - problem.initial_pressure_bar_a)
+        <= (0.50 * (p_peak_bar - problem.initial_pressure_bar_a));
     let is_overall_ok = is_press_margin_ok && is_temp_ok && is_24h_ok;
 
     Ok(ContainmentLocaResult {
@@ -240,9 +245,15 @@ mod tests {
         let res = solve_containment_loca(&prob)?;
 
         assert!(res.dry_air_mass_tonnes > 60.0 && res.dry_air_mass_tonnes < 90.0);
-        assert!(res.tagami_condensing_htc_w_m2_k > 800.0 && res.tagami_condensing_htc_w_m2_k < 2000.0);
-        assert!(res.peak_containment_temperature_c > 90.0 && res.peak_containment_temperature_c < 145.0);
-        assert!(res.peak_containment_pressure_bar_a > 1.8 && res.peak_containment_pressure_bar_a < 4.50);
+        assert!(
+            res.tagami_condensing_htc_w_m2_k > 800.0 && res.tagami_condensing_htc_w_m2_k < 2000.0
+        );
+        assert!(
+            res.peak_containment_temperature_c > 90.0 && res.peak_containment_temperature_c < 145.0
+        );
+        assert!(
+            res.peak_containment_pressure_bar_a > 1.8 && res.peak_containment_pressure_bar_a < 4.50
+        );
         assert!(res.pressure_margin_pct >= 10.0);
         assert!(res.spray_heat_removal_mw_th > 100.0);
         assert!(res.pressure_24h_post_loca_bar_a < 0.70 * res.peak_containment_pressure_bar_a);

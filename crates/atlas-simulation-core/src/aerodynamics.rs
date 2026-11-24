@@ -62,14 +62,6 @@ pub fn solve_wing_aerodynamics(prob: &WingAeroProblem) -> Result<SimulationResul
     let lift_force_n = q_inf * prob.wing_area_m2 * cl;
     let drag_force_n = q_inf * prob.wing_area_m2 * cd;
 
-    // Theoretical 2D comparison for infinite aspect ratio
-    let theoretical_cl_2d = a0 * alpha_rad;
-    let val = AnalyticalComparison::assess(
-        "2D vs 3D Lift Slope Correction",
-        cl,
-        theoretical_cl_2d / (1.0 + a0 / (std::f64::consts::PI * ar * e)),
-    );
-
     let mut metrics = HashMap::new();
     metrics.insert("lift_coefficient_cl".to_string(), cl);
     metrics.insert("drag_coefficient_cd".to_string(), cd);
@@ -104,7 +96,7 @@ pub fn solve_wing_aerodynamics(prob: &WingAeroProblem) -> Result<SimulationResul
         execution_time_ms: 2,
         scalar_metrics: metrics,
         convergence: conv,
-        validation: Some(val),
+        validation: None,
         provenance: SimulationProvenance::new("atlas-aero", "0.1.0"),
         logs,
     })

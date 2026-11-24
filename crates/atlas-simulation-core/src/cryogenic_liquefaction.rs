@@ -52,11 +52,11 @@ impl Default for CryogenicLiquefactionProblem {
         Self {
             problem_id: "industrial_nitrogen_liquefaction_plant".to_string(),
             fluid_type: CryogenicFluidType::NitrogenN2,
-            feed_gas_flow_rate_kg_h: 1200.0,       // 1200 kg/h feed loop
-            suction_pressure_bar_a: 1.05,          // 1.05 bar suction
-            discharge_pressure_bar_a: 200.0,       // 200 bar Linde high-pressure operating point
-            ambient_aftercooler_temp_c: 20.0,      // 293.15 K
-            heat_exchanger_pinch_k: 4.0,           // 4 K warm end approach
+            feed_gas_flow_rate_kg_h: 1200.0,  // 1200 kg/h feed loop
+            suction_pressure_bar_a: 1.05,     // 1.05 bar suction
+            discharge_pressure_bar_a: 200.0,  // 200 bar Linde high-pressure operating point
+            ambient_aftercooler_temp_c: 20.0, // 293.15 K
+            heat_exchanger_pinch_k: 4.0,      // 4 K warm end approach
             compressor_isothermal_efficiency: 0.72,
             heat_exchanger_effectiveness: 0.97,
             ambient_heat_leak_w: 180.0,
@@ -116,25 +116,28 @@ pub fn solve_cryogenic_liquefaction(
     if problem.discharge_pressure_bar_a <= problem.suction_pressure_bar_a {
         return Err("Discharge pressure must exceed suction pressure".to_string());
     }
-    if problem.compressor_isothermal_efficiency <= 0.1 || problem.compressor_isothermal_efficiency > 1.0 {
+    if problem.compressor_isothermal_efficiency <= 0.1
+        || problem.compressor_isothermal_efficiency > 1.0
+    {
         return Err("Compressor efficiency must be between 0.10 and 1.00".to_string());
     }
 
     // Thermophysical properties by fluid:
-    let (t_nbp, h_fg, r_gas, rho_liq, p_inv_max_bar, w_min_kwh_kg, c_p_avg) = match problem.fluid_type {
-        CryogenicFluidType::NitrogenN2 => {
-            // N2: T_nbp = 77.36 K, h_fg = 199.1 kJ/kg, R = 0.2968 kJ/(kg*K), rho_liq = 808 kg/m3
-            (77.36, 199.1, 0.2968, 808.0, 375.0, 0.214, 1.04)
-        }
-        CryogenicFluidType::ArgonAr => {
-            // Ar: T_nbp = 87.30 K, h_fg = 163.6 kJ/kg, R = 0.2081 kJ/(kg*K), rho_liq = 1395 kg/m3
-            (87.30, 163.6, 0.2081, 1395.0, 420.0, 0.138, 0.52)
-        }
-        CryogenicFluidType::MethaneLNG => {
-            // CH4: T_nbp = 111.6 K, h_fg = 510.8 kJ/kg, R = 0.5183 kJ/(kg*K), rho_liq = 422 kg/m3
-            (111.6, 510.8, 0.5183, 422.0, 450.0, 0.302, 2.22)
-        }
-    };
+    let (t_nbp, h_fg, r_gas, rho_liq, p_inv_max_bar, w_min_kwh_kg, c_p_avg) =
+        match problem.fluid_type {
+            CryogenicFluidType::NitrogenN2 => {
+                // N2: T_nbp = 77.36 K, h_fg = 199.1 kJ/kg, R = 0.2968 kJ/(kg*K), rho_liq = 808 kg/m3
+                (77.36, 199.1, 0.2968, 808.0, 375.0, 0.214, 1.04)
+            }
+            CryogenicFluidType::ArgonAr => {
+                // Ar: T_nbp = 87.30 K, h_fg = 163.6 kJ/kg, R = 0.2081 kJ/(kg*K), rho_liq = 1395 kg/m3
+                (87.30, 163.6, 0.2081, 1395.0, 420.0, 0.138, 0.52)
+            }
+            CryogenicFluidType::MethaneLNG => {
+                // CH4: T_nbp = 111.6 K, h_fg = 510.8 kJ/kg, R = 0.5183 kJ/(kg*K), rho_liq = 422 kg/m3
+                (111.6, 510.8, 0.5183, 422.0, 450.0, 0.302, 2.22)
+            }
+        };
 
     let t_0 = problem.ambient_aftercooler_temp_c + 273.15; // Ambient aftercooler outlet in K
     let p_1 = problem.suction_pressure_bar_a;
@@ -196,7 +199,8 @@ pub fn solve_cryogenic_liquefaction(
     let jt_drop_k = (delta_h_isotherm_kj_kg / c_p_avg).min(t_0 - t_nbp);
 
     // Heat exchanger duty:
-    let hx_duty_kw_th = m_dot_feed_kg_s * c_p_avg * (t_0 - t_nbp) * problem.heat_exchanger_effectiveness;
+    let hx_duty_kw_th =
+        m_dot_feed_kg_s * c_p_avg * (t_0 - t_nbp) * problem.heat_exchanger_effectiveness;
 
     // Validation checks:
     let is_p_inv_ok = p_2 <= p_inv_max_bar;

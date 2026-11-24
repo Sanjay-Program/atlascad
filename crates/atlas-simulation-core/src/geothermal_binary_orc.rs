@@ -61,17 +61,17 @@ impl Default for GeothermalOrcProblem {
         Self {
             problem_id: "basin_and_range_binary_plant".to_string(),
             working_fluid: OrcWorkingFluid::Isopentane,
-            brine_mass_flow_kg_s: 85.0,              // 85 kg/s hot liquid geothermal brine
-            brine_inlet_temperature_c: 165.0,        // 165 °C production temperature
-            min_reinjection_temperature_c: 72.0,     // 72 °C silica scaling limit
-            pinch_point_temp_diff_c: 6.0,            // 6.0 °C pinch point
-            evaporator_pressure_bar: 18.5,           // 18.5 bar evaporator pressure
-            condensing_temperature_c: 36.0,          // 36 °C condensing temperature
-            expander_isentropic_efficiency: 0.86,    // 86% radial inflow expander
-            pump_isentropic_efficiency: 0.80,        // 80% multi-stage canned pump
-            generator_efficiency: 0.975,             // 97.5% synchronous generator
-            parasitic_power_fraction: 0.085,         // 8.5% ACC fans + reinjection pump
-            ambient_reference_temp_c: 20.0,          // 20 °C ambient reference
+            brine_mass_flow_kg_s: 85.0, // 85 kg/s hot liquid geothermal brine
+            brine_inlet_temperature_c: 165.0, // 165 °C production temperature
+            min_reinjection_temperature_c: 72.0, // 72 °C silica scaling limit
+            pinch_point_temp_diff_c: 6.0, // 6.0 °C pinch point
+            evaporator_pressure_bar: 18.5, // 18.5 bar evaporator pressure
+            condensing_temperature_c: 36.0, // 36 °C condensing temperature
+            expander_isentropic_efficiency: 0.86, // 86% radial inflow expander
+            pump_isentropic_efficiency: 0.80, // 80% multi-stage canned pump
+            generator_efficiency: 0.975, // 97.5% synchronous generator
+            parasitic_power_fraction: 0.085, // 8.5% ACC fans + reinjection pump
+            ambient_reference_temp_c: 20.0, // 20 °C ambient reference
         }
     }
 }
@@ -114,12 +114,16 @@ pub struct GeothermalOrcResult {
 }
 
 /// Solves geothermal binary Organic Rankine Cycle thermodynamics according to ASME PTC 46 / DiPippo.
-pub fn solve_geothermal_binary_orc(problem: &GeothermalOrcProblem) -> Result<GeothermalOrcResult, String> {
+pub fn solve_geothermal_binary_orc(
+    problem: &GeothermalOrcProblem,
+) -> Result<GeothermalOrcResult, String> {
     if problem.brine_mass_flow_kg_s <= 1.0 {
         return Err("Brine mass flow rate must be positive".to_string());
     }
     if problem.brine_inlet_temperature_c <= problem.min_reinjection_temperature_c {
-        return Err("Brine inlet temperature must exceed minimum reinjection temperature".to_string());
+        return Err(
+            "Brine inlet temperature must exceed minimum reinjection temperature".to_string(),
+        );
     }
     if problem.evaporator_pressure_bar <= 2.0 || problem.evaporator_pressure_bar > 60.0 {
         return Err("Evaporator pressure must be between 2.0 and 60.0 bar".to_string());
@@ -134,7 +138,13 @@ pub fn solve_geothermal_binary_orc(problem: &GeothermalOrcProblem) -> Result<Geo
 
     // Working fluid thermophysical parameters (calibrated to NIST REFPROP / VDI 4670):
     // Specific enthalpy and entropy changes:
-    let (t_sat_evap_c, delta_h_evap_kj_kg, delta_h_exp_isentropic_kj_kg, v_liquid_m3_kg, p_cond_bar) = match problem.working_fluid {
+    let (
+        t_sat_evap_c,
+        delta_h_evap_kj_kg,
+        delta_h_exp_isentropic_kj_kg,
+        v_liquid_m3_kg,
+        p_cond_bar,
+    ) = match problem.working_fluid {
         OrcWorkingFluid::Isopentane => {
             // Isopentane at ~18.5 bar: T_sat ~ 140 °C, latent heat ~ 240 kJ/kg, isentropic exp drop ~ 68 kJ/kg
             let t_sat = 120.0 + 1.2 * problem.evaporator_pressure_bar;
@@ -176,7 +186,9 @@ pub fn solve_geothermal_binary_orc(problem: &GeothermalOrcProblem) -> Result<Geo
     // 3. Organic working fluid circulating mass flow:
     // Total enthalpy absorbed per kg ORC: delta_h_total = c_p_liq * (T_sat - T_cond) + delta_h_evap
     let cp_orc_liq = 2.35; // kJ/(kg*K)
-    let delta_h_total_kj_kg = cp_orc_liq * (t_sat_evap_c - problem.condensing_temperature_c).max(5.0) + delta_h_evap_kj_kg;
+    let delta_h_total_kj_kg = cp_orc_liq
+        * (t_sat_evap_c - problem.condensing_temperature_c).max(5.0)
+        + delta_h_evap_kj_kg;
     let m_orc_kg_s = q_thermal_kw / delta_h_total_kj_kg;
 
     // 4. Turbine Expander Gross Power:
@@ -189,7 +201,8 @@ pub fn solve_geothermal_binary_orc(problem: &GeothermalOrcProblem) -> Result<Geo
     // 5. Parasitic Feed Pump Power:
     // P_pump = m_orc * v_f * (P_evap - P_cond) / eta_pump [kW]
     let delta_p_pa = (problem.evaporator_pressure_bar - p_cond_bar).max(0.5) * 1.0e5; // Pa = J/m³
-    let p_pump_kw = (m_orc_kg_s * v_liquid_m3_kg * (delta_p_pa / 1000.0)) / problem.pump_isentropic_efficiency;
+    let p_pump_kw =
+        (m_orc_kg_s * v_liquid_m3_kg * (delta_p_pa / 1000.0)) / problem.pump_isentropic_efficiency;
     let p_pump_mw = p_pump_kw / 1000.0;
 
     // 6. Air-Cooled Condenser and auxiliary parasitic power:
@@ -260,9 +273,15 @@ mod tests {
         assert!(res.brine_reinjection_temperature_c >= 72.0);
         assert!(res.gross_electrical_power_mw > 4.0 && res.gross_electrical_power_mw < 8.0);
         assert!(res.net_electrical_power_mw > 3.0 && res.net_electrical_power_mw < 7.0);
-        assert!(res.thermal_first_law_efficiency_pct > 10.0 && res.thermal_first_law_efficiency_pct < 20.0);
+        assert!(
+            res.thermal_first_law_efficiency_pct > 10.0
+                && res.thermal_first_law_efficiency_pct < 20.0
+        );
         assert!(res.exergy_second_law_efficiency_pct >= 35.0);
-        assert!(res.specific_brine_consumption_kg_per_kwh > 50.0 && res.specific_brine_consumption_kg_per_kwh < 120.0);
+        assert!(
+            res.specific_brine_consumption_kg_per_kwh > 50.0
+                && res.specific_brine_consumption_kg_per_kwh < 120.0
+        );
         assert!(res.is_silica_scaling_prevented);
         assert!(res.is_power_output_commercial);
         assert!(res.is_exergy_efficiency_competitive);

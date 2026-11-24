@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
 use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Power transformer cooling class per IEC 60076.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -224,12 +224,30 @@ pub fn solve_power_transformer_sim(problem: &PowerTransformerProblem) -> Simulat
     match solve_power_transformer(problem) {
         Ok(result) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("percent_voltage_regulation".to_string(), result.percent_voltage_regulation);
-            metrics.insert("operating_efficiency_pct".to_string(), result.operating_efficiency_pct);
-            metrics.insert("total_operating_loss_kw".to_string(), result.total_operating_loss_kw);
-            metrics.insert("top_oil_temperature_c".to_string(), result.top_oil_temperature_c);
-            metrics.insert("hot_spot_temperature_c".to_string(), result.hot_spot_temperature_c);
-            metrics.insert("relative_insulation_aging_factor".to_string(), result.relative_insulation_aging_factor);
+            metrics.insert(
+                "percent_voltage_regulation".to_string(),
+                result.percent_voltage_regulation,
+            );
+            metrics.insert(
+                "operating_efficiency_pct".to_string(),
+                result.operating_efficiency_pct,
+            );
+            metrics.insert(
+                "total_operating_loss_kw".to_string(),
+                result.total_operating_loss_kw,
+            );
+            metrics.insert(
+                "top_oil_temperature_c".to_string(),
+                result.top_oil_temperature_c,
+            );
+            metrics.insert(
+                "hot_spot_temperature_c".to_string(),
+                result.hot_spot_temperature_c,
+            );
+            metrics.insert(
+                "relative_insulation_aging_factor".to_string(),
+                result.relative_insulation_aging_factor,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, result.hot_spot_temperature_c, 1, 1e-4);
@@ -248,7 +266,10 @@ pub fn solve_power_transformer_sim(problem: &PowerTransformerProblem) -> Simulat
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.electrical.transformer_iec60076", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.electrical.transformer_iec60076",
+                    "0.1.0",
+                ),
                 logs: vec![format!(
                     "Transformer IEC 60076: η = {:.2}%, %VR = {:.2}%, P_loss = {:.1} kW, T_top = {:.1} °C, T_hs = {:.1} °C (Aging = {:.2}x, Safe: {})",
                     result.operating_efficiency_pct,
@@ -272,7 +293,10 @@ pub fn solve_power_transformer_sim(problem: &PowerTransformerProblem) -> Simulat
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.electrical.transformer_iec60076", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.electrical.transformer_iec60076",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Transformer simulation failed: {}", err)],
             }
         }

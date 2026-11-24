@@ -48,12 +48,12 @@ impl Default for FiberDispersionProblem {
         Self {
             problem_id: "long_haul_c_band_optical_link".to_string(),
             fiber_standard: FiberStandardType::ItuG652dStandard,
-            wavelength_nm: 1550.0,          // 1550 nm standard C-band transmission window
-            fiber_length_km: 80.0,           // 80 km unamplified repeater span
-            laser_linewidth_fwhm_nm: 0.015,  // 0.015 nm (1.8 GHz) narrow DFB laser linewidth
-            initial_pulse_width_ps: 25.0,    // 25 ps pulse width (40 Gbit/s NRZ equivalent)
-            launch_power_mw: 5.0,            // +7 dBm launch power (5 mW)
-            target_bit_rate_gbps: 10.0,      // 10 Gbit/s standard SONET/SDH/10GbE
+            wavelength_nm: 1550.0, // 1550 nm standard C-band transmission window
+            fiber_length_km: 80.0, // 80 km unamplified repeater span
+            laser_linewidth_fwhm_nm: 0.015, // 0.015 nm (1.8 GHz) narrow DFB laser linewidth
+            initial_pulse_width_ps: 25.0, // 25 ps pulse width (40 Gbit/s NRZ equivalent)
+            launch_power_mw: 5.0,  // +7 dBm launch power (5 mW)
+            target_bit_rate_gbps: 10.0, // 10 Gbit/s standard SONET/SDH/10GbE
         }
     }
 }
@@ -100,9 +100,13 @@ pub struct FiberDispersionResult {
 }
 
 /// Solves optical fiber chromatic dispersion, Sellmeier group velocity, and pulse broadening dynamics.
-pub fn solve_fiber_dispersion(problem: &FiberDispersionProblem) -> Result<FiberDispersionResult, String> {
+pub fn solve_fiber_dispersion(
+    problem: &FiberDispersionProblem,
+) -> Result<FiberDispersionResult, String> {
     if problem.wavelength_nm <= 1000.0 || problem.wavelength_nm >= 1800.0 {
-        return Err("Wavelength must be within standard telecom spectrum (1000 to 1800 nm)".to_string());
+        return Err(
+            "Wavelength must be within standard telecom spectrum (1000 to 1800 nm)".to_string(),
+        );
     }
     if problem.fiber_length_km <= 0.01 {
         return Err("Fiber length must be positive".to_string());
@@ -144,7 +148,11 @@ pub fn solve_fiber_dispersion(problem: &FiberDispersionProblem) -> Result<FiberD
     let (lambda_0_nm, s_0, alpha_db_km): (f64, f64, f64) = match problem.fiber_standard {
         FiberStandardType::ItuG652dStandard => {
             // G.652.D: lambda_0 = 1312 nm, S_0 = 0.092 ps/(nm^2*km), alpha = 0.19 dB/km at 1550 nm
-            let alpha = if problem.wavelength_nm < 1360.0 { 0.35 } else { 0.19 };
+            let alpha = if problem.wavelength_nm < 1360.0 {
+                0.35
+            } else {
+                0.19
+            };
             (1312.0, 0.092, alpha)
         }
         FiberStandardType::ItuG655Nzdsf => {
@@ -159,7 +167,8 @@ pub fn solve_fiber_dispersion(problem: &FiberDispersionProblem) -> Result<FiberD
 
     // ITU-T G.652 Chromatic dispersion formula:
     // D(lambda) = (S_0 / 4) * [lambda - (lambda_0^4 / lambda^3)] [ps / (nm * km)]
-    let d_chromatic = (s_0 / 4.0) * (problem.wavelength_nm - (lambda_0_nm.powi(4) / problem.wavelength_nm.powi(3)));
+    let d_chromatic = (s_0 / 4.0)
+        * (problem.wavelength_nm - (lambda_0_nm.powi(4) / problem.wavelength_nm.powi(3)));
 
     // Total accumulated chromatic dispersion across link span:
     let total_dispersion = d_chromatic * problem.fiber_length_km; // ps/nm
@@ -170,7 +179,8 @@ pub fn solve_fiber_dispersion(problem: &FiberDispersionProblem) -> Result<FiberD
 
     // Pulse broadening due to source spectral linewidth:
     // Delta tau = |D| * L * Delta_lambda [ps]
-    let delta_tau_ps = d_chromatic.abs() * problem.fiber_length_km * problem.laser_linewidth_fwhm_nm;
+    let delta_tau_ps =
+        d_chromatic.abs() * problem.fiber_length_km * problem.laser_linewidth_fwhm_nm;
 
     // Output broadened pulse duration: tau_out = sqrt(tau_in^2 + Delta_tau^2) [ps]
     let tau_out_ps = (problem.initial_pulse_width_ps.powi(2) + delta_tau_ps.powi(2)).sqrt();
@@ -229,11 +239,16 @@ mod tests {
         let res = solve_fiber_dispersion(&prob)?;
 
         assert!(res.core_refractive_index > 1.44 && res.core_refractive_index < 1.46);
-        assert!(res.chromatic_dispersion_ps_per_nm_km >= 15.0 && res.chromatic_dispersion_ps_per_nm_km <= 19.0);
+        assert!(
+            res.chromatic_dispersion_ps_per_nm_km >= 15.0
+                && res.chromatic_dispersion_ps_per_nm_km <= 19.0
+        );
         assert!(res.total_accumulated_dispersion_ps_per_nm > 1200.0);
         assert!(res.total_link_attenuation_db >= 14.0 && res.total_link_attenuation_db <= 18.0);
         assert!(res.received_optical_power_mw > 0.05);
-        assert!(res.pulse_broadening_delta_tau_ps > 15.0 && res.pulse_broadening_delta_tau_ps < 50.0);
+        assert!(
+            res.pulse_broadening_delta_tau_ps > 15.0 && res.pulse_broadening_delta_tau_ps < 50.0
+        );
         assert!(res.output_pulse_width_ps > res.pulse_broadening_delta_tau_ps);
         assert!(res.is_inter_symbol_interference_acceptable);
         assert!(res.is_received_optical_power_adequate);

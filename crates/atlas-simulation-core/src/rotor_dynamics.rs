@@ -245,8 +245,8 @@ pub fn solve_rotor_dynamics(prob: &RotorDynamicsProblem) -> RotorDynamicsResult 
 
     // API 617 Allowable Unbalance Vibration Limit:
     // A_allow = 25.4 * sqrt(12000 / N) in µm pk-pk or max 25.4 µm
-    let api_vibration_limit_um = (25.4 * (12000.0 / prob.operating_speed_rpm.max(100.0)).sqrt())
-        .clamp(6.35, 25.4);
+    let api_vibration_limit_um =
+        (25.4 * (12000.0 / prob.operating_speed_rpm.max(100.0)).sqrt()).clamp(6.35, 25.4);
 
     let vibration_compliant = dynamic_amp_um_pk_pk <= api_vibration_limit_um;
 
@@ -277,10 +277,19 @@ pub fn solve_rotor_dynamics(prob: &RotorDynamicsProblem) -> RotorDynamicsResult 
 pub fn solve_rotor_dynamics_sim(prob: &RotorDynamicsProblem) -> SimulationResult {
     let sol = solve_rotor_dynamics(prob);
     let mut metrics = std::collections::HashMap::new();
-    metrics.insert("critical_speed_first_rpm".to_string(), sol.critical_speed_first_rpm);
-    metrics.insert("amplification_factor_af".to_string(), sol.amplification_factor_af);
+    metrics.insert(
+        "critical_speed_first_rpm".to_string(),
+        sol.critical_speed_first_rpm,
+    );
+    metrics.insert(
+        "amplification_factor_af".to_string(),
+        sol.amplification_factor_af,
+    );
     metrics.insert("actual_margin_pct".to_string(), sol.actual_margin_pct);
-    metrics.insert("unbalance_peak_displacement_um_pk_pk".to_string(), sol.unbalance_peak_displacement_um_pk_pk);
+    metrics.insert(
+        "unbalance_peak_displacement_um_pk_pk".to_string(),
+        sol.unbalance_peak_displacement_um_pk_pk,
+    );
 
     let comparison = AnalyticalComparison::assess(
         "api617_margin_compliance",
@@ -300,7 +309,10 @@ pub fn solve_rotor_dynamics_sim(prob: &RotorDynamicsProblem) -> SimulationResult
         convergence: conv,
         validation: Some(comparison),
         provenance: SimulationProvenance::new("atlas.rotor_dynamics.api617", "0.1.0"),
-        logs: vec![format!("1st Critical: {:.1} RPM, Operating Margin: {:.1}%, API 617 Compliant: {}", sol.critical_speed_first_rpm, sol.actual_margin_pct, sol.api617_margin_compliant)],
+        logs: vec![format!(
+            "1st Critical: {:.1} RPM, Operating Margin: {:.1}%, API 617 Compliant: {}",
+            sol.critical_speed_first_rpm, sol.actual_margin_pct, sol.api617_margin_compliant
+        )],
     }
 }
 

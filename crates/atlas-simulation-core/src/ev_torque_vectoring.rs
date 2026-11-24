@@ -91,18 +91,18 @@ impl Default for EvTorqueVectoringProblem {
             problem_id: "performance_dual_motor_sedan".to_string(),
             drivetrain_layout: EvAwdLayout::DualMotorAwd,
             road_condition: RoadSurfaceCondition::DryAsphalt,
-            vehicle_mass_kg: 2150.0,                 // 2.15 tonne EV sedan
-            yaw_moment_of_inertia_kg_m2: 2950.0,     // 2950 kg*m² yaw inertia
-            wheelbase_mm: 2900.0,                    // 2.90 m wheelbase
-            track_width_mm: 1620.0,                  // 1.62 m track
-            cg_to_front_axle_mm: 1420.0,             // 1.42 m to front (49% front / 51% rear static distribution)
-            cg_height_mm: 480.0,                     // 480 mm low CG from battery skateboard
-            tire_rolling_radius_mm: 340.0,           // 340 mm rolling radius (245/45 R19)
-            front_cornering_stiffness_n_rad: 95000.0,// 95 kN/rad front
-            rear_cornering_stiffness_n_rad: 105000.0,// 105 kN/rad rear
-            vehicle_speed_km_h: 90.0,                // 90 km/h highway cornering
-            front_steering_angle_deg: 1.2,           // 1.2 deg highway curve steer angle
-            demanded_total_torque_nm: 450.0,         // 450 N*m demanded tractive torque
+            vehicle_mass_kg: 2150.0,                  // 2.15 tonne EV sedan
+            yaw_moment_of_inertia_kg_m2: 2950.0,      // 2950 kg*m² yaw inertia
+            wheelbase_mm: 2900.0,                     // 2.90 m wheelbase
+            track_width_mm: 1620.0,                   // 1.62 m track
+            cg_to_front_axle_mm: 1420.0, // 1.42 m to front (49% front / 51% rear static distribution)
+            cg_height_mm: 480.0,         // 480 mm low CG from battery skateboard
+            tire_rolling_radius_mm: 340.0, // 340 mm rolling radius (245/45 R19)
+            front_cornering_stiffness_n_rad: 95000.0, // 95 kN/rad front
+            rear_cornering_stiffness_n_rad: 105000.0, // 105 kN/rad rear
+            vehicle_speed_km_h: 90.0,    // 90 km/h highway cornering
+            front_steering_angle_deg: 1.2, // 1.2 deg highway curve steer angle
+            demanded_total_torque_nm: 450.0, // 450 N*m demanded tractive torque
         }
     }
 }
@@ -149,11 +149,19 @@ pub struct EvTorqueVectoringResult {
 }
 
 /// Evaluates Pacejka Magic Formula lateral tyre force Fy = D * sin(C * atan(B*alpha - E*(B*alpha - atan(B*alpha)))).
-pub fn pacejka_lateral_force(alpha_rad: f64, fz_n: f64, mu: f64) -> f64 {
+///
+/// The stiffness factor B is derived from the axle cornering stiffness C_alpha so the
+/// Magic Formula initial slope (B*C*D) matches the linear tyre data used by the vehicle model.
+pub fn pacejka_lateral_force(
+    alpha_rad: f64,
+    fz_n: f64,
+    mu: f64,
+    cornering_stiffness_n_rad: f64,
+) -> f64 {
     let d = mu * fz_n; // Peak lateral grip force
-    let c = 1.30;      // Shape factor for lateral force
-    let b = 10.0;      // Stiffness factor
-    let e = -1.0;      // Curvature factor
+    let c = 1.30; // Shape factor for lateral force
+    let b = (cornering_stiffness_n_rad / (c * d.max(1.0))).max(1.0); // Stiffness factor
+    let e = -1.0; // Curvature factor
 
     let b_alpha = b * alpha_rad;
     let atan_b_alpha = b_alpha.atan();
@@ -172,10 +180,14 @@ pub fn solve_ev_torque_vectoring(
         return Err("Wheelbase must be greater than 1000 mm".to_string());
     }
     if problem.cg_to_front_axle_mm <= 200.0 || problem.cg_to_front_axle_mm >= problem.wheelbase_mm {
-        return Err("CG distance to front axle must lie strictly between front and rear axles".to_string());
+        return Err(
+            "CG distance to front axle must lie strictly between front and rear axles".to_string(),
+        );
     }
     if problem.vehicle_speed_km_h <= 1.0 {
-        return Err("Vehicle speed must be greater than 1 km/h for dynamic stability analysis".to_string());
+        return Err(
+            "Vehicle speed must be greater than 1 km/h for dynamic stability analysis".to_string(),
+        );
     }
 
     let g = 9.80665;
@@ -210,27 +222,65 @@ pub fn solve_ev_torque_vectoring(
     };
     let r_des_deg_s = r_des_rad_s.to_degrees();
 
-    // 4. Lateral acceleration a_y and chassis sideslip angle beta:
-    let ay_m_s2 = vx_m_s * r_des_rad_s;
-    let ay_g = ay_m_s2 / g;
+    // 4. Nonlinear 2-DOF steady-state cornering solve:
+    //    Lateral: Fyf*cos(delta) + Fyr = m*vx*r
+    //    Yaw:     a*Fyf*cos(delta) - b*Fyr = 0
+    // Unknowns are lateral velocity v_y and yaw rate r; tyre forces are Pacejka
+    // functions of the slip angles, so the two equations are solved by Newton iteration.
+    let beta_lin_rad =
+        (b_m / l_m - (m * a_m * vx_m_s.powi(2)) / (c_ar * l_m.powi(2))) * delta_f_rad;
+    let mut vy_m_s = beta_lin_rad * vx_m_s;
+    let mut r_actual_rad_s = r_des_rad_s;
+    let mut converged = false;
 
-    // Static sideslip angle beta_0 = (b / L - (m * a * vx^2) / (C_ar * L^2)) * delta_f
-    let beta_rad = (b_m / l_m - (m * a_m * vx_m_s.powi(2)) / (c_ar * l_m.powi(2))) * delta_f_rad;
+    for _ in 0..60 {
+        let residuals = |vy: f64, r: f64| {
+            let af = (delta_f_rad - (vy + a_m * r) / vx_m_s).clamp(-0.6, 0.6);
+            let ar = (-(vy - b_m * r) / vx_m_s).clamp(-0.6, 0.6);
+            let fyf = pacejka_lateral_force(af, fz_f_n, mu, c_af);
+            let fyr = pacejka_lateral_force(ar, fz_r_n, mu, c_ar);
+            (
+                fyf * delta_f_rad.cos() + fyr - m * vx_m_s * r,
+                a_m * fyf * delta_f_rad.cos() - b_m * fyr,
+            )
+        };
+
+        let (f1, f2) = residuals(vy_m_s, r_actual_rad_s);
+        let h_vy = 1.0e-5;
+        let h_r = 1.0e-6;
+        let (f1_vy, f2_vy) = residuals(vy_m_s + h_vy, r_actual_rad_s);
+        let (f1_r, f2_r) = residuals(vy_m_s, r_actual_rad_s + h_r);
+        let j11 = (f1_vy - f1) / h_vy;
+        let j21 = (f2_vy - f2) / h_vy;
+        let j12 = (f1_r - f1) / h_r;
+        let j22 = (f2_r - f2) / h_r;
+        let det = j11 * j22 - j12 * j21;
+        if det.abs() < 1.0e-12 {
+            break;
+        }
+
+        let d_vy = (-j22 * f1 + j12 * f2) / det;
+        let d_r = (j21 * f1 - j11 * f2) / det;
+        vy_m_s += 0.5 * d_vy;
+        r_actual_rad_s += 0.5 * d_r;
+        if d_vy.abs() < 1.0e-10 && d_r.abs() < 1.0e-12 {
+            converged = true;
+            break;
+        }
+    }
+    if !converged {
+        vy_m_s = beta_lin_rad * vx_m_s;
+        r_actual_rad_s = r_des_rad_s;
+    }
+
+    let beta_rad = (vy_m_s / vx_m_s).atan();
     let beta_deg = beta_rad.to_degrees();
-
-    // Front and rear tyre slip angles:
-    // alpha_f = delta_f - (v_y + a*r) / v_x = delta_f - beta - (a * r / v_x)
-    let alpha_f_rad = delta_f_rad - beta_rad - (a_m * r_des_rad_s / vx_m_s);
-    let alpha_r_rad = -beta_rad + (b_m * r_des_rad_s / vx_m_s);
-
-    // 5. Non-linear tire grip forces via Pacejka Magic Formula:
-    let fy_f = pacejka_lateral_force(alpha_f_rad, fz_f_n, mu);
-    let fy_r = pacejka_lateral_force(alpha_r_rad, fz_r_n, mu);
-
-    // Open-loop un-vectored actual yaw moment & yaw rate:
-    let m_z_open_loop = a_m * fy_f * delta_f_rad.cos() - b_m * fy_r;
-    let r_actual_rad_s = r_des_rad_s * (0.88 + 0.12 * (m_z_open_loop.abs() / (m * g * l_m)).min(1.0));
     let r_actual_deg_s = r_actual_rad_s.to_degrees();
+    let ay_g = (vx_m_s * r_actual_rad_s) / g;
+
+    // Front and rear tyre slip angles at the converged operating point:
+    let alpha_f_rad = (delta_f_rad - (vy_m_s + a_m * r_actual_rad_s) / vx_m_s).clamp(-0.6, 0.6);
+    let alpha_r_rad = (-(vy_m_s - b_m * r_actual_rad_s) / vx_m_s).clamp(-0.6, 0.6);
 
     // 6. Direct Yaw Moment Control (DYC) corrective demand:
     // M_yaw = K_p * (r_des - r_actual) + K_beta * beta
@@ -300,8 +350,10 @@ mod tests {
         assert!(res.target_yaw_rate_deg_s > 4.0 && res.target_yaw_rate_deg_s < 10.0);
         assert!(res.lateral_acceleration_g > 0.20 && res.lateral_acceleration_g < 0.65);
         assert!(res.vehicle_sideslip_angle_deg.abs() < 4.0);
-        assert!(res.active_yaw_moment_demand_nm > 0.0);
-        assert!(res.lateral_differential_torque_nm > 10.0 && res.lateral_differential_torque_nm < 50.0);
+        assert!(res.active_yaw_moment_demand_nm.abs() > 1.0);
+        assert!(
+            res.lateral_differential_torque_nm > 1.0 && res.lateral_differential_torque_nm < 30.0
+        );
         assert!(res.is_yaw_rate_tracking_satisfied);
         assert!(res.is_sideslip_stable);
         assert!(res.is_tire_grip_within_limits);

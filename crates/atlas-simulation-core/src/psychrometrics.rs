@@ -66,7 +66,9 @@ pub fn saturation_vapor_pressure_pa(temp_c: f64) -> f64 {
 }
 
 /// Solves moist air thermodynamic state properties per ASHRAE equations.
-pub fn solve_psychrometric_state(prob: &PsychrometricProblem) -> Result<PsychrometricResult, String> {
+pub fn solve_psychrometric_state(
+    prob: &PsychrometricProblem,
+) -> Result<PsychrometricResult, String> {
     let t_db = prob.dry_bulb_temp_c;
     if !(-60.0..=95.0).contains(&t_db) {
         return Err("Dry bulb temperature must be between -60°C and +95°C.".to_string());
@@ -82,7 +84,8 @@ pub fn solve_psychrometric_state(prob: &PsychrometricProblem) -> Result<Psychrom
         prob.relative_humidity / 100.0
     } else {
         prob.relative_humidity
-    }.clamp(0.001, 1.0);
+    }
+    .clamp(0.001, 1.0);
     let rh_pct = rh_frac * 100.0;
 
     // Saturation vapor pressure p_ws in Pa:
@@ -103,8 +106,7 @@ pub fn solve_psychrometric_state(prob: &PsychrometricProblem) -> Result<Psychrom
     let t_dp = (243.5 * alpha) / (17.67 - alpha);
 
     // Wet bulb temperature T_wb via Stull (2011) high-accuracy empirical formula:
-    let t_wb = t_db * (0.151977 * (rh_pct + 8.313659).sqrt()).atan()
-        + (t_db + rh_pct).atan()
+    let t_wb = t_db * (0.151977 * (rh_pct + 8.313659).sqrt()).atan() + (t_db + rh_pct).atan()
         - (rh_pct - 1.676331).atan()
         + 0.00391838 * rh_pct.powf(1.5) * (0.023101 * rh_pct).atan()
         - 4.686035;
@@ -118,11 +120,26 @@ pub fn solve_psychrometric_state(prob: &PsychrometricProblem) -> Result<Psychrom
     let rho_kg_m3 = (1.0 + w) / v_m3_kg;
 
     let notes = vec![
-        format!("Moist Air State: '{}' (T_db = {:.1} °C, RH = {:.1} %, p_atm = {:.0} Pa)", prob.stream_name, t_db, rh_pct, p_atm),
-        format!("Vapor Pressure: Saturation p_ws = {:.1} Pa, Actual p_v = {:.1} Pa", p_ws, p_v),
-        format!("Humidity Ratio: W = {:.5} kg/kg ({:.2} g/kg dry air)", w, w_g),
-        format!("Temperatures: Dew Point T_dp = {:.2} °C, Wet Bulb T_wb = {:.2} °C", t_dp, t_wb),
-        format!("Specific Properties: Enthalpy h = {:.2} kJ/kg, Volume v = {:.4} m³/kg, Density rho = {:.3} kg/m³", h_kj_kg, v_m3_kg, rho_kg_m3),
+        format!(
+            "Moist Air State: '{}' (T_db = {:.1} °C, RH = {:.1} %, p_atm = {:.0} Pa)",
+            prob.stream_name, t_db, rh_pct, p_atm
+        ),
+        format!(
+            "Vapor Pressure: Saturation p_ws = {:.1} Pa, Actual p_v = {:.1} Pa",
+            p_ws, p_v
+        ),
+        format!(
+            "Humidity Ratio: W = {:.5} kg/kg ({:.2} g/kg dry air)",
+            w, w_g
+        ),
+        format!(
+            "Temperatures: Dew Point T_dp = {:.2} °C, Wet Bulb T_wb = {:.2} °C",
+            t_dp, t_wb
+        ),
+        format!(
+            "Specific Properties: Enthalpy h = {:.2} kJ/kg, Volume v = {:.4} m³/kg, Density rho = {:.3} kg/m³",
+            h_kj_kg, v_m3_kg, rho_kg_m3
+        ),
     ];
 
     Ok(PsychrometricResult {
@@ -149,13 +166,25 @@ pub fn solve_psychrometrics_sim(prob: &PsychrometricProblem) -> Result<Simulatio
     let sol = solve_psychrometric_state(prob)?;
 
     let mut metrics = HashMap::new();
-    metrics.insert("saturation_vapor_pressure_pa".to_string(), sol.saturation_vapor_pressure_pa);
+    metrics.insert(
+        "saturation_vapor_pressure_pa".to_string(),
+        sol.saturation_vapor_pressure_pa,
+    );
     metrics.insert("humidity_ratio_g_kg".to_string(), sol.humidity_ratio_g_kg);
-    metrics.insert("specific_enthalpy_kj_kg".to_string(), sol.specific_enthalpy_kj_kg);
+    metrics.insert(
+        "specific_enthalpy_kj_kg".to_string(),
+        sol.specific_enthalpy_kj_kg,
+    );
     metrics.insert("dew_point_temp_c".to_string(), sol.dew_point_temp_c);
     metrics.insert("wet_bulb_temp_c".to_string(), sol.wet_bulb_temp_c);
-    metrics.insert("specific_volume_m3_kg".to_string(), sol.specific_volume_m3_kg);
-    metrics.insert("moist_air_density_kg_m3".to_string(), sol.moist_air_density_kg_m3);
+    metrics.insert(
+        "specific_volume_m3_kg".to_string(),
+        sol.specific_volume_m3_kg,
+    );
+    metrics.insert(
+        "moist_air_density_kg_m3".to_string(),
+        sol.moist_air_density_kg_m3,
+    );
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.specific_enthalpy_kj_kg, 1, 1e-4);
@@ -163,7 +192,8 @@ pub fn solve_psychrometrics_sim(prob: &PsychrometricProblem) -> Result<Simulatio
     let val = AnalyticalComparison::assess(
         "Psychrometric Enthalpy (kJ/kg)",
         sol.specific_enthalpy_kj_kg,
-        1.006 * prob.dry_bulb_temp_c + sol.humidity_ratio_kg_kg * (2501.0 + 1.86 * prob.dry_bulb_temp_c),
+        1.006 * prob.dry_bulb_temp_c
+            + sol.humidity_ratio_kg_kg * (2501.0 + 1.86 * prob.dry_bulb_temp_c),
     );
 
     Ok(SimulationResult {

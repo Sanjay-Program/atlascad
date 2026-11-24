@@ -7,11 +7,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
 use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Battery pack liquid cooling problem specification.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -123,7 +123,9 @@ pub struct BatteryThermalResult {
 }
 
 /// Solves battery pack thermal management and liquid cooling physics.
-pub fn solve_battery_thermal(problem: &BatteryThermalProblem) -> Result<BatteryThermalResult, String> {
+pub fn solve_battery_thermal(
+    problem: &BatteryThermalProblem,
+) -> Result<BatteryThermalResult, String> {
     if problem.cell_count_series == 0 || problem.cell_count_parallel == 0 {
         return Err("Cell count series and parallel must be greater than zero".to_string());
     }
@@ -208,12 +210,30 @@ pub fn solve_battery_thermal_sim(problem: &BatteryThermalProblem) -> SimulationR
     match solve_battery_thermal(problem) {
         Ok(result) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("total_pack_energy_kwh".to_string(), result.total_pack_energy_kwh);
-            metrics.insert("nominal_pack_voltage_v".to_string(), result.nominal_pack_voltage_v);
-            metrics.insert("total_pack_heat_dissipation_w".to_string(), result.total_pack_heat_dissipation_w);
-            metrics.insert("coolant_temperature_rise_c".to_string(), result.coolant_temperature_rise_c);
-            metrics.insert("maximum_cell_temp_c".to_string(), result.maximum_cell_temp_c);
-            metrics.insert("max_pack_temperature_gradient_c".to_string(), result.max_pack_temperature_gradient_c);
+            metrics.insert(
+                "total_pack_energy_kwh".to_string(),
+                result.total_pack_energy_kwh,
+            );
+            metrics.insert(
+                "nominal_pack_voltage_v".to_string(),
+                result.nominal_pack_voltage_v,
+            );
+            metrics.insert(
+                "total_pack_heat_dissipation_w".to_string(),
+                result.total_pack_heat_dissipation_w,
+            );
+            metrics.insert(
+                "coolant_temperature_rise_c".to_string(),
+                result.coolant_temperature_rise_c,
+            );
+            metrics.insert(
+                "maximum_cell_temp_c".to_string(),
+                result.maximum_cell_temp_c,
+            );
+            metrics.insert(
+                "max_pack_temperature_gradient_c".to_string(),
+                result.max_pack_temperature_gradient_c,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, result.maximum_cell_temp_c, 1, 1e-4);
@@ -232,7 +252,10 @@ pub fn solve_battery_thermal_sim(problem: &BatteryThermalProblem) -> SimulationR
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.thermal.battery_cooling_iec62660", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.thermal.battery_cooling_iec62660",
+                    "0.1.0",
+                ),
                 logs: vec![format!(
                     "Battery Thermal: {} kWh pack, Q_loss = {:.1} W, T_max = {:.1} °C, ΔT = {:.2} °C (Safe: {})",
                     result.total_pack_energy_kwh,
@@ -254,7 +277,10 @@ pub fn solve_battery_thermal_sim(problem: &BatteryThermalProblem) -> SimulationR
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.thermal.battery_cooling_iec62660", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.thermal.battery_cooling_iec62660",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Battery thermal simulation failed: {}", err)],
             }
         }
@@ -276,7 +302,10 @@ mod tests {
         assert!((res.total_pack_energy_kwh - 71.04).abs() < 0.1);
         assert!((res.cell_current_a - 50.0).abs() < 1e-3);
         assert!(res.cell_total_heat_w > 5.0 && res.cell_total_heat_w < 10.0);
-        assert!(res.total_pack_heat_dissipation_w > 2000.0 && res.total_pack_heat_dissipation_w < 3500.0);
+        assert!(
+            res.total_pack_heat_dissipation_w > 2000.0
+                && res.total_pack_heat_dissipation_w < 3500.0
+        );
         assert!(res.coolant_temperature_rise_c > 1.5 && res.coolant_temperature_rise_c < 4.0);
         assert!(res.maximum_cell_temp_c > 22.0 && res.maximum_cell_temp_c < 35.0);
         assert!(res.max_pack_temperature_gradient_c < 5.0);

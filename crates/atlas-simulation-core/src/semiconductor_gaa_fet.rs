@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Elementary charge q in Coulombs.
 pub const Q_ELEC: f64 = 1.602176634e-19;
@@ -36,7 +36,7 @@ impl GaaChannelMaterial {
     /// Returns (relative_permittivity, ballistic_injection_velocity_m_s).
     pub fn properties(&self) -> (f64, f64) {
         match self {
-            Self::Silicon          => (11.7, 1.25e5),
+            Self::Silicon => (11.7, 1.25e5),
             Self::SiliconGermanium => (12.5, 1.45e5),
         }
     }
@@ -135,13 +135,14 @@ pub struct GaaFetResult {
 }
 
 /// Solves GAA nanosheet FET 3D electrostatics, DIBL, subthreshold swing, and quasi-ballistic currents.
-pub fn solve_gaa_fet(
-    problem: &GaaFetProblem,
-) -> Result<GaaFetResult, String> {
+pub fn solve_gaa_fet(problem: &GaaFetProblem) -> Result<GaaFetResult, String> {
     if problem.nanosheet_count == 0 {
         return Err("Nanosheet count must be at least 1".to_string());
     }
-    if problem.gate_length_nm <= 0.0 || problem.nanosheet_width_nm <= 0.0 || problem.nanosheet_thickness_nm <= 0.0 {
+    if problem.gate_length_nm <= 0.0
+        || problem.nanosheet_width_nm <= 0.0
+        || problem.nanosheet_thickness_nm <= 0.0
+    {
         return Err("Nanosheet dimensions must be positive".to_string());
     }
     if problem.equivalent_oxide_thickness_nm <= 0.0 || problem.supply_voltage_v <= 0.0 {
@@ -233,18 +234,28 @@ pub fn solve_gaa_fet(
 }
 
 /// Executes GAA FET simulation and packages into SimulationResult envelope.
-pub fn solve_gaa_fet_sim(
-    problem: &GaaFetProblem,
-) -> SimulationResult {
+pub fn solve_gaa_fet_sim(problem: &GaaFetProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_gaa_fet(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("effective_gate_width_nm".to_string(), res.effective_gate_width_nm);
-            metrics.insert("natural_scaling_length_nm".to_string(), res.natural_scaling_length_nm);
-            metrics.insert("channel_control_ratio".to_string(), res.channel_control_ratio);
+            metrics.insert(
+                "effective_gate_width_nm".to_string(),
+                res.effective_gate_width_nm,
+            );
+            metrics.insert(
+                "natural_scaling_length_nm".to_string(),
+                res.natural_scaling_length_nm,
+            );
+            metrics.insert(
+                "channel_control_ratio".to_string(),
+                res.channel_control_ratio,
+            );
             metrics.insert("dibl_mv_v".to_string(), res.dibl_mv_v);
-            metrics.insert("subthreshold_swing_mv_dec".to_string(), res.subthreshold_swing_mv_dec);
+            metrics.insert(
+                "subthreshold_swing_mv_dec".to_string(),
+                res.subthreshold_swing_mv_dec,
+            );
             metrics.insert("on_current_ua".to_string(), res.on_current_ua);
             metrics.insert("off_current_pa".to_string(), res.off_current_pa);
             metrics.insert("on_off_ratio".to_string(), res.on_off_ratio);
@@ -269,10 +280,19 @@ pub fn solve_gaa_fet_sim(
                 provenance: SimulationProvenance::new("atlas.semiconductor.gaa_fet", "0.1.0"),
                 logs: vec![format!(
                     "GAA Nanosheet FET (Taur / BSIM-CMG): {} sheets, Weff = {:.0} nm, Lg = {:.1} nm (λ = {:.2} nm, Lg/λ = {:.2}), DIBL = {:.1} mV/V, SS = {:.1} mV/dec (ideal = {:.1}), Vth = {:.3} V, Ion = {:.1} μA, Ioff = {:.1} pA, Ion/Ioff = {:.2e}, Adequate Control: {}",
-                    problem.nanosheet_count, res.effective_gate_width_nm, problem.gate_length_nm,
-                    res.natural_scaling_length_nm, res.channel_control_ratio, res.dibl_mv_v,
-                    res.subthreshold_swing_mv_dec, res.thermal_limit_ss_mv_dec, res.threshold_voltage_v,
-                    res.on_current_ua, res.off_current_pa, res.on_off_ratio, res.is_channel_control_adequate
+                    problem.nanosheet_count,
+                    res.effective_gate_width_nm,
+                    problem.gate_length_nm,
+                    res.natural_scaling_length_nm,
+                    res.channel_control_ratio,
+                    res.dibl_mv_v,
+                    res.subthreshold_swing_mv_dec,
+                    res.thermal_limit_ss_mv_dec,
+                    res.threshold_voltage_v,
+                    res.on_current_ua,
+                    res.off_current_pa,
+                    res.on_off_ratio,
+                    res.is_channel_control_adequate
                 )],
             }
         }
@@ -306,8 +326,14 @@ mod tests {
         let res = solve_gaa_fet(&prob).expect("gaa fet solver failed");
         println!(
             "GAA FET: Weff = {:.0} nm, lambda = {:.2} nm, Lg/lambda = {:.2}, DIBL = {:.1} mV/V, SS = {:.1} mV/dec, Ion = {:.1} uA, Ioff = {:.1} pA, Ratio = {:.2e}",
-            res.effective_gate_width_nm, res.natural_scaling_length_nm, res.channel_control_ratio,
-            res.dibl_mv_v, res.subthreshold_swing_mv_dec, res.on_current_ua, res.off_current_pa, res.on_off_ratio
+            res.effective_gate_width_nm,
+            res.natural_scaling_length_nm,
+            res.channel_control_ratio,
+            res.dibl_mv_v,
+            res.subthreshold_swing_mv_dec,
+            res.on_current_ua,
+            res.off_current_pa,
+            res.on_off_ratio
         );
 
         assert_eq!(res.effective_gate_width_nm, 210.0);

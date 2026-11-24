@@ -6,12 +6,12 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
-use std::f64::consts::PI;
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
+use std::f64::consts::PI;
 
 /// Stent biomaterial alloy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -32,8 +32,8 @@ impl StentMaterial {
         match self {
             Self::CobaltChromiumL605 => (243.0, 510.0, 1050.0, 42.0),
             Self::StainlessSteel316L => (193.0, 310.0, 620.0, 45.0),
-            Self::PlatinumChromium   => (210.0, 460.0, 920.0, 40.0),
-            Self::Nitinol            => (75.0,  550.0, 1100.0, 18.0),
+            Self::PlatinumChromium => (210.0, 460.0, 920.0, 40.0),
+            Self::Nitinol => (75.0, 550.0, 1100.0, 18.0),
         }
     }
 }
@@ -138,7 +138,10 @@ pub fn solve_stent_expansion(
     if problem.crimped_diameter_mm <= 0.0 || problem.nominal_expanded_diameter_mm <= 0.0 {
         return Err("Diameters must be positive".to_string());
     }
-    if problem.nominal_length_mm <= 0.0 || problem.strut_thickness_um <= 0.0 || problem.strut_width_um <= 0.0 {
+    if problem.nominal_length_mm <= 0.0
+        || problem.strut_thickness_um <= 0.0
+        || problem.strut_width_um <= 0.0
+    {
         return Err("Dimensions must be positive".to_string());
     }
     if problem.balloon_pressure_atm <= 0.0 {
@@ -192,7 +195,8 @@ pub fn solve_stent_expansion(
     // 5. Peak plastic strain in crown inner radius:
     // Crown inner radius r_crown ~ 0.5 * w_strut
     // eps_max = t_strut / (2 * r_crown) * factor
-    let peak_plastic_strain_pct = ((w_strut_mm / (d_crimp * PI / n_crowns)) * 18.0).clamp(8.0, 26.0);
+    let peak_plastic_strain_pct =
+        ((w_strut_mm / (d_crimp * PI / n_crowns)) * 18.0).clamp(8.0, 26.0);
     let fracture_safety_factor = (elong_break_pct / peak_plastic_strain_pct).max(1.0);
 
     // 6. FDA and ASTM F3067 compliance check:
@@ -224,19 +228,29 @@ pub fn solve_stent_expansion(
 }
 
 /// Executes stent expansion simulation and packages into SimulationResult envelope.
-pub fn solve_stent_expansion_sim(
-    problem: &StentExpansionProblem,
-) -> SimulationResult {
+pub fn solve_stent_expansion_sim(problem: &StentExpansionProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_stent_expansion(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("inflated_outer_diameter_mm".to_string(), res.inflated_outer_diameter_mm);
-            metrics.insert("post_recoil_diameter_mm".to_string(), res.post_recoil_diameter_mm);
+            metrics.insert(
+                "inflated_outer_diameter_mm".to_string(),
+                res.inflated_outer_diameter_mm,
+            );
+            metrics.insert(
+                "post_recoil_diameter_mm".to_string(),
+                res.post_recoil_diameter_mm,
+            );
             metrics.insert("elastic_recoil_pct".to_string(), res.elastic_recoil_pct);
             metrics.insert("foreshortening_pct".to_string(), res.foreshortening_pct);
-            metrics.insert("radial_resistive_force_n_mm".to_string(), res.radial_resistive_force_n_mm);
-            metrics.insert("fracture_safety_factor".to_string(), res.fracture_safety_factor);
+            metrics.insert(
+                "radial_resistive_force_n_mm".to_string(),
+                res.radial_resistive_force_n_mm,
+            );
+            metrics.insert(
+                "fracture_safety_factor".to_string(),
+                res.fracture_safety_factor,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, res.post_recoil_diameter_mm, 1, 1e-4);
@@ -258,9 +272,15 @@ pub fn solve_stent_expansion_sim(
                 provenance: SimulationProvenance::new("atlas.biomedical.stent_expansion", "0.1.0"),
                 logs: vec![format!(
                     "Stent Biomechanics (ASTM F3067): Material = {:?}, D_infl = {:.3} mm -> D_post = {:.3} mm, Recoil = {:.2}% (<= 5%), FS = {:.2}% (<= 8%), RRF = {:.2} N/mm, Strain = {:.1}%, FoS = {:.2}, FDA Compliant: {}",
-                    res.stent_material, res.inflated_outer_diameter_mm, res.post_recoil_diameter_mm,
-                    res.elastic_recoil_pct, res.foreshortening_pct, res.radial_resistive_force_n_mm,
-                    res.peak_plastic_strain_pct, res.fracture_safety_factor, res.is_fda_compliant
+                    res.stent_material,
+                    res.inflated_outer_diameter_mm,
+                    res.post_recoil_diameter_mm,
+                    res.elastic_recoil_pct,
+                    res.foreshortening_pct,
+                    res.radial_resistive_force_n_mm,
+                    res.peak_plastic_strain_pct,
+                    res.fracture_safety_factor,
+                    res.is_fda_compliant
                 )],
             }
         }
@@ -292,9 +312,14 @@ mod tests {
     fn test_stent_expansion_nominal() {
         let prob = StentExpansionProblem::default();
         let res = solve_stent_expansion(&prob).expect("solver failed");
-        println!("Stent Expansion: D_post = {:.3} mm, Recoil = {:.2}%, FS = {:.2}%, RRF = {:.2} N/mm, FoS = {:.2}",
-            res.post_recoil_diameter_mm, res.elastic_recoil_pct, res.foreshortening_pct,
-            res.radial_resistive_force_n_mm, res.fracture_safety_factor);
+        println!(
+            "Stent Expansion: D_post = {:.3} mm, Recoil = {:.2}%, FS = {:.2}%, RRF = {:.2} N/mm, FoS = {:.2}",
+            res.post_recoil_diameter_mm,
+            res.elastic_recoil_pct,
+            res.foreshortening_pct,
+            res.radial_resistive_force_n_mm,
+            res.fracture_safety_factor
+        );
 
         assert!(res.expansion_ratio > 2.5 && res.expansion_ratio < 3.5);
         assert!(res.inflated_outer_diameter_mm > 3.10 && res.inflated_outer_diameter_mm < 3.30);

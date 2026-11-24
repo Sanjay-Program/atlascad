@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Engineering alloy powder material for LPBF additive manufacturing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -29,10 +29,10 @@ impl LpbfPowderMaterial {
     /// Returns (density_kg_m3, melting_temp_k, thermal_cond_w_m_k, specific_heat_j_kg_k, laser_absorptivity, boiling_temp_k).
     pub fn thermophysical_properties(&self) -> (f64, f64, f64, f64, f64, f64) {
         match self {
-            Self::Ti6Al4V    => (4430.0, 1928.0, 7.20,  560.0, 0.35, 3560.0),
-            Self::Ss316L     => (7950.0, 1673.0, 21.50, 500.0, 0.40, 3090.0),
+            Self::Ti6Al4V => (4430.0, 1928.0, 7.20, 560.0, 0.35, 3560.0),
+            Self::Ss316L => (7950.0, 1673.0, 21.50, 500.0, 0.40, 3090.0),
             Self::Inconel718 => (8190.0, 1609.0, 11.40, 435.0, 0.42, 3190.0),
-            Self::AlSi10Mg   => (2680.0, 867.0,  150.0, 910.0, 0.16, 2740.0),
+            Self::AlSi10Mg => (2680.0, 867.0, 150.0, 910.0, 0.16, 2740.0),
         }
     }
 }
@@ -135,13 +135,14 @@ pub struct LpbfResult {
 }
 
 /// Solves LPBF laser melt pool thermals, normalized enthalpy, dimensions, and defect regimes.
-pub fn solve_lpbf_meltpool(
-    problem: &LpbfProblem,
-) -> Result<LpbfResult, String> {
+pub fn solve_lpbf_meltpool(problem: &LpbfProblem) -> Result<LpbfResult, String> {
     if problem.laser_power_w <= 0.0 || problem.scan_speed_mm_s <= 0.0 {
         return Err("Laser power and scan speed must be positive".to_string());
     }
-    if problem.beam_diameter_um <= 0.0 || problem.layer_thickness_um <= 0.0 || problem.hatch_spacing_um <= 0.0 {
+    if problem.beam_diameter_um <= 0.0
+        || problem.layer_thickness_um <= 0.0
+        || problem.hatch_spacing_um <= 0.0
+    {
         return Err("Geometrical parameters must be positive".to_string());
     }
 
@@ -157,7 +158,10 @@ pub fn solve_lpbf_meltpool(
 
     // 1. Volumetric Energy Density (VED) [J/mm³]:
     // VED = P / (v * h * t)
-    let ved_j_mm3 = problem.laser_power_w / (problem.scan_speed_mm_s * (problem.hatch_spacing_um * 1e-3) * (problem.layer_thickness_um * 1e-3));
+    let ved_j_mm3 = problem.laser_power_w
+        / (problem.scan_speed_mm_s
+            * (problem.hatch_spacing_um * 1e-3)
+            * (problem.layer_thickness_um * 1e-3));
     let led_j_mm = problem.laser_power_w / problem.scan_speed_mm_s;
 
     // 2. Thermal Diffusivity alpha [m²/s]:
@@ -185,7 +189,10 @@ pub fn solve_lpbf_meltpool(
     // 5. Melt pool dimensions (Rosenthal / Eagar-Tsai calibrated model):
     // Width W_mp:
     let p_eff = absorptivity * problem.laser_power_w;
-    let w_mp_m = ((8.0 / (std::f64::consts::E * std::f64::consts::PI)).sqrt() * (p_eff / (k_th * delta_t)).sqrt() * (alpha / v_m_s).sqrt()).clamp(problem.beam_diameter_um * 1e-6 * 0.8, 0.0004);
+    let w_mp_m = ((8.0 / (std::f64::consts::E * std::f64::consts::PI)).sqrt()
+        * (p_eff / (k_th * delta_t)).sqrt()
+        * (alpha / v_m_s).sqrt())
+    .clamp(problem.beam_diameter_um * 1e-6 * 0.8, 0.0004);
     let w_mp_um = w_mp_m * 1e6;
 
     // Depth D_mp:
@@ -213,8 +220,10 @@ pub fn solve_lpbf_meltpool(
         LpbfProcessRegime::Conduction
     };
 
-    let is_acceptable = matches!(regime, LpbfProcessRegime::Conduction | LpbfProcessRegime::Transition)
-        && hatch_overlap >= 1.15
+    let is_acceptable = matches!(
+        regime,
+        LpbfProcessRegime::Conduction | LpbfProcessRegime::Transition
+    ) && hatch_overlap >= 1.15
         && penetration_ratio >= 1.30;
 
     Ok(LpbfResult {
@@ -236,15 +245,19 @@ pub fn solve_lpbf_meltpool(
 }
 
 /// Executes LPBF melt pool simulation and packages into SimulationResult envelope.
-pub fn solve_lpbf_meltpool_sim(
-    problem: &LpbfProblem,
-) -> SimulationResult {
+pub fn solve_lpbf_meltpool_sim(problem: &LpbfProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_lpbf_meltpool(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("volumetric_energy_density_j_mm3".to_string(), res.volumetric_energy_density_j_mm3);
-            metrics.insert("linear_energy_density_j_mm".to_string(), res.linear_energy_density_j_mm);
+            metrics.insert(
+                "volumetric_energy_density_j_mm3".to_string(),
+                res.volumetric_energy_density_j_mm3,
+            );
+            metrics.insert(
+                "linear_energy_density_j_mm".to_string(),
+                res.linear_energy_density_j_mm,
+            );
             metrics.insert("normalized_enthalpy".to_string(), res.normalized_enthalpy);
             metrics.insert("meltpool_width_um".to_string(), res.meltpool_width_um);
             metrics.insert("meltpool_depth_um".to_string(), res.meltpool_depth_um);
@@ -256,11 +269,8 @@ pub fn solve_lpbf_meltpool_sim(
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, res.meltpool_width_um, 1, 1e-4);
 
-            let comparison = AnalyticalComparison::assess(
-                "meltpool_width_um",
-                res.meltpool_width_um,
-                135.0,
-            );
+            let comparison =
+                AnalyticalComparison::assess("meltpool_width_um", res.meltpool_width_um, 135.0);
 
             SimulationResult {
                 problem_id: problem.problem_id.clone(),
@@ -273,10 +283,17 @@ pub fn solve_lpbf_meltpool_sim(
                 provenance: SimulationProvenance::new("atlas.manufacturing.lpbf_meltpool", "0.1.0"),
                 logs: vec![format!(
                     "LPBF Melt Pool (King / Rosenthal): VED = {:.1} J/mm³, Delta_H/hs = {:.2} (Keyhole crit = {:.2}), W_mp = {:.1} μm, D_mp = {:.1} μm, AR = {:.2}, Overlap = {:.2}x, Penetration = {:.2}x, dT/dt = {:.2e} K/s, Regime: {:?}, Acceptable: {}",
-                    res.volumetric_energy_density_j_mm3, res.normalized_enthalpy,
-                    res.keyhole_threshold_enthalpy, res.meltpool_width_um, res.meltpool_depth_um,
-                    res.aspect_ratio, res.hatch_overlap_ratio, res.penetration_ratio,
-                    res.cooling_rate_k_s, res.regime, res.is_acceptable
+                    res.volumetric_energy_density_j_mm3,
+                    res.normalized_enthalpy,
+                    res.keyhole_threshold_enthalpy,
+                    res.meltpool_width_um,
+                    res.meltpool_depth_um,
+                    res.aspect_ratio,
+                    res.hatch_overlap_ratio,
+                    res.penetration_ratio,
+                    res.cooling_rate_k_s,
+                    res.regime,
+                    res.is_acceptable
                 )],
             }
         }
@@ -310,12 +327,19 @@ mod tests {
         let res = solve_lpbf_meltpool(&prob).expect("lpbf solver failed");
         println!(
             "LPBF: VED = {:.1} J/mm³, NormH = {:.2}, W = {:.1} μm, D = {:.1} μm, AR = {:.2}, Regime = {:?}, Acceptable = {}",
-            res.volumetric_energy_density_j_mm3, res.normalized_enthalpy,
-            res.meltpool_width_um, res.meltpool_depth_um, res.aspect_ratio,
-            res.regime, res.is_acceptable
+            res.volumetric_energy_density_j_mm3,
+            res.normalized_enthalpy,
+            res.meltpool_width_um,
+            res.meltpool_depth_um,
+            res.aspect_ratio,
+            res.regime,
+            res.is_acceptable
         );
 
-        assert!(res.volumetric_energy_density_j_mm3 > 50.0 && res.volumetric_energy_density_j_mm3 < 80.0);
+        assert!(
+            res.volumetric_energy_density_j_mm3 > 50.0
+                && res.volumetric_energy_density_j_mm3 < 80.0
+        );
         assert!(res.normalized_enthalpy > 2.5 && res.normalized_enthalpy < 5.5);
         assert!(res.meltpool_width_um > 100.0 && res.meltpool_width_um < 170.0);
         assert!(res.meltpool_depth_um > 50.0 && res.meltpool_depth_um < 100.0);

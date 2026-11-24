@@ -150,7 +150,9 @@ pub struct HydraulicActuatorResult {
 }
 
 /// Solves hydraulic actuator mechanics, barrel stresses, rod buckling, and cushioning.
-pub fn solve_hydraulic_actuator(problem: &HydraulicActuatorProblem) -> Result<HydraulicActuatorResult, String> {
+pub fn solve_hydraulic_actuator(
+    problem: &HydraulicActuatorProblem,
+) -> Result<HydraulicActuatorResult, String> {
     if problem.bore_diameter_mm <= 0.0 {
         return Err("Bore diameter must be positive".to_string());
     }
@@ -203,7 +205,10 @@ pub fn solve_hydraulic_actuator(problem: &HydraulicActuatorProblem) -> Result<Hy
     let sigma_z = p_mpa * r_i_sq / denominator;
 
     // von Mises equivalent stress
-    let vm_sq = 0.5 * ((sigma_theta - sigma_r).powi(2) + (sigma_r - sigma_z).powi(2) + (sigma_z - sigma_theta).powi(2));
+    let vm_sq = 0.5
+        * ((sigma_theta - sigma_r).powi(2)
+            + (sigma_r - sigma_z).powi(2)
+            + (sigma_z - sigma_theta).powi(2));
     let barrel_von_mises = vm_sq.sqrt();
     let barrel_sf = problem.barrel_yield_strength_mpa / barrel_von_mises.max(1.0e-4);
 
@@ -236,7 +241,8 @@ pub fn solve_hydraulic_actuator(problem: &HydraulicActuatorProblem) -> Result<Hy
         (p_euler, "EulerElastic".to_string())
     } else {
         // Johnson parabolic inelastic formula
-        let p_johnson = a_rod_m2 * (s_y_pa - (s_y_pa * s_y_pa / (4.0 * PI * PI * e_pa)) * lambda * lambda);
+        let p_johnson =
+            a_rod_m2 * (s_y_pa - (s_y_pa * s_y_pa / (4.0 * PI * PI * e_pa)) * lambda * lambda);
         (p_johnson.max(1.0), "JohnsonInelastic".to_string())
     };
 
@@ -269,14 +275,22 @@ pub fn solve_hydraulic_actuator(problem: &HydraulicActuatorProblem) -> Result<Hy
         push_force_kn,
         pull_force_kn,
         barrel_sf,
-        if is_barrel_safe { "PASS" } else { "INSUFFICIENT" },
+        if is_barrel_safe {
+            "PASS"
+        } else {
+            "INSUFFICIENT"
+        },
         rod_buckling_sf,
         mode,
         lambda,
         lambda_c,
         peak_cushion_bar,
         proof_limit_bar,
-        if is_safe { "SAFE CONFORMANT" } else { "REDESIGN REQUIRED" }
+        if is_safe {
+            "SAFE CONFORMANT"
+        } else {
+            "REDESIGN REQUIRED"
+        }
     );
 
     Ok(HydraulicActuatorResult {
@@ -314,18 +328,24 @@ pub fn solve_hydraulic_actuator_sim(problem: &HydraulicActuatorProblem) -> Simul
             let mut metrics = std::collections::HashMap::new();
             metrics.insert("push_force_kn".to_string(), result.push_force_kn);
             metrics.insert("pull_force_kn".to_string(), result.pull_force_kn);
-            metrics.insert("barrel_safety_factor".to_string(), result.barrel_safety_factor);
-            metrics.insert("rod_buckling_safety_factor".to_string(), result.rod_buckling_safety_factor);
-            metrics.insert("peak_cushion_pressure_bar".to_string(), result.peak_cushion_pressure_bar);
+            metrics.insert(
+                "barrel_safety_factor".to_string(),
+                result.barrel_safety_factor,
+            );
+            metrics.insert(
+                "rod_buckling_safety_factor".to_string(),
+                result.rod_buckling_safety_factor,
+            );
+            metrics.insert(
+                "peak_cushion_pressure_bar".to_string(),
+                result.peak_cushion_pressure_bar,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, result.push_force_kn, 1, 1e-4);
 
-            let comparison = AnalyticalComparison::assess(
-                "push_force_kn",
-                result.push_force_kn,
-                150.0,
-            );
+            let comparison =
+                AnalyticalComparison::assess("push_force_kn", result.push_force_kn, 150.0);
 
             SimulationResult {
                 problem_id: problem.problem_id.clone(),
@@ -379,8 +399,8 @@ mod tests {
     #[test]
     fn test_hydraulic_actuator_buckling_failure() {
         let prob = HydraulicActuatorProblem {
-            stroke_length_mm: 3500.0, // very long stroke
-            rod_diameter_mm: 30.0,    // thin rod
+            stroke_length_mm: 3500.0,                             // very long stroke
+            rod_diameter_mm: 30.0,                                // thin rod
             mounting_end_condition: MountingCondition::FixedFree, // K=2.0
             ..Default::default()
         };

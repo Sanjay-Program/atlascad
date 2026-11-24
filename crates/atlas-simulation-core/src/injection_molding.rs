@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Engineering polymer resin classification with thermal and rheological properties.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,8 +33,8 @@ impl PolymerResin {
     pub fn properties(&self) -> (f64, f64, f64, f64, f64, f64, f64, f64) {
         match self {
             Self::Polypropylene => (230.0, 40.0, 90.0, 0.095, 905.0, 0.35, 8500.0, 1.8),
-            Self::ABS           => (240.0, 60.0, 95.0, 0.120, 1040.0, 0.32, 12000.0, 0.6),
-            Self::Polyamide66   => (285.0, 80.0, 150.0, 0.110, 1140.0, 0.40, 6500.0, 1.5),
+            Self::ABS => (240.0, 60.0, 95.0, 0.120, 1040.0, 0.32, 12000.0, 0.6),
+            Self::Polyamide66 => (285.0, 80.0, 150.0, 0.110, 1140.0, 0.40, 6500.0, 1.5),
             Self::Polycarbonate => (300.0, 90.0, 135.0, 0.135, 1200.0, 0.30, 22000.0, 0.7),
             Self::Polyoxymethylene => (205.0, 85.0, 120.0, 0.085, 1410.0, 0.36, 9500.0, 2.0),
         }
@@ -157,7 +157,8 @@ pub fn solve_injection_molding(
     }
 
     let log_arg = (4.0 / std::f64::consts::PI) * (delta_t_total / delta_t_eject);
-    let cooling_time_s = (h * h / (std::f64::consts::PI * std::f64::consts::PI * alpha_diff)) * log_arg.ln();
+    let cooling_time_s =
+        (h * h / (std::f64::consts::PI * std::f64::consts::PI * alpha_diff)) * log_arg.ln();
 
     // 2. Volumetric flow rate and flow-length-to-thickness ratio:
     let total_volume_cm3 = problem.cavity_volume_cm3 * problem.cavity_count as f64 * 1.12; // +12% runner system
@@ -169,8 +170,8 @@ pub fn solve_injection_molding(
     // PP/ABS ~ 300 - 600 bar; PC/PA66 ~ 500 - 900 bar depending on flow ratio
     let base_flow_factor = match problem.resin {
         PolymerResin::Polypropylene => 2.2,
-        PolymerResin::ABS           => 2.8,
-        PolymerResin::Polyamide66   => 3.2,
+        PolymerResin::ABS => 2.8,
+        PolymerResin::Polyamide66 => 3.2,
         PolymerResin::Polyoxymethylene => 2.6,
         PolymerResin::Polycarbonate => 4.2,
     };
@@ -187,14 +188,19 @@ pub fn solve_injection_molding(
     let avg_cavity_pressure_bar = peak_cavity_pressure_bar * 0.65; // average pressure across mold cavity
     let clamp_force_n = avg_cavity_pressure_bar * 10.0 * total_proj_area_cm2;
     let required_clamp_force_tonnes = clamp_force_n / 9806.65;
-    let sf = if problem.clamp_safety_factor > 1.0 { problem.clamp_safety_factor } else { 1.20 };
+    let sf = if problem.clamp_safety_factor > 1.0 {
+        problem.clamp_safety_factor
+    } else {
+        1.20
+    };
     let recommended_clamp_tonnage_t = (required_clamp_force_tonnes * sf / 10.0).ceil() * 10.0; // round up to standard 10-tonne machine step
 
     // 5. Total molding cycle time:
     // t_cycle = t_inject + t_pack + t_cool + t_mold_open_eject_close (~4.0s)
     let pack_time_s = (cooling_time_s * 0.35).max(1.5);
     let mold_dry_cycle_s = 4.0;
-    let total_cycle_time_s = problem.injection_time_s + pack_time_s + cooling_time_s + mold_dry_cycle_s;
+    let total_cycle_time_s =
+        problem.injection_time_s + pack_time_s + cooling_time_s + mold_dry_cycle_s;
 
     // 6. Shot mass:
     let total_shot_mass_g = total_volume_cm3 * (density_kg_m3 / 1000.0);
@@ -226,18 +232,25 @@ pub fn solve_injection_molding(
 }
 
 /// Executes injection molding simulation and packages into SimulationResult envelope.
-pub fn solve_injection_molding_sim(
-    problem: &InjectionMoldingProblem,
-) -> SimulationResult {
+pub fn solve_injection_molding_sim(problem: &InjectionMoldingProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_injection_molding(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
             metrics.insert("cooling_time_s".to_string(), res.cooling_time_s);
             metrics.insert("total_cycle_time_s".to_string(), res.total_cycle_time_s);
-            metrics.insert("peak_cavity_pressure_bar".to_string(), res.peak_cavity_pressure_bar);
-            metrics.insert("required_clamp_force_tonnes".to_string(), res.required_clamp_force_tonnes);
-            metrics.insert("recommended_clamp_tonnage_t".to_string(), res.recommended_clamp_tonnage_t);
+            metrics.insert(
+                "peak_cavity_pressure_bar".to_string(),
+                res.peak_cavity_pressure_bar,
+            );
+            metrics.insert(
+                "required_clamp_force_tonnes".to_string(),
+                res.required_clamp_force_tonnes,
+            );
+            metrics.insert(
+                "recommended_clamp_tonnage_t".to_string(),
+                res.recommended_clamp_tonnage_t,
+            );
             metrics.insert("total_shot_mass_g".to_string(), res.total_shot_mass_g);
 
             let mut conv = ConvergenceMonitor::new(1e-6);
@@ -257,11 +270,18 @@ pub fn solve_injection_molding_sim(
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.manufacturing.injection_molding_spe", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.manufacturing.injection_molding_spe",
+                    "0.1.0",
+                ),
                 logs: vec![format!(
                     "Injection Molding (ISO 294): t_cool = {:.2}s, t_cycle = {:.2}s, P_peak = {:.1} bar, Clamp = {:.1} t (Rec = {:.0} t), Safe: {}",
-                    res.cooling_time_s, res.total_cycle_time_s, res.peak_cavity_pressure_bar,
-                    res.required_clamp_force_tonnes, res.recommended_clamp_tonnage_t, res.is_safe
+                    res.cooling_time_s,
+                    res.total_cycle_time_s,
+                    res.peak_cavity_pressure_bar,
+                    res.required_clamp_force_tonnes,
+                    res.recommended_clamp_tonnage_t,
+                    res.is_safe
                 )],
             }
         }
@@ -277,7 +297,10 @@ pub fn solve_injection_molding_sim(
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.manufacturing.injection_molding_spe", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.manufacturing.injection_molding_spe",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Injection molding simulation failed: {}", err)],
             }
         }
@@ -293,13 +316,21 @@ mod tests {
     fn test_injection_molding_nominal() {
         let prob = InjectionMoldingProblem::default();
         let res = solve_injection_molding(&prob).expect("solver failed");
-        println!("Injection Molding: t_cool = {:.2}s, t_cycle = {:.2}s, P_peak = {:.1} bar, Clamp = {:.1} t (Rec = {:.0} t), Shot = {:.1} g",
-            res.cooling_time_s, res.total_cycle_time_s, res.peak_cavity_pressure_bar,
-            res.required_clamp_force_tonnes, res.recommended_clamp_tonnage_t, res.total_shot_mass_g);
+        println!(
+            "Injection Molding: t_cool = {:.2}s, t_cycle = {:.2}s, P_peak = {:.1} bar, Clamp = {:.1} t (Rec = {:.0} t), Shot = {:.1} g",
+            res.cooling_time_s,
+            res.total_cycle_time_s,
+            res.peak_cavity_pressure_bar,
+            res.required_clamp_force_tonnes,
+            res.recommended_clamp_tonnage_t,
+            res.total_shot_mass_g
+        );
 
         assert!(res.cooling_time_s > 5.0 && res.cooling_time_s < 30.0);
         assert!(res.total_cycle_time_s > res.cooling_time_s);
-        assert!(res.flow_length_to_thickness_ratio > 40.0 && res.flow_length_to_thickness_ratio < 120.0);
+        assert!(
+            res.flow_length_to_thickness_ratio > 40.0 && res.flow_length_to_thickness_ratio < 120.0
+        );
         assert!(res.peak_cavity_pressure_bar > 200.0 && res.peak_cavity_pressure_bar < 1000.0);
         assert!(res.required_clamp_force_tonnes > 80.0 && res.required_clamp_force_tonnes < 300.0);
         assert!(res.recommended_clamp_tonnage_t >= res.required_clamp_force_tonnes);

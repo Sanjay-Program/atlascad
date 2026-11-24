@@ -128,7 +128,10 @@ pub fn solve_crash_deceleration(
         return Err("Impact velocity must be between 5 and 160 km/h".to_string());
     }
     if problem.crumple_zone_length_m <= 0.10 || problem.crash_box_mean_force_kn <= 10.0 {
-        return Err("Crumple zone length and crash box force must be positive engineering values".to_string());
+        return Err(
+            "Crumple zone length and crash box force must be positive engineering values"
+                .to_string(),
+        );
     }
 
     let g_accel = 9.80665;
@@ -139,7 +142,7 @@ pub fn solve_crash_deceleration(
     // Structural effective stiffness and crush force accounting for scenario offset and deformable barrier energy absorption:
     let (barrier_absorption_ratio, scenario_force_factor) = match problem.scenario {
         CrashScenario::OffsetDeformableBarrier40Pct => (0.25, 1.10), // barrier absorbs 25% of KE
-        CrashScenario::FullWidthRigidBarrier => (0.00, 1.40),      // rigid wall, both rails engage
+        CrashScenario::FullWidthRigidBarrier => (0.00, 1.40), // rigid wall, both rails engage
         CrashScenario::SmallOverlapRigidBarrier25Pct => (0.00, 0.70), // narrow offset engagement
     };
 
@@ -169,16 +172,18 @@ pub fn solve_crash_deceleration(
 
     // Occupant restraint coupling:
     // Restraint belt load limiter cap and airbag cushioning:
-    let (belt_load_limit_kn, chest_coupling_factor, head_accel_factor): (f64, f64, f64) = match problem.restraint {
-        RestraintSystemType::AdvancedAirbagAndAdaptiveBelt => (3.5, 0.65, 0.70),
-        RestraintSystemType::BeltPretensionerWithLoadLimiter => (4.0, 0.75, 0.85),
-        RestraintSystemType::ConventionalThreePointBelt => (6.5, 1.10, 1.35),
-    };
+    let (belt_load_limit_kn, chest_coupling_factor, head_accel_factor): (f64, f64, f64) =
+        match problem.restraint {
+            RestraintSystemType::AdvancedAirbagAndAdaptiveBelt => (3.5, 0.65, 0.70),
+            RestraintSystemType::BeltPretensionerWithLoadLimiter => (4.0, 0.75, 0.85),
+            RestraintSystemType::ConventionalThreePointBelt => (6.5, 1.10, 1.35),
+        };
 
     let f_belt_kn = belt_load_limit_kn.min(problem.occupant_mass_kg * a_peak_m_s2 / 1000.0);
 
     // Occupant chest acceleration (3 ms clip):
-    let a_chest_g = (a_mean_g * chest_coupling_factor + (f_belt_kn * 1000.0 / problem.occupant_mass_kg) / g_accel * 0.5)
+    let a_chest_g = (a_mean_g * chest_coupling_factor
+        + (f_belt_kn * 1000.0 / problem.occupant_mass_kg) / g_accel * 0.5)
         .clamp(15.0, 75.0);
 
     // Chest deflection (mm) based on chest force and sternal stiffness (~ 0.25 kN/mm):

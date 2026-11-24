@@ -97,14 +97,19 @@ pub fn solve_column_buckling(prob: &BucklingProblem) -> Result<SimulationResult,
         f64::INFINITY
     };
 
-    // Analytical verification for Pinned-Pinned Euler formula
-    let analytical_euler_p =
+    // Analytical reference for the active regime: Euler elastic or Johnson inelastic.
+    let analytical_p_cr = if slenderness >= lambda_crit {
         (std::f64::consts::PI * std::f64::consts::PI * prob.elastic_modulus_pa * i)
-            / (l_eff * l_eff);
+            / (l_eff * l_eff)
+    } else {
+        let factor = (prob.yield_strength_pa * slenderness * slenderness)
+            / (4.0 * std::f64::consts::PI * std::f64::consts::PI * prob.elastic_modulus_pa);
+        prob.yield_strength_pa * (1.0 - factor).max(0.1) * a
+    };
     let val = AnalyticalComparison::assess(
-        "Euler Classical Critical Buckling Load (N)",
+        "Euler/Johnson Critical Buckling Load (N)",
         p_cr,
-        analytical_euler_p,
+        analytical_p_cr,
     );
 
     let mut metrics = HashMap::new();

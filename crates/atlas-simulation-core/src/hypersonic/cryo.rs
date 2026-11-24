@@ -93,7 +93,8 @@ pub fn evaluate_cryogenic_system(
     let inducer_speed_rpm = 24_000.0;
     let inducer_flow_gpm = flow_rate_gpm * 0.5; // Twin parallel inducer entry
     let target_nss = 35_000.0;
-    let npsh_required_m = ((inducer_speed_rpm * inducer_flow_gpm.sqrt()) / target_nss).powf(4.0 / 3.0);
+    let npsh_required_m =
+        ((inducer_speed_rpm * inducer_flow_gpm.sqrt()) / target_nss).powf(4.0 / 3.0);
     let cavitation_safety_margin = npsh_available_m / npsh_required_m.max(1.0);
 
     // Fuel slosh damping with perforated ring baffles
@@ -151,7 +152,7 @@ pub fn evaluate_slush_hydrogen(
 ) -> SlushHydrogenResult {
     let phi = solid_fraction.clamp(0.0, 0.65);
     let rho_liquid_tp = 77.0; // kg/m^3 at triple point 13.8 K
-    let rho_solid_tp = 86.6;  // kg/m^3 solid hydrogen at 13.8 K
+    let rho_solid_tp = 86.6; // kg/m^3 solid hydrogen at 13.8 K
 
     // Slush mixture density: 1 / rho_slush = (1 - phi)/rho_l + phi/rho_s
     let inv_rho = ((1.0 - phi) / rho_liquid_tp) + (phi / rho_solid_tp);

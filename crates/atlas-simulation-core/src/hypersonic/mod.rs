@@ -287,7 +287,7 @@ pub fn solve_hypersonic_airplane(
         0.80,   // 80 cm skin panel length
         0.0035, // 3.5 mm UHTC skin thickness
         t_wall_c,
-        480.0,  // 480 GPa ZrB2-SiC baseline
+        480.0, // 480 GPa ZrB2-SiC baseline
         0.15,
         6080.0,
         atmos.density_kg_m3,
@@ -330,8 +330,14 @@ pub fn solve_hypersonic_airplane(
     metrics.insert("wall_equilibrium_temp_c".to_string(), t_wall_c);
     metrics.insert("thermal_safety_margin_c".to_string(), thermal_margin_c);
     metrics.insert("structural_fos".to_string(), structural_fos);
-    metrics.insert("scramjet_air_flow_kg_s".to_string(), scram_res.air_mass_flow_kg_s);
-    metrics.insert("scramjet_fuel_flow_kg_s".to_string(), scram_res.fuel_mass_flow_kg_s);
+    metrics.insert(
+        "scramjet_air_flow_kg_s".to_string(),
+        scram_res.air_mass_flow_kg_s,
+    );
+    metrics.insert(
+        "scramjet_fuel_flow_kg_s".to_string(),
+        scram_res.fuel_mass_flow_kg_s,
+    );
     metrics.insert("scramjet_net_thrust_kn".to_string(), net_thrust_kn);
     metrics.insert("scramjet_specific_impulse_s".to_string(), scramjet_isp);
     metrics.insert("thrust_to_drag_ratio".to_string(), thrust_to_drag_ratio);
@@ -341,30 +347,90 @@ pub fn solve_hypersonic_airplane(
     metrics.insert("flight_time_hours".to_string(), flight_time_hours);
 
     // Deep Subsystem Scalar Metrics
-    metrics.insert("plasma_cutoff_freq_ghz".to_string(), plasma_res.plasma_cutoff_freq_ghz);
-    metrics.insert("plasma_electron_density_m3".to_string(), plasma_res.electron_density_m3);
-    metrics.insert("attenuation_x_band_db".to_string(), plasma_res.attenuation_x_band_db);
-    metrics.insert("mhd_b_field_tesla".to_string(), plasma_res.mhd_window_b_field_tesla);
-    metrics.insert("regen_htc_w_m2_k".to_string(), cooling_res.coolant_htc_w_m2_k);
-    metrics.insert("regen_substrate_margin_c".to_string(), cooling_res.substrate_thermal_margin_c);
-    metrics.insert("isolator_unstart_margin".to_string(), scram_res.isolator_unstart_margin);
-    metrics.insert("combustor_residence_time_ms".to_string(), scram_res.combustor_residence_time_ms);
-    metrics.insert("autoignition_delay_ms".to_string(), scram_res.autoignition_delay_ms);
-    metrics.insert("turbopump_cavitation_margin".to_string(), cryo_res.cavitation_safety_margin);
-    metrics.insert("turbopump_head_rise_m".to_string(), cryo_res.turbopump_head_rise_m);
-    metrics.insert("cryo_boiloff_rate_pct_day".to_string(), cryo_res.boil_off_rate_pct_day);
-    metrics.insert("quantum_gyro_drift_deg_hr".to_string(), av_res.quantum_gyro_drift_deg_hr);
-    metrics.insert("blackout_pos_drift_m".to_string(), av_res.blackout_position_drift_m);
-    metrics.insert("fbl_optical_margin_db".to_string(), av_res.optical_link_margin_db);
+    metrics.insert(
+        "plasma_cutoff_freq_ghz".to_string(),
+        plasma_res.plasma_cutoff_freq_ghz,
+    );
+    metrics.insert(
+        "plasma_electron_density_m3".to_string(),
+        plasma_res.electron_density_m3,
+    );
+    metrics.insert(
+        "attenuation_x_band_db".to_string(),
+        plasma_res.attenuation_x_band_db,
+    );
+    metrics.insert(
+        "mhd_b_field_tesla".to_string(),
+        plasma_res.mhd_window_b_field_tesla,
+    );
+    metrics.insert(
+        "regen_htc_w_m2_k".to_string(),
+        cooling_res.coolant_htc_w_m2_k,
+    );
+    metrics.insert(
+        "regen_substrate_margin_c".to_string(),
+        cooling_res.substrate_thermal_margin_c,
+    );
+    metrics.insert(
+        "isolator_unstart_margin".to_string(),
+        scram_res.isolator_unstart_margin,
+    );
+    metrics.insert(
+        "combustor_residence_time_ms".to_string(),
+        scram_res.combustor_residence_time_ms,
+    );
+    metrics.insert(
+        "autoignition_delay_ms".to_string(),
+        scram_res.autoignition_delay_ms,
+    );
+    metrics.insert(
+        "turbopump_cavitation_margin".to_string(),
+        cryo_res.cavitation_safety_margin,
+    );
+    metrics.insert(
+        "turbopump_head_rise_m".to_string(),
+        cryo_res.turbopump_head_rise_m,
+    );
+    metrics.insert(
+        "cryo_boiloff_rate_pct_day".to_string(),
+        cryo_res.boil_off_rate_pct_day,
+    );
+    metrics.insert(
+        "quantum_gyro_drift_deg_hr".to_string(),
+        av_res.quantum_gyro_drift_deg_hr,
+    );
+    metrics.insert(
+        "blackout_pos_drift_m".to_string(),
+        av_res.blackout_position_drift_m,
+    );
+    metrics.insert(
+        "fbl_optical_margin_db".to_string(),
+        av_res.optical_link_margin_db,
+    );
 
     // Aeroelastic Flutter & 6-DOF Maneuvering Metrics
-    metrics.insert("flutter_factor_of_safety".to_string(), flutter_res.flutter_factor_of_safety);
-    metrics.insert("flutter_critical_q_kpa".to_string(), flutter_res.critical_flutter_dynamic_pressure_kpa);
-    metrics.insert("flutter_natural_freq_hz".to_string(), flutter_res.natural_frequency_hz);
+    metrics.insert(
+        "flutter_factor_of_safety".to_string(),
+        flutter_res.flutter_factor_of_safety,
+    );
+    metrics.insert(
+        "flutter_critical_q_kpa".to_string(),
+        flutter_res.critical_flutter_dynamic_pressure_kpa,
+    );
+    metrics.insert(
+        "flutter_natural_freq_hz".to_string(),
+        flutter_res.natural_frequency_hz,
+    );
     metrics.insert("btt_turn_rate_deg_s".to_string(), btt_res.turn_rate_deg_s);
     metrics.insert("btt_turn_radius_km".to_string(), btt_res.turn_radius_km);
-    metrics.insert("btt_normal_load_g".to_string(), btt_res.normal_load_factor_g);
-    metrics.insert("btt_maneuver_duration_s".to_string(), btt_res.maneuver_duration_s);
+    metrics.insert(
+        "btt_normal_load_g".to_string(),
+        btt_res.normal_load_factor_g,
+    );
+    metrics.insert(
+        "btt_maneuver_duration_s".to_string(),
+        btt_res.maneuver_duration_s,
+    );
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, mach, 1, 1e-4);
@@ -397,23 +463,37 @@ pub fn solve_hypersonic_airplane(
         ),
         format!(
             "Scramjet Propulsion: m_air = {:.1} kg/s, m_fuel = {:.2} kg/s LH2 -> Net Thrust = {:.1} kN, Isp = {:.0} s (T/D = {:.2}x, Isolator Margin = {:.2}x)",
-            scram_res.air_mass_flow_kg_s, scram_res.fuel_mass_flow_kg_s, net_thrust_kn, scramjet_isp, thrust_to_drag_ratio, scram_res.isolator_unstart_margin
+            scram_res.air_mass_flow_kg_s,
+            scram_res.fuel_mass_flow_kg_s,
+            net_thrust_kn,
+            scramjet_isp,
+            thrust_to_drag_ratio,
+            scram_res.isolator_unstart_margin
         ),
         format!(
             "Regenerative Cooling: Supercritical H2 HTC = {:.0} W/m²K, Substrate Wall = {:.1} °C (Margin = +{:.1} °C)",
-            cooling_res.coolant_htc_w_m2_k, cooling_res.inner_substrate_temperature_c, cooling_res.substrate_thermal_margin_c
+            cooling_res.coolant_htc_w_m2_k,
+            cooling_res.inner_substrate_temperature_c,
+            cooling_res.substrate_thermal_margin_c
         ),
         format!(
             "Plasma Sheath & RF Blackout: Cutoff f_p = {:.1} GHz, X-band atten = {:.1} dB, MHD Whistler B-field = {:.2} T",
-            plasma_res.plasma_cutoff_freq_ghz, plasma_res.attenuation_x_band_db, plasma_res.mhd_window_b_field_tesla
+            plasma_res.plasma_cutoff_freq_ghz,
+            plasma_res.attenuation_x_band_db,
+            plasma_res.mhd_window_b_field_tesla
         ),
         format!(
             "Inside Circuits: 270V DC Bus = {:.1} V under {:.0} kW load, IPC-2141 Z0 = {:.1} Ω differential, Q-INS drift = {:.2} m",
-            bus_voltage_v, av_res.total_power_demand_kw, z0_differential, av_res.blackout_position_drift_m
+            bus_voltage_v,
+            av_res.total_power_demand_kw,
+            z0_differential,
+            av_res.blackout_position_drift_m
         ),
         format!(
             "Cryogenic Feed: 60-layer MLI boil-off = {:.3}%/day, Turbopump head = {:.0} m, Cavitation margin = {:.2}x",
-            cryo_res.boil_off_rate_pct_day, cryo_res.turbopump_head_rise_m, cryo_res.cavitation_safety_margin
+            cryo_res.boil_off_rate_pct_day,
+            cryo_res.turbopump_head_rise_m,
+            cryo_res.cavitation_safety_margin
         ),
         format!(
             "Global Mission Trajectory: Breguet Range = {:.0} km ({:.1} hours endurance) with {:.0} kg LH2",
@@ -421,11 +501,18 @@ pub fn solve_hypersonic_airplane(
         ),
         format!(
             "Aeroelastic Stability: Panel Flutter FoS = {:.2} (q_crit = {:.1} kPa vs q_op = {:.1} kPa, f1 = {:.0} Hz, AS9100 Pass)",
-            flutter_res.flutter_factor_of_safety, flutter_res.critical_flutter_dynamic_pressure_kpa, dynamic_press_kpa, flutter_res.natural_frequency_hz
+            flutter_res.flutter_factor_of_safety,
+            flutter_res.critical_flutter_dynamic_pressure_kpa,
+            dynamic_press_kpa,
+            flutter_res.natural_frequency_hz
         ),
         format!(
             "6-DOF Bank-to-Turn Maneuver: 30° heading turn at 55° bank in {:.1} s (Rate = {:.2}°/s, Radius = {:.1} km, Load = {:.2} g, Residual Sideslip = {:.3}°)",
-            btt_res.maneuver_duration_s, btt_res.turn_rate_deg_s, btt_res.turn_radius_km, btt_res.normal_load_factor_g, btt_res.residual_sideslip_deg
+            btt_res.maneuver_duration_s,
+            btt_res.turn_rate_deg_s,
+            btt_res.turn_radius_km,
+            btt_res.normal_load_factor_g,
+            btt_res.residual_sideslip_deg
         ),
     ];
 
@@ -517,17 +604,38 @@ mod tests {
         );
 
         // Subsystems assertions
-        let isolator_margin = *r.scalar_metrics.get("isolator_unstart_margin").unwrap_or(&0.0);
-        assert!(isolator_margin > 1.20, "Isolator must prevent shock-train unstart");
+        let isolator_margin = *r
+            .scalar_metrics
+            .get("isolator_unstart_margin")
+            .unwrap_or(&0.0);
+        assert!(
+            isolator_margin > 1.20,
+            "Isolator must prevent shock-train unstart"
+        );
 
-        let cav_margin = *r.scalar_metrics.get("turbopump_cavitation_margin").unwrap_or(&0.0);
-        assert!(cav_margin > 1.50, "Turbopump must have positive cavitation margin");
+        let cav_margin = *r
+            .scalar_metrics
+            .get("turbopump_cavitation_margin")
+            .unwrap_or(&0.0);
+        assert!(
+            cav_margin > 1.50,
+            "Turbopump must have positive cavitation margin"
+        );
 
         let htc = *r.scalar_metrics.get("regen_htc_w_m2_k").unwrap_or(&0.0);
-        assert!(htc > 10_000.0, "Regenerative cooling HTC must exceed 10,000 W/m^2K");
+        assert!(
+            htc > 10_000.0,
+            "Regenerative cooling HTC must exceed 10,000 W/m^2K"
+        );
 
-        let plasma_fp = *r.scalar_metrics.get("plasma_cutoff_freq_ghz").unwrap_or(&0.0);
-        assert!(plasma_fp > 10.0, "Plasma cutoff frequency at Mach 11 should exceed 10 GHz");
+        let plasma_fp = *r
+            .scalar_metrics
+            .get("plasma_cutoff_freq_ghz")
+            .unwrap_or(&0.0);
+        assert!(
+            plasma_fp > 10.0,
+            "Plasma cutoff frequency at Mach 11 should exceed 10 GHz"
+        );
     }
 
     #[test]
@@ -544,37 +652,67 @@ mod tests {
     fn test_advanced_hypersonic_subsystems() {
         // 1. MHD Energy Bypass Generator
         let mhd = plasma::evaluate_mhd_energy_bypass(3333.3, 0.80, 0.25, 2.77e18, 1.8e9);
-        assert!(mhd.extracted_power_mw > 5.0, "MHD should extract > 5 MW from plasma");
+        assert!(
+            mhd.extracted_power_mw > 5.0,
+            "MHD should extract > 5 MW from plasma"
+        );
         assert_eq!(mhd.avionics_bus_power_kw, 104.2);
         assert!(mhd.downstream_thrust_boost_kn > 1.0);
 
         // 2. Slush Hydrogen Triple-Point Fuel
         let slush = cryo::evaluate_slush_hydrogen(16300.0, 0.50, 158.4);
-        assert!(slush.volume_savings_m3 > 20.0, "Slush H2 must save > 20 m³ tank volume");
+        assert!(
+            slush.volume_savings_m3 > 20.0,
+            "Slush H2 must save > 20 m³ tank volume"
+        );
         assert!(slush.latent_heat_capacity_mj > 400.0);
         assert!(slush.zero_boiloff_hold_time_hours > 10.0);
 
         // 3. High-Temperature UHTC Viscoplastic Creep & Larson-Miller Life
         let creep = thermal::evaluate_high_temp_creep(2545.0, 45.0, 1.6);
-        assert!(creep.rupture_life_hours > 1000.0, "UHTC creep rupture life must exceed 1000 hrs");
-        assert!(creep.mission_accumulated_strain_pct < 0.1, "Creep strain per flight must be < 0.1%");
+        assert!(
+            creep.rupture_life_hours > 1000.0,
+            "UHTC creep rupture life must exceed 1000 hrs"
+        );
+        assert!(
+            creep.mission_accumulated_strain_pct < 0.1,
+            "Creep strain per flight must be < 0.1%"
+        );
         assert!(creep.creep_life_safety_factor >= 1.0);
 
         // 4. Aeroelastic Panel Flutter (Dowell Piston Theory)
-        let flutter = trajectory::evaluate_hypersonic_flutter(73.5, 11.0, 0.80, 0.0035, 2272.0, 480.0, 0.15, 6080.0, 0.0132, 3333.3);
-        assert!(flutter.is_flutter_safe, "Hypersonic panel flutter must be safe");
-        assert!(flutter.flutter_factor_of_safety >= 1.50, "Flutter factor of safety must exceed 1.50");
+        let flutter = trajectory::evaluate_hypersonic_flutter(
+            73.5, 11.0, 0.80, 0.0035, 2272.0, 480.0, 0.15, 6080.0, 0.0132, 3333.3,
+        );
+        assert!(
+            flutter.is_flutter_safe,
+            "Hypersonic panel flutter must be safe"
+        );
+        assert!(
+            flutter.flutter_factor_of_safety >= 1.50,
+            "Flutter factor of safety must exceed 1.50"
+        );
         assert!(flutter.critical_flutter_dynamic_pressure_kpa > 110.0);
 
         // 5. 6-DOF Bank-to-Turn Hypersonic Maneuvering
-        let btt = trajectory::evaluate_6dof_btt_maneuver(3333.3, 32000.0, 48000.0, 30.0, 55.0, 770_000.0);
+        let btt =
+            trajectory::evaluate_6dof_btt_maneuver(3333.3, 32000.0, 48000.0, 30.0, 55.0, 770_000.0);
         assert!(btt.is_maneuver_safe, "6-DOF BTT maneuver must be safe");
-        assert!(btt.turn_radius_km > 100.0, "Turn radius at Mach 11 should be large");
-        assert!(btt.normal_load_factor_g < 3.5, "Normal load factor should remain within pilot/airframe envelope");
+        assert!(
+            btt.turn_radius_km > 100.0,
+            "Turn radius at Mach 11 should be large"
+        );
+        assert!(
+            btt.normal_load_factor_g < 3.5,
+            "Normal load factor should remain within pilot/airframe envelope"
+        );
 
         // 6. 20 K REBCO Superconducting Magnet
         let magnet = plasma::evaluate_superconducting_hts_magnet(1.25, 0.35, 20.0, 0.25);
-        assert!(magnet.is_hts_stable, "REBCO magnet must remain superconductive");
+        assert!(
+            magnet.is_hts_stable,
+            "REBCO magnet must remain superconductive"
+        );
         assert!(magnet.critical_current_margin >= 1.30);
         assert!(magnet.magnetic_pressure_kpa > 500.0);
     }

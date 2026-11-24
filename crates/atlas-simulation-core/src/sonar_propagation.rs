@@ -68,14 +68,14 @@ impl Default for SonarPropagationProblem {
             problem_id: "anti_submarine_active_sonar_detection".to_string(),
             acoustic_regime: OceanAcousticRegime::ShallowWaterWaveguide,
             target_class: SonarTargetClass::SubmarineLargeFleet,
-            operating_frequency_khz: 7.5,           // 7.5 kHz mid-frequency active sonar
-            transmitter_acoustic_power_w: 4500.0,   // 4.5 kW acoustic emitted power
-            array_directivity_index_db: 22.0,       // 22 dB transducer array DI
-            ocean_depth_m: 180.0,                   // 180 m continental shelf
-            target_range_m: 8500.0,                 // 8.5 km detection range
-            sea_state_code: 3,                      // Sea state 3 (moderate waves)
-            shipping_traffic_index: 2,              // Moderate shipping
-            detection_threshold_db: 14.0,           // 14 dB DT
+            operating_frequency_khz: 7.5, // 7.5 kHz mid-frequency active sonar
+            transmitter_acoustic_power_w: 4500.0, // 4.5 kW acoustic emitted power
+            array_directivity_index_db: 22.0, // 22 dB transducer array DI
+            ocean_depth_m: 180.0,         // 180 m continental shelf
+            target_range_m: 8500.0,       // 8.5 km detection range
+            sea_state_code: 3,            // Sea state 3 (moderate waves)
+            shipping_traffic_index: 2,    // Moderate shipping
+            detection_threshold_db: 14.0, // 14 dB DT
         }
     }
 }
@@ -122,7 +122,9 @@ pub struct SonarPropagationResult {
 }
 
 /// Solves ocean acoustic transmission loss, Thorpe attenuation, Wenz noise, and active sonar equation.
-pub fn solve_sonar_propagation(problem: &SonarPropagationProblem) -> Result<SonarPropagationResult, String> {
+pub fn solve_sonar_propagation(
+    problem: &SonarPropagationProblem,
+) -> Result<SonarPropagationResult, String> {
     if problem.operating_frequency_khz <= 0.1 || problem.operating_frequency_khz > 200.0 {
         return Err("Operating frequency must be between 0.1 and 200 kHz".to_string());
     }
@@ -154,7 +156,9 @@ pub fn solve_sonar_propagation(problem: &SonarPropagationProblem) -> Result<Sona
     // In shallow water, transition occurs at roughly R_trans ~ H_ocean / 2
     let r_trans_m = match problem.acoustic_regime {
         OceanAcousticRegime::DeepOceanChannel => 2500.0,
-        OceanAcousticRegime::ShallowWaterWaveguide => (problem.ocean_depth_m / 2.0).clamp(20.0, 300.0),
+        OceanAcousticRegime::ShallowWaterWaveguide => {
+            (problem.ocean_depth_m / 2.0).clamp(20.0, 300.0)
+        }
         OceanAcousticRegime::ArcticUnderIce => (problem.ocean_depth_m / 3.0).clamp(20.0, 200.0),
     };
 
@@ -190,7 +194,8 @@ pub fn solve_sonar_propagation(problem: &SonarPropagationProblem) -> Result<Sona
     let nl_wind = 44.0 + 7.5 * ss - 17.0 * f.log10();
 
     // Total ambient noise NL:
-    let nl_total = 10.0 * (10.0_f64.powf(nl_shipping / 10.0) + 10.0_f64.powf(nl_wind / 10.0)).log10();
+    let nl_total =
+        10.0 * (10.0_f64.powf(nl_shipping / 10.0) + 10.0_f64.powf(nl_wind / 10.0)).log10();
     let nl_array = nl_total - di;
 
     // Received echo level: EL = SL - 2*TL + TS
@@ -206,7 +211,8 @@ pub fn solve_sonar_propagation(problem: &SonarPropagationProblem) -> Result<Sona
     // Maximum detection range estimate from FOM:
     let r_max_km = if fom > 40.0 {
         // Approximate range inversion
-        ((fom - 10.0 * (r_trans_m / 1000.0).log10() - 60.0) / (2.0 * alpha_db_km + 1.5)).clamp(1.0, 50.0)
+        ((fom - 10.0 * (r_trans_m / 1000.0).log10() - 60.0) / (2.0 * alpha_db_km + 1.5))
+            .clamp(1.0, 50.0)
     } else {
         0.5
     };
@@ -253,10 +259,16 @@ mod tests {
         let res = solve_sonar_propagation(&prob)?;
 
         assert!(res.source_level_db_re_upa > 210.0 && res.source_level_db_re_upa < 235.0);
-        assert!(res.absorption_coefficient_db_per_km > 0.1 && res.absorption_coefficient_db_per_km < 3.0);
+        assert!(
+            res.absorption_coefficient_db_per_km > 0.1
+                && res.absorption_coefficient_db_per_km < 3.0
+        );
         assert!(res.one_way_transmission_loss_db > 40.0);
         assert!(res.signal_to_noise_ratio_snr_db > res.signal_excess_se_db);
-        assert!(res.signal_excess_se_db >= 0.0, "Should achieve positive signal excess for detection");
+        assert!(
+            res.signal_excess_se_db >= 0.0,
+            "Should achieve positive signal excess for detection"
+        );
         assert!(res.figure_of_merit_fom_db > 100.0);
         assert!(res.is_target_detected);
         assert!(res.is_cavitation_limit_satisfied);

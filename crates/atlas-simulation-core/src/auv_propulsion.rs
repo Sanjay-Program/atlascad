@@ -142,7 +142,8 @@ pub fn solve_auv_propulsion(problem: &AuvPropulsionProblem) -> Result<AuvPropuls
     let v_m_s = problem.cruising_speed_knots * 0.514444;
 
     // Reynolds number:
-    let re = (problem.seawater_density_kg_m3 * v_m_s * problem.vehicle_length_m) / problem.seawater_viscosity_pa_s;
+    let re = (problem.seawater_density_kg_m3 * v_m_s * problem.vehicle_length_m)
+        / problem.seawater_viscosity_pa_s;
 
     // ITTC-78 flat plate correlation:
     // C_F = 0.075 / (log10(Re) - 2)^2
@@ -161,7 +162,8 @@ pub fn solve_auv_propulsion(problem: &AuvPropulsionProblem) -> Result<AuvPropuls
 
     // Total hydrodynamic resistance:
     // R_T = 0.5 * rho * v^2 * S_wetted * C_T
-    let r_t_n = 0.5 * problem.seawater_density_kg_m3 * v_m_s.powi(2) * problem.wetted_surface_area_m2 * c_t;
+    let r_t_n =
+        0.5 * problem.seawater_density_kg_m3 * v_m_s.powi(2) * problem.wetted_surface_area_m2 * c_t;
 
     // Effective power:
     let p_e_w = r_t_n * v_m_s;
@@ -184,7 +186,8 @@ pub fn solve_auv_propulsion(problem: &AuvPropulsionProblem) -> Result<AuvPropuls
     let p_total_elec_w = p_motor_elec_w + problem.hotel_power_draw_w;
 
     // Battery endurance:
-    let usable_energy_kwh = problem.battery_capacity_kwh * (problem.battery_depth_of_discharge_pct / 100.0) * 0.96; // 96% DC-DC efficiency
+    let usable_energy_kwh =
+        problem.battery_capacity_kwh * (problem.battery_depth_of_discharge_pct / 100.0) * 0.96; // 96% DC-DC efficiency
     let usable_energy_wh = usable_energy_kwh * 1000.0;
 
     let endurance_hours = usable_energy_wh / p_total_elec_w;

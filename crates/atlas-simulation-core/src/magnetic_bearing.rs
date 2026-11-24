@@ -58,14 +58,14 @@ impl Default for MagneticBearingProblem {
         Self {
             problem_id: "high_speed_compressor_radial_amb".to_string(),
             topology: MagneticBearingTopology::Heteropolar8Pole,
-            rotor_supported_mass_kg: 85.0,         // 85 kg rotor share
-            max_rotational_speed_rpm: 36000.0,     // 36,000 RPM high-speed centrifugal compressor
-            nominal_air_gap_mm: 0.60,              // 0.60 mm air gap
-            pole_face_area_mm2: 850.0,             // 850 mm² pole area
-            coil_turns_per_pole: 140,              // 140 turns
-            bias_current_a: 5.0,                   // 5.0 A bias
-            max_control_current_a: 12.0,           // 12.0 A peak control current
-            amplifier_bus_voltage_v: 180.0,        // 180 V DC bus
+            rotor_supported_mass_kg: 85.0,     // 85 kg rotor share
+            max_rotational_speed_rpm: 36000.0, // 36,000 RPM high-speed centrifugal compressor
+            nominal_air_gap_mm: 0.60,          // 0.60 mm air gap
+            pole_face_area_mm2: 850.0,         // 850 mm² pole area
+            coil_turns_per_pole: 140,          // 140 turns
+            bias_current_a: 5.0,               // 5.0 A bias
+            max_control_current_a: 12.0,       // 12.0 A peak control current
+            amplifier_bus_voltage_v: 180.0,    // 180 V DC bus
             controller_proportional_gain_a_per_mm: 18.0, // 18 A/mm
             controller_derivative_gain_a_s_per_m: 35.0, // 35.0 A·s/m (0.035 A/(mm/s))
             rotor_unbalance_eccentricity_um: 0.50, // ISO 1940 G1.0 precision balance at 36,000 RPM
@@ -117,7 +117,9 @@ pub struct MagneticBearingResult {
 }
 
 /// Solves active magnetic bearing electrodynamic levitation, open/closed-loop stiffness, and ISO 14839 clearance.
-pub fn solve_magnetic_bearing(problem: &MagneticBearingProblem) -> Result<MagneticBearingResult, String> {
+pub fn solve_magnetic_bearing(
+    problem: &MagneticBearingProblem,
+) -> Result<MagneticBearingResult, String> {
     if problem.nominal_air_gap_mm <= 0.05 {
         return Err("Nominal air gap must be at least 0.05 mm".to_string());
     }
@@ -193,11 +195,7 @@ pub fn solve_magnetic_bearing(problem: &MagneticBearingProblem) -> Result<Magnet
     };
 
     // Peak unbalance orbit displacement:
-    let x_orbit_m = if k_net > 0.0 {
-        f_unb / k_net
-    } else {
-        g_0
-    };
+    let x_orbit_m = if k_net > 0.0 { f_unb / k_net } else { g_0 };
     let x_orbit_um = x_orbit_m * 1e6;
     let orbit_gap_ratio = x_orbit_m / g_0;
 

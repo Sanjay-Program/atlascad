@@ -127,29 +127,89 @@ pub struct Din6885KeyDimensions {
 pub fn lookup_din6885_key(shaft_dia_mm: f64) -> Din6885KeyDimensions {
     let d = shaft_dia_mm;
     if d <= 12.0 {
-        Din6885KeyDimensions { key_width_b_mm: 4.0, key_height_h_mm: 4.0, shaft_keyway_depth_t1_mm: 2.5, hub_keyway_depth_t2_mm: 1.8 }
+        Din6885KeyDimensions {
+            key_width_b_mm: 4.0,
+            key_height_h_mm: 4.0,
+            shaft_keyway_depth_t1_mm: 2.5,
+            hub_keyway_depth_t2_mm: 1.8,
+        }
     } else if d <= 17.0 {
-        Din6885KeyDimensions { key_width_b_mm: 5.0, key_height_h_mm: 5.0, shaft_keyway_depth_t1_mm: 3.0, hub_keyway_depth_t2_mm: 2.3 }
+        Din6885KeyDimensions {
+            key_width_b_mm: 5.0,
+            key_height_h_mm: 5.0,
+            shaft_keyway_depth_t1_mm: 3.0,
+            hub_keyway_depth_t2_mm: 2.3,
+        }
     } else if d <= 22.0 {
-        Din6885KeyDimensions { key_width_b_mm: 6.0, key_height_h_mm: 6.0, shaft_keyway_depth_t1_mm: 3.5, hub_keyway_depth_t2_mm: 2.8 }
+        Din6885KeyDimensions {
+            key_width_b_mm: 6.0,
+            key_height_h_mm: 6.0,
+            shaft_keyway_depth_t1_mm: 3.5,
+            hub_keyway_depth_t2_mm: 2.8,
+        }
     } else if d <= 30.0 {
-        Din6885KeyDimensions { key_width_b_mm: 8.0, key_height_h_mm: 7.0, shaft_keyway_depth_t1_mm: 4.0, hub_keyway_depth_t2_mm: 3.3 }
+        Din6885KeyDimensions {
+            key_width_b_mm: 8.0,
+            key_height_h_mm: 7.0,
+            shaft_keyway_depth_t1_mm: 4.0,
+            hub_keyway_depth_t2_mm: 3.3,
+        }
     } else if d <= 38.0 {
-        Din6885KeyDimensions { key_width_b_mm: 10.0, key_height_h_mm: 8.0, shaft_keyway_depth_t1_mm: 5.0, hub_keyway_depth_t2_mm: 3.3 }
+        Din6885KeyDimensions {
+            key_width_b_mm: 10.0,
+            key_height_h_mm: 8.0,
+            shaft_keyway_depth_t1_mm: 5.0,
+            hub_keyway_depth_t2_mm: 3.3,
+        }
     } else if d <= 44.0 {
-        Din6885KeyDimensions { key_width_b_mm: 12.0, key_height_h_mm: 8.0, shaft_keyway_depth_t1_mm: 5.0, hub_keyway_depth_t2_mm: 3.3 }
+        Din6885KeyDimensions {
+            key_width_b_mm: 12.0,
+            key_height_h_mm: 8.0,
+            shaft_keyway_depth_t1_mm: 5.0,
+            hub_keyway_depth_t2_mm: 3.3,
+        }
     } else if d <= 50.0 {
-        Din6885KeyDimensions { key_width_b_mm: 14.0, key_height_h_mm: 9.0, shaft_keyway_depth_t1_mm: 5.5, hub_keyway_depth_t2_mm: 3.8 }
+        Din6885KeyDimensions {
+            key_width_b_mm: 14.0,
+            key_height_h_mm: 9.0,
+            shaft_keyway_depth_t1_mm: 5.5,
+            hub_keyway_depth_t2_mm: 3.8,
+        }
     } else if d <= 58.0 {
-        Din6885KeyDimensions { key_width_b_mm: 16.0, key_height_h_mm: 10.0, shaft_keyway_depth_t1_mm: 6.0, hub_keyway_depth_t2_mm: 4.3 }
+        Din6885KeyDimensions {
+            key_width_b_mm: 16.0,
+            key_height_h_mm: 10.0,
+            shaft_keyway_depth_t1_mm: 6.0,
+            hub_keyway_depth_t2_mm: 4.3,
+        }
     } else if d <= 65.0 {
-        Din6885KeyDimensions { key_width_b_mm: 18.0, key_height_h_mm: 11.0, shaft_keyway_depth_t1_mm: 7.0, hub_keyway_depth_t2_mm: 4.4 }
+        Din6885KeyDimensions {
+            key_width_b_mm: 18.0,
+            key_height_h_mm: 11.0,
+            shaft_keyway_depth_t1_mm: 7.0,
+            hub_keyway_depth_t2_mm: 4.4,
+        }
     } else if d <= 75.0 {
-        Din6885KeyDimensions { key_width_b_mm: 20.0, key_height_h_mm: 12.0, shaft_keyway_depth_t1_mm: 7.5, hub_keyway_depth_t2_mm: 4.9 }
+        Din6885KeyDimensions {
+            key_width_b_mm: 20.0,
+            key_height_h_mm: 12.0,
+            shaft_keyway_depth_t1_mm: 7.5,
+            hub_keyway_depth_t2_mm: 4.9,
+        }
     } else if d <= 85.0 {
-        Din6885KeyDimensions { key_width_b_mm: 22.0, key_height_h_mm: 14.0, shaft_keyway_depth_t1_mm: 9.0, hub_keyway_depth_t2_mm: 5.4 }
+        Din6885KeyDimensions {
+            key_width_b_mm: 22.0,
+            key_height_h_mm: 14.0,
+            shaft_keyway_depth_t1_mm: 9.0,
+            hub_keyway_depth_t2_mm: 5.4,
+        }
     } else {
-        Din6885KeyDimensions { key_width_b_mm: 25.0, key_height_h_mm: 14.0, shaft_keyway_depth_t1_mm: 9.0, hub_keyway_depth_t2_mm: 5.4 }
+        Din6885KeyDimensions {
+            key_width_b_mm: 25.0,
+            key_height_h_mm: 14.0,
+            shaft_keyway_depth_t1_mm: 9.0,
+            hub_keyway_depth_t2_mm: 5.4,
+        }
     }
 }
 
@@ -182,7 +242,9 @@ pub struct ShaftKeyResult {
 /// Solves transmission shaft sizing and DIN 6885-1 parallel key verification.
 pub fn solve_shaft_and_key(prob: &ShaftKeyProblem) -> Result<ShaftKeyResult, String> {
     if prob.transmitted_power_kw <= 0.0 || prob.rotational_speed_rpm <= 0.0 {
-        return Err("Transmitted power and rotational speed must be strictly positive.".to_string());
+        return Err(
+            "Transmitted power and rotational speed must be strictly positive.".to_string(),
+        );
     }
 
     let fos = prob.safety_factor.unwrap_or(2.0).max(1.0);
@@ -212,7 +274,10 @@ pub fn solve_shaft_and_key(prob: &ShaftKeyProblem) -> Result<ShaftKeyResult, Str
     let d_min_mm = (16.0 * te_nmm / (std::f64::consts::PI * tau_perm_mpa)).cbrt();
 
     // Nominal selected shaft diameter:
-    let actual_d_mm = prob.selected_shaft_diameter_mm.unwrap_or(d_min_mm).max(d_min_mm);
+    let actual_d_mm = prob
+        .selected_shaft_diameter_mm
+        .unwrap_or(d_min_mm)
+        .max(d_min_mm);
 
     // Actual stresses:
     // tau = 16 * T / (pi * d^3)
@@ -235,7 +300,9 @@ pub fn solve_shaft_and_key(prob: &ShaftKeyProblem) -> Result<ShaftKeyResult, Str
 
     // Parallel Key sizing per DIN 6885-1:
     let key_dims = lookup_din6885_key(actual_d_mm);
-    let key_len_mm = prob.key_length_mm.unwrap_or_else(|| (1.5 * actual_d_mm).clamp(20.0, 150.0));
+    let key_len_mm = prob
+        .key_length_mm
+        .unwrap_or_else(|| (1.5 * actual_d_mm).clamp(20.0, 150.0));
     // Effective key shear length (subtract rounded ends if Type A key: Leff = L - b)
     let leff_mm = (key_len_mm - key_dims.key_width_b_mm).max(key_len_mm * 0.75);
 
@@ -258,11 +325,26 @@ pub fn solve_shaft_and_key(prob: &ShaftKeyProblem) -> Result<ShaftKeyResult, Str
     let is_ok = shaft_fos >= fos && key_shear_fos >= 1.0 && hub_pressure_fos >= 1.0;
 
     let notes = vec![
-        format!("Shaft Design: '{}' (Power = {:.1} kW @ {:.0} RPM -> Torque = {:.1} N·m)", prob.shaft_name, prob.transmitted_power_kw, prob.rotational_speed_rpm, torque_nm),
-        format!("Diameter: Min Required = {:.1} mm, Actual = {:.1} mm (von Mises Stress = {:.1} MPa, FoS = {:.2})", d_min_mm, actual_d_mm, sigma_vm_mpa, shaft_fos),
-        format!("Torsional Deflection: Total = {:.3}°, Specific = {:.3}°/m (Criterion <= 0.25°/m for precision, <= 1.0°/m general)", theta_deg, theta_deg_per_meter),
-        format!("DIN 6885-1 Key: {:.0}x{:.0} mm (L = {:.0} mm, Leff = {:.1} mm)", key_dims.key_width_b_mm, key_dims.key_height_h_mm, key_len_mm, leff_mm),
-        format!("Key Stress: Shear = {:.1} MPa (FoS = {:.2}), Hub Contact Pressure = {:.1} MPa / Permissible {:.1} MPa (FoS = {:.2})", tau_key_mpa, key_shear_fos, p_hub_mpa, p_perm_hub, hub_pressure_fos),
+        format!(
+            "Shaft Design: '{}' (Power = {:.1} kW @ {:.0} RPM -> Torque = {:.1} N·m)",
+            prob.shaft_name, prob.transmitted_power_kw, prob.rotational_speed_rpm, torque_nm
+        ),
+        format!(
+            "Diameter: Min Required = {:.1} mm, Actual = {:.1} mm (von Mises Stress = {:.1} MPa, FoS = {:.2})",
+            d_min_mm, actual_d_mm, sigma_vm_mpa, shaft_fos
+        ),
+        format!(
+            "Torsional Deflection: Total = {:.3}°, Specific = {:.3}°/m (Criterion <= 0.25°/m for precision, <= 1.0°/m general)",
+            theta_deg, theta_deg_per_meter
+        ),
+        format!(
+            "DIN 6885-1 Key: {:.0}x{:.0} mm (L = {:.0} mm, Leff = {:.1} mm)",
+            key_dims.key_width_b_mm, key_dims.key_height_h_mm, key_len_mm, leff_mm
+        ),
+        format!(
+            "Key Stress: Shear = {:.1} MPa (FoS = {:.2}), Hub Contact Pressure = {:.1} MPa / Permissible {:.1} MPa (FoS = {:.2})",
+            tau_key_mpa, key_shear_fos, p_hub_mpa, p_perm_hub, hub_pressure_fos
+        ),
     ];
 
     Ok(ShaftKeyResult {
@@ -296,13 +378,28 @@ pub fn solve_shaft_keys_sim(prob: &ShaftKeyProblem) -> Result<SimulationResult, 
 
     let mut metrics = HashMap::new();
     metrics.insert("torque_nm".to_string(), sol.torque_nm);
-    metrics.insert("min_required_diameter_mm".to_string(), sol.min_required_diameter_mm);
-    metrics.insert("actual_shaft_diameter_mm".to_string(), sol.actual_shaft_diameter_mm);
-    metrics.insert("shaft_von_mises_stress_mpa".to_string(), sol.shaft_von_mises_stress_mpa);
+    metrics.insert(
+        "min_required_diameter_mm".to_string(),
+        sol.min_required_diameter_mm,
+    );
+    metrics.insert(
+        "actual_shaft_diameter_mm".to_string(),
+        sol.actual_shaft_diameter_mm,
+    );
+    metrics.insert(
+        "shaft_von_mises_stress_mpa".to_string(),
+        sol.shaft_von_mises_stress_mpa,
+    );
     metrics.insert("shaft_safety_factor".to_string(), sol.shaft_safety_factor);
-    metrics.insert("torsional_deflection_deg".to_string(), sol.torsional_deflection_deg);
+    metrics.insert(
+        "torsional_deflection_deg".to_string(),
+        sol.torsional_deflection_deg,
+    );
     metrics.insert("key_shear_stress_mpa".to_string(), sol.key_shear_stress_mpa);
-    metrics.insert("hub_contact_pressure_mpa".to_string(), sol.hub_contact_pressure_mpa);
+    metrics.insert(
+        "hub_contact_pressure_mpa".to_string(),
+        sol.hub_contact_pressure_mpa,
+    );
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.min_required_diameter_mm, 1, 1e-4);

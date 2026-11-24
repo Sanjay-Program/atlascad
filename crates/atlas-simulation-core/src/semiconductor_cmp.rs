@@ -144,7 +144,10 @@ pub fn solve_semiconductor_cmp(
     let c_abrasive_factor = (problem.abrasive_concentration_pct / 10.0).sqrt();
 
     // Preston MRR = k_p * P * v * c_factor:
-    let mrr_nm_min = k_preston * problem.down_force_pressure_kpa * problem.relative_velocity_m_s * c_abrasive_factor;
+    let mrr_nm_min = k_preston
+        * problem.down_force_pressure_kpa
+        * problem.relative_velocity_m_s
+        * c_abrasive_factor;
 
     // Total material removed:
     let total_removed_nm = mrr_nm_min * (problem.polish_time_s / 60.0);
@@ -167,8 +170,10 @@ pub fn solve_semiconductor_cmp(
     // Planarization of step height (exponential decay model):
     // h(t) = h_0 * exp(- t / tau_plan)
     let tau_plan_s = 22.0; // typical planarization time constant
-    let final_step_nm = (problem.initial_step_height_nm * (-problem.polish_time_s / tau_plan_s).exp()).max(5.0);
-    let pe_pct = ((problem.initial_step_height_nm - final_step_nm) / problem.initial_step_height_nm) * 100.0;
+    let final_step_nm =
+        (problem.initial_step_height_nm * (-problem.polish_time_s / tau_plan_s).exp()).max(5.0);
+    let pe_pct =
+        ((problem.initial_step_height_nm - final_step_nm) / problem.initial_step_height_nm) * 100.0;
 
     // Overpolish time in seconds:
     let t_op_s = problem.polish_time_s * (problem.overpolish_pct / 100.0);
@@ -180,15 +185,25 @@ pub fn solve_semiconductor_cmp(
         CmpLayerType::TungstenPlug => 0.022,
         _ => 0.012,
     };
-    let dishing_nm = k_dish * problem.interconnect_line_width_um.sqrt() * (problem.down_force_pressure_kpa / 20.0) * (t_op_s / 10.0) * 15.0;
+    let dishing_nm = k_dish
+        * problem.interconnect_line_width_um.sqrt()
+        * (problem.down_force_pressure_kpa / 20.0)
+        * (t_op_s / 10.0)
+        * 15.0;
 
     // Array erosion = k_ero * rho_pattern * P * t_op:
     let k_ero = 0.028;
-    let erosion_nm = k_ero * problem.local_pattern_density * (problem.down_force_pressure_kpa / 20.0) * (t_op_s / 10.0) * 18.0;
+    let erosion_nm = k_ero
+        * problem.local_pattern_density
+        * (problem.down_force_pressure_kpa / 20.0)
+        * (t_op_s / 10.0)
+        * 18.0;
 
     // Within-Wafer Non-Uniformity (WIWNU):
     // Center-to-edge velocity profile and pressure roll-off give ~ 2.5% to 4.2%
-    let wiwnu_pct = 2.8 + 0.05 * (problem.wafer_diameter_mm / 100.0) + 0.4 * (problem.relative_velocity_m_s - 1.0);
+    let wiwnu_pct = 2.8
+        + 0.05 * (problem.wafer_diameter_mm / 100.0)
+        + 0.4 * (problem.relative_velocity_m_s - 1.0);
 
     let is_pe_ok = pe_pct >= 85.0;
     let is_dish_ok = dishing_nm <= 35.0; // SEMI standard <= 35 nm for 10 um line

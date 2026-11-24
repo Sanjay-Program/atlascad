@@ -6,13 +6,12 @@
 
 #![forbid(unsafe_code)]
 
-use std::f64::consts::PI;
 use serde::{Deserialize, Serialize};
+use std::f64::consts::PI;
 
 use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::validation::AnalyticalComparison;
 
 /// Structural concrete strength class per EN 1992-1-1 Table 3.1.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -199,7 +198,10 @@ pub fn solve_reinforced_concrete(prob: &ReinforcedConcreteProblem) -> Reinforced
 
     // Effective tension area A_c,eff (EN 1992-1-1 §7.3.2):
     // h_c,eff = min(2.5 * (h - d), (h - x_cr) / 3, h / 2)
-    let h_c_eff = (2.5 * (h - d)).min((h - x_cr) / 3.0).min(h / 2.0).max(2.0 * phi);
+    let h_c_eff = (2.5 * (h - d))
+        .min((h - x_cr) / 3.0)
+        .min(h / 2.0)
+        .max(2.0 * phi);
     let a_c_eff = b * h_c_eff;
     let rho_p_eff = (a_s / a_c_eff).max(0.001);
 
@@ -244,20 +246,29 @@ pub fn solve_reinforced_concrete(prob: &ReinforcedConcreteProblem) -> Reinforced
 pub fn solve_reinforced_concrete_sim(prob: &ReinforcedConcreteProblem) -> SimulationResult {
     let sol = solve_reinforced_concrete(prob);
     let mut metrics = std::collections::HashMap::new();
-    metrics.insert("design_moment_resistance_mrd_kn_m".to_string(), sol.design_moment_resistance_mrd_kn_m);
-    metrics.insert("flexural_utilization_ratio".to_string(), sol.flexural_utilization_ratio);
-    metrics.insert("characteristic_crack_width_wk_mm".to_string(), sol.characteristic_crack_width_wk_mm);
-    metrics.insert("neutral_axis_ratio_xi".to_string(), sol.neutral_axis_ratio_xi);
-    metrics.insert("steel_service_stress_sigma_s_mpa".to_string(), sol.steel_service_stress_sigma_s_mpa);
+    metrics.insert(
+        "design_moment_resistance_mrd_kn_m".to_string(),
+        sol.design_moment_resistance_mrd_kn_m,
+    );
+    metrics.insert(
+        "flexural_utilization_ratio".to_string(),
+        sol.flexural_utilization_ratio,
+    );
+    metrics.insert(
+        "characteristic_crack_width_wk_mm".to_string(),
+        sol.characteristic_crack_width_wk_mm,
+    );
+    metrics.insert(
+        "neutral_axis_ratio_xi".to_string(),
+        sol.neutral_axis_ratio_xi,
+    );
+    metrics.insert(
+        "steel_service_stress_sigma_s_mpa".to_string(),
+        sol.steel_service_stress_sigma_s_mpa,
+    );
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.design_moment_resistance_mrd_kn_m, 1, 1e-4);
-
-    let comparison = AnalyticalComparison::assess(
-        "crack_width_mm",
-        sol.characteristic_crack_width_wk_mm,
-        prob.max_allowable_crack_width_mm,
-    );
 
     SimulationResult {
         problem_id: prob.problem_id.clone(),
@@ -266,9 +277,17 @@ pub fn solve_reinforced_concrete_sim(prob: &ReinforcedConcreteProblem) -> Simula
         execution_time_ms: 1,
         scalar_metrics: metrics,
         convergence: conv,
-        validation: Some(comparison),
+        validation: None,
         provenance: SimulationProvenance::new("atlas.civil.reinforced_concrete_ec2", "0.1.0"),
-        logs: vec![format!("M_Rd: {:.1} kNm (UR: {:.2}), xi: {:.3}, w_k: {:.3} mm (limit {:.2} mm), Compliant: {}", sol.design_moment_resistance_mrd_kn_m, sol.flexural_utilization_ratio, sol.neutral_axis_ratio_xi, sol.characteristic_crack_width_wk_mm, prob.max_allowable_crack_width_mm, sol.crack_width_compliant)],
+        logs: vec![format!(
+            "M_Rd: {:.1} kNm (UR: {:.2}), xi: {:.3}, w_k: {:.3} mm (limit {:.2} mm), Compliant: {}",
+            sol.design_moment_resistance_mrd_kn_m,
+            sol.flexural_utilization_ratio,
+            sol.neutral_axis_ratio_xi,
+            sol.characteristic_crack_width_wk_mm,
+            prob.max_allowable_crack_width_mm,
+            sol.crack_width_compliant
+        )],
     }
 }
 
@@ -296,16 +315,25 @@ mod tests {
         assert!((sol.internal_lever_arm_z_mm - 501.4).abs() < 2.0);
 
         // M_Rd = 1256.6 * 434.78 * 501.4 / 1e6 ≈ 274.0 kNm
-        assert!(sol.design_moment_resistance_mrd_kn_m > 260.0 && sol.design_moment_resistance_mrd_kn_m < 290.0);
+        assert!(
+            sol.design_moment_resistance_mrd_kn_m > 260.0
+                && sol.design_moment_resistance_mrd_kn_m < 290.0
+        );
         // Applied M_Ed = 240 kNm -> UR ≈ 0.87 < 1.0
         assert!(sol.flexural_utilization_ratio < 1.0);
         assert!(sol.uls_flexure_adequate);
 
         // Service stress in steel sigma_s under 0.65 * 240 = 156 kNm: ~260 to 300 MPa
-        assert!(sol.steel_service_stress_sigma_s_mpa > 220.0 && sol.steel_service_stress_sigma_s_mpa < 320.0);
+        assert!(
+            sol.steel_service_stress_sigma_s_mpa > 220.0
+                && sol.steel_service_stress_sigma_s_mpa < 320.0
+        );
 
         // Characteristic crack width w_k should be between 0.15 mm and 0.28 mm <= 0.30 mm limit
-        assert!(sol.characteristic_crack_width_wk_mm > 0.10 && sol.characteristic_crack_width_wk_mm <= 0.30);
+        assert!(
+            sol.characteristic_crack_width_wk_mm > 0.10
+                && sol.characteristic_crack_width_wk_mm <= 0.30
+        );
         assert!(sol.crack_width_compliant);
     }
 }

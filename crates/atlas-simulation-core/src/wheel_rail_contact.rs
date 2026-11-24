@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Standard UIC 60 / 60E1 steel rail profile properties.
 pub const E_STEEL_PA: f64 = 2.10e11;
@@ -127,10 +127,11 @@ pub struct WheelRailResult {
 }
 
 /// Solves wheel-rail Hertzian contact, Kalker creepage, Klingel hunting, and Nadal derailment.
-pub fn solve_wheel_rail_contact(
-    problem: &WheelRailProblem,
-) -> Result<WheelRailResult, String> {
-    if problem.wheel_vertical_load_kn <= 0.0 || problem.wheel_radius_mm <= 0.0 || problem.rail_crown_radius_mm <= 0.0 {
+pub fn solve_wheel_rail_contact(problem: &WheelRailProblem) -> Result<WheelRailResult, String> {
+    if problem.wheel_vertical_load_kn <= 0.0
+        || problem.wheel_radius_mm <= 0.0
+        || problem.rail_crown_radius_mm <= 0.0
+    {
         return Err("Load and radii must be positive".to_string());
     }
     if problem.train_speed_km_h <= 0.0 {
@@ -234,21 +235,34 @@ pub fn solve_wheel_rail_contact(
 }
 
 /// Executes wheel-rail contact simulation and packages into SimulationResult envelope.
-pub fn solve_wheel_rail_contact_sim(
-    problem: &WheelRailProblem,
-) -> SimulationResult {
+pub fn solve_wheel_rail_contact_sim(problem: &WheelRailProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_wheel_rail_contact(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("contact_semi_axis_a_mm".to_string(), res.contact_semi_axis_a_mm);
-            metrics.insert("contact_semi_axis_b_mm".to_string(), res.contact_semi_axis_b_mm);
-            metrics.insert("max_hertz_pressure_mpa".to_string(), res.max_hertz_pressure_mpa);
+            metrics.insert(
+                "contact_semi_axis_a_mm".to_string(),
+                res.contact_semi_axis_a_mm,
+            );
+            metrics.insert(
+                "contact_semi_axis_b_mm".to_string(),
+                res.contact_semi_axis_b_mm,
+            );
+            metrics.insert(
+                "max_hertz_pressure_mpa".to_string(),
+                res.max_hertz_pressure_mpa,
+            );
             metrics.insert("kalker_f11_mn".to_string(), res.kalker_f11_mn);
             metrics.insert("kalker_f22_mn".to_string(), res.kalker_f22_mn);
-            metrics.insert("klingel_hunting_frequency_hz".to_string(), res.klingel_hunting_frequency_hz);
+            metrics.insert(
+                "klingel_hunting_frequency_hz".to_string(),
+                res.klingel_hunting_frequency_hz,
+            );
             metrics.insert("nadal_limit_y_q".to_string(), res.nadal_limit_y_q);
-            metrics.insert("derailment_safety_factor".to_string(), res.derailment_safety_factor);
+            metrics.insert(
+                "derailment_safety_factor".to_string(),
+                res.derailment_safety_factor,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, res.max_hertz_pressure_mpa, 1, 1e-4);
@@ -270,10 +284,18 @@ pub fn solve_wheel_rail_contact_sim(
                 provenance: SimulationProvenance::new("atlas.rail.wheel_rail_contact", "0.1.0"),
                 logs: vec![format!(
                     "Wheel-Rail Contact (Kalker / Hertz / Nadal): Patch = {:.2} x {:.2} mm ({:.1} mm²), p0 = {:.1} MPa, f11 = {:.2} MN, f22 = {:.2} MN, Klingel f_h = {:.2} Hz (λ = {:.1} m @ {:.0} km/h), (Y/Q)_app = {:.2}, Nadal Limit = {:.2} (SF = {:.2}), Safe: {}",
-                    res.contact_semi_axis_a_mm, res.contact_semi_axis_b_mm, res.contact_patch_area_mm2,
-                    res.max_hertz_pressure_mpa, res.kalker_f11_mn, res.kalker_f22_mn,
-                    res.klingel_hunting_frequency_hz, res.hunting_wavelength_m, problem.train_speed_km_h,
-                    res.applied_y_q_ratio, res.nadal_limit_y_q, res.derailment_safety_factor,
+                    res.contact_semi_axis_a_mm,
+                    res.contact_semi_axis_b_mm,
+                    res.contact_patch_area_mm2,
+                    res.max_hertz_pressure_mpa,
+                    res.kalker_f11_mn,
+                    res.kalker_f22_mn,
+                    res.klingel_hunting_frequency_hz,
+                    res.hunting_wavelength_m,
+                    problem.train_speed_km_h,
+                    res.applied_y_q_ratio,
+                    res.nadal_limit_y_q,
+                    res.derailment_safety_factor,
                     res.is_derailment_safe
                 )],
             }
@@ -308,8 +330,13 @@ mod tests {
         let res = solve_wheel_rail_contact(&prob).expect("solver failed");
         println!(
             "Wheel-Rail: a = {:.2} mm, b = {:.2} mm, p0 = {:.1} MPa, f11 = {:.2} MN, f_h = {:.2} Hz, Nadal = {:.2}, SF = {:.2}",
-            res.contact_semi_axis_a_mm, res.contact_semi_axis_b_mm, res.max_hertz_pressure_mpa,
-            res.kalker_f11_mn, res.klingel_hunting_frequency_hz, res.nadal_limit_y_q, res.derailment_safety_factor
+            res.contact_semi_axis_a_mm,
+            res.contact_semi_axis_b_mm,
+            res.max_hertz_pressure_mpa,
+            res.kalker_f11_mn,
+            res.klingel_hunting_frequency_hz,
+            res.nadal_limit_y_q,
+            res.derailment_safety_factor
         );
 
         assert!(res.contact_semi_axis_a_mm > 5.0 && res.contact_semi_axis_a_mm < 12.0);

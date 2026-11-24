@@ -208,9 +208,9 @@ pub fn get_standard_metric_threads() -> Vec<MetricThreadSpec> {
 /// Find metric thread spec by designation string (e.g. "M8" or "8").
 pub fn find_metric_thread(designation: &str) -> Option<MetricThreadSpec> {
     let clean = designation.trim().to_uppercase();
-    get_standard_metric_threads().into_iter().find(|t| {
-        t.designation == clean || t.designation.trim_start_matches('M') == clean
-    })
+    get_standard_metric_threads()
+        .into_iter()
+        .find(|t| t.designation == clean || t.designation.trim_start_matches('M') == clean)
 }
 
 /// Input problem for bolted joint preload, tightening torque, and load capacity.
@@ -317,11 +317,7 @@ pub fn solve_bolted_joint(prob: &BoltedJointProblem) -> Result<BoltedJointResult
     let p_sep_kn = fi_kn / (1.0 - c);
 
     // Tensile safety factor against proof load
-    let fos_tensile = if fb_kn > 1e-6 {
-        fp_kn / fb_kn
-    } else {
-        100.0
-    };
+    let fos_tensile = if fb_kn > 1e-6 { fp_kn / fb_kn } else { 100.0 };
 
     // Shear safety factor
     let fos_shear = if v_ext_per_bolt > 1e-6 {
@@ -397,10 +393,7 @@ pub fn solve_bolted_joint_sim(prob: &BoltedJointProblem) -> Result<SimulationRes
         "recommended_preload_kn".to_string(),
         sol.recommended_preload_kn,
     );
-    metrics.insert(
-        "tightening_torque_nm".to_string(),
-        sol.tightening_torque_nm,
-    );
+    metrics.insert("tightening_torque_nm".to_string(), sol.tightening_torque_nm);
     metrics.insert("shear_capacity_kn".to_string(), sol.shear_capacity_kn);
     metrics.insert(
         "tensile_safety_factor".to_string(),

@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Speed of light in vacuum c in m/s.
 pub const SPEED_OF_LIGHT: f64 = 299792458.0;
@@ -30,8 +30,8 @@ impl FeedIlluminationPattern {
     /// Returns (taper_efficiency, spillover_efficiency, sidelobe_level_db, beamwidth_factor_deg).
     pub fn efficiency_factors(&self) -> (f64, f64, f64, f64) {
         match self {
-            Self::Uniform            => (1.00, 0.75, -13.26, 58.5),
-            Self::TaperMinus10dB     => (0.92, 0.88, -23.50, 70.0),
+            Self::Uniform => (1.00, 0.75, -13.26, 58.5),
+            Self::TaperMinus10dB => (0.92, 0.88, -23.50, 70.0),
             Self::DeepTaperMinus15dB => (0.84, 0.94, -28.00, 78.0),
         }
     }
@@ -204,29 +204,33 @@ pub fn solve_reflector_antenna(
 }
 
 /// Executes reflector antenna simulation and packages into SimulationResult envelope.
-pub fn solve_reflector_antenna_sim(
-    problem: &ReflectorAntennaProblem,
-) -> SimulationResult {
+pub fn solve_reflector_antenna_sim(problem: &ReflectorAntennaProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_reflector_antenna(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
             metrics.insert("wavelength_mm".to_string(), res.wavelength_mm);
-            metrics.insert("electrical_diameter_wavelengths".to_string(), res.electrical_diameter_wavelengths);
+            metrics.insert(
+                "electrical_diameter_wavelengths".to_string(),
+                res.electrical_diameter_wavelengths,
+            );
             metrics.insert("ruze_efficiency".to_string(), res.ruze_efficiency);
-            metrics.insert("aperture_efficiency_pct".to_string(), res.aperture_efficiency_pct);
+            metrics.insert(
+                "aperture_efficiency_pct".to_string(),
+                res.aperture_efficiency_pct,
+            );
             metrics.insert("boresight_gain_dbi".to_string(), res.boresight_gain_dbi);
-            metrics.insert("half_power_beamwidth_deg".to_string(), res.half_power_beamwidth_deg);
+            metrics.insert(
+                "half_power_beamwidth_deg".to_string(),
+                res.half_power_beamwidth_deg,
+            );
             metrics.insert("itu_mask_margin_db".to_string(), res.itu_mask_margin_db);
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, res.boresight_gain_dbi, 1, 1e-4);
 
-            let comparison = AnalyticalComparison::assess(
-                "boresight_gain_dbi",
-                res.boresight_gain_dbi,
-                48.5,
-            );
+            let comparison =
+                AnalyticalComparison::assess("boresight_gain_dbi", res.boresight_gain_dbi, 48.5);
 
             SimulationResult {
                 problem_id: problem.problem_id.clone(),
@@ -239,10 +243,18 @@ pub fn solve_reflector_antenna_sim(
                 provenance: SimulationProvenance::new("atlas.telecom.reflector_antenna", "0.1.0"),
                 logs: vec![format!(
                     "Reflector Antenna (Silver / ITU-R S.580): D = {:.2} m (F/D = {:.2}, D/λ = {:.0}), f = {:.2} GHz, Gain = {:.2} dBi, HPBW = {:.2}°, FNBW = {:.2}°, SLL = {:.1} dB, Ruze η = {:.2}%, Total η = {:.1}%, ITU Margin @ 2° = {:.1} dB, Compliant: {}",
-                    problem.dish_diameter_m, res.focal_ratio, res.electrical_diameter_wavelengths,
-                    problem.operating_frequency_ghz, res.boresight_gain_dbi, res.half_power_beamwidth_deg,
-                    res.first_null_beamwidth_deg, res.first_sidelobe_level_db, res.ruze_efficiency * 100.0,
-                    res.aperture_efficiency_pct, res.itu_mask_margin_db, res.is_itu_compliant
+                    problem.dish_diameter_m,
+                    res.focal_ratio,
+                    res.electrical_diameter_wavelengths,
+                    problem.operating_frequency_ghz,
+                    res.boresight_gain_dbi,
+                    res.half_power_beamwidth_deg,
+                    res.first_null_beamwidth_deg,
+                    res.first_sidelobe_level_db,
+                    res.ruze_efficiency * 100.0,
+                    res.aperture_efficiency_pct,
+                    res.itu_mask_margin_db,
+                    res.is_itu_compliant
                 )],
             }
         }
@@ -276,13 +288,20 @@ mod tests {
         let res = solve_reflector_antenna(&prob).expect("antenna solver failed");
         println!(
             "Antenna: D = {:.2} m, lambda = {:.2} mm, D/lambda = {:.0}, Gain = {:.2} dBi, HPBW = {:.2}°, eta = {:.1}%, ITU margin = {:.1} dB",
-            prob.dish_diameter_m, res.wavelength_mm, res.electrical_diameter_wavelengths,
-            res.boresight_gain_dbi, res.half_power_beamwidth_deg, res.aperture_efficiency_pct,
+            prob.dish_diameter_m,
+            res.wavelength_mm,
+            res.electrical_diameter_wavelengths,
+            res.boresight_gain_dbi,
+            res.half_power_beamwidth_deg,
+            res.aperture_efficiency_pct,
             res.itu_mask_margin_db
         );
 
         assert!(res.wavelength_mm > 20.0 && res.wavelength_mm < 22.0);
-        assert!(res.electrical_diameter_wavelengths > 100.0 && res.electrical_diameter_wavelengths < 130.0);
+        assert!(
+            res.electrical_diameter_wavelengths > 100.0
+                && res.electrical_diameter_wavelengths < 130.0
+        );
         assert!(res.ruze_efficiency > 0.90);
         assert!(res.aperture_efficiency_pct > 60.0 && res.aperture_efficiency_pct < 80.0);
         assert!(res.boresight_gain_dbi > 46.0 && res.boresight_gain_dbi < 52.0);

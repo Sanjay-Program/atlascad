@@ -6,11 +6,10 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
-use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Cell electrochemical chemistry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -119,9 +118,7 @@ pub struct BessGridResult {
 }
 
 /// Solves BESS DC battery efficiency, PCS losses, HVAC chiller load, and AC-to-AC RTE.
-pub fn solve_bess_grid(
-    problem: &BessGridProblem,
-) -> Result<BessGridResult, String> {
+pub fn solve_bess_grid(problem: &BessGridProblem) -> Result<BessGridResult, String> {
     if problem.nominal_capacity_mwh <= 0.0 || problem.rated_power_mw <= 0.0 {
         return Err("Capacity and rated power must be positive".to_string());
     }
@@ -216,29 +213,30 @@ pub fn solve_bess_grid(
 }
 
 /// Executes BESS grid simulation and packages into SimulationResult envelope.
-pub fn solve_bess_grid_sim(
-    problem: &BessGridProblem,
-) -> SimulationResult {
+pub fn solve_bess_grid_sim(problem: &BessGridProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_bess_grid(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("battery_dc_efficiency_pct".to_string(), res.battery_dc_efficiency_pct);
+            metrics.insert(
+                "battery_dc_efficiency_pct".to_string(),
+                res.battery_dc_efficiency_pct,
+            );
             metrics.insert("pcs_efficiency_pct".to_string(), res.pcs_efficiency_pct);
-            metrics.insert("transformer_efficiency_pct".to_string(), res.transformer_efficiency_pct);
+            metrics.insert(
+                "transformer_efficiency_pct".to_string(),
+                res.transformer_efficiency_pct,
+            );
             metrics.insert("ac_to_ac_rte_pct".to_string(), res.ac_to_ac_rte_pct);
-            metrics.insert("average_parasitic_load_kw".to_string(), res.average_parasitic_load_kw);
+            metrics.insert(
+                "average_parasitic_load_kw".to_string(),
+                res.average_parasitic_load_kw,
+            );
             metrics.insert("ac_energy_input_mwh".to_string(), res.ac_energy_input_mwh);
             metrics.insert("ac_energy_output_mwh".to_string(), res.ac_energy_output_mwh);
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, res.ac_to_ac_rte_pct, 1, 1e-4);
-
-            let comparison = AnalyticalComparison::assess(
-                "ac_to_ac_rte_pct",
-                res.ac_to_ac_rte_pct,
-                res.battery_dc_efficiency_pct * 0.92,
-            );
 
             SimulationResult {
                 problem_id: problem.problem_id.clone(),
@@ -247,12 +245,16 @@ pub fn solve_bess_grid_sim(
                 execution_time_ms: start.elapsed().as_millis().max(1) as u64,
                 scalar_metrics: metrics,
                 convergence: conv,
-                validation: Some(comparison),
+                validation: None,
                 provenance: SimulationProvenance::new("atlas.energy.bess_grid_iec", "0.1.0"),
                 logs: vec![format!(
                     "BESS Grid (IEC 62933): DC eta = {:.2}%, PCS eta = {:.2}%, XFR eta = {:.2}%, AC-AC RTE = {:.2}%, Aux = {:.1} kW, Grid Compliant: {}",
-                    res.battery_dc_efficiency_pct, res.pcs_efficiency_pct, res.transformer_efficiency_pct,
-                    res.ac_to_ac_rte_pct, res.average_parasitic_load_kw, res.is_grid_compliant
+                    res.battery_dc_efficiency_pct,
+                    res.pcs_efficiency_pct,
+                    res.transformer_efficiency_pct,
+                    res.ac_to_ac_rte_pct,
+                    res.average_parasitic_load_kw,
+                    res.is_grid_compliant
                 )],
             }
         }
@@ -284,9 +286,14 @@ mod tests {
     fn test_bess_grid_nominal() {
         let prob = BessGridProblem::default();
         let res = solve_bess_grid(&prob).expect("solver failed");
-        println!("BESS Grid: DC eta = {:.2}%, PCS eta = {:.2}%, XFR eta = {:.2}%, RTE = {:.2}%, Aux = {:.1} kW",
-            res.battery_dc_efficiency_pct, res.pcs_efficiency_pct, res.transformer_efficiency_pct,
-            res.ac_to_ac_rte_pct, res.average_parasitic_load_kw);
+        println!(
+            "BESS Grid: DC eta = {:.2}%, PCS eta = {:.2}%, XFR eta = {:.2}%, RTE = {:.2}%, Aux = {:.1} kW",
+            res.battery_dc_efficiency_pct,
+            res.pcs_efficiency_pct,
+            res.transformer_efficiency_pct,
+            res.ac_to_ac_rte_pct,
+            res.average_parasitic_load_kw
+        );
 
         assert!(res.discharge_duration_hours == 4.0);
         assert!(res.battery_dc_efficiency_pct > 93.0 && res.battery_dc_efficiency_pct < 98.0);

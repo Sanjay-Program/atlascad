@@ -299,14 +299,14 @@ pub fn solve_welding_sim(prob: &WeldingProblem) -> SimulationResult {
     let mut metrics = std::collections::HashMap::new();
     metrics.insert("net_heat_input_kj_mm".to_string(), sol.net_heat_input_kj_mm);
     metrics.insert("cooling_time_t8_5_s".to_string(), sol.cooling_time_t8_5_s);
-    metrics.insert("carbon_equivalent_iiw".to_string(), sol.carbon_equivalent_iiw);
+    metrics.insert(
+        "carbon_equivalent_iiw".to_string(),
+        sol.carbon_equivalent_iiw,
+    );
     metrics.insert("max_haz_hardness_hv".to_string(), sol.max_haz_hardness_hv);
 
-    let comparison = AnalyticalComparison::assess(
-        "haz_hardness_limit",
-        sol.max_haz_hardness_hv,
-        380.0,
-    );
+    let comparison =
+        AnalyticalComparison::assess("haz_hardness_limit", sol.max_haz_hardness_hv, 380.0);
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.cooling_time_t8_5_s, 1, 1e-4);
@@ -320,7 +320,10 @@ pub fn solve_welding_sim(prob: &WeldingProblem) -> SimulationResult {
         convergence: conv,
         validation: Some(comparison),
         provenance: SimulationProvenance::new("atlas.welding.metallurgy", "0.1.0"),
-        logs: vec![format!("Net heat input: {:.2} kJ/mm, t8/5: {:.1}s, Peak HV: {:.0}", sol.net_heat_input_kj_mm, sol.cooling_time_t8_5_s, sol.max_haz_hardness_hv)],
+        logs: vec![format!(
+            "Net heat input: {:.2} kJ/mm, t8/5: {:.1}s, Peak HV: {:.0}",
+            sol.net_heat_input_kj_mm, sol.cooling_time_t8_5_s, sol.max_haz_hardness_hv
+        )],
     }
 }
 

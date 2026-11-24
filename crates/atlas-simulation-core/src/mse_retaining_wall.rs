@@ -56,12 +56,12 @@ impl Default for MseWallProblem {
         Self {
             problem_id: "highway_bridge_abutment_mse_wall".to_string(),
             polymer_type: GeogridPolymerType::HdpeUniaxial,
-            wall_height_h_m: 8.0,               // 8.0 m highway bridge approach retaining wall
-            reinforcement_length_l_m: 6.0,      // 6.0 m geogrid embedment (L = 0.75*H >= 0.70*H)
-            vertical_layer_spacing_m: 0.60,     // 0.60 m layer spacing (13 layers)
-            soil_unit_weight_kn_m3: 19.5,       // Well-graded crushed gravel fill
-            soil_friction_angle_deg: 34.0,      // phi = 34 deg
-            crest_surcharge_q_kpa: 12.0,        // 12 kPa AASHTO highway traffic surcharge
+            wall_height_h_m: 8.0, // 8.0 m highway bridge approach retaining wall
+            reinforcement_length_l_m: 6.0, // 6.0 m geogrid embedment (L = 0.75*H >= 0.70*H)
+            vertical_layer_spacing_m: 0.60, // 0.60 m layer spacing (13 layers)
+            soil_unit_weight_kn_m3: 19.5, // Well-graded crushed gravel fill
+            soil_friction_angle_deg: 34.0, // phi = 34 deg
+            crest_surcharge_q_kpa: 12.0, // 12 kPa AASHTO highway traffic surcharge
             geogrid_ultimate_strength_kn_m: 110.0, // 110 kN/m HDPE uniaxial geogrid (e.g. UX1600MSE / Miragrid 10XT)
             rf_installation_damage: 1.15,
             rf_creep_rupture: 1.65,
@@ -133,7 +133,8 @@ pub fn solve_mse_retaining_wall(problem: &MseWallProblem) -> Result<MseWallResul
     let k_a = (1.0 - phi_rad.sin()) / (1.0 + phi_rad.sin());
 
     // Total reduction factor: RF_total = RF_id * RF_cr * RF_d
-    let rf_total = problem.rf_installation_damage * problem.rf_creep_rupture * problem.rf_durability;
+    let rf_total =
+        problem.rf_installation_damage * problem.rf_creep_rupture * problem.rf_durability;
     if rf_total <= 1.0 {
         return Err("Combined reduction factor must exceed 1.0".to_string());
     }
@@ -204,7 +205,8 @@ pub fn solve_mse_retaining_wall(problem: &MseWallProblem) -> Result<MseWallResul
     }
 
     let lh_ratio = problem.reinforcement_length_l_m / problem.wall_height_h_m;
-    let reinforced_weight = problem.soil_unit_weight_kn_m3 * problem.wall_height_h_m * problem.reinforcement_length_l_m;
+    let reinforced_weight =
+        problem.soil_unit_weight_kn_m3 * problem.wall_height_h_m * problem.reinforcement_length_l_m;
 
     // Design verification:
     let is_l_ok = lh_ratio >= 0.70;
@@ -240,12 +242,23 @@ mod tests {
         let prob = MseWallProblem::default();
         let res = solve_mse_retaining_wall(&prob)?;
 
-        assert!(res.active_earth_pressure_coef_ka > 0.25 && res.active_earth_pressure_coef_ka < 0.32);
+        assert!(
+            res.active_earth_pressure_coef_ka > 0.25 && res.active_earth_pressure_coef_ka < 0.32
+        );
         assert_eq!(res.total_reinforcement_layers, 13);
-        assert!(res.allowable_design_strength_tal_kn_m > 35.0 && res.allowable_design_strength_tal_kn_m < 55.0);
+        assert!(
+            res.allowable_design_strength_tal_kn_m > 35.0
+                && res.allowable_design_strength_tal_kn_m < 55.0
+        );
         assert!(res.max_layer_tensile_force_kn_m > 15.0 && res.max_layer_tensile_force_kn_m < 35.0);
-        assert!(res.min_rupture_safety_factor >= 1.50, "Should satisfy AASHTO LRFD rupture safety factor >= 1.50");
-        assert!(res.min_pullout_safety_factor >= 1.50, "Should satisfy AASHTO LRFD pullout safety factor >= 1.50");
+        assert!(
+            res.min_rupture_safety_factor >= 1.50,
+            "Should satisfy AASHTO LRFD rupture safety factor >= 1.50"
+        );
+        assert!(
+            res.min_pullout_safety_factor >= 1.50,
+            "Should satisfy AASHTO LRFD pullout safety factor >= 1.50"
+        );
         assert!(res.length_to_height_ratio >= 0.70);
         assert!(res.is_embedment_length_adequate);
         assert!(res.is_tensile_rupture_safe);

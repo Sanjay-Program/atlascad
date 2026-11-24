@@ -56,15 +56,15 @@ impl Default for SlurryPumpProblem {
         Self {
             problem_id: "mining_tailings_centrifugal_slurry_pump".to_string(),
             abrasiveness_class: SlurryAbrasivenessClass::Class3Severe,
-            slurry_flow_rate_m3_h: 650.0,       // 650 m³/h mining tailings slurry
-            clear_water_head_m: 45.0,           // 45 m water head
-            clear_water_efficiency: 0.78,       // 78% clear water efficiency
-            solid_specific_gravity: 2.75,       // Copper/quartz porphyry rock
-            solids_concentration_wt_pct: 35.0,  // 35% solids by weight
+            slurry_flow_rate_m3_h: 650.0, // 650 m³/h mining tailings slurry
+            clear_water_head_m: 45.0,     // 45 m water head
+            clear_water_efficiency: 0.78, // 78% clear water efficiency
+            solid_specific_gravity: 2.75, // Copper/quartz porphyry rock
+            solids_concentration_wt_pct: 35.0, // 35% solids by weight
             median_particle_size_d50_um: 110.0, // 110 µm median particle size
-            impeller_diameter_mm: 680.0,        // Ø680 mm high-chrome impeller
-            pump_rotational_speed_rpm: 850.0,   // 850 RPM
-            allowable_wear_thickness_mm: 25.0,  // 25 mm sacrificial casing/vane wear allowance
+            impeller_diameter_mm: 680.0,  // Ø680 mm high-chrome impeller
+            pump_rotational_speed_rpm: 850.0, // 850 RPM
+            allowable_wear_thickness_mm: 25.0, // 25 mm sacrificial casing/vane wear allowance
         }
     }
 }
@@ -160,14 +160,16 @@ pub fn solve_slurry_pump_derating(problem: &SlurryPumpProblem) -> Result<SlurryP
 
     // Shaft power: P = (rho_m * g * Q * TDH_slurry) / (3.6e6 * eta_slurry) [kW]
     let g = 9.80665;
-    let p_shaft_kw = (rho_slurry * g * problem.slurry_flow_rate_m3_h * tdh_slurry) / (3.6e6 * eta_slurry);
+    let p_shaft_kw =
+        (rho_slurry * g * problem.slurry_flow_rate_m3_h * tdh_slurry) / (3.6e6 * eta_slurry);
 
     // Recommended motor power with standard 15% nameplate margin:
     let p_motor_kw = p_shaft_kw * 1.15;
 
     // Impeller tip speed: v_tip = pi * D * N / 60 [m/s]:
     let d_impeller_m = problem.impeller_diameter_mm / 1000.0;
-    let v_tip_m_s = (std::f64::consts::PI * d_impeller_m * problem.pump_rotational_speed_rpm) / 60.0;
+    let v_tip_m_s =
+        (std::f64::consts::PI * d_impeller_m * problem.pump_rotational_speed_rpm) / 60.0;
 
     // Pagalthivarthi-Roco abrasive wear model:
     // Wear rate W = k_wear * C_v * (v_tip / 25)^2.8 * (d50 / 100)^0.8 [mm / 1000 h]
@@ -177,7 +179,10 @@ pub fn solve_slurry_pump_derating(problem: &SlurryPumpProblem) -> Result<SlurryP
         SlurryAbrasivenessClass::Class3Severe => 4.50,
         SlurryAbrasivenessClass::Class4Extreme => 9.20,
     };
-    let wear_rate_1000h = k_wear * c_v * (v_tip_m_s / 25.0).powf(2.8) * (problem.median_particle_size_d50_um / 100.0).powf(0.8);
+    let wear_rate_1000h = k_wear
+        * c_v
+        * (v_tip_m_s / 25.0).powf(2.8)
+        * (problem.median_particle_size_d50_um / 100.0).powf(0.8);
     let wear_rate_safe = wear_rate_1000h.max(0.10);
 
     // Wear life in operating hours:
@@ -219,8 +224,14 @@ mod tests {
         let prob = SlurryPumpProblem::default();
         let res = solve_slurry_pump_derating(&prob)?;
 
-        assert!(res.slurry_mixture_specific_gravity > 1.20 && res.slurry_mixture_specific_gravity < 1.45);
-        assert!(res.solids_volumetric_concentration_pct > 12.0 && res.solids_volumetric_concentration_pct < 25.0);
+        assert!(
+            res.slurry_mixture_specific_gravity > 1.20
+                && res.slurry_mixture_specific_gravity < 1.45
+        );
+        assert!(
+            res.solids_volumetric_concentration_pct > 12.0
+                && res.solids_volumetric_concentration_pct < 25.0
+        );
         assert!(res.head_derating_ratio_hr >= 0.85 && res.head_derating_ratio_hr <= 0.98);
         assert!(res.derated_slurry_head_m >= 38.0);
         assert!(res.shaft_power_kw > 100.0);

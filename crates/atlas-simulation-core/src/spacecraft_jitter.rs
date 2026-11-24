@@ -113,7 +113,9 @@ pub struct SpacecraftJitterResult {
 }
 
 /// Solves spacecraft reaction wheel jitter, bearing harmonics, and payload line-of-sight micro-vibrations.
-pub fn solve_spacecraft_jitter(problem: &SpacecraftJitterProblem) -> Result<SpacecraftJitterResult, String> {
+pub fn solve_spacecraft_jitter(
+    problem: &SpacecraftJitterProblem,
+) -> Result<SpacecraftJitterResult, String> {
     if problem.wheel_speed_rpm <= 0.0 {
         return Err("Wheel speed must be positive".to_string());
     }
@@ -173,8 +175,13 @@ pub fn solve_spacecraft_jitter(problem: &SpacecraftJitterProblem) -> Result<Spac
     // Line-of-Sight (LOS) Pointing Jitter Angle RMS (microradians):
     // theta_jitter = (M_dynamic * H(spin)) / (J_sat * omega^2) * 1e6
     // Add RSS contribution from bearing ripple (~15% of unbalance torque):
-    let theta_spin_urad = ((m_dynamic_n_m * h_spin) / (problem.satellite_inertia_kg_m2 * omega_spin * omega_spin)) * 1e6;
-    let theta_bearing_urad = 0.15 * ((m_dynamic_n_m * h_bpfo.max(h_bpfi)) / (problem.satellite_inertia_kg_m2 * omega_spin * omega_spin)) * 1e6;
+    let theta_spin_urad = ((m_dynamic_n_m * h_spin)
+        / (problem.satellite_inertia_kg_m2 * omega_spin * omega_spin))
+        * 1e6;
+    let theta_bearing_urad = 0.15
+        * ((m_dynamic_n_m * h_bpfo.max(h_bpfi))
+            / (problem.satellite_inertia_kg_m2 * omega_spin * omega_spin))
+        * 1e6;
     let theta_total_urad = (theta_spin_urad.powi(2) + theta_bearing_urad.powi(2)).sqrt();
     let theta_arcsec = theta_total_urad * 0.206265; // 1 rad = 206265 arcsec
 
@@ -231,7 +238,9 @@ mod tests {
         let res = solve_spacecraft_jitter(&prob)?;
         assert_eq!(res.spin_frequency_hz, 60.0);
         assert!(res.static_disturbance_force_n > 0.20 && res.static_disturbance_force_n < 0.35);
-        assert!(res.dynamic_disturbance_torque_mn_m > 4.0 && res.dynamic_disturbance_torque_mn_m < 6.5);
+        assert!(
+            res.dynamic_disturbance_torque_mn_m > 4.0 && res.dynamic_disturbance_torque_mn_m < 6.5
+        );
         assert!(res.bearing_bpfo_frequency_hz > 180.0 && res.bearing_bpfo_frequency_hz < 220.0);
         assert!(res.bearing_bpfi_frequency_hz > 260.0 && res.bearing_bpfi_frequency_hz < 300.0);
         assert!(res.payload_pointing_jitter_urad < 2.50);

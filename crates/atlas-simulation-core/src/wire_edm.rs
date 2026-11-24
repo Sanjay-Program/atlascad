@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Workpiece material for Wire EDM processing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -32,11 +32,11 @@ impl EdmWorkpieceMaterial {
     /// (melting_temp_k, thermal_conductivity_w_m_k, density_kg_m3, specific_heat_j_kg_k, electrical_resistivity_ohm_m)
     pub fn properties(&self) -> (f64, f64, f64, f64, f64) {
         match self {
-            Self::ToolSteelD2    => (1690.0, 20.0, 7700.0, 460.0, 6.5e-7),
+            Self::ToolSteelD2 => (1690.0, 20.0, 7700.0, 460.0, 6.5e-7),
             Self::TitaniumGrade5 => (1930.0, 7.2, 4430.0, 526.0, 1.7e-6),
-            Self::Inconel718     => (1609.0, 11.4, 8190.0, 435.0, 1.2e-6),
+            Self::Inconel718 => (1609.0, 11.4, 8190.0, 435.0, 1.2e-6),
             Self::TungstenCarbide => (3140.0, 84.0, 14500.0, 210.0, 2.0e-7),
-            Self::Aluminum6061   => (925.0, 167.0, 2700.0, 896.0, 4.0e-8),
+            Self::Aluminum6061 => (925.0, 167.0, 2700.0, 896.0, 4.0e-8),
         }
     }
 }
@@ -129,9 +129,7 @@ pub struct WireEdmResult {
 }
 
 /// Solves Wire EDM spark erosion physics, cutting speed, MRR, and wire deflection.
-pub fn solve_wire_edm(
-    problem: &WireEdmProblem,
-) -> Result<WireEdmResult, String> {
+pub fn solve_wire_edm(problem: &WireEdmProblem) -> Result<WireEdmResult, String> {
     if problem.workpiece_thickness_mm <= 0.0 || problem.wire_diameter_mm <= 0.0 {
         return Err("Workpiece thickness and wire diameter must be positive".to_string());
     }
@@ -162,7 +160,8 @@ pub fn solve_wire_edm(
 
     // 2. Spark gap distance s_g per side:
     // Empirical Palanisamy / CIRP formulation: s_g ~ 0.0006 * U_o^0.68 * I_e^0.28 [mm]
-    let spark_gap_mm = 0.0006 * problem.open_circuit_voltage_v.powf(0.68) * problem.discharge_current_a.powf(0.28);
+    let spark_gap_mm =
+        0.0006 * problem.open_circuit_voltage_v.powf(0.68) * problem.discharge_current_a.powf(0.28);
     let spark_gap_um = spark_gap_mm * 1000.0;
     let kerf_width_mm = problem.wire_diameter_mm + 2.0 * spark_gap_mm;
 
@@ -197,7 +196,8 @@ pub fn solve_wire_edm(
     let f_lateral_total_n = 0.005 * (problem.discharge_current_a * 0.15).powf(1.1);
     // Wire deflection under tension T over span L: y_max = (F * L) / (4 * T)
     let span_mm = problem.workpiece_thickness_mm * 1.35; // guide-to-guide span
-    let wire_deflection_mm = (f_lateral_total_n * (span_mm * 1e-3)) / (4.0 * problem.wire_tension_n);
+    let wire_deflection_mm =
+        (f_lateral_total_n * (span_mm * 1e-3)) / (4.0 * problem.wire_tension_n);
     let wire_deflection_um = wire_deflection_mm * 1e6;
 
     // 7. Dielectric flushing pressure:
@@ -206,7 +206,8 @@ pub fn solve_wire_edm(
 
     // 8. Process safety check:
     // Wire tensile stress: sigma = T / (pi/4 * d^2). For brass wire, UTS ~ 900 MPa.
-    let wire_area_mm2 = std::f64::consts::PI * 0.25 * problem.wire_diameter_mm * problem.wire_diameter_mm;
+    let wire_area_mm2 =
+        std::f64::consts::PI * 0.25 * problem.wire_diameter_mm * problem.wire_diameter_mm;
     let wire_stress_mpa = problem.wire_tension_n / wire_area_mm2;
     let is_safe = wire_stress_mpa < 600.0 // SF > 1.5 against 900 MPa breaking limit
         && cutting_speed_mm_min > 0.1
@@ -233,27 +234,37 @@ pub fn solve_wire_edm(
 }
 
 /// Executes Wire EDM simulation and packages into SimulationResult envelope.
-pub fn solve_wire_edm_sim(
-    problem: &WireEdmProblem,
-) -> SimulationResult {
+pub fn solve_wire_edm_sim(problem: &WireEdmProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_wire_edm(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
             metrics.insert("cutting_speed_mm_min".to_string(), res.cutting_speed_mm_min);
-            metrics.insert("volumetric_mrr_mm3_min".to_string(), res.volumetric_mrr_mm3_min);
+            metrics.insert(
+                "volumetric_mrr_mm3_min".to_string(),
+                res.volumetric_mrr_mm3_min,
+            );
             metrics.insert("cutting_rate_mm2_min".to_string(), res.cutting_rate_mm2_min);
-            metrics.insert("surface_roughness_ra_um".to_string(), res.surface_roughness_ra_um);
+            metrics.insert(
+                "surface_roughness_ra_um".to_string(),
+                res.surface_roughness_ra_um,
+            );
             metrics.insert("kerf_width_mm".to_string(), res.kerf_width_mm);
-            metrics.insert("max_wire_deflection_um".to_string(), res.max_wire_deflection_um);
+            metrics.insert(
+                "max_wire_deflection_um".to_string(),
+                res.max_wire_deflection_um,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, res.cutting_speed_mm_min, 1, 1e-4);
 
+            // Kinematic continuity check: MRR must equal v_c * workpiece thickness * kerf.
+            let mrr_from_cut =
+                res.cutting_speed_mm_min * problem.workpiece_thickness_mm * res.kerf_width_mm;
             let comparison = AnalyticalComparison::assess(
-                "cutting_speed_mm_min",
-                res.cutting_speed_mm_min,
-                res.cutting_speed_mm_min * 0.98,
+                "MRR–Cutting Speed Continuity (mm³/min)",
+                res.volumetric_mrr_mm3_min,
+                mrr_from_cut,
             );
 
             SimulationResult {
@@ -267,9 +278,14 @@ pub fn solve_wire_edm_sim(
                 provenance: SimulationProvenance::new("atlas.manufacturing.wire_edm_cirp", "0.1.0"),
                 logs: vec![format!(
                     "Wire EDM (ISO 230): Material = {:?}, vc = {:.2} mm/min, MRR = {:.1} mm³/min, Rate = {:.1} mm²/min, Kerf = {:.3} mm, Ra = {:.2} μm, Defl = {:.1} μm, Safe: {}",
-                    res.workpiece_material, res.cutting_speed_mm_min, res.volumetric_mrr_mm3_min,
-                    res.cutting_rate_mm2_min, res.kerf_width_mm, res.surface_roughness_ra_um,
-                    res.max_wire_deflection_um, res.is_safe
+                    res.workpiece_material,
+                    res.cutting_speed_mm_min,
+                    res.volumetric_mrr_mm3_min,
+                    res.cutting_rate_mm2_min,
+                    res.kerf_width_mm,
+                    res.surface_roughness_ra_um,
+                    res.max_wire_deflection_um,
+                    res.is_safe
                 )],
             }
         }
@@ -301,9 +317,15 @@ mod tests {
     fn test_wire_edm_nominal() {
         let prob = WireEdmProblem::default();
         let res = solve_wire_edm(&prob).expect("solver failed");
-        println!("Wire EDM: vc = {:.2} mm/min, MRR = {:.1} mm3/min, Kerf = {:.3} mm (gap = {:.1} um), Ra = {:.2} um, Defl = {:.1} um",
-            res.cutting_speed_mm_min, res.volumetric_mrr_mm3_min, res.kerf_width_mm,
-            res.spark_gap_um, res.surface_roughness_ra_um, res.max_wire_deflection_um);
+        println!(
+            "Wire EDM: vc = {:.2} mm/min, MRR = {:.1} mm3/min, Kerf = {:.3} mm (gap = {:.1} um), Ra = {:.2} um, Defl = {:.1} um",
+            res.cutting_speed_mm_min,
+            res.volumetric_mrr_mm3_min,
+            res.kerf_width_mm,
+            res.spark_gap_um,
+            res.surface_roughness_ra_um,
+            res.max_wire_deflection_um
+        );
 
         assert!(res.single_pulse_energy_mj > 1.0 && res.single_pulse_energy_mj < 5.0);
         assert!(res.pulse_duty_cycle > 0.20 && res.pulse_duty_cycle < 0.35);

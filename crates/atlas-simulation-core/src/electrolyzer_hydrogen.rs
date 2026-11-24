@@ -63,7 +63,7 @@ impl Default for ElectrolyzerHydrogenProblem {
             cell_count: 120,                         // 120 cell commercial stack
             membrane_thickness_um: 90.0,             // 90 µm reinforced Nafion membrane
             membrane_water_content_lambda: 18.0,     // Well-hydrated membrane
-            anode_exchange_current_density_a_cm2: 1.5e-3,   // High-activity IrO2 nano-catalyst
+            anode_exchange_current_density_a_cm2: 1.5e-3, // High-activity IrO2 nano-catalyst
             cathode_exchange_current_density_a_cm2: 1.5e-2, // Pt/C nano-particle cathode
             limiting_current_density_a_cm2: 3.80,
         }
@@ -169,7 +169,8 @@ pub fn solve_electrolyzer_hydrogen(
     // Membrane proton conductivity (Springer / Nafion empirical relation):
     // sigma_mem = (0.005139 * lambda - 0.00326) * exp( 1268 * (1/303.15 - 1/T_k) ) in S/cm
     let lambda = problem.membrane_water_content_lambda;
-    let sigma_mem_s_cm = (0.005139 * lambda - 0.00326) * (1268.0 * (1.0 / 303.15 - 1.0 / t_k)).exp();
+    let sigma_mem_s_cm =
+        (0.005139 * lambda - 0.00326) * (1268.0 * (1.0 / 303.15 - 1.0 / t_k)).exp();
 
     let t_mem_cm = (problem.membrane_thickness_um * 1e-6) * 100.0; // µm to cm
     let r_mem_ohm_cm2 = t_mem_cm / sigma_mem_s_cm;
@@ -262,15 +263,27 @@ mod tests {
 
         assert!(res.reversible_nernst_voltage_v > 1.20 && res.reversible_nernst_voltage_v < 1.35);
         assert!(res.thermoneutral_voltage_v > 1.45 && res.thermoneutral_voltage_v < 1.50);
-        assert!(res.anode_activation_overpotential_v > 0.25 && res.anode_activation_overpotential_v < 0.55);
-        assert!(res.cathode_activation_overpotential_v > 0.05 && res.cathode_activation_overpotential_v < 0.35);
+        assert!(
+            res.anode_activation_overpotential_v > 0.25
+                && res.anode_activation_overpotential_v < 0.55
+        );
+        assert!(
+            res.cathode_activation_overpotential_v > 0.05
+                && res.cathode_activation_overpotential_v < 0.35
+        );
         assert!(res.ohmic_overpotential_v > 0.10 && res.ohmic_overpotential_v < 0.35);
         assert!(res.operating_cell_voltage_v > 1.70 && res.operating_cell_voltage_v < 2.20);
         assert!(res.stack_terminal_voltage_v > 200.0 && res.stack_terminal_voltage_v < 280.0);
         assert!(res.stack_electric_power_kw_e > 200.0 && res.stack_electric_power_kw_e < 350.0);
         assert!(res.faraday_efficiency_pct > 96.0 && res.faraday_efficiency_pct < 100.0);
-        assert!(res.hydrogen_production_rate_kg_per_h > 4.0 && res.hydrogen_production_rate_kg_per_h < 6.5);
-        assert!(res.specific_energy_consumption_kwh_per_kg > 44.0 && res.specific_energy_consumption_kwh_per_kg < 60.0);
+        assert!(
+            res.hydrogen_production_rate_kg_per_h > 4.0
+                && res.hydrogen_production_rate_kg_per_h < 6.5
+        );
+        assert!(
+            res.specific_energy_consumption_kwh_per_kg > 44.0
+                && res.specific_energy_consumption_kwh_per_kg < 60.0
+        );
         assert!(res.stack_hhv_efficiency_pct >= 65.0);
         assert!(res.is_cell_voltage_acceptable);
         assert!(res.is_specific_energy_acceptable);

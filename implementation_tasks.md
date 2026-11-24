@@ -232,5 +232,5 @@
 1. **Zero Unsafe & Zero Panics:** Every crate compiles under `#![forbid(unsafe_code)]` with zero `unwrap()`, `expect()`, or `panic!()`. Verified with `cargo clippy --workspace --all-targets --all-features -- -D warnings` (0 warnings) and `cargo fmt --check` (0 diffs).
 2. **Automated Live Demonstration:** `scripts/live-demo.py` executes end-to-end against live release binary and verifies every single workbench and discipline (**139/139 assertions passed**).
 3. **Full Web Browser CDP Automation:** `scripts/test-airplane-web.py` creates a workplane from scratch, extrudes a solid, executes CAE simulations, runs 5-axis CAM, slices with TPMS Gyroid infill, and verifies 0 console errors (**52/52 browser assertions passed**).
-4. **Analytical Truth:** Every simulation result is validated against closed-form theoretical solutions with error $< 1\%$.
+4. **Analytical Truth:** Every simulation result that has a closed-form reference is validated against it; results based on empirical correlations or design margins report no analytical comparison rather than a fabricated sub-1% match.
 5. **Full Regression Battery:** `cargo test --workspace` (100% pass across all unit and doc tests), `scripts/full-check.py` (**312/312 assertions passed**), and `./scripts/simulate.sh --http` (**56/56 assertions passed**).

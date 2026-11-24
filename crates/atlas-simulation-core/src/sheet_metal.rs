@@ -335,16 +335,13 @@ pub fn solve_sheet_metal_sim(prob: &SheetMetalPartProblem) -> Result<SimulationR
     let sol = solve_sheet_metal_unfold(prob)?;
 
     let mut metrics = HashMap::new();
-    metrics.insert(
-        "total_flat_length_mm".to_string(),
-        sol.total_flat_length_mm,
-    );
+    metrics.insert("total_flat_length_mm".to_string(), sol.total_flat_length_mm);
     metrics.insert("total_flat_width_mm".to_string(), sol.total_flat_width_mm);
-    metrics.insert("flat_pattern_area_mm2".to_string(), sol.flat_pattern_area_mm2);
     metrics.insert(
-        "forming_force_kn".to_string(),
-        sol.total_forming_force_kn,
+        "flat_pattern_area_mm2".to_string(),
+        sol.flat_pattern_area_mm2,
     );
+    metrics.insert("forming_force_kn".to_string(), sol.total_forming_force_kn);
     metrics.insert(
         "forming_tonnage_metric_tons".to_string(),
         sol.total_forming_tonnage_metric_tons,
@@ -361,8 +358,9 @@ pub fn solve_sheet_metal_sim(prob: &SheetMetalPartProblem) -> Result<SimulationR
         metrics.insert("k_factor".to_string(), first_bend.k_factor);
     }
 
-    let analytical_unfold_check =
-        sol.bends[0].flat_flange1_mm + sol.bends[0].bend_allowance_mm + sol.bends[0].flat_flange2_mm;
+    let analytical_unfold_check = sol.bends[0].flat_flange1_mm
+        + sol.bends[0].bend_allowance_mm
+        + sol.bends[0].flat_flange2_mm;
     let val = AnalyticalComparison::assess(
         "Single Bend Flat Length Conservation",
         sol.total_flat_length_mm,

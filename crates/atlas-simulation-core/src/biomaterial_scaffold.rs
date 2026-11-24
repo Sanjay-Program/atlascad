@@ -173,12 +173,15 @@ pub fn solve_biomaterial_scaffold(
     let k_hydro_per_week = match problem.biomaterial_type {
         ScaffoldBiomaterialType::PllaPolymer => 0.018, // ~ 1.8% per week (~54 week half-life)
         ScaffoldBiomaterialType::Plga5050Polymer => 0.125, // ~ 12.5% per week (~6 week half-life)
-        ScaffoldBiomaterialType::PclPolymer => 0.008, // ~ 0.8% per week (~86 week half-life)
+        ScaffoldBiomaterialType::PclPolymer => 0.008,  // ~ 0.8% per week (~86 week half-life)
         ScaffoldBiomaterialType::BioceramicComposite => 0.005,
     };
 
-    let m_n_t = problem.initial_molecular_weight_kda * (-k_hydro_per_week * problem.incubation_time_weeks).exp();
-    let mw_loss_pct = ((problem.initial_molecular_weight_kda - m_n_t) / problem.initial_molecular_weight_kda) * 100.0;
+    let m_n_t = problem.initial_molecular_weight_kda
+        * (-k_hydro_per_week * problem.incubation_time_weeks).exp();
+    let mw_loss_pct = ((problem.initial_molecular_weight_kda - m_n_t)
+        / problem.initial_molecular_weight_kda)
+        * 100.0;
 
     // Modulus loss scales as (M_n / M_n0)^1.5:
     let e_t_mpa = e_0_mpa * (m_n_t / problem.initial_molecular_weight_kda).powf(1.5);
@@ -240,7 +243,10 @@ mod tests {
         assert!(res.bulk_volume_mm3 > 1100.0 && res.bulk_volume_mm3 < 1300.0);
         assert!(res.scaffold_dry_mass_mg > 300.0 && res.scaffold_dry_mass_mg < 450.0);
         assert!(res.darcy_permeability_darcy > 50.0);
-        assert!(res.initial_compressive_modulus_mpa > 100.0 && res.initial_compressive_modulus_mpa < 300.0);
+        assert!(
+            res.initial_compressive_modulus_mpa > 100.0
+                && res.initial_compressive_modulus_mpa < 300.0
+        );
         assert!(res.retained_molecular_weight_kda > 80.0);
         assert!(res.is_osteoconductive_architecture_favorable);
         assert!(res.is_shear_stress_osteogenic);

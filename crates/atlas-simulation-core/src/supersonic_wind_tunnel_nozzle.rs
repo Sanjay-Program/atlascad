@@ -91,13 +91,13 @@ impl Default for SupersonicNozzleProblem {
             problem_id: "trisonic_aerospace_tunnel_m2".to_string(),
             gas_medium: SupersonicGasMedium::DryAir,
             contour_method: NozzleContourMethod::MethodOfCharacteristicsMOC,
-            stagnation_pressure_kpa: 450.0,         // 4.5 bar total pressure
-            stagnation_temperature_k: 320.0,        // 320 K (47 °C)
-            design_mach_number: 2.20,               // Mach 2.2 supersonic test section
-            throat_diameter_mm: 85.0,               // 85 mm throat diameter
-            ambient_backpressure_kpa: 42.0,         // 42 kPa ambient backpressure
-            model_deflection_angle_deg: 10.0,       // 10 deg wedge deflection
-            divergence_half_angle_deg: 12.0,        // 12 deg half-angle
+            stagnation_pressure_kpa: 450.0,   // 4.5 bar total pressure
+            stagnation_temperature_k: 320.0,  // 320 K (47 °C)
+            design_mach_number: 2.20,         // Mach 2.2 supersonic test section
+            throat_diameter_mm: 85.0,         // 85 mm throat diameter
+            ambient_backpressure_kpa: 42.0,   // 42 kPa ambient backpressure
+            model_deflection_angle_deg: 10.0, // 10 deg wedge deflection
+            divergence_half_angle_deg: 12.0,  // 12 deg half-angle
         }
     }
 }
@@ -332,7 +332,10 @@ mod tests {
         assert!(res.exit_static_pressure_kpa > 35.0 && res.exit_static_pressure_kpa < 48.0);
         assert!(res.exit_flow_velocity_m_s > 500.0 && res.exit_flow_velocity_m_s < 600.0);
         assert!(res.normal_shock_downstream_mach > 0.50 && res.normal_shock_downstream_mach < 0.60);
-        assert!(res.normal_shock_total_pressure_recovery > 0.60 && res.normal_shock_total_pressure_recovery < 0.70);
+        assert!(
+            res.normal_shock_total_pressure_recovery > 0.60
+                && res.normal_shock_total_pressure_recovery < 0.70
+        );
         assert!(res.oblique_shock_wave_angle_deg > 30.0 && res.oblique_shock_wave_angle_deg < 40.0);
         assert!(res.is_choked_at_throat);
         assert!(res.is_supersonic_flow_established);

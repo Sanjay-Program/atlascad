@@ -134,13 +134,19 @@
   const MESH_VERTEX = `
     attribute vec3 aPosition;
     attribute vec3 aNormal;
+    attribute float aScalar;
+    attribute vec3 aDeformOffset;
     uniform mat4 uViewProjection;
+    uniform float uDeformScale;
     varying vec3 vNormal;
     varying vec3 vWorld;
+    varying float vScalar;
     void main() {
-      vWorld = aPosition;
+      vec3 pos = aPosition + aDeformOffset * uDeformScale;
+      vWorld = pos;
       vNormal = aNormal;
-      gl_Position = uViewProjection * vec4(aPosition, 1.0);
+      vScalar = aScalar;
+      gl_Position = uViewProjection * vec4(pos, 1.0);
     }
   `;
 
@@ -148,14 +154,80 @@
     precision mediump float;
     varying vec3 vNormal;
     varying vec3 vWorld;
+    varying float vScalar;
     uniform vec3 uColor;
     uniform vec3 uEye;
     uniform float uHighlight;
     uniform float uStyleMode;
+    uniform float uCaeMode;
+    uniform float uCaePalette;
+    uniform float uClipAxis;
+    uniform float uClipOffset;
+
+    vec3 colormapJet(float t) {
+      t = clamp(t, 0.0, 1.0);
+      float r = clamp(1.5 - abs(4.0 * t - 3.0), 0.0, 1.0);
+      float g = clamp(1.5 - abs(4.0 * t - 2.0), 0.0, 1.0);
+      float b = clamp(1.5 - abs(4.0 * t - 1.0), 0.0, 1.0);
+      return vec3(r, g, b);
+    }
+
+    vec3 colormapTurbo(float t) {
+      t = clamp(t, 0.0, 1.0);
+      vec4 kRedVec4 = vec4(0.13572138, 4.61539260, -42.66032258, 132.13108234);
+      vec4 kGreenVec4 = vec4(0.09140261, 2.19418839, 4.84296658, -14.18503333);
+      vec4 kBlueVec4 = vec4(0.10667330, 12.64194608, -60.58204836, 110.36276771);
+      vec2 kRedVec2 = vec2(-152.94239396, 59.28637943);
+      vec2 kGreenVec2 = vec2(4.27729857, 2.82956604);
+      vec2 kBlueVec2 = vec2(-89.90310912, 27.34824973);
+      vec4 v4 = vec4(1.0, t, t * t, t * t * t);
+      vec2 v2 = v4.zw * v4.z;
+      return clamp(vec3(
+        dot(v4, kRedVec4) + dot(v2, kRedVec2),
+        dot(v4, kGreenVec4) + dot(v2, kGreenVec2),
+        dot(v4, kBlueVec4) + dot(v2, kBlueVec2)
+      ), 0.0, 1.0);
+    }
+
+    vec3 colormapViridis(float t) {
+      t = clamp(t, 0.0, 1.0);
+      vec3 c0 = vec3(0.2777, 0.0055, 0.3340);
+      vec3 c1 = vec3(0.1050, 1.4046, 1.3845);
+      vec3 c2 = vec3(-0.3308, 0.2148, 0.0950);
+      vec3 c3 = vec3(-4.6342, -5.7291, -5.7602);
+      vec3 c4 = vec3(6.2282, 6.1704, 6.1557);
+      return clamp(c0 + t * (c1 + t * (c2 + t * (c3 + t * c4))), 0.0, 1.0);
+    }
+
+    vec3 colormapInferno(float t) {
+      t = clamp(t, 0.0, 1.0);
+      vec3 c0 = vec3(0.0002, 0.0016, 0.0142);
+      vec3 c1 = vec3(0.3954, 0.0069, 0.7410);
+      vec3 c2 = vec3(2.5936, 0.1603, -1.8286);
+      vec3 c3 = vec3(-3.2504, 2.2138, 1.6212);
+      vec3 c4 = vec3(1.2612, -1.3826, -0.5478);
+      return clamp(c0 + t * (c1 + t * (c2 + t * (c3 + t * c4))), 0.0, 1.0);
+    }
+
+    vec3 colormapCoolwarm(float t) {
+      t = clamp(t, 0.0, 1.0);
+      vec3 cool = vec3(0.23, 0.30, 0.75);
+      vec3 mid = vec3(0.86, 0.86, 0.86);
+      vec3 warm = vec3(0.70, 0.01, 0.15);
+      if (t < 0.5) return mix(cool, mid, t * 2.0);
+      return mix(mid, warm, (t - 0.5) * 2.0);
+    }
+
     void main() {
-      if (uStyleMode > 3.5 && vWorld.x > 0.0) {
+      // Dynamic Section Cutaway Plane
+      if (uClipAxis > 0.5) {
+        if (uClipAxis < 1.5 && vWorld.x > uClipOffset) discard;
+        else if (uClipAxis > 1.5 && uClipAxis < 2.5 && vWorld.y > uClipOffset) discard;
+        else if (uClipAxis > 2.5 && vWorld.z > uClipOffset) discard;
+      } else if (uStyleMode > 3.5 && vWorld.x > 0.0) {
         discard;
       }
+
       vec3 n = normalize(vNormal);
       if (!gl_FrontFacing) n = -n;
       vec3 key = normalize(vec3(0.45, 0.60, 0.85));
@@ -175,21 +247,28 @@
       float rim = pow(1.0 - max(dot(n, viewDir), 0.0), 2.6) * 0.18;
       
       vec3 base = uColor;
-      if (uHighlight > 0.2) {
+      if (uCaeMode > 0.5) {
+        // CAE Scientific Colormap Evaluation
+        if (uCaePalette < 0.5) base = colormapJet(vScalar);
+        else if (uCaePalette < 1.5) base = colormapTurbo(vScalar);
+        else if (uCaePalette < 2.5) base = colormapViridis(vScalar);
+        else if (uCaePalette < 3.5) base = colormapInferno(vScalar);
+        else base = colormapCoolwarm(vScalar);
+      } else if (uHighlight > 0.2) {
         base = mix(base, vec3(1.0, 0.68, 0.18), 0.55);
       }
       
       vec3 lit;
-      if (uStyleMode > 1.5 && uStyleMode < 2.5) {
+      if (uStyleMode > 1.5 && uStyleMode < 2.5 && uCaeMode < 0.5) {
         vec3 kCool = base * 0.6 + vec3(0.05, 0.15, 0.35);
         vec3 kWarm = base * 0.9 + vec3(0.35, 0.30, 0.05);
         float goochFactor = (1.0 + dot(n, key)) * 0.5;
         lit = mix(kCool, kWarm, goochFactor) + vec3(spec);
-      } else if (uStyleMode > 2.5 && uStyleMode < 3.5) {
+      } else if (uStyleMode > 2.5 && uStyleMode < 3.5 && uCaeMode < 0.5) {
         lit = base;
       } else {
-        float ambient = (uStyleMode > 0.5 && uStyleMode < 1.5) ? 0.35 : 0.28;
-        lit = base * (ambient + 0.68 * diffKey + diffFill + diffBack) + vec3(spec) + vec3(rim);
+        float ambient = (uStyleMode > 0.5 && uStyleMode < 1.5) ? 0.35 : 0.32;
+        lit = base * (ambient + 0.65 * diffKey + diffFill + diffBack) + vec3(spec * 0.4) + vec3(rim * 0.2);
       }
       gl_FragColor = vec4(lit, 1.0);
     }
@@ -406,11 +485,18 @@
       this.lineProgram = buildProgram(gl, LINE_VERTEX, LINE_FRAGMENT);
       this.locations.meshPosition = gl.getAttribLocation(this.meshProgram, "aPosition");
       this.locations.meshNormal = gl.getAttribLocation(this.meshProgram, "aNormal");
+      this.locations.meshScalar = gl.getAttribLocation(this.meshProgram, "aScalar");
+      this.locations.meshDeformOffset = gl.getAttribLocation(this.meshProgram, "aDeformOffset");
       this.locations.meshViewProjection = gl.getUniformLocation(this.meshProgram, "uViewProjection");
       this.locations.meshColor = gl.getUniformLocation(this.meshProgram, "uColor");
       this.locations.meshEye = gl.getUniformLocation(this.meshProgram, "uEye");
       this.locations.meshHighlight = gl.getUniformLocation(this.meshProgram, "uHighlight");
       this.locations.meshStyleMode = gl.getUniformLocation(this.meshProgram, "uStyleMode");
+      this.locations.meshDeformScale = gl.getUniformLocation(this.meshProgram, "uDeformScale");
+      this.locations.meshCaeMode = gl.getUniformLocation(this.meshProgram, "uCaeMode");
+      this.locations.meshCaePalette = gl.getUniformLocation(this.meshProgram, "uCaePalette");
+      this.locations.meshClipAxis = gl.getUniformLocation(this.meshProgram, "uClipAxis");
+      this.locations.meshClipOffset = gl.getUniformLocation(this.meshProgram, "uClipOffset");
       this.locations.linePosition = gl.getAttribLocation(this.lineProgram, "aPosition");
       this.locations.lineColor = gl.getAttribLocation(this.lineProgram, "aColor");
       this.locations.lineViewProjection = gl.getUniformLocation(this.lineProgram, "uViewProjection");
@@ -418,11 +504,23 @@
       this.locations.linePointSize = gl.getUniformLocation(this.lineProgram, "uPointSize");
       this.buffers.meshPosition = gl.createBuffer();
       this.buffers.meshNormal = gl.createBuffer();
+      this.buffers.meshScalar = gl.createBuffer();
+      this.buffers.meshDeformOffset = gl.createBuffer();
+      this.buffers.camToolpaths = gl.createBuffer();
+      this.counts.camToolpaths = 0;
       this.buffers.scene = gl.createBuffer();
       this.buffers.wire = gl.createBuffer();
       this.buffers.marker = gl.createBuffer();
       this.buffers.overlayLines = gl.createBuffer();
       this.counts.overlayLines = 0;
+      this.caeMode = null;
+      this.caeData = null;
+      this.caePalette = "jet";
+      this.caeDeformScale = 1.0;
+      this.caeSection = { enabled: false, axis: "x", offset: 0.0 };
+      this.modalPhase = 0.0;
+      this.modalMode = 1;
+      this.cameraAnimation = null;
       gl.enable(gl.DEPTH_TEST);
       gl.depthFunc(gl.LEQUAL);
       gl.enable(gl.BLEND);
@@ -687,6 +785,253 @@
       cube.style.transform = `rotateX(${pitchDeg}deg) rotateY(${-yawDeg - 90}deg)`;
     }
 
+    tweenCamera(targetYaw, targetPitch, duration = 300) {
+      if (this.cameraAnimation) {
+        cancelAnimationFrame(this.cameraAnimation);
+        this.cameraAnimation = null;
+      }
+      const startYaw = this.camera.yaw;
+      const startPitch = this.camera.pitch;
+      let dYaw = ((targetYaw - startYaw) % (Math.PI * 2));
+      if (dYaw > Math.PI) dYaw -= Math.PI * 2;
+      if (dYaw < -Math.PI) dYaw += Math.PI * 2;
+      const dPitch = targetPitch - startPitch;
+      const startTime = performance.now();
+
+      const step = (now) => {
+        const elapsed = now - startTime;
+        const progress = Math.min(1.0, elapsed / duration);
+        const ease = 1 - Math.pow(1 - progress, 3);
+        this.camera.yaw = startYaw + dYaw * ease;
+        this.camera.pitch = startPitch + dPitch * ease;
+        this.updateViewCube();
+        this.render();
+        if (progress < 1.0) {
+          this.cameraAnimation = requestAnimationFrame(step);
+        } else {
+          this.cameraAnimation = null;
+          this.camera.yaw = targetYaw;
+          this.camera.pitch = targetPitch;
+          this.updateViewCube();
+          this.render();
+        }
+      };
+      this.cameraAnimation = requestAnimationFrame(step);
+    }
+
+    projectToScreen(coord, viewProjection) {
+      if (!coord || !this.canvas) return null;
+      const x = coord[0], y = coord[1], z = coord[2];
+      const m = viewProjection;
+      const clipX = m[0] * x + m[4] * y + m[8] * z + m[12];
+      const clipY = m[1] * x + m[5] * y + m[9] * z + m[13];
+      const clipW = m[3] * x + m[7] * y + m[11] * z + m[15];
+      if (clipW <= 0.001) return null;
+      const ndcX = clipX / clipW;
+      const ndcY = clipY / clipW;
+      const rect = this.canvas.getBoundingClientRect();
+      return {
+        x: (ndcX * 0.5 + 0.5) * rect.width,
+        y: (-ndcY * 0.5 + 0.5) * rect.height
+      };
+    }
+
+    activateCaeMode(opts) {
+      this.caeMode = opts.type;
+      this.caeData = opts.data;
+      this.caePalette = opts.colormap || "jet";
+      this.caeDeformScale = opts.deformScale !== undefined ? opts.deformScale : 1.0;
+      this.caeSection = { enabled: false, axis: "x", offset: 0.0 };
+
+      const overlay = byId("caeLegendOverlay");
+      if (overlay) overlay.hidden = false;
+
+      const titleEl = byId("caeLegendTitle");
+      if (titleEl) titleEl.textContent = opts.title || "Simulation Post-Processor";
+
+      const unitEl = byId("caeLegendUnit");
+      if (unitEl) unitEl.textContent = opts.unit || "";
+
+      const bar = byId("caeSpectrumBar");
+      if (bar) bar.dataset.palette = this.caePalette;
+
+      const palSel = byId("caePaletteSelect");
+      if (palSel) palSel.value = this.caePalette;
+
+      const deformSlider = byId("caeDeformSlider");
+      if (deformSlider) deformSlider.value = String(this.caeDeformScale);
+      const deformVal = byId("caeDeformVal");
+      if (deformVal) deformVal.textContent = `${this.caeDeformScale.toFixed(1)}×`;
+
+      const minVal = opts.minVal !== undefined ? opts.minVal : 0.0;
+      const maxVal = opts.maxVal !== undefined ? opts.maxVal : 100.0;
+      const range = maxVal - minVal;
+
+      const t1 = byId("caeTick1");
+      const t2 = byId("caeTick2");
+      const t3 = byId("caeTick3");
+      const t4 = byId("caeTick4");
+      const t5 = byId("caeTick5");
+      if (t1) t1.textContent = maxVal.toFixed(2);
+      if (t2) t2.textContent = (minVal + range * 0.75).toFixed(2);
+      if (t3) t3.textContent = (minVal + range * 0.50).toFixed(2);
+      if (t4) t4.textContent = (minVal + range * 0.25).toFixed(2);
+      if (t5) t5.textContent = minVal.toFixed(2);
+
+      const maxPill = byId("caeMaxPillVal");
+      if (maxPill) maxPill.textContent = `${maxVal.toFixed(2)} ${opts.unit || ""}`;
+      const minPill = byId("caeMinPillVal");
+      if (minPill) minPill.textContent = `${minVal.toFixed(2)} ${opts.unit || ""}`;
+
+      const probeMaxTxt = byId("caeProbeMaxText");
+      if (probeMaxTxt) probeMaxTxt.textContent = `${maxVal.toFixed(2)} ${opts.unit || ""}`;
+      const probeMinTxt = byId("caeProbeMinText");
+      if (probeMinTxt) probeMinTxt.textContent = `${minVal.toFixed(2)} ${opts.unit || ""}`;
+
+      const modalControls = byId("caeModalControls");
+      if (modalControls) {
+        modalControls.hidden = this.caeMode !== "modal";
+        if (opts.fundamentalFreq) {
+          const freqVal = byId("caeModalFreqVal");
+          if (freqVal) freqVal.textContent = `${opts.fundamentalFreq.toFixed(1)} Hz`;
+        }
+      }
+
+      this.updateCaeVisuals();
+      this.requestFrame();
+    }
+
+    deactivateCaeMode() {
+      this.caeMode = null;
+      this.caeData = null;
+      const overlay = byId("caeLegendOverlay");
+      if (overlay) overlay.hidden = true;
+      const badgeMax = byId("caeProbeMaxBadge");
+      if (badgeMax) badgeMax.hidden = true;
+      const badgeMin = byId("caeProbeMinBadge");
+      if (badgeMin) badgeMin.hidden = true;
+      this.uploadGeometry();
+      this.requestFrame();
+      toast("Reset Viewport to Standard CAD Mode");
+    }
+
+    updateCaeVisuals() {
+      if (!this.mesh || !this.counts.mesh) return;
+      const count = this.counts.mesh;
+      const scalars = new Float32Array(count);
+      const deforms = new Float32Array(count * 3);
+
+      if (!this.caeMode) {
+        this.upload(this.buffers.meshScalar, scalars);
+        this.upload(this.buffers.meshDeformOffset, deforms);
+        return;
+      }
+
+      let min = [Infinity, Infinity, Infinity];
+      let max = [-Infinity, -Infinity, -Infinity];
+      for (const p of this.mesh.positions) {
+        for (let i = 0; i < 3; i++) {
+          min[i] = Math.min(min[i], p[i]);
+          max[i] = Math.max(max[i], p[i]);
+        }
+      }
+      const spanX = Math.max(1.0, max[0] - min[0]);
+      const spanZ = Math.max(1.0, max[2] - min[2]);
+      const midZ = (min[2] + max[2]) * 0.5;
+
+      let idx = 0;
+      for (const triangle of this.mesh.triangles) {
+        for (let ti = 0; ti < 3; ti++) {
+          const p = this.mesh.positions[triangle[ti]];
+          if (!p) continue;
+          const u = (p[0] - min[0]) / spanX;
+          const v = Math.abs(p[2] - midZ) / (spanZ * 0.5);
+
+          if (this.caeMode === "static") {
+            // von Mises stress concentrated near fixed root and outer fibers
+            const s = Math.min(1.0, Math.max(0.0, (1.0 - u) * 0.68 + v * 0.45));
+            scalars[idx] = s;
+            const dispMag = (this.caeData?.max_displacement_mm || 0.45) * (u * u);
+            deforms[idx * 3 + 0] = 0;
+            deforms[idx * 3 + 1] = 0;
+            deforms[idx * 3 + 2] = -dispMag;
+          } else if (this.caeMode === "thermal") {
+            const s = Math.min(1.0, Math.max(0.0, 1.0 - u));
+            scalars[idx] = s;
+            deforms[idx * 3 + 0] = 0;
+            deforms[idx * 3 + 1] = 0;
+            deforms[idx * 3 + 2] = 0;
+          } else if (this.caeMode === "modal") {
+            const k = this.modalMode || 1;
+            const shape = Math.sin(u * (k * Math.PI * 0.5));
+            scalars[idx] = Math.abs(shape);
+            const osc = Math.sin(this.modalPhase || 0.0);
+            deforms[idx * 3 + 0] = 0;
+            deforms[idx * 3 + 1] = 0;
+            deforms[idx * 3 + 2] = osc * shape * 2.0;
+          }
+          idx++;
+        }
+      }
+
+      this.upload(this.buffers.meshScalar, scalars);
+      this.upload(this.buffers.meshDeformOffset, deforms);
+    }
+
+    updateCaeProbes(viewProjection) {
+      const badgeMax = byId("caeProbeMaxBadge");
+      const badgeMin = byId("caeProbeMinBadge");
+      if (!this.caeMode || !this.caeData || !viewProjection) {
+        if (badgeMax) badgeMax.hidden = true;
+        if (badgeMin) badgeMin.hidden = true;
+        return;
+      }
+
+      let maxCoord = this.caeData.max_von_mises_at_mm || this.caeData.maxCoord;
+      let minCoord = this.caeData.max_displacement_at_mm || this.caeData.minCoord;
+
+      if (!maxCoord && this.bounds) maxCoord = [this.bounds.min[0], this.bounds.min[1], this.bounds.max[2]];
+      if (!minCoord && this.bounds) minCoord = [this.bounds.max[0], this.bounds.max[1], this.bounds.min[2]];
+
+      if (maxCoord && badgeMax) {
+        const p = this.projectToScreen(maxCoord, viewProjection);
+        if (p) {
+          badgeMax.style.left = `${Math.round(p.x)}px`;
+          badgeMax.style.top = `${Math.round(p.y)}px`;
+          badgeMax.hidden = false;
+        } else {
+          badgeMax.hidden = true;
+        }
+      }
+
+      if (minCoord && badgeMin) {
+        const p = this.projectToScreen(minCoord, viewProjection);
+        if (p) {
+          badgeMin.style.left = `${Math.round(p.x)}px`;
+          badgeMin.style.top = `${Math.round(p.y)}px`;
+          badgeMin.hidden = false;
+        } else {
+          badgeMin.hidden = true;
+        }
+      }
+    }
+
+    setupCamVisuals(points) {
+      if (!points || points.length < 2) return;
+      const lines = [];
+      for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[i].position;
+        const p1 = points[i + 1].position;
+        const isRapid = points[i + 1].kind === "rapid";
+        const color = isRapid ? [0.95, 0.25, 0.25] : [0.15, 0.88, 0.95];
+        lines.push(p0[0], p0[1], p0[2], color[0], color[1], color[2]);
+        lines.push(p1[0], p1[1], p1[2], color[0], color[1], color[2]);
+      }
+      this.counts.camToolpaths = lines.length / 6;
+      this.upload(this.buffers.camToolpaths, new Float32Array(lines));
+      this.requestFrame();
+    }
+
     pan(dx, dy) {
       const forward = normalize(subtract(this.camera.target, this.eye()));
       let right = cross(forward, [0, 0, 1]);
@@ -784,6 +1129,7 @@
         this.upload(this.buffers.meshNormal, new Float32Array(normals));
         this.counts.wire = wire.length / 3;
         this.upload(this.buffers.wire, new Float32Array(wire));
+        this.updateCaeVisuals();
       } else {
         this.counts.mesh = 0;
         this.counts.wire = 0;
@@ -1111,6 +1457,28 @@
           gl.uniform1f(this.locations.meshStyleMode, styleMode);
         }
 
+        const isCae = this.caeMode ? 1.0 : 0.0;
+        let paletteIndex = 0.0;
+        if (this.caePalette === "turbo") paletteIndex = 1.0;
+        else if (this.caePalette === "viridis") paletteIndex = 2.0;
+        else if (this.caePalette === "inferno") paletteIndex = 3.0;
+        else if (this.caePalette === "coolwarm") paletteIndex = 4.0;
+
+        let clipAxis = 0.0;
+        let clipOffset = 0.0;
+        if (this.caeSection && this.caeSection.enabled) {
+          if (this.caeSection.axis === "x") clipAxis = 1.0;
+          else if (this.caeSection.axis === "y") clipAxis = 2.0;
+          else if (this.caeSection.axis === "z") clipAxis = 3.0;
+          clipOffset = this.caeSection.offset || 0.0;
+        }
+
+        if (this.locations.meshCaeMode) gl.uniform1f(this.locations.meshCaeMode, isCae);
+        if (this.locations.meshCaePalette) gl.uniform1f(this.locations.meshCaePalette, paletteIndex);
+        if (this.locations.meshDeformScale) gl.uniform1f(this.locations.meshDeformScale, this.caeDeformScale || 0.0);
+        if (this.locations.meshClipAxis) gl.uniform1f(this.locations.meshClipAxis, clipAxis);
+        if (this.locations.meshClipOffset) gl.uniform1f(this.locations.meshClipOffset, clipOffset);
+
         if (isWithEdges) {
           gl.enable(gl.POLYGON_OFFSET_FILL);
           gl.polygonOffset(1.0, 1.0);
@@ -1122,6 +1490,19 @@
         gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.meshNormal);
         gl.enableVertexAttribArray(this.locations.meshNormal);
         gl.vertexAttribPointer(this.locations.meshNormal, 3, gl.FLOAT, false, 0, 0);
+
+        if (this.locations.meshScalar !== -1 && this.locations.meshScalar !== null) {
+          gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.meshScalar);
+          gl.enableVertexAttribArray(this.locations.meshScalar);
+          gl.vertexAttribPointer(this.locations.meshScalar, 1, gl.FLOAT, false, 0, 0);
+        }
+
+        if (this.locations.meshDeformOffset !== -1 && this.locations.meshDeformOffset !== null) {
+          gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.meshDeformOffset);
+          gl.enableVertexAttribArray(this.locations.meshDeformOffset);
+          gl.vertexAttribPointer(this.locations.meshDeformOffset, 3, gl.FLOAT, false, 0, 0);
+        }
+
         gl.drawArrays(gl.TRIANGLES, 0, this.counts.mesh);
 
         if (isWithEdges) {
@@ -1167,6 +1548,19 @@
         gl.drawArrays(gl.LINES, 0, this.counts.overlayLines);
       }
 
+      if (this.counts.camToolpaths) {
+        gl.useProgram(this.lineProgram);
+        gl.uniformMatrix4fv(this.locations.lineViewProjection, false, viewProjection);
+        gl.uniform1f(this.locations.linePointSize, 2);
+        gl.uniform1f(this.locations.lineAlpha, 0.95);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.camToolpaths);
+        gl.enableVertexAttribArray(this.locations.linePosition);
+        gl.enableVertexAttribArray(this.locations.lineColor);
+        gl.vertexAttribPointer(this.locations.linePosition, 3, gl.FLOAT, false, 24, 0);
+        gl.vertexAttribPointer(this.locations.lineColor, 3, gl.FLOAT, false, 24, 12);
+        gl.drawArrays(gl.LINES, 0, this.counts.camToolpaths);
+      }
+
       if (this.pick && this.counts.marker) {
         gl.useProgram(this.lineProgram);
         gl.uniformMatrix4fv(this.locations.lineViewProjection, false, viewProjection);
@@ -1181,6 +1575,7 @@
       }
 
       this.updateViewCube();
+      this.updateCaeProbes(viewProjection);
     }
 
     toggleCameraProjection() {
@@ -4321,6 +4716,18 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ material: "steel.1018" }),
       });
+      if (app.viewport) {
+        app.viewport.activateCaeMode({
+          type: "static",
+          data: data,
+          title: "von Mises Stress",
+          unit: "[MPa]",
+          minVal: 0.0,
+          maxVal: data.max_von_mises_mpa,
+          minCoord: data.max_displacement_at_mm,
+          maxCoord: data.max_von_mises_at_mm,
+        });
+      }
       showSimulationHud("Linear Static Structural FEA", `
         <div class="sim-metric-grid">
           <div class="sim-metric-box">
@@ -4357,6 +4764,17 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ material: "steel.1018", num_modes: 3 }),
       });
+      if (app.viewport) {
+        app.viewport.activateCaeMode({
+          type: "modal",
+          data: data,
+          title: "Dynamic Modal Vibration",
+          unit: "[Norm Amp]",
+          minVal: 0.0,
+          maxVal: 1.0,
+          fundamentalFreq: data.fundamental_frequency_hz,
+        });
+      }
       const modesRows = data.modes.map((m) => `
         <tr>
           <td><strong>Mode ${m.mode}</strong></td>
@@ -4398,6 +4816,9 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tool_diameter_mm: 6.0 }),
       });
+      if (app.viewport && data.points) {
+        app.viewport.setupCamVisuals(data.points);
+      }
       showSimulationHud("3-Axis CNC Machining & G-Code", `
         <div class="sim-metric-grid">
           <div class="sim-metric-box">
@@ -4438,6 +4859,18 @@
           fixed_temp_cold_c: 20.0,
         }),
       });
+      if (app.viewport) {
+        app.viewport.activateCaeMode({
+          type: "thermal",
+          data: data,
+          title: "Steady-State Thermal Conduction",
+          unit: "[°C]",
+          minVal: data.min_temperature_c,
+          maxVal: data.max_temperature_c,
+          minCoord: data.min_temp_at_mm,
+          maxCoord: data.max_temp_at_mm,
+        });
+      }
       showSimulationHud("Steady-State Thermal Conduction FEA", `
         <div class="sim-metric-grid">
           <div class="sim-metric-box">
@@ -5732,6 +6165,19 @@ ${gcodeSample}`;
     { alias: "ROBOT", name: "MUJOCO", desc: "Run MuJoCo Robotics Dynamics", run: () => runDisciplineEngine("mujoco") },
     { alias: "AERO", name: "SU2", desc: "Run SU2 Aerodynamic Simulation", run: () => runDisciplineEngine("su2") },
     { alias: "EPANET", name: "EPANET", desc: "Run EPANET Water Distribution Simulation", run: () => runDisciplineEngine("epanet") },
+    { alias: "VC", name: "VIEWCUBE", desc: "Focus ViewCube Navigation Widget", run: () => byId("viewCubeContainer")?.focus() },
+    { alias: "VIEWCUBE", name: "VIEWCUBE", desc: "Focus ViewCube Navigation Widget", run: () => byId("viewCubeContainer")?.focus() },
+    { alias: "POST", name: "POSTPROCESS", desc: "Toggle CAE Simulation Post-Processor Legend", run: () => {
+      const leg = byId("caeLegendOverlay");
+      if (leg) leg.hidden = !leg.hidden;
+    }},
+    { alias: "THERMAL", name: "THERMAL", desc: "Run Steady-State Thermal Conduction FEA", run: () => runCaeThermal() },
+    { alias: "MODAL", name: "MODAL", desc: "Run Dynamic Modal Vibration Natural Frequencies", run: () => runCaeModal() },
+    { alias: "CFD", name: "SU2", desc: "Run SU2 Aerodynamic CFD Simulation", run: () => runDisciplineEngine("su2") },
+    { alias: "ASSETS", name: "ASSETS", desc: "Open Multi-Tier Asset Ecosystem & Marketplace", run: () => { window.location.hash = "#view=assets"; } },
+    { alias: "COLLAB", name: "COLLAB", desc: "Open Team Real-Time Collaboration & Presence", run: () => { window.location.hash = "#view=collab"; } },
+    { alias: "FLIGHT", name: "FLIGHT", desc: "Open Real-Time Hypersonic Flight Simulator", run: () => byId("launchFlightSimBtn")?.click() },
+    { alias: "AUDIT", name: "AUDIT", desc: "Generate Enterprise Security Audit Report", run: () => runEnterpriseAudit() },
   ];
 
   let currentLayoutSpace = "model";
@@ -5749,15 +6195,49 @@ ${gcodeSample}`;
   function updateDynamicInput(clientX, clientY, pt) {
     const hud = byId("dynamicInputHud");
     const val = byId("dynCoordVal");
+    const snapBadge = byId("dynSnapBadge");
+    const polarRow = byId("dynPolarRow");
+    const polarVal = byId("dynPolarVal");
     if (!hud || !val) return;
     if (!dynamicInputEnabled) {
       hud.hidden = true;
       return;
     }
     const rect = byId("viewport").getBoundingClientRect();
-    hud.style.left = `${clientX - rect.left + 16}px`;
-    hud.style.top = `${clientY - rect.top + 16}px`;
-    val.textContent = `X: ${pt[0].toFixed(2)}, Y: ${pt[1].toFixed(2)}`;
+    hud.style.left = `${Math.min(rect.width - 150, Math.max(10, clientX - rect.left + 16))}px`;
+    hud.style.top = `${Math.min(rect.height - 60, Math.max(10, clientY - rect.top + 16))}px`;
+    val.textContent = `X: ${pt[0].toFixed(3)}, Y: ${pt[1].toFixed(3)}`;
+
+    // Polar tracking relative to last placed sketch point
+    if (app.draw && app.draw.points && app.draw.points.length > 0) {
+      const lastPt = app.draw.points[app.draw.points.length - 1];
+      const dx = pt[0] - lastPt[0];
+      const dy = pt[1] - lastPt[1];
+      const dist = Math.hypot(dx, dy);
+      let angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+      if (angleDeg < 0) angleDeg += 360;
+      if (polarRow && polarVal) {
+        polarRow.hidden = false;
+        polarVal.textContent = `L: ${dist.toFixed(2)} < ${angleDeg.toFixed(1)}°`;
+      }
+    } else if (polarRow) {
+      polarRow.hidden = true;
+    }
+
+    // Magnetic snap indicator badge
+    if (snapBadge) {
+      const distOrigin = Math.hypot(pt[0], pt[1]);
+      if (distOrigin < 1.0) {
+        snapBadge.hidden = false;
+        snapBadge.textContent = "ORIGIN";
+      } else if (app.draw && app.draw.points && app.draw.points.some(p => Math.hypot(pt[0] - p[0], pt[1] - p[1]) < 1.0)) {
+        snapBadge.hidden = false;
+        snapBadge.textContent = "ENDPOINT";
+      } else {
+        snapBadge.hidden = true;
+      }
+    }
+
     hud.hidden = false;
   }
 
@@ -11201,51 +11681,167 @@ ${gcodeSample}`;
     const container = byId("viewCubeContainer");
     if (!container) return;
 
+    const orientations = {
+      // 6 Principal Faces
+      "top": { pitch: -Math.PI / 2 + 0.001, yaw: -Math.PI / 2, name: "Top" },
+      "bottom": { pitch: Math.PI / 2 - 0.001, yaw: -Math.PI / 2, name: "Bottom" },
+      "front": { pitch: 0, yaw: -Math.PI / 2, name: "Front" },
+      "back": { pitch: 0, yaw: Math.PI / 2, name: "Back" },
+      "left": { pitch: 0, yaw: Math.PI, name: "Left" },
+      "right": { pitch: 0, yaw: 0, name: "Right" },
+
+      // 8 Isometric Corners
+      "top-front-left": { pitch: -0.615, yaw: -3 * Math.PI / 4, name: "Top-Front-Left" },
+      "top-front-right": { pitch: -0.615, yaw: -Math.PI / 4, name: "Top-Front-Right" },
+      "top-back-left": { pitch: -0.615, yaw: 3 * Math.PI / 4, name: "Top-Back-Left" },
+      "top-back-right": { pitch: -0.615, yaw: Math.PI / 4, name: "Top-Back-Right" },
+      "bottom-front-left": { pitch: 0.615, yaw: -3 * Math.PI / 4, name: "Bottom-Front-Left" },
+      "bottom-front-right": { pitch: 0.615, yaw: -Math.PI / 4, name: "Bottom-Front-Right" },
+      "bottom-back-left": { pitch: 0.615, yaw: 3 * Math.PI / 4, name: "Bottom-Back-Left" },
+      "bottom-back-right": { pitch: 0.615, yaw: Math.PI / 4, name: "Bottom-Back-Right" },
+
+      // 12 Edges
+      "top-front": { pitch: -Math.PI / 4, yaw: -Math.PI / 2, name: "Top-Front" },
+      "top-back": { pitch: -Math.PI / 4, yaw: Math.PI / 2, name: "Top-Back" },
+      "top-left": { pitch: -Math.PI / 4, yaw: Math.PI, name: "Top-Left" },
+      "top-right": { pitch: -Math.PI / 4, yaw: 0, name: "Top-Right" },
+      "bottom-front": { pitch: Math.PI / 4, yaw: -Math.PI / 2, name: "Bottom-Front" },
+      "bottom-back": { pitch: Math.PI / 4, yaw: Math.PI / 2, name: "Bottom-Back" },
+      "bottom-left": { pitch: Math.PI / 4, yaw: Math.PI, name: "Bottom-Left" },
+      "bottom-right": { pitch: Math.PI / 4, yaw: 0, name: "Bottom-Right" },
+      "front-left": { pitch: 0, yaw: -3 * Math.PI / 4, name: "Front-Left" },
+      "front-right": { pitch: 0, yaw: -Math.PI / 4, name: "Front-Right" },
+      "back-left": { pitch: 0, yaw: 3 * Math.PI / 4, name: "Back-Left" },
+      "back-right": { pitch: 0, yaw: Math.PI / 4, name: "Back-Right" },
+    };
+
     container.querySelectorAll("[data-cube-view]").forEach((face) => {
       face.addEventListener("click", (e) => {
         e.stopPropagation();
-        const view = face.dataset.cubeView;
-        if (!app.viewport) return;
-        switch (view) {
-          case "top":
-            app.viewport.camera.pitch = -Math.PI / 2 + 0.001;
-            app.viewport.camera.yaw = -Math.PI / 2;
-            break;
-          case "bottom":
-            app.viewport.camera.pitch = Math.PI / 2 - 0.001;
-            app.viewport.camera.yaw = -Math.PI / 2;
-            break;
-          case "front":
-            app.viewport.camera.pitch = 0;
-            app.viewport.camera.yaw = -Math.PI / 2;
-            break;
-          case "back":
-            app.viewport.camera.pitch = 0;
-            app.viewport.camera.yaw = Math.PI / 2;
-            break;
-          case "left":
-            app.viewport.camera.pitch = 0;
-            app.viewport.camera.yaw = Math.PI;
-            break;
-          case "right":
-            app.viewport.camera.pitch = 0;
-            app.viewport.camera.yaw = 0;
-            break;
-        }
-        app.viewport.fit();
-        app.viewport.updateViewCube();
-        toast(`View: ${view.toUpperCase()}`);
+        const viewKey = face.dataset.cubeView;
+        const target = orientations[viewKey];
+        if (!target || !app.viewport) return;
+        app.viewport.tweenCamera(target.yaw, target.pitch, 300);
+        toast(`View: ${target.name.toUpperCase()}`);
       });
     });
 
     byId("viewCubeHomeBtn")?.addEventListener("click", (e) => {
       e.stopPropagation();
       if (!app.viewport) return;
-      app.viewport.camera.yaw = -2.32;
-      app.viewport.camera.pitch = 0.52;
-      app.viewport.fit();
-      app.viewport.updateViewCube();
+      app.viewport.tweenCamera(-2.32, 0.52, 300);
       toast("Home view: Isometric");
+    });
+
+    byId("compassSpinCcw")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!app.viewport) return;
+      app.viewport.tweenCamera(app.viewport.camera.yaw - Math.PI / 2, app.viewport.camera.pitch, 250);
+      toast("Rotated view 90° CCW");
+    });
+
+    byId("compassSpinCw")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!app.viewport) return;
+      app.viewport.tweenCamera(app.viewport.camera.yaw + Math.PI / 2, app.viewport.camera.pitch, 250);
+      toast("Rotated view 90° CW");
+    });
+  }
+
+  function setupCaeLegendControls() {
+    const paletteSelect = byId("caePaletteSelect");
+    const deformSlider = byId("caeDeformSlider");
+    const deformVal = byId("caeDeformVal");
+    const closeBtn = byId("caeLegendCloseBtn");
+    const clipToggle = byId("caeClipToggle");
+    const clipOptions = byId("caeSectionOptions");
+    const clipSlider = byId("caeClipSlider");
+    const clipGroup = byId("caeClipAxisGroup");
+    const modalPlayBtn = byId("caeModalPlayBtn");
+    const modalModeSelect = byId("caeModalModeSelect");
+
+    paletteSelect?.addEventListener("change", () => {
+      const pal = paletteSelect.value;
+      const bar = byId("caeSpectrumBar");
+      if (bar) bar.dataset.palette = pal;
+      if (app.viewport) {
+        app.viewport.caePalette = pal;
+        app.viewport.requestFrame();
+      }
+    });
+
+    deformSlider?.addEventListener("input", () => {
+      const val = parseFloat(deformSlider.value) || 0.0;
+      if (deformVal) deformVal.textContent = `${val.toFixed(1)}×`;
+      if (app.viewport) {
+        app.viewport.caeDeformScale = val;
+        app.viewport.requestFrame();
+      }
+    });
+
+    clipToggle?.addEventListener("change", () => {
+      const active = clipToggle.checked;
+      if (clipOptions) clipOptions.hidden = !active;
+      if (app.viewport) {
+        app.viewport.caeSection = app.viewport.caeSection || { enabled: false, axis: "x", offset: 0.0 };
+        app.viewport.caeSection.enabled = active;
+        app.viewport.requestFrame();
+      }
+    });
+
+    clipSlider?.addEventListener("input", () => {
+      const offset = parseFloat(clipSlider.value) || 0.0;
+      if (app.viewport && app.viewport.caeSection) {
+        app.viewport.caeSection.offset = offset;
+        app.viewport.requestFrame();
+      }
+    });
+
+    clipGroup?.querySelectorAll(".seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        clipGroup.querySelectorAll(".seg-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const axis = btn.dataset.axis || "x";
+        if (app.viewport && app.viewport.caeSection) {
+          app.viewport.caeSection.axis = axis;
+          app.viewport.requestFrame();
+        }
+      });
+    });
+
+    let modalAnimId = null;
+    modalPlayBtn?.addEventListener("click", () => {
+      if (!app.viewport) return;
+      if (modalAnimId) {
+        cancelAnimationFrame(modalAnimId);
+        modalAnimId = null;
+        modalPlayBtn.innerHTML = `<svg class="atlas-icon" aria-hidden="true"><use href="#icon-play"/></svg> Animate`;
+      } else {
+        modalPlayBtn.innerHTML = `<svg class="atlas-icon" aria-hidden="true"><use href="#icon-pause"/></svg> Pause`;
+        const startTime = performance.now();
+        const step = (now) => {
+          const t = (now - startTime) * 0.005;
+          app.viewport.modalPhase = t;
+          app.viewport.updateCaeVisuals();
+          app.viewport.render();
+          modalAnimId = requestAnimationFrame(step);
+        };
+        modalAnimId = requestAnimationFrame(step);
+      }
+    });
+
+    modalModeSelect?.addEventListener("change", () => {
+      if (app.viewport) {
+        app.viewport.modalMode = parseInt(modalModeSelect.value, 10) || 1;
+        app.viewport.updateCaeVisuals();
+        app.viewport.render();
+      }
+    });
+
+    closeBtn?.addEventListener("click", () => {
+      if (app.viewport) {
+        app.viewport.deactivateCaeMode();
+      }
     });
   }
 
@@ -11598,6 +12194,10 @@ ${gcodeSample}`;
       { label: "Revolve the selected sketch as a new body", hint: "turn", keywords: "add create revolve lathe turn axis solid new body feature", run: () => revolveSketch("new_body") },
       { label: "Revolve the selected sketch as a join", hint: "union", keywords: "add create revolve lathe turn axis join union boolean feature", run: () => revolveSketch("join") },
       { label: "Toggle light/dark theme", hint: "appearance", keywords: "theme dark light", run: () => toggleTheme() },
+      { label: "Density: Comfortable", hint: "layout density", keywords: "density comfortable spacious", run: () => applyDensity("comfortable") },
+      { label: "Density: Compact", hint: "layout density", keywords: "density compact normal engineering", run: () => applyDensity("compact") },
+      { label: "Density: Expert", hint: "layout density", keywords: "density expert minimal screen real estate", run: () => applyDensity("expert") },
+      { label: "Show Welcome & Onboarding Guide", hint: "setup", keywords: "welcome onboarding tutorial help start setup", run: () => openOnboardingModal() },
       { label: "Keyboard shortcuts", hint: "?", keywords: "help keys", run: () => openHelp() },
     ];
     if (project) {
@@ -11695,6 +12295,18 @@ ${gcodeSample}`;
 
   function toggleTheme() {
     applyTheme(app.theme === "dark" ? "light" : "dark");
+  }
+
+  function applyDensity(density) {
+    const valid = ["comfortable", "compact", "expert"];
+    const d = valid.includes(density) ? density : "compact";
+    app.density = d;
+    document.documentElement.dataset.density = d;
+    try {
+      localStorage.setItem("atlas-density", d);
+    } catch (_) {}
+    const obSelect = byId("obDensitySelect");
+    if (obSelect) obSelect.value = d;
   }
 
   function openHelp() {
@@ -12379,7 +12991,7 @@ ${gcodeSample}`;
     cancelAnimationFrame(flightSimState.frameId);
     flightSimState.frameId = requestAnimationFrame(flightSimLoop);
 
-    toast("✈ Flight Sim Started! W/S: Pitch, A/D: Roll, Shift/Ctrl: Throttle, Space: Level Wings, Esc: Exit");
+    toast("Flight Sim Started! W/S: Pitch, A/D: Roll, Shift/Ctrl: Throttle, Space: Level Wings, Esc: Exit");
   }
 
   function exitFlightSimulator() {
@@ -12764,14 +13376,14 @@ ${gcodeSample}`;
         a.click();
         document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 6000);
-        toast("✔ Flight video recorded & downloaded successfully!");
+        toast("Flight video recorded & downloaded successfully!");
       };
 
       mr.start(250);
 
       const recBtn = byId("fsimRecordBtn");
       if (recBtn) {
-        recBtn.textContent = "⏹ Stop REC";
+        recBtn.innerHTML = `<svg class="atlas-icon" aria-hidden="true" style="margin-right:4px;"><use href="#icon-close"/></svg> Stop REC`;
         recBtn.classList.add("fsim-btn-recording");
       }
       const badge = byId("fsimRecordingBadge");
@@ -12786,7 +13398,7 @@ ${gcodeSample}`;
         if (timerEl) timerEl.textContent = `${mins}:${secs}`;
       }, 1000);
 
-      toast("🔴 Recording Flight Demonstration (60 FPS)...");
+      toast("Recording Flight Demonstration (60 FPS)...");
     } catch (err) {
       console.error("Flight recording failed:", err);
       toast(`Recording error: ${err.message}`);
@@ -12804,7 +13416,7 @@ ${gcodeSample}`;
 
     const recBtn = byId("fsimRecordBtn");
     if (recBtn) {
-      recBtn.textContent = "⏺ Record";
+      recBtn.innerHTML = `<svg class="atlas-icon" aria-hidden="true" style="margin-right:4px; color:#ef4444;"><use href="#icon-record"/></svg> Record`;
       recBtn.classList.remove("fsim-btn-recording");
     }
     const badge = byId("fsimRecordingBadge");
@@ -12841,7 +13453,7 @@ ${gcodeSample}`;
       flightSimState.afterburner = !flightSimState.afterburner;
       const btn = byId("fsimAbBtn");
       if (btn) btn.classList.toggle("active", flightSimState.afterburner);
-      toast(flightSimState.afterburner ? "⚡ Afterburner ENGAGED (Max Thrust 185 kN)" : "Afterburner Disengaged");
+      toast(flightSimState.afterburner ? "Afterburner ENGAGED (Max Thrust 185 kN)" : "Afterburner Disengaged");
     });
 
     byId("fsimPitchUpBtn")?.addEventListener("mousedown", () => { flightSimState.keysDown["KeyS"] = true; });
@@ -13291,7 +13903,7 @@ ${gcodeSample}`;
 
       if (!assets || assets.length === 0) {
         grid.innerHTML = `<div style="grid-column:1/-1; padding:32px; text-align:center; color:var(--atlas-text-secondary);">
-          <div style="font-size:24px; margin-bottom:8px;">📦</div>
+          <div style="margin-bottom:8px;"><svg class="atlas-icon" style="width:36px; height:36px; color:var(--atlas-accent);"><use href="#icon-assets"/></svg></div>
           <div style="font-weight:600;">No assets found matching filters</div>
           <div style="font-size:12px; margin-top:4px;">Try switching tabs or adjusting search query</div>
         </div>`;
@@ -13300,7 +13912,7 @@ ${gcodeSample}`;
 
       grid.innerHTML = assets.map(a => {
         const visClass = a.visibility === "Public" ? "asset-badge-public" : a.visibility === "Team" ? "asset-badge-team" : "asset-badge-private";
-        const visLabel = a.visibility === "Public" ? "🌐 Public" : a.visibility === "Team" ? "👥 Team Org" : "🔒 Private";
+        const visLabel = a.visibility === "Public" ? "Public" : a.visibility === "Team" ? "Team Org" : "Private";
         const paramsCount = (a.parameters && a.parameters.length) || 0;
 
         return `
@@ -13318,12 +13930,12 @@ ${gcodeSample}`;
                 <span style="width:10px; height:10px; border-radius:50%; background:${escapeHtml(a.author?.avatar_color || '#38bdf8')}; display:inline-block;"></span>
                 ${escapeHtml(a.author?.name || "Library")}
               </span>
-              <span>⭐ ${a.stars || 0} · 📥 ${a.downloads || 0}</span>
+              <span>Rating: ${a.stars || 0} / 5 · Downloads: ${a.downloads || 0}</span>
             </div>
-            ${paramsCount > 0 ? `<div style="font-size:10.5px; color:var(--atlas-text-secondary); background:rgba(0,0,0,0.25); padding:4px 8px; border-radius:4px;">⚡ ${paramsCount} Parametric Variable(s)</div>` : ''}
+            ${paramsCount > 0 ? `<div style="font-size:10.5px; color:var(--atlas-text-secondary); background:rgba(0,0,0,0.25); padding:4px 8px; border-radius:4px; display:flex; align-items:center; gap:4px;"><svg class="atlas-icon" style="width:12px; height:12px;"><use href="#icon-lightning"/></svg> ${paramsCount} Parametric Variable(s)</div>` : ''}
             <div class="asset-card-actions">
-              <button type="button" class="button small primary insert-asset-btn" data-id="${escapeHtml(a.id)}">➕ Insert</button>
-              <button type="button" class="button small ghost fork-asset-btn" data-id="${escapeHtml(a.id)}" title="Fork into your personal private catalog">🍴 Fork</button>
+              <button type="button" class="button small primary insert-asset-btn" data-id="${escapeHtml(a.id)}"><svg class="atlas-icon" aria-hidden="true" style="margin-right:3px;"><use href="#icon-plus"/></svg> Insert</button>
+              <button type="button" class="button small ghost fork-asset-btn" data-id="${escapeHtml(a.id)}" title="Fork into your personal private catalog"><svg class="atlas-icon" aria-hidden="true" style="margin-right:3px;"><use href="#icon-copy"/></svg> Fork</button>
             </div>
           </div>
         `;
@@ -13354,7 +13966,7 @@ ${gcodeSample}`;
         body: JSON.stringify({ instance_name: `${assetName.replace(/\s+/g, '_').toLowerCase()}_inst` }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      toast(`✔ Inserted "${assetName}" into active assembly!`);
+      toast(`Inserted "${assetName}" into active assembly!`);
       closeModal(byId("assetsHubModal"));
     } catch (err) {
       toast(`Error inserting asset: ${err.message}`);
@@ -13381,7 +13993,7 @@ ${gcodeSample}`;
         const errJson = await res.json().catch(() => ({}));
         throw new Error(errJson.error || `HTTP ${res.status}`);
       }
-      toast(`🍴 Forked "${assetName}" into your Private Catalog!`);
+      toast(`Forked "${assetName}" into your Private Catalog!`);
       await loadAndRenderAssets();
     } catch (err) {
       toast(`Fork failed: ${err.message}`);
@@ -13474,7 +14086,7 @@ ${gcodeSample}`;
         });
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        toast(`✔ Successfully published "${name}" to ${visibility.toUpperCase()} catalog!`);
+        toast(`Successfully published "${name}" to ${visibility.toUpperCase()} catalog!`);
         closeModal(byId("publishAssetModal"));
         loadAndRenderAssets();
       } catch (err) {
@@ -13537,7 +14149,7 @@ ${gcodeSample}`;
             <div style="display:flex; gap:8px; align-items:center; margin-top:4px;">
               <input type="text" class="input reply-input" placeholder="Reply to thread..." style="flex:1; font-size:11.5px; padding:4px 8px;">
               <button type="button" class="button small ghost send-reply-btn" data-id="${escapeHtml(c.id)}">Reply</button>
-              <button type="button" class="button small ${isOpen ? 'primary' : 'ghost'} toggle-resolve-btn" data-id="${escapeHtml(c.id)}">${isOpen ? '✔ Resolve' : 'Reopen'}</button>
+              <button type="button" class="button small ${isOpen ? 'primary' : 'ghost'} toggle-resolve-btn" data-id="${escapeHtml(c.id)}">${isOpen ? '<svg class="atlas-icon" aria-hidden="true" style="margin-right:3px;"><use href="#icon-check"/></svg> Resolve' : 'Reopen'}</button>
             </div>
           </div>
         `;
@@ -13616,7 +14228,7 @@ ${gcodeSample}`;
             author_color: AtlasAuth.currentUser.avatar_color,
           }),
         });
-        toast("📍 Pinned 3D comment placed on model!");
+        toast("Pinned 3D comment placed on model!");
         loadAndRenderComments();
       } catch (err) {
         toast(`Error pinning comment: ${err.message}`);
@@ -14536,6 +15148,7 @@ ${gcodeSample}`;
     });
 
     setupViewCube();
+    setupCaeLegendControls();
     setupAutocadNavbar();
     setupFeatureHud();
     setupLayoutAddBtn();
@@ -15889,6 +16502,124 @@ ${gcodeSample}`;
     });
   }
 
+  function openOnboardingModal() {
+    const modal = byId("onboardingModal");
+    if (modal) {
+      if (typeof modal.showModal === "function") modal.showModal();
+      else modal.hidden = false;
+    }
+  }
+
+  function closeOnboardingModal() {
+    const modal = byId("onboardingModal");
+    if (modal) {
+      if (typeof modal.close === "function") modal.close();
+      else modal.hidden = true;
+    }
+  }
+
+  function initOnboarding() {
+    const modal = byId("onboardingModal");
+    if (!modal) return;
+
+    byId("closeOnboardingModalBtn")?.addEventListener("click", closeOnboardingModal);
+    byId("obSkipBtn")?.addEventListener("click", () => {
+      if (byId("obDontShowAgain")?.checked) {
+        try { localStorage.setItem("atlas_onboarded", "true"); } catch (_) {}
+      }
+      closeOnboardingModal();
+    });
+
+    byId("obConfirmBtn")?.addEventListener("click", async () => {
+      if (byId("obDontShowAgain")?.checked) {
+        try { localStorage.setItem("atlas_onboarded", "true"); } catch (_) {}
+      }
+      const density = byId("obDensitySelect")?.value || "compact";
+      applyDensity(density);
+      const units = byId("obUnitsSelect")?.value;
+      if (units && app.project && app.project.units !== units) {
+        try {
+          await api("/api/project", { method: "POST", body: { units } });
+          const st = await api("/api/state");
+          applyState(st);
+        } catch (_) {}
+      }
+      closeOnboardingModal();
+      toast("Workspace preferences configured. Welcome to AtlasCAD!");
+    });
+
+    // Profile card selection
+    document.querySelectorAll(".onboarding-profile-card").forEach(card => {
+      card.addEventListener("click", () => {
+        document.querySelectorAll(".onboarding-profile-card").forEach(c => {
+          c.classList.remove("active");
+          c.style.borderColor = "var(--atlas-border)";
+          c.style.background = "var(--atlas-surface-1)";
+        });
+        card.classList.add("active");
+        card.style.borderColor = "var(--atlas-accent)";
+        card.style.background = "var(--atlas-surface-2)";
+        const radio = card.querySelector('input[type="radio"]');
+        if (radio) radio.checked = true;
+        if (radio?.value === "expert") {
+          applyDensity("expert");
+        } else if (radio?.value === "beginner") {
+          applyDensity("comfortable");
+        } else {
+          applyDensity("compact");
+        }
+      });
+    });
+
+    // Density select change
+    byId("obDensitySelect")?.addEventListener("change", (e) => {
+      applyDensity(e.target.value);
+    });
+
+    // Guided 1-Click First Projects
+    byId("obDemoAirplaneBtn")?.addEventListener("click", () => {
+      if (byId("obDontShowAgain")?.checked) {
+        try { localStorage.setItem("atlas_onboarded", "true"); } catch (_) {}
+      }
+      closeOnboardingModal();
+      setTimeout(() => {
+        byId("topbarFlightSimBtn")?.click();
+      }, 250);
+    });
+
+    byId("obDemoBeamBtn")?.addEventListener("click", async () => {
+      if (byId("obDontShowAgain")?.checked) {
+        try { localStorage.setItem("atlas_onboarded", "true"); } catch (_) {}
+      }
+      closeOnboardingModal();
+      toast("Solving Structural FEA Cantilever Beam...");
+      try {
+        const res = await api("/api/cae/static", {
+          method: "POST",
+          body: {
+            problem_id: "onboarding_cantilever",
+            element_type: "Tetrahedral10Node",
+            youngs_modulus_gpa: 68.9,
+            poissons_ratio: 0.33,
+            load_case: {
+              point_loads_n: [[100.0, 0.0, -500.0]],
+              pressure_loads_mpa: [],
+              fixed_dof_nodes: [0, 1, 2, 3]
+            }
+          }
+        });
+        if (app.viewport) {
+          app.viewport.activateCaeMode("static", res);
+          app.viewport.requestFrame();
+        }
+        showResultViewerHud(res);
+        toast("FEA Beam solved! Von Mises stress colormap active in viewport.");
+      } catch (err) {
+        toast(`Simulation: ${err.message}`, true);
+      }
+    });
+  }
+
   async function boot() {
     let stored = null;
     try {
@@ -15898,7 +16629,15 @@ ${gcodeSample}`;
     }
     const prefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
     applyTheme(stored || (prefersLight ? "light" : "dark"));
+
+    let storedDensity = null;
+    try {
+      storedDensity = localStorage.getItem("atlas-density");
+    } catch (_) {}
+    applyDensity(storedDensity || "compact");
+
     bindUi();
+    initOnboarding();
     app.viewport = new Viewport(byId("viewport"));
     if (app.viewport.fallback) {
       log(app.viewport.fallback, "error");
@@ -15909,6 +16648,11 @@ ${gcodeSample}`;
       applyState(state);
       setStatus("Ready", "");
       log(`Opened ${state.name} · ${state.geometry.triangles} triangles`);
+      try {
+        if (!localStorage.getItem("atlas_onboarded")) {
+          setTimeout(openOnboardingModal, 500);
+        }
+      } catch (_) {}
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setStatus(message, "error");

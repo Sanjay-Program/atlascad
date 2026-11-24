@@ -6,12 +6,12 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
-use std::f64::consts::PI;
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
+use std::f64::consts::PI;
 
 /// Speed of light in vacuum in meters per second (m/s).
 pub const SPEED_OF_LIGHT: f64 = 299_792_458.0;
@@ -164,7 +164,8 @@ pub fn solve_microwave_waveguide(
 
     // Conductor attenuation alpha_c (Pozar Eq. 3.96):
     // alpha_c = (R_s / (b * eta * sqrt(1 - (fc/f)^2))) * [1 + (2*b/a)*(fc/f)^2] [Np/m]
-    let alpha_c_np_m = (r_s / (b_m * eta * wave_factor)) * (1.0 + (2.0 * b_m / a_m) * cutoff_ratio.powi(2));
+    let alpha_c_np_m =
+        (r_s / (b_m * eta * wave_factor)) * (1.0 + (2.0 * b_m / a_m) * cutoff_ratio.powi(2));
     let alpha_c_db_m = alpha_c_np_m * 8.685889638;
     let insertion_loss_db = alpha_c_db_m * l_m;
 
@@ -182,7 +183,8 @@ pub fn solve_microwave_waveguide(
 
     // Cavity unloaded quality factor Q0 (Pozar Eq. 6.38):
     let num_q = 2.0 * b_m * (a_m.powi(2) + d_cav_m.powi(2)).powf(1.5);
-    let den_q = a_m * d_cav_m * (a_m.powi(2) + d_cav_m.powi(2)) + 2.0 * b_m * (a_m.powi(3) + d_cav_m.powi(3));
+    let den_q = a_m * d_cav_m * (a_m.powi(2) + d_cav_m.powi(2))
+        + 2.0 * b_m * (a_m.powi(3) + d_cav_m.powi(3));
     let q_0 = (PI * eta / (4.0 * r_s)) * (num_q / den_q);
 
     Ok(MicrowaveWaveguideResult {
@@ -206,19 +208,26 @@ pub fn solve_microwave_waveguide(
 }
 
 /// Executes microwave waveguide simulation and packages into SimulationResult envelope.
-pub fn solve_microwave_waveguide_sim(
-    problem: &MicrowaveWaveguideProblem,
-) -> SimulationResult {
+pub fn solve_microwave_waveguide_sim(problem: &MicrowaveWaveguideProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_microwave_waveguide(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("cutoff_frequency_te10_ghz".to_string(), res.cutoff_frequency_te10_ghz);
+            metrics.insert(
+                "cutoff_frequency_te10_ghz".to_string(),
+                res.cutoff_frequency_te10_ghz,
+            );
             metrics.insert("guide_wavelength_mm".to_string(), res.guide_wavelength_mm);
             metrics.insert("wave_impedance_ohms".to_string(), res.wave_impedance_ohms);
-            metrics.insert("attenuation_rate_db_m".to_string(), res.attenuation_rate_db_m);
+            metrics.insert(
+                "attenuation_rate_db_m".to_string(),
+                res.attenuation_rate_db_m,
+            );
             metrics.insert("insertion_loss_db".to_string(), res.insertion_loss_db);
-            metrics.insert("peak_electric_field_kv_m".to_string(), res.peak_electric_field_kv_m);
+            metrics.insert(
+                "peak_electric_field_kv_m".to_string(),
+                res.peak_electric_field_kv_m,
+            );
             metrics.insert("cavity_unloaded_q".to_string(), res.cavity_unloaded_q);
 
             let mut conv = ConvergenceMonitor::new(1e-6);
@@ -238,12 +247,21 @@ pub fn solve_microwave_waveguide_sim(
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.electronics.microwave_waveguide", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.electronics.microwave_waveguide",
+                    "0.1.0",
+                ),
                 logs: vec![format!(
                     "Microwave Waveguide (IEEE 148 / WR-90): fc = {:.2} GHz, λg = {:.2} mm (λ0 = {:.2} mm), Z_TE = {:.1} Ω, α = {:.3} dB/m, IL = {:.4} dB, E_pk = {:.1} kV/m (margin = {:.1}x), Cavity Q0 = {:.0}, SingleMode: {}",
-                    res.cutoff_frequency_te10_ghz, res.guide_wavelength_mm, res.freespace_wavelength_mm,
-                    res.wave_impedance_ohms, res.attenuation_rate_db_m, res.insertion_loss_db,
-                    res.peak_electric_field_kv_m, res.breakdown_safety_margin, res.cavity_unloaded_q,
+                    res.cutoff_frequency_te10_ghz,
+                    res.guide_wavelength_mm,
+                    res.freespace_wavelength_mm,
+                    res.wave_impedance_ohms,
+                    res.attenuation_rate_db_m,
+                    res.insertion_loss_db,
+                    res.peak_electric_field_kv_m,
+                    res.breakdown_safety_margin,
+                    res.cavity_unloaded_q,
                     res.is_single_mode
                 )],
             }
@@ -260,7 +278,10 @@ pub fn solve_microwave_waveguide_sim(
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.electronics.microwave_waveguide", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.electronics.microwave_waveguide",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Microwave waveguide simulation failed: {}", err)],
             }
         }
@@ -276,9 +297,16 @@ mod tests {
     fn test_wr90_waveguide_nominal() {
         let prob = MicrowaveWaveguideProblem::default();
         let res = solve_microwave_waveguide(&prob).expect("solver failed");
-        println!("WR-90 Waveguide: fc = {:.2} GHz, λg = {:.2} mm, ZTE = {:.1} Ω, α = {:.3} dB/m, IL = {:.4} dB, Epk = {:.1} kV/m, Q0 = {:.0}",
-            res.cutoff_frequency_te10_ghz, res.guide_wavelength_mm, res.wave_impedance_ohms,
-            res.attenuation_rate_db_m, res.insertion_loss_db, res.peak_electric_field_kv_m, res.cavity_unloaded_q);
+        println!(
+            "WR-90 Waveguide: fc = {:.2} GHz, λg = {:.2} mm, ZTE = {:.1} Ω, α = {:.3} dB/m, IL = {:.4} dB, Epk = {:.1} kV/m, Q0 = {:.0}",
+            res.cutoff_frequency_te10_ghz,
+            res.guide_wavelength_mm,
+            res.wave_impedance_ohms,
+            res.attenuation_rate_db_m,
+            res.insertion_loss_db,
+            res.peak_electric_field_kv_m,
+            res.cavity_unloaded_q
+        );
 
         assert!(res.cutoff_frequency_te10_ghz > 6.50 && res.cutoff_frequency_te10_ghz < 6.60);
         assert!(res.cutoff_frequency_te20_ghz > 13.0 && res.cutoff_frequency_te20_ghz < 13.2);

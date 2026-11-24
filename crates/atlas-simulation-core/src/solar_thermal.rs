@@ -132,7 +132,10 @@ pub fn solve_solar_thermal(problem: &SolarThermalProblem) -> Result<SolarThermal
     }
 
     let (def_eta0, def_a1, def_a2) = problem.collector_type.default_coefficients();
-    let eta0 = problem.optical_efficiency_eta0.unwrap_or(def_eta0).clamp(0.1, 1.0);
+    let eta0 = problem
+        .optical_efficiency_eta0
+        .unwrap_or(def_eta0)
+        .clamp(0.1, 1.0);
     let a1 = problem.linear_heat_loss_a1.unwrap_or(def_a1).max(0.1);
     let a2 = problem.quadratic_heat_loss_a2.unwrap_or(def_a2).max(0.0001);
 
@@ -185,7 +188,11 @@ pub fn solve_solar_thermal(problem: &SolarThermalProblem) -> Result<SolarThermal
         q_u / a_apt,
         efficiency_pct,
         t_stag,
-        if is_safe { "PASS NOMINAL" } else { "LOW EFFICIENCY OR BOILING RISK" }
+        if is_safe {
+            "PASS NOMINAL"
+        } else {
+            "LOW EFFICIENCY OR BOILING RISK"
+        }
     );
 
     Ok(SolarThermalResult {
@@ -211,10 +218,22 @@ pub fn solve_solar_thermal_sim(problem: &SolarThermalProblem) -> SimulationResul
     match solve_solar_thermal(problem) {
         Ok(result) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("collector_efficiency_pct".to_string(), result.collector_efficiency_pct);
-            metrics.insert("useful_thermal_power_w".to_string(), result.useful_thermal_power_w);
-            metrics.insert("fluid_outlet_temp_c".to_string(), result.fluid_outlet_temp_c);
-            metrics.insert("stagnation_temperature_c".to_string(), result.stagnation_temperature_c);
+            metrics.insert(
+                "collector_efficiency_pct".to_string(),
+                result.collector_efficiency_pct,
+            );
+            metrics.insert(
+                "useful_thermal_power_w".to_string(),
+                result.useful_thermal_power_w,
+            );
+            metrics.insert(
+                "fluid_outlet_temp_c".to_string(),
+                result.fluid_outlet_temp_c,
+            );
+            metrics.insert(
+                "stagnation_temperature_c".to_string(),
+                result.stagnation_temperature_c,
+            );
             metrics.insert("temperature_gain_c".to_string(), result.temperature_gain_c);
 
             let mut conv = ConvergenceMonitor::new(1e-6);
@@ -234,7 +253,10 @@ pub fn solve_solar_thermal_sim(problem: &SolarThermalProblem) -> SimulationResul
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.thermal.solar_collector_iso9806", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.thermal.solar_collector_iso9806",
+                    "0.1.0",
+                ),
                 logs: vec![result.design_assessment],
             }
         }
@@ -249,7 +271,10 @@ pub fn solve_solar_thermal_sim(problem: &SolarThermalProblem) -> SimulationResul
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.thermal.solar_collector_iso9806", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.thermal.solar_collector_iso9806",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Solar thermal simulation failed: {}", err)],
             }
         }

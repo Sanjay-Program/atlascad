@@ -57,16 +57,16 @@ impl Default for OffshoreWaveProblem {
         Self {
             problem_id: "north_sea_15mw_monopile".to_string(),
             structure_type: OffshoreStructureType::OffshoreWindMonopile,
-            water_depth_m: 40.0,                // 40 m North Sea water depth
-            wave_height_m: 14.5,                // 50-year extreme design wave height H = 14.5 m
-            wave_period_s: 13.0,                // Peak wave period T = 13.0 s
-            surface_current_m_s: 1.20,          // 1.2 m/s tidal + wind storm current
-            cylinder_diameter_m: 8.50,          // Ø8.50 m heavy monopile
-            wall_thickness_mm: 85.0,            // 85 mm structural steel wall
-            steel_yield_strength_mpa: 355.0,    // S355 ML subsea structural steel
-            drag_coefficient_cd: 0.70,          // Post-critical Reynolds smooth/marine fouled cylinder
-            inertia_coefficient_cm: 2.00,       // Standard potential flow inertia coefficient
-            seawater_density_kg_m3: 1025.0,     // Seawater
+            water_depth_m: 40.0,             // 40 m North Sea water depth
+            wave_height_m: 14.5,             // 50-year extreme design wave height H = 14.5 m
+            wave_period_s: 13.0,             // Peak wave period T = 13.0 s
+            surface_current_m_s: 1.20,       // 1.2 m/s tidal + wind storm current
+            cylinder_diameter_m: 8.50,       // Ø8.50 m heavy monopile
+            wall_thickness_mm: 85.0,         // 85 mm structural steel wall
+            steel_yield_strength_mpa: 355.0, // S355 ML subsea structural steel
+            drag_coefficient_cd: 0.70,       // Post-critical Reynolds smooth/marine fouled cylinder
+            inertia_coefficient_cm: 2.00,    // Standard potential flow inertia coefficient
+            seawater_density_kg_m3: 1025.0,  // Seawater
         }
     }
 }
@@ -111,12 +111,17 @@ pub struct OffshoreWaveResult {
 }
 
 /// Solves offshore wave dispersion, particle kinematics, and Morison loading according to API RP 2A / DNV-RP-C205.
-pub fn solve_offshore_wave_loading(problem: &OffshoreWaveProblem) -> Result<OffshoreWaveResult, String> {
+pub fn solve_offshore_wave_loading(
+    problem: &OffshoreWaveProblem,
+) -> Result<OffshoreWaveResult, String> {
     if problem.water_depth_m < 2.0 || problem.water_depth_m > 1000.0 {
         return Err("Water depth must be between 2.0 and 1000.0 meters".to_string());
     }
     if problem.wave_height_m <= 0.1 || problem.wave_height_m > (0.78 * problem.water_depth_m) {
-        return Err("Wave height must be positive and below shallow-water breaking limit (0.78*d)".to_string());
+        return Err(
+            "Wave height must be positive and below shallow-water breaking limit (0.78*d)"
+                .to_string(),
+        );
     }
     if problem.wave_period_s < 2.0 || problem.wave_period_s > 40.0 {
         return Err("Wave period must be between 2.0 and 40.0 seconds".to_string());
@@ -153,7 +158,8 @@ pub fn solve_offshore_wave_loading(problem: &OffshoreWaveProblem) -> Result<Offs
 
     // Surface orbital velocity and acceleration (at z = 0, cos(omega*t) = 1, sin(omega*t) = 1):
     let u_surf_wave = (std::f64::consts::PI * h / problem.wave_period_s) * (kd.cosh() / sinh_kd);
-    let du_surf_wave = (2.0 * std::f64::consts::PI.powi(2) * h / problem.wave_period_s.powi(2)) * (kd.cosh() / sinh_kd);
+    let du_surf_wave = (2.0 * std::f64::consts::PI.powi(2) * h / problem.wave_period_s.powi(2))
+        * (kd.cosh() / sinh_kd);
 
     // Keulegan-Carpenter number: KC = u_max * T / D:
     let kc = (u_surf_wave * problem.wave_period_s) / problem.cylinder_diameter_m;
@@ -178,7 +184,8 @@ pub fn solve_offshore_wave_loading(problem: &OffshoreWaveProblem) -> Result<Offs
         // Wave horizontal velocity at depth z:
         let cosh_k_zd = (k * (z + d)).cosh();
         let u_wave_z = (std::f64::consts::PI * h / problem.wave_period_s) * (cosh_k_zd / sinh_kd);
-        let a_wave_z = (2.0 * std::f64::consts::PI.powi(2) * h / problem.wave_period_s.powi(2)) * (cosh_k_zd / sinh_kd);
+        let a_wave_z = (2.0 * std::f64::consts::PI.powi(2) * h / problem.wave_period_s.powi(2))
+            * (cosh_k_zd / sinh_kd);
 
         // 1/7th power-law current velocity at depth z:
         let u_curr_z = problem.surface_current_m_s * ((z + d) / d).max(0.001).powf(1.0 / 7.0);
@@ -186,8 +193,14 @@ pub fn solve_offshore_wave_loading(problem: &OffshoreWaveProblem) -> Result<Offs
         // Morison force components:
         // Peak force occurs near wave crest where drag and current combine:
         let u_tot = u_wave_z + u_curr_z;
-        let f_drag = 0.5 * problem.seawater_density_kg_m3 * problem.drag_coefficient_cd * problem.cylinder_diameter_m * u_tot * u_tot.abs();
-        let f_inertia = problem.seawater_density_kg_m3 * problem.inertia_coefficient_cm * a_cyl * a_wave_z;
+        let f_drag = 0.5
+            * problem.seawater_density_kg_m3
+            * problem.drag_coefficient_cd
+            * problem.cylinder_diameter_m
+            * u_tot
+            * u_tot.abs();
+        let f_inertia =
+            problem.seawater_density_kg_m3 * problem.inertia_coefficient_cm * a_cyl * a_wave_z;
 
         // In Morison equations for extreme load, drag and inertia are phase-offset by 90°.
         // Maximum combined load is bounded by sqrt(F_drag^2 + F_inertia^2) or max instantaneous sum:
@@ -205,7 +218,9 @@ pub fn solve_offshore_wave_loading(problem: &OffshoreWaveProblem) -> Result<Offs
     let t_m = problem.wall_thickness_mm / 1000.0;
     let d_int = (problem.cylinder_diameter_m - 2.0 * t_m).max(0.05);
     // Elastic section modulus: Z_el = (pi / 32) * (D^4 - D_int^4) / D [m³]
-    let z_el = (std::f64::consts::PI / 32.0) * (problem.cylinder_diameter_m.powi(4) - d_int.powi(4)) / problem.cylinder_diameter_m;
+    let z_el = (std::f64::consts::PI / 32.0)
+        * (problem.cylinder_diameter_m.powi(4) - d_int.powi(4))
+        / problem.cylinder_diameter_m;
 
     // Bending stress: sigma = M / Z_el [N/m²] -> [MPa]:
     let sigma_bend_pa = total_m_base_nm / z_el.max(1.0e-5);
@@ -252,10 +267,19 @@ mod tests {
         assert!(res.wave_celerity_m_s > 12.0 && res.wave_celerity_m_s < 20.0);
         assert!(res.surface_wave_velocity_m_s > 2.5 && res.surface_wave_velocity_m_s < 5.0);
         assert!(res.keulegan_carpenter_number > 3.0 && res.keulegan_carpenter_number < 10.0);
-        assert!(res.diffraction_parameter_d_l <= 0.20, "Diffraction parameter D/L <= 0.20 ensures Morison validity");
+        assert!(
+            res.diffraction_parameter_d_l <= 0.20,
+            "Diffraction parameter D/L <= 0.20 ensures Morison validity"
+        );
         assert!(res.peak_base_shear_kn > 2000.0 && res.peak_base_shear_kn < 8000.0);
-        assert!(res.peak_overturning_moment_kn_m > 40000.0 && res.peak_overturning_moment_kn_m < 200000.0);
-        assert!(res.structural_bending_safety_factor >= 1.35, "API RP 2A structural bending safety factor >= 1.35");
+        assert!(
+            res.peak_overturning_moment_kn_m > 40000.0
+                && res.peak_overturning_moment_kn_m < 200000.0
+        );
+        assert!(
+            res.structural_bending_safety_factor >= 1.35,
+            "API RP 2A structural bending safety factor >= 1.35"
+        );
         assert!(res.is_morison_valid);
         assert!(res.is_bending_stress_acceptable);
         assert!(res.is_offshore_design_viable);

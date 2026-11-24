@@ -127,7 +127,10 @@ pub fn solve_wastewater_treatment(
     if problem.mlss_mg_l <= 500.0 || problem.sludge_retention_time_days <= 1.0 {
         return Err("MLSS must exceed 500 mg/L and SRT must exceed 1 day".to_string());
     }
-    if problem.basin_depth_m <= 1.0 || problem.clarifier_diameter_m <= 5.0 || problem.clarifier_count == 0 {
+    if problem.basin_depth_m <= 1.0
+        || problem.clarifier_diameter_m <= 5.0
+        || problem.clarifier_count == 0
+    {
         return Err("Clarifier and basin dimensions must be positive non-zero".to_string());
     }
 
@@ -178,18 +181,24 @@ pub fn solve_wastewater_treatment(
 
     // Actual Oxygen Transfer Rate (AOTR):
     // AOTR = Q * (S0 - S) * 1e-3 - 1.42 * P_x_vss  [kg O2 / day]
-    let aotr_kg_day = ((q * substrate_removed * 1e-3) - (1.42 * p_x_vss)).max(q * substrate_removed * 1e-3 * 0.5);
+    let aotr_kg_day =
+        ((q * substrate_removed * 1e-3) - (1.42 * p_x_vss)).max(q * substrate_removed * 1e-3 * 0.5);
 
     // Correction to Standard Clean Water Oxygen Transfer Rate (SOTR):
     // SOTR = AOTR / [ alpha * F * (beta * C_s_T_alt / C_s_20 - C_L) * theta^(T-20) ]
     let alpha = 0.65; // wastewater oxygen transfer correction factor
-    let beta = 0.95;  // wastewater salinity / dissolved solids correction factor
+    let beta = 0.95; // wastewater salinity / dissolved solids correction factor
     let c_s_20 = 9.09; // clean water saturation DO at 20°C, 1 atm [mg/L]
     let c_s_t = 14.652 - 0.41022 * temp_c + 0.007991 * temp_c * temp_c; // DO saturation at operating temp
-    let c_l = 2.0;    // target operating dissolved oxygen level in basin [mg/L]
+    let c_l = 2.0; // target operating dissolved oxygen level in basin [mg/L]
     let theta_do: f64 = 1.024;
-    let denom_o2 = alpha * (((beta * c_s_t) / c_s_20) - (c_l / c_s_20)) * theta_do.powf(temp_c - 20.0);
-    let sotr_kg_day = if denom_o2 > 0.1 { aotr_kg_day / denom_o2 } else { aotr_kg_day * 1.5 };
+    let denom_o2 =
+        alpha * (((beta * c_s_t) / c_s_20) - (c_l / c_s_20)) * theta_do.powf(temp_c - 20.0);
+    let sotr_kg_day = if denom_o2 > 0.1 {
+        aotr_kg_day / denom_o2
+    } else {
+        aotr_kg_day * 1.5
+    };
     let sotr_kg_h = sotr_kg_day / 24.0;
 
     // Aeration blower power based on diffuser efficiency
@@ -227,8 +236,8 @@ pub fn solve_wastewater_treatment(
     let bod_rem_pct = ((s0 - s_effluent) / s0) * 100.0;
 
     // Standards compliance check (WEF MOP 8 & Ten States Standards)
-    let is_sor_acceptable = sor <= 32.0;       // Max design SOR <= 32 m³/m²·d (peak 40)
-    let is_slr_acceptable = slr <= 6.0;        // Max design SLR <= 6.0 kg/m²·h (peak 8.0)
+    let is_sor_acceptable = sor <= 32.0; // Max design SOR <= 32 m³/m²·d (peak 40)
+    let is_slr_acceptable = slr <= 6.0; // Max design SLR <= 6.0 kg/m²·h (peak 8.0)
     let is_hrt_acceptable = (4.0..=12.0).contains(&hrt_hours); // Normal municipal HRT 4 - 12 hours
     let is_effluent_compliant = s_effluent <= s_target;
 
@@ -279,7 +288,10 @@ mod tests {
         assert!((5.0..=9.0).contains(&res.hydraulic_retention_time_hours));
         assert!(res.food_to_microorganism_ratio > 0.20 && res.food_to_microorganism_ratio < 0.40);
         assert!(res.daily_sludge_production_kg_day > 1500.0);
-        assert!(res.surface_overflow_rate_m3_m2_day > 10.0 && res.surface_overflow_rate_m3_m2_day <= 25.0);
+        assert!(
+            res.surface_overflow_rate_m3_m2_day > 10.0
+                && res.surface_overflow_rate_m3_m2_day <= 25.0
+        );
         assert!(res.solids_loading_rate_kg_m2_h > 2.0 && res.solids_loading_rate_kg_m2_h <= 5.0);
         assert!(res.zone_settling_velocity_m_h > 2.0);
         assert!(res.bod_removal_efficiency_pct > 90.0);

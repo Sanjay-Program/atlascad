@@ -142,7 +142,10 @@ pub fn solve_kienzle_machining(
     let vc = prob.cutting_speed_vc_m_min;
 
     if d <= 0.1 || ap <= 0.0 || fz <= 0.0 || vc <= 0.0 {
-        return Err("Tool diameter, axial depth, feed, and cutting speed must be strictly positive.".to_string());
+        return Err(
+            "Tool diameter, axial depth, feed, and cutting speed must be strictly positive."
+                .to_string(),
+        );
     }
 
     let kc11 = prob.workpiece_material.specific_cutting_force_kc11_n_mm2();
@@ -208,15 +211,41 @@ pub fn solve_kienzle_machining(
     };
 
     let notes = vec![
-        format!("Machining Operation: '{}' ({:?} on {:?})", prob.operation_name, prob.operation_type, prob.workpiece_material),
-        format!("Tooling: Diameter = {:.1} mm, Teeth = {}, Rake = {:.1}°", d, prob.number_of_teeth, gamma_0),
-        format!("Cutting Regimes: vc = {:.1} m/min -> Spindle Speed = {:.0} RPM, Feed Rate = {:.1} mm/min (fz = {:.3} mm/tooth)", vc, n_rpm, vf_mm_min, fz),
-        format!("Kienzle Mechanics: Mean Chip Thickness h = {:.3} mm -> Specific Cutting Force kc = {:.1} N/mm²", h_mm, kc_n_mm2),
-        format!("Forces & Power: Tangential Force Fc = {:.1} N, Spindle Power Pm = {:.2} kW (Torque = {:.1} N·m, η = {:.0}%)", fc_total, pm_kw, mc_nm, eta_spindle * 100.0),
-        format!("Productivity: Material Removal Rate MRR = {:.2} cm³/min", mrr_cm3_min),
-        format!("Surface Finish: {}",
+        format!(
+            "Machining Operation: '{}' ({:?} on {:?})",
+            prob.operation_name, prob.operation_type, prob.workpiece_material
+        ),
+        format!(
+            "Tooling: Diameter = {:.1} mm, Teeth = {}, Rake = {:.1}°",
+            d, prob.number_of_teeth, gamma_0
+        ),
+        format!(
+            "Cutting Regimes: vc = {:.1} m/min -> Spindle Speed = {:.0} RPM, Feed Rate = {:.1} mm/min (fz = {:.3} mm/tooth)",
+            vc, n_rpm, vf_mm_min, fz
+        ),
+        format!(
+            "Kienzle Mechanics: Mean Chip Thickness h = {:.3} mm -> Specific Cutting Force kc = {:.1} N/mm²",
+            h_mm, kc_n_mm2
+        ),
+        format!(
+            "Forces & Power: Tangential Force Fc = {:.1} N, Spindle Power Pm = {:.2} kW (Torque = {:.1} N·m, η = {:.0}%)",
+            fc_total,
+            pm_kw,
+            mc_nm,
+            eta_spindle * 100.0
+        ),
+        format!(
+            "Productivity: Material Removal Rate MRR = {:.2} cm³/min",
+            mrr_cm3_min
+        ),
+        format!(
+            "Surface Finish: {}",
             if let Some(ra) = ra_um {
-                format!("Theoretical Ra = {:.2} µm (Rmax = {:.2} µm)", ra, rmax_um.unwrap_or(0.0))
+                format!(
+                    "Theoretical Ra = {:.2} µm (Rmax = {:.2} µm)",
+                    ra,
+                    rmax_um.unwrap_or(0.0)
+                )
             } else {
                 "Tool nose radius not specified".to_string()
             }
@@ -249,12 +278,24 @@ pub fn solve_machining_physics_sim(
 
     let mut metrics = HashMap::new();
     metrics.insert("spindle_speed_rpm".to_string(), sol.spindle_speed_rpm);
-    metrics.insert("table_feed_rate_vf_mm_min".to_string(), sol.table_feed_rate_vf_mm_min);
-    metrics.insert("tangential_cutting_force_fc_n".to_string(), sol.tangential_cutting_force_fc_n);
+    metrics.insert(
+        "table_feed_rate_vf_mm_min".to_string(),
+        sol.table_feed_rate_vf_mm_min,
+    );
+    metrics.insert(
+        "tangential_cutting_force_fc_n".to_string(),
+        sol.tangential_cutting_force_fc_n,
+    );
     metrics.insert("cutting_power_pc_kw".to_string(), sol.cutting_power_pc_kw);
-    metrics.insert("required_spindle_power_pm_kw".to_string(), sol.required_spindle_power_pm_kw);
+    metrics.insert(
+        "required_spindle_power_pm_kw".to_string(),
+        sol.required_spindle_power_pm_kw,
+    );
     metrics.insert("spindle_torque_mc_nm".to_string(), sol.spindle_torque_mc_nm);
-    metrics.insert("material_removal_rate_cm3_min".to_string(), sol.material_removal_rate_cm3_min);
+    metrics.insert(
+        "material_removal_rate_cm3_min".to_string(),
+        sol.material_removal_rate_cm3_min,
+    );
     if let Some(ra) = sol.theoretical_arithmetic_roughness_ra_um {
         metrics.insert("theoretical_ra_um".to_string(), ra);
     }
@@ -262,10 +303,15 @@ pub fn solve_machining_physics_sim(
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.tangential_cutting_force_fc_n, 1, 1e-4);
 
+    // Independent Kienzle invariant: kc(h) * h^mc / rake_correction must recover kc1.1.
+    let mc = prob.workpiece_material.chip_thickness_exponent_mc();
+    let rake_corr = 1.0 - (prob.rake_angle_deg.unwrap_or(6.0) / 100.0);
+    let recovered_kc11 =
+        sol.specific_cutting_force_kc_n_mm2 * sol.uncut_chip_thickness_h_mm.powf(mc) / rake_corr;
     let val = AnalyticalComparison::assess(
-        "Kienzle Tangential Cutting Force (N)",
-        sol.tangential_cutting_force_fc_n,
-        sol.tangential_cutting_force_fc_n,
+        "Kienzle Reference Specific Cutting Force kc1.1 (N/mm²)",
+        recovered_kc11,
+        prob.workpiece_material.specific_cutting_force_kc11_n_mm2(),
     );
 
     Ok(SimulationResult {
@@ -295,7 +341,9 @@ mod tests {
         // vf = 1145.9 * 4 * 0.15 = 687.5 mm/min
         assert!((sol.table_feed_rate_vf_mm_min - 687.5).abs() < 2.0);
         // Cutting force > 500 N
-        assert!(sol.tangential_cutting_force_fc_n > 500.0 && sol.tangential_cutting_force_fc_n < 5000.0);
+        assert!(
+            sol.tangential_cutting_force_fc_n > 500.0 && sol.tangential_cutting_force_fc_n < 5000.0
+        );
         // Spindle power should be positive and reasonable for 50mm face mill
         assert!(sol.required_spindle_power_pm_kw > 1.0 && sol.required_spindle_power_pm_kw < 20.0);
         // MRR = 3 * 35 * 687.5 / 1000 = 72.18 cm^3/min

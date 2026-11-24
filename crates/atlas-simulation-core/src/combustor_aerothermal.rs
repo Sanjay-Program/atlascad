@@ -6,11 +6,10 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
-use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Specific gas constant for air in J/(kg·K).
 pub const R_AIR: f64 = 287.058;
@@ -102,16 +101,17 @@ pub struct CombustorResult {
 }
 
 /// Solves combustor aerothermal thermodynamics, pressure drop, pattern factor, and emissions.
-pub fn solve_combustor(
-    problem: &CombustorProblem,
-) -> Result<CombustorResult, String> {
+pub fn solve_combustor(problem: &CombustorProblem) -> Result<CombustorResult, String> {
     if problem.inlet_total_pressure_mpa <= 0.0 || problem.inlet_total_temperature_k <= 0.0 {
         return Err("Inlet pressure and temperature must be positive".to_string());
     }
     if problem.air_mass_flow_kg_s <= 0.0 || problem.fuel_mass_flow_kg_s <= 0.0 {
         return Err("Air and fuel mass flows must be positive".to_string());
     }
-    if problem.combustor_volume_m3 <= 0.0 || problem.combustor_length_m <= 0.0 || problem.liner_reference_area_m2 <= 0.0 {
+    if problem.combustor_volume_m3 <= 0.0
+        || problem.combustor_length_m <= 0.0
+        || problem.liner_reference_area_m2 <= 0.0
+    {
         return Err("Geometric combustor dimensions must be positive".to_string());
     }
 
@@ -174,11 +174,14 @@ pub fn solve_combustor(
     let t_flame_k = (t3_k + 1400.0).min(2450.0);
     // EI_NOx correlation: EI_NOx = 0.10 * (P3_bar)^0.5 * exp(T_flame / 350.0) * tau_res_s^0.5
     let p3_bar = problem.inlet_total_pressure_mpa * 10.0;
-    let ei_nox = (0.10 * p3_bar.sqrt() * (t_flame_k / 350.0).exp() * tau_res_s.sqrt()).clamp(5.0, 65.0);
+    let ei_nox =
+        (0.10 * p3_bar.sqrt() * (t_flame_k / 350.0).exp() * tau_res_s.sqrt()).clamp(5.0, 65.0);
 
     // 8. Carbon Monoxide (CO) emissions index:
     // High at low power, low at high power:
-    let ei_co = (0.25 * (t3_k / 1000.0) / ((p3_kpa / 1000.0).sqrt() * tau_res_s) * (-t4_k / 2000.0).exp()).clamp(0.5, 25.0);
+    let ei_co = (0.25 * (t3_k / 1000.0) / ((p3_kpa / 1000.0).sqrt() * tau_res_s)
+        * (-t4_k / 2000.0).exp())
+    .clamp(0.5, 25.0);
 
     // 9. Conformance checks:
     // ICAO Annex 16 / Engine standards:
@@ -207,30 +210,39 @@ pub fn solve_combustor(
 }
 
 /// Executes combustor aerothermal simulation and packages into SimulationResult envelope.
-pub fn solve_combustor_sim(
-    problem: &CombustorProblem,
-) -> SimulationResult {
+pub fn solve_combustor_sim(problem: &CombustorProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_combustor(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("combustion_efficiency_pct".to_string(), res.combustion_efficiency_pct);
-            metrics.insert("total_pressure_loss_pct".to_string(), res.total_pressure_loss_pct);
-            metrics.insert("turbine_inlet_temperature_k".to_string(), res.turbine_inlet_temperature_k);
+            metrics.insert(
+                "combustion_efficiency_pct".to_string(),
+                res.combustion_efficiency_pct,
+            );
+            metrics.insert(
+                "total_pressure_loss_pct".to_string(),
+                res.total_pressure_loss_pct,
+            );
+            metrics.insert(
+                "turbine_inlet_temperature_k".to_string(),
+                res.turbine_inlet_temperature_k,
+            );
             metrics.insert("pattern_factor".to_string(), res.pattern_factor);
-            metrics.insert("nox_emissions_index_g_kg".to_string(), res.nox_emissions_index_g_kg);
-            metrics.insert("co_emissions_index_g_kg".to_string(), res.co_emissions_index_g_kg);
+            metrics.insert(
+                "nox_emissions_index_g_kg".to_string(),
+                res.nox_emissions_index_g_kg,
+            );
+            metrics.insert(
+                "co_emissions_index_g_kg".to_string(),
+                res.co_emissions_index_g_kg,
+            );
             metrics.insert("residence_time_ms".to_string(), res.residence_time_ms);
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, res.turbine_inlet_temperature_k, 1, 1e-4);
 
-            let comparison = AnalyticalComparison::assess(
-                "turbine_inlet_temperature_k",
-                res.turbine_inlet_temperature_k,
-                res.turbine_inlet_temperature_k * 0.99,
-            );
-
+            // No closed-form solution exists for the empirical Lefebvre/ICAO correlations;
+            // the metrics are reported without a fabricated analytical comparison.
             SimulationResult {
                 problem_id: problem.problem_id.clone(),
                 engine_id: "atlas.aerospace.combustor_aerothermal".to_string(),
@@ -238,13 +250,22 @@ pub fn solve_combustor_sim(
                 execution_time_ms: start.elapsed().as_millis().max(1) as u64,
                 scalar_metrics: metrics,
                 convergence: conv,
-                validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.aerospace.combustor_aerothermal", "0.1.0"),
+                validation: None,
+                provenance: SimulationProvenance::new(
+                    "atlas.aerospace.combustor_aerothermal",
+                    "0.1.0",
+                ),
                 logs: vec![format!(
                     "Combustor Aerothermal (Lefebvre/ICAO): TIT = {:.1} K, eta = {:.2}%, dP/P = {:.2}% (fric={:.2}%, mom={:.2}%), PF = {:.3}, NOx = {:.1} g/kg, CO = {:.2} g/kg, tau = {:.2} ms, Acceptable: {}",
-                    res.turbine_inlet_temperature_k, res.combustion_efficiency_pct, res.total_pressure_loss_pct,
-                    res.friction_pressure_drop_pct, res.momentum_pressure_drop_pct, res.pattern_factor,
-                    res.nox_emissions_index_g_kg, res.co_emissions_index_g_kg, res.residence_time_ms,
+                    res.turbine_inlet_temperature_k,
+                    res.combustion_efficiency_pct,
+                    res.total_pressure_loss_pct,
+                    res.friction_pressure_drop_pct,
+                    res.momentum_pressure_drop_pct,
+                    res.pattern_factor,
+                    res.nox_emissions_index_g_kg,
+                    res.co_emissions_index_g_kg,
+                    res.residence_time_ms,
                     res.is_acceptable
                 )],
             }
@@ -261,7 +282,10 @@ pub fn solve_combustor_sim(
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.aerospace.combustor_aerothermal", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.aerospace.combustor_aerothermal",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Combustor simulation failed: {}", err)],
             }
         }
@@ -277,14 +301,21 @@ mod tests {
     fn test_combustor_nominal() {
         let prob = CombustorProblem::default();
         let res = solve_combustor(&prob).expect("solver failed");
-        println!("Combustor: TIT = {:.1} K, eta = {:.2}%, dP/P = {:.2}%, PF = {:.3}, NOx = {:.1} g/kg",
-            res.turbine_inlet_temperature_k, res.combustion_efficiency_pct, res.total_pressure_loss_pct,
-            res.pattern_factor, res.nox_emissions_index_g_kg);
+        println!(
+            "Combustor: TIT = {:.1} K, eta = {:.2}%, dP/P = {:.2}%, PF = {:.3}, NOx = {:.1} g/kg",
+            res.turbine_inlet_temperature_k,
+            res.combustion_efficiency_pct,
+            res.total_pressure_loss_pct,
+            res.pattern_factor,
+            res.nox_emissions_index_g_kg
+        );
 
         assert!(res.overall_fuel_air_ratio == 0.020);
         assert!(res.equivalence_ratio > 0.28 && res.equivalence_ratio < 0.32);
         assert!(res.combustion_efficiency_pct > 99.0);
-        assert!(res.turbine_inlet_temperature_k > 1450.0 && res.turbine_inlet_temperature_k < 1650.0);
+        assert!(
+            res.turbine_inlet_temperature_k > 1450.0 && res.turbine_inlet_temperature_k < 1650.0
+        );
         assert!(res.total_pressure_loss_pct > 3.0 && res.total_pressure_loss_pct < 5.5);
         assert!(res.pattern_factor > 0.15 && res.pattern_factor < 0.25);
         assert!(res.residence_time_ms > 4.0 && res.residence_time_ms < 15.0);

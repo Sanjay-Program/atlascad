@@ -230,15 +230,41 @@ pub fn solve_involute_gear_pair(
     let fos_h = allow_contact / sigma_h.max(1.0);
 
     let notes = vec![
-        format!("Gear Set: '{}' ({:?}, u = {:.3}, a = {:.2} mm)", prob.gear_set_name, prob.gear_type, u, a),
-        format!("Pinion (z1 = {}): Pitch d1 = {:.2} mm, Tip da1 = {:.2} mm, Root df1 = {:.2} mm", prob.pinion_teeth_z1, d1, da1, df1),
-        format!("Gear (z2 = {}): Pitch d2 = {:.2} mm, Tip da2 = {:.2} mm, Root df2 = {:.2} mm", prob.gear_teeth_z2, d2, da2, df2),
-        format!("Meshing: Normal Module mn = {:.2} mm, Helix β = {:.1}°, Transverse Contact Ratio εα = {:.3} [{}]",
-            mn, prob.helix_angle_deg, eps_alpha, if is_eps_ok { "Continuous Smooth Involute Handover" } else { "Warning: Low Contact Ratio (<1.20)" }
+        format!(
+            "Gear Set: '{}' ({:?}, u = {:.3}, a = {:.2} mm)",
+            prob.gear_set_name, prob.gear_type, u, a
         ),
-        format!("Forces at {:.0} RPM (v = {:.2} m/s): Ft = {:.1} N, Fr = {:.1} N, Fa = {:.1} N (Torque = {:.1} N·m)", n1, v_m_s, ft, fr, fa, t1_nm),
-        format!("AGMA Tooth Bending: σb = {:.1} MPa vs Allowable {:.0} MPa (FoS = {:.2})", sigma_b, allow_bend, fos_b),
-        format!("AGMA Hertzian Pitting: σH = {:.1} MPa vs Allowable {:.0} MPa (FoS = {:.2})", sigma_h, allow_contact, fos_h),
+        format!(
+            "Pinion (z1 = {}): Pitch d1 = {:.2} mm, Tip da1 = {:.2} mm, Root df1 = {:.2} mm",
+            prob.pinion_teeth_z1, d1, da1, df1
+        ),
+        format!(
+            "Gear (z2 = {}): Pitch d2 = {:.2} mm, Tip da2 = {:.2} mm, Root df2 = {:.2} mm",
+            prob.gear_teeth_z2, d2, da2, df2
+        ),
+        format!(
+            "Meshing: Normal Module mn = {:.2} mm, Helix β = {:.1}°, Transverse Contact Ratio εα = {:.3} [{}]",
+            mn,
+            prob.helix_angle_deg,
+            eps_alpha,
+            if is_eps_ok {
+                "Continuous Smooth Involute Handover"
+            } else {
+                "Warning: Low Contact Ratio (<1.20)"
+            }
+        ),
+        format!(
+            "Forces at {:.0} RPM (v = {:.2} m/s): Ft = {:.1} N, Fr = {:.1} N, Fa = {:.1} N (Torque = {:.1} N·m)",
+            n1, v_m_s, ft, fr, fa, t1_nm
+        ),
+        format!(
+            "AGMA Tooth Bending: σb = {:.1} MPa vs Allowable {:.0} MPa (FoS = {:.2})",
+            sigma_b, allow_bend, fos_b
+        ),
+        format!(
+            "AGMA Hertzian Pitting: σH = {:.1} MPa vs Allowable {:.0} MPa (FoS = {:.2})",
+            sigma_h, allow_contact, fos_h
+        ),
     ];
 
     Ok(InvoluteGearPairResult {
@@ -280,16 +306,37 @@ pub fn solve_gear_pair_sim(prob: &InvoluteGearPairProblem) -> Result<SimulationR
     let mut metrics = HashMap::new();
     metrics.insert("center_distance_a_mm".to_string(), sol.center_distance_a_mm);
     metrics.insert("gear_ratio_u".to_string(), sol.gear_ratio_u);
-    metrics.insert("transverse_contact_ratio".to_string(), sol.transverse_contact_ratio);
-    metrics.insert("pitch_line_velocity_m_s".to_string(), sol.pitch_line_velocity_m_s);
+    metrics.insert(
+        "transverse_contact_ratio".to_string(),
+        sol.transverse_contact_ratio,
+    );
+    metrics.insert(
+        "pitch_line_velocity_m_s".to_string(),
+        sol.pitch_line_velocity_m_s,
+    );
     metrics.insert("pinion_torque_nm".to_string(), sol.pinion_torque_nm);
-    metrics.insert("tangential_force_ft_n".to_string(), sol.tangential_force_ft_n);
+    metrics.insert(
+        "tangential_force_ft_n".to_string(),
+        sol.tangential_force_ft_n,
+    );
     metrics.insert("radial_force_fr_n".to_string(), sol.radial_force_fr_n);
     metrics.insert("axial_force_fa_n".to_string(), sol.axial_force_fa_n);
-    metrics.insert("tooth_bending_stress_mpa".to_string(), sol.tooth_bending_stress_mpa);
-    metrics.insert("bending_safety_factor".to_string(), sol.bending_safety_factor);
-    metrics.insert("contact_hertzian_stress_mpa".to_string(), sol.contact_hertzian_stress_mpa);
-    metrics.insert("contact_safety_factor".to_string(), sol.contact_safety_factor);
+    metrics.insert(
+        "tooth_bending_stress_mpa".to_string(),
+        sol.tooth_bending_stress_mpa,
+    );
+    metrics.insert(
+        "bending_safety_factor".to_string(),
+        sol.bending_safety_factor,
+    );
+    metrics.insert(
+        "contact_hertzian_stress_mpa".to_string(),
+        sol.contact_hertzian_stress_mpa,
+    );
+    metrics.insert(
+        "contact_safety_factor".to_string(),
+        sol.contact_safety_factor,
+    );
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.center_distance_a_mm, 1, 1e-4);

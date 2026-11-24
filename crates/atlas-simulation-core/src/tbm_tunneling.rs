@@ -144,7 +144,10 @@ pub fn solve_tbm_tunneling(problem: &TbmTunnelingProblem) -> Result<TbmTunneling
         return Err("Tunnel outer diameter must be greater than 0.50 m".to_string());
     }
     if problem.tunnel_depth_to_axis_m <= problem.tunnel_outer_diameter_m / 2.0 {
-        return Err("Tunnel depth to axis must exceed the radius (positive cover depth required)".to_string());
+        return Err(
+            "Tunnel depth to axis must exceed the radius (positive cover depth required)"
+                .to_string(),
+        );
     }
     if problem.cutterhead_rotational_speed_rpm <= 0.0 {
         return Err("Cutterhead rotational speed must be positive".to_string());
@@ -177,7 +180,9 @@ pub fn solve_tbm_tunneling(problem: &TbmTunnelingProblem) -> Result<TbmTunneling
 
     // Active earth pressure coefficient:
     let phi_rad = problem.soil_effective_friction_angle_deg.to_radians();
-    let ka = ((std::f64::consts::PI / 4.0) - (phi_rad / 2.0)).tan().powi(2);
+    let ka = ((std::f64::consts::PI / 4.0) - (phi_rad / 2.0))
+        .tan()
+        .powi(2);
 
     // Minimum face pressure at crown to prevent active collapse (Krause / Herzog / ITA):
     // P_min_crown = u_crown + max(0, sigma'_v * Ka - 2 * c' * sqrt(Ka)) + safety margin (20 kPa)
@@ -194,7 +199,8 @@ pub fn solve_tbm_tunneling(problem: &TbmTunnelingProblem) -> Result<TbmTunneling
     let face_stability_fs = target_axis_support_kpa / min_axis_support_kpa;
 
     // Penetration kinematics:
-    let penetration_speed_mm_min = problem.penetration_rate_mm_per_rev * problem.cutterhead_rotational_speed_rpm;
+    let penetration_speed_mm_min =
+        problem.penetration_rate_mm_per_rev * problem.cutterhead_rotational_speed_rpm;
     let v_p_m_s = (penetration_speed_mm_min / 1000.0) / 60.0;
     let volumetric_excavation_rate_m3_h = face_area_m2 * (penetration_speed_mm_min / 1000.0) * 60.0;
 
@@ -207,7 +213,8 @@ pub fn solve_tbm_tunneling(problem: &TbmTunnelingProblem) -> Result<TbmTunneling
         GroundConditionType::MixedFaceGround => 0.065,
         GroundConditionType::WeatheredSoftRock => 0.090,
     };
-    let cutting_thrust_kn = c_cut_coeff * face_area_m2 * (problem.soil_compressive_strength_mpa * 1000.0);
+    let cutting_thrust_kn =
+        c_cut_coeff * face_area_m2 * (problem.soil_compressive_strength_mpa * 1000.0);
 
     // 2. Face pressure thrust against the pressure bulkhead:
     let face_pressure_thrust_kn = target_axis_support_kpa * face_area_m2;
@@ -222,7 +229,8 @@ pub fn solve_tbm_tunneling(problem: &TbmTunnelingProblem) -> Result<TbmTunneling
     // 4. Backup trailer towing force (~800 kN standard):
     let backup_towing_kn = 800.0;
 
-    let total_required_thrust_kn = cutting_thrust_kn + face_pressure_thrust_kn + shield_skin_friction_kn + backup_towing_kn;
+    let total_required_thrust_kn =
+        cutting_thrust_kn + face_pressure_thrust_kn + shield_skin_friction_kn + backup_towing_kn;
 
     // Torque decomposition:
     // 1. Soil / rock cutting torque:
@@ -312,13 +320,20 @@ mod tests {
         let res = solve_tbm_tunneling(&prob)?;
         assert!(res.face_area_m2 > 33.0 && res.face_area_m2 < 36.0);
         assert!(res.hydrostatic_water_pressure_kpa > 150.0);
-        assert!(res.min_face_support_pressure_kpa > 180.0 && res.min_face_support_pressure_kpa < 320.0);
+        assert!(
+            res.min_face_support_pressure_kpa > 180.0 && res.min_face_support_pressure_kpa < 320.0
+        );
         assert!(res.target_face_support_pressure_kpa > 220.0);
         assert!(res.face_stability_safety_factor >= 1.20);
         assert!(res.penetration_speed_mm_min == 30.0); // 2.5 * 12
-        assert!(res.volumetric_excavation_rate_m3_h > 55.0 && res.volumetric_excavation_rate_m3_h < 70.0);
+        assert!(
+            res.volumetric_excavation_rate_m3_h > 55.0
+                && res.volumetric_excavation_rate_m3_h < 70.0
+        );
         assert!(res.total_required_thrust_kn > 15000.0 && res.total_required_thrust_kn < 35000.0);
-        assert!(res.total_cutterhead_torque_kn_m > 2000.0 && res.total_cutterhead_torque_kn_m < 4500.0);
+        assert!(
+            res.total_cutterhead_torque_kn_m > 2000.0 && res.total_cutterhead_torque_kn_m < 4500.0
+        );
         assert!(res.cutterhead_drive_power_kw > 500.0 && res.cutterhead_drive_power_kw < 1200.0);
         assert!(res.specific_energy_mj_m3 > 25.0 && res.specific_energy_mj_m3 < 90.0);
         assert!(res.is_face_stable);

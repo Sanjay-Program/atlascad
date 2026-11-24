@@ -301,10 +301,22 @@ pub fn solve_distillation_column(prob: &DistillationProblem) -> DistillationResu
 pub fn solve_distillation_sim(prob: &DistillationProblem) -> SimulationResult {
     let sol = solve_distillation_column(prob);
     let mut metrics = std::collections::HashMap::new();
-    metrics.insert("fenske_minimum_stages".to_string(), sol.fenske_minimum_stages);
-    metrics.insert("minimum_reflux_ratio_rmin".to_string(), sol.minimum_reflux_ratio_rmin);
-    metrics.insert("operating_reflux_ratio".to_string(), sol.operating_reflux_ratio);
-    metrics.insert("theoretical_stages_count".to_string(), sol.theoretical_stages_count as f64);
+    metrics.insert(
+        "fenske_minimum_stages".to_string(),
+        sol.fenske_minimum_stages,
+    );
+    metrics.insert(
+        "minimum_reflux_ratio_rmin".to_string(),
+        sol.minimum_reflux_ratio_rmin,
+    );
+    metrics.insert(
+        "operating_reflux_ratio".to_string(),
+        sol.operating_reflux_ratio,
+    );
+    metrics.insert(
+        "theoretical_stages_count".to_string(),
+        sol.theoretical_stages_count as f64,
+    );
     metrics.insert("condenser_duty_kw".to_string(), sol.condenser_duty_kw);
 
     let comparison = AnalyticalComparison::assess(
@@ -325,7 +337,10 @@ pub fn solve_distillation_sim(prob: &DistillationProblem) -> SimulationResult {
         convergence: conv,
         validation: Some(comparison),
         provenance: SimulationProvenance::new("atlas.chemical.distillation", "0.1.0"),
-        logs: vec![format!("Theoretical stages: {}, Feed tray: {}", sol.theoretical_stages_count, sol.optimal_feed_stage)],
+        logs: vec![format!(
+            "Theoretical stages: {}, Feed tray: {}",
+            sol.theoretical_stages_count, sol.optimal_feed_stage
+        )],
     }
 }
 
@@ -349,7 +364,9 @@ mod tests {
         assert!(sol.operating_reflux_ratio > sol.minimum_reflux_ratio_rmin);
         // Theoretical stages stepped from top to bottom
         assert!(sol.theoretical_stages_count >= 10 && sol.theoretical_stages_count <= 25);
-        assert!(sol.optimal_feed_stage > 1 && sol.optimal_feed_stage < sol.theoretical_stages_count);
+        assert!(
+            sol.optimal_feed_stage > 1 && sol.optimal_feed_stage < sol.theoretical_stages_count
+        );
         assert!(sol.condenser_duty_kw > 500.0);
         assert!(sol.reboiler_duty_kw > 500.0);
     }

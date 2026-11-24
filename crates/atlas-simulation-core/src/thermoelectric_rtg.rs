@@ -70,13 +70,13 @@ impl Default for ThermoelectricRtgProblem {
             problem_id: "deep_space_gphs_rtg".to_string(),
             material_type: ThermoelectricMaterialType::SiliconGermaniumSiGe,
             initial_thermal_power_w_th: 4400.0, // 18 GPHS modules ~ 4.4 kW_th
-            hot_junction_temp_k: 1273.15, // 1000 °C hot shoe
-            cold_junction_temp_k: 566.15, // 293 °C radiator cold root
-            couple_count: 572, // 572 SiGe unicouples
+            hot_junction_temp_k: 1273.15,       // 1000 °C hot shoe
+            cold_junction_temp_k: 566.15,       // 293 °C radiator cold root
+            couple_count: 572,                  // 572 SiGe unicouples
             leg_length_mm: 20.0,
             leg_area_mm2: 9.0,
             mission_elapsed_years: 15.0, // 15-year outer solar system mission
-            fuel_half_life_years: 87.7, // Pu-238
+            fuel_half_life_years: 87.7,  // Pu-238
             annual_junction_degradation_pct: 0.75,
         }
     }
@@ -120,7 +120,9 @@ pub fn solve_thermoelectric_rtg(
     problem: &ThermoelectricRtgProblem,
 ) -> Result<ThermoelectricRtgResult, String> {
     if problem.hot_junction_temp_k <= problem.cold_junction_temp_k {
-        return Err("Hot junction temperature must be higher than cold junction temperature".to_string());
+        return Err(
+            "Hot junction temperature must be higher than cold junction temperature".to_string(),
+        );
     }
     if problem.couple_count == 0 {
         return Err("Couple count must be positive".to_string());
@@ -192,7 +194,9 @@ pub fn solve_thermoelectric_rtg(
     let q_th_eol = problem.initial_thermal_power_w_th * decay_factor;
 
     // Couple aging degradation factor:
-    let aging_factor = (1.0 - (problem.annual_junction_degradation_pct / 100.0) * problem.mission_elapsed_years).max(0.10);
+    let aging_factor = (1.0
+        - (problem.annual_junction_degradation_pct / 100.0) * problem.mission_elapsed_years)
+        .max(0.10);
 
     // EOL electrical power (proportional to thermal decay squared/linear and thermocouple aging):
     // Since Delta_T drops slightly with thermal decay, P_el scales roughly as (Q_th / Q_th0)^1.8 * aging

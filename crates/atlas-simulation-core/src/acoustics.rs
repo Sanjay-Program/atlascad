@@ -252,7 +252,10 @@ pub fn solve_outdoor_noise_propagation(
     let hr = prob.receiver_height_m.max(0.1);
     let g = prob.ground_factor.clamp(0.0, 1.0);
     let temp_c = prob.ambient_temp_c.unwrap_or(20.0);
-    let rh = prob.relative_humidity_pct.unwrap_or(50.0).clamp(10.0, 100.0);
+    let rh = prob
+        .relative_humidity_pct
+        .unwrap_or(50.0)
+        .clamp(10.0, 100.0);
     let limit_dba = prob.regulatory_limit_dba.unwrap_or(50.0);
 
     // 1. Geometrical divergence: A_div = 20 * log10(d / d0) + 11.0 dB (point source hemispherical reference d0=1m)
@@ -310,12 +313,32 @@ pub fn solve_outdoor_noise_propagation(
     let margin = limit_dba - received_dba;
 
     let notes = vec![
-        format!("Noise Source: '{}' (LwA = {:.1} dBA)", prob.source_name, prob.sound_power_lwa),
-        format!("Distance to Receiver: {:.1} m (Hs = {:.1} m, Hr = {:.1} m, Ground Factor G = {:.2})", d, hs, hr, g),
-        format!("Attenuation Breakdown: Divergence = {:.2} dB, Atmosphere = {:.2} dB, Ground = {:.2} dB, Barrier = {:.2} dB", a_div, a_atm, a_gr, a_bar),
-        format!("Total Acoustic Propagation Attenuation: {:.2} dB", total_atten),
-        format!("Received Noise Level: {:.2} dBA vs Limit {:.1} dBA (Margin: {:+.2} dBA) -> [{}]",
-            received_dba, limit_dba, margin, if is_compliant { "COMPLIANT" } else { "EXCEEDS LIMIT" }
+        format!(
+            "Noise Source: '{}' (LwA = {:.1} dBA)",
+            prob.source_name, prob.sound_power_lwa
+        ),
+        format!(
+            "Distance to Receiver: {:.1} m (Hs = {:.1} m, Hr = {:.1} m, Ground Factor G = {:.2})",
+            d, hs, hr, g
+        ),
+        format!(
+            "Attenuation Breakdown: Divergence = {:.2} dB, Atmosphere = {:.2} dB, Ground = {:.2} dB, Barrier = {:.2} dB",
+            a_div, a_atm, a_gr, a_bar
+        ),
+        format!(
+            "Total Acoustic Propagation Attenuation: {:.2} dB",
+            total_atten
+        ),
+        format!(
+            "Received Noise Level: {:.2} dBA vs Limit {:.1} dBA (Margin: {:+.2} dBA) -> [{}]",
+            received_dba,
+            limit_dba,
+            margin,
+            if is_compliant {
+                "COMPLIANT"
+            } else {
+                "EXCEEDS LIMIT"
+            }
         ),
     ];
 
@@ -343,15 +366,36 @@ pub fn solve_outdoor_noise_sim(prob: &OutdoorNoiseProblem) -> Result<SimulationR
     let mut metrics = HashMap::new();
     metrics.insert("sound_power_lwa".to_string(), sol.sound_power_lwa);
     metrics.insert("distance_m".to_string(), sol.distance_m);
-    metrics.insert("divergence_attenuation_db".to_string(), sol.divergence_attenuation_db);
-    metrics.insert("atmospheric_attenuation_db".to_string(), sol.atmospheric_attenuation_db);
-    metrics.insert("ground_attenuation_db".to_string(), sol.ground_attenuation_db);
-    metrics.insert("barrier_attenuation_db".to_string(), sol.barrier_attenuation_db);
+    metrics.insert(
+        "divergence_attenuation_db".to_string(),
+        sol.divergence_attenuation_db,
+    );
+    metrics.insert(
+        "atmospheric_attenuation_db".to_string(),
+        sol.atmospheric_attenuation_db,
+    );
+    metrics.insert(
+        "ground_attenuation_db".to_string(),
+        sol.ground_attenuation_db,
+    );
+    metrics.insert(
+        "barrier_attenuation_db".to_string(),
+        sol.barrier_attenuation_db,
+    );
     metrics.insert("total_attenuation_db".to_string(), sol.total_attenuation_db);
-    metrics.insert("received_sound_level_dba".to_string(), sol.received_sound_level_dba);
+    metrics.insert(
+        "received_sound_level_dba".to_string(),
+        sol.received_sound_level_dba,
+    );
     metrics.insert("regulatory_limit_dba".to_string(), sol.regulatory_limit_dba);
-    metrics.insert("compliance_margin_dba".to_string(), sol.compliance_margin_dba);
-    metrics.insert("is_compliant".to_string(), if sol.is_compliant { 1.0 } else { 0.0 });
+    metrics.insert(
+        "compliance_margin_dba".to_string(),
+        sol.compliance_margin_dba,
+    );
+    metrics.insert(
+        "is_compliant".to_string(),
+        if sol.is_compliant { 1.0 } else { 0.0 },
+    );
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.received_sound_level_dba, 1, 1e-4);

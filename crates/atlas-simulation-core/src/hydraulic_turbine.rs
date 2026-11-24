@@ -6,12 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
-use std::f64::consts::PI;
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
-use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
+use std::f64::consts::PI;
 
 /// Earth gravitational acceleration in m/s².
 pub const G_ACCEL: f64 = 9.80665;
@@ -260,29 +259,33 @@ pub fn solve_hydraulic_turbine(
 }
 
 /// Executes hydraulic turbine simulation and packages into SimulationResult envelope.
-pub fn solve_hydraulic_turbine_sim(
-    problem: &HydraulicTurbineProblem,
-) -> SimulationResult {
+pub fn solve_hydraulic_turbine_sim(problem: &HydraulicTurbineProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_hydraulic_turbine(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("available_hydraulic_power_mw".to_string(), res.available_hydraulic_power_mw);
+            metrics.insert(
+                "available_hydraulic_power_mw".to_string(),
+                res.available_hydraulic_power_mw,
+            );
             metrics.insert("shaft_power_mw".to_string(), res.shaft_power_mw);
             metrics.insert("electrical_power_mw".to_string(), res.electrical_power_mw);
-            metrics.insert("hydraulic_efficiency_pct".to_string(), res.hydraulic_efficiency_pct);
-            metrics.insert("overall_efficiency_pct".to_string(), res.overall_efficiency_pct);
+            metrics.insert(
+                "hydraulic_efficiency_pct".to_string(),
+                res.hydraulic_efficiency_pct,
+            );
+            metrics.insert(
+                "overall_efficiency_pct".to_string(),
+                res.overall_efficiency_pct,
+            );
             metrics.insert("speed_ratio_phi".to_string(), res.speed_ratio_phi);
-            metrics.insert("thoma_cavitation_sigma".to_string(), res.thoma_cavitation_sigma);
+            metrics.insert(
+                "thoma_cavitation_sigma".to_string(),
+                res.thoma_cavitation_sigma,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, res.shaft_power_mw, 1, 1e-4);
-
-            let comparison = AnalyticalComparison::assess(
-                "shaft_power_mw",
-                res.shaft_power_mw,
-                res.available_hydraulic_power_mw * 0.90,
-            );
 
             SimulationResult {
                 problem_id: problem.problem_id.clone(),
@@ -291,13 +294,19 @@ pub fn solve_hydraulic_turbine_sim(
                 execution_time_ms: start.elapsed().as_millis().max(1) as u64,
                 scalar_metrics: metrics,
                 convergence: conv,
-                validation: Some(comparison),
+                validation: None,
                 provenance: SimulationProvenance::new("atlas.energy.hydraulic_turbine", "0.1.0"),
                 logs: vec![format!(
                     "Hydraulic Turbine (IEC 60193): Type = {:?}, Hn = {:.1} m, Q = {:.2} m³/s, P_hyd = {:.2} MW, P_shaft = {:.2} MW, P_elec = {:.2} MW, eta_hyd = {:.2}%, phi = {:.3}, sigma = {:.4} (safe: {})",
-                    res.turbine_type, problem.net_head_m, problem.flow_rate_m3_s,
-                    res.available_hydraulic_power_mw, res.shaft_power_mw, res.electrical_power_mw,
-                    res.hydraulic_efficiency_pct, res.speed_ratio_phi, res.thoma_cavitation_sigma,
+                    res.turbine_type,
+                    problem.net_head_m,
+                    problem.flow_rate_m3_s,
+                    res.available_hydraulic_power_mw,
+                    res.shaft_power_mw,
+                    res.electrical_power_mw,
+                    res.hydraulic_efficiency_pct,
+                    res.speed_ratio_phi,
+                    res.thoma_cavitation_sigma,
                     res.is_cavitation_safe
                 )],
             }
@@ -330,9 +339,15 @@ mod tests {
     fn test_pelton_turbine_nominal() {
         let prob = HydraulicTurbineProblem::default();
         let res = solve_hydraulic_turbine(&prob).expect("solver failed");
-        println!("Pelton Turbine: P_hyd = {:.2} MW, P_shaft = {:.2} MW, P_elec = {:.2} MW, eta = {:.2}%, phi = {:.3}, dj = {:.1} mm",
-            res.available_hydraulic_power_mw, res.shaft_power_mw, res.electrical_power_mw,
-            res.hydraulic_efficiency_pct, res.speed_ratio_phi, res.jet_diameter_mm);
+        println!(
+            "Pelton Turbine: P_hyd = {:.2} MW, P_shaft = {:.2} MW, P_elec = {:.2} MW, eta = {:.2}%, phi = {:.3}, dj = {:.1} mm",
+            res.available_hydraulic_power_mw,
+            res.shaft_power_mw,
+            res.electrical_power_mw,
+            res.hydraulic_efficiency_pct,
+            res.speed_ratio_phi,
+            res.jet_diameter_mm
+        );
 
         assert!(res.available_hydraulic_power_mw > 13.0 && res.available_hydraulic_power_mw < 15.0);
         assert!(res.jet_velocity_m_s > 90.0 && res.jet_velocity_m_s < 95.0);

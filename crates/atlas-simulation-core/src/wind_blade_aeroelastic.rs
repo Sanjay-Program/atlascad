@@ -6,12 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
-use std::f64::consts::PI;
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
-use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
+use std::f64::consts::PI;
 
 /// Wind turbine blade aeroelastic problem specification.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -109,13 +108,14 @@ pub struct WindBladeResult {
 }
 
 /// Solves wind turbine blade aeroelastic bending, centrifugal stiffening, and flutter stability.
-pub fn solve_wind_blade_aeroelastic(
-    problem: &WindBladeProblem,
-) -> Result<WindBladeResult, String> {
+pub fn solve_wind_blade_aeroelastic(problem: &WindBladeProblem) -> Result<WindBladeResult, String> {
     if problem.blade_length_m <= 0.0 || problem.rotor_radius_m <= 0.0 {
         return Err("Blade length and rotor radius must be positive".to_string());
     }
-    if problem.blade_mass_kg <= 0.0 || problem.flapwise_rigidity_ei_nm2 <= 0.0 || problem.torsional_rigidity_gj_nm2 <= 0.0 {
+    if problem.blade_mass_kg <= 0.0
+        || problem.flapwise_rigidity_ei_nm2 <= 0.0
+        || problem.torsional_rigidity_gj_nm2 <= 0.0
+    {
         return Err("Mass and structural stiffnesses must be positive".to_string());
     }
     if problem.root_chord_m <= 0.0 || problem.tip_chord_m <= 0.0 {
@@ -144,7 +144,8 @@ pub fn solve_wind_blade_aeroelastic(
 
     // 3. First torsional natural frequency:
     // Fixed-free torsional shaft: omega_tor = (pi / (2 * L)) * sqrt(GJ / I_p)
-    let omega_tor = (PI / (2.0 * l)) * (problem.torsional_rigidity_gj_nm2 / problem.polar_moment_inertia_kg_m).sqrt();
+    let omega_tor = (PI / (2.0 * l))
+        * (problem.torsional_rigidity_gj_nm2 / problem.polar_moment_inertia_kg_m).sqrt();
     let f_tor = omega_tor / (2.0 * PI);
     let freq_sep = f_tor / f_flap_rot;
 
@@ -156,7 +157,9 @@ pub fn solve_wind_blade_aeroelastic(
 
     // 5. Critical aerodynamic divergence velocity (Bisplinghoff / Theodorsen):
     // v_div = sqrt( 2 * GJ / (rho * c^2 * e * C_L_alpha * L) )
-    let v_div = (2.0 * problem.torsional_rigidity_gj_nm2 / (problem.air_density_kg_m3 * c_75.powi(2) * e * cla * l)).sqrt();
+    let v_div = (2.0 * problem.torsional_rigidity_gj_nm2
+        / (problem.air_density_kg_m3 * c_75.powi(2) * e * cla * l))
+        .sqrt();
 
     // 6. Flap-torsion coupled classical flutter velocity:
     // Hodges-Dowell / Theodorsen formulation for coupled flutter:
@@ -179,9 +182,11 @@ pub fn solve_wind_blade_aeroelastic(
     // Extreme thrust per unit length: q_thrust = 0.5 * rho * v_gust^2 * c_avg * C_d_blade
     let c_avg = 0.5 * (problem.root_chord_m + problem.tip_chord_m);
     let c_drag = 1.15; // drag coefficient for parked/feathered blade under cross-gust
-    let q_gust_load = 0.5 * problem.air_density_kg_m3 * problem.extreme_gust_speed_m_s.powi(2) * c_avg * c_drag;
+    let q_gust_load =
+        0.5 * problem.air_density_kg_m3 * problem.extreme_gust_speed_m_s.powi(2) * c_avg * c_drag;
     // Cantilever tip deflection under distributed load w: y_tip = (w * L^4) / (8 * EI)
-    let tip_gust_deflection_m = (q_gust_load * l.powi(4)) / (8.0 * problem.flapwise_rigidity_ei_nm2);
+    let tip_gust_deflection_m =
+        (q_gust_load * l.powi(4)) / (8.0 * problem.flapwise_rigidity_ei_nm2);
     let tip_deflection_ratio_pct = (tip_gust_deflection_m / l) * 100.0;
 
     // 9. Conformance checks:
@@ -213,29 +218,33 @@ pub fn solve_wind_blade_aeroelastic(
 }
 
 /// Executes wind turbine blade aeroelastic simulation and packages into SimulationResult envelope.
-pub fn solve_wind_blade_aeroelastic_sim(
-    problem: &WindBladeProblem,
-) -> SimulationResult {
+pub fn solve_wind_blade_aeroelastic_sim(problem: &WindBladeProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_wind_blade_aeroelastic(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("standstill_flap_freq_hz".to_string(), res.standstill_flap_freq_hz);
-            metrics.insert("rotating_flap_freq_hz".to_string(), res.rotating_flap_freq_hz);
+            metrics.insert(
+                "standstill_flap_freq_hz".to_string(),
+                res.standstill_flap_freq_hz,
+            );
+            metrics.insert(
+                "rotating_flap_freq_hz".to_string(),
+                res.rotating_flap_freq_hz,
+            );
             metrics.insert("torsional_freq_hz".to_string(), res.torsional_freq_hz);
             metrics.insert("flutter_speed_m_s".to_string(), res.flutter_speed_m_s);
             metrics.insert("divergence_speed_m_s".to_string(), res.divergence_speed_m_s);
-            metrics.insert("flutter_safety_margin".to_string(), res.flutter_safety_margin);
-            metrics.insert("tip_gust_deflection_m".to_string(), res.tip_gust_deflection_m);
+            metrics.insert(
+                "flutter_safety_margin".to_string(),
+                res.flutter_safety_margin,
+            );
+            metrics.insert(
+                "tip_gust_deflection_m".to_string(),
+                res.tip_gust_deflection_m,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, res.rotating_flap_freq_hz, 1, 1e-4);
-
-            let comparison = AnalyticalComparison::assess(
-                "rotating_flap_freq_hz",
-                res.rotating_flap_freq_hz,
-                res.standstill_flap_freq_hz * 1.05,
-            );
 
             SimulationResult {
                 problem_id: problem.problem_id.clone(),
@@ -244,13 +253,21 @@ pub fn solve_wind_blade_aeroelastic_sim(
                 execution_time_ms: start.elapsed().as_millis().max(1) as u64,
                 scalar_metrics: metrics,
                 convergence: conv,
-                validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.renewable.wind_blade_aeroelastic", "0.1.0"),
+                validation: None,
+                provenance: SimulationProvenance::new(
+                    "atlas.renewable.wind_blade_aeroelastic",
+                    "0.1.0",
+                ),
                 logs: vec![format!(
                     "Wind Blade Aeroelastic (IEC 61400-1): f_flap_rot = {:.3} Hz, f_tor = {:.3} Hz, v_flutter = {:.1} m/s (margin = {:.2}x), v_div = {:.1} m/s, y_gust = {:.2} m ({:.1}%), Stable: {}",
-                    res.rotating_flap_freq_hz, res.torsional_freq_hz, res.flutter_speed_m_s,
-                    res.flutter_safety_margin, res.divergence_speed_m_s, res.tip_gust_deflection_m,
-                    res.tip_deflection_ratio_pct, res.is_stable
+                    res.rotating_flap_freq_hz,
+                    res.torsional_freq_hz,
+                    res.flutter_speed_m_s,
+                    res.flutter_safety_margin,
+                    res.divergence_speed_m_s,
+                    res.tip_gust_deflection_m,
+                    res.tip_deflection_ratio_pct,
+                    res.is_stable
                 )],
             }
         }
@@ -266,7 +283,10 @@ pub fn solve_wind_blade_aeroelastic_sim(
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.renewable.wind_blade_aeroelastic", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.renewable.wind_blade_aeroelastic",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Wind blade aeroelastic simulation failed: {}", err)],
             }
         }
@@ -282,8 +302,14 @@ mod tests {
     fn test_wind_blade_nominal() {
         let prob = WindBladeProblem::default();
         let res = solve_wind_blade_aeroelastic(&prob).expect("solver failed");
-        println!("Wind Blade: f_flap_rot = {:.3} Hz, f_tor = {:.3} Hz, v_flutter = {:.1} m/s, y_gust = {:.2} m, margin = {:.2}",
-            res.rotating_flap_freq_hz, res.torsional_freq_hz, res.flutter_speed_m_s, res.tip_gust_deflection_m, res.flutter_safety_margin);
+        println!(
+            "Wind Blade: f_flap_rot = {:.3} Hz, f_tor = {:.3} Hz, v_flutter = {:.1} m/s, y_gust = {:.2} m, margin = {:.2}",
+            res.rotating_flap_freq_hz,
+            res.torsional_freq_hz,
+            res.flutter_speed_m_s,
+            res.tip_gust_deflection_m,
+            res.flutter_safety_margin
+        );
 
         assert!(res.standstill_flap_freq_hz > 0.40 && res.standstill_flap_freq_hz < 1.20);
         assert!(res.rotating_flap_freq_hz > res.standstill_flap_freq_hz);

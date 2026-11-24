@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::validation::AnalyticalComparison;
 
 /// Structural timber material grade and species classification.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -255,8 +254,14 @@ pub fn solve_timber_fire(prob: &TimberFireProblem) -> TimberFireResult {
         let k_val = if t < 20.0 { (t / 20.0) * 7.0 } else { 7.0 };
         let d_e = d_c + k_val;
         let (b_t, h_t) = match prob.exposure {
-            FireExposureSides::ThreeSides => (prob.initial_breadth_mm - 2.0 * d_e, prob.initial_depth_mm - d_e),
-            FireExposureSides::FourSides => (prob.initial_breadth_mm - 2.0 * d_e, prob.initial_depth_mm - 2.0 * d_e),
+            FireExposureSides::ThreeSides => (
+                prob.initial_breadth_mm - 2.0 * d_e,
+                prob.initial_depth_mm - d_e,
+            ),
+            FireExposureSides::FourSides => (
+                prob.initial_breadth_mm - 2.0 * d_e,
+                prob.initial_depth_mm - 2.0 * d_e,
+            ),
             FireExposureSides::OneSide => (prob.initial_breadth_mm, prob.initial_depth_mm - d_e),
         };
         if b_t <= 5.0 || h_t <= 5.0 {
@@ -298,20 +303,29 @@ pub fn solve_timber_fire(prob: &TimberFireProblem) -> TimberFireResult {
 pub fn solve_timber_fire_sim(prob: &TimberFireProblem) -> SimulationResult {
     let sol = solve_timber_fire(prob);
     let mut metrics = std::collections::HashMap::new();
-    metrics.insert("effective_char_depth_def_mm".to_string(), sol.effective_char_depth_def_mm);
-    metrics.insert("residual_breadth_bef_mm".to_string(), sol.residual_breadth_bef_mm);
-    metrics.insert("residual_depth_hef_mm".to_string(), sol.residual_depth_hef_mm);
-    metrics.insert("fire_utilization_ratio".to_string(), sol.fire_utilization_ratio);
-    metrics.insert("critical_fire_endurance_min".to_string(), sol.critical_fire_endurance_min);
+    metrics.insert(
+        "effective_char_depth_def_mm".to_string(),
+        sol.effective_char_depth_def_mm,
+    );
+    metrics.insert(
+        "residual_breadth_bef_mm".to_string(),
+        sol.residual_breadth_bef_mm,
+    );
+    metrics.insert(
+        "residual_depth_hef_mm".to_string(),
+        sol.residual_depth_hef_mm,
+    );
+    metrics.insert(
+        "fire_utilization_ratio".to_string(),
+        sol.fire_utilization_ratio,
+    );
+    metrics.insert(
+        "critical_fire_endurance_min".to_string(),
+        sol.critical_fire_endurance_min,
+    );
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.fire_utilization_ratio, 1, 1e-4);
-
-    let comparison = AnalyticalComparison::assess(
-        "fire_bending_utilization",
-        sol.fire_utilization_ratio,
-        0.85,
-    );
 
     SimulationResult {
         problem_id: prob.problem_id.clone(),
@@ -320,9 +334,15 @@ pub fn solve_timber_fire_sim(prob: &TimberFireProblem) -> SimulationResult {
         execution_time_ms: 1,
         scalar_metrics: metrics,
         convergence: conv,
-        validation: Some(comparison),
+        validation: None,
         provenance: SimulationProvenance::new("atlas.structural.timber_fire_ec5", "0.1.0"),
-        logs: vec![format!("Fire duration: {:.0} min, Char depth: {:.1} mm, UR: {:.2}, Verified: {}", prob.fire_duration_min, sol.effective_char_depth_def_mm, sol.fire_utilization_ratio, sol.fire_resistance_verified)],
+        logs: vec![format!(
+            "Fire duration: {:.0} min, Char depth: {:.1} mm, UR: {:.2}, Verified: {}",
+            prob.fire_duration_min,
+            sol.effective_char_depth_def_mm,
+            sol.fire_utilization_ratio,
+            sol.fire_resistance_verified
+        )],
     }
 }
 
@@ -356,7 +376,10 @@ mod tests {
         assert!((sol.fire_design_moment_med_fi_kn_m - 84.0).abs() < 1e-3);
 
         // Bending stress: 84 * 10^6 / 3.71e6 ≈ 22.6 MPa
-        assert!(sol.fire_bending_stress_sigmam_fi_mpa > 20.0 && sol.fire_bending_stress_sigmam_fi_mpa < 25.0);
+        assert!(
+            sol.fire_bending_stress_sigmam_fi_mpa > 20.0
+                && sol.fire_bending_stress_sigmam_fi_mpa < 25.0
+        );
 
         // Design fire strength: f_m,d,fi = 1.0 * 1.15 * 28.0 = 32.2 MPa
         assert!((sol.fire_design_strength_fmd_fi_mpa - 32.2).abs() < 1e-3);

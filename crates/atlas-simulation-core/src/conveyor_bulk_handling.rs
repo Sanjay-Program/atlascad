@@ -77,20 +77,20 @@ impl Default for ConveyorProblem {
             problem_id: "overland_crushed_ore_conveyor".to_string(),
             carcass_type: BeltCarcassType::SteelCordST,
             troughing_angle: TroughingAngleClass::Trough35Deg,
-            belt_width_mm: 1200.0,              // 1200 mm (B = 1.2 m)
-            conveyor_length_m: 450.0,           // 450 m center-to-center run
-            elevation_lift_m: 28.0,             // 28 m elevation gain (incline)
-            belt_speed_m_s: 3.15,               // 3.15 m/s belt velocity
-            material_bulk_density_kg_m3: 1650.0,// 1650 kg/m³ crushed copper-gold ore
-            surcharge_angle_deg: 20.0,          // 20 deg dynamic surcharge
-            belt_unit_weight_kg_m: 24.5,        // 24.5 kg/m heavy rubber belt
-            idlers_carrying_weight_kg_m: 28.0,  // 28 kg/m 3-roll trough idlers @ 1.2m spacing
-            idlers_return_weight_kg_m: 8.5,     // 8.5 kg/m flat return rolls @ 3.0m spacing
-            friction_factor_f: 0.022,           // Standard DIN 22101 coefficient
-            drive_wrap_angle_deg: 210.0,        // 210° snubbed drive pulley
-            drive_friction_mu: 0.35,            // Ceramic/rubber diamond lagging
+            belt_width_mm: 1200.0,                     // 1200 mm (B = 1.2 m)
+            conveyor_length_m: 450.0,                  // 450 m center-to-center run
+            elevation_lift_m: 28.0,                    // 28 m elevation gain (incline)
+            belt_speed_m_s: 3.15,                      // 3.15 m/s belt velocity
+            material_bulk_density_kg_m3: 1650.0,       // 1650 kg/m³ crushed copper-gold ore
+            surcharge_angle_deg: 20.0,                 // 20 deg dynamic surcharge
+            belt_unit_weight_kg_m: 24.5,               // 24.5 kg/m heavy rubber belt
+            idlers_carrying_weight_kg_m: 28.0, // 28 kg/m 3-roll trough idlers @ 1.2m spacing
+            idlers_return_weight_kg_m: 8.5,    // 8.5 kg/m flat return rolls @ 3.0m spacing
+            friction_factor_f: 0.022,          // Standard DIN 22101 coefficient
+            drive_wrap_angle_deg: 210.0,       // 210° snubbed drive pulley
+            drive_friction_mu: 0.35,           // Ceramic/rubber diamond lagging
             belt_rated_breaking_strength_kn_m: 1250.0, // ST1250 belt (1250 kN/m)
-            drive_mechanical_efficiency: 0.92,  // 92% gearbox + coupling efficiency
+            drive_mechanical_efficiency: 0.92, // 92% gearbox + coupling efficiency
         }
     }
 }
@@ -279,10 +279,18 @@ mod tests {
 
         assert!(res.material_cross_section_m2 > 0.08 && res.material_cross_section_m2 < 0.18);
         assert!(res.mass_throughput_t_h > 1500.0 && res.mass_throughput_t_h < 3500.0);
-        assert!(res.peripheral_drive_force_fu_kn > 60.0 && res.peripheral_drive_force_fu_kn < 160.0);
+        assert!(
+            res.peripheral_drive_force_fu_kn > 60.0 && res.peripheral_drive_force_fu_kn < 160.0
+        );
         assert!(res.motor_brake_power_kw > 200.0 && res.motor_brake_power_kw < 550.0);
-        assert!(res.drive_slip_safety_factor >= 1.05, "Capstan drive slip safety factor >= 1.05");
-        assert!(res.belt_tensile_safety_factor >= 6.5, "Steel cord carcass tensile safety factor >= 6.5");
+        assert!(
+            res.drive_slip_safety_factor >= 1.05,
+            "Capstan drive slip safety factor >= 1.05"
+        );
+        assert!(
+            res.belt_tensile_safety_factor >= 6.5,
+            "Steel cord carcass tensile safety factor >= 6.5"
+        );
         assert!(res.is_drive_slip_safe);
         assert!(res.is_belt_strength_sufficient);
         assert!(res.is_conveyor_design_viable);

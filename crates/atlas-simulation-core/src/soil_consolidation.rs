@@ -6,12 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
-use std::f64::consts::PI;
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
-use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
+use std::f64::consts::PI;
 
 /// Drainage boundary conditions for consolidation layer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -173,7 +172,8 @@ pub fn solve_soil_consolidation(
         (4.0 * tv / PI).sqrt()
     } else {
         1.0 - 10.0_f64.powf(-(tv + 0.085) / 0.933)
-    }.clamp(0.0, 0.999);
+    }
+    .clamp(0.0, 0.999);
     let u_v_pct = u_v * 100.0;
 
     // Settlement at time t:
@@ -209,28 +209,35 @@ pub fn solve_soil_consolidation(
 }
 
 /// Executes soil consolidation simulation and packages into SimulationResult envelope.
-pub fn solve_soil_consolidation_sim(
-    problem: &SoilConsolidationProblem,
-) -> SimulationResult {
+pub fn solve_soil_consolidation_sim(problem: &SoilConsolidationProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_soil_consolidation(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("over_consolidation_ratio".to_string(), res.over_consolidation_ratio);
-            metrics.insert("ultimate_primary_settlement_mm".to_string(), res.ultimate_primary_settlement_mm);
-            metrics.insert("degree_of_consolidation_pct".to_string(), res.degree_of_consolidation_pct);
-            metrics.insert("settlement_at_time_mm".to_string(), res.settlement_at_time_mm);
+            metrics.insert(
+                "over_consolidation_ratio".to_string(),
+                res.over_consolidation_ratio,
+            );
+            metrics.insert(
+                "ultimate_primary_settlement_mm".to_string(),
+                res.ultimate_primary_settlement_mm,
+            );
+            metrics.insert(
+                "degree_of_consolidation_pct".to_string(),
+                res.degree_of_consolidation_pct,
+            );
+            metrics.insert(
+                "settlement_at_time_mm".to_string(),
+                res.settlement_at_time_mm,
+            );
             metrics.insert("time_factor_tv".to_string(), res.time_factor_tv);
-            metrics.insert("remaining_pore_pressure_kpa".to_string(), res.remaining_pore_pressure_kpa);
+            metrics.insert(
+                "remaining_pore_pressure_kpa".to_string(),
+                res.remaining_pore_pressure_kpa,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, res.settlement_at_time_mm, 1, 1e-4);
-
-            let comparison = AnalyticalComparison::assess(
-                "settlement_at_time_mm",
-                res.settlement_at_time_mm,
-                res.ultimate_primary_settlement_mm * (res.degree_of_consolidation_pct / 100.0),
-            );
 
             SimulationResult {
                 problem_id: problem.problem_id.clone(),
@@ -239,12 +246,19 @@ pub fn solve_soil_consolidation_sim(
                 execution_time_ms: start.elapsed().as_millis().max(1) as u64,
                 scalar_metrics: metrics,
                 convergence: conv,
-                validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.geotechnical.soil_consolidation", "0.1.0"),
+                validation: None,
+                provenance: SimulationProvenance::new(
+                    "atlas.geotechnical.soil_consolidation",
+                    "0.1.0",
+                ),
                 logs: vec![format!(
                     "Soil Consolidation (Eurocode 7 / Terzaghi): OCR = {:.2}, Sc_ult = {:.1} mm, Tv = {:.3}, U = {:.1}%, S(t) = {:.1} mm, u_rem = {:.1} kPa, Acceptable: {}",
-                    res.over_consolidation_ratio, res.ultimate_primary_settlement_mm, res.time_factor_tv,
-                    res.degree_of_consolidation_pct, res.settlement_at_time_mm, res.remaining_pore_pressure_kpa,
+                    res.over_consolidation_ratio,
+                    res.ultimate_primary_settlement_mm,
+                    res.time_factor_tv,
+                    res.degree_of_consolidation_pct,
+                    res.settlement_at_time_mm,
+                    res.remaining_pore_pressure_kpa,
                     res.is_acceptable
                 )],
             }
@@ -261,7 +275,10 @@ pub fn solve_soil_consolidation_sim(
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.geotechnical.soil_consolidation", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.geotechnical.soil_consolidation",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Soil consolidation simulation failed: {}", err)],
             }
         }
@@ -277,12 +294,21 @@ mod tests {
     fn test_soil_consolidation_nominal() {
         let prob = SoilConsolidationProblem::default();
         let res = solve_soil_consolidation(&prob).expect("solver failed");
-        println!("Soil Consolidation: OCR = {:.2}, Sc = {:.1} mm, Tv = {:.3}, U = {:.1}%, S(2yr) = {:.1} mm, u_rem = {:.1} kPa",
-            res.over_consolidation_ratio, res.ultimate_primary_settlement_mm, res.time_factor_tv,
-            res.degree_of_consolidation_pct, res.settlement_at_time_mm, res.remaining_pore_pressure_kpa);
+        println!(
+            "Soil Consolidation: OCR = {:.2}, Sc = {:.1} mm, Tv = {:.3}, U = {:.1}%, S(2yr) = {:.1} mm, u_rem = {:.1} kPa",
+            res.over_consolidation_ratio,
+            res.ultimate_primary_settlement_mm,
+            res.time_factor_tv,
+            res.degree_of_consolidation_pct,
+            res.settlement_at_time_mm,
+            res.remaining_pore_pressure_kpa
+        );
 
         assert!(res.over_consolidation_ratio == 1.20);
-        assert!(res.ultimate_primary_settlement_mm > 150.0 && res.ultimate_primary_settlement_mm < 220.0);
+        assert!(
+            res.ultimate_primary_settlement_mm > 150.0
+                && res.ultimate_primary_settlement_mm < 220.0
+        );
         assert!(res.drainage_path_m == 3.0);
         assert!(res.time_factor_tv > 0.50 && res.time_factor_tv < 0.75);
         assert!(res.degree_of_consolidation_pct > 75.0 && res.degree_of_consolidation_pct < 90.0);

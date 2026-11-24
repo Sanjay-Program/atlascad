@@ -65,16 +65,19 @@ pub fn evaluate_plasma_sheath(
     let electron_density_m3 = base_ne.clamp(1.0e16, 5.0e20);
 
     // 3. Angular plasma frequency: omega_p = sqrt(n_e * e^2 / (eps0 * m_e))
-    let omega_p = ((electron_density_m3 * elem_charge * elem_charge) / (eps0 * electron_mass)).sqrt();
+    let omega_p =
+        ((electron_density_m3 * elem_charge * elem_charge) / (eps0 * electron_mass)).sqrt();
     let fp_ghz = (omega_p / (2.0 * std::f64::consts::PI)) / 1.0e9;
 
     // 4. Electron-neutral collision frequency: nu_en ~ n_neutral * sigma * v_th
-    let v_thermal_e = ((8.0 * 1.380_649e-23 * shock_temp_k) / (std::f64::consts::PI * electron_mass)).sqrt();
+    let v_thermal_e =
+        ((8.0 * 1.380_649e-23 * shock_temp_k) / (std::f64::consts::PI * electron_mass)).sqrt();
     let collision_cross_section = 1.5e-19; // m^2
     let nu_en = n_neutral * collision_cross_section * v_thermal_e;
 
     // 5. Boundary layer sheath thickness: delta ~ 0.38 * x / Re_x^0.2, scaled with nose radius
-    let sheath_thickness_m = (0.05 * (nose_radius_m / 0.05).sqrt() * (altitude_m / 30000.0).powf(0.3)).clamp(0.02, 0.25);
+    let sheath_thickness_m =
+        (0.05 * (nose_radius_m / 0.05).sqrt() * (altitude_m / 30000.0).powf(0.3)).clamp(0.02, 0.25);
 
     // Helper: compute electromagnetic wave attenuation through plasma sheath in dB
     // Attenuation constant: alpha = (omega / c) * Im(sqrt(1 - omega_p^2 / (omega * (omega - i * nu))))
@@ -94,9 +97,9 @@ pub fn evaluate_plasma_sheath(
     };
 
     let atten_l = calc_attenuation_db(1.575); // GPS L1
-    let atten_x = calc_attenuation_db(10.0);  // X-Band radar / downlink
+    let atten_x = calc_attenuation_db(10.0); // X-Band radar / downlink
     let atten_ka = calc_attenuation_db(35.0); // Ka-Band high-bandwidth satellite
-    let atten_opt = 0.005;                    // 1550 nm optical laser communication (193.4 THz)
+    let atten_opt = 0.005; // 1550 nm optical laser communication (193.4 THz)
 
     let is_rf_blackout = atten_x > 20.0 || atten_l > 20.0;
 
@@ -162,12 +165,17 @@ pub fn evaluate_mhd_energy_bypass(
 
     // Faraday generator load factor K = 0.75 for maximum power transfer
     let load_factor = 0.75;
-    let power_density_w_m3 = sigma * flow_velocity_m_s.powi(2) * b_field_tesla.powi(2) * load_factor * (1.0 - load_factor);
+    let power_density_w_m3 = sigma
+        * flow_velocity_m_s.powi(2)
+        * b_field_tesla.powi(2)
+        * load_factor
+        * (1.0 - load_factor);
     let extracted_power_w = power_density_w_m3 * channel_volume_m3.clamp(0.05, 2.0);
     let extracted_power_mw = extracted_power_w / 1.0e6;
 
     // Lorentz force: F_L = sigma * u * B^2 * (1 - K) * Volume
-    let lorentz_n = sigma * flow_velocity_m_s * b_field_tesla.powi(2) * (1.0 - load_factor) * channel_volume_m3;
+    let lorentz_n =
+        sigma * flow_velocity_m_s * b_field_tesla.powi(2) * (1.0 - load_factor) * channel_volume_m3;
     let lorentz_kn = lorentz_n / 1000.0;
 
     let avionics_kw = 104.2; // Direct baseline avionics load
@@ -224,8 +232,8 @@ pub fn evaluate_superconducting_hts_magnet(
     // J_c(T, B) ~ J_c0 * (1 - T / 92)^1.5 / (1 + B / 3.0)^0.7
     let temp_ratio = (coil_temperature_k / 92.0).clamp(0.0, 1.0);
     let jc0_a_mm2 = 1200.0; // Baseline at 4.2 K self-field
-    let critical_current_density_a_mm2 = (jc0_a_mm2 * (1.0 - temp_ratio).powf(1.5))
-        / (1.0 + target_b_field_tesla / 3.0).powf(0.7);
+    let critical_current_density_a_mm2 =
+        (jc0_a_mm2 * (1.0 - temp_ratio).powf(1.5)) / (1.0 + target_b_field_tesla / 3.0).powf(0.7);
 
     // Operating current design: 65% of critical current for thermal runaway margin
     let operating_current_a = (critical_current_density_a_mm2 * 4.0 * 0.12 * 0.65).max(100.0); // 4mm x 0.12mm tape

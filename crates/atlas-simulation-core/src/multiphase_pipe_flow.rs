@@ -73,11 +73,11 @@ impl Default for MultiphasePipeFlowProblem {
             problem_id: "subsea_tieback_10km".to_string(),
             pipe_length_m: 8500.0,
             pipe_inner_diameter_mm: 254.0, // 10-inch standard pipe
-            elevation_change_m: 120.0, // uphill flow
-            liquid_mass_flow_kg_s: 35.0, // ~ 19,000 bpd oil
-            gas_mass_flow_kg_s: 4.50, // ~ 18 MMSCFD gas
-            liquid_density_kg_m3: 840.0, // 36° API crude oil
-            gas_density_kg_m3: 42.0, // compressed gas @ 60 bar
+            elevation_change_m: 120.0,     // uphill flow
+            liquid_mass_flow_kg_s: 35.0,   // ~ 19,000 bpd oil
+            gas_mass_flow_kg_s: 4.50,      // ~ 18 MMSCFD gas
+            liquid_density_kg_m3: 840.0,   // 36° API crude oil
+            gas_density_kg_m3: 42.0,       // compressed gas @ 60 bar
             liquid_viscosity_mpa_s: 2.80,
             gas_viscosity_mpa_s: 0.016,
             pipe_roughness_mm: 0.045,
@@ -140,7 +140,9 @@ pub fn solve_multiphase_pipe_flow(
         return Err("Pipe diameter must be greater than 5 mm".to_string());
     }
     if problem.liquid_mass_flow_kg_s <= 0.0 || problem.gas_mass_flow_kg_s <= 0.0 {
-        return Err("Both liquid and gas mass flow rates must be positive for two-phase flow".to_string());
+        return Err(
+            "Both liquid and gas mass flow rates must be positive for two-phase flow".to_string(),
+        );
     }
     if problem.liquid_density_kg_m3 <= 0.0 || problem.gas_density_kg_m3 <= 0.0 {
         return Err("Fluid densities must be positive".to_string());
@@ -176,7 +178,7 @@ pub fn solve_multiphase_pipe_flow(
     let re_l = (problem.liquid_density_kg_m3 * v_sl * d_m) / mu_l_pa_s;
     // Swamee-Jain single-phase friction factor:
     let rel_rough = (problem.pipe_roughness_mm / 1000.0) / d_m;
-    let f_l = 0.25 / ( (rel_rough / 3.7 + 5.74 / re_l.powf(0.9)).log10() ).powi(2);
+    let f_l = 0.25 / ((rel_rough / 3.7 + 5.74 / re_l.powf(0.9)).log10()).powi(2);
     let dp_dl_liquid_alone_pa_m = (f_l * problem.liquid_density_kg_m3 * v_sl * v_sl) / (2.0 * d_m);
 
     // 5. Two-phase frictional pressure gradient:
@@ -188,7 +190,8 @@ pub fn solve_multiphase_pipe_flow(
     let h_l_clamped = h_l.clamp(0.01, 0.99);
 
     // 7. Mixture density:
-    let rho_m = h_l_clamped * problem.liquid_density_kg_m3 + (1.0 - h_l_clamped) * problem.gas_density_kg_m3;
+    let rho_m = h_l_clamped * problem.liquid_density_kg_m3
+        + (1.0 - h_l_clamped) * problem.gas_density_kg_m3;
 
     // 8. Hydrostatic head loss:
     let g = 9.80665;
@@ -249,14 +252,22 @@ mod tests {
         let prob = MultiphasePipeFlowProblem::default();
         let res = solve_multiphase_pipe_flow(&prob)?;
 
-        assert!(res.liquid_superficial_velocity_m_s > 0.60 && res.liquid_superficial_velocity_m_s < 1.20);
+        assert!(
+            res.liquid_superficial_velocity_m_s > 0.60
+                && res.liquid_superficial_velocity_m_s < 1.20
+        );
         assert!(res.gas_superficial_velocity_m_s > 1.50 && res.gas_superficial_velocity_m_s < 3.00);
         assert!(res.mixture_velocity_m_s > 2.0 && res.mixture_velocity_m_s < 4.0);
         assert!(res.in_situ_liquid_holdup_hl > 0.40 && res.in_situ_liquid_holdup_hl < 0.75);
         assert!(res.mixture_density_kg_m3 > 300.0 && res.mixture_density_kg_m3 < 600.0);
-        assert!(res.chisholm_two_phase_multiplier > 5.0 && res.chisholm_two_phase_multiplier < 30.0);
+        assert!(
+            res.chisholm_two_phase_multiplier > 5.0 && res.chisholm_two_phase_multiplier < 30.0
+        );
         assert!(res.total_pressure_drop_bar > 5.0 && res.total_pressure_drop_bar < 25.0);
-        assert!(res.api_erosional_velocity_limit_m_s > 4.5 && res.api_erosional_velocity_limit_m_s < 8.0);
+        assert!(
+            res.api_erosional_velocity_limit_m_s > 4.5
+                && res.api_erosional_velocity_limit_m_s < 8.0
+        );
         assert!(res.is_erosion_velocity_acceptable);
         assert!(res.is_pressure_drop_acceptable);
         Ok(())

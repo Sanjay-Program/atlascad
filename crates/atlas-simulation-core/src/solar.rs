@@ -49,6 +49,34 @@ impl Default for SolarPvProblem {
     }
 }
 
+/// Liu-Jordan clear-sky transposition factor for a south-facing tilted surface.
+fn compute_transposition_factor(
+    latitude_rad: f64,
+    tilt_rad: f64,
+    declination_rad: f64,
+    sunset_hour_angle_rad: f64,
+    diffuse_fraction: f64,
+    ground_albedo: f64,
+) -> f64 {
+    let phi_minus_beta = latitude_rad - tilt_rad;
+    let cos_omega_tilt = (-phi_minus_beta.tan() * declination_rad.tan()).clamp(-1.0, 1.0);
+    let omega_tilt = cos_omega_tilt.acos().min(sunset_hour_angle_rad);
+
+    let num = phi_minus_beta.cos() * declination_rad.cos() * omega_tilt.sin()
+        + omega_tilt * phi_minus_beta.sin() * declination_rad.sin();
+    let den = latitude_rad.cos() * declination_rad.cos() * sunset_hour_angle_rad.sin()
+        + sunset_hour_angle_rad * latitude_rad.sin() * declination_rad.sin();
+    let r_b = if den.abs() > 1.0e-4 {
+        (num / den).max(0.5)
+    } else {
+        1.0
+    };
+
+    let sky_view = 0.5 * (1.0 + tilt_rad.cos());
+    let ground_view = 0.5 * (1.0 - tilt_rad.cos());
+    (1.0 - diffuse_fraction) * r_b + diffuse_fraction * sky_view + ground_albedo * ground_view
+}
+
 /// Solves solar transposition and annual photovoltaic energy generation.
 pub fn solve_solar_pv(prob: &SolarPvProblem) -> Result<SimulationResult, String> {
     if prob.array_area_m2 <= 0.0 || prob.module_efficiency <= 0.0 {
@@ -69,34 +97,17 @@ pub fn solve_solar_pv(prob: &SolarPvProblem) -> Result<SimulationResult, String>
     let cos_omega_s = (-phi_rad.tan() * delta_rad.tan()).clamp(-1.0, 1.0);
     let omega_s_rad = cos_omega_s.acos();
 
-    // Sunset hour angle on tilted south-facing surface: cos(omega_s') = -tan(phi - beta) * tan(delta)
-    let phi_minus_beta = phi_rad - beta_rad;
-    let cos_omega_s_tilt = (-phi_minus_beta.tan() * delta_rad.tan()).clamp(-1.0, 1.0);
-    let omega_s_tilt_rad = cos_omega_s_tilt.acos();
-    let omega_s_eff = omega_s_tilt_rad.min(omega_s_rad);
-
-    // Geometric beam transposition factor Rb (Liu and Jordan)
-    let num = (phi_minus_beta).cos() * delta_rad.cos() * omega_s_eff.sin()
-        + omega_s_eff * (phi_minus_beta).sin() * delta_rad.sin();
-    let den = phi_rad.cos() * delta_rad.cos() * omega_s_rad.sin()
-        + omega_s_rad * phi_rad.sin() * delta_rad.sin();
-    let r_b = if den.abs() > 1e-4 {
-        (num / den).max(0.5)
-    } else {
-        1.0
-    };
-
-    // Tilted annual irradiance multiplier (combining beam Rb, sky view diffuse, ground albedo 0.20)
-    // H_T / H_GHI factor approx:
+    // Tilted annual irradiance multiplier (beam Rb + sky-view diffuse + ground albedo 0.20):
     let diffuse_fraction = 0.40; // typical diffuse fraction
-    let beam_fraction = 1.0 - diffuse_fraction;
     let ground_albedo = 0.20;
-    let sky_view_factor = 0.5 * (1.0 + beta_rad.cos());
-    let ground_view_factor = 0.5 * (1.0 - beta_rad.cos());
-
-    let transposition_factor = beam_fraction * r_b
-        + diffuse_fraction * sky_view_factor
-        + ground_albedo * ground_view_factor;
+    let transposition_factor = compute_transposition_factor(
+        phi_rad,
+        beta_rad,
+        delta_rad,
+        omega_s_rad,
+        diffuse_fraction,
+        ground_albedo,
+    );
 
     let tilted_annual_irradiation_kwh_m2 = prob.annual_ghi_kwh_m2 * transposition_factor;
 
@@ -119,12 +130,19 @@ pub fn solve_solar_pv(prob: &SolarPvProblem) -> Result<SimulationResult, String>
     // Environmental impact: Grid carbon offset (0.475 kg CO2 / kWh average)
     let annual_co2_offset_tonnes = (annual_energy_yield_kwh * 0.475) / 1000.0;
 
-    // Analytical validation: At zero tilt (beta = 0), transposition factor must equal 1.0
-    let analytical_zero_tilt_factor = 1.0;
+    // Analytical validation: at zero tilt the transposition factor must be exactly 1.0.
+    let zero_tilt_factor = compute_transposition_factor(
+        phi_rad,
+        0.0,
+        delta_rad,
+        omega_s_rad,
+        diffuse_fraction,
+        ground_albedo,
+    );
     let val = AnalyticalComparison::assess(
         "Zero Tilt Transposition Factor Match",
-        beam_fraction * 1.0 + diffuse_fraction * 1.0 + ground_albedo * 0.0,
-        analytical_zero_tilt_factor,
+        zero_tilt_factor,
+        1.0,
     );
 
     let mut metrics = HashMap::new();

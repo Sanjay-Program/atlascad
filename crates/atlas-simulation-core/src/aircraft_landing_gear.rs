@@ -65,18 +65,18 @@ impl Default for LandingGearProblem {
         Self {
             problem_id: "commercial_twinjet_main_gear".to_string(),
             metering_type: MeteringPinType::TaperedContourPin,
-            gear_landed_mass_kg: 18500.0,            // 18.5 tonnes per main gear leg (37t touchdown mass)
-            vertical_sink_velocity_m_s: 3.05,        // 3.05 m/s (10.0 ft/s FAR 25.723 limit drop)
-            lift_to_weight_ratio: 0.85,              // 85% wing lift during flare/touchdown
-            available_stroke_mm: 420.0,              // 420 mm maximum available stroke
-            piston_diameter_mm: 180.0,               // 180 mm piston diameter (Ah = 0.0254 m²)
-            gas_precharge_pressure_mpa: 4.20,        // 4.20 MPa (42 bar initial N2 precharge)
-            initial_gas_volume_liters: 14.5,         // 14.5 liters initial nitrogen volume
-            polytropic_exponent: 1.35,               // Dynamic adiabatic compression
-            orifice_diameter_mm: 34.0,               // 34 mm discharge orifice with metering pin
-            orifice_discharge_coeff: 0.68,           // Calibrated discharge coefficient
-            fluid_density_kg_m3: 885.0,              // MIL-PRF-5606 hydraulic oil
-            tire_stiffness_kn_m: 2400.0,             // 2400 kN/m twin tire dual assembly
+            gear_landed_mass_kg: 18500.0, // 18.5 tonnes per main gear leg (37t touchdown mass)
+            vertical_sink_velocity_m_s: 3.05, // 3.05 m/s (10.0 ft/s FAR 25.723 limit drop)
+            lift_to_weight_ratio: 0.85,   // 85% wing lift during flare/touchdown
+            available_stroke_mm: 420.0,   // 420 mm maximum available stroke
+            piston_diameter_mm: 180.0,    // 180 mm piston diameter (Ah = 0.0254 m²)
+            gas_precharge_pressure_mpa: 4.20, // 4.20 MPa (42 bar initial N2 precharge)
+            initial_gas_volume_liters: 14.5, // 14.5 liters initial nitrogen volume
+            polytropic_exponent: 1.35,    // Dynamic adiabatic compression
+            orifice_diameter_mm: 34.0,    // 34 mm discharge orifice with metering pin
+            orifice_discharge_coeff: 0.68, // Calibrated discharge coefficient
+            fluid_density_kg_m3: 885.0,   // MIL-PRF-5606 hydraulic oil
+            tire_stiffness_kn_m: 2400.0,  // 2400 kN/m twin tire dual assembly
             max_allowable_tire_deflection_mm: 180.0, // 180 mm bottoming limit
         }
     }
@@ -120,7 +120,9 @@ pub struct LandingGearResult {
 }
 
 /// Solves aircraft oleo-pneumatic landing gear drop dynamics according to FAR/CS 25.723.
-pub fn solve_aircraft_landing_gear(problem: &LandingGearProblem) -> Result<LandingGearResult, String> {
+pub fn solve_aircraft_landing_gear(
+    problem: &LandingGearProblem,
+) -> Result<LandingGearResult, String> {
     if problem.gear_landed_mass_kg <= 100.0 {
         return Err("Gear landed mass must be greater than 100 kg".to_string());
     }
@@ -258,7 +260,8 @@ pub fn solve_aircraft_landing_gear(problem: &LandingGearProblem) -> Result<Landi
     // Certifications & Safety criteria:
     let is_stroke_margin_sufficient = max_stroke_mm <= (0.92 * problem.available_stroke_mm);
     let is_load_factor_compliant = n_z <= 2.50; // FAR 25.473 limit <= 2.50 g
-    let is_tire_deflection_acceptable = max_tire_deflection_mm <= problem.max_allowable_tire_deflection_mm;
+    let is_tire_deflection_acceptable =
+        max_tire_deflection_mm <= problem.max_allowable_tire_deflection_mm;
     let is_pressure_safe = peak_internal_pressure_mpa <= 45.0; // 45 MPa proof ceiling
     let is_landing_gear_viable = is_stroke_margin_sufficient
         && is_load_factor_compliant

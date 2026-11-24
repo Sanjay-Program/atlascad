@@ -50,13 +50,13 @@ impl Default for TecCoolerProblem {
         Self {
             problem_id: "telecom_laser_diode_tec_cooler".to_string(),
             material: TecMaterialType::BismuthTelluride,
-            couple_count_n: 127,            // Standard 127-couple industrial Peltier module
-            pellet_area_mm2: 2.25,          // 1.5 mm x 1.5 mm pellets
-            pellet_length_mm: 1.80,         // 1.8 mm pellet thickness
-            cold_junction_temp_c: 25.0,     // 25 °C laser diode junction temperature
-            hot_junction_temp_c: 50.0,      // 50 °C heat sink temperature (Delta T = 25 K)
-            operating_current_a: 4.5,       // 4.5 A operating current
-            heat_load_qc_target_w: 35.0,    // 35 W heat dissipation
+            couple_count_n: 127, // Standard 127-couple industrial Peltier module
+            pellet_area_mm2: 2.25, // 1.5 mm x 1.5 mm pellets
+            pellet_length_mm: 1.80, // 1.8 mm pellet thickness
+            cold_junction_temp_c: 25.0, // 25 °C laser diode junction temperature
+            hot_junction_temp_c: 50.0, // 50 °C heat sink temperature (Delta T = 25 K)
+            operating_current_a: 4.5, // 4.5 A operating current
+            heat_load_qc_target_w: 35.0, // 35 W heat dissipation
         }
     }
 }

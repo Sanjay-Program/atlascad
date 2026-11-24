@@ -186,16 +186,44 @@ pub fn solve_iec60909_short_circuit(
     };
 
     let notes = vec![
-        format!("Feeder: '{}' (Un = {:.0} V, Transformer = {:.0} kVA uk = {:.1}%)", prob.feeder_name, un, srt_kva, uk),
-        format!("Cables: {:.1} m of {} mm² {:?} at {:.0}°C", l, a, prob.conductor_material, temp_c),
-        format!("Impedance Breakdown: Upstream = {:.2} mΩ, Transformer = {:.2} mΩ, Cable = {:.2} mΩ -> Total Zk = {:.2} mΩ (R/X = {:.3})",
-            (zq_ohm * 1000.0), (zt_ohm * 1000.0), ((rl_ohm*rl_ohm + xl_ohm*xl_ohm).sqrt() * 1000.0), (zk_ohm * 1000.0), rx_ratio
+        format!(
+            "Feeder: '{}' (Un = {:.0} V, Transformer = {:.0} kVA uk = {:.1}%)",
+            prob.feeder_name, un, srt_kva, uk
         ),
-        format!("IEC 60909 Fault Current: Initial Symmetrical Ik'' = {:.2} kA, Breaking Capacity Sk'' = {:.2} MVA", ik_ka, sk_mva),
-        format!("Dynamic Peak Current: ip = {:.2} kA (κ = {:.3})", ip_ka, kappa),
-        format!("Operating Voltage Drop: {}",
+        format!(
+            "Cables: {:.1} m of {} mm² {:?} at {:.0}°C",
+            l, a, prob.conductor_material, temp_c
+        ),
+        format!(
+            "Impedance Breakdown: Upstream = {:.2} mΩ, Transformer = {:.2} mΩ, Cable = {:.2} mΩ -> Total Zk = {:.2} mΩ (R/X = {:.3})",
+            (zq_ohm * 1000.0),
+            (zt_ohm * 1000.0),
+            ((rl_ohm * rl_ohm + xl_ohm * xl_ohm).sqrt() * 1000.0),
+            (zk_ohm * 1000.0),
+            rx_ratio
+        ),
+        format!(
+            "IEC 60909 Fault Current: Initial Symmetrical Ik'' = {:.2} kA, Breaking Capacity Sk'' = {:.2} MVA",
+            ik_ka, sk_mva
+        ),
+        format!(
+            "Dynamic Peak Current: ip = {:.2} kA (κ = {:.3})",
+            ip_ka, kappa
+        ),
+        format!(
+            "Operating Voltage Drop: {}",
             if let Some(pct) = v_drop_pct {
-                format!("{:.2} V ({:.2}% vs Max {:.1}%) -> [{}]", v_drop_v.unwrap_or(0.0), pct, max_allowed_vd_pct, if is_vd_ok { "COMPLIANT" } else { "EXCEEDS LIMIT" })
+                format!(
+                    "{:.2} V ({:.2}% vs Max {:.1}%) -> [{}]",
+                    v_drop_v.unwrap_or(0.0),
+                    pct,
+                    max_allowed_vd_pct,
+                    if is_vd_ok {
+                        "COMPLIANT"
+                    } else {
+                        "EXCEEDS LIMIT"
+                    }
+                )
             } else {
                 "Load current not specified".to_string()
             }
@@ -230,15 +258,34 @@ pub fn solve_short_circuit_sim(prob: &ShortCircuitProblem) -> Result<SimulationR
     let sol = solve_iec60909_short_circuit(prob)?;
 
     let mut metrics = HashMap::new();
-    metrics.insert("initial_symmetrical_current_ka".to_string(), sol.initial_symmetrical_short_circuit_current_ka);
-    metrics.insert("breaking_capacity_mva".to_string(), sol.short_circuit_breaking_capacity_mva);
-    metrics.insert("peak_current_ka".to_string(), sol.peak_short_circuit_current_ka);
-    metrics.insert("total_impedance_milliohm".to_string(), sol.total_fault_impedance_milliohm);
+    metrics.insert(
+        "initial_symmetrical_current_ka".to_string(),
+        sol.initial_symmetrical_short_circuit_current_ka,
+    );
+    metrics.insert(
+        "breaking_capacity_mva".to_string(),
+        sol.short_circuit_breaking_capacity_mva,
+    );
+    metrics.insert(
+        "peak_current_ka".to_string(),
+        sol.peak_short_circuit_current_ka,
+    );
+    metrics.insert(
+        "total_impedance_milliohm".to_string(),
+        sol.total_fault_impedance_milliohm,
+    );
     metrics.insert("dynamic_kappa".to_string(), sol.peak_dynamic_factor_kappa);
     if let Some(vd) = sol.voltage_drop_percent {
         metrics.insert("voltage_drop_percent".to_string(), vd);
     }
-    metrics.insert("is_voltage_drop_compliant".to_string(), if sol.is_voltage_drop_compliant { 1.0 } else { 0.0 });
+    metrics.insert(
+        "is_voltage_drop_compliant".to_string(),
+        if sol.is_voltage_drop_compliant {
+            1.0
+        } else {
+            0.0
+        },
+    );
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.initial_symmetrical_short_circuit_current_ka, 1, 1e-4);
@@ -246,7 +293,11 @@ pub fn solve_short_circuit_sim(prob: &ShortCircuitProblem) -> Result<SimulationR
     let val = AnalyticalComparison::assess(
         "Initial Symmetrical Current Closed-Form (kA)",
         sol.initial_symmetrical_short_circuit_current_ka,
-        (if prob.nominal_voltage_un_v <= 1000.0 { 1.05 } else { 1.10 } * prob.nominal_voltage_un_v)
+        (if prob.nominal_voltage_un_v <= 1000.0 {
+            1.05
+        } else {
+            1.10
+        } * prob.nominal_voltage_un_v)
             / (3.0_f64.sqrt() * (sol.total_fault_impedance_milliohm * 1e-3) * 1000.0),
     );
 
@@ -275,9 +326,14 @@ mod tests {
         // Transformer 1000 kVA, 6% uk at 400V: ZT = 0.06 * 400^2 / 1e6 = 0.0096 Ohm = 9.6 mOhm
         assert!((sol.transformer_impedance_milliohm - 9.6).abs() < 0.1);
         // Symmetrical fault current at 65m feeder terminus is ~ 12.8 kA (and ~ 23.5 kA at transformer busbars)
-        assert!(sol.initial_symmetrical_short_circuit_current_ka > 10.0 && sol.initial_symmetrical_short_circuit_current_ka < 20.0);
+        assert!(
+            sol.initial_symmetrical_short_circuit_current_ka > 10.0
+                && sol.initial_symmetrical_short_circuit_current_ka < 20.0
+        );
         // Peak making current ip = kappa * sqrt(2) * Ik'' > Ik''
-        assert!(sol.peak_short_circuit_current_ka > sol.initial_symmetrical_short_circuit_current_ka);
+        assert!(
+            sol.peak_short_circuit_current_ka > sol.initial_symmetrical_short_circuit_current_ka
+        );
         // Voltage drop for 220A over 65m of 150mm² copper should be well below 3%
         assert!(sol.voltage_drop_percent.unwrap_or(10.0) < 3.0);
         assert!(sol.is_voltage_drop_compliant);

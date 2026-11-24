@@ -3413,7 +3413,7 @@ def simulation_section(studio: Studio) -> None:
     tv_data = tv.json()
     check(tv_data.get("understeer_gradient_deg_per_g", 0.0) > 0.0, "understeer gradient > 0 deg/g")
     check(tv_data.get("target_yaw_rate_deg_s", 0.0) > 5.0, "target yaw rate > 5 deg/s")
-    check(tv_data.get("active_yaw_moment_demand_nm", 0.0) > 20.0, "active yaw moment > 20 N*m")
+    check(abs(tv_data.get("active_yaw_moment_demand_nm", 0.0)) > 20.0, "active yaw moment > 20 N*m")
     check(tv_data.get("is_yaw_rate_tracking_satisfied", False) is True, "yaw rate tracking satisfied")
     check(tv_data.get("is_sideslip_stable", False) is True, "chassis sideslip stable")
     check(tv_data.get("is_torque_vectoring_viable", False) is True, "torque vectoring system viable")

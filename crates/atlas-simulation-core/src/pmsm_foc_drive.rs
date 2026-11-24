@@ -50,14 +50,14 @@ impl Default for PmsmDriveProblem {
         Self {
             problem_id: "ev_traction_ipmsm_motor_drive".to_string(),
             rotor_topology: PmsmRotorTopology::InteriorIPMSM,
-            pole_pairs_p: 4,                    // 8-pole EV traction motor
-            stator_resistance_ohms: 0.025,      // 25 mΩ stator winding
-            d_axis_inductance_mh: 0.45,         // L_d = 0.45 mH
-            q_axis_inductance_mh: 0.95,         // L_q = 0.95 mH (Saliency ratio L_q/L_d = 2.11)
-            permanent_magnet_flux_wb: 0.095,    // 0.095 Wb NdFeB rotor flux
-            rotational_speed_rpm: 4500.0,       // 4500 RPM cruise speed
-            q_axis_current_iq_a: 120.0,         // 120 A q-axis current
-            inverter_dc_bus_voltage_v: 650.0,   // 650 V EV boost converter DC bus (e.g. Toyota THS-II / high-voltage inverter)
+            pole_pairs_p: 4,                  // 8-pole EV traction motor
+            stator_resistance_ohms: 0.025,    // 25 mΩ stator winding
+            d_axis_inductance_mh: 0.45,       // L_d = 0.45 mH
+            q_axis_inductance_mh: 0.95,       // L_q = 0.95 mH (Saliency ratio L_q/L_d = 2.11)
+            permanent_magnet_flux_wb: 0.095,  // 0.095 Wb NdFeB rotor flux
+            rotational_speed_rpm: 4500.0,     // 4500 RPM cruise speed
+            q_axis_current_iq_a: 120.0,       // 120 A q-axis current
+            inverter_dc_bus_voltage_v: 650.0, // 650 V EV boost converter DC bus (e.g. Toyota THS-II / high-voltage inverter)
         }
     }
 }
@@ -247,13 +247,25 @@ mod tests {
         let res = solve_pmsm_foc_drive(&prob)?;
 
         assert!(res.electrical_angular_velocity_rad_s > 1800.0);
-        assert!(res.d_axis_current_id_a < 0.0, "IPMSM MTPA should inject negative d-axis current");
+        assert!(
+            res.d_axis_current_id_a < 0.0,
+            "IPMSM MTPA should inject negative d-axis current"
+        );
         assert!(res.pm_alignment_torque_nm > 60.0);
-        assert!(res.reluctance_torque_nm > 5.0, "Reluctance torque should contribute positively");
+        assert!(
+            res.reluctance_torque_nm > 5.0,
+            "Reluctance torque should contribute positively"
+        );
         assert!(res.total_electromagnetic_torque_nm > res.pm_alignment_torque_nm);
         assert!(res.mechanical_shaft_power_kw > 30.0);
-        assert!(res.motor_efficiency_pct >= 90.0, "EV traction motor efficiency >= 90%");
-        assert!(res.inverter_modulation_index <= 1.0, "Should remain within inverter linear SVPWM range");
+        assert!(
+            res.motor_efficiency_pct >= 90.0,
+            "EV traction motor efficiency >= 90%"
+        );
+        assert!(
+            res.inverter_modulation_index <= 1.0,
+            "Should remain within inverter linear SVPWM range"
+        );
         assert!(res.is_voltage_within_inverter_limits);
         assert!(res.is_efficiency_high);
         assert!(res.is_pmsm_drive_viable);

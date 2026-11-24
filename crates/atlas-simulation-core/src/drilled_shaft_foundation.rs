@@ -108,9 +108,7 @@ pub struct DrilledShaftResult {
 }
 
 /// Solves O'Neill-Reese / FHWA GEC-010 side friction, end bearing, AASHTO LRFD resistance, and elastic settlement.
-pub fn solve_drilled_shaft(
-    problem: &DrilledShaftProblem,
-) -> Result<DrilledShaftResult, String> {
+pub fn solve_drilled_shaft(problem: &DrilledShaftProblem) -> Result<DrilledShaftResult, String> {
     if problem.shaft_diameter_m <= 0.40 || problem.shaft_diameter_m >= 5.0 {
         return Err("Shaft diameter must be between 0.40 and 5.0 meters".to_string());
     }
@@ -159,7 +157,8 @@ pub fn solve_drilled_shaft(
 
             // End bearing in sand: q_p = 57.5 * N_60 <= 4000 kPa
             // Empirical mapping from phi' ~ 32° (N60 ~ 25)
-            let n60_equiv = ((problem.effective_friction_angle_deg - 28.0) * 3.5 + 15.0).clamp(10.0, 50.0);
+            let n60_equiv =
+                ((problem.effective_friction_angle_deg - 28.0) * 3.5 + 15.0).clamp(10.0, 50.0);
             let q_p = (57.5 * n60_equiv * 1.5).min(3800.0);
             let l_eff = l.max(1.0);
             (f_s, q_p, l_eff)
@@ -203,7 +202,8 @@ pub fn solve_drilled_shaft(
     let e_conc_mpa = 4700.0 * problem.concrete_compressive_strength_mpa.sqrt();
     let e_conc_kpa = e_conc_mpa * 1000.0;
     let eta_load_transfer = 0.60; // 60% load transfer along shaft
-    let delta_elastic_shaft_m = (problem.service_load_demand_kn * l) / (a_b_m2 * e_conc_kpa) * eta_load_transfer;
+    let delta_elastic_shaft_m =
+        (problem.service_load_demand_kn * l) / (a_b_m2 * e_conc_kpa) * eta_load_transfer;
 
     // Tip settlement under service load:
     // E_soil ~ 300 * s_u for clay
@@ -211,7 +211,8 @@ pub fn solve_drilled_shaft(
     let nu_soil = 0.40;
     let i_w = 0.85; // circular rigid base influence factor
     let q_base_serv_kn = problem.service_load_demand_kn * (r_p_kn / r_n_kn);
-    let delta_tip_m = ((q_base_serv_kn / a_b_m2) * b * (1.0 - nu_soil * nu_soil) * i_w) / e_soil_kpa;
+    let delta_tip_m =
+        ((q_base_serv_kn / a_b_m2) * b * (1.0 - nu_soil * nu_soil) * i_w) / e_soil_kpa;
 
     let delta_total_mm = (delta_elastic_shaft_m + delta_tip_m) * 1000.0;
 
@@ -265,7 +266,9 @@ mod tests {
         assert!(res.factored_geotechnical_resistance_kn > 2500.0);
         assert!(res.factored_structural_resistance_kn > 15000.0);
         assert!(res.geotechnical_demand_capacity_ratio <= 1.25);
-        assert!(res.elastic_service_settlement_mm > 5.0 && res.elastic_service_settlement_mm < 25.0);
+        assert!(
+            res.elastic_service_settlement_mm > 5.0 && res.elastic_service_settlement_mm < 25.0
+        );
         assert!(res.is_settlement_acceptable);
         Ok(())
     }

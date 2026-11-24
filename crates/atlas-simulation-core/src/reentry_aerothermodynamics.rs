@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::convergence::ConvergenceMonitor;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Stefan-Boltzmann constant sigma in W/(m²·K⁴).
 pub const STEFAN_BOLTZMANN: f64 = 5.670374419e-8;
@@ -111,9 +111,7 @@ pub struct ReentryResult {
 }
 
 /// Solves hypersonic entry aerothermodynamics, stagnation heat flux, and radiative equilibrium wall temperature.
-pub fn solve_reentry_aerothermodynamics(
-    problem: &ReentryProblem,
-) -> Result<ReentryResult, String> {
+pub fn solve_reentry_aerothermodynamics(problem: &ReentryProblem) -> Result<ReentryResult, String> {
     if problem.freestream_velocity_m_s <= 500.0 {
         return Err("Freestream velocity must be supersonic/hypersonic (> 500 m/s)".to_string());
     }
@@ -207,23 +205,48 @@ pub fn solve_reentry_aerothermodynamics(
 }
 
 /// Executes reentry aerothermodynamics simulation and packages into SimulationResult envelope.
-pub fn solve_reentry_aerothermodynamics_sim(
-    problem: &ReentryProblem,
-) -> SimulationResult {
+pub fn solve_reentry_aerothermodynamics_sim(problem: &ReentryProblem) -> SimulationResult {
     let start = std::time::Instant::now();
     match solve_reentry_aerothermodynamics(problem) {
         Ok(res) => {
             let mut metrics = std::collections::HashMap::new();
             metrics.insert("freestream_mach".to_string(), res.freestream_mach);
-            metrics.insert("stagnation_pressure_kpa".to_string(), res.stagnation_pressure_kpa);
-            metrics.insert("stagnation_enthalpy_mj_kg".to_string(), res.stagnation_enthalpy_mj_kg);
-            metrics.insert("shock_standoff_distance_mm".to_string(), res.shock_standoff_distance_mm);
-            metrics.insert("convective_heat_flux_kw_m2".to_string(), res.convective_heat_flux_kw_m2);
-            metrics.insert("radiative_heat_flux_kw_m2".to_string(), res.radiative_heat_flux_kw_m2);
-            metrics.insert("total_stagnation_heat_flux_kw_m2".to_string(), res.total_stagnation_heat_flux_kw_m2);
-            metrics.insert("radiative_equilibrium_wall_temperature_k".to_string(), res.radiative_equilibrium_wall_temperature_k);
-            metrics.insert("recommended_tps_thickness_mm".to_string(), res.recommended_tps_thickness_mm);
-            metrics.insert("thermal_safety_factor".to_string(), res.thermal_safety_factor);
+            metrics.insert(
+                "stagnation_pressure_kpa".to_string(),
+                res.stagnation_pressure_kpa,
+            );
+            metrics.insert(
+                "stagnation_enthalpy_mj_kg".to_string(),
+                res.stagnation_enthalpy_mj_kg,
+            );
+            metrics.insert(
+                "shock_standoff_distance_mm".to_string(),
+                res.shock_standoff_distance_mm,
+            );
+            metrics.insert(
+                "convective_heat_flux_kw_m2".to_string(),
+                res.convective_heat_flux_kw_m2,
+            );
+            metrics.insert(
+                "radiative_heat_flux_kw_m2".to_string(),
+                res.radiative_heat_flux_kw_m2,
+            );
+            metrics.insert(
+                "total_stagnation_heat_flux_kw_m2".to_string(),
+                res.total_stagnation_heat_flux_kw_m2,
+            );
+            metrics.insert(
+                "radiative_equilibrium_wall_temperature_k".to_string(),
+                res.radiative_equilibrium_wall_temperature_k,
+            );
+            metrics.insert(
+                "recommended_tps_thickness_mm".to_string(),
+                res.recommended_tps_thickness_mm,
+            );
+            metrics.insert(
+                "thermal_safety_factor".to_string(),
+                res.thermal_safety_factor,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, res.total_stagnation_heat_flux_kw_m2, 1, 1e-4);
@@ -242,14 +265,24 @@ pub fn solve_reentry_aerothermodynamics_sim(
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.aerospace.reentry_aerothermodynamics", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.aerospace.reentry_aerothermodynamics",
+                    "0.1.0",
+                ),
                 logs: vec![format!(
                     "Reentry Aerothermodynamics (Sutton-Graves / NASA SP-8000): Mach {:.1} @ {:.1} km, P_stag = {:.1} kPa, h0 = {:.1} MJ/kg, Delta_shock = {:.1} mm, q_total = {:.1} kW/m² (conv = {:.1}, rad = {:.1}), T_wall_eq = {:.1} K, SF = {:.2}, TPS Thick = {:.1} mm, Safe: {}",
-                    res.freestream_mach, problem.altitude_km, res.stagnation_pressure_kpa,
-                    res.stagnation_enthalpy_mj_kg, res.shock_standoff_distance_mm,
-                    res.total_stagnation_heat_flux_kw_m2, res.convective_heat_flux_kw_m2,
-                    res.radiative_heat_flux_kw_m2, res.radiative_equilibrium_wall_temperature_k,
-                    res.thermal_safety_factor, res.recommended_tps_thickness_mm, res.is_tps_safe
+                    res.freestream_mach,
+                    problem.altitude_km,
+                    res.stagnation_pressure_kpa,
+                    res.stagnation_enthalpy_mj_kg,
+                    res.shock_standoff_distance_mm,
+                    res.total_stagnation_heat_flux_kw_m2,
+                    res.convective_heat_flux_kw_m2,
+                    res.radiative_heat_flux_kw_m2,
+                    res.radiative_equilibrium_wall_temperature_k,
+                    res.thermal_safety_factor,
+                    res.recommended_tps_thickness_mm,
+                    res.is_tps_safe
                 )],
             }
         }
@@ -265,8 +298,14 @@ pub fn solve_reentry_aerothermodynamics_sim(
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.aerospace.reentry_aerothermodynamics", "0.1.0"),
-                logs: vec![format!("Reentry aerothermodynamics simulation failed: {}", err)],
+                provenance: SimulationProvenance::new(
+                    "atlas.aerospace.reentry_aerothermodynamics",
+                    "0.1.0",
+                ),
+                logs: vec![format!(
+                    "Reentry aerothermodynamics simulation failed: {}",
+                    err
+                )],
             }
         }
     }
@@ -283,17 +322,27 @@ mod tests {
         let res = solve_reentry_aerothermodynamics(&prob).expect("reentry solver failed");
         println!(
             "Reentry: Mach = {:.1}, Pstag = {:.1} kPa, h0 = {:.1} MJ/kg, q_tot = {:.1} kW/m², Twall = {:.1} K, SF = {:.2}, safe = {}",
-            res.freestream_mach, res.stagnation_pressure_kpa, res.stagnation_enthalpy_mj_kg,
-            res.total_stagnation_heat_flux_kw_m2, res.radiative_equilibrium_wall_temperature_k,
-            res.thermal_safety_factor, res.is_tps_safe
+            res.freestream_mach,
+            res.stagnation_pressure_kpa,
+            res.stagnation_enthalpy_mj_kg,
+            res.total_stagnation_heat_flux_kw_m2,
+            res.radiative_equilibrium_wall_temperature_k,
+            res.thermal_safety_factor,
+            res.is_tps_safe
         );
 
         assert!(res.freestream_mach > 20.0 && res.freestream_mach < 30.0);
         assert!(res.stagnation_pressure_kpa > 10.0 && res.stagnation_pressure_kpa < 30.0);
         assert!(res.stagnation_enthalpy_mj_kg > 25.0 && res.stagnation_enthalpy_mj_kg < 32.0);
         assert!(res.shock_standoff_distance_mm > 120.0 && res.shock_standoff_distance_mm < 200.0);
-        assert!(res.total_stagnation_heat_flux_kw_m2 > 800.0 && res.total_stagnation_heat_flux_kw_m2 < 1400.0);
-        assert!(res.radiative_equilibrium_wall_temperature_k > 1700.0 && res.radiative_equilibrium_wall_temperature_k < 2250.0);
+        assert!(
+            res.total_stagnation_heat_flux_kw_m2 > 800.0
+                && res.total_stagnation_heat_flux_kw_m2 < 1400.0
+        );
+        assert!(
+            res.radiative_equilibrium_wall_temperature_k > 1700.0
+                && res.radiative_equilibrium_wall_temperature_k < 2250.0
+        );
         assert!(res.thermal_safety_factor >= 1.05);
         assert!(res.recommended_tps_thickness_mm > 30.0 && res.recommended_tps_thickness_mm < 60.0);
         assert!(res.is_tps_safe);

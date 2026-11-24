@@ -153,7 +153,8 @@ pub fn evaluate_hypersonic_flutter(
 
     // Flexural rigidity: D = E * h^3 / (12 * (1 - nu^2))
     let nu_sq = (poissons_ratio * poissons_ratio).min(0.90);
-    let flexural_rigidity_n_m = (youngs_modulus_pa * panel_thickness_m.powi(3)) / (12.0 * (1.0 - nu_sq));
+    let flexural_rigidity_n_m =
+        (youngs_modulus_pa * panel_thickness_m.powi(3)) / (12.0 * (1.0 - nu_sq));
 
     // Dowell's non-dimensional critical aerodynamic parameter for hypersonic flow:
     // lambda_crit = 380 + 40 / sqrt(M^2 - 1)
@@ -161,15 +162,18 @@ pub fn evaluate_hypersonic_flutter(
     let lambda_crit = 380.0 + (40.0 / mach_factor);
 
     // Critical dynamic pressure: q_crit = lambda_crit * D * sqrt(M^2 - 1) / (2 * a^3)
-    let q_crit_pa = (lambda_crit * flexural_rigidity_n_m * mach_factor) / (2.0 * panel_length_m.powi(3));
+    let q_crit_pa =
+        (lambda_crit * flexural_rigidity_n_m * mach_factor) / (2.0 * panel_length_m.powi(3));
     let critical_flutter_dynamic_pressure_kpa = q_crit_pa / 1000.0;
 
-    let flutter_factor_of_safety = critical_flutter_dynamic_pressure_kpa / dynamic_pressure_kpa.max(0.1);
+    let flutter_factor_of_safety =
+        critical_flutter_dynamic_pressure_kpa / dynamic_pressure_kpa.max(0.1);
     let is_flutter_safe = flutter_factor_of_safety >= 1.50; // AS9100 50% margin requirement
 
     // Fundamental natural frequency in vacuum: omega_1 = (pi^2 / a^2) * sqrt(D / (rho_m * h))
     let mass_per_area = density_kg_m3 * panel_thickness_m;
-    let omega_1 = (std::f64::consts::PI.powi(2) / panel_length_m.powi(2)) * (flexural_rigidity_n_m / mass_per_area.max(1e-3)).sqrt();
+    let omega_1 = (std::f64::consts::PI.powi(2) / panel_length_m.powi(2))
+        * (flexural_rigidity_n_m / mass_per_area.max(1e-3)).sqrt();
     let natural_frequency_hz = omega_1 / (2.0 * std::f64::consts::PI);
 
     // Aerodynamic damping ratio: zeta_aero = (rho_inf * v_inf) / (rho_m * h * omega_1 * sqrt(M^2 - 1))

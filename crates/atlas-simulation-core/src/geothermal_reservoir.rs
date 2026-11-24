@@ -139,7 +139,9 @@ pub fn solve_geothermal_reservoir(
     problem: &GeothermalReservoirProblem,
 ) -> Result<GeothermalReservoirResult, String> {
     if problem.reservoir_temperature_c <= problem.reinjection_temperature_c {
-        return Err("Reservoir temperature must be greater than reinjection temperature".to_string());
+        return Err(
+            "Reservoir temperature must be greater than reinjection temperature".to_string(),
+        );
     }
     if problem.brine_flow_rate_l_s <= 0.0 {
         return Err("Brine flow rate must be positive".to_string());
@@ -157,7 +159,7 @@ pub fn solve_geothermal_reservoir(
 
     // Brine properties at mean temperature ~ 110 °C:
     let rho_w = 950.0; // kg/m³
-    let c_w = 4220.0;  // J/(kg·K)
+    let c_w = 4220.0; // J/(kg·K)
     let mu_w_pa_s = 0.00025; // 0.25 mPa·s at high temp
 
     // Volumetric heat capacity of water:
@@ -182,7 +184,9 @@ pub fn solve_geothermal_reservoir(
     // delta_P = (Q_w * mu_w) / (pi * k * H) * ln(D / r_w)
     let k_m2 = problem.reservoir_permeability_md * 9.869233e-16;
     let ln_ratio = (problem.well_spacing_distance_m / problem.wellbore_radius_m).ln();
-    let delta_p_pa = (q_w_m3_s * mu_w_pa_s) / (std::f64::consts::PI * k_m2 * problem.reservoir_thickness_m) * ln_ratio;
+    let delta_p_pa = (q_w_m3_s * mu_w_pa_s)
+        / (std::f64::consts::PI * k_m2 * problem.reservoir_thickness_m)
+        * ln_ratio;
     let delta_p_bar = delta_p_pa / 1e5;
 
     // 3. Parasitic pumping power:
@@ -192,7 +196,10 @@ pub fn solve_geothermal_reservoir(
 
     // 4. Gringarten thermal breakthrough time (seconds -> years):
     // t_break = (pi * (rho*c)_rock * H * D^2) / (3 * (rho*c)_w * Q_w)
-    let t_break_s = (std::f64::consts::PI * rho_c_rock * problem.reservoir_thickness_m * problem.well_spacing_distance_m.powi(2))
+    let t_break_s = (std::f64::consts::PI
+        * rho_c_rock
+        * problem.reservoir_thickness_m
+        * problem.well_spacing_distance_m.powi(2))
         / (3.0 * rho_c_w * q_w_m3_s);
     let t_break_years = t_break_s / (86400.0 * 365.25);
 
@@ -255,7 +262,10 @@ mod tests {
         assert!(res.doublet_pressure_drop_bar > 5.0 && res.doublet_pressure_drop_bar < 25.0);
         assert!(res.parasitic_pump_power_kw_e > 50.0 && res.parasitic_pump_power_kw_e < 250.0);
         assert!(res.thermal_breakthrough_years > 20.0 && res.thermal_breakthrough_years < 35.0);
-        assert!(res.final_production_temperature_c > 145.0 && res.final_production_temperature_c <= 160.0);
+        assert!(
+            res.final_production_temperature_c > 145.0
+                && res.final_production_temperature_c <= 160.0
+        );
         assert!(res.thermal_cop > 100.0);
         assert!(res.is_breakthrough_delayed_acceptable);
         assert!(res.is_pumping_power_viable);

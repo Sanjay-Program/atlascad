@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
 use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Standard acceleration due to gravity in m/s².
 pub const G_ACCEL: f64 = 9.80665;
@@ -269,12 +269,27 @@ pub fn solve_quarter_car_sim(problem: &QuarterCarProblem) -> SimulationResult {
     match solve_quarter_car(problem) {
         Ok(result) => {
             let mut metrics = std::collections::HashMap::new();
-            metrics.insert("body_bounce_frequency_hz".to_string(), result.body_bounce_frequency_hz);
-            metrics.insert("wheel_hop_frequency_hz".to_string(), result.wheel_hop_frequency_hz);
+            metrics.insert(
+                "body_bounce_frequency_hz".to_string(),
+                result.body_bounce_frequency_hz,
+            );
+            metrics.insert(
+                "wheel_hop_frequency_hz".to_string(),
+                result.wheel_hop_frequency_hz,
+            );
             metrics.insert("damping_ratio_zeta".to_string(), result.damping_ratio_zeta);
-            metrics.insert("body_acceleration_rms_m_s2".to_string(), result.body_acceleration_rms_m_s2);
-            metrics.insert("suspension_deflection_rms_mm".to_string(), result.suspension_deflection_rms_mm);
-            metrics.insert("dynamic_load_coefficient".to_string(), result.dynamic_load_coefficient);
+            metrics.insert(
+                "body_acceleration_rms_m_s2".to_string(),
+                result.body_acceleration_rms_m_s2,
+            );
+            metrics.insert(
+                "suspension_deflection_rms_mm".to_string(),
+                result.suspension_deflection_rms_mm,
+            );
+            metrics.insert(
+                "dynamic_load_coefficient".to_string(),
+                result.dynamic_load_coefficient,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, result.body_acceleration_rms_m_s2, 1, 1e-4);
@@ -293,7 +308,10 @@ pub fn solve_quarter_car_sim(problem: &QuarterCarProblem) -> SimulationResult {
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.automotive.quarter_car_iso2631", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.automotive.quarter_car_iso2631",
+                    "0.1.0",
+                ),
                 logs: vec![format!(
                     "Quarter-Car Dynamics: f_body = {:.2} Hz, f_wheel = {:.1} Hz (ζ = {:.2}), a_rms = {:.2} m/s², DLC = {:.3} (Safe: {})",
                     result.body_bounce_frequency_hz,
@@ -316,7 +334,10 @@ pub fn solve_quarter_car_sim(problem: &QuarterCarProblem) -> SimulationResult {
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.automotive.quarter_car_iso2631", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.automotive.quarter_car_iso2631",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Quarter car simulation failed: {}", err)],
             }
         }

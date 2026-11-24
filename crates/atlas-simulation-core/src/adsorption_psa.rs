@@ -111,9 +111,7 @@ pub struct AdsorptionPsaResult {
 }
 
 /// Solves multicomponent adsorption equilibrium, Glueckauf LDF kinetics, Thomas breakthrough dynamics, and PSA recovery.
-pub fn solve_adsorption_psa(
-    problem: &AdsorptionPsaProblem,
-) -> Result<AdsorptionPsaResult, String> {
+pub fn solve_adsorption_psa(problem: &AdsorptionPsaProblem) -> Result<AdsorptionPsaResult, String> {
     if problem.bed_diameter_m <= 0.05 || problem.bed_length_m <= 0.10 {
         return Err("Bed diameter and length must be physically viable dimensions".to_string());
     }
@@ -164,14 +162,17 @@ pub fn solve_adsorption_psa(
     // Interstitial gas velocity through packed column:
     // Bed void fraction epsilon ~ 0.38
     let bed_void = 0.38;
-    let flow_rate_m3_s = (problem.feed_flow_rate_nm3_h / 3600.0) * (1.01325 / problem.adsorption_pressure_bar) * (t_k / 273.15);
+    let flow_rate_m3_s = (problem.feed_flow_rate_nm3_h / 3600.0)
+        * (1.01325 / problem.adsorption_pressure_bar)
+        * (t_k / 273.15);
     let bed_cross_area_m2 = std::f64::consts::PI * bed_radius_m * bed_radius_m;
     let interstitial_velocity_m_s = flow_rate_m3_s / (bed_cross_area_m2 * bed_void);
 
     // Mass Transfer Zone (MTZ) length (Ruthven):
     // L_MTZ = (v_interstitial / k_LDF) * ln[(1 - y_b) * y_e / (y_b * (1 - y_e))]
     // With y_b = 0.05 and y_e = 0.95, ln factor = ln(19 * 19) = 5.888
-    let l_mtz_m = ((interstitial_velocity_m_s / k_ldf_s_inv) * 5.888).clamp(0.15, problem.bed_length_m * 0.85);
+    let l_mtz_m = ((interstitial_velocity_m_s / k_ldf_s_inv) * 5.888)
+        .clamp(0.15, problem.bed_length_m * 0.85);
 
     // Bed utilization factor:
     let eta_bed = (1.0 - 0.5 * (l_mtz_m / problem.bed_length_m)).clamp(0.40, 0.95);
@@ -196,14 +197,16 @@ pub fn solve_adsorption_psa(
 
     let light_feed_fraction = 1.0 - problem.feed_heavy_fraction;
     let light_feed_nm3_h = problem.feed_flow_rate_nm3_h * light_feed_fraction;
-    let product_nm3_h = light_feed_nm3_h * (target_recovery_pct / 100.0) / (target_purity_pct / 100.0);
+    let product_nm3_h =
+        light_feed_nm3_h * (target_recovery_pct / 100.0) / (target_purity_pct / 100.0);
 
     let is_cycle_ok = t_b_sec >= 30.0;
-    let is_purity_ok = target_purity_pct >= match problem.duty {
-        PsaSeparationDuty::OxygenGenerationFromAir => 90.0,
-        PsaSeparationDuty::HydrogenPurificationFromSyngas => 99.0,
-        PsaSeparationDuty::BiogasUpgradingCo2Removal => 96.0,
-    };
+    let is_purity_ok = target_purity_pct
+        >= match problem.duty {
+            PsaSeparationDuty::OxygenGenerationFromAir => 90.0,
+            PsaSeparationDuty::HydrogenPurificationFromSyngas => 99.0,
+            PsaSeparationDuty::BiogasUpgradingCo2Removal => 96.0,
+        };
 
     Ok(AdsorptionPsaResult {
         problem_id: problem.problem_id.clone(),
@@ -245,7 +248,10 @@ mod tests {
 
         let res = solve_adsorption_psa(&prob)?;
         assert!(res.column_adsorbent_mass_kg > 400.0 && res.column_adsorbent_mass_kg < 500.0);
-        assert!(res.heavy_key_equilibrium_capacity_mol_kg > 1.2 && res.heavy_key_equilibrium_capacity_mol_kg < 2.5);
+        assert!(
+            res.heavy_key_equilibrium_capacity_mol_kg > 1.2
+                && res.heavy_key_equilibrium_capacity_mol_kg < 2.5
+        );
         assert!(res.working_capacity_mol_kg > 0.5);
         assert!(res.ldf_mass_transfer_coeff_per_s > 0.1);
         assert!(res.mass_transfer_zone_length_m > 0.2 && res.mass_transfer_zone_length_m < 1.8);

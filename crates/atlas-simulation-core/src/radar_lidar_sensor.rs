@@ -165,8 +165,12 @@ pub fn solve_radar_lidar_sensor(
     let l_atm_db = 2.0 * gamma_radar_total * (r / 1000.0); // two-way atmospheric loss
     let l_atm_linear = 10.0_f64.powf(l_atm_db / 10.0);
 
-    let numerator_radar = problem.radar_tx_power_w * g_linear.powi(2) * lambda_radar_m.powi(2) * problem.target_rcs_m2;
-    let denom_radar = (4.0 * std::f64::consts::PI).powi(3) * r.powi(4) * l_sys_linear * l_atm_linear;
+    let numerator_radar = problem.radar_tx_power_w
+        * g_linear.powi(2)
+        * lambda_radar_m.powi(2)
+        * problem.target_rcs_m2;
+    let denom_radar =
+        (4.0 * std::f64::consts::PI).powi(3) * r.powi(4) * l_sys_linear * l_atm_linear;
     let p_r_radar_w = numerator_radar / denom_radar;
     let p_r_radar_dbm = 10.0 * (p_r_radar_w * 1000.0).log10();
 
@@ -185,9 +189,14 @@ pub fn solve_radar_lidar_sensor(
     let snr_radar_db = (p_r_radar_dbm - n_radar_dbm) + g_processing_db;
 
     // Maximum radar range:
-    let min_p_r_w = n_radar_w * 10.0_f64.powf((problem.required_snr_threshold_db - g_processing_db) / 10.0);
-    let r_max_radar_m = ((problem.radar_tx_power_w * g_linear.powi(2) * lambda_radar_m.powi(2) * problem.target_rcs_m2)
-        / ((4.0 * std::f64::consts::PI).powi(3) * min_p_r_w * l_sys_linear)).powf(0.25);
+    let min_p_r_w =
+        n_radar_w * 10.0_f64.powf((problem.required_snr_threshold_db - g_processing_db) / 10.0);
+    let r_max_radar_m = ((problem.radar_tx_power_w
+        * g_linear.powi(2)
+        * lambda_radar_m.powi(2)
+        * problem.target_rcs_m2)
+        / ((4.0 * std::f64::consts::PI).powi(3) * min_p_r_w * l_sys_linear))
+        .powf(0.25);
 
     // 4. Optical LiDAR Link Budget (Kruse / Kim model):
     let lambda_um = problem.lidar_wavelength_nm / 1000.0;

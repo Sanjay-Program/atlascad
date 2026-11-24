@@ -74,7 +74,7 @@ impl Default for GravityDamProblem {
             foundation_rock: FoundationRockClass::CompetentSedimentary,
             dam_height_m: 85.0,
             crest_width_m: 8.50,
-            base_width_m: 68.0,                  // 0.80 * H
+            base_width_m: 68.0, // 0.80 * H
             upstream_water_depth_m: 80.0,
             downstream_tailwater_depth_m: 6.0,
             silt_deposit_depth_m: 12.0,
@@ -205,12 +205,14 @@ pub fn solve_gravity_dam(problem: &GravityDamProblem) -> Result<GravityDamResult
 
     // Uplift force integration (heel to gallery trapezoid + gallery to toe trapezoid):
     let u_block1 = 0.5 * (u_heel_kpa + u_drain_kpa) * x_d;
-    let arm_u1_from_heel = (x_d / 3.0) * ((u_heel_kpa + 2.0 * u_drain_kpa) / (u_heel_kpa + u_drain_kpa));
+    let arm_u1_from_heel =
+        (x_d / 3.0) * ((u_heel_kpa + 2.0 * u_drain_kpa) / (u_heel_kpa + u_drain_kpa));
     let arm_u1_from_toe = b_base - arm_u1_from_heel;
 
     let l_block2 = b_base - x_d;
     let u_block2 = 0.5 * (u_drain_kpa + u_toe_kpa) * l_block2;
-    let arm_u2_from_gal = (l_block2 / 3.0) * ((u_drain_kpa + 2.0 * u_toe_kpa) / (u_drain_kpa + u_toe_kpa));
+    let arm_u2_from_gal =
+        (l_block2 / 3.0) * ((u_drain_kpa + 2.0 * u_toe_kpa) / (u_drain_kpa + u_toe_kpa));
     let arm_u2_from_toe = l_block2 - arm_u2_from_gal;
 
     let u_total = u_block1 + u_block2;
@@ -232,8 +234,11 @@ pub fn solve_gravity_dam(problem: &GravityDamProblem) -> Result<GravityDamResult
     let n_vertical_net = (w_total - u_total).max(10.0);
 
     let m_resisting_total = m_weight_resisting + m_f_dn_resisting;
-    let m_overturning_total = m_f_up_overturning + m_silt_overturning + m_uplift_overturning
-        + m_seismic_conc_overturning + m_westergaard_overturning;
+    let m_overturning_total = m_f_up_overturning
+        + m_silt_overturning
+        + m_uplift_overturning
+        + m_seismic_conc_overturning
+        + m_westergaard_overturning;
 
     let fs_overturn = m_resisting_total / m_overturning_total.max(1.0);
 
@@ -244,7 +249,8 @@ pub fn solve_gravity_dam(problem: &GravityDamProblem) -> Result<GravityDamResult
         FoundationRockClass::CompetentSedimentary => (600.0, 42.0_f64.to_radians().tan()),
         FoundationRockClass::FracturedMetamorphic => (300.0, 35.0_f64.to_radians().tan()),
     };
-    let sliding_shear_friction = (n_vertical_net * tan_phi + c_rock_kpa * b_base) / f_horiz_total.max(1.0);
+    let sliding_shear_friction =
+        (n_vertical_net * tan_phi + c_rock_kpa * b_base) / f_horiz_total.max(1.0);
 
     // 8. Resultant Location, Eccentricity, and Foundation Contact Stresses:
     let x_resultant_from_toe = (m_resisting_total - m_overturning_total) / n_vertical_net;
@@ -307,9 +313,18 @@ mod tests {
         let prob = GravityDamProblem::default();
         let res = solve_gravity_dam(&prob)?;
 
-        assert!(res.total_concrete_weight_kn_per_m > 70000.0 && res.total_concrete_weight_kn_per_m < 110000.0);
-        assert!(res.hydrostatic_thrust_upstream_kn_per_m > 25000.0 && res.hydrostatic_thrust_upstream_kn_per_m < 35000.0);
-        assert!(res.total_seepage_uplift_force_kn_per_m > 10000.0 && res.total_seepage_uplift_force_kn_per_m < 25000.0);
+        assert!(
+            res.total_concrete_weight_kn_per_m > 70000.0
+                && res.total_concrete_weight_kn_per_m < 110000.0
+        );
+        assert!(
+            res.hydrostatic_thrust_upstream_kn_per_m > 25000.0
+                && res.hydrostatic_thrust_upstream_kn_per_m < 35000.0
+        );
+        assert!(
+            res.total_seepage_uplift_force_kn_per_m > 10000.0
+                && res.total_seepage_uplift_force_kn_per_m < 25000.0
+        );
         assert!(res.overturning_safety_factor > 1.75);
         assert!(res.sliding_shear_friction_factor > 1.80);
         assert!(res.base_eccentricity_m <= res.middle_third_kern_limit_m);

@@ -127,7 +127,10 @@ pub struct TerminalBallisticsResult {
 pub fn solve_terminal_ballistics(
     problem: &TerminalBallisticsProblem,
 ) -> Result<TerminalBallisticsResult, String> {
-    if problem.projectile_mass_kg <= 0.001 || problem.projectile_diameter_mm <= 1.0 || problem.projectile_length_mm <= 5.0 {
+    if problem.projectile_mass_kg <= 0.001
+        || problem.projectile_diameter_mm <= 1.0
+        || problem.projectile_length_mm <= 5.0
+    {
         return Err("Projectile mass and dimensions must be positive realistic values".to_string());
     }
     if problem.impact_velocity_m_s <= 100.0 || problem.armor_thickness_mm <= 1.0 {
@@ -139,16 +142,16 @@ pub fn solve_terminal_ballistics(
 
     // Material properties (Rosenberg & Dekel)
     let (rho_p, y_p_mpa): (f64, f64) = match problem.projectile_type {
-        ProjectileType::TungstenLongRod => (17600.0, 1850.0),    // WHA: rho=17.6 g/cm³, Yp=1.85 GPa
+        ProjectileType::TungstenLongRod => (17600.0, 1850.0), // WHA: rho=17.6 g/cm³, Yp=1.85 GPa
         ProjectileType::DepletedUraniumRod => (18600.0, 1950.0), // DU: rho=18.6 g/cm³, Yp=1.95 GPa
-        ProjectileType::HardenedSteelCore => (7850.0, 1400.0),   // Tool steel: rho=7.85 g/cm³, Yp=1.40 GPa
+        ProjectileType::HardenedSteelCore => (7850.0, 1400.0), // Tool steel: rho=7.85 g/cm³, Yp=1.40 GPa
     };
 
     let (rho_t, r_t_mpa): (f64, f64) = match problem.armor_type {
-        TargetArmorType::RolledHomogeneousArmor => (7850.0, 4800.0),     // RHA: Rt ~ 4.5 * sigma_y ~ 4.8 GPa
-        TargetArmorType::HighHardnessArmor => (7850.0, 5800.0),          // HHA: Rt ~ 5.8 GPa
-        TargetArmorType::AluminaCeramicComposite => (3950.0, 7200.0),    // Al2O3: Rt ~ 7.2 GPa, lower density
-        TargetArmorType::TitaniumArmor => (4430.0, 4200.0),              // Ti-6Al-4V: Rt ~ 4.2 GPa
+        TargetArmorType::RolledHomogeneousArmor => (7850.0, 4800.0), // RHA: Rt ~ 4.5 * sigma_y ~ 4.8 GPa
+        TargetArmorType::HighHardnessArmor => (7850.0, 5800.0),      // HHA: Rt ~ 5.8 GPa
+        TargetArmorType::AluminaCeramicComposite => (3950.0, 7200.0), // Al2O3: Rt ~ 7.2 GPa, lower density
+        TargetArmorType::TitaniumArmor => (4430.0, 4200.0),           // Ti-6Al-4V: Rt ~ 4.2 GPa
     };
 
     let theta_rad = problem.obliquity_angle_deg.to_radians();
@@ -285,7 +288,10 @@ mod tests {
         assert!(res.normal_impact_velocity_m_s > 1200.0);
         assert!(res.line_of_sight_thickness_mm > 80.0 && res.line_of_sight_thickness_mm < 90.0);
         assert!(res.hydrodynamic_density_ratio > 1.40);
-        assert!(res.penetration_interface_velocity_m_s > 500.0 && res.penetration_interface_velocity_m_s < 1000.0);
+        assert!(
+            res.penetration_interface_velocity_m_s > 500.0
+                && res.penetration_interface_velocity_m_s < 1000.0
+        );
         assert!(res.total_penetration_depth_mm > 50.0 && res.total_penetration_depth_mm < 95.0);
         assert!(res.ballistic_limit_v50_m_s > 800.0);
         assert!(res.armor_protection_margin_factor > 1.05);

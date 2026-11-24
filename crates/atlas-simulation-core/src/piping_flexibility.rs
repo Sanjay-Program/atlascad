@@ -6,11 +6,11 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
 use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
 use crate::validation::AnalyticalComparison;
+use serde::{Deserialize, Serialize};
 
 /// Piping flexibility analysis problem specification.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,19 +57,19 @@ impl Default for PipingFlexibilityProblem {
         Self {
             problem_id: default_problem_id(),
             nominal_outside_diameter_mm: 219.1, // 8-inch NPS
-            wall_thickness_mm: 8.18,           // Schedule 40
+            wall_thickness_mm: 8.18,            // Schedule 40
             anchor_distance_m: 60.0,
             design_temperature_c: 260.0,
             ambient_temperature_c: 20.0,
             thermal_expansion_coeff_per_c: 12.8e-6,
             elastic_modulus_gpa: 190.0,
-            cold_allowable_stress_mpa: 137.9,  // ASTM A106 Gr B
+            cold_allowable_stress_mpa: 137.9, // ASTM A106 Gr B
             hot_allowable_stress_mpa: 125.0,
             sustained_stress_sl_mpa: 65.0,
             total_thermal_cycles: 5000,
             loop_height_m: 7.5,
             loop_width_m: 5.0,
-            bend_radius_mm: Some(304.8),      // 1.5 * 203.2
+            bend_radius_mm: Some(304.8), // 1.5 * 203.2
         }
     }
 }
@@ -121,7 +121,9 @@ pub fn solve_piping_flexibility(
         return Err("Anchor distance and loop height must be positive".to_string());
     }
     if problem.elastic_modulus_gpa <= 0.0 || problem.thermal_expansion_coeff_per_c <= 0.0 {
-        return Err("Elastic modulus and thermal expansion coefficient must be positive".to_string());
+        return Err(
+            "Elastic modulus and thermal expansion coefficient must be positive".to_string(),
+        );
     }
 
     let d_o = problem.nominal_outside_diameter_mm;
@@ -182,7 +184,11 @@ pub fn solve_piping_flexibility(
     let f_anchor_n = (12.0 * e_mpa * i_mm4 * delta_l_mm) / (2.0 * h_mm.powi(3));
     let f_anchor_kn = f_anchor_n * 1e-3;
 
-    let stress_ratio = if s_a_mpa > 1e-6 { s_e_mpa / s_a_mpa } else { 999.0 };
+    let stress_ratio = if s_a_mpa > 1e-6 {
+        s_e_mpa / s_a_mpa
+    } else {
+        999.0
+    };
     let is_safe = s_e_mpa <= s_a_mpa;
 
     Ok(PipingFlexibilityResult {
@@ -204,16 +210,23 @@ pub fn solve_piping_flexibility(
 }
 
 /// Generic simulation adapter for piping flexibility analysis.
-pub fn solve_piping_flexibility_sim(
-    problem: &PipingFlexibilityProblem,
-) -> SimulationResult {
+pub fn solve_piping_flexibility_sim(problem: &PipingFlexibilityProblem) -> SimulationResult {
     match solve_piping_flexibility(problem) {
         Ok(result) => {
             let mut metrics = std::collections::HashMap::new();
             metrics.insert("thermal_growth_mm".to_string(), result.thermal_growth_mm);
-            metrics.insert("displacement_stress_se_mpa".to_string(), result.displacement_stress_se_mpa);
-            metrics.insert("allowable_stress_range_sa_mpa".to_string(), result.allowable_stress_range_sa_mpa);
-            metrics.insert("anchor_reaction_force_kn".to_string(), result.anchor_reaction_force_kn);
+            metrics.insert(
+                "displacement_stress_se_mpa".to_string(),
+                result.displacement_stress_se_mpa,
+            );
+            metrics.insert(
+                "allowable_stress_range_sa_mpa".to_string(),
+                result.allowable_stress_range_sa_mpa,
+            );
+            metrics.insert(
+                "anchor_reaction_force_kn".to_string(),
+                result.anchor_reaction_force_kn,
+            );
             metrics.insert("stress_ratio".to_string(), result.stress_ratio);
 
             let mut conv = ConvergenceMonitor::new(1e-6);
@@ -233,7 +246,10 @@ pub fn solve_piping_flexibility_sim(
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.piping.flexibility_asme_b31_3", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.piping.flexibility_asme_b31_3",
+                    "0.1.0",
+                ),
                 logs: vec![format!(
                     "ASME B31.3 Piping Flexibility: ΔL = {:.1} mm, SE = {:.1} MPa <= SA = {:.1} MPa (Ratio = {:.2}, F_anchor = {:.1} kN, Safe: {})",
                     result.thermal_growth_mm,
@@ -256,7 +272,10 @@ pub fn solve_piping_flexibility_sim(
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.piping.flexibility_asme_b31_3", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.piping.flexibility_asme_b31_3",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Piping flexibility simulation failed: {}", err)],
             }
         }
@@ -272,9 +291,14 @@ mod tests {
     fn test_piping_flexibility_nominal() {
         let prob = PipingFlexibilityProblem::default();
         let res = solve_piping_flexibility(&prob).expect("solver failed");
-        println!("Piping flexibility: ΔL = {}, SE = {}, SA = {}, ratio = {}, F_anchor = {}",
-            res.thermal_growth_mm, res.displacement_stress_se_mpa, res.allowable_stress_range_sa_mpa,
-            res.stress_ratio, res.anchor_reaction_force_kn);
+        println!(
+            "Piping flexibility: ΔL = {}, SE = {}, SA = {}, ratio = {}, F_anchor = {}",
+            res.thermal_growth_mm,
+            res.displacement_stress_se_mpa,
+            res.allowable_stress_range_sa_mpa,
+            res.stress_ratio,
+            res.anchor_reaction_force_kn
+        );
 
         assert!(res.thermal_growth_mm > 150.0 && res.thermal_growth_mm < 220.0);
         assert!(res.cyclic_factor_f == 1.0);

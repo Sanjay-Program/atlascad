@@ -148,7 +148,11 @@ pub fn solve_hydro_governor(problem: &HydroGovernorProblem) -> Result<HydroGover
     let g = 9.80665; // m/s²
 
     // Rated power P_0 = rho * g * Q * H * eta (in Watts):
-    let p_0_w = rho * g * problem.rated_discharge_m3_s * problem.rated_net_head_m * problem.turbine_efficiency;
+    let p_0_w = rho
+        * g
+        * problem.rated_discharge_m3_s
+        * problem.rated_net_head_m
+        * problem.turbine_efficiency;
     let p_0_mw = p_0_w / 1e6;
 
     // Penstock cross-sectional area:
@@ -263,9 +267,13 @@ mod tests {
 
         let res = solve_hydro_governor(&prob)?;
         assert!(res.rated_mechanical_power_mw > 30.0 && res.rated_mechanical_power_mw < 35.0);
-        assert!(res.water_hammer_wave_speed_m_s > 1000.0 && res.water_hammer_wave_speed_m_s < 1300.0);
+        assert!(
+            res.water_hammer_wave_speed_m_s > 1000.0 && res.water_hammer_wave_speed_m_s < 1300.0
+        );
         assert!(res.water_starting_time_tw_s > 1.5 && res.water_starting_time_tw_s < 2.5);
-        assert!(res.mechanical_starting_time_tm_s > 8.0 && res.mechanical_starting_time_tm_s < 14.0);
+        assert!(
+            res.mechanical_starting_time_tm_s > 8.0 && res.mechanical_starting_time_tm_s < 14.0
+        );
         assert!(res.max_head_rise_m > 30.0 && res.max_head_rise_m < 55.0);
         assert!(res.max_head_rise_pct < 40.0);
         assert!(res.max_overspeed_pct < 55.0);

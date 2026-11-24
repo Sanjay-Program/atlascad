@@ -142,7 +142,9 @@ pub struct BeltTransmissionResult {
 }
 
 /// Solves belt and pulley mechanical power transmission.
-pub fn solve_belt_transmission(problem: &BeltTransmissionProblem) -> Result<BeltTransmissionResult, String> {
+pub fn solve_belt_transmission(
+    problem: &BeltTransmissionProblem,
+) -> Result<BeltTransmissionResult, String> {
     if problem.power_kw <= 0.0 {
         return Err("Transmitted power must be positive".to_string());
     }
@@ -152,8 +154,12 @@ pub fn solve_belt_transmission(problem: &BeltTransmissionProblem) -> Result<Belt
     if problem.driver_diameter_mm <= 0.0 || problem.driven_diameter_mm <= 0.0 {
         return Err("Pulley diameters must be positive".to_string());
     }
-    if problem.center_distance_mm <= (problem.driver_diameter_mm + problem.driven_diameter_mm) / 2.0 {
-        return Err("Center distance must be greater than average pulley diameter to avoid interference".to_string());
+    if problem.center_distance_mm <= (problem.driver_diameter_mm + problem.driven_diameter_mm) / 2.0
+    {
+        return Err(
+            "Center distance must be greater than average pulley diameter to avoid interference"
+                .to_string(),
+        );
     }
 
     // 1. Kinematics
@@ -228,7 +234,9 @@ pub fn solve_belt_transmission(problem: &BeltTransmissionProblem) -> Result<Belt
     let t2_actual = t1_actual - f_u_actual_per_belt;
 
     // 4. Shaft Radial Reaction Force (at operating load)
-    let single_shaft_f = (t1_actual.powi(2) + t2_actual.powi(2) - 2.0 * t1_actual * t2_actual * theta_small_rad.cos()).sqrt();
+    let single_shaft_f = (t1_actual.powi(2) + t2_actual.powi(2)
+        - 2.0 * t1_actual * t2_actual * theta_small_rad.cos())
+    .sqrt();
     let total_shaft_reaction_n = single_shaft_f * (belts_required as f64);
 
     // 5. Bending Fatigue Life (Miner-type flex cycle model)
@@ -288,18 +296,24 @@ pub fn solve_belt_transmission_sim(problem: &BeltTransmissionProblem) -> Simulat
             let mut metrics = std::collections::HashMap::new();
             metrics.insert("belt_velocity_m_s".to_string(), result.belt_velocity_m_s);
             metrics.insert("belts_required".to_string(), result.belts_required as f64);
-            metrics.insert("tight_side_tension_per_belt_n".to_string(), result.tight_side_tension_per_belt_n);
-            metrics.insert("shaft_reaction_force_n".to_string(), result.shaft_reaction_force_n);
-            metrics.insert("estimated_life_hours".to_string(), result.estimated_life_hours);
+            metrics.insert(
+                "tight_side_tension_per_belt_n".to_string(),
+                result.tight_side_tension_per_belt_n,
+            );
+            metrics.insert(
+                "shaft_reaction_force_n".to_string(),
+                result.shaft_reaction_force_n,
+            );
+            metrics.insert(
+                "estimated_life_hours".to_string(),
+                result.estimated_life_hours,
+            );
 
             let mut conv = ConvergenceMonitor::new(1e-6);
             conv.record(1, result.belt_velocity_m_s, 1, 1e-4);
 
-            let comparison = AnalyticalComparison::assess(
-                "belt_velocity_m_s",
-                result.belt_velocity_m_s,
-                12.0,
-            );
+            let comparison =
+                AnalyticalComparison::assess("belt_velocity_m_s", result.belt_velocity_m_s, 12.0);
 
             SimulationResult {
                 problem_id: problem.problem_id.clone(),
@@ -309,7 +323,10 @@ pub fn solve_belt_transmission_sim(problem: &BeltTransmissionProblem) -> Simulat
                 scalar_metrics: metrics,
                 convergence: conv,
                 validation: Some(comparison),
-                provenance: SimulationProvenance::new("atlas.mechanical.belt_transmission_iso5296", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.mechanical.belt_transmission_iso5296",
+                    "0.1.0",
+                ),
                 logs: vec![result.design_assessment],
             }
         }
@@ -324,7 +341,10 @@ pub fn solve_belt_transmission_sim(problem: &BeltTransmissionProblem) -> Simulat
                 scalar_metrics: std::collections::HashMap::new(),
                 convergence: conv,
                 validation: None,
-                provenance: SimulationProvenance::new("atlas.mechanical.belt_transmission_iso5296", "0.1.0"),
+                provenance: SimulationProvenance::new(
+                    "atlas.mechanical.belt_transmission_iso5296",
+                    "0.1.0",
+                ),
                 logs: vec![format!("Belt transmission simulation failed: {}", err)],
             }
         }

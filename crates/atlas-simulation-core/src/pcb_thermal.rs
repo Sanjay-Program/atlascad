@@ -214,7 +214,8 @@ pub fn solve_pcb_thermal(prob: &PcbThermalProblem) -> PcbThermalResult {
     let peak_comp_temp = prob.ambient_temp_c + comp_delta_t;
 
     // Standard FR-4 limit (Tg 130°C or 170°C for high-Tg)
-    let thermal_limits_satisfied = peak_comp_temp <= 125.0 && (prob.ambient_temp_c + actual_delta_t) <= 105.0;
+    let thermal_limits_satisfied =
+        peak_comp_temp <= 125.0 && (prob.ambient_temp_c + actual_delta_t) <= 105.0;
 
     PcbThermalResult {
         problem_id: prob.problem_id.clone(),
@@ -238,17 +239,29 @@ pub fn solve_pcb_thermal(prob: &PcbThermalProblem) -> PcbThermalResult {
 pub fn solve_pcb_thermal_sim(prob: &PcbThermalProblem) -> SimulationResult {
     let sol = solve_pcb_thermal(prob);
     let mut metrics = std::collections::HashMap::new();
-    metrics.insert("allowable_current_ipc2152_a".to_string(), sol.allowable_current_ipc2152_a);
-    metrics.insert("actual_trace_temp_rise_c".to_string(), sol.actual_trace_temp_rise_c);
-    metrics.insert("trace_resistance_mohm".to_string(), sol.trace_resistance_mohm);
-    metrics.insert("via_array_thermal_resistance_k_w".to_string(), sol.via_array_thermal_resistance_k_w);
-    metrics.insert("peak_component_temp_c".to_string(), sol.peak_component_temp_c);
-
-    let comparison = AnalyticalComparison::assess(
-        "current_margin_factor",
-        sol.current_margin_factor,
-        1.0,
+    metrics.insert(
+        "allowable_current_ipc2152_a".to_string(),
+        sol.allowable_current_ipc2152_a,
     );
+    metrics.insert(
+        "actual_trace_temp_rise_c".to_string(),
+        sol.actual_trace_temp_rise_c,
+    );
+    metrics.insert(
+        "trace_resistance_mohm".to_string(),
+        sol.trace_resistance_mohm,
+    );
+    metrics.insert(
+        "via_array_thermal_resistance_k_w".to_string(),
+        sol.via_array_thermal_resistance_k_w,
+    );
+    metrics.insert(
+        "peak_component_temp_c".to_string(),
+        sol.peak_component_temp_c,
+    );
+
+    let comparison =
+        AnalyticalComparison::assess("current_margin_factor", sol.current_margin_factor, 1.0);
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.allowable_current_ipc2152_a, 1, 1e-4);
@@ -262,7 +275,10 @@ pub fn solve_pcb_thermal_sim(prob: &PcbThermalProblem) -> SimulationResult {
         convergence: conv,
         validation: Some(comparison),
         provenance: SimulationProvenance::new("atlas.ecad.pcb_thermal", "0.1.0"),
-        logs: vec![format!("Allowable current: {:.2} A, Via array R_th: {:.2} K/W", sol.allowable_current_ipc2152_a, sol.via_array_thermal_resistance_k_w)],
+        logs: vec![format!(
+            "Allowable current: {:.2} A, Via array R_th: {:.2} K/W",
+            sol.allowable_current_ipc2152_a, sol.via_array_thermal_resistance_k_w
+        )],
     }
 }
 
@@ -283,7 +299,10 @@ mod tests {
         // Resistance for 50mm length is ~10 to 15 mOhm
         assert!(sol.trace_resistance_mohm > 8.0 && sol.trace_resistance_mohm < 20.0);
         // Array of 16 thermal vias gives ~10 to 15 K/W for 1.6mm standard FR-4
-        assert!(sol.via_array_thermal_resistance_k_w > 5.0 && sol.via_array_thermal_resistance_k_w < 20.0);
+        assert!(
+            sol.via_array_thermal_resistance_k_w > 5.0
+                && sol.via_array_thermal_resistance_k_w < 20.0
+        );
         // Peak component temperature under 3.5W dissipation
         assert!(sol.peak_component_temp_c > 35.0 && sol.peak_component_temp_c < 75.0);
         assert!(sol.thermal_limits_satisfied);

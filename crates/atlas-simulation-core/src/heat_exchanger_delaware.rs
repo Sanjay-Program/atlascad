@@ -169,7 +169,9 @@ pub fn solve_heat_exchanger_delaware(
     if problem.shell_inside_diameter_m <= 0.10 || problem.number_of_tubes == 0 {
         return Err("Shell diameter and number of tubes must be positive".to_string());
     }
-    if problem.tube_outer_diameter_mm <= 5.0 || problem.tube_pitch_mm <= problem.tube_outer_diameter_mm {
+    if problem.tube_outer_diameter_mm <= 5.0
+        || problem.tube_pitch_mm <= problem.tube_outer_diameter_mm
+    {
         return Err("Tube pitch must strictly exceed tube outer diameter".to_string());
     }
     if problem.baffle_cut_pct <= 10.0 || problem.baffle_cut_pct >= 45.0 {
@@ -186,7 +188,9 @@ pub fn solve_heat_exchanger_delaware(
     let dt1 = problem.hot_inlet_temp_c - problem.cold_outlet_temp_c;
     let dt2 = problem.hot_outlet_temp_c - problem.cold_inlet_temp_c;
     if dt1 <= 0.0 || dt2 <= 0.0 {
-        return Err("Temperature cross violation: cold stream temperature exceeds hot stream".to_string());
+        return Err(
+            "Temperature cross violation: cold stream temperature exceeds hot stream".to_string(),
+        );
     }
     let lmtd_c = if (dt1 - dt2).abs() < 0.1 {
         (dt1 + dt2) / 2.0
@@ -197,8 +201,10 @@ pub fn solve_heat_exchanger_delaware(
     // Bowman-Mueller-Nagle LMTD F-factor for 1-shell pass, 2-or-more tube passes:
     // P = (t2 - t1) / (T1 - t1)
     // R = (T1 - T2) / (t2 - t1)
-    let p_therm = (problem.cold_outlet_temp_c - problem.cold_inlet_temp_c) / (problem.hot_inlet_temp_c - problem.cold_inlet_temp_c);
-    let r_therm = (problem.hot_inlet_temp_c - problem.hot_outlet_temp_c) / (problem.cold_outlet_temp_c - problem.cold_inlet_temp_c);
+    let p_therm = (problem.cold_outlet_temp_c - problem.cold_inlet_temp_c)
+        / (problem.hot_inlet_temp_c - problem.cold_inlet_temp_c);
+    let r_therm = (problem.hot_inlet_temp_c - problem.hot_outlet_temp_c)
+        / (problem.cold_outlet_temp_c - problem.cold_inlet_temp_c);
 
     let f_factor = if (r_therm - 1.0).abs() < 1e-4 {
         // Limit as R -> 1
@@ -226,7 +232,8 @@ pub fn solve_heat_exchanger_delaware(
     // Approximately: S_m = B * D_s * (P_t - d_o) / P_t
     let d_o_m = problem.tube_outer_diameter_mm / 1000.0;
     let p_t_m = problem.tube_pitch_mm / 1000.0;
-    let s_m_m2 = problem.baffle_spacing_m * problem.shell_inside_diameter_m * ((p_t_m - d_o_m) / p_t_m);
+    let s_m_m2 =
+        problem.baffle_spacing_m * problem.shell_inside_diameter_m * ((p_t_m - d_o_m) / p_t_m);
     let mass_velocity_kg_m2_s = problem.hot_mass_flow_kg_s / s_m_m2;
 
     // Shell-side Reynolds number: Re_s = G_s * d_o / mu
@@ -234,7 +241,8 @@ pub fn solve_heat_exchanger_delaware(
 
     // Ideal tube bank crossflow heat transfer coefficient (Colburn j-factor):
     // j_H = 0.35 * Re_s^(-0.40)
-    let pr_s = (problem.shell_fluid_cp_j_kg_k * problem.shell_fluid_viscosity_pa_s) / problem.shell_fluid_conductivity_w_m_k;
+    let pr_s = (problem.shell_fluid_cp_j_kg_k * problem.shell_fluid_viscosity_pa_s)
+        / problem.shell_fluid_conductivity_w_m_k;
     let j_h = 0.34 * re_s.powf(-0.38);
     let h_ideal = j_h * (problem.shell_fluid_conductivity_w_m_k / d_o_m) * re_s * pr_s.cbrt();
 
@@ -263,7 +271,8 @@ pub fn solve_heat_exchanger_delaware(
     let u_dirty = 1.0 / r_total;
 
     // Surface areas:
-    let a_avail_m2 = (problem.number_of_tubes as f64) * std::f64::consts::PI * d_o_m * problem.tube_length_m;
+    let a_avail_m2 =
+        (problem.number_of_tubes as f64) * std::f64::consts::PI * d_o_m * problem.tube_length_m;
     let a_req_m2 = q_w / (u_dirty * delta_t_m_c);
     let overdesign_pct = ((a_avail_m2 - a_req_m2) / a_req_m2) * 100.0;
 
@@ -271,7 +280,10 @@ pub fn solve_heat_exchanger_delaware(
     // Number of baffles N_b = (L / B) - 1
     let n_baffles = (problem.tube_length_m / problem.baffle_spacing_m).round() - 1.0;
     let f_fric = 0.28 * re_s.powf(-0.18);
-    let dp_ideal_pa = 2.0 * f_fric * (mass_velocity_kg_m2_s * mass_velocity_kg_m2_s / problem.shell_fluid_density_kg_m3) * (n_baffles + 1.0);
+    let dp_ideal_pa = 2.0
+        * f_fric
+        * (mass_velocity_kg_m2_s * mass_velocity_kg_m2_s / problem.shell_fluid_density_kg_m3)
+        * (n_baffles + 1.0);
     // Apply pressure drop correction factors (bypass & leakage):
     let r_l = 0.45; // leakage bypass reduction
     let r_b = 0.65; // bundle bypass reduction
@@ -337,7 +349,10 @@ mod tests {
         assert!(res.thermal_duty_kw > 2000.0 && res.thermal_duty_kw < 3000.0);
         assert!(res.counterflow_lmtd_c > 45.0 && res.counterflow_lmtd_c < 65.0);
         assert!(res.lmtd_correction_factor_f >= 0.80);
-        assert!(res.shell_side_corrected_htc_w_m2_k > 400.0 && res.shell_side_corrected_htc_w_m2_k < 1800.0);
+        assert!(
+            res.shell_side_corrected_htc_w_m2_k > 400.0
+                && res.shell_side_corrected_htc_w_m2_k < 1800.0
+        );
         assert!(res.overall_htc_w_m2_k > 200.0 && res.overall_htc_w_m2_k < 600.0);
         assert!(res.available_surface_area_m2 > 90.0 && res.available_surface_area_m2 < 120.0);
         assert!(res.surface_area_overdesign_pct >= 10.0);

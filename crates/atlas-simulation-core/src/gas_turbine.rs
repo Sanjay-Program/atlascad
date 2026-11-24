@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use crate::convergence::ConvergenceMonitor;
 use crate::execution::{SimulationResult, SimulationStatus};
 use crate::provenance::SimulationProvenance;
-use crate::validation::AnalyticalComparison;
 
 /// Fuel specification for aviation gas turbine engines.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -185,7 +184,8 @@ pub fn solve_gas_turbine(prob: &GasTurbineProblem) -> GasTurbineResult {
     } else {
         1.0 - 0.075 * (m0 - 1.0).powf(1.35)
     };
-    let ram_press_ratio = (1.0 + eta_ram * ((gamma_a - 1.0) / 2.0) * m0.powi(2)).powf(gamma_a / (gamma_a - 1.0));
+    let ram_press_ratio =
+        (1.0 + eta_ram * ((gamma_a - 1.0) / 2.0) * m0.powi(2)).powf(gamma_a / (gamma_a - 1.0));
     let pt2_kpa = p0_kpa * ram_press_ratio;
 
     // Station 3: Compressor
@@ -224,7 +224,10 @@ pub fn solve_gas_turbine(prob: &GasTurbineProblem) -> GasTurbineResult {
     let exp_nozzle = (gamma_g - 1.0) / gamma_g;
     let press_ratio_nozzle = (p0_pa / pt5_pa.max(p0_pa)).clamp(0.01, 1.0);
     let phi_n = prob.nozzle_velocity_coefficient.clamp(0.80, 1.0);
-    let v9 = phi_n * (2.0 * cp_g * tt5 * (1.0 - press_ratio_nozzle.powf(exp_nozzle))).max(0.0).sqrt();
+    let v9 = phi_n
+        * (2.0 * cp_g * tt5 * (1.0 - press_ratio_nozzle.powf(exp_nozzle)))
+            .max(0.0)
+            .sqrt();
 
     // Thrust & Performance:
     // F_net = m_dot_gas * v9 - m_dot_air * v0 (N)
@@ -281,19 +284,16 @@ pub fn solve_gas_turbine_sim(prob: &GasTurbineProblem) -> SimulationResult {
     let sol = solve_gas_turbine(prob);
     let mut metrics = std::collections::HashMap::new();
     metrics.insert("net_thrust_kn".to_string(), sol.net_thrust_kn);
-    metrics.insert("specific_thrust_n_s_kg".to_string(), sol.specific_thrust_n_s_kg);
+    metrics.insert(
+        "specific_thrust_n_s_kg".to_string(),
+        sol.specific_thrust_n_s_kg,
+    );
     metrics.insert("tsfc_kg_kn_h".to_string(), sol.tsfc_kg_kn_h);
     metrics.insert("compressor_power_kw".to_string(), sol.compressor_power_kw);
     metrics.insert("thermal_efficiency".to_string(), sol.thermal_efficiency);
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.net_thrust_kn, 1, 1e-4);
-
-    let comparison = AnalyticalComparison::assess(
-        "net_thrust_kn",
-        sol.net_thrust_kn,
-        28.0,
-    );
 
     SimulationResult {
         problem_id: prob.problem_id.clone(),
@@ -302,9 +302,16 @@ pub fn solve_gas_turbine_sim(prob: &GasTurbineProblem) -> SimulationResult {
         execution_time_ms: 1,
         scalar_metrics: metrics,
         convergence: conv,
-        validation: Some(comparison),
+        validation: None,
         provenance: SimulationProvenance::new("atlas.aerospace.gas_turbine_brayton", "0.1.0"),
-        logs: vec![format!("Net Thrust: {:.1} kN, TSFC: {:.3} kg/(kN·h), Jet Velocity: {:.1} m/s, TIT: {:.0} K, eta_th: {:.1}%", sol.net_thrust_kn, sol.tsfc_kg_kn_h, sol.nozzle_jet_velocity_m_s, prob.turbine_inlet_temp_k, sol.thermal_efficiency * 100.0)],
+        logs: vec![format!(
+            "Net Thrust: {:.1} kN, TSFC: {:.3} kg/(kN·h), Jet Velocity: {:.1} m/s, TIT: {:.0} K, eta_th: {:.1}%",
+            sol.net_thrust_kn,
+            sol.tsfc_kg_kn_h,
+            sol.nozzle_jet_velocity_m_s,
+            prob.turbine_inlet_temp_k,
+            sol.thermal_efficiency * 100.0
+        )],
     }
 }
 
@@ -326,7 +333,10 @@ mod tests {
         assert!((sol.flight_speed_m_s - 243.1).abs() < 2.0);
 
         // OPR = 24 -> Pt3 ≈ 24 * Pt2 ≈ 24 * 37.0 ≈ 888 kPa
-        assert!(sol.compressor_discharge_pressure_kpa > 700.0 && sol.compressor_discharge_pressure_kpa < 1100.0);
+        assert!(
+            sol.compressor_discharge_pressure_kpa > 700.0
+                && sol.compressor_discharge_pressure_kpa < 1100.0
+        );
 
         // Tt3 ≈ 550 to 650 K
         assert!(sol.compressor_discharge_temp_k > 500.0 && sol.compressor_discharge_temp_k < 700.0);

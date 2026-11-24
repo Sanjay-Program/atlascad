@@ -74,16 +74,16 @@ impl Default for IndoorAirQualityProblem {
             problem_id: "commercial_office_co2_dilution".to_string(),
             contaminant: AirContaminantType::CarbonDioxideCO2,
             space_type: SpaceOccupancyType::CommercialOffice,
-            room_floor_area_m2: 120.0,          // 120 m² open office
-            ceiling_height_m: 3.0,              // 3.0 m ceiling (Room volume = 360 m³)
-            occupant_count: 12,                 // 12 engineers/architects
+            room_floor_area_m2: 120.0,              // 120 m² open office
+            ceiling_height_m: 3.0,                  // 3.0 m ceiling (Room volume = 360 m³)
+            occupant_count: 12,                     // 12 engineers/architects
             outdoor_ventilation_rate_m3_h: 720.0, // 720 m³/h fresh air (ACH = 2.0 h^-1, 60 m³/h/person)
-            hvac_filter_efficiency: 0.0,        // Gaseous CO2 is not trapped by particulate filters
+            hvac_filter_efficiency: 0.0, // Gaseous CO2 is not trapped by particulate filters
             outdoor_ambient_concentration: 420.0, // 420 ppm outdoor CO2
-            initial_room_concentration: 450.0,  // 450 ppm morning baseline
+            initial_room_concentration: 450.0, // 450 ppm morning baseline
             target_threshold_concentration: 1000.0, // ASHRAE 62.1 recommended indoor CO2 ceiling (1000 ppm)
-            exposure_duration_hours: 4.0,       // 4.0 hours continuous work session
-            infected_occupants: 0,              // Nominal baseline
+            exposure_duration_hours: 4.0,           // 4.0 hours continuous work session
+            infected_occupants: 0,                  // Nominal baseline
         }
     }
 }
@@ -126,7 +126,9 @@ pub struct IndoorAirQualityResult {
 }
 
 /// Solves indoor air quality mass balance, transient exponential dilution, and Wells-Riley transmission.
-pub fn solve_indoor_air_quality(problem: &IndoorAirQualityProblem) -> Result<IndoorAirQualityResult, String> {
+pub fn solve_indoor_air_quality(
+    problem: &IndoorAirQualityProblem,
+) -> Result<IndoorAirQualityResult, String> {
     if problem.room_floor_area_m2 <= 2.0 {
         return Err("Room floor area must exceed 2 m²".to_string());
     }
@@ -191,7 +193,8 @@ pub fn solve_indoor_air_quality(problem: &IndoorAirQualityProblem) -> Result<Ind
     // Steady-state concentration:
     // V * dC/dt = S_dot + Q_vent * (1 - eta_f) * C_amb - lambda * V * C_ss = 0
     // C_ss = [S_dot/V + ACH * (1 - eta_f) * C_amb] / lambda
-    let effective_ambient_term = ach * (1.0 - problem.hvac_filter_efficiency) * problem.outdoor_ambient_concentration;
+    let effective_ambient_term =
+        ach * (1.0 - problem.hvac_filter_efficiency) * problem.outdoor_ambient_concentration;
     let c_ss = (total_s_dot / room_volume_m3 + effective_ambient_term) / lambda;
 
     // Transient concentration at exposure duration t: C(t) = C_ss + (C_0 - C_ss) * exp(-lambda * t)
@@ -200,7 +203,9 @@ pub fn solve_indoor_air_quality(problem: &IndoorAirQualityProblem) -> Result<Ind
 
     // Purge time from max(C_t, C_0) down to target threshold:
     let c_peak = c_t.max(problem.initial_room_concentration);
-    let purge_time_h = if c_peak > problem.target_threshold_concentration && c_ss < problem.target_threshold_concentration {
+    let purge_time_h = if c_peak > problem.target_threshold_concentration
+        && c_ss < problem.target_threshold_concentration
+    {
         -(1.0 / lambda) * ((problem.target_threshold_concentration - c_ss) / (c_peak - c_ss)).ln()
     } else if c_peak <= problem.target_threshold_concentration {
         0.0
@@ -232,12 +237,14 @@ pub fn solve_indoor_air_quality(problem: &IndoorAirQualityProblem) -> Result<Ind
     // P_inf = 1 - exp(- (I * q * p * t) / Q_vent)
     // p = pulmonary ventilation rate ~ 0.54 m³/h (light activity breathing)
     let p_pulmonary = 0.54; // m³/h
-    let wells_riley_risk_pct = if problem.infected_occupants > 0 && problem.outdoor_ventilation_rate_m3_h > 0.0 {
-        let exponent = ((problem.infected_occupants as f64) * q_quanta_h * p_pulmonary * t_exp) / problem.outdoor_ventilation_rate_m3_h;
-        (1.0 - (-exponent).exp()) * 100.0
-    } else {
-        0.0
-    };
+    let wells_riley_risk_pct =
+        if problem.infected_occupants > 0 && problem.outdoor_ventilation_rate_m3_h > 0.0 {
+            let exponent = ((problem.infected_occupants as f64) * q_quanta_h * p_pulmonary * t_exp)
+                / problem.outdoor_ventilation_rate_m3_h;
+            (1.0 - (-exponent).exp()) * 100.0
+        } else {
+            0.0
+        };
 
     // Verification checks:
     let is_threshold_ok = c_ss <= (1.05 * problem.target_threshold_concentration);
@@ -277,8 +284,13 @@ mod tests {
         assert_eq!(res.room_volume_m3, 360.0);
         assert_eq!(res.air_changes_per_hour_ach, 2.0);
         assert!(res.steady_state_concentration > 650.0 && res.steady_state_concentration < 850.0);
-        assert!(res.concentration_after_exposure > 600.0 && res.concentration_after_exposure < 800.0);
-        assert!(res.ventilation_compliance_ratio >= 1.0, "Should satisfy ASHRAE 62.1 minimum ventilation");
+        assert!(
+            res.concentration_after_exposure > 600.0 && res.concentration_after_exposure < 800.0
+        );
+        assert!(
+            res.ventilation_compliance_ratio >= 1.0,
+            "Should satisfy ASHRAE 62.1 minimum ventilation"
+        );
         assert!(res.outdoor_flow_per_person_l_s >= 10.0);
         assert!(res.is_target_threshold_satisfied);
         assert!(res.is_ashrae_62_1_compliant);

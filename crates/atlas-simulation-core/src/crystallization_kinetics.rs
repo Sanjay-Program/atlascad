@@ -50,12 +50,12 @@ impl Default for CrystallizationProblem {
         Self {
             problem_id: "industrial_potash_kcl_cooling_crystallizer".to_string(),
             solute: CrystallineSolute::PotassiumChloride,
-            operating_temperature_c: 35.0,        // 35 °C crystallizer vessel
-            feed_volumetric_flow_m3_h: 25.0,      // 25 m³/h slurry throughput
-            crystallizer_active_volume_m3: 50.0,  // 50 m³ draft tube baffle (DTB) crystallizer (tau = 2.0 h)
-            solution_concentration_kg_m3: 395.0,  // KCl supersaturated concentration (C_sat ~ 380 kg/m³)
-            crystal_volumetric_shape_factor: 0.85,// Orthorhombic/cubic sylvite
-            target_median_size_um: 350.0,         // Commercial fertilizer grade >= 300 µm
+            operating_temperature_c: 35.0, // 35 °C crystallizer vessel
+            feed_volumetric_flow_m3_h: 25.0, // 25 m³/h slurry throughput
+            crystallizer_active_volume_m3: 50.0, // 50 m³ draft tube baffle (DTB) crystallizer (tau = 2.0 h)
+            solution_concentration_kg_m3: 395.0, // KCl supersaturated concentration (C_sat ~ 380 kg/m³)
+            crystal_volumetric_shape_factor: 0.85, // Orthorhombic/cubic sylvite
+            target_median_size_um: 350.0,        // Commercial fertilizer grade >= 300 µm
         }
     }
 }
@@ -114,7 +114,9 @@ pub fn solve_crystallization_kinetics(
     if problem.solution_concentration_kg_m3 <= 10.0 {
         return Err("Solution concentration must exceed 10 kg/m³".to_string());
     }
-    if problem.crystal_volumetric_shape_factor <= 0.1 || problem.crystal_volumetric_shape_factor > 1.2 {
+    if problem.crystal_volumetric_shape_factor <= 0.1
+        || problem.crystal_volumetric_shape_factor > 1.2
+    {
         return Err("Volumetric shape factor must be between 0.1 and 1.2".to_string());
     }
 
@@ -176,7 +178,8 @@ pub fn solve_crystallization_kinetics(
     // Convert µm³ to m³: 1 µm³ = 1e-18 m³
     // Magma density M_T = rho_c * k_v * m_3 = 6 * rho_c * k_v * n_0 * (G * tau)^4 * 1e-18 [kg/m³]
     // In practice, mass balance restricts M_T <= Delta C_available:
-    let theoretical_mt = 6.0 * rho_c * problem.crystal_volumetric_shape_factor * n_0 * g_tau_um.powi(4) * 1.0e-18;
+    let theoretical_mt =
+        6.0 * rho_c * problem.crystal_volumetric_shape_factor * n_0 * g_tau_um.powi(4) * 1.0e-18;
     // Practical operating magma density clamped by mass conservation to feed supersaturation precipitation:
     let practical_mt = (delta_c * 0.92).min(theoretical_mt.max(delta_c * 0.85));
 
@@ -221,9 +224,16 @@ mod tests {
         let prob = CrystallizationProblem::default();
         let res = solve_crystallization_kinetics(&prob)?;
 
-        assert!(res.saturation_concentration_kg_m3 > 350.0 && res.saturation_concentration_kg_m3 < 400.0);
-        assert!(res.supersaturation_delta_c_kg_m3 > 5.0 && res.supersaturation_delta_c_kg_m3 < 30.0);
-        assert!(res.relative_supersaturation_sigma > 0.01 && res.relative_supersaturation_sigma < 0.08);
+        assert!(
+            res.saturation_concentration_kg_m3 > 350.0
+                && res.saturation_concentration_kg_m3 < 400.0
+        );
+        assert!(
+            res.supersaturation_delta_c_kg_m3 > 5.0 && res.supersaturation_delta_c_kg_m3 < 30.0
+        );
+        assert!(
+            res.relative_supersaturation_sigma > 0.01 && res.relative_supersaturation_sigma < 0.08
+        );
         assert!(res.residence_time_tau_hours >= 1.5 && res.residence_time_tau_hours <= 3.0);
         assert!(res.crystal_growth_rate_g_um_per_s > 0.10);
         assert!(res.median_crystal_size_l50_um >= 300.0);

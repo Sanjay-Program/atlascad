@@ -238,10 +238,15 @@ pub fn solve_pump_sim(prob: &PumpProblem) -> SimulationResult {
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.operating_flow_m3_hr, 1, 1e-4);
 
+    // Independent operating-point check: pump curve and system curve must agree at Q_op.
+    let h_pump_at_q =
+        sol.scaled_shutoff_head_m - sol.scaled_curve_coeff_a * sol.operating_flow_m3_hr.powi(2);
+    let h_system_at_q =
+        prob.system_static_head_m + prob.system_friction_coeff_k * sol.operating_flow_m3_hr.powi(2);
     let comparison = AnalyticalComparison::assess(
-        "cavitation_npsh_margin",
-        sol.npsh_margin_m,
-        prob.npsh_required_m * 0.10,
+        "Pump / System Curve Operating Point Head (m)",
+        h_pump_at_q,
+        h_system_at_q,
     );
 
     SimulationResult {
@@ -253,7 +258,10 @@ pub fn solve_pump_sim(prob: &PumpProblem) -> SimulationResult {
         convergence: conv,
         validation: Some(comparison),
         provenance: SimulationProvenance::new("atlas.hydraulic.pump_iso9906", "0.1.0"),
-        logs: vec![format!("Operating point: {:.1} m3/hr @ {:.1} m head, Brake power: {:.1} kW", sol.operating_flow_m3_hr, sol.operating_head_m, sol.brake_shaft_power_kw)],
+        logs: vec![format!(
+            "Operating point: {:.1} m3/hr @ {:.1} m head, Brake power: {:.1} kW",
+            sol.operating_flow_m3_hr, sol.operating_head_m, sol.brake_shaft_power_kw
+        )],
     }
 }
 

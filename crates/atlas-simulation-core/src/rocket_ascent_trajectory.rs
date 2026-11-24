@@ -66,21 +66,21 @@ impl Default for RocketAscentProblem {
         Self {
             problem_id: "two_stage_orbital_launch_vehicle".to_string(),
             staging_type: RocketStagingArchitecture::TwoStageToOrbit,
-            gross_liftoff_mass_kg: 549054.0,       // Falcon 9 class GLOW
-            payload_mass_kg: 15600.0,              // 15.6 tonnes to LEO
+            gross_liftoff_mass_kg: 549054.0, // Falcon 9 class GLOW
+            payload_mass_kg: 15600.0,        // 15.6 tonnes to LEO
             stage1_propellant_mass_kg: 411000.0,
             stage1_dry_mass_kg: 25600.0,
-            stage1_thrust_sl_kn: 7607.0,           // 9 Merlin 1D sea level thrust
+            stage1_thrust_sl_kn: 7607.0, // 9 Merlin 1D sea level thrust
             stage1_isp_vac_s: 311.0,
             stage1_burn_time_s: 162.0,
             stage2_propellant_mass_kg: 92670.0,
             stage2_dry_mass_kg: 4000.0,
-            stage2_thrust_vac_kn: 981.0,           // Merlin Vacuum thrust
+            stage2_thrust_vac_kn: 981.0, // Merlin Vacuum thrust
             stage2_isp_vac_s: 348.0,
-            aerodynamic_reference_area_m2: 10.52,  // 3.66 m diameter core
+            aerodynamic_reference_area_m2: 10.52, // 3.66 m diameter core
             drag_coefficient_cd: 0.32,
-            target_orbit_altitude_km: 300.0,       // 300 km circular LEO
-            launch_latitude_deg: 28.5,             // Cape Canaveral
+            target_orbit_altitude_km: 300.0, // 300 km circular LEO
+            launch_latitude_deg: 28.5,       // Cape Canaveral
         }
     }
 }
@@ -162,7 +162,8 @@ pub fn solve_rocket_ascent(problem: &RocketAscentProblem) -> Result<RocketAscent
 
     // 3. Stage 2 Tsiolkovsky Delta-V:
     // Initial mass M_02 = Stage 2 dry + Stage 2 prop + payload
-    let m_02 = problem.stage2_dry_mass_kg + problem.stage2_propellant_mass_kg + problem.payload_mass_kg;
+    let m_02 =
+        problem.stage2_dry_mass_kg + problem.stage2_propellant_mass_kg + problem.payload_mass_kg;
     let m_f2 = problem.stage2_dry_mass_kg + problem.payload_mass_kg;
     let delta_v2 = problem.stage2_isp_vac_s * g_0 * (m_02 / m_f2).ln();
 
@@ -191,7 +192,8 @@ pub fn solve_rocket_ascent(problem: &RocketAscentProblem) -> Result<RocketAscent
     let q_max_pa = 0.5 * rho_max_q * v_max_q.powi(2);
     let q_max_kpa = q_max_pa / 1000.0;
 
-    let drag_force_max_q = q_max_pa * problem.drag_coefficient_cd * problem.aerodynamic_reference_area_m2;
+    let drag_force_max_q =
+        q_max_pa * problem.drag_coefficient_cd * problem.aerodynamic_reference_area_m2;
     // Aerodynamic loss typically 120 - 180 m/s for slender orbital launcher:
     let delta_v_aero = (drag_force_max_q / (0.75 * m_01)) * 35.0 + 85.0;
 
@@ -252,7 +254,9 @@ mod tests {
         let prob = RocketAscentProblem::default();
         let res = solve_rocket_ascent(&prob)?;
 
-        assert!(res.liftoff_thrust_to_weight_ratio > 1.30 && res.liftoff_thrust_to_weight_ratio < 1.60);
+        assert!(
+            res.liftoff_thrust_to_weight_ratio > 1.30 && res.liftoff_thrust_to_weight_ratio < 1.60
+        );
         assert!(res.stage1_ideal_delta_v_m_s > 4000.0 && res.stage1_ideal_delta_v_m_s < 5200.0);
         assert!(res.stage2_ideal_delta_v_m_s > 4000.0 && res.stage2_ideal_delta_v_m_s < 6500.0);
         assert!(res.total_ideal_delta_v_m_s > 9000.0 && res.total_ideal_delta_v_m_s < 10500.0);

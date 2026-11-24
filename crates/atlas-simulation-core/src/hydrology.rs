@@ -122,7 +122,10 @@ pub fn solve_rational_runoff_and_pipe(prob: &HydrologyProblem) -> Result<Hydrolo
     let s_pipe = prob.pipe_slope;
 
     if a_ha <= 0.01 || l_m <= 10.0 || s_terr <= 0.0001 || s_pipe <= 0.0001 {
-        return Err("Catchment area, flow length, terrain slope, and pipe slope must be strictly positive.".to_string());
+        return Err(
+            "Catchment area, flow length, terrain slope, and pipe slope must be strictly positive."
+                .to_string(),
+        );
     }
 
     let c_coeff = prob.land_use.runoff_coefficient();
@@ -152,7 +155,10 @@ pub fn solve_rational_runoff_and_pipe(prob: &HydrologyProblem) -> Result<Hydrolo
     let d_min_mm = d_min_m * 1000.0;
 
     // Commercial standard pipe selection:
-    let d_actual_mm = prob.selected_pipe_diameter_mm.unwrap_or(d_min_mm).max(d_min_mm);
+    let d_actual_mm = prob
+        .selected_pipe_diameter_mm
+        .unwrap_or(d_min_mm)
+        .max(d_min_mm);
     let d_actual_m = d_actual_mm / 1000.0;
 
     // Full pipe capacity:
@@ -170,11 +176,31 @@ pub fn solve_rational_runoff_and_pipe(prob: &HydrologyProblem) -> Result<Hydrolo
     let capacity_margin_pct = ((q_cap_m3_s - q_peak_m3_s) / q_peak_m3_s) * 100.0;
 
     let notes = vec![
-        format!("Stormwater Hydrology: '{}' ({:.1} ha, Land Use = {:?}, C = {:.2})", prob.basin_name, a_ha, prob.land_use, c_coeff),
-        format!("Kirpich Concentration: Flow Path = {:.0} m @ {:.2}% Slope -> Tc = {:.1} min", l_m, s_terr * 100.0, tc_min),
-        format!("IDF Rainfall: Intensity = {:.1} mm/hr -> Peak Runoff Q_peak = {:.3} m³/s ({:.1} L/s)", rainfall_intensity_mm_hr, q_peak_m3_s, q_peak_l_s),
-        format!("Manning Culvert: Min D = {:.0} mm, Nominal D = {:.0} mm @ {:.2}% Slope (n = {:.3})", d_min_mm, d_actual_mm, s_pipe * 100.0, n_manning),
-        format!("Hydraulic Performance: Pipe Full Capacity = {:.3} m³/s (+{:.1}% Margin), Velocity = {:.2} m/s (Self-Cleansing: {})", q_cap_m3_s, capacity_margin_pct, velocity_m_s, is_self_clean),
+        format!(
+            "Stormwater Hydrology: '{}' ({:.1} ha, Land Use = {:?}, C = {:.2})",
+            prob.basin_name, a_ha, prob.land_use, c_coeff
+        ),
+        format!(
+            "Kirpich Concentration: Flow Path = {:.0} m @ {:.2}% Slope -> Tc = {:.1} min",
+            l_m,
+            s_terr * 100.0,
+            tc_min
+        ),
+        format!(
+            "IDF Rainfall: Intensity = {:.1} mm/hr -> Peak Runoff Q_peak = {:.3} m³/s ({:.1} L/s)",
+            rainfall_intensity_mm_hr, q_peak_m3_s, q_peak_l_s
+        ),
+        format!(
+            "Manning Culvert: Min D = {:.0} mm, Nominal D = {:.0} mm @ {:.2}% Slope (n = {:.3})",
+            d_min_mm,
+            d_actual_mm,
+            s_pipe * 100.0,
+            n_manning
+        ),
+        format!(
+            "Hydraulic Performance: Pipe Full Capacity = {:.3} m³/s (+{:.1}% Margin), Velocity = {:.2} m/s (Self-Cleansing: {})",
+            q_cap_m3_s, capacity_margin_pct, velocity_m_s, is_self_clean
+        ),
     ];
 
     Ok(HydrologyResult {
@@ -200,13 +226,28 @@ pub fn solve_hydrology_sim(prob: &HydrologyProblem) -> Result<SimulationResult, 
     let sol = solve_rational_runoff_and_pipe(prob)?;
 
     let mut metrics = HashMap::new();
-    metrics.insert("time_of_concentration_min".to_string(), sol.time_of_concentration_min);
-    metrics.insert("rainfall_intensity_mm_hr".to_string(), sol.rainfall_intensity_mm_hr);
+    metrics.insert(
+        "time_of_concentration_min".to_string(),
+        sol.time_of_concentration_min,
+    );
+    metrics.insert(
+        "rainfall_intensity_mm_hr".to_string(),
+        sol.rainfall_intensity_mm_hr,
+    );
     metrics.insert("peak_discharge_m3_s".to_string(), sol.peak_discharge_m3_s);
-    metrics.insert("min_required_pipe_diameter_mm".to_string(), sol.min_required_pipe_diameter_mm);
-    metrics.insert("actual_pipe_diameter_mm".to_string(), sol.actual_pipe_diameter_mm);
+    metrics.insert(
+        "min_required_pipe_diameter_mm".to_string(),
+        sol.min_required_pipe_diameter_mm,
+    );
+    metrics.insert(
+        "actual_pipe_diameter_mm".to_string(),
+        sol.actual_pipe_diameter_mm,
+    );
     metrics.insert("flow_velocity_m_s".to_string(), sol.flow_velocity_m_s);
-    metrics.insert("capacity_safety_margin_percent".to_string(), sol.capacity_safety_margin_percent);
+    metrics.insert(
+        "capacity_safety_margin_percent".to_string(),
+        sol.capacity_safety_margin_percent,
+    );
 
     let mut conv = ConvergenceMonitor::new(1e-6);
     conv.record(1, sol.peak_discharge_m3_s, 1, 1e-4);
@@ -214,7 +255,10 @@ pub fn solve_hydrology_sim(prob: &HydrologyProblem) -> Result<SimulationResult, 
     let val = AnalyticalComparison::assess(
         "Peak Runoff Discharge (m³/s)",
         sol.peak_discharge_m3_s,
-        (prob.land_use.runoff_coefficient() * sol.rainfall_intensity_mm_hr * prob.catchment_area_ha) / 360.0,
+        (prob.land_use.runoff_coefficient()
+            * sol.rainfall_intensity_mm_hr
+            * prob.catchment_area_ha)
+            / 360.0,
     );
 
     Ok(SimulationResult {
@@ -248,7 +292,9 @@ mod tests {
         // Q_peak ~ 1.0 - 2.0 m³/s
         assert!(sol.peak_discharge_m3_s > 0.8 && sol.peak_discharge_m3_s < 2.5);
         // Required pipe diameter ~ 800 - 1100 mm for 1.6 m3/s runoff
-        assert!(sol.min_required_pipe_diameter_mm > 700.0 && sol.min_required_pipe_diameter_mm < 1200.0);
+        assert!(
+            sol.min_required_pipe_diameter_mm > 700.0 && sol.min_required_pipe_diameter_mm < 1200.0
+        );
         // Velocity should be self-cleansing (> 0.9 m/s)
         assert!(sol.flow_velocity_m_s > 0.9);
 
