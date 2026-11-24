@@ -1986,10 +1986,35 @@
         <button type="button" class="navbar-btn" id="navCleanScreenBtn" title="AutoCAD Clean Screen Focus Mode (Ctrl+0 / F11)">
           <span class="nav-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-clean-screen"/></svg></span>
         </button>
+        <button type="button" class="navbar-btn" id="navExplodeBtn" title="3D Assembly Exploded View Slider (X)">
+          <span class="nav-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-explode"/></svg></span>
+        </button>
+        <button type="button" class="navbar-btn" id="navSectionBtn" title="3D Dynamic Section Cutting Plane (S)">
+          <span class="nav-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-section-cut"/></svg></span>
+        </button>
         <button type="button" class="navbar-btn" id="navQuadViewBtn" title="Toggle Multi-Viewport Quad View (4-Up Split: Top, Front, Right, Perspective)">
           <span class="nav-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-quad-view"/></svg></span>
         </button>
       </nav>
+
+      <!-- 3D Exploded View HUD Control -->
+      <div id="viewportExplodeHud" class="viewport-hud-control" hidden>
+        <span class="hud-label"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-explode"/></svg> Explode: <strong id="explodeValLabel">0%</strong></span>
+        <input type="range" id="explodeSlider" min="0" max="100" step="1" value="0" class="hud-slider-compact" aria-label="Explode Percentage">
+        <button type="button" class="icon-button small" id="explodeResetBtn" title="Reset Exploded View">&times;</button>
+      </div>
+
+      <!-- 3D Section Plane HUD Control -->
+      <div id="viewportSectionHud" class="viewport-hud-control" hidden>
+        <span class="hud-label"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-section-cut"/></svg> Section Cut:</span>
+        <div class="cae-segmented" id="viewportSectionAxisGroup">
+          <button type="button" class="seg-btn active" data-axis="x">X</button>
+          <button type="button" class="seg-btn" data-axis="y">Y</button>
+          <button type="button" class="seg-btn" data-axis="z">Z</button>
+        </div>
+        <input type="range" id="viewportSectionSlider" min="-50" max="50" step="1" value="0" class="hud-slider-compact" aria-label="Section Plane Offset">
+        <button type="button" class="icon-button small" id="viewportSectionCloseBtn" title="Close Section Cut">&times;</button>
+      </div>
 
       <!-- Quad View Labels Overlay -->
       <div class="quad-view-labels-overlay" id="quadViewLabelsOverlay" hidden>
@@ -2490,6 +2515,15 @@
             <button type="button" class="button secondary small" id="caeRunAllSuiteBtn"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-fea"/></svg> Run 27-Domain Suite</button>
             <button type="button" class="button ghost small" id="caeDispatchClusterBtn">Dispatch to HPC Cluster</button>
           </div>
+        </div>
+        <div class="wb-presets-bar" id="caePresetsBar">
+          <span class="wb-presets-label"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-lightning"/></svg> 1-Click Simulation Presets:</span>
+          <button type="button" class="preset-chip" data-preset="hypersonic" title="Mach 6.0 Scramjet & Waverider Aerothermal Flow">Mach 6 Waverider</button>
+          <button type="button" class="preset-chip" data-preset="cfd_nozzle" title="Converging-Diverging Supersonic Rocket Nozzle">Supersonic Nozzle</button>
+          <button type="button" class="preset-chip" data-preset="modal_wing" title="Cantilever Aircraft Wing Dynamic Modal Resonance">Wing Modal (5 Modes)</button>
+          <button type="button" class="preset-chip" data-preset="thermal_heatsink" title="Transient Thermal Dissipation & Heatsink Conduction">Thermal Conduction</button>
+          <button type="button" class="preset-chip" data-preset="static_beam" title="Linear Static Stress & Yield FoS Analysis">Static Beam (Von Mises)</button>
+          <button type="button" class="preset-chip" data-preset="ev_battery" title="EV 400V Battery Pack Thermal Runaway Safety">EV Battery Thermal</button>
         </div>
         <div class="wb-body-split">
           <div class="wb-control-pane">
@@ -4543,6 +4577,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
           <button type="button" class="view-mode-btn active" id="assetsGridModeBtn" data-mode="grid" title="Visual Cards View">▦ Grid</button>
           <button type="button" class="view-mode-btn" id="assetsTableModeBtn" data-mode="table" title="Detailed Table View"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-table"/></svg> Table</button>
         </div>
+        <button type="button" class="button primary" id="assetsPublishBtn"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-create"/></svg> + Publish Asset</button>
         <button type="button" class="button ghost" id="assetsRefreshBtn">Refresh Catalog</button>
       </div>
     </div>
@@ -5488,6 +5523,129 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
       </div>
       <div style="display:flex; justify-content:flex-end; margin-top:16px;">
         <button type="button" class="button ghost" id="importExportDoneBtn">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Publish / Create Asset Modal -->
+  <div id="publishAssetModal" class="palette" hidden role="dialog" aria-modal="true" aria-labelledby="publishAssetTitle">
+    <div class="palette-backdrop" id="publishAssetBackdrop"></div>
+    <div class="palette-card" style="max-width:620px;">
+      <div class="palette-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="color:#3b82f6;"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-create"/></svg></span>
+          <h3 id="publishAssetTitle" style="margin:0; font-size:15px;">Publish to Engineering Asset Registry</h3>
+        </div>
+        <button type="button" class="icon-button" id="publishAssetCloseBtn">&times;</button>
+      </div>
+      <p style="font-size:12px; color:var(--atlas-text-dim); margin-top:0; margin-bottom:14px;">
+        Share certified parametric parts, assemblies, or materials with your engineering team or the public AtlasCAD ecosystem.
+      </p>
+      <form id="publishAssetForm" onsubmit="return false;" style="display:flex; flex-direction:column; gap:12px;">
+        <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px;">
+          <div>
+            <label for="publishAssetName" style="display:block; font-size:11px; margin-bottom:4px; font-weight:600;">Asset Name</label>
+            <input type="text" id="publishAssetName" class="filter-input" placeholder="e.g. ISO 4762 Titanium M10 Bolt" required style="width:100%;">
+          </div>
+          <div>
+            <label for="publishAssetCategory" style="display:block; font-size:11px; margin-bottom:4px; font-weight:600;">Category</label>
+            <select id="publishAssetCategory" class="filter-select" style="width:100%;">
+              <option value="Hardware">Hardware / Fasteners</option>
+              <option value="Aerospace">Aerospace &amp; Defense</option>
+              <option value="Robotics">Robotics &amp; Actuators</option>
+              <option value="Materials">Certified Materials</option>
+              <option value="Structural">Structural Extrusions</option>
+              <option value="Electronics">ECAD / Electronics</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div>
+            <label for="publishAssetVisibility" style="display:block; font-size:11px; margin-bottom:4px; font-weight:600;">Visibility &amp; Access</label>
+            <select id="publishAssetVisibility" class="filter-select" style="width:100%;">
+              <option value="public">Public (AtlasCAD Global Marketplace)</option>
+              <option value="team" selected>Team (Organization Workspace)</option>
+              <option value="private">Private (Only You)</option>
+            </select>
+          </div>
+          <div>
+            <label for="publishAssetTags" style="display:block; font-size:11px; margin-bottom:4px; font-weight:600;">Tags (Comma Separated)</label>
+            <input type="text" id="publishAssetTags" class="filter-input" placeholder="fastener, titanium, aero, iso" style="width:100%;">
+          </div>
+        </div>
+
+        <div>
+          <label for="publishAssetDesc" style="display:block; font-size:11px; margin-bottom:4px; font-weight:600;">Engineering Description &amp; Standard</label>
+          <textarea id="publishAssetDesc" class="filter-input" rows="3" style="width:100%; resize:vertical; font-family:inherit;" placeholder="Parametric socket head cap screw according to ISO 4762 with Grade 5 Ti-6Al-4V certified properties."></textarea>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">
+          <button type="button" class="button ghost" id="publishAssetCancelBtn">Cancel</button>
+          <button type="submit" class="button primary" id="publishAssetSubmitBtn">Publish to Registry</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Interactive Bill of Materials (BOM) & Mass Rollup Modal -->
+  <div id="bomModal" class="palette" hidden role="dialog" aria-modal="true" aria-labelledby="bomModalTitle">
+    <div class="palette-backdrop" id="bomModalBackdrop"></div>
+    <div class="palette-card" style="max-width:850px; width:92vw;">
+      <div class="palette-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="color:#10b981;"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-bom"/></svg></span>
+          <h3 id="bomModalTitle" style="margin:0; font-size:15px;">Engineering Bill of Materials (BOM) &amp; Mass Rollup</h3>
+        </div>
+        <button type="button" class="icon-button" id="bomModalCloseBtn">&times;</button>
+      </div>
+
+      <div class="sim-metric-grid" style="margin-bottom:14px;">
+        <div class="sim-metric-box">
+          <div class="label">Total Items</div>
+          <div class="value" id="bomTotalItemsVal">0</div>
+        </div>
+        <div class="sim-metric-box">
+          <div class="label">Total Quantity</div>
+          <div class="value" id="bomTotalQtyVal">0</div>
+        </div>
+        <div class="sim-metric-box">
+          <div class="label">Assembly Volume</div>
+          <div class="value" id="bomTotalVolVal">0.0 mm³</div>
+        </div>
+        <div class="sim-metric-box">
+          <div class="label">Assembly Mass</div>
+          <div class="value" style="color:var(--accent);" id="bomTotalMassVal">0.000 kg</div>
+        </div>
+      </div>
+
+      <div class="studio-table-wrap" style="max-height:360px; overflow-y:auto; border:1px solid var(--atlas-border); border-radius:6px;">
+        <table class="studio-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Component / Body</th>
+              <th>Material</th>
+              <th>Dimensions (X × Y × Z mm)</th>
+              <th>Volume</th>
+              <th>Mass</th>
+              <th>Process</th>
+            </tr>
+          </thead>
+          <tbody id="bomTableBody">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+        <div style="font-size:11.5px; color:var(--atlas-text-dim);">
+          Center of Mass: <strong id="bomComDisplay" style="color:var(--atlas-text);">[0.0, 0.0, 0.0] mm</strong>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="button secondary small" id="bomExportCsvBtn"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-table"/></svg> Export CSV</button>
+          <button type="button" class="button ghost small" id="bomDoneBtn">Close</button>
+        </div>
       </div>
     </div>
   </div>

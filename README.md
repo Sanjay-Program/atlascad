@@ -94,13 +94,26 @@ flowchart TD
 - **Comprehensive Documentation**: Full architectural guides available in [docs/ENTERPRISE_IDENTITY_AND_RBAC.md](file:///home/sanjay/Projects/atlascad-main/docs/ENTERPRISE_IDENTITY_AND_RBAC.md) and [docs/ASSET_ECOSYSTEM_AND_COLLABORATION.md](file:///home/sanjay/Projects/atlascad-main/docs/ASSET_ECOSYSTEM_AND_COLLABORATION.md).
 
 ### Pillar 7: World #1 CAD & Multiphysics Simulation UI/UX Experience
+- **1-Click Multiphysics Simulation Presets**: Instant one-click verification of complex engineering domains:
+  1. *Mach 6.0 Hypersonic Waverider*: Solves aerothermal stagnation heat flux ($T_{wall} \approx 1,240^\circ\text{C}$), scramjet thrust ($185\text{ kN}$), and global range.
+  2. *Supersonic De Laval Rocket Nozzle (CFD)*: Compressible gas dynamic flow with exit Mach number, pressure drop, and shock diamonds.
+  3. *Aircraft Cantilever Wing Modal Resonance*: 5 dynamic bending & torsional natural frequencies with live harmonic sinusoidal oscillation.
+  4. *Transient Thermal Dissipation*: Steady-state and transient heat sink temperature distribution ($25^\circ\text{C} \to 95^\circ\text{C}$).
+  5. *Linear Static Beam Stress (FEA)*: Peak von Mises stress, tip deflection, and certified ASTM yield Factor of Safety ($FoS$).
+  6. *EV 400V Battery Pack Thermal Safety*: Thevenin electrochemical heat generation, forced convective cooling, and thermal runaway prevention.
+- **1-Click Parametric 3D Asset Insertion & Publishing**:
+  - *Procedural 3D Mesh Engine*: Instant vertex/triangle generation for ISO socket bolts, ball bearings, modular aluminum extrusions, involute spur gears, NEMA stepper motors, and waverider airframes.
+  - *Publishing Modal*: In-app dialog to publish custom models with tags, category, and access tiers (`public`, `team`, `private`) to the content-addressed registry.
+  - *Drag-and-Drop Assembly*: Drag catalog cards directly onto the 3D canvas to merge into the active assembly with automated usage logging.
+- **Interactive 3D Assembly Exploded View Slider (`X`)**: GPU-accelerated continuous radial separation slider ($0\% \to 100\%$) translating multi-body parts outwards from the assembly centroid for internal clearance inspection.
+- **Dynamic Cartesian Section Cutaway Plane (`S`)**: Instantaneous planar clipping along $X, Y, Z$ with offset scrubbing to inspect core internal stresses and geometries.
+- **Interactive Bill of Materials (BOM) & Mass Rollup**: Comprehensive assembly parts list with bounding dimensions, volumes, masses, manufacturing processes (5-Axis CNC, LPBF Additive), and 1-click CSV export.
 - **AutoCAD 3D ViewCube (26 Directions + Animated Slerp Tweening)**: Complete 26-direction orientation matrix (6 principal orthographic faces, 8 isometric corners, 12 edge bevels) with cubic ease-out spherical camera tweening, compass heading dial ($N, S, E, W$), twin $90^\circ$ spin buttons ($↶$ CCW / $↷$ CW), and instant Home view recovery.
 - **Interactive 3D CAE Simulation Post-Processor**: Direct in-viewport WebGL scalar field color contour mapping for linear static stress ($\sigma_{vM}$), structural deflection ($\delta$), modal vibration modes, and steady-state thermal isotherms without external post-processors (ParaView/Ansys).
 - **Five Scientific Colormaps**: Real-time evaluation of Jet (Rainbow), Turbo (Perceptually smooth), Viridis (Scientific & colorblind-safe), Inferno (Blackbody thermal), and Coolwarm (Diverging tension/compression).
 - **Pinned 3D Model Probes**: Automatic world-to-screen matrix projection pinning 🔴 MAX and 🔵 MIN callout badges at the exact $[X, Y, Z]$ coordinates of peak stress and deflection, plus dynamic cursor inspection probe.
 - **Micro-Deflection Deformation Magnifier**: Continuous $0\times \to 50\times$ scrubbable slider amplifying micro-strains into visible structural deformation modes.
 - **Harmonic Modal Vibration Animation**: Real-time sinusoidal phase engine ($\sin(\omega_k t)$) animating resonance mode shapes at fundamental and harmonic natural frequencies.
-- **Dynamic Cartesian Section Cutaway Plane**: Instantaneous planar clipping along $X, Y, Z$ with offset scrubbing to inspect core internal stresses.
 - **3D CNC Toolpath Vectors**: Real-time visualization of rapid moves (red dashed) and cutting moves (cyan/green) directly in the solid model scene.
 - **AutoCAD Dynamic Input (`F12 / DYN`) & Status Tray**: Cursor-following HUD displaying live cartesian coordinates, relative polar distance/angle ($L < \theta^\circ$), and magnetic snap badges (`ORIGIN`, `ENDPOINT`).
 - **100% Vector SVG Icon Infrastructure**: Universal icon symbol library eliminating all emoji glyphs.

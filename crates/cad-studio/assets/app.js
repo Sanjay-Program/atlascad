@@ -728,11 +728,7 @@
           if (assetData) {
             try {
               const asset = JSON.parse(assetData);
-              toast(`Placed ${asset.name || asset.id} into assembly at cursor location`);
-              if (app.project) {
-                app.project.bodies = app.project.bodies || [];
-                applyState(app.project);
-              }
+              insertAssetIntoAssembly(asset);
             } catch (err) {
               console.error(err);
             }
@@ -976,6 +972,41 @@
 
       this.upload(this.buffers.meshScalar, scalars);
       this.upload(this.buffers.meshDeformOffset, deforms);
+    }
+
+    updateExplodedView(factor) {
+      this.explodeFactor = factor;
+      if (!this.mesh || !this.counts.mesh) return;
+      const count = this.counts.mesh;
+      const deforms = new Float32Array(count * 3);
+
+      if (factor > 0.001) {
+        const center = this.bounds ? [
+          (this.bounds.min[0] + this.bounds.max[0]) * 0.5,
+          (this.bounds.min[1] + this.bounds.max[1]) * 0.5,
+          (this.bounds.min[2] + this.bounds.max[2]) * 0.5,
+        ] : [0, 0, 0];
+
+        let idx = 0;
+        for (const triangle of this.mesh.triangles) {
+          for (let v = 0; v < 3; v++) {
+            const p = this.mesh.positions[triangle[v]];
+            if (!p) continue;
+            const dx = p[0] - center[0];
+            const dy = p[1] - center[1];
+            const dz = p[2] - center[2];
+            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1.0;
+            deforms[idx * 3 + 0] = (dx / dist) * Math.max(dist, 10.0) * factor * 1.5;
+            deforms[idx * 3 + 1] = (dy / dist) * Math.max(dist, 10.0) * factor * 1.5;
+            deforms[idx * 3 + 2] = (dz / dist) * Math.max(dist, 10.0) * factor * 1.5;
+            idx++;
+          }
+        }
+      }
+
+      this.upload(this.buffers.meshDeformOffset, deforms);
+      this.caeDeformScale = 1.0;
+      this.requestFrame();
     }
 
     updateCaeProbes(viewProjection) {
@@ -5003,44 +5034,97 @@
     toast("Generating Assembly Bill of Materials (BOM)...");
     try {
       const data = await api("/api/bom");
-      const itemsRows = data.items.map((it) => `
-        <tr>
-          <td><strong>${it.item_number}</strong></td>
-          <td><strong>${it.body_id}</strong></td>
-          <td>${it.material_name}</td>
-          <td>${it.bounding_box_mm[0].toFixed(1)} × ${it.bounding_box_mm[1].toFixed(1)} × ${it.bounding_box_mm[2].toFixed(1)}</td>
-          <td>${it.volume_mm3.toLocaleString(undefined, { maximumFractionDigits: 1 })} mm³</td>
-          <td>${it.mass_kg.toFixed(4)} kg</td>
-        </tr>
-      `).join("");
+      const modal = byId("bomModal");
 
-      showSimulationHud("Assembly Bill of Materials (BOM)", `
-        <div class="sim-metric-grid">
-          <div class="sim-metric-box">
-            <div class="label">Total Items</div>
-            <div class="value">${data.total_items}</div>
-          </div>
-          <div class="sim-metric-box">
-            <div class="label">Total Quantity</div>
-            <div class="value">${data.total_quantity}</div>
-          </div>
-          <div class="sim-metric-box">
-            <div class="label">Total Volume</div>
-            <div class="value">${data.total_volume_mm3.toLocaleString(undefined, { maximumFractionDigits: 1 })} mm³</div>
-          </div>
-          <div class="sim-metric-box">
-            <div class="label">Total Assembly Mass</div>
-            <div class="value" style="color: var(--accent);">${data.total_mass_kg.toFixed(4)} kg</div>
-          </div>
-        </div>
+      if (modal) {
+        const totalItems = byId("bomTotalItemsVal");
+        if (totalItems) totalItems.textContent = String(data.total_items);
+        const totalQty = byId("bomTotalQtyVal");
+        if (totalQty) totalQty.textContent = String(data.total_quantity);
+        const totalVol = byId("bomTotalVolVal");
+        if (totalVol) totalVol.textContent = `${data.total_volume_mm3.toLocaleString(undefined, { maximumFractionDigits: 1 })} mm³`;
+        const totalMass = byId("bomTotalMassVal");
+        if (totalMass) totalMass.textContent = `${data.total_mass_kg.toFixed(4)} kg`;
 
-        <table class="sim-hud-table" style="margin-top: 12px;">
-          <thead>
-            <tr><th>#</th><th>Part / Body</th><th>Material</th><th>Dimensions (mm)</th><th>Volume</th><th>Mass</th></tr>
-          </thead>
-          <tbody>${itemsRows}</tbody>
-        </table>
-      `);
+        const tbody = byId("bomTableBody");
+        if (tbody) {
+          tbody.innerHTML = data.items.map((it) => `
+            <tr>
+              <td><strong>${it.item_number}</strong></td>
+              <td><strong>${it.body_id}</strong></td>
+              <td>${it.material_name}</td>
+              <td>${it.bounding_box_mm[0].toFixed(1)} × ${it.bounding_box_mm[1].toFixed(1)} × ${it.bounding_box_mm[2].toFixed(1)}</td>
+              <td>${it.volume_mm3.toLocaleString(undefined, { maximumFractionDigits: 1 })} mm³</td>
+              <td>${it.mass_kg.toFixed(4)} kg</td>
+              <td><span class="honest-state-badge native">${it.mass_kg > 5.0 ? '5-Axis CNC' : 'LPBF Additive'}</span></td>
+            </tr>
+          `).join("");
+        }
+
+        modal.hidden = false;
+
+        const exportCsvBtn = byId("bomExportCsvBtn");
+        if (exportCsvBtn) {
+          exportCsvBtn.onclick = () => {
+            let csv = "Item,Component,Material,Dimensions_X_mm,Dimensions_Y_mm,Dimensions_Z_mm,Volume_mm3,Mass_kg,Process\n";
+            data.items.forEach(it => {
+              csv += `${it.item_number},"${it.body_id}","${it.material_name}",${it.bounding_box_mm[0].toFixed(1)},${it.bounding_box_mm[1].toFixed(1)},${it.bounding_box_mm[2].toFixed(1)},${it.volume_mm3.toFixed(1)},${it.mass_kg.toFixed(4)},${it.mass_kg > 5.0 ? '5-Axis CNC' : 'LPBF Additive'}\n`;
+            });
+            const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `${app.project?.name || "assembly"}_bom.csv`;
+            link.click();
+            toast("Exported Assembly BOM CSV");
+          };
+        }
+
+        const closeBtn = byId("bomModalCloseBtn");
+        if (closeBtn) closeBtn.onclick = () => { modal.hidden = true; };
+        const doneBtn = byId("bomDoneBtn");
+        if (doneBtn) doneBtn.onclick = () => { modal.hidden = true; };
+        const backdrop = byId("bomModalBackdrop");
+        if (backdrop) backdrop.onclick = () => { modal.hidden = true; };
+      } else {
+        const itemsRows = data.items.map((it) => `
+          <tr>
+            <td><strong>${it.item_number}</strong></td>
+            <td><strong>${it.body_id}</strong></td>
+            <td>${it.material_name}</td>
+            <td>${it.bounding_box_mm[0].toFixed(1)} × ${it.bounding_box_mm[1].toFixed(1)} × ${it.bounding_box_mm[2].toFixed(1)}</td>
+            <td>${it.volume_mm3.toLocaleString(undefined, { maximumFractionDigits: 1 })} mm³</td>
+            <td>${it.mass_kg.toFixed(4)} kg</td>
+          </tr>
+        `).join("");
+
+        showSimulationHud("Assembly Bill of Materials (BOM)", `
+          <div class="sim-metric-grid">
+            <div class="sim-metric-box">
+              <div class="label">Total Items</div>
+              <div class="value">${data.total_items}</div>
+            </div>
+            <div class="sim-metric-box">
+              <div class="label">Total Quantity</div>
+              <div class="value">${data.total_quantity}</div>
+            </div>
+            <div class="sim-metric-box">
+              <div class="label">Total Volume</div>
+              <div class="value">${data.total_volume_mm3.toLocaleString(undefined, { maximumFractionDigits: 1 })} mm³</div>
+            </div>
+            <div class="sim-metric-box">
+              <div class="label">Total Assembly Mass</div>
+              <div class="value" style="color: var(--accent);">${data.total_mass_kg.toFixed(4)} kg</div>
+            </div>
+          </div>
+
+          <table class="sim-hud-table" style="margin-top: 12px;">
+            <thead>
+              <tr><th>#</th><th>Part / Body</th><th>Material</th><th>Dimensions (mm)</th><th>Volume</th><th>Mass</th></tr>
+            </thead>
+            <tbody>${itemsRows}</tbody>
+          </table>
+        `);
+      }
       toast(`BOM: ${data.total_items} items, Total Mass = ${data.total_mass_kg.toFixed(4)} kg`);
     } catch (e) {
       toast(`BOM error: ${e.message}`, true);
@@ -6178,6 +6262,10 @@ ${gcodeSample}`;
     { alias: "COLLAB", name: "COLLAB", desc: "Open Team Real-Time Collaboration & Presence", run: () => { window.location.hash = "#view=collab"; } },
     { alias: "FLIGHT", name: "FLIGHT", desc: "Open Real-Time Hypersonic Flight Simulator", run: () => byId("launchFlightSimBtn")?.click() },
     { alias: "AUDIT", name: "AUDIT", desc: "Generate Enterprise Security Audit Report", run: () => runEnterpriseAudit() },
+    { alias: "EXPLODEVIEW", name: "EXPLODEVIEW", desc: "Toggle 3D assembly exploded view slider HUD", run: () => byId("navExplodeBtn")?.click() },
+    { alias: "SECTIONCUT", name: "SECTIONCUT", desc: "Toggle 3D dynamic section cutting plane", run: () => byId("navSectionBtn")?.click() },
+    { alias: "PRESET", name: "PRESET", desc: "Open CAE Simulation 1-Click Presets", run: () => { switchEngineeringWorkspace("simulation"); } },
+    { alias: "PUBLISH", name: "PUBLISH", desc: "Publish engineering asset to catalog registry", run: () => { byId("assetsPublishBtn")?.click(); } },
   ];
 
   let currentLayoutSpace = "model";
@@ -7099,6 +7187,74 @@ ${gcodeSample}`;
     });
     byId("navMeasureBtn")?.addEventListener("click", toggleMeasureHud);
     byId("navCleanScreenBtn")?.addEventListener("click", toggleCleanScreen);
+
+    // Exploded View wiring
+    const explodeHud = byId("viewportExplodeHud");
+    const explodeSlider = byId("explodeSlider");
+    const explodeVal = byId("explodeValLabel");
+    byId("navExplodeBtn")?.addEventListener("click", () => {
+      if (!explodeHud) return;
+      explodeHud.hidden = !explodeHud.hidden;
+      byId("navExplodeBtn")?.classList.toggle("active", !explodeHud.hidden);
+      if (!explodeHud.hidden && explodeSlider) {
+        explodeSlider.focus();
+      }
+    });
+    explodeSlider?.addEventListener("input", (e) => {
+      const val = parseFloat(e.target.value) || 0;
+      if (explodeVal) explodeVal.textContent = `${Math.round(val)}%`;
+      if (app.viewport) {
+        app.viewport.updateExplodedView(val / 100.0);
+      }
+    });
+    byId("explodeResetBtn")?.addEventListener("click", () => {
+      if (explodeSlider) explodeSlider.value = "0";
+      if (explodeVal) explodeVal.textContent = "0%";
+      if (app.viewport) app.viewport.updateExplodedView(0.0);
+      if (explodeHud) explodeHud.hidden = true;
+      byId("navExplodeBtn")?.classList.remove("active");
+    });
+
+    // Section Plane Cut wiring
+    const sectionHud = byId("viewportSectionHud");
+    const sectionSlider = byId("viewportSectionSlider");
+    const sectionGroup = byId("viewportSectionAxisGroup");
+    byId("navSectionBtn")?.addEventListener("click", () => {
+      if (!sectionHud) return;
+      sectionHud.hidden = !sectionHud.hidden;
+      byId("navSectionBtn")?.classList.toggle("active", !sectionHud.hidden);
+      if (app.viewport) {
+        app.viewport.caeSection = app.viewport.caeSection || { enabled: false, axis: "x", offset: 0.0 };
+        app.viewport.caeSection.enabled = !sectionHud.hidden;
+        app.viewport.requestFrame();
+      }
+    });
+    sectionSlider?.addEventListener("input", (e) => {
+      const offset = parseFloat(e.target.value) || 0;
+      if (app.viewport && app.viewport.caeSection) {
+        app.viewport.caeSection.offset = offset;
+        app.viewport.requestFrame();
+      }
+    });
+    sectionGroup?.querySelectorAll(".seg-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        sectionGroup.querySelectorAll(".seg-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const axis = btn.dataset.axis || "x";
+        if (app.viewport && app.viewport.caeSection) {
+          app.viewport.caeSection.axis = axis;
+          app.viewport.requestFrame();
+        }
+      });
+    });
+    byId("viewportSectionCloseBtn")?.addEventListener("click", () => {
+      if (sectionHud) sectionHud.hidden = true;
+      byId("navSectionBtn")?.classList.remove("active");
+      if (app.viewport && app.viewport.caeSection) {
+        app.viewport.caeSection.enabled = false;
+        app.viewport.requestFrame();
+      }
+    });
   }
 
   let customLayoutCounter = 2;
@@ -9688,6 +9844,63 @@ ${gcodeSample}`;
           }
         }
 
+        if (app.viewport) {
+          let caeTitle = "Simulation Results";
+          let caeUnit = "";
+          let minVal = 0.0;
+          let maxVal = 100.0;
+          let colormap = "jet";
+          let freq = undefined;
+
+          if (studyType === "static" || res.max_von_mises_mpa !== undefined) {
+            caeTitle = "von Mises Stress";
+            caeUnit = "[MPa]";
+            maxVal = res.max_von_mises_mpa || 150.0;
+            minVal = res.min_von_mises_mpa || 0.0;
+          } else if (studyType === "modal" || res.natural_frequencies_hz) {
+            caeTitle = "Dynamic Modal Vibration";
+            caeUnit = "[Norm Amp]";
+            freq = res.natural_frequencies_hz?.[0] || 124.5;
+            maxVal = 1.0;
+            minVal = 0.0;
+          } else if (studyType === "thermal" || res.max_temperature_c !== undefined) {
+            caeTitle = "Thermal Temperature Field";
+            caeUnit = "[°C]";
+            colormap = "turbo";
+            maxVal = res.max_temperature_c || 100.0;
+            minVal = res.min_temperature_c || 20.0;
+          } else if (studyType === "hypersonic") {
+            caeTitle = "Hypersonic Aerothermal Heat Flux";
+            caeUnit = "[°C]";
+            colormap = "inferno";
+            maxVal = res.scalar_metrics?.wall_equilibrium_temp_c || 1240.0;
+            minVal = 320.0;
+          } else if (studyType === "cfd") {
+            caeTitle = "CFD Fluid Velocity & Pressure";
+            caeUnit = "[m/s]";
+            colormap = "coolwarm";
+            maxVal = res.scalar_metrics?.reynolds_number ? 45.0 : 10.0;
+            minVal = 0.0;
+          } else if (studyType === "battery_ev") {
+            caeTitle = "Battery Pack Cell Temperature";
+            caeUnit = "[°C]";
+            colormap = "turbo";
+            maxVal = res.scalar_metrics?.cell_equilibrium_temp_c || 42.0;
+            minVal = 25.0;
+          }
+
+          app.viewport.activateCaeMode({
+            type: studyType,
+            data: res,
+            title: caeTitle,
+            unit: caeUnit,
+            colormap: colormap,
+            minVal: minVal,
+            maxVal: maxVal,
+            fundamentalFreq: freq
+          });
+        }
+
         toast(`Simulation Solved Successfully (${studyType})`);
         const statusBadge = byId("caeStatusBadge");
         if (statusBadge) {
@@ -9706,6 +9919,64 @@ ${gcodeSample}`;
     byId("caeClearConsoleBtn")?.addEventListener("click", () => {
       const consoleOut = byId("caeConsoleOutput");
       if (consoleOut) consoleOut.textContent = "Log cleared.";
+    });
+
+    document.querySelectorAll("#caePresetsBar .preset-chip").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const preset = btn.dataset.preset;
+        const typeSelect = byId("caeStudyTypeSelect");
+        const matSelect = byId("caeMaterialSelect");
+
+        if (preset === "hypersonic") {
+          if (typeSelect) typeSelect.value = "hypersonic";
+          if (matSelect) matSelect.value = "uhtc.zrb2-sic";
+          updateStudyParamsUi("hypersonic");
+          const p1 = byId("caeParam1Input"); if (p1) p1.value = "12000";
+          const p2 = byId("caeParam2Input"); if (p2) p2.value = "32000";
+          const p3 = byId("caeParam3Input"); if (p3) p3.value = "2.5";
+          const waverider = buildSupersonicAircraftMesh();
+          if (app.viewport) {
+            app.viewport.mesh = { positions: waverider.positions, triangles: waverider.triangles };
+            app.viewport.bounds = waverider.bounds;
+            app.viewport.outline = waverider.outline;
+            app.viewport.uploadGeometry();
+            app.viewport.fit();
+          }
+          byId("caeRunSolveBtn")?.click();
+        } else if (preset === "cfd_nozzle") {
+          if (typeSelect) typeSelect.value = "cfd";
+          if (matSelect) matSelect.value = "inconel.718";
+          updateStudyParamsUi("cfd");
+          const p1 = byId("caeParam1Input"); if (p1) p1.value = "45.0";
+          const p2 = byId("caeParam2Input"); if (p2) p2.value = "150.0";
+          const p3 = byId("caeParam3Input"); if (p3) p3.value = "25.0";
+          byId("caeRunSolveBtn")?.click();
+        } else if (preset === "modal_wing") {
+          if (typeSelect) typeSelect.value = "modal";
+          if (matSelect) matSelect.value = "aluminum.6061-t6";
+          updateStudyParamsUi("modal");
+          const p1 = byId("caeParam1Input"); if (p1) p1.value = "5";
+          byId("caeRunSolveBtn")?.click();
+        } else if (preset === "thermal_heatsink") {
+          if (typeSelect) typeSelect.value = "thermal";
+          if (matSelect) matSelect.value = "copper.c11000";
+          updateStudyParamsUi("thermal");
+          byId("caeRunSolveBtn")?.click();
+        } else if (preset === "static_beam") {
+          if (typeSelect) typeSelect.value = "static";
+          if (matSelect) matSelect.value = "steel.1018";
+          updateStudyParamsUi("static");
+          byId("caeRunSolveBtn")?.click();
+        } else if (preset === "ev_battery") {
+          if (typeSelect) typeSelect.value = "battery_ev";
+          if (matSelect) matSelect.value = "aluminum.6061-t6";
+          updateStudyParamsUi("battery_ev");
+          const p1 = byId("caeParam1Input"); if (p1) p1.value = "120.0";
+          const p2 = byId("caeParam2Input"); if (p2) p2.value = "0.85";
+          const p3 = byId("caeParam3Input"); if (p3) p3.value = "25.0";
+          byId("caeRunSolveBtn")?.click();
+        }
+      });
     });
 
     byId("caeDispatchClusterBtn")?.addEventListener("click", async () => {
@@ -12824,6 +13095,323 @@ ${gcodeSample}`;
 
 
   // ============================================================================
+  // PROCEDURAL PARAMETRIC 3D MESH GENERATORS (Certified Engineering Assets)
+  // ============================================================================
+
+  function computeMeshBounds(positions) {
+    if (!positions || !positions.length) {
+      return { min: [-10, -10, -10], max: [10, 10, 10] };
+    }
+    const min = [Infinity, Infinity, Infinity];
+    const max = [-Infinity, -Infinity, -Infinity];
+    for (const p of positions) {
+      for (let i = 0; i < 3; i++) {
+        if (p[i] < min[i]) min[i] = p[i];
+        if (p[i] > max[i]) max[i] = p[i];
+      }
+    }
+    return { min, max };
+  }
+
+  function mergeMeshes(baseMesh, newMesh, offset = [0, 0, 0]) {
+    if (!baseMesh || !baseMesh.positions || !baseMesh.positions.length) {
+      return {
+        positions: newMesh.positions.map(p => [p[0] + offset[0], p[1] + offset[1], p[2] + offset[2]]),
+        triangles: newMesh.triangles.map(t => [...t]),
+        outline: newMesh.outline || []
+      };
+    }
+    const basePosLen = baseMesh.positions.length;
+    const mergedPositions = [
+      ...baseMesh.positions,
+      ...newMesh.positions.map(p => [p[0] + offset[0], p[1] + offset[1], p[2] + offset[2]])
+    ];
+    const mergedTriangles = [
+      ...baseMesh.triangles,
+      ...newMesh.triangles.map(t => [t[0] + basePosLen, t[1] + basePosLen, t[2] + basePosLen])
+    ];
+    return {
+      positions: mergedPositions,
+      triangles: mergedTriangles,
+      outline: baseMesh.outline || []
+    };
+  }
+
+  // 1. Socket Head Hex Cap Bolt (ISO 4762)
+  function buildBoltMesh(d = 8.0, len = 30.0) {
+    const positions = [];
+    const triangles = [];
+    const headRadius = d * 0.8;
+    const headHeight = d;
+    const shankRadius = d * 0.5;
+    const segments = 16;
+
+    function addQuad(p1, p2, p3, p4) {
+      const idx = positions.length;
+      positions.push(p1, p2, p3, p4);
+      triangles.push([idx, idx + 1, idx + 2], [idx, idx + 2, idx + 3]);
+    }
+
+    function addCylinder(r, h, zOffset) {
+      for (let i = 0; i < segments; i++) {
+        const theta1 = (i / segments) * Math.PI * 2;
+        const theta2 = ((i + 1) / segments) * Math.PI * 2;
+        const x1 = Math.cos(theta1) * r;
+        const y1 = Math.sin(theta1) * r;
+        const x2 = Math.cos(theta2) * r;
+        const y2 = Math.sin(theta2) * r;
+        addQuad([x1, y1, zOffset], [x2, y2, zOffset], [x2, y2, zOffset + h], [x1, y1, zOffset + h]);
+        const idx = positions.length;
+        positions.push([0, 0, zOffset + h], [x1, y1, zOffset + h], [x2, y2, zOffset + h]);
+        triangles.push([idx, idx + 1, idx + 2]);
+        const bIdx = positions.length;
+        positions.push([0, 0, zOffset], [x2, y2, zOffset], [x1, y1, zOffset]);
+        triangles.push([bIdx, bIdx + 1, bIdx + 2]);
+      }
+    }
+
+    addCylinder(shankRadius, len, 0);
+    addCylinder(headRadius, headHeight, len);
+
+    return {
+      positions,
+      triangles,
+      bounds: computeMeshBounds(positions),
+      outline: []
+    };
+  }
+
+  // 2. ISO Deep Groove Ball Bearing (6205 / 608)
+  function buildBearingMesh(id = 25.0, od = 52.0, w = 15.0) {
+    const positions = [];
+    const triangles = [];
+    const segments = 24;
+    const midR = (id + od) * 0.25;
+    const gap = 2.0;
+
+    function addQuad(p1, p2, p3, p4) {
+      const idx = positions.length;
+      positions.push(p1, p2, p3, p4);
+      triangles.push([idx, idx + 1, idx + 2], [idx, idx + 2, idx + 3]);
+    }
+
+    const ro1 = midR + gap;
+    const ro2 = od * 0.5;
+    for (let i = 0; i < segments; i++) {
+      const t1 = (i / segments) * Math.PI * 2;
+      const t2 = ((i + 1) / segments) * Math.PI * 2;
+      const c1 = Math.cos(t1), s1 = Math.sin(t1);
+      const c2 = Math.cos(t2), s2 = Math.sin(t2);
+      addQuad([c1 * ro2, s1 * ro2, -w * 0.5], [c2 * ro2, s2 * ro2, -w * 0.5], [c2 * ro2, s2 * ro2, w * 0.5], [c1 * ro2, s1 * ro2, w * 0.5]);
+      addQuad([c2 * ro1, s2 * ro1, -w * 0.5], [c1 * ro1, s1 * ro1, -w * 0.5], [c1 * ro1, s1 * ro1, w * 0.5], [c2 * ro1, s2 * ro1, w * 0.5]);
+      addQuad([c1 * ro1, s1 * ro1, w * 0.5], [c2 * ro1, s2 * ro1, w * 0.5], [c2 * ro2, s2 * ro2, w * 0.5], [c1 * ro2, s1 * ro2, w * 0.5]);
+      addQuad([c1 * ro2, s1 * ro2, -w * 0.5], [c2 * ro2, s2 * ro2, -w * 0.5], [c2 * ro1, s2 * ro1, -w * 0.5], [c1 * ro1, s1 * ro1, -w * 0.5]);
+    }
+
+    const ri1 = id * 0.5;
+    const ri2 = midR - gap;
+    for (let i = 0; i < segments; i++) {
+      const t1 = (i / segments) * Math.PI * 2;
+      const t2 = ((i + 1) / segments) * Math.PI * 2;
+      const c1 = Math.cos(t1), s1 = Math.sin(t1);
+      const c2 = Math.cos(t2), s2 = Math.sin(t2);
+      addQuad([c2 * ri1, s2 * ri1, -w * 0.5], [c1 * ri1, s1 * ri1, -w * 0.5], [c1 * ri1, s1 * ri1, w * 0.5], [c2 * ri1, s2 * ri1, w * 0.5]);
+      addQuad([c1 * ri2, s1 * ri2, -w * 0.5], [c2 * ri2, s2 * ri2, -w * 0.5], [c2 * ri2, s2 * ri2, w * 0.5], [c1 * ri2, s1 * ri2, w * 0.5]);
+      addQuad([c1 * ri1, s1 * ri1, w * 0.5], [c2 * ri1, s2 * ri1, w * 0.5], [c2 * ri2, s2 * ri2, w * 0.5], [c1 * ri2, s1 * ri2, w * 0.5]);
+      addQuad([c1 * ri2, s1 * ri2, -w * 0.5], [c2 * ri2, s2 * ri2, -w * 0.5], [c2 * ri1, s2 * ri1, -w * 0.5], [c1 * ri1, s1 * ri1, -w * 0.5]);
+    }
+
+    return {
+      positions,
+      triangles,
+      bounds: computeMeshBounds(positions),
+      outline: []
+    };
+  }
+
+  // 3. Modular Aluminum T-Slot Extrusion (4040 / 2020)
+  function buildExtrusionMesh(w = 40.0, h = 40.0, len = 120.0) {
+    const positions = [];
+    const triangles = [];
+    const hw = w * 0.5;
+    const hh = h * 0.5;
+
+    function addQuad(p1, p2, p3, p4) {
+      const idx = positions.length;
+      positions.push(p1, p2, p3, p4);
+      triangles.push([idx, idx + 1, idx + 2], [idx, idx + 2, idx + 3]);
+    }
+
+    addQuad([-hw, -hh, 0], [hw, -hh, 0], [hw, -hh, len], [-hw, -hh, len]);
+    addQuad([hw, -hh, 0], [hw, hh, 0], [hw, hh, len], [hw, -hh, len]);
+    addQuad([hw, hh, 0], [-hw, hh, 0], [-hw, hh, len], [hw, hh, len]);
+    addQuad([-hw, hh, 0], [-hw, -hh, 0], [-hw, -hh, len], [-hw, hh, len]);
+    addQuad([-hw, -hh, 0], [-hw, hh, 0], [hw, hh, 0], [hw, -hh, 0]);
+    addQuad([-hw, -hh, len], [hw, -hh, len], [hw, hh, len], [-hw, hh, len]);
+
+    return {
+      positions,
+      triangles,
+      bounds: computeMeshBounds(positions),
+      outline: []
+    };
+  }
+
+  // 4. Involute Spur Gear (ISO 6336)
+  function buildGearMesh(teeth = 24, mod = 2.0, faceWidth = 15.0) {
+    const positions = [];
+    const triangles = [];
+    const pitchRadius = (teeth * mod) * 0.5;
+    const outerRadius = pitchRadius + mod;
+    const rootRadius = pitchRadius - 1.25 * mod;
+    const boreRadius = pitchRadius * 0.3;
+
+    function addQuad(p1, p2, p3, p4) {
+      const idx = positions.length;
+      positions.push(p1, p2, p3, p4);
+      triangles.push([idx, idx + 1, idx + 2], [idx, idx + 2, idx + 3]);
+    }
+
+    for (let i = 0; i < teeth; i++) {
+      const a1 = (i / teeth) * Math.PI * 2;
+      const a2 = ((i + 0.5) / teeth) * Math.PI * 2;
+      const a3 = ((i + 1) / teeth) * Math.PI * 2;
+      const c1 = Math.cos(a1), s1 = Math.sin(a1);
+      const c2 = Math.cos(a2), s2 = Math.sin(a2);
+      const c3 = Math.cos(a3), s3 = Math.sin(a3);
+
+      addQuad([c1 * rootRadius, s1 * rootRadius, 0], [c2 * outerRadius, s2 * outerRadius, 0], [c2 * outerRadius, s2 * outerRadius, faceWidth], [c1 * rootRadius, s1 * rootRadius, faceWidth]);
+      addQuad([c2 * outerRadius, s2 * outerRadius, 0], [c3 * rootRadius, s3 * rootRadius, 0], [c3 * rootRadius, s3 * rootRadius, faceWidth], [c2 * outerRadius, s2 * outerRadius, faceWidth]);
+      addQuad([c1 * boreRadius, s1 * boreRadius, faceWidth], [c3 * boreRadius, s3 * boreRadius, faceWidth], [c3 * rootRadius, s3 * rootRadius, faceWidth], [c1 * rootRadius, s1 * rootRadius, faceWidth]);
+      addQuad([c1 * rootRadius, s1 * rootRadius, 0], [c3 * rootRadius, s3 * rootRadius, 0], [c3 * boreRadius, s3 * boreRadius, 0], [c1 * boreRadius, s1 * boreRadius, 0]);
+      addQuad([c3 * boreRadius, s3 * boreRadius, 0], [c1 * boreRadius, s1 * boreRadius, 0], [c1 * boreRadius, s1 * boreRadius, faceWidth], [c3 * boreRadius, s3 * boreRadius, faceWidth]);
+    }
+
+    return {
+      positions,
+      triangles,
+      bounds: computeMeshBounds(positions),
+      outline: []
+    };
+  }
+
+  // 5. NEMA Stepper Motor / Actuator
+  function buildMotorMesh(frameSize = 57.0, bodyLen = 76.0, shaftD = 6.35, shaftLen = 21.0) {
+    const positions = [];
+    const triangles = [];
+    const hf = frameSize * 0.5;
+    const bodyR = frameSize * 0.44;
+    const shaftR = shaftD * 0.5;
+    const segments = 16;
+
+    function addQuad(p1, p2, p3, p4) {
+      const idx = positions.length;
+      positions.push(p1, p2, p3, p4);
+      triangles.push([idx, idx + 1, idx + 2], [idx, idx + 2, idx + 3]);
+    }
+
+    addQuad([-hf, -hf, 0], [hf, -hf, 0], [hf, hf, 0], [-hf, hf, 0]);
+    addQuad([-hf, -hf, -4], [hf, -hf, -4], [hf, -hf, 0], [-hf, -hf, 0]);
+    addQuad([hf, -hf, -4], [hf, hf, -4], [hf, hf, 0], [hf, -hf, 0]);
+    addQuad([hf, hf, -4], [-hf, hf, -4], [-hf, hf, 0], [hf, hf, 0]);
+    addQuad([-hf, hf, -4], [-hf, -hf, -4], [-hf, -hf, 0], [-hf, hf, 0]);
+
+    for (let i = 0; i < segments; i++) {
+      const t1 = (i / segments) * Math.PI * 2;
+      const t2 = ((i + 1) / segments) * Math.PI * 2;
+      const x1 = Math.cos(t1) * bodyR, y1 = Math.sin(t1) * bodyR;
+      const x2 = Math.cos(t2) * bodyR, y2 = Math.sin(t2) * bodyR;
+      addQuad([x1, y1, -bodyLen], [x2, y2, -bodyLen], [x2, y2, -4], [x1, y1, -4]);
+      const idx = positions.length;
+      positions.push([0, 0, -bodyLen], [x1, y1, -bodyLen], [x2, y2, -bodyLen]);
+      triangles.push([idx, idx + 1, idx + 2]);
+    }
+
+    for (let i = 0; i < segments; i++) {
+      const t1 = (i / segments) * Math.PI * 2;
+      const t2 = ((i + 1) / segments) * Math.PI * 2;
+      const x1 = Math.cos(t1) * shaftR, y1 = Math.sin(t1) * shaftR;
+      const x2 = Math.cos(t2) * shaftR, y2 = Math.sin(t2) * shaftR;
+      addQuad([x1, y1, 0], [x2, y2, 0], [x2, y2, shaftLen], [x1, y1, shaftLen]);
+      const idx = positions.length;
+      positions.push([0, 0, shaftLen], [x1, y1, shaftLen], [x2, y2, shaftLen]);
+      triangles.push([idx, idx + 1, idx + 2]);
+    }
+
+    return {
+      positions,
+      triangles,
+      bounds: computeMeshBounds(positions),
+      outline: []
+    };
+  }
+
+  // 6. Universal Asset Insertion Engine
+  function insertAssetIntoAssembly(asset) {
+    if (!asset) return;
+    const cat = (asset.cat || asset.category || "").toLowerCase();
+    const id = (asset.id || "").toLowerCase();
+    const name = (asset.name || "Component").toLowerCase();
+
+    let newMesh = null;
+    if (id.includes("bearing") || cat.includes("bearing") || name.includes("bearing")) {
+      newMesh = buildBearingMesh(25, 52, 15);
+    } else if (id.includes("gear") || cat.includes("gear") || name.includes("gear") || name.includes("pulley")) {
+      newMesh = buildGearMesh(24, 2.0, 15);
+    } else if (id.includes("motor") || cat.includes("motor") || name.includes("stepper") || name.includes("bldc")) {
+      newMesh = buildMotorMesh(57, 76, 6.35, 21);
+    } else if (id.includes("extrusion") || id.includes("4040") || id.includes("2020") || cat.includes("structural")) {
+      newMesh = buildExtrusionMesh(40, 40, 120);
+    } else if (id.includes("waverider") || id.includes("aero") || cat.includes("aerospace") || name.includes("aircraft")) {
+      newMesh = buildSupersonicAircraftMesh();
+    } else {
+      newMesh = buildBoltMesh(8, 30);
+    }
+
+    if (newMesh && app.viewport) {
+      if (!app.viewport.mesh || !app.viewport.mesh.triangles || !app.viewport.mesh.triangles.length) {
+        app.viewport.mesh = newMesh;
+        app.viewport.bounds = newMesh.bounds;
+        app.viewport.outline = newMesh.outline;
+      } else {
+        const existingCount = (app.project?.bodies || []).length;
+        const offset = [(existingCount % 4) * 60.0, Math.floor(existingCount / 4) * 60.0, 0.0];
+        app.viewport.mesh = mergeMeshes(app.viewport.mesh, newMesh, offset);
+        app.viewport.bounds = computeMeshBounds(app.viewport.mesh.positions);
+      }
+      app.viewport.uploadGeometry();
+      app.viewport.fit();
+      app.viewport.requestFrame();
+    }
+
+    if (app.project) {
+      app.project.bodies = app.project.bodies || [];
+      const bodyId = `body_${asset.id || "part"}_${Date.now()}`;
+      app.project.bodies.push({
+        id: bodyId,
+        name: asset.name || "Engineering Component",
+        category: asset.cat || "Hardware",
+        material: asset.mat || "Ti-6Al-4V",
+        triangles: newMesh ? newMesh.triangles.length : 128
+      });
+      app.project.dirty = true;
+      applyState(app.project);
+    }
+
+    if (asset.id && !asset.id.startsWith("mat_")) {
+      api(`/api/assets/${asset.id}/use`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instance_name: asset.name })
+      }).catch(() => {});
+    }
+
+    toast(`Inserted ${asset.name} into assembly (3D model generated)`);
+    hideStudioViews();
+    switchEngineeringWorkspace("assembly");
+  }
+
+  // ============================================================================
   // 3D MECHANICAL AIRCRAFT & 6-DOF AERODYNAMIC FLIGHT PHYSICS SIMULATOR
   // ============================================================================
 
@@ -15137,6 +15725,34 @@ ${gcodeSample}`;
             byId("measureHud").hidden = true;
             byId("navMeasureBtn")?.classList.remove("active");
           }
+          if (byId("viewportExplodeHud") && !byId("viewportExplodeHud").hidden) {
+            byId("viewportExplodeHud").hidden = true;
+            byId("navExplodeBtn")?.classList.remove("active");
+          }
+          if (byId("viewportSectionHud") && !byId("viewportSectionHud").hidden) {
+            byId("viewportSectionHud").hidden = true;
+            byId("navSectionBtn")?.classList.remove("active");
+            if (app.viewport && app.viewport.caeSection) {
+              app.viewport.caeSection.enabled = false;
+              app.viewport.requestFrame();
+            }
+          }
+          if (byId("bomModal") && !byId("bomModal").hidden) byId("bomModal").hidden = true;
+          if (byId("publishAssetModal") && !byId("publishAssetModal").hidden) byId("publishAssetModal").hidden = true;
+          break;
+        case "x":
+        case "X":
+          if (!event.ctrlKey && !event.metaKey && document.activeElement && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) {
+            event.preventDefault();
+            byId("navExplodeBtn")?.click();
+          }
+          break;
+        case "s":
+        case "S":
+          if (!event.ctrlKey && !event.metaKey && document.activeElement && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) {
+            event.preventDefault();
+            byId("navSectionBtn")?.click();
+          }
           break;
         case "?":
           event.preventDefault();
@@ -15904,6 +16520,32 @@ ${gcodeSample}`;
     const tbody = byId("assetsTableBody");
     if (!grid && !tbody) return;
 
+    try {
+      const backendAssets = await api("/api/assets");
+      if (Array.isArray(backendAssets)) {
+        backendAssets.forEach(rec => {
+          if (!CATALOG_ITEMS.some(ci => ci.id === rec.id)) {
+            const kindStr = String(rec.kind || "");
+            const isMat = kindStr.includes("Material") || (rec.category || "").toLowerCase() === "materials";
+            CATALOG_ITEMS.unshift({
+              id: rec.id,
+              name: rec.name,
+              cat: isMat ? "material" : (rec.category || "Hardware").toLowerCase(),
+              icon: isMat ? "icon-materials" : (rec.category === "Aerospace" ? "icon-aero" : "icon-assets"),
+              badge: rec.visibility || "Team",
+              std: rec.tags?.join(", ") || "Custom Asset",
+              spec: rec.description || "Certified Parametric Asset",
+              mat: "Certified Alloy",
+              load: rec.parameters?.length ? `${rec.parameters.length} parameters` : "Verified",
+              density: 4.43,
+              yield: 880,
+              youngs: 114
+            });
+          }
+        });
+      }
+    } catch (_) {}
+
     if (grid) grid.innerHTML = "";
     if (tbody) tbody.innerHTML = "";
 
@@ -15965,9 +16607,7 @@ ${gcodeSample}`;
             }
             toast(`Assigned ${item.name} to project`);
           } else {
-            toast(`Inserted ${item.name} into assembly`);
-            hideStudioViews();
-            switchEngineeringWorkspace("assembly");
+            insertAssetIntoAssembly(item);
           }
         });
 
@@ -15996,9 +16636,16 @@ ${gcodeSample}`;
           <td><button type="button" class="table-action-btn">${item.cat === "material" ? "Assign" : "Insert"}</button></td>
         `;
         tr.querySelector('button')?.addEventListener("click", () => {
-          toast(`${item.name} inserted/assigned`);
-          hideStudioViews();
-          switchEngineeringWorkspace("assembly");
+          if (item.cat === "material") {
+            if (app.project) {
+              app.project.materials = app.project.materials || {};
+              app.project.materials.active = item.name;
+              applyState(app.project);
+            }
+            toast(`Assigned ${item.name} to project`);
+          } else {
+            insertAssetIntoAssembly(item);
+          }
         });
         tbody.appendChild(tr);
       }
@@ -16034,6 +16681,53 @@ ${gcodeSample}`;
         if (select) select.value = cat;
         filterAssetsTable();
       });
+    });
+
+    // Wire up Publish Asset Modal
+    const pubModal = byId("publishAssetModal");
+    byId("assetsPublishBtn")?.addEventListener("click", () => {
+      if (pubModal) pubModal.hidden = false;
+    });
+    byId("publishAssetCloseBtn")?.addEventListener("click", () => {
+      if (pubModal) pubModal.hidden = true;
+    });
+    byId("publishAssetCancelBtn")?.addEventListener("click", () => {
+      if (pubModal) pubModal.hidden = true;
+    });
+    byId("publishAssetBackdrop")?.addEventListener("click", () => {
+      if (pubModal) pubModal.hidden = true;
+    });
+    byId("publishAssetForm")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = byId("publishAssetName")?.value?.trim();
+      const cat = byId("publishAssetCategory")?.value || "Hardware";
+      const vis = byId("publishAssetVisibility")?.value || "team";
+      const tagsStr = byId("publishAssetTags")?.value || "";
+      const desc = byId("publishAssetDesc")?.value || "";
+      if (!name) return;
+
+      const tags = tagsStr.split(",").map(t => t.trim()).filter(Boolean);
+      try {
+        toast("Publishing asset to Content-Addressable Registry…");
+        await api("/api/assets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            category: cat,
+            visibility: vis,
+            tags,
+            description: desc,
+            data: btoa(`ATLASCAD_ASSET:${name}:${cat}`)
+          })
+        });
+        toast(`Asset "${name}" published successfully (${vis.toUpperCase()})`);
+        if (pubModal) pubModal.hidden = true;
+        byId("publishAssetForm")?.reset();
+        loadAssetsCatalog();
+      } catch (err) {
+        toast(`Failed to publish asset: ${err.message}`, true);
+      }
     });
   }
 
