@@ -330,16 +330,11 @@ fn face_frame(corners: [[f64; 3]; 3]) -> Option<([f64; 3], [f64; 3])> {
 }
 
 fn normalize(vector: [f64; 3]) -> Option<[f64; 3]> {
-    let length =
-        (vector[0] * vector[0] + vector[1] * vector[1] + vector[2] * vector[2]).sqrt();
+    let length = (vector[0] * vector[0] + vector[1] * vector[1] + vector[2] * vector[2]).sqrt();
     if !length.is_finite() || length <= 1e-12 {
         return None;
     }
-    Some([
-        vector[0] / length,
-        vector[1] / length,
-        vector[2] / length,
-    ])
+    Some([vector[0] / length, vector[1] / length, vector[2] / length])
 }
 
 /// Is every welded edge shared by exactly two triangles, in opposite directions?
@@ -526,9 +521,7 @@ pub fn read_step(bytes: &[u8]) -> Result<StepImport, StepError> {
         let list = match arguments.get(1) {
             Some(Arg::List(list)) => list,
             _ => {
-                return Err(StepError::Invalid(format!(
-                    "#{shell} has no face list"
-                )));
+                return Err(StepError::Invalid(format!("#{shell} has no face list")));
             }
         };
         for value in list {
@@ -685,9 +678,9 @@ fn parse_entities(text: &str) -> Result<HashMap<u64, (String, Vec<Arg>)>, StepEr
             let mut parser = Parser::new(trimmed);
             ("COMPLEX".to_string(), parser.complex_list()?)
         } else {
-            let open = trimmed.find('(').ok_or_else(|| {
-                StepError::Invalid(format!("#{id} has no parameter list"))
-            })?;
+            let open = trimmed
+                .find('(')
+                .ok_or_else(|| StepError::Invalid(format!("#{id} has no parameter list")))?;
             let kind = trimmed[..open].trim().to_ascii_uppercase();
             if kind.is_empty() {
                 return Err(StepError::Invalid(format!("#{id} has no entity name")));
@@ -852,7 +845,8 @@ impl<'a> Parser<'a> {
             Some(byte) if byte.is_ascii_alphabetic() || byte == b'_' => self.typed_or_enum(),
             other => Err(StepError::Invalid(format!(
                 "unexpected {} at byte {} of a STEP parameter",
-                other.map(|byte| format!("`{}`", byte as char))
+                other
+                    .map(|byte| format!("`{}`", byte as char))
                     .unwrap_or_else(|| "end of file".into()),
                 self.index
             ))),
@@ -922,11 +916,7 @@ impl<'a> Parser<'a> {
     fn enumeration(&mut self) -> Result<Arg, StepError> {
         self.index += 1;
         let start = self.index;
-        while self
-            .bytes
-            .get(self.index)
-            .is_some_and(|byte| *byte != b'.')
-        {
+        while self.bytes.get(self.index).is_some_and(|byte| *byte != b'.') {
             self.index += 1;
         }
         if self.peek() != Some(b'.') {
@@ -948,8 +938,7 @@ impl<'a> Parser<'a> {
     fn number(&mut self) -> Result<Arg, StepError> {
         let start = self.index;
         while self.bytes.get(self.index).is_some_and(|byte| {
-            byte.is_ascii_digit()
-                || matches!(byte, b'+' | b'-' | b'.' | b'e' | b'E' | b'd' | b'D')
+            byte.is_ascii_digit() || matches!(byte, b'+' | b'-' | b'.' | b'e' | b'E' | b'd' | b'D')
         }) {
             self.index += 1;
         }
@@ -964,9 +953,11 @@ impl<'a> Parser<'a> {
 
     fn typed_or_enum(&mut self) -> Result<Arg, StepError> {
         let start = self.index;
-        while self.bytes.get(self.index).is_some_and(|byte| {
-            byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-')
-        }) {
+        while self
+            .bytes
+            .get(self.index)
+            .is_some_and(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+        {
             self.index += 1;
         }
         let name = std::str::from_utf8(&self.bytes[start..self.index])
@@ -1027,7 +1018,9 @@ impl Resolver<'_> {
             };
             let mut refs = Vec::with_capacity(vertices.len());
             for vertex in vertices {
-                let Arg::Ref(vertex) = vertex else { return None };
+                let Arg::Ref(vertex) = vertex else {
+                    return None;
+                };
                 refs.push(*vertex);
             }
             return Some(refs);
@@ -1088,10 +1081,7 @@ fn collect_typed<'a>(arguments: &'a [Arg], name: &str, out: &mut Vec<&'a [Arg]>)
 ///
 /// Defaults to millimetres, which is also the contract's unit, so a file that declares nothing is
 /// read at face value rather than guessed from coordinate magnitude.
-fn unit_scale(
-    entities: &HashMap<u64, (String, Vec<Arg>)>,
-    ordered: &[u64],
-) -> (Unit, f64) {
+fn unit_scale(entities: &HashMap<u64, (String, Vec<Arg>)>, ordered: &[u64]) -> (Unit, f64) {
     let mut found = (Unit::Millimeter, 1.0);
     for id in ordered {
         let (kind, arguments) = &entities[id];
@@ -1279,7 +1269,10 @@ mod tests {
             normals: vec![],
         };
         // An empty mesh fails the contract's own validation before the writer sees it.
-        assert!(matches!(step_bytes(&none, "Empty"), Err(StepError::Mesh(_))));
+        assert!(matches!(
+            step_bytes(&none, "Empty"),
+            Err(StepError::Mesh(_))
+        ));
     }
 
     #[test]
@@ -1331,18 +1324,11 @@ mod tests {
     #[test]
     fn an_inch_file_is_converted_to_millimetres() -> TestResult {
         let mut text = String::from_utf8(step_bytes(&cube(), "Cube")?)?;
-        text = text.replace(
-            "SI_UNIT(.MILLI.,.METRE.)",
-            "SI_UNIT($,.METRE.)",
-        );
+        text = text.replace("SI_UNIT(.MILLI.,.METRE.)", "SI_UNIT($,.METRE.)");
         // The cube's 10 mm coordinates are read as 10 m, which is 10 000 mm.
         let imported = read_step(text.as_bytes())?;
         assert_eq!(imported.source_unit, Unit::Meter);
-        let max = imported
-            .mesh
-            .bounding_box()
-            .ok_or("no bounds")?
-            .max;
+        let max = imported.mesh.bounding_box().ok_or("no bounds")?.max;
         assert!((max[0] - 10_000.0).abs() < 1e-6, "max was {max:?}");
         Ok(())
     }

@@ -72,10 +72,18 @@ impl SmpteTimecode {
         if parts.len() != 4 {
             return Err(MediaError::InvalidTimecode(s.to_string()));
         }
-        let h = parts[0].parse::<u32>().map_err(|_| MediaError::InvalidTimecode(s.to_string()))?;
-        let m = parts[1].parse::<u32>().map_err(|_| MediaError::InvalidTimecode(s.to_string()))?;
-        let sec = parts[2].parse::<u32>().map_err(|_| MediaError::InvalidTimecode(s.to_string()))?;
-        let f = parts[3].parse::<u32>().map_err(|_| MediaError::InvalidTimecode(s.to_string()))?;
+        let h = parts[0]
+            .parse::<u32>()
+            .map_err(|_| MediaError::InvalidTimecode(s.to_string()))?;
+        let m = parts[1]
+            .parse::<u32>()
+            .map_err(|_| MediaError::InvalidTimecode(s.to_string()))?;
+        let sec = parts[2]
+            .parse::<u32>()
+            .map_err(|_| MediaError::InvalidTimecode(s.to_string()))?;
+        let f = parts[3]
+            .parse::<u32>()
+            .map_err(|_| MediaError::InvalidTimecode(s.to_string()))?;
         Ok(Self::new(h, m, sec, f, fps))
     }
 }
@@ -194,7 +202,11 @@ impl MediaPool {
         }
     }
 
-    pub fn add_item(&mut self, item: MediaItem, bin_id: Option<&str>) -> Result<String, MediaError> {
+    pub fn add_item(
+        &mut self,
+        item: MediaItem,
+        bin_id: Option<&str>,
+    ) -> Result<String, MediaError> {
         let id = item.id.clone();
         let target_bin = bin_id.unwrap_or(&self.root_bin_id);
         if let Some(bin) = self.bins.get_mut(target_bin) {
@@ -207,7 +219,11 @@ impl MediaPool {
         Ok(id)
     }
 
-    pub fn create_bin(&mut self, name: &str, parent_bin_id: Option<&str>) -> Result<String, MediaError> {
+    pub fn create_bin(
+        &mut self,
+        name: &str,
+        parent_bin_id: Option<&str>,
+    ) -> Result<String, MediaError> {
         let bin_id = format!("bin_{}", self.bins.len() + 1);
         let new_bin = MediaBin::new(bin_id.clone(), name);
         let parent = parent_bin_id.unwrap_or(&self.root_bin_id);
@@ -223,7 +239,10 @@ impl MediaPool {
     }
 
     pub fn find_by_tag(&self, tag: &str) -> Vec<&MediaItem> {
-        self.items.values().filter(|i| i.tags.iter().any(|t| t == tag)).collect()
+        self.items
+            .values()
+            .filter(|i| i.tags.iter().any(|t| t == tag))
+            .collect()
     }
 }
 

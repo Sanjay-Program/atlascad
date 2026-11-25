@@ -244,11 +244,25 @@ html[data-density="expert"] .select {
 
 .app-workspace-container {
   display: grid;
+  /* Without an explicit column the implicit track sized itself to its widest child's min-content
+     width, which is the toolbars at roughly 2700px. The shell hides overflow, so on a 1280-1920px
+     screen the right-hand inspector and the model were rendered past the edge and clipped with no
+     way to scroll to them. Pin the single column to the available width instead. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: var(--topbar) auto minmax(0, 1fr) auto var(--statusbar);
   height: 100vh;
   min-width: 0;
   overflow: hidden;
   position: relative;
+}
+
+/* The toolbars are wider than a laptop screen; scroll them inside the column rather than letting
+   them stretch it. Context menus are positioned against the viewport, so this does not clip them. */
+.topbar,
+.autocad-ribbon,
+.enterprise-workbench-bar {
+  min-width: 0;
+  overflow-x: auto;
 }
 
 [hidden] {

@@ -2,6 +2,7 @@
 name = "atlas-media-core"
 version.workspace = true
 edition.workspace = true
+publish.workspace = true
 license-file.workspace = true
 rust-version.workspace = true
 description = "Atlas Media Core: DaVinci Resolve-class media pool, SMPTE timecode math, clip bins and proxy media management"

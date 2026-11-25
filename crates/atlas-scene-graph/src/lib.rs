@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use atlas_animation_core::{
-    mat4_from_transform, mat4_identity, mat4_multiply, mat4_transform_point, quat_identity, Mat4,
-    Quat, Vec3,
+    Mat4, Quat, Vec3, mat4_from_transform, mat4_identity, mat4_multiply, mat4_transform_point,
+    quat_identity,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -274,7 +274,11 @@ impl Scene {
         }
     }
 
-    pub fn add_node(&mut self, mut node: SceneNode, parent_id: Option<&str>) -> Result<String, SceneError> {
+    pub fn add_node(
+        &mut self,
+        mut node: SceneNode,
+        parent_id: Option<&str>,
+    ) -> Result<String, SceneError> {
         let id = node.id.clone();
         if let Some(p_id) = parent_id {
             if let Some(parent) = self.nodes.get_mut(p_id) {
@@ -331,19 +335,19 @@ impl Scene {
             if let Some(mesh) = node.mesh.as_ref().filter(|m| !m.bounds.is_empty()) {
                 // Transform 8 corners by world matrix
                 let corners = [
-                        [mesh.bounds.min[0], mesh.bounds.min[1], mesh.bounds.min[2]],
-                        [mesh.bounds.max[0], mesh.bounds.min[1], mesh.bounds.min[2]],
-                        [mesh.bounds.min[0], mesh.bounds.max[1], mesh.bounds.min[2]],
-                        [mesh.bounds.max[0], mesh.bounds.max[1], mesh.bounds.min[2]],
-                        [mesh.bounds.min[0], mesh.bounds.min[1], mesh.bounds.max[2]],
-                        [mesh.bounds.max[0], mesh.bounds.min[1], mesh.bounds.max[2]],
-                        [mesh.bounds.min[0], mesh.bounds.max[1], mesh.bounds.max[2]],
-                        [mesh.bounds.max[0], mesh.bounds.max[1], mesh.bounds.max[2]],
-                    ];
-                    for c in corners {
-                        let tc = mat4_transform_point(&node.world_matrix, c);
-                        bounds.include_point(tc);
-                    }
+                    [mesh.bounds.min[0], mesh.bounds.min[1], mesh.bounds.min[2]],
+                    [mesh.bounds.max[0], mesh.bounds.min[1], mesh.bounds.min[2]],
+                    [mesh.bounds.min[0], mesh.bounds.max[1], mesh.bounds.min[2]],
+                    [mesh.bounds.max[0], mesh.bounds.max[1], mesh.bounds.min[2]],
+                    [mesh.bounds.min[0], mesh.bounds.min[1], mesh.bounds.max[2]],
+                    [mesh.bounds.max[0], mesh.bounds.min[1], mesh.bounds.max[2]],
+                    [mesh.bounds.min[0], mesh.bounds.max[1], mesh.bounds.max[2]],
+                    [mesh.bounds.max[0], mesh.bounds.max[1], mesh.bounds.max[2]],
+                ];
+                for c in corners {
+                    let tc = mat4_transform_point(&node.world_matrix, c);
+                    bounds.include_point(tc);
+                }
             }
             for child_id in &node.children_ids {
                 let cb = self.compute_world_bounds(child_id);

@@ -77,9 +77,15 @@ impl PolyMesh {
             }
             // Fan triangulation for quads and n-gons
             for i in 1..(face.len() - 1) {
-                let a = *face.first().ok_or_else(|| CreativeError::Mesh("missing face index".into()))?;
-                let b = *face.get(i).ok_or_else(|| CreativeError::Mesh("missing face index".into()))?;
-                let c = *face.get(i + 1).ok_or_else(|| CreativeError::Mesh("missing face index".into()))?;
+                let a = *face
+                    .first()
+                    .ok_or_else(|| CreativeError::Mesh("missing face index".into()))?;
+                let b = *face
+                    .get(i)
+                    .ok_or_else(|| CreativeError::Mesh("missing face index".into()))?;
+                let c = *face
+                    .get(i + 1)
+                    .ok_or_else(|| CreativeError::Mesh("missing face index".into()))?;
                 triangles.push([a, b, c]);
             }
         }
@@ -88,7 +94,8 @@ impl PolyMesh {
             triangles,
             normals: self.normals.clone(),
         };
-        mesh.validate().map_err(|e| CreativeError::Mesh(e.to_string()))?;
+        mesh.validate()
+            .map_err(|e| CreativeError::Mesh(e.to_string()))?;
         Ok(mesh)
     }
 
@@ -99,7 +106,9 @@ impl PolyMesh {
                 continue;
             }
             for i in 1..(face.len() - 1) {
-                let (Some(&ai), Some(&bi), Some(&ci)) = (face.first(), face.get(i), face.get(i + 1)) else {
+                let (Some(&ai), Some(&bi), Some(&ci)) =
+                    (face.first(), face.get(i), face.get(i + 1))
+                else {
                     continue;
                 };
                 let (Some(&a), Some(&b), Some(&c)) = (
@@ -155,10 +164,9 @@ impl PolyMesh {
             }
             let mut sum = [0.0, 0.0, 0.0];
             for &idx in face {
-                let p = self
-                    .positions
-                    .get(idx as usize)
-                    .ok_or_else(|| CreativeError::Mesh(format!("vertex index {idx} out of range")))?;
+                let p = self.positions.get(idx as usize).ok_or_else(|| {
+                    CreativeError::Mesh(format!("vertex index {idx} out of range"))
+                })?;
                 sum[0] += p[0];
                 sum[1] += p[1];
                 sum[2] += p[2];
@@ -203,11 +211,16 @@ impl PolyMesh {
                     (p_a[2] + p_b[2] + fp1[2] + fp2[2]) / 4.0,
                 ]
             } else {
-                [(p_a[0] + p_b[0]) / 2.0, (p_a[1] + p_b[1]) / 2.0, (p_a[2] + p_b[2]) / 2.0]
+                [
+                    (p_a[0] + p_b[0]) / 2.0,
+                    (p_a[1] + p_b[1]) / 2.0,
+                    (p_a[2] + p_b[2]) / 2.0,
+                ]
             };
 
-            let pt_idx = u32::try_from(new_positions.len())
-                .map_err(|_| CreativeError::Mesh("subdivision exceeded vertex index limit".into()))?;
+            let pt_idx = u32::try_from(new_positions.len()).map_err(|_| {
+                CreativeError::Mesh("subdivision exceeded vertex index limit".into())
+            })?;
             edge_to_point_idx.insert((a, b), pt_idx);
             new_positions.push(edge_pt);
         }

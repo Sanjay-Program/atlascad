@@ -148,7 +148,9 @@ impl SculptBrush {
                         for face in &mesh.faces {
                             if face.contains(&(idx as u32)) {
                                 for &v in face {
-                                    if v != idx as u32 && let Some(other) = orig_positions.get(v as usize) {
+                                    if v != idx as u32
+                                        && let Some(other) = orig_positions.get(v as usize)
+                                    {
                                         avg[0] += other[0];
                                         avg[1] += other[1];
                                         avg[2] += other[2];
@@ -208,7 +210,8 @@ impl SculptBrush {
                     if dist_sq <= radius_sq {
                         let d = dist_sq.sqrt() / self.radius;
                         let weight = self.falloff.evaluate(d) * self.strength;
-                        let dist_to_plane = dx * stroke_normal[0] + dy * stroke_normal[1] + dz * stroke_normal[2];
+                        let dist_to_plane =
+                            dx * stroke_normal[0] + dy * stroke_normal[1] + dz * stroke_normal[2];
                         pos[0] -= stroke_normal[0] * dist_to_plane * weight;
                         pos[1] -= stroke_normal[1] * dist_to_plane * weight;
                         pos[2] -= stroke_normal[2] * dist_to_plane * weight;

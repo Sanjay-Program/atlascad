@@ -132,11 +132,16 @@ impl Timeline {
     }
 
     pub fn add_track(&mut self, name: &str, kind: TrackKind) -> String {
-        let track_id = format!("track_{}_{}", match kind {
-            TrackKind::Video => "v",
-            TrackKind::Audio => "a",
-        }, self.tracks.len() + 1);
-        self.tracks.push(TimelineTrack::new(track_id.clone(), name, kind));
+        let track_id = format!(
+            "track_{}_{}",
+            match kind {
+                TrackKind::Video => "v",
+                TrackKind::Audio => "a",
+            },
+            self.tracks.len() + 1
+        );
+        self.tracks
+            .push(TimelineTrack::new(track_id.clone(), name, kind));
         track_id
     }
 
@@ -155,11 +160,17 @@ impl Timeline {
     }
 
     /// Split a clip at a given timeline frame into two adjacent clips
-    pub fn split_clip(&mut self, clip_id: &str, split_timeline_frame: u64) -> Result<(String, String), TimelineError> {
+    pub fn split_clip(
+        &mut self,
+        clip_id: &str,
+        split_timeline_frame: u64,
+    ) -> Result<(String, String), TimelineError> {
         for track in &mut self.tracks {
             if let Some(pos) = track.clips.iter().position(|c| c.id == clip_id) {
                 let orig = &track.clips[pos];
-                if split_timeline_frame <= orig.timeline_in || split_timeline_frame >= orig.timeline_out {
+                if split_timeline_frame <= orig.timeline_in
+                    || split_timeline_frame >= orig.timeline_out
+                {
                     return Err(TimelineError::InvalidSplitFrame(
                         split_timeline_frame,
                         orig.timeline_in,
@@ -265,7 +276,8 @@ impl Timeline {
             }
         });
 
-        serde_json::to_string_pretty(&otio_doc).map_err(|e| TimelineError::Serialization(e.to_string()))
+        serde_json::to_string_pretty(&otio_doc)
+            .map_err(|e| TimelineError::Serialization(e.to_string()))
     }
 }
 

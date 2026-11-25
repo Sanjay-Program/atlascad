@@ -2,6 +2,7 @@
 name = "atlas-material-system"
 version.workspace = true
 edition.workspace = true
+publish.workspace = true
 license-file.workspace = true
 rust-version.workspace = true
 description = "AtlasCAD PBR Material System and MaterialX shader node graph engine"

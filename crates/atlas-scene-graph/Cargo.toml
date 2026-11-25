@@ -2,6 +2,7 @@
 name = "atlas-scene-graph"
 version.workspace = true
 edition.workspace = true
+publish.workspace = true
 license-file.workspace = true
 rust-version.workspace = true
 description = "Atlas RealTime / Create Scene Graph, ECS entity-component architecture, hierarchy, and BVH spatial indexing"

@@ -2,6 +2,7 @@
 name = "atlas-timeline"
 version.workspace = true
 edition.workspace = true
+publish.workspace = true
 license-file.workspace = true
 rust-version.workspace = true
 description = "Atlas Timeline: multi-track NLE timeline engine, trimming operations, and OpenTimelineIO serialization"

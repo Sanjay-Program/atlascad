@@ -1,5 +1,20 @@
 name: atlascad
 
+# Convenience container for a single document.
+#
+# This is the quick path; deploy/compose.yaml is the supported hosted shape (TLS via Caddy,
+# token staged as a file, hardened containers). Read docs/operations/deployment.md first.
+#
+#   export ATLAS_STUDIO_TOKEN="$(openssl rand -hex 32)"
+#   docker compose up -d
+#
+# The token is mandatory: the container listens on 0.0.0.0 (docker's port mapping cannot reach a
+# loopback bind) and a non-loopback studio requires a token for every /api route. Without it the
+# studio would be an open, unauthenticated editor.
+#
+# The published port is bound to 127.0.0.1 so the studio is not exposed to the network by default.
+# Put a TLS proxy in front (see deploy/Caddyfile) and change STUDIO_BIND_IP only deliberately.
+
 services:
   atlascad:
     build:
@@ -9,20 +24,29 @@ services:
     container_name: atlascad-studio
     restart: unless-stopped
     ports:
-      - "${PORT:-7519}:7519"
+      - "${STUDIO_BIND_IP:-127.0.0.1}:${PORT:-7519}:7519"
     environment:
-      - PORT=7519
-      - HOST=0.0.0.0
-      - ATLAS_PROJECT=/data/workspace.atlas
-      - ATLAS_STUDIO_TOKEN=${ATLAS_STUDIO_TOKEN:-}
+      PORT: "7519"
+      HOST: "0.0.0.0"
+      ATLAS_PROJECT: /data/workspace.atlas
+      # Fails the start with a clear message instead of serving an unauthenticated document.
+      # Generate one with: openssl rand -hex 32
+      ATLAS_STUDIO_TOKEN: "${ATLAS_STUDIO_TOKEN:?ATLAS_STUDIO_TOKEN is required - generate one with openssl rand -hex 32}"
     volumes:
       - atlascad-data:/data
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://127.0.0.1:7519/api/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
       start_period: 5s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   atlascad-data:

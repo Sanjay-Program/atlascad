@@ -4461,7 +4461,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(thermal_resp.status, 200);
     let thermal_json = json(&thermal_resp)?;
     assert!(thermal_json["coolant_htc_w_m2_k"].as_f64().ok_or("htc")? > 10_000.0);
-    assert!(thermal_json["substrate_thermal_margin_c"].as_f64().ok_or("margin")? > 0.0);
+    assert!(
+        thermal_json["substrate_thermal_margin_c"]
+            .as_f64()
+            .ok_or("margin")?
+            > 0.0
+    );
 
     let scram_resp = post(
         addr,
@@ -4470,8 +4475,18 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(scram_resp.status, 200);
     let scram_json = json(&scram_resp)?;
-    assert!(scram_json["isolator_unstart_margin"].as_f64().ok_or("margin")? > 1.20);
-    assert!(scram_json["combustion_efficiency_pct"].as_f64().ok_or("eff")? > 80.0);
+    assert!(
+        scram_json["isolator_unstart_margin"]
+            .as_f64()
+            .ok_or("margin")?
+            > 1.20
+    );
+    assert!(
+        scram_json["combustion_efficiency_pct"]
+            .as_f64()
+            .ok_or("eff")?
+            > 80.0
+    );
 
     let cryo_resp = post(
         addr,
@@ -4480,7 +4495,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(cryo_resp.status, 200);
     let cryo_json = json(&cryo_resp)?;
-    assert!(cryo_json["cavitation_safety_margin"].as_f64().ok_or("cav")? > 1.50);
+    assert!(
+        cryo_json["cavitation_safety_margin"]
+            .as_f64()
+            .ok_or("cav")?
+            > 1.50
+    );
     assert!(cryo_json["boil_off_rate_pct_day"].as_f64().ok_or("boil")? < 1.0);
 
     let bom_resp = get(addr, "/api/sim/hypersonic/bom")?;
@@ -4507,7 +4527,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(slush_resp.status, 200);
     let slush_json = json(&slush_resp)?;
     assert!(slush_json["volume_savings_m3"].as_f64().ok_or("vol")? > 20.0);
-    assert!(slush_json["latent_heat_capacity_mj"].as_f64().ok_or("latent")? > 400.0);
+    assert!(
+        slush_json["latent_heat_capacity_mj"]
+            .as_f64()
+            .ok_or("latent")?
+            > 400.0
+    );
 
     let creep_resp = post(
         addr,
@@ -4517,7 +4542,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(creep_resp.status, 200);
     let creep_json = json(&creep_resp)?;
     assert!(creep_json["rupture_life_hours"].as_f64().ok_or("tr")? > 1000.0);
-    assert!(creep_json["mission_accumulated_strain_pct"].as_f64().ok_or("strain")? < 0.1);
+    assert!(
+        creep_json["mission_accumulated_strain_pct"]
+            .as_f64()
+            .ok_or("strain")?
+            < 0.1
+    );
 
     // 32. DaVinci Resolve Timeline & VFX Bundle Exporter
     let davinci_resp = get(addr, "/api/export/davinci")?;
@@ -4667,15 +4697,14 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(timeline_json["otio_schema"], "Timeline.1");
 
     // 40. Atlas Media: Render Master & Color Grade API
-    let render_resp = post(
-        addr,
-        "/api/media/render",
-        r#"{}"#,
-    )?;
+    let render_resp = post(addr, "/api/media/render", r#"{}"#)?;
     assert_eq!(render_resp.status, 200);
     let render_json = json(&render_resp)?;
     assert_eq!(render_json["status"], "rendered");
-    assert_eq!(render_json["export_format"], "ProRes 422 HQ / OpenTimelineIO");
+    assert_eq!(
+        render_json["export_format"],
+        "ProRes 422 HQ / OpenTimelineIO"
+    );
 
     // 41. Hypersonic Panel Flutter Aeroelastic Stability API
     let flutter_resp = post(
@@ -4686,7 +4715,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(flutter_resp.status, 200);
     let flutter_json = json(&flutter_resp)?;
     assert_eq!(flutter_json["is_flutter_safe"], true);
-    assert!(flutter_json["flutter_factor_of_safety"].as_f64().unwrap_or(0.0) >= 1.50);
+    assert!(
+        flutter_json["flutter_factor_of_safety"]
+            .as_f64()
+            .unwrap_or(0.0)
+            >= 1.50
+    );
 
     // 42. Hypersonic 6-DOF Bank-to-Turn Maneuver API
     let btt_resp = post(
@@ -4708,7 +4742,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(magnet_resp.status, 200);
     let magnet_json = json(&magnet_resp)?;
     assert_eq!(magnet_json["is_hts_stable"], true);
-    assert!(magnet_json["critical_current_margin"].as_f64().unwrap_or(0.0) >= 1.30);
+    assert!(
+        magnet_json["critical_current_margin"]
+            .as_f64()
+            .unwrap_or(0.0)
+            >= 1.30
+    );
 
     // 44. Closed-Loop Autonomous Master Workflow Run API
     let run_all_resp = post(
@@ -4761,7 +4800,10 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(mcp_tools_resp.status, 200);
     let mcp_tools_json = json(&mcp_tools_resp)?;
-    let tools_list = mcp_tools_json["result"]["tools"].as_array().map(|v| v.len()).unwrap_or(0);
+    let tools_list = mcp_tools_json["result"]["tools"]
+        .as_array()
+        .map(|v| v.len())
+        .unwrap_or(0);
     assert!(tools_list >= 43);
 
     // 49. Standardized ISO 10303-21 STEP Part 21 CAD Exporter API
@@ -4830,12 +4872,20 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let init_ph = titr_json["initial_ph"].as_f64().ok_or("initial_ph")?;
     let v_eq = titr_json["equivalence_volume_ml"].as_f64().ok_or("v_eq")?;
     let eq_ph = titr_json["equivalence_ph"].as_f64().ok_or("eq_ph")?;
-    let beta_max = titr_json["max_buffer_capacity"].as_f64().ok_or("beta_max")?;
+    let beta_max = titr_json["max_buffer_capacity"]
+        .as_f64()
+        .ok_or("beta_max")?;
     assert!(init_ph > 2.8 && init_ph < 3.0);
     assert!((v_eq - 25.0).abs() < 1e-4);
     assert!(eq_ph > 8.5 && eq_ph < 9.0);
     assert!(beta_max > 0.0);
-    assert!(titr_json["titration_curve"].as_array().map(|a| a.len()).unwrap_or(0) > 50);
+    assert!(
+        titr_json["titration_curve"]
+            .as_array()
+            .map(|a| a.len())
+            .unwrap_or(0)
+            > 50
+    );
 
     // 54. Chemical Species Catalog API
     let species_resp = get(addr, "/api/sim/chemical/species")?;
@@ -4857,7 +4907,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(cmd_titr.status, 200);
     let cmd_titr_json = json(&cmd_titr)?;
     assert_eq!(cmd_titr_json["status"], "Success");
-    let cmd_veq = cmd_titr_json["output"]["equivalence_volume_ml"].as_f64().ok_or("cmd_veq")?;
+    let cmd_veq = cmd_titr_json["output"]["equivalence_volume_ml"]
+        .as_f64()
+        .ok_or("cmd_veq")?;
     assert!((cmd_veq - 25.0).abs() < 1e-4);
 
     let cmd_cat = post(
@@ -4891,7 +4943,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(sm_resp.status, 200);
     let sm_json = json(&sm_resp)?;
     let flat_len = sm_json["total_flat_length_mm"].as_f64().ok_or("flat_len")?;
-    let forming_force = sm_json["total_forming_force_kn"].as_f64().ok_or("forming_force")?;
+    let forming_force = sm_json["total_forming_force_kn"]
+        .as_f64()
+        .ok_or("forming_force")?;
     assert!((flat_len - 96.398).abs() < 0.1);
     assert!(forming_force > 10.0 && forming_force < 40.0);
     let sm_bends = sm_json["bends"].as_array().ok_or("sm_bends")?;
@@ -4951,9 +5005,16 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(add_sla_resp.status, 200);
     let add_sla_json = json(&add_sla_resp)?;
     assert_eq!(add_sla_json["total_layers"], 1200);
-    let cure_depth = add_sla_json["jacobs_cure_depth_mm"].as_f64().ok_or("cure_depth")?;
+    let cure_depth = add_sla_json["jacobs_cure_depth_mm"]
+        .as_f64()
+        .ok_or("cure_depth")?;
     assert!((cure_depth - 0.0675).abs() < 0.005);
-    assert!(add_sla_json["total_build_time_hours"].as_f64().unwrap_or(0.0) > 0.0);
+    assert!(
+        add_sla_json["total_build_time_hours"]
+            .as_f64()
+            .unwrap_or(0.0)
+            > 0.0
+    );
 
     let add_slm_resp = post(
         addr,
@@ -4962,7 +5023,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(add_slm_resp.status, 200);
     let add_slm_json = json(&add_slm_resp)?;
-    let ved = add_slm_json["volumetric_energy_density_j_mm3"].as_f64().ok_or("ved")?;
+    let ved = add_slm_json["volumetric_energy_density_j_mm3"]
+        .as_f64()
+        .ok_or("ved")?;
     assert!((ved - 60.6).abs() < 1.0);
     let regime = add_slm_json["process_regime"].as_str().unwrap_or("");
     assert!(regime.contains("Optimal Conduction"));
@@ -4975,9 +5038,15 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(noise_resp.status, 200);
     let noise_json = json(&noise_resp)?;
-    let div_att = noise_json["divergence_attenuation_db"].as_f64().ok_or("div_att")?;
-    let bar_att = noise_json["barrier_attenuation_db"].as_f64().ok_or("bar_att")?;
-    let rec_dba = noise_json["received_sound_level_dba"].as_f64().ok_or("rec_dba")?;
+    let div_att = noise_json["divergence_attenuation_db"]
+        .as_f64()
+        .ok_or("div_att")?;
+    let bar_att = noise_json["barrier_attenuation_db"]
+        .as_f64()
+        .ok_or("bar_att")?;
+    let rec_dba = noise_json["received_sound_level_dba"]
+        .as_f64()
+        .ok_or("rec_dba")?;
     let compliant = noise_json["is_compliant"].as_bool().ok_or("compliant")?;
     assert!((div_att - 52.58).abs() < 0.2);
     assert!(bar_att > 5.0 && bar_att <= 20.0);
@@ -5149,7 +5218,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(res_sc.status, 200);
     let sc_json = json(&res_sc)?;
-    let ik = sc_json["initial_symmetrical_short_circuit_current_ka"].as_f64().unwrap();
+    let ik = sc_json["initial_symmetrical_short_circuit_current_ka"]
+        .as_f64()
+        .unwrap();
     let ip = sc_json["peak_short_circuit_current_ka"].as_f64().unwrap();
     let v_drop = sc_json["voltage_drop_percent"].as_f64().unwrap();
     assert!(ik > 10.0 && ik < 20.0);
@@ -5270,7 +5341,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let sh_json = json(&res_shaft)?;
     assert!((sh_json["torque_nm"].as_f64().unwrap() - 296.34).abs() < 1.0);
     assert!(sh_json["min_required_diameter_mm"].as_f64().unwrap() > 25.0);
-    assert_eq!(sh_json["key_dimensions"]["key_width_b_mm"].as_f64().unwrap(), 14.0);
+    assert_eq!(
+        sh_json["key_dimensions"]["key_width_b_mm"]
+            .as_f64()
+            .unwrap(),
+        14.0
+    );
     assert!(sh_json["is_design_adequate"].as_bool().unwrap());
 
     // 72. ASME BPVC Section VIII Div 1 Pressure Vessel
@@ -5320,7 +5396,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(res_hydro.status, 200);
     let hydro_json = json(&res_hydro)?;
     assert!(hydro_json["peak_discharge_m3_s"].as_f64().unwrap() > 0.8);
-    assert!(hydro_json["min_required_pipe_diameter_mm"].as_f64().unwrap() > 700.0);
+    assert!(
+        hydro_json["min_required_pipe_diameter_mm"]
+            .as_f64()
+            .unwrap()
+            > 700.0
+    );
     assert!(hydro_json["is_self_cleansing"].as_bool().unwrap());
 
     // 75. LEFM Stress Intensity & Paris Fatigue Crack Growth
@@ -5336,10 +5417,21 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(res_frac.status, 200);
     let frac_json = json(&res_frac)?;
-    assert!((frac_json["initial_stress_intensity_k1_mpa_m05"].as_f64().unwrap() - 13.9).abs() < 1.0);
+    assert!(
+        (frac_json["initial_stress_intensity_k1_mpa_m05"]
+            .as_f64()
+            .unwrap()
+            - 13.9)
+            .abs()
+            < 1.0
+    );
     assert!(frac_json["critical_crack_length_ac_mm"].as_f64().unwrap() > 5.0);
     assert!(frac_json["fatigue_cycles_to_failure_nf"].as_f64().unwrap() > 1500.0);
-    assert!(frac_json["is_safe_against_fast_fracture"].as_bool().unwrap());
+    assert!(
+        frac_json["is_safe_against_fast_fracture"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 76. Universal Commands Execution Verification (5 Advanced Domains)
     for cmd_id in [
@@ -5369,7 +5461,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 120, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 120, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -5451,7 +5545,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(pcb_json["allowable_current_ipc2152_a"].as_f64().unwrap() > 6.0);
     assert!(pcb_json["current_margin_factor"].as_f64().unwrap() > 1.0);
     assert!(pcb_json["trace_resistance_mohm"].as_f64().unwrap() > 8.0);
-    assert!(pcb_json["via_array_thermal_resistance_k_w"].as_f64().unwrap() > 5.0);
+    assert!(
+        pcb_json["via_array_thermal_resistance_k_w"]
+            .as_f64()
+            .unwrap()
+            > 5.0
+    );
     assert!(pcb_json["thermal_limits_satisfied"].as_bool().unwrap());
 
     // 82. Structural Steel Bolted & Welded Connections (Eurocode 3 / AISC 360)
@@ -5468,8 +5567,18 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(res_conn.status, 200);
     let conn_json = json(&res_conn)?;
-    assert!(conn_json["single_bolt_shear_resistance_kn"].as_f64().unwrap() > 85.0);
-    assert!(conn_json["total_connection_shear_capacity_kn"].as_f64().unwrap() > 350.0);
+    assert!(
+        conn_json["single_bolt_shear_resistance_kn"]
+            .as_f64()
+            .unwrap()
+            > 85.0
+    );
+    assert!(
+        conn_json["total_connection_shear_capacity_kn"]
+            .as_f64()
+            .unwrap()
+            > 350.0
+    );
     assert!(conn_json["bolt_interaction_utilization"].as_f64().unwrap() < 1.0);
     assert!(conn_json["bolted_joint_safe"].as_bool().unwrap());
     assert!(conn_json["weld_utilization"].as_f64().unwrap() < 1.0);
@@ -5503,7 +5612,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 130, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 130, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -5561,8 +5672,18 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(res_bearing.status, 200);
     let bearing_json = json(&res_bearing)?;
-    assert!(bearing_json["ultimate_bearing_capacity_qult_kpa"].as_f64().unwrap() > 1500.0);
-    assert!(bearing_json["allowable_bearing_capacity_qall_kpa"].as_f64().unwrap() > 500.0);
+    assert!(
+        bearing_json["ultimate_bearing_capacity_qult_kpa"]
+            .as_f64()
+            .unwrap()
+            > 1500.0
+    );
+    assert!(
+        bearing_json["allowable_bearing_capacity_qall_kpa"]
+            .as_f64()
+            .unwrap()
+            > 500.0
+    );
     assert!(bearing_json["actual_factor_of_safety"].as_f64().unwrap() > 3.0);
     assert!(bearing_json["estimated_settlement_mm"].as_f64().unwrap() < 25.0);
     assert!(bearing_json["bearing_capacity_adequate"].as_bool().unwrap());
@@ -5633,7 +5754,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 140, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 140, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -5689,9 +5812,19 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(res_rc.status, 200);
     let rc_json = json(&res_rc)?;
-    assert!(rc_json["design_moment_resistance_mrd_kn_m"].as_f64().unwrap() > 250.0);
+    assert!(
+        rc_json["design_moment_resistance_mrd_kn_m"]
+            .as_f64()
+            .unwrap()
+            > 250.0
+    );
     assert!(rc_json["flexural_utilization_ratio"].as_f64().unwrap() < 1.0);
-    assert!(rc_json["characteristic_crack_width_wk_mm"].as_f64().unwrap() <= 0.30);
+    assert!(
+        rc_json["characteristic_crack_width_wk_mm"]
+            .as_f64()
+            .unwrap()
+            <= 0.30
+    );
     assert!(rc_json["uls_flexure_adequate"].as_bool().unwrap());
     assert!(rc_json["crack_width_compliant"].as_bool().unwrap());
 
@@ -5711,7 +5844,11 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(duct_json["air_velocity_m_s"].as_f64().unwrap() > 5.0);
     assert!(duct_json["total_fan_pressure_pa"].as_f64().unwrap() > 200.0);
     assert!(duct_json["fan_brake_power_kw"].as_f64().unwrap() > 0.40);
-    assert!(duct_json["velocity_within_comfort_limits"].as_bool().unwrap());
+    assert!(
+        duct_json["velocity_within_comfort_limits"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 96. Aero Gas Turbine Open Brayton Cycle & Thrust (NASA SP-290 / ISO 2314)
     let res_gt = post(
@@ -5759,7 +5896,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 150, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 150, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -5834,7 +5973,10 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(res_motor.status, 200);
     let motor_json = json(&res_motor)?;
-    assert_eq!(motor_json["synchronous_speed_rpm"].as_f64().unwrap(), 1500.0);
+    assert_eq!(
+        motor_json["synchronous_speed_rpm"].as_f64().unwrap(),
+        1500.0
+    );
     assert!(motor_json["operating_speed_rpm"].as_f64().unwrap() > 1420.0);
     assert!(motor_json["efficiency_pct"].as_f64().unwrap() > 85.0);
     assert!(motor_json["torque_ratio_breakdown_rated"].as_f64().unwrap() > 1.75);
@@ -5886,7 +6028,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 160, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 160, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -5943,8 +6087,18 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(res_rankine.status, 200);
     let rankine_json = json(&res_rankine)?;
     assert!(rankine_json["gross_electric_power_mw"].as_f64().unwrap() > 100.0);
-    assert!(rankine_json["cycle_thermal_efficiency_pct"].as_f64().unwrap() > 30.0);
-    assert!(rankine_json["cooling_water_flow_rate_kg_s"].as_f64().unwrap() > 3000.0);
+    assert!(
+        rankine_json["cycle_thermal_efficiency_pct"]
+            .as_f64()
+            .unwrap()
+            > 30.0
+    );
+    assert!(
+        rankine_json["cooling_water_flow_rate_kg_s"]
+            .as_f64()
+            .unwrap()
+            > 3000.0
+    );
     assert!(rankine_json["is_safe"].as_bool().unwrap());
 
     // 109. Deep Foundation Bored Pile Load Capacity & Settlement (Eurocode 7 / API RP 2A)
@@ -6012,7 +6166,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 161, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 161, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -6134,7 +6290,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 162, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 162, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -6195,7 +6353,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let trans_json = json(&res_trans)?;
     assert!(trans_json["operating_efficiency_pct"].as_f64().unwrap() > 99.0);
     assert!(trans_json["hot_spot_temperature_c"].as_f64().unwrap() > 80.0);
-    assert!(trans_json["relative_insulation_aging_factor"].as_f64().unwrap() < 2.0);
+    assert!(
+        trans_json["relative_insulation_aging_factor"]
+            .as_f64()
+            .unwrap()
+            < 2.0
+    );
     assert!(trans_json["is_safe"].as_bool().unwrap());
 
     // 123. Vapor Compression Refrigeration Cycle & Heat Pump COP (ASHRAE / AHRI 550/590)
@@ -6211,7 +6374,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(res_ref.status, 200);
     let ref_json = json(&res_ref)?;
-    assert!(ref_json["coefficient_of_performance_cooling"].as_f64().unwrap() > 2.0);
+    assert!(
+        ref_json["coefficient_of_performance_cooling"]
+            .as_f64()
+            .unwrap()
+            > 2.0
+    );
     assert!(ref_json["compressor_electrical_power_kw"].as_f64().unwrap() > 15.0);
     assert!(ref_json["is_safe"].as_bool().unwrap());
 
@@ -6229,7 +6397,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(res_ship.status, 200);
     let ship_json = json(&res_ship)?;
     assert!(ship_json["displacement_mass_tonnes"].as_f64().unwrap() > 15000.0);
-    assert!(ship_json["initial_metacentric_height_gm0_m"].as_f64().unwrap() > 1.0);
+    assert!(
+        ship_json["initial_metacentric_height_gm0_m"]
+            .as_f64()
+            .unwrap()
+            > 1.0
+    );
     assert!(ship_json["max_gz_righting_arm_m"].as_f64().unwrap() > 0.5);
     assert!(ship_json["is_safe"].as_bool().unwrap());
 
@@ -6261,7 +6434,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 163, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 163, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -6391,7 +6566,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 164, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 164, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -6434,7 +6611,10 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(res_wind.status, 200);
     let wind_json = json(&res_wind)?;
     assert!(wind_json["standstill_flap_freq_hz"].as_f64().unwrap() > 0.40);
-    assert!(wind_json["rotating_flap_freq_hz"].as_f64().unwrap() > wind_json["standstill_flap_freq_hz"].as_f64().unwrap());
+    assert!(
+        wind_json["rotating_flap_freq_hz"].as_f64().unwrap()
+            > wind_json["standstill_flap_freq_hz"].as_f64().unwrap()
+    );
     assert!(wind_json["centrifugal_stiffening_ratio"].as_f64().unwrap() > 1.05);
     assert!(wind_json["torsional_freq_hz"].as_f64().unwrap() > 2.0);
     assert!(wind_json["flutter_speed_m_s"].as_f64().unwrap() > 100.0);
@@ -6458,8 +6638,18 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(res_pipeline.status, 200);
     let pipe_json = json(&res_pipeline)?;
     assert!(pipe_json["hydrostatic_pressure_mpa"].as_f64().unwrap() > 14.0);
-    assert!(pipe_json["characteristic_collapse_pressure_mpa"].as_f64().unwrap() > 20.0);
-    assert!(pipe_json["design_collapse_resistance_mpa"].as_f64().unwrap() > 14.0);
+    assert!(
+        pipe_json["characteristic_collapse_pressure_mpa"]
+            .as_f64()
+            .unwrap()
+            > 20.0
+    );
+    assert!(
+        pipe_json["design_collapse_resistance_mpa"]
+            .as_f64()
+            .unwrap()
+            > 14.0
+    );
     assert!(pipe_json["collapse_safety_factor"].as_f64().unwrap() > 1.30);
     assert!(pipe_json["internal_burst_pressure_mpa"].as_f64().unwrap() > 35.0);
     assert!(pipe_json["burst_safety_factor"].as_f64().unwrap() > 1.50);
@@ -6534,7 +6724,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 165, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 165, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -6557,8 +6749,16 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(res_soil.status, 200);
     let soil_json = json(&res_soil)?;
-    assert_eq!(soil_json["over_consolidation_ratio"].as_f64().unwrap(), 1.20);
-    assert!(soil_json["ultimate_primary_settlement_mm"].as_f64().unwrap() > 150.0);
+    assert_eq!(
+        soil_json["over_consolidation_ratio"].as_f64().unwrap(),
+        1.20
+    );
+    assert!(
+        soil_json["ultimate_primary_settlement_mm"]
+            .as_f64()
+            .unwrap()
+            > 150.0
+    );
     assert!(soil_json["time_factor_tv"].as_f64().unwrap() > 0.50);
     assert!(soil_json["degree_of_consolidation_pct"].as_f64().unwrap() > 75.0);
     assert!(soil_json["settlement_at_time_mm"].as_f64().unwrap() > 120.0);
@@ -6683,7 +6883,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 166, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 166, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -6726,10 +6928,18 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(res_mag.status, 200);
     let mag_json = json(&res_mag)?;
     assert!(mag_json["central_field_t"].as_f64().unwrap() > 2.5);
-    assert!(mag_json["peak_conductor_field_t"].as_f64().unwrap() > mag_json["central_field_t"].as_f64().unwrap());
+    assert!(
+        mag_json["peak_conductor_field_t"].as_f64().unwrap()
+            > mag_json["central_field_t"].as_f64().unwrap()
+    );
     assert!(mag_json["stored_energy_mj"].as_f64().unwrap() > 1.8);
     assert!(mag_json["load_line_margin_pct"].as_f64().unwrap() < 75.0);
-    assert!(mag_json["adiabatic_hotspot_temperature_k"].as_f64().unwrap() < 180.0);
+    assert!(
+        mag_json["adiabatic_hotspot_temperature_k"]
+            .as_f64()
+            .unwrap()
+            < 180.0
+    );
     assert!(mag_json["is_quench_safe"].as_bool().unwrap());
     assert!(mag_json["is_margin_adequate"].as_bool().unwrap());
 
@@ -6749,8 +6959,18 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(reentry_json["freestream_mach"].as_f64().unwrap() > 20.0);
     assert!(reentry_json["stagnation_pressure_kpa"].as_f64().unwrap() > 10.0);
     assert!(reentry_json["stagnation_enthalpy_mj_kg"].as_f64().unwrap() > 25.0);
-    assert!(reentry_json["total_stagnation_heat_flux_kw_m2"].as_f64().unwrap() > 800.0);
-    assert!(reentry_json["radiative_equilibrium_wall_temperature_k"].as_f64().unwrap() > 1700.0);
+    assert!(
+        reentry_json["total_stagnation_heat_flux_kw_m2"]
+            .as_f64()
+            .unwrap()
+            > 800.0
+    );
+    assert!(
+        reentry_json["radiative_equilibrium_wall_temperature_k"]
+            .as_f64()
+            .unwrap()
+            > 1700.0
+    );
     assert!(reentry_json["thermal_safety_factor"].as_f64().unwrap() >= 1.05);
     assert!(reentry_json["is_tps_safe"].as_bool().unwrap());
 
@@ -6768,7 +6988,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(res_lpbf.status, 200);
     let lpbf_json = json(&res_lpbf)?;
-    assert!(lpbf_json["volumetric_energy_density_j_mm3"].as_f64().unwrap() > 50.0);
+    assert!(
+        lpbf_json["volumetric_energy_density_j_mm3"]
+            .as_f64()
+            .unwrap()
+            > 50.0
+    );
     assert!(lpbf_json["normalized_enthalpy"].as_f64().unwrap() > 2.5);
     assert!(lpbf_json["meltpool_width_um"].as_f64().unwrap() > 100.0);
     assert!(lpbf_json["hatch_overlap_ratio"].as_f64().unwrap() > 1.10);
@@ -6791,7 +7016,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(phononic_json["lattice_constant_mm"].as_f64().unwrap() > 35.0);
     assert!(phononic_json["impedance_contrast_ratio"].as_f64().unwrap() > 15.0);
     assert!(phononic_json["bragg_center_frequency_hz"].as_f64().unwrap() > 20000.0);
-    assert!(phononic_json["relative_bandgap_width_pct"].as_f64().unwrap() > 30.0);
+    assert!(
+        phononic_json["relative_bandgap_width_pct"]
+            .as_f64()
+            .unwrap()
+            > 30.0
+    );
     assert!(phononic_json["is_in_bandgap"].as_bool().unwrap());
     assert!(phononic_json["transmission_loss_db"].as_f64().unwrap() > 30.0);
     assert!(phononic_json["is_isolation_effective"].as_bool().unwrap());
@@ -6824,7 +7054,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 167, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 167, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -6971,7 +7203,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 168, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 168, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -6995,10 +7229,25 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(res_wwtp.status, 200);
     let wwtp_json = json(&res_wwtp)?;
     assert!(wwtp_json["aeration_basin_volume_m3"].as_f64().unwrap() > 4000.0);
-    assert!(wwtp_json["hydraulic_retention_time_hours"].as_f64().unwrap() > 5.0);
+    assert!(
+        wwtp_json["hydraulic_retention_time_hours"]
+            .as_f64()
+            .unwrap()
+            > 5.0
+    );
     assert!(wwtp_json["food_to_microorganism_ratio"].as_f64().unwrap() > 0.20);
-    assert!(wwtp_json["daily_sludge_production_kg_day"].as_f64().unwrap() > 1500.0);
-    assert!(wwtp_json["surface_overflow_rate_m3_m2_day"].as_f64().unwrap() <= 32.0);
+    assert!(
+        wwtp_json["daily_sludge_production_kg_day"]
+            .as_f64()
+            .unwrap()
+            > 1500.0
+    );
+    assert!(
+        wwtp_json["surface_overflow_rate_m3_m2_day"]
+            .as_f64()
+            .unwrap()
+            <= 32.0
+    );
     assert!(wwtp_json["solids_loading_rate_kg_m2_h"].as_f64().unwrap() <= 6.0);
     assert!(wwtp_json["is_clarifier_sor_acceptable"].as_bool().unwrap());
     assert!(wwtp_json["is_clarifier_slr_acceptable"].as_bool().unwrap());
@@ -7053,7 +7302,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(lrb_json["total_system_yield_force_qd_kn"].as_f64().unwrap() > 2500.0);
     assert!(lrb_json["effective_isolated_period_s"].as_f64().unwrap() > 2.0);
     assert!(lrb_json["effective_damping_ratio_pct"].as_f64().unwrap() > 15.0);
-    assert!(lrb_json["design_horizontal_displacement_dd_mm"].as_f64().unwrap() > 100.0);
+    assert!(
+        lrb_json["design_horizontal_displacement_dd_mm"]
+            .as_f64()
+            .unwrap()
+            > 100.0
+    );
     assert!(lrb_json["base_shear_reduction_ratio"].as_f64().unwrap() < 0.35);
     assert!(lrb_json["seismic_force_attenuation_pct"].as_f64().unwrap() > 50.0);
     assert!(lrb_json["is_rubber_strain_safe"].as_bool().unwrap());
@@ -7076,7 +7330,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let bal_json = json(&res_ballistics)?;
     assert!(bal_json["normal_impact_velocity_m_s"].as_f64().unwrap() > 1200.0);
     assert!(bal_json["line_of_sight_thickness_mm"].as_f64().unwrap() > 80.0);
-    assert!(bal_json["penetration_interface_velocity_m_s"].as_f64().unwrap() > 500.0);
+    assert!(
+        bal_json["penetration_interface_velocity_m_s"]
+            .as_f64()
+            .unwrap()
+            > 500.0
+    );
     assert!(bal_json["total_penetration_depth_mm"].as_f64().unwrap() > 50.0);
     assert!(bal_json["ballistic_limit_v50_m_s"].as_f64().unwrap() > 800.0);
     assert!(bal_json["armor_protection_margin_factor"].as_f64().unwrap() > 1.05);
@@ -7100,10 +7359,20 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(res_solder.status, 200);
     let sol_json = json(&res_solder)?;
-    assert!(sol_json["distance_to_neutral_point_dnp_mm"].as_f64().unwrap() > 20.0);
+    assert!(
+        sol_json["distance_to_neutral_point_dnp_mm"]
+            .as_f64()
+            .unwrap()
+            > 20.0
+    );
     assert!(sol_json["cyclic_shear_strain_pct"].as_f64().unwrap() > 1.5);
     assert!(sol_json["median_cycles_to_failure_n50"].as_f64().unwrap() > 500.0);
-    assert!(sol_json["weibull_characteristic_life_eta"].as_f64().unwrap() > 500.0);
+    assert!(
+        sol_json["weibull_characteristic_life_eta"]
+            .as_f64()
+            .unwrap()
+            > 500.0
+    );
     assert!(sol_json["is_ipc_9701_compliant"].as_bool().unwrap());
 
     // 167. Universal Commands Execution Verification (Batch 16 Domains)
@@ -7134,7 +7403,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 169, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 169, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -7154,14 +7425,27 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(res_slamming.status, 200);
     let slam_json = json(&res_slamming)?;
-    assert!(slam_json["slamming_pressure_coefficient_cp"].as_f64().unwrap() > 10.0);
+    assert!(
+        slam_json["slamming_pressure_coefficient_cp"]
+            .as_f64()
+            .unwrap()
+            > 10.0
+    );
     assert!(slam_json["peak_localized_pressure_kpa"].as_f64().unwrap() > 250.0);
     assert!(slam_json["space_averaged_pressure_kpa"].as_f64().unwrap() > 150.0);
     assert!(slam_json["slamming_pulse_duration_ms"].as_f64().unwrap() > 5.0);
     assert!(slam_json["dnv_required_thickness_mm"].as_f64().unwrap() > 8.0);
     assert!(slam_json["thickness_safety_factor"].as_f64().unwrap() >= 1.0);
-    assert!(slam_json["is_plate_thickness_sufficient"].as_bool().unwrap());
-    assert!(slam_json["is_air_cushioning_non_critical"].as_bool().unwrap());
+    assert!(
+        slam_json["is_plate_thickness_sufficient"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        slam_json["is_air_cushioning_non_critical"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 170. Vehicle Frontal Crash Deceleration & Occupant Severity (ECE R94 / FMVSS 208 / HIC15)
     let res_crash = post(
@@ -7185,7 +7469,11 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(crash_json["occupant_chest_deflection_mm"].as_f64().unwrap() < 42.0);
     assert!(crash_json["is_crumple_zone_sufficient"].as_bool().unwrap());
     assert!(crash_json["is_hic15_compliant"].as_bool().unwrap());
-    assert!(crash_json["is_chest_deflection_compliant"].as_bool().unwrap());
+    assert!(
+        crash_json["is_chest_deflection_compliant"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 171. Nuclear Reactor Fuel Pin Radial Conduction & DNB Margin (Fourier / Dittus-Boelter / W-3)
     let res_fuel = post(
@@ -7206,11 +7494,21 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(res_fuel.status, 200);
     let fuel_json = json(&res_fuel)?;
     assert!(fuel_json["clad_surface_heat_flux_mw_m2"].as_f64().unwrap() > 0.8);
-    assert!(fuel_json["coolant_heat_transfer_coeff_w_m2_k"].as_f64().unwrap() > 20000.0);
+    assert!(
+        fuel_json["coolant_heat_transfer_coeff_w_m2_k"]
+            .as_f64()
+            .unwrap()
+            > 20000.0
+    );
     assert!(fuel_json["clad_outer_temperature_c"].as_f64().unwrap() > 310.0);
     assert!(fuel_json["centerline_temperature_c"].as_f64().unwrap() > 1200.0);
     assert!(fuel_json["fuel_melting_margin_c"].as_f64().unwrap() > 600.0);
-    assert!(fuel_json["departure_from_nucleate_boiling_ratio"].as_f64().unwrap() >= 1.30);
+    assert!(
+        fuel_json["departure_from_nucleate_boiling_ratio"]
+            .as_f64()
+            .unwrap()
+            >= 1.30
+    );
     assert!(fuel_json["is_dnbr_acceptable"].as_bool().unwrap());
     assert!(fuel_json["is_fuel_melting_prevented"].as_bool().unwrap());
 
@@ -7230,7 +7528,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(res_psa.status, 200);
     let psa_json = json(&res_psa)?;
     assert!(psa_json["column_adsorbent_mass_kg"].as_f64().unwrap() > 400.0);
-    assert!(psa_json["heavy_key_equilibrium_capacity_mol_kg"].as_f64().unwrap() > 1.0);
+    assert!(
+        psa_json["heavy_key_equilibrium_capacity_mol_kg"]
+            .as_f64()
+            .unwrap()
+            > 1.0
+    );
     assert!(psa_json["working_capacity_mol_kg"].as_f64().unwrap() > 0.4);
     assert!(psa_json["mass_transfer_zone_length_m"].as_f64().unwrap() > 0.2);
     assert!(psa_json["breakthrough_time_seconds"].as_f64().unwrap() > 60.0);
@@ -7257,7 +7560,11 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(rotor_json["induced_velocity_m_s"].as_f64().unwrap() > 10.0);
     assert!(rotor_json["figure_of_merit"].as_f64().unwrap() > 0.65);
     assert!(rotor_json["total_engine_shaft_power_kw"].as_f64().unwrap() > 600.0);
-    assert!(rotor_json["is_blade_loading_within_limits"].as_bool().unwrap());
+    assert!(
+        rotor_json["is_blade_loading_within_limits"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(rotor_json["is_tip_mach_non_critical"].as_bool().unwrap());
 
     // 174. Universal Commands Execution Verification (Batch 17 Domains)
@@ -7288,7 +7595,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 176, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 176, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -7349,8 +7658,18 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(shaft_json["unit_side_resistance_kpa"].as_f64().unwrap() > 50.0);
     assert!(shaft_json["nominal_side_resistance_kn"].as_f64().unwrap() > 3000.0);
     assert!(shaft_json["nominal_total_resistance_kn"].as_f64().unwrap() > 4500.0);
-    assert!(shaft_json["factored_geotechnical_resistance_kn"].as_f64().unwrap() > 2500.0);
-    assert!(shaft_json["elastic_service_settlement_mm"].as_f64().unwrap() < 25.0);
+    assert!(
+        shaft_json["factored_geotechnical_resistance_kn"]
+            .as_f64()
+            .unwrap()
+            > 2500.0
+    );
+    assert!(
+        shaft_json["elastic_service_settlement_mm"]
+            .as_f64()
+            .unwrap()
+            < 25.0
+    );
     assert!(shaft_json["is_settlement_acceptable"].as_bool().unwrap());
 
     // 178. Prosthetic Heart Valve Hemodynamics & Effective Orifice Area (ISO 5840 / Gorlin)
@@ -7377,9 +7696,17 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(valve_json["effective_orifice_area_cm2"].as_f64().unwrap() > 1.30);
     assert!(valve_json["indexed_eoa_cm2_per_m2"].as_f64().unwrap() > 0.75);
     assert!(valve_json["regurgitant_fraction_pct"].as_f64().unwrap() < 12.0);
-    assert!(valve_json["is_hemodynamic_eoa_acceptable"].as_bool().unwrap());
+    assert!(
+        valve_json["is_hemodynamic_eoa_acceptable"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(valve_json["is_regurgitation_safe"].as_bool().unwrap());
-    assert!(valve_json["is_severe_mismatch_prevented"].as_bool().unwrap());
+    assert!(
+        valve_json["is_severe_mismatch_prevented"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 179. Centrifugal Compressor Stage Aerodynamics & Surge Margin (Stanitz / Eckardt / Dixon)
     let res_comp = post(
@@ -7428,10 +7755,23 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(panto_json["contact_wire_wave_speed_m_s"].as_f64().unwrap() > 130.0);
     assert!(panto_json["doppler_speed_ratio_alpha"].as_f64().unwrap() <= 0.70);
     assert!(panto_json["contact_wire_uplift_mm"].as_f64().unwrap() < 100.0);
-    assert!(panto_json["loss_of_contact_percentage_nq"].as_f64().unwrap() <= 0.20);
-    assert!(panto_json["is_mean_contact_force_compliant"].as_bool().unwrap());
+    assert!(
+        panto_json["loss_of_contact_percentage_nq"]
+            .as_f64()
+            .unwrap()
+            <= 0.20
+    );
+    assert!(
+        panto_json["is_mean_contact_force_compliant"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(panto_json["is_arcing_rate_acceptable"].as_bool().unwrap());
-    assert!(panto_json["is_doppler_speed_non_critical"].as_bool().unwrap());
+    assert!(
+        panto_json["is_doppler_speed_non_critical"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(panto_json["is_uplift_acceptable"].as_bool().unwrap());
 
     // 181. Universal Commands Execution Verification (Batch 18 Domains)
@@ -7462,7 +7802,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 183, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 183, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -7489,14 +7831,27 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(tbm_json["face_area_m2"].as_f64().unwrap() > 33.0);
     assert!(tbm_json["hydrostatic_water_pressure_kpa"].as_f64().unwrap() > 150.0);
     assert!(tbm_json["min_face_support_pressure_kpa"].as_f64().unwrap() > 180.0);
-    assert!(tbm_json["target_face_support_pressure_kpa"].as_f64().unwrap() > 220.0);
+    assert!(
+        tbm_json["target_face_support_pressure_kpa"]
+            .as_f64()
+            .unwrap()
+            > 220.0
+    );
     assert!(tbm_json["face_stability_safety_factor"].as_f64().unwrap() >= 1.20);
     assert!(tbm_json["total_required_thrust_kn"].as_f64().unwrap() > 15000.0);
     assert!(tbm_json["total_cutterhead_torque_kn_m"].as_f64().unwrap() > 2000.0);
     assert!(tbm_json["cutterhead_drive_power_kw"].as_f64().unwrap() > 500.0);
     assert!(tbm_json["is_face_stable"].as_bool().unwrap());
-    assert!(tbm_json["is_torque_within_machine_capacity"].as_bool().unwrap());
-    assert!(tbm_json["is_thrust_within_machine_capacity"].as_bool().unwrap());
+    assert!(
+        tbm_json["is_torque_within_machine_capacity"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        tbm_json["is_thrust_within_machine_capacity"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 184. Prestressed Post-Tensioned Concrete Girder Friction & Losses (ACI 318 / AASHTO)
     let res_prestress = post(
@@ -7522,12 +7877,39 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let prestress_json = json(&res_prestress)?;
     assert!(prestress_json["initial_jacking_force_kn"].as_f64().unwrap() > 3800.0);
     assert!(prestress_json["friction_loss_pct"].as_f64().unwrap() > 1.0);
-    assert!(prestress_json["anchorage_seating_length_m"].as_f64().unwrap() > 8.0);
-    assert!(prestress_json["total_final_prestress_loss_pct"].as_f64().unwrap() > 10.0);
-    assert!(prestress_json["final_effective_midspan_force_kn"].as_f64().unwrap() > 3000.0);
-    assert!(prestress_json["is_service_tension_compliant"].as_bool().unwrap());
-    assert!(prestress_json["is_service_compression_compliant"].as_bool().unwrap());
-    assert!(prestress_json["is_jacking_stress_compliant"].as_bool().unwrap());
+    assert!(
+        prestress_json["anchorage_seating_length_m"]
+            .as_f64()
+            .unwrap()
+            > 8.0
+    );
+    assert!(
+        prestress_json["total_final_prestress_loss_pct"]
+            .as_f64()
+            .unwrap()
+            > 10.0
+    );
+    assert!(
+        prestress_json["final_effective_midspan_force_kn"]
+            .as_f64()
+            .unwrap()
+            > 3000.0
+    );
+    assert!(
+        prestress_json["is_service_tension_compliant"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        prestress_json["is_service_compression_compliant"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        prestress_json["is_jacking_stress_compliant"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 185. Spacecraft Reaction Wheel Dynamic Jitter & Micro-Vibration (NASA-HDBK-7005 / ECSS)
     let res_jitter = post(
@@ -7549,10 +7931,20 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let jitter_json = json(&res_jitter)?;
     assert_eq!(jitter_json["spin_frequency_hz"].as_f64().unwrap(), 60.0);
     assert!(jitter_json["static_disturbance_force_n"].as_f64().unwrap() > 0.20);
-    assert!(jitter_json["dynamic_disturbance_torque_mn_m"].as_f64().unwrap() > 4.0);
+    assert!(
+        jitter_json["dynamic_disturbance_torque_mn_m"]
+            .as_f64()
+            .unwrap()
+            > 4.0
+    );
     assert!(jitter_json["bearing_bpfo_frequency_hz"].as_f64().unwrap() > 180.0);
     assert!(jitter_json["bearing_bpfi_frequency_hz"].as_f64().unwrap() > 260.0);
-    assert!(jitter_json["payload_pointing_jitter_urad"].as_f64().unwrap() < 2.50);
+    assert!(
+        jitter_json["payload_pointing_jitter_urad"]
+            .as_f64()
+            .unwrap()
+            < 2.50
+    );
     assert!(jitter_json["is_jitter_compliant"].as_bool().unwrap());
     assert!(jitter_json["is_resonance_avoided"].as_bool().unwrap());
 
@@ -7577,7 +7969,11 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(radar_json["radar_snr_at_target_db"].as_f64().unwrap() > 15.0);
     assert!(radar_json["radar_max_detection_range_m"].as_f64().unwrap() > 180.0);
     assert!(radar_json["is_radar_target_detected"].as_bool().unwrap());
-    assert!(radar_json["is_sensor_fusion_redundancy_achieved"].as_bool().unwrap());
+    assert!(
+        radar_json["is_sensor_fusion_redundancy_achieved"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 187. Autonomous Underwater Vehicle (AUV) Hydrodynamics & Endurance (ITTC-78 / Hoerner)
     let res_auv = post(
@@ -7631,7 +8027,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 189, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 189, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -7659,10 +8057,23 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(hydro_json["max_head_rise_m"].as_f64().unwrap() > 30.0);
     assert!(hydro_json["max_head_rise_pct"].as_f64().unwrap() < 40.0);
     assert!(hydro_json["max_overspeed_pct"].as_f64().unwrap() < 55.0);
-    assert!(hydro_json["penstock_stress_safety_factor"].as_f64().unwrap() >= 1.50);
-    assert!(hydro_json["is_water_hammer_pressure_acceptable"].as_bool().unwrap());
+    assert!(
+        hydro_json["penstock_stress_safety_factor"]
+            .as_f64()
+            .unwrap()
+            >= 1.50
+    );
+    assert!(
+        hydro_json["is_water_hammer_pressure_acceptable"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(hydro_json["is_overspeed_acceptable"].as_bool().unwrap());
-    assert!(hydro_json["is_penstock_stress_acceptable"].as_bool().unwrap());
+    assert!(
+        hydro_json["is_penstock_stress_acceptable"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 191. Semiconductor CMP Removal Rate, Dishing & Erosion (SEMI / Preston)
     let cmp_res = post(
@@ -7704,15 +8115,32 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(pave_res.status, 200);
     let pave_json = json(&pave_res)?;
-    assert_eq!(pave_json["total_structure_thickness_mm"].as_f64().unwrap(), 600.0);
-    assert!(pave_json["asphalt_bottom_tensile_strain_ue"].as_f64().unwrap() > 50.0);
-    assert!(pave_json["subgrade_top_compressive_strain_ue"].as_f64().unwrap() > 100.0);
+    assert_eq!(
+        pave_json["total_structure_thickness_mm"].as_f64().unwrap(),
+        600.0
+    );
+    assert!(
+        pave_json["asphalt_bottom_tensile_strain_ue"]
+            .as_f64()
+            .unwrap()
+            > 50.0
+    );
+    assert!(
+        pave_json["subgrade_top_compressive_strain_ue"]
+            .as_f64()
+            .unwrap()
+            > 100.0
+    );
     assert!(pave_json["fatigue_damage_ratio"].as_f64().unwrap() <= 1.0);
     assert!(pave_json["rutting_damage_ratio"].as_f64().unwrap() <= 1.0);
     assert!(pave_json["predicted_total_rut_depth_mm"].as_f64().unwrap() <= 12.5);
     assert!(pave_json["is_fatigue_life_adequate"].as_bool().unwrap());
     assert!(pave_json["is_rutting_life_adequate"].as_bool().unwrap());
-    assert!(pave_json["is_pavement_structure_adequate"].as_bool().unwrap());
+    assert!(
+        pave_json["is_pavement_structure_adequate"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 193. Biomaterial Tissue Engineering Scaffold Porosity, Permeability & Degradation (ISO 13781)
     let scaf_res = post(
@@ -7729,12 +8157,34 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(scaf_res.status, 200);
     let scaf_json = json(&scaf_res)?;
     assert!(scaf_json["darcy_permeability_m2"].as_f64().unwrap() > 1e-11);
-    assert!(scaf_json["initial_compressive_modulus_mpa"].as_f64().unwrap() > 150.0);
-    assert!(scaf_json["degraded_compressive_modulus_mpa"].as_f64().unwrap() > 80.0);
-    assert!(scaf_json["is_osteoconductive_architecture_favorable"].as_bool().unwrap());
+    assert!(
+        scaf_json["initial_compressive_modulus_mpa"]
+            .as_f64()
+            .unwrap()
+            > 150.0
+    );
+    assert!(
+        scaf_json["degraded_compressive_modulus_mpa"]
+            .as_f64()
+            .unwrap()
+            > 80.0
+    );
+    assert!(
+        scaf_json["is_osteoconductive_architecture_favorable"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(scaf_json["is_shear_stress_osteogenic"].as_bool().unwrap());
-    assert!(scaf_json["is_initial_modulus_sufficient"].as_bool().unwrap());
-    assert!(scaf_json["is_degradation_profile_biocompatible"].as_bool().unwrap());
+    assert!(
+        scaf_json["is_initial_modulus_sufficient"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        scaf_json["is_degradation_profile_biocompatible"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 194. Satellite Orbital Decay & Atmospheric Re-entry Lifetime (King-Hele / ISO 27852)
     let decay_res = post(
@@ -7751,8 +8201,18 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(decay_res.status, 200);
     let decay_json = json(&decay_res)?;
-    assert!(decay_json["ballistic_coefficient_m2_per_kg"].as_f64().unwrap() > 0.006);
-    assert!(decay_json["initial_orbital_period_minutes"].as_f64().unwrap() > 90.0);
+    assert!(
+        decay_json["ballistic_coefficient_m2_per_kg"]
+            .as_f64()
+            .unwrap()
+            > 0.006
+    );
+    assert!(
+        decay_json["initial_orbital_period_minutes"]
+            .as_f64()
+            .unwrap()
+            > 90.0
+    );
     assert!(decay_json["initial_decay_rate_m_per_day"].as_f64().unwrap() > 10.0);
     assert!(decay_json["orbital_lifetime_years"].as_f64().unwrap() < 10.0);
     assert!(decay_json["is_iadc_25yr_compliant"].as_bool().unwrap());
@@ -7785,7 +8245,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 196, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 196, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -7812,11 +8274,25 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(excavator_res.status, 200);
     let excavator_json = json(&excavator_res)?;
-    assert!(excavator_json["theoretical_capacity_m3_per_h"].as_f64().unwrap() > 7000.0);
-    assert!(excavator_json["tangential_digging_force_kn"].as_f64().unwrap() > 200.0);
+    assert!(
+        excavator_json["theoretical_capacity_m3_per_h"]
+            .as_f64()
+            .unwrap()
+            > 7000.0
+    );
+    assert!(
+        excavator_json["tangential_digging_force_kn"]
+            .as_f64()
+            .unwrap()
+            > 200.0
+    );
     assert!(excavator_json["required_drive_power_kw"].as_f64().unwrap() > 800.0);
     assert!(excavator_json["stability_safety_factor"].as_f64().unwrap() > 1.30);
-    assert!(excavator_json["is_cutting_speed_acceptable"].as_bool().unwrap());
+    assert!(
+        excavator_json["is_cutting_speed_acceptable"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(excavator_json["is_drive_power_feasible"].as_bool().unwrap());
     assert!(excavator_json["is_machine_stable"].as_bool().unwrap());
 
@@ -7842,11 +8318,29 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let multiphase_json = json(&multiphase_res)?;
     assert!(multiphase_json["mixture_density_kg_m3"].as_f64().unwrap() > 100.0);
     assert!(multiphase_json["mixture_velocity_m_s"].as_f64().unwrap() > 1.0);
-    assert!(multiphase_json["lockhart_martinelli_param_x"].as_f64().unwrap() > 0.5);
-    assert!(multiphase_json["in_situ_liquid_holdup_hl"].as_f64().unwrap() > 0.1);
+    assert!(
+        multiphase_json["lockhart_martinelli_param_x"]
+            .as_f64()
+            .unwrap()
+            > 0.5
+    );
+    assert!(
+        multiphase_json["in_situ_liquid_holdup_hl"]
+            .as_f64()
+            .unwrap()
+            > 0.1
+    );
     assert!(multiphase_json["total_pressure_drop_bar"].as_f64().unwrap() > 1.0);
-    assert!(multiphase_json["is_erosion_velocity_acceptable"].as_bool().unwrap());
-    assert!(multiphase_json["is_pressure_drop_acceptable"].as_bool().unwrap());
+    assert!(
+        multiphase_json["is_erosion_velocity_acceptable"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        multiphase_json["is_pressure_drop_acceptable"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 199. Geothermal Reservoir Doublet Well Heat Extraction (Gringarten / Bodvarsson)
     let geothermal_res = post(
@@ -7868,13 +8362,40 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(geothermal_res.status, 200);
     let geothermal_json = json(&geothermal_res)?;
-    assert!(geothermal_json["initial_thermal_power_mw_th"].as_f64().unwrap() > 25.0);
-    assert!(geothermal_json["parasitic_pump_power_kw_e"].as_f64().unwrap() > 50.0);
+    assert!(
+        geothermal_json["initial_thermal_power_mw_th"]
+            .as_f64()
+            .unwrap()
+            > 25.0
+    );
+    assert!(
+        geothermal_json["parasitic_pump_power_kw_e"]
+            .as_f64()
+            .unwrap()
+            > 50.0
+    );
     assert!(geothermal_json["thermal_cop"].as_f64().unwrap() > 100.0);
-    assert!(geothermal_json["thermal_breakthrough_years"].as_f64().unwrap() > 20.0);
-    assert!(geothermal_json["is_breakthrough_delayed_acceptable"].as_bool().unwrap());
-    assert!(geothermal_json["is_pumping_power_viable"].as_bool().unwrap());
-    assert!(geothermal_json["is_thermal_cop_sustainable"].as_bool().unwrap());
+    assert!(
+        geothermal_json["thermal_breakthrough_years"]
+            .as_f64()
+            .unwrap()
+            > 20.0
+    );
+    assert!(
+        geothermal_json["is_breakthrough_delayed_acceptable"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        geothermal_json["is_pumping_power_viable"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        geothermal_json["is_thermal_cop_sustainable"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 200. Spray Drying Atomization, Droplet Evaporation & Powder Moisture (Masters / ASABE)
     let spray_res = post(
@@ -7900,10 +8421,23 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(spray_json["sauter_mean_diameter_d32_um"].as_f64().unwrap() > 20.0);
     assert!(spray_json["droplet_drying_time_seconds"].as_f64().unwrap() < 5.0);
     assert!(spray_json["water_evaporation_rate_kg_h"].as_f64().unwrap() > 600.0);
-    assert!(spray_json["dry_powder_production_rate_kg_h"].as_f64().unwrap() > 500.0);
+    assert!(
+        spray_json["dry_powder_production_rate_kg_h"]
+            .as_f64()
+            .unwrap()
+            > 500.0
+    );
     assert!(spray_json["is_drying_time_adequate"].as_bool().unwrap());
-    assert!(spray_json["is_stickiness_risk_acceptable"].as_bool().unwrap());
-    assert!(spray_json["is_thermal_efficiency_acceptable"].as_bool().unwrap());
+    assert!(
+        spray_json["is_stickiness_risk_acceptable"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        spray_json["is_thermal_efficiency_acceptable"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 201. Radioisotope Thermoelectric Generator (RTG) (NASA SP-8000 / Ioffe)
     let rtg_res = post(
@@ -7930,7 +8464,11 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(rtg_json["eol_electric_power_w_e"].as_f64().unwrap() > 180.0);
     assert!(rtg_json["is_bus_voltage_adequate"].as_bool().unwrap());
     assert!(rtg_json["is_eol_power_sufficient"].as_bool().unwrap());
-    assert!(rtg_json["is_conversion_efficiency_acceptable"].as_bool().unwrap());
+    assert!(
+        rtg_json["is_conversion_efficiency_acceptable"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 202. Universal Commands Execution Verification (Batch 21 Domains)
     for cmd_id in [
@@ -7960,7 +8498,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 203, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 203, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -7987,15 +8527,37 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(loca_res.status, 200);
     let loca_json = json(&loca_res)?;
-    assert!(loca_json["volumetric_energy_release_rate_kw_per_m3"].as_f64().unwrap() > 100.0);
+    assert!(
+        loca_json["volumetric_energy_release_rate_kw_per_m3"]
+            .as_f64()
+            .unwrap()
+            > 100.0
+    );
     assert!(loca_json["tagami_condensing_htc_w_m2_k"].as_f64().unwrap() > 500.0);
-    assert!(loca_json["peak_containment_pressure_bar_a"].as_f64().unwrap() < 4.80);
+    assert!(
+        loca_json["peak_containment_pressure_bar_a"]
+            .as_f64()
+            .unwrap()
+            < 4.80
+    );
     assert!(loca_json["pressure_margin_pct"].as_f64().unwrap() >= 5.0);
     assert!(loca_json["spray_heat_removal_mw_th"].as_f64().unwrap() > 50.0);
-    assert!(loca_json["is_pressure_margin_acceptable"].as_bool().unwrap());
+    assert!(
+        loca_json["is_pressure_margin_acceptable"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(loca_json["is_temperature_within_design"].as_bool().unwrap());
-    assert!(loca_json["is_24h_depressurization_compliant"].as_bool().unwrap());
-    assert!(loca_json["is_containment_integrity_verified"].as_bool().unwrap());
+    assert!(
+        loca_json["is_24h_depressurization_compliant"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        loca_json["is_containment_integrity_verified"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 205. Atmospheric Pollutant Gaussian Plume Dispersion (EPA AERMOD / Pasquill-Gifford / Briggs)
     let plume_res = post(
@@ -8020,7 +8582,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(plume_json["buoyancy_flux_m4_per_s3"].as_f64().unwrap() > 50.0);
     assert!(plume_json["plume_rise_delta_h_m"].as_f64().unwrap() > 50.0);
     assert!(plume_json["effective_stack_height_m"].as_f64().unwrap() > 130.0);
-    assert!(plume_json["peak_max_ground_concentration_ug_per_m3"].as_f64().unwrap() < 196.0);
+    assert!(
+        plume_json["peak_max_ground_concentration_ug_per_m3"]
+            .as_f64()
+            .unwrap()
+            < 196.0
+    );
     assert!(plume_json["is_naaqs_compliant"].as_bool().unwrap());
     assert!(plume_json["is_plume_rise_adequate"].as_bool().unwrap());
 
@@ -8049,13 +8616,31 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(rocket_res.status, 200);
     let rocket_json = json(&rocket_res)?;
-    assert!(rocket_json["liftoff_thrust_to_weight_ratio"].as_f64().unwrap() > 1.20);
+    assert!(
+        rocket_json["liftoff_thrust_to_weight_ratio"]
+            .as_f64()
+            .unwrap()
+            > 1.20
+    );
     assert!(rocket_json["total_ideal_delta_v_m_s"].as_f64().unwrap() > 9000.0);
-    assert!(rocket_json["achieved_orbital_velocity_m_s"].as_f64().unwrap() > 7700.0);
+    assert!(
+        rocket_json["achieved_orbital_velocity_m_s"]
+            .as_f64()
+            .unwrap()
+            > 7700.0
+    );
     assert!(rocket_json["max_q_dynamic_pressure_kpa"].as_f64().unwrap() < 45.0);
     assert!(rocket_json["is_liftoff_thrust_adequate"].as_bool().unwrap());
-    assert!(rocket_json["is_orbit_injection_achieved"].as_bool().unwrap());
-    assert!(rocket_json["is_max_q_within_structural_limits"].as_bool().unwrap());
+    assert!(
+        rocket_json["is_orbit_injection_achieved"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        rocket_json["is_max_q_within_structural_limits"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 207. Concrete Gravity Dam Overturning & Sliding Stability (USACE EM 1110-2-2200 / FERC)
     let dam_res = post(
@@ -8085,7 +8670,11 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(dam_json["toe_bearing_stress_mpa"].as_f64().unwrap() < 8.0);
     assert!(dam_json["is_sliding_stable"].as_bool().unwrap());
     assert!(dam_json["is_overturning_stable"].as_bool().unwrap());
-    assert!(dam_json["is_no_tension_kern_rule_satisfied"].as_bool().unwrap());
+    assert!(
+        dam_json["is_no_tension_kern_rule_satisfied"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(dam_json["is_dam_stability_verified"].as_bool().unwrap());
 
     // 208. Water Electrolyzer Hydrogen Production & Cell Polarization (Butler-Volmer / ISO 22734)
@@ -8110,8 +8699,18 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let h2_json = json(&h2_res)?;
     assert!(h2_json["operating_cell_voltage_v"].as_f64().unwrap() > 1.80);
     assert!(h2_json["operating_cell_voltage_v"].as_f64().unwrap() < 2.30);
-    assert!(h2_json["hydrogen_production_rate_kg_per_h"].as_f64().unwrap() > 4.5);
-    assert!(h2_json["specific_energy_consumption_kwh_per_kg"].as_f64().unwrap() < 58.0);
+    assert!(
+        h2_json["hydrogen_production_rate_kg_per_h"]
+            .as_f64()
+            .unwrap()
+            > 4.5
+    );
+    assert!(
+        h2_json["specific_energy_consumption_kwh_per_kg"]
+            .as_f64()
+            .unwrap()
+            < 58.0
+    );
     assert!(h2_json["stack_hhv_efficiency_pct"].as_f64().unwrap() > 65.0);
     assert!(h2_json["is_cell_voltage_acceptable"].as_bool().unwrap());
     assert!(h2_json["is_specific_energy_acceptable"].as_bool().unwrap());
@@ -8146,7 +8745,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 210, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 210, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -8170,8 +8771,16 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(optics_json["transmittance_pct"].as_f64().unwrap() < 5.0);
     assert!(optics_json["dbr_stopband_bandwidth_nm"].as_f64().unwrap() > 50.0);
     assert!(optics_json["is_energy_conserved"].as_bool().unwrap());
-    assert!(optics_json["is_target_reflectance_achieved"].as_bool().unwrap());
-    assert!(optics_json["is_thickness_manufacturable"].as_bool().unwrap());
+    assert!(
+        optics_json["is_target_reflectance_achieved"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        optics_json["is_thickness_manufacturable"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(optics_json["is_optical_design_viable"].as_bool().unwrap());
 
     // 212. Cryogenic Linde-Hampson Liquefaction & Joule-Thomson (ISO 21009 / Barron)
@@ -8195,7 +8804,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(cryo_json["liquid_yield_fraction"].as_f64().unwrap() >= 0.05);
     assert!(cryo_json["liquid_production_rate_kg_h"].as_f64().unwrap() > 60.0);
     assert!(cryo_json["compressor_power_kw_e"].as_f64().unwrap() > 100.0);
-    assert!(cryo_json["specific_energy_consumption_kwh_per_kg"].as_f64().unwrap() < 3.20);
+    assert!(
+        cryo_json["specific_energy_consumption_kwh_per_kg"]
+            .as_f64()
+            .unwrap()
+            < 3.20
+    );
     assert!(cryo_json["is_below_inversion_pressure"].as_bool().unwrap());
     assert!(cryo_json["is_liquid_yield_viable"].as_bool().unwrap());
     assert!(cryo_json["is_specific_power_acceptable"].as_bool().unwrap());
@@ -8225,8 +8839,16 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(cyclone_json["pressure_drop_kpa"].as_f64().unwrap() >= 50.0);
     assert!(cyclone_json["corrected_cut_size_d50c_um"].as_f64().unwrap() > 20.0);
     assert!(cyclone_json["sharpness_index_m"].as_f64().unwrap() >= 1.5);
-    assert!(cyclone_json["is_discharge_in_spray_regime"].as_bool().unwrap());
-    assert!(cyclone_json["is_pressure_drop_acceptable"].as_bool().unwrap());
+    assert!(
+        cyclone_json["is_discharge_in_spray_regime"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        cyclone_json["is_pressure_drop_acceptable"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(cyclone_json["is_inlet_velocity_optimal"].as_bool().unwrap());
     assert!(cyclone_json["is_classification_viable"].as_bool().unwrap());
 
@@ -8252,12 +8874,31 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(amb_res.status, 200);
     let amb_json = json(&amb_res)?;
     assert!(amb_json["current_gain_ki_n_per_a"].as_f64().unwrap() > 100.0);
-    assert!(amb_json["open_loop_negative_stiffness_kx_kn_per_m"].as_f64().unwrap() > 500.0);
-    assert!(amb_json["closed_loop_stiffness_k_net_kn_per_m"].as_f64().unwrap() > 500.0);
-    assert!(amb_json["suspension_natural_frequency_hz"].as_f64().unwrap() > 25.0);
+    assert!(
+        amb_json["open_loop_negative_stiffness_kx_kn_per_m"]
+            .as_f64()
+            .unwrap()
+            > 500.0
+    );
+    assert!(
+        amb_json["closed_loop_stiffness_k_net_kn_per_m"]
+            .as_f64()
+            .unwrap()
+            > 500.0
+    );
+    assert!(
+        amb_json["suspension_natural_frequency_hz"]
+            .as_f64()
+            .unwrap()
+            > 25.0
+    );
     assert!(amb_json["dynamic_load_safety_factor"].as_f64().unwrap() >= 2.0);
     assert!(amb_json["air_gap_displacement_ratio"].as_f64().unwrap() <= 0.30);
-    assert!(amb_json["is_stiffness_positive_and_stable"].as_bool().unwrap());
+    assert!(
+        amb_json["is_stiffness_positive_and_stable"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(amb_json["is_damping_ratio_adequate"].as_bool().unwrap());
     assert!(amb_json["is_air_gap_clearance_safe"].as_bool().unwrap());
     assert!(amb_json["is_load_capacity_sufficient"].as_bool().unwrap());
@@ -8283,13 +8924,26 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(sonar_res.status, 200);
     let sonar_json = json(&sonar_res)?;
     assert!(sonar_json["source_level_db_re_upa"].as_f64().unwrap() > 210.0);
-    assert!(sonar_json["absorption_coefficient_db_per_km"].as_f64().unwrap() > 0.1);
+    assert!(
+        sonar_json["absorption_coefficient_db_per_km"]
+            .as_f64()
+            .unwrap()
+            > 0.1
+    );
     assert!(sonar_json["one_way_transmission_loss_db"].as_f64().unwrap() > 40.0);
     assert!(sonar_json["signal_excess_se_db"].as_f64().unwrap() >= 0.0);
     assert!(sonar_json["figure_of_merit_fom_db"].as_f64().unwrap() > 100.0);
     assert!(sonar_json["is_target_detected"].as_bool().unwrap());
-    assert!(sonar_json["is_cavitation_limit_satisfied"].as_bool().unwrap());
-    assert!(sonar_json["is_absorption_loss_favorable"].as_bool().unwrap());
+    assert!(
+        sonar_json["is_cavitation_limit_satisfied"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        sonar_json["is_absorption_loss_favorable"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(sonar_json["is_sonar_detection_viable"].as_bool().unwrap());
 
     // 216. Universal Commands Execution Verification (Batch 23 Domains)
@@ -8320,7 +8974,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 217, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 217, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -8349,7 +9005,11 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(ebw_json["cooling_time_t8_5_seconds"].as_f64().unwrap() > 0.10);
     assert!(ebw_json["is_narrow_keyhole_achieved"].as_bool().unwrap());
     assert!(ebw_json["is_cooling_time_acceptable"].as_bool().unwrap());
-    assert!(ebw_json["is_iso_13919_class_b_compliant"].as_bool().unwrap());
+    assert!(
+        ebw_json["is_iso_13919_class_b_compliant"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(ebw_json["is_ebw_process_viable"].as_bool().unwrap());
 
     // 219. Industrial Crystallization Kinetics & Crystal Size Distribution (MSMPR / Mersmann)
@@ -8368,14 +9028,32 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(crys_res.status, 200);
     let crys_json = json(&crys_res)?;
-    assert!(crys_json["saturation_concentration_kg_m3"].as_f64().unwrap() > 350.0);
+    assert!(
+        crys_json["saturation_concentration_kg_m3"]
+            .as_f64()
+            .unwrap()
+            > 350.0
+    );
     assert!(crys_json["supersaturation_delta_c_kg_m3"].as_f64().unwrap() > 5.0);
-    assert!(crys_json["relative_supersaturation_sigma"].as_f64().unwrap() > 0.01);
+    assert!(
+        crys_json["relative_supersaturation_sigma"]
+            .as_f64()
+            .unwrap()
+            > 0.01
+    );
     assert!(crys_json["residence_time_tau_hours"].as_f64().unwrap() >= 1.5);
     assert!(crys_json["median_crystal_size_l50_um"].as_f64().unwrap() >= 300.0);
     assert!(crys_json["crystal_production_rate_kg_h"].as_f64().unwrap() > 200.0);
-    assert!(crys_json["is_supersaturation_controlled"].as_bool().unwrap());
-    assert!(crys_json["is_target_crystal_size_achieved"].as_bool().unwrap());
+    assert!(
+        crys_json["is_supersaturation_controlled"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        crys_json["is_target_crystal_size_achieved"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(crys_json["is_crystallization_viable"].as_bool().unwrap());
 
     // 220. Thermoelectric Peltier Heat Pump Cooler (Ioffe / Thomson / ISO 9001)
@@ -8401,8 +9079,16 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(tec_json["electrical_input_power_w"].as_f64().unwrap() > 30.0);
     assert!(tec_json["coefficient_of_performance_cop"].as_f64().unwrap() > 0.30);
     assert!(tec_json["is_target_heat_load_met"].as_bool().unwrap());
-    assert!(tec_json["is_operating_below_thermal_runaway"].as_bool().unwrap());
-    assert!(tec_json["is_temperature_lift_achievable"].as_bool().unwrap());
+    assert!(
+        tec_json["is_operating_below_thermal_runaway"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        tec_json["is_temperature_lift_achievable"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(tec_json["is_tec_cooling_viable"].as_bool().unwrap());
 
     // 221. Centrifugal Slurry Pump Hydraulic De-Rating & Wear Life (ANSI/HI 12.1-12.6 / Cave)
@@ -8424,7 +9110,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(pump_res.status, 200);
     let pump_json = json(&pump_res)?;
-    assert!(pump_json["slurry_mixture_specific_gravity"].as_f64().unwrap() > 1.20);
+    assert!(
+        pump_json["slurry_mixture_specific_gravity"]
+            .as_f64()
+            .unwrap()
+            > 1.20
+    );
     assert!(pump_json["head_derating_ratio_hr"].as_f64().unwrap() >= 0.85);
     assert!(pump_json["derated_slurry_head_m"].as_f64().unwrap() >= 38.0);
     assert!(pump_json["shaft_power_kw"].as_f64().unwrap() > 100.0);
@@ -8452,14 +9143,41 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(fiber_res.status, 200);
     let fiber_json = json(&fiber_res)?;
     assert!(fiber_json["core_refractive_index"].as_f64().unwrap() > 1.44);
-    assert!(fiber_json["chromatic_dispersion_ps_per_nm_km"].as_f64().unwrap() >= 15.0);
-    assert!(fiber_json["total_accumulated_dispersion_ps_per_nm"].as_f64().unwrap() > 1200.0);
+    assert!(
+        fiber_json["chromatic_dispersion_ps_per_nm_km"]
+            .as_f64()
+            .unwrap()
+            >= 15.0
+    );
+    assert!(
+        fiber_json["total_accumulated_dispersion_ps_per_nm"]
+            .as_f64()
+            .unwrap()
+            > 1200.0
+    );
     assert!(fiber_json["total_link_attenuation_db"].as_f64().unwrap() >= 14.0);
     assert!(fiber_json["received_optical_power_mw"].as_f64().unwrap() > 0.05);
-    assert!(fiber_json["pulse_broadening_delta_tau_ps"].as_f64().unwrap() > 15.0);
-    assert!(fiber_json["is_inter_symbol_interference_acceptable"].as_bool().unwrap());
-    assert!(fiber_json["is_received_optical_power_adequate"].as_bool().unwrap());
-    assert!(fiber_json["is_dispersion_penalty_tolerable"].as_bool().unwrap());
+    assert!(
+        fiber_json["pulse_broadening_delta_tau_ps"]
+            .as_f64()
+            .unwrap()
+            > 15.0
+    );
+    assert!(
+        fiber_json["is_inter_symbol_interference_acceptable"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        fiber_json["is_received_optical_power_adequate"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        fiber_json["is_dispersion_penalty_tolerable"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(fiber_json["is_fiber_link_viable"].as_bool().unwrap());
 
     // 223. Universal Commands Execution Verification (Batch 24 Domains)
@@ -8490,7 +9208,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 224, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 224, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -8519,7 +9239,11 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(prop_json["thrust_force_kn"].as_f64().unwrap() > 400.0);
     assert!(prop_json["delivered_power_kw"].as_f64().unwrap() > 3000.0);
     assert!(prop_json["blade_tip_speed_m_s"].as_f64().unwrap() <= 40.0);
-    assert!(prop_json["is_keller_criterion_satisfied"].as_bool().unwrap());
+    assert!(
+        prop_json["is_keller_criterion_satisfied"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(prop_json["is_efficiency_satisfactory"].as_bool().unwrap());
     assert!(prop_json["is_tip_speed_acceptable"].as_bool().unwrap());
     assert!(prop_json["is_propeller_design_viable"].as_bool().unwrap());
@@ -8573,14 +9297,23 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(pmsm_res.status, 200);
     let pmsm_json = json(&pmsm_res)?;
-    assert!(pmsm_json["electrical_angular_velocity_rad_s"].as_f64().unwrap() > 1800.0);
+    assert!(
+        pmsm_json["electrical_angular_velocity_rad_s"]
+            .as_f64()
+            .unwrap()
+            > 1800.0
+    );
     assert!(pmsm_json["d_axis_current_id_a"].as_f64().unwrap() < 0.0);
     assert!(pmsm_json["pm_alignment_torque_nm"].as_f64().unwrap() > 60.0);
     assert!(pmsm_json["reluctance_torque_nm"].as_f64().unwrap() > 5.0);
     assert!(pmsm_json["mechanical_shaft_power_kw"].as_f64().unwrap() > 30.0);
     assert!(pmsm_json["motor_efficiency_pct"].as_f64().unwrap() >= 90.0);
     assert!(pmsm_json["inverter_modulation_index"].as_f64().unwrap() <= 1.0);
-    assert!(pmsm_json["is_voltage_within_inverter_limits"].as_bool().unwrap());
+    assert!(
+        pmsm_json["is_voltage_within_inverter_limits"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(pmsm_json["is_efficiency_high"].as_bool().unwrap());
     assert!(pmsm_json["is_pmsm_drive_viable"].as_bool().unwrap());
 
@@ -8606,7 +9339,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let mse_json = json(&mse_res)?;
     assert!(mse_json["active_earth_pressure_coef_ka"].as_f64().unwrap() > 0.25);
     assert_eq!(mse_json["total_reinforcement_layers"].as_u64().unwrap(), 13);
-    assert!(mse_json["allowable_design_strength_tal_kn_m"].as_f64().unwrap() > 35.0);
+    assert!(
+        mse_json["allowable_design_strength_tal_kn_m"]
+            .as_f64()
+            .unwrap()
+            > 35.0
+    );
     assert!(mse_json["max_layer_tensile_force_kn_m"].as_f64().unwrap() > 15.0);
     assert!(mse_json["min_rupture_safety_factor"].as_f64().unwrap() >= 1.50);
     assert!(mse_json["min_pullout_safety_factor"].as_f64().unwrap() >= 1.50);
@@ -8634,16 +9372,58 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(centrifuge_res.status, 200);
     let centrifuge_json = json(&centrifuge_res)?;
-    assert!(centrifuge_json["rotor_peripheral_speed_m_s"].as_f64().unwrap() > 600.0);
-    assert!(centrifuge_json["centrifugal_acceleration_g"].as_f64().unwrap() > 350000.0);
-    assert!(centrifuge_json["rotor_burst_safety_factor"].as_f64().unwrap() >= 1.30);
-    assert!(centrifuge_json["elementary_separation_factor_alpha0"].as_f64().unwrap() > 1.05);
-    assert!(centrifuge_json["overall_stage_separation_factor_alpha"].as_f64().unwrap() > 1.10);
-    assert!(centrifuge_json["separative_power_swu_per_year"].as_f64().unwrap() >= 10.0);
+    assert!(
+        centrifuge_json["rotor_peripheral_speed_m_s"]
+            .as_f64()
+            .unwrap()
+            > 600.0
+    );
+    assert!(
+        centrifuge_json["centrifugal_acceleration_g"]
+            .as_f64()
+            .unwrap()
+            > 350000.0
+    );
+    assert!(
+        centrifuge_json["rotor_burst_safety_factor"]
+            .as_f64()
+            .unwrap()
+            >= 1.30
+    );
+    assert!(
+        centrifuge_json["elementary_separation_factor_alpha0"]
+            .as_f64()
+            .unwrap()
+            > 1.05
+    );
+    assert!(
+        centrifuge_json["overall_stage_separation_factor_alpha"]
+            .as_f64()
+            .unwrap()
+            > 1.10
+    );
+    assert!(
+        centrifuge_json["separative_power_swu_per_year"]
+            .as_f64()
+            .unwrap()
+            >= 10.0
+    );
     assert!(centrifuge_json["is_rotor_stress_safe"].as_bool().unwrap());
-    assert!(centrifuge_json["is_separation_effective"].as_bool().unwrap());
-    assert!(centrifuge_json["is_swu_capacity_commercial"].as_bool().unwrap());
-    assert!(centrifuge_json["is_centrifuge_stage_viable"].as_bool().unwrap());
+    assert!(
+        centrifuge_json["is_separation_effective"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        centrifuge_json["is_swu_capacity_commercial"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        centrifuge_json["is_centrifuge_stage_viable"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 230. Universal Commands Execution Verification (Batch 25 Domains)
     for cmd_id in [
@@ -8673,7 +9453,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 231, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 231, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -8702,14 +9484,32 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(conveyor_json["material_cross_section_m2"].as_f64().unwrap() > 0.10);
     assert!(conveyor_json["volumetric_capacity_m3_h"].as_f64().unwrap() > 1200.0);
     assert!(conveyor_json["mass_throughput_t_h"].as_f64().unwrap() > 2000.0);
-    assert!(conveyor_json["peripheral_drive_force_fu_kn"].as_f64().unwrap() > 80.0);
+    assert!(
+        conveyor_json["peripheral_drive_force_fu_kn"]
+            .as_f64()
+            .unwrap()
+            > 80.0
+    );
     assert!(conveyor_json["motor_brake_power_kw"].as_f64().unwrap() > 250.0);
     assert!(conveyor_json["slack_side_tension_t2_kn"].as_f64().unwrap() > 30.0);
     assert!(conveyor_json["tight_side_tension_t1_kn"].as_f64().unwrap() > 100.0);
-    assert!(conveyor_json["belt_tensile_safety_factor"].as_f64().unwrap() >= 8.0);
+    assert!(
+        conveyor_json["belt_tensile_safety_factor"]
+            .as_f64()
+            .unwrap()
+            >= 8.0
+    );
     assert!(conveyor_json["is_drive_slip_safe"].as_bool().unwrap());
-    assert!(conveyor_json["is_belt_strength_sufficient"].as_bool().unwrap());
-    assert!(conveyor_json["is_conveyor_design_viable"].as_bool().unwrap());
+    assert!(
+        conveyor_json["is_belt_strength_sufficient"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        conveyor_json["is_conveyor_design_viable"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 233. Offshore Monopile / Jacket Wave & Current Hydrodynamics (API RP 2A-WSD / DNV-RP-C205 / Morison)
     let wave_res = post(
@@ -8735,7 +9535,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(wave_json["peak_base_shear_kn"].as_f64().unwrap() > 3000.0);
     assert!(wave_json["peak_overturning_moment_kn_m"].as_f64().unwrap() > 60000.0);
     assert!(wave_json["mudline_bending_stress_mpa"].as_f64().unwrap() > 15.0);
-    assert!(wave_json["structural_bending_safety_factor"].as_f64().unwrap() >= 1.35);
+    assert!(
+        wave_json["structural_bending_safety_factor"]
+            .as_f64()
+            .unwrap()
+            >= 1.35
+    );
     assert!(wave_json["is_morison_valid"].as_bool().unwrap());
     assert!(wave_json["is_bending_stress_acceptable"].as_bool().unwrap());
     assert!(wave_json["is_offshore_design_viable"].as_bool().unwrap());
@@ -8764,8 +9569,18 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(adcs_json["aerodynamic_drag_torque_un_m"].as_f64().unwrap() > 0.10);
     assert!(adcs_json["magnetic_residual_torque_un_m"].as_f64().unwrap() > 5.0);
     assert!(adcs_json["peak_disturbance_torque_un_m"].as_f64().unwrap() > 30.0);
-    assert!(adcs_json["accumulated_momentum_per_orbit_nms"].as_f64().unwrap() > 0.04);
-    assert!(adcs_json["recommended_wheel_momentum_nms"].as_f64().unwrap() > 0.08);
+    assert!(
+        adcs_json["accumulated_momentum_per_orbit_nms"]
+            .as_f64()
+            .unwrap()
+            > 0.04
+    );
+    assert!(
+        adcs_json["recommended_wheel_momentum_nms"]
+            .as_f64()
+            .unwrap()
+            > 0.08
+    );
     assert!(adcs_json["required_slew_torque_mn_m"].as_f64().unwrap() > 500.0);
     assert!(adcs_json["is_wheel_capacity_adequate"].as_bool().unwrap());
     assert!(adcs_json["is_mtq_desaturation_adequate"].as_bool().unwrap());
@@ -8793,11 +9608,33 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(battery_json["cc_phase_duration_minutes"].as_f64().unwrap() > 10.0);
     assert!(battery_json["total_charge_time_minutes"].as_f64().unwrap() < 25.0);
     assert!(battery_json["peak_heat_generation_w"].as_f64().unwrap() > 20.0);
-    assert!(battery_json["min_anode_plating_margin_mv"].as_f64().unwrap() > 0.0);
-    assert!(battery_json["estimated_cycle_life_to_80_soh"].as_u64().unwrap() > 1200);
-    assert!(battery_json["is_fast_charge_time_competitive"].as_bool().unwrap());
-    assert!(battery_json["is_lithium_plating_prevented"].as_bool().unwrap());
-    assert!(battery_json["is_thermal_dissipation_manageable"].as_bool().unwrap());
+    assert!(
+        battery_json["min_anode_plating_margin_mv"]
+            .as_f64()
+            .unwrap()
+            > 0.0
+    );
+    assert!(
+        battery_json["estimated_cycle_life_to_80_soh"]
+            .as_u64()
+            .unwrap()
+            > 1200
+    );
+    assert!(
+        battery_json["is_fast_charge_time_competitive"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        battery_json["is_lithium_plating_prevented"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        battery_json["is_thermal_dissipation_manageable"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(battery_json["is_fast_charging_viable"].as_bool().unwrap());
 
     // 236. Industrial Packed Bed Gas Absorption & Wet Scrubber Sizing (Coulson-Richardson / Onda / EPA OAQPS)
@@ -8820,12 +9657,39 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(scrubber_json["column_diameter_m"].as_f64().unwrap() > 0.8);
     assert!(scrubber_json["active_bed_height_m"].as_f64().unwrap() > 3.0);
     assert!(scrubber_json["solvent_flow_rate_m3_h"].as_f64().unwrap() > 2.0);
-    assert!(scrubber_json["number_of_transfer_units_ntu"].as_f64().unwrap() > 5.0);
-    assert!(scrubber_json["total_gas_pressure_drop_pa"].as_f64().unwrap() <= 3500.0);
-    assert!(scrubber_json["pollutant_removal_efficiency_pct"].as_f64().unwrap() >= 95.0);
-    assert!(scrubber_json["is_removal_efficiency_met"].as_bool().unwrap());
-    assert!(scrubber_json["is_pressure_drop_acceptable"].as_bool().unwrap());
-    assert!(scrubber_json["is_flooding_velocity_safe"].as_bool().unwrap());
+    assert!(
+        scrubber_json["number_of_transfer_units_ntu"]
+            .as_f64()
+            .unwrap()
+            > 5.0
+    );
+    assert!(
+        scrubber_json["total_gas_pressure_drop_pa"]
+            .as_f64()
+            .unwrap()
+            <= 3500.0
+    );
+    assert!(
+        scrubber_json["pollutant_removal_efficiency_pct"]
+            .as_f64()
+            .unwrap()
+            >= 95.0
+    );
+    assert!(
+        scrubber_json["is_removal_efficiency_met"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        scrubber_json["is_pressure_drop_acceptable"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        scrubber_json["is_flooding_velocity_safe"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(scrubber_json["is_packed_bed_viable"].as_bool().unwrap());
 
     // 237. Universal Commands Execution Verification (Batch 26 Domains)
@@ -8856,7 +9720,9 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         let mcp_res = post(
             addr,
             "/api/mcp",
-            &format!(r#"{{"jsonrpc": "2.0", "id": 238, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#),
+            &format!(
+                r#"{{"jsonrpc": "2.0", "id": 238, "method": "tools/call", "params": {{"name": "{tool_name}", "arguments": {{}}}}}}"#
+            ),
         )?;
         assert_eq!(mcp_res.status, 200);
     }
@@ -8889,7 +9755,11 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(gear_json["shock_strut_efficiency_pct"].as_f64().unwrap() >= 70.0);
     assert!(gear_json["is_stroke_margin_sufficient"].as_bool().unwrap());
     assert!(gear_json["is_load_factor_compliant"].as_bool().unwrap());
-    assert!(gear_json["is_tire_deflection_acceptable"].as_bool().unwrap());
+    assert!(
+        gear_json["is_tire_deflection_acceptable"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(gear_json["is_landing_gear_viable"].as_bool().unwrap());
 
     // 240. Pumped Storage Hydroelectric Plant Reversible Pump-Turbine & Water Conduit (IEC 60041 / IEC 61362 / IEEE 1207)
@@ -8914,11 +9784,20 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let hydro_json = json(&hydro_res)?;
     assert!(hydro_json["total_dynamic_pumping_head_m"].as_f64().unwrap() > 311.0);
     assert!(hydro_json["pumping_electrical_power_mw"].as_f64().unwrap() > 90.0);
-    assert!(hydro_json["generating_electrical_power_mw"].as_f64().unwrap() > 80.0);
+    assert!(
+        hydro_json["generating_electrical_power_mw"]
+            .as_f64()
+            .unwrap()
+            > 80.0
+    );
     assert!(hydro_json["round_trip_efficiency_pct"].as_f64().unwrap() >= 75.0);
     assert!(hydro_json["cavitation_safety_factor"].as_f64().unwrap() >= 1.15);
     assert!(hydro_json["is_cavitation_safe"].as_bool().unwrap());
-    assert!(hydro_json["is_round_trip_efficiency_competitive"].as_bool().unwrap());
+    assert!(
+        hydro_json["is_round_trip_efficiency_competitive"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(hydro_json["is_pumped_storage_viable"].as_bool().unwrap());
 
     // 241. Semiconductor EUV Photolithography Multi-Layer Optics & Resolution (ASML / SEMI / Fresnel-Debye)
@@ -8943,12 +9822,29 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(euv_res.status, 200);
     let euv_json = json(&euv_res)?;
     assert!(euv_json["net_mirror_reflectivity_pct"].as_f64().unwrap() >= 66.0);
-    assert!(euv_json["critical_dimension_resolution_nm"].as_f64().unwrap() <= 15.0);
+    assert!(
+        euv_json["critical_dimension_resolution_nm"]
+            .as_f64()
+            .unwrap()
+            <= 15.0
+    );
     assert!(euv_json["depth_of_focus_nm"].as_f64().unwrap() >= 60.0);
     assert!(euv_json["line_edge_roughness_3sigma_nm"].as_f64().unwrap() <= 3.0);
-    assert!(euv_json["is_mirror_reflectivity_sufficient"].as_bool().unwrap());
-    assert!(euv_json["is_resolution_advanced_node_capable"].as_bool().unwrap());
-    assert!(euv_json["is_depth_of_focus_manufacturable"].as_bool().unwrap());
+    assert!(
+        euv_json["is_mirror_reflectivity_sufficient"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        euv_json["is_resolution_advanced_node_capable"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        euv_json["is_depth_of_focus_manufacturable"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(euv_json["is_euv_system_viable"].as_bool().unwrap());
 
     // 242. Geothermal Binary Organic Rankine Cycle (ORC) Power Plant (ASME PTC 46 / VDI 4670 / DiPippo)
@@ -8972,9 +9868,18 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let orc_json = json(&orc_res)?;
     assert!(orc_json["thermal_duty_extracted_mw"].as_f64().unwrap() > 25.0);
     assert!(orc_json["net_electrical_power_mw"].as_f64().unwrap() > 3.0);
-    assert!(orc_json["exergy_second_law_efficiency_pct"].as_f64().unwrap() >= 35.0);
+    assert!(
+        orc_json["exergy_second_law_efficiency_pct"]
+            .as_f64()
+            .unwrap()
+            >= 35.0
+    );
     assert!(orc_json["is_silica_scaling_prevented"].as_bool().unwrap());
-    assert!(orc_json["is_exergy_efficiency_competitive"].as_bool().unwrap());
+    assert!(
+        orc_json["is_exergy_efficiency_competitive"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(orc_json["is_geothermal_orc_viable"].as_bool().unwrap());
 
     // 243. Cable-Stayed Bridge Stay Cable Rain-Wind Induced Vibration & Damping (FHWA-HRT-05-072 / PTI / Eurocode 1)
@@ -8999,7 +9904,12 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let stay_json = json(&stay_res)?;
     assert!(stay_json["midspan_static_sag_mm"].as_f64().unwrap() > 500.0);
     assert!(stay_json["fundamental_frequency_hz"].as_f64().unwrap() > 0.4);
-    assert!(stay_json["optimal_damper_coefficient_kn_s_m"].as_f64().unwrap() > 30.0);
+    assert!(
+        stay_json["optimal_damper_coefficient_kn_s_m"]
+            .as_f64()
+            .unwrap()
+            > 30.0
+    );
     assert!(stay_json["attained_damping_ratio"].as_f64().unwrap() >= 0.0060);
     assert!(stay_json["is_cable_sag_acceptable"].as_bool().unwrap());
     assert!(stay_json["is_rwiv_mitigated"].as_bool().unwrap());
@@ -9057,11 +9967,29 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let nozzle_json = json(&nozzle_res)?;
     assert!(nozzle_json["choked_mass_flow_rate_kg_s"].as_f64().unwrap() > 5.0);
     assert!(nozzle_json["exit_flow_velocity_m_s"].as_f64().unwrap() > 500.0);
-    assert!(nozzle_json["normal_shock_downstream_mach"].as_f64().unwrap() < 1.0);
-    assert!(nozzle_json["oblique_shock_wave_angle_deg"].as_f64().unwrap() > 30.0);
+    assert!(
+        nozzle_json["normal_shock_downstream_mach"]
+            .as_f64()
+            .unwrap()
+            < 1.0
+    );
+    assert!(
+        nozzle_json["oblique_shock_wave_angle_deg"]
+            .as_f64()
+            .unwrap()
+            > 30.0
+    );
     assert!(nozzle_json["is_choked_at_throat"].as_bool().unwrap());
-    assert!(nozzle_json["is_supersonic_flow_established"].as_bool().unwrap());
-    assert!(nozzle_json["is_nozzle_aerodynamically_viable"].as_bool().unwrap());
+    assert!(
+        nozzle_json["is_supersonic_flow_established"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        nozzle_json["is_nozzle_aerodynamically_viable"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 247. Electric Vehicle (EV) Dual-Motor AWD Torque Vectoring & Yaw Stability (ISO 8855 / Pacejka Magic Formula)
     let tv_res = post(
@@ -9086,11 +10014,13 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(tv_json["understeer_gradient_deg_per_g"].as_f64().unwrap() > 0.0);
     assert!(tv_json["target_yaw_rate_deg_s"].as_f64().unwrap() > 5.0);
     // DYC demand is signed: a negative value corrects the measured oversteer.
-    assert!(tv_json["active_yaw_moment_demand_nm"]
-        .as_f64()
-        .unwrap()
-        .abs()
-        > 20.0);
+    assert!(
+        tv_json["active_yaw_moment_demand_nm"]
+            .as_f64()
+            .unwrap()
+            .abs()
+            > 20.0
+    );
     assert!(tv_json["is_yaw_rate_tracking_satisfied"].as_bool().unwrap());
     assert!(tv_json["is_sideslip_stable"].as_bool().unwrap());
     assert!(tv_json["is_torque_vectoring_viable"].as_bool().unwrap());
@@ -9144,10 +10074,23 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert!(chrom_json["residence_time_minutes"].as_f64().unwrap() > 3.0);
     assert!(chrom_json["hetp_mm"].as_f64().unwrap() < 1.0);
     assert!(chrom_json["number_of_theoretical_plates"].as_f64().unwrap() > 400.0);
-    assert!(chrom_json["dynamic_binding_capacity_10pct_g_l"].as_f64().unwrap() > 40.0);
+    assert!(
+        chrom_json["dynamic_binding_capacity_10pct_g_l"]
+            .as_f64()
+            .unwrap()
+            > 40.0
+    );
     assert!(chrom_json["is_pressure_drop_acceptable"].as_bool().unwrap());
-    assert!(chrom_json["is_dbc_utilization_competitive"].as_bool().unwrap());
-    assert!(chrom_json["is_chromatography_column_viable"].as_bool().unwrap());
+    assert!(
+        chrom_json["is_dbc_utilization_competitive"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        chrom_json["is_chromatography_column_viable"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 250. High-Speed Maglev Electromagnetic Suspension Active Airgap Control (Transrapid / IEEE 1475)
     let maglev_res = post(
@@ -9167,10 +10110,27 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let maglev_json = json(&maglev_res)?;
     assert!(maglev_json["equilibrium_current_a"].as_f64().unwrap() > 25.0);
     assert!(maglev_json["equilibrium_flux_density_t"].as_f64().unwrap() > 0.40);
-    assert!(maglev_json["open_loop_unstable_pole_rad_s"].as_f64().unwrap() > 30.0);
-    assert!(maglev_json["is_core_saturation_prevented"].as_bool().unwrap());
-    assert!(maglev_json["is_airgap_contact_prevented"].as_bool().unwrap());
-    assert!(maglev_json["is_maglev_suspension_viable"].as_bool().unwrap());
+    assert!(
+        maglev_json["open_loop_unstable_pole_rad_s"]
+            .as_f64()
+            .unwrap()
+            > 30.0
+    );
+    assert!(
+        maglev_json["is_core_saturation_prevented"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        maglev_json["is_airgap_contact_prevented"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        maglev_json["is_maglev_suspension_viable"]
+            .as_bool()
+            .unwrap()
+    );
 
     // 251. Universal Commands Execution Verification (Batch 28 Domains)
     for cmd_id in [
@@ -9210,13 +10170,22 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     // 253. Supersonic Aircraft Flight Simulation Video & Poster Binary Endpoints
     let poster_res = get(addr, "/flight-demo-poster.png")?;
     assert_eq!(poster_res.status, 200);
-    assert_eq!(poster_res.headers.get("content-type").map(String::as_str), Some("image/png"));
+    assert_eq!(
+        poster_res.headers.get("content-type").map(String::as_str),
+        Some("image/png")
+    );
     assert!(!poster_res.body.is_empty());
 
     let video_res = get(addr, "/atlascad-supersonic-flight.mp4")?;
     assert_eq!(video_res.status, 200);
-    assert_eq!(video_res.headers.get("content-type").map(String::as_str), Some("video/mp4"));
-    assert_eq!(video_res.headers.get("accept-ranges").map(String::as_str), Some("bytes"));
+    assert_eq!(
+        video_res.headers.get("content-type").map(String::as_str),
+        Some("video/mp4")
+    );
+    assert_eq!(
+        video_res.headers.get("accept-ranges").map(String::as_str),
+        Some("bytes")
+    );
     assert!(video_res.body.len() > 1_000_000);
 
     // 254. Multi-Tier Universal Asset Store & Component Hub Endpoints
@@ -9234,8 +10203,16 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let asset_detail_res = get(addr, "/api/assets/ast_aero_waverider")?;
     assert_eq!(asset_detail_res.status, 200);
     let detail_val = json(&asset_detail_res)?;
-    assert_eq!(detail_val["record"]["name"], "Aerospace Supersonic Waverider");
-    assert!(!detail_val["record"]["parameters"].as_array().unwrap().is_empty());
+    assert_eq!(
+        detail_val["record"]["name"],
+        "Aerospace Supersonic Waverider"
+    );
+    assert!(
+        !detail_val["record"]["parameters"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
 
     // Publish New Custom Part Asset
     let pub_res = post(
@@ -9370,11 +10347,7 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(auth_val["teams"].as_array().unwrap().len(), 5);
 
     // Switch active role/user to Dr. Elena Rostova
-    let switch_user_res = post(
-        addr,
-        "/api/auth/login",
-        r#"{ "user_id": "usr_elena" }"#,
-    )?;
+    let switch_user_res = post(addr, "/api/auth/login", r#"{ "user_id": "usr_elena" }"#)?;
     assert_eq!(switch_user_res.status, 200);
     let elena_val = json(&switch_user_res)?;
     assert_eq!(elena_val["success"], true);
@@ -9403,7 +10376,13 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     // Verify key appears in list
     let list_keys_res = get(addr, "/api/auth/api-keys")?;
     assert_eq!(list_keys_res.status, 200);
-    assert!(json(&list_keys_res)?["api_keys"].as_array().unwrap().iter().any(|k| k["id"] == key_id));
+    assert!(
+        json(&list_keys_res)?["api_keys"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|k| k["id"] == key_id)
+    );
 
     // Revoke key
     let revoke_res = post(

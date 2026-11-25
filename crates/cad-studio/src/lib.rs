@@ -8243,9 +8243,9 @@ namespace AtlasCAD.Unity
                 .problem_id
                 .clone()
                 .unwrap_or_else(|| "ev_torque_vectoring_sim".to_string()),
-            drivetrain_layout: req.drivetrain_layout.unwrap_or(
-                atlas_simulation_core::ev_torque_vectoring::EvAwdLayout::DualMotorAwd,
-            ),
+            drivetrain_layout: req
+                .drivetrain_layout
+                .unwrap_or(atlas_simulation_core::ev_torque_vectoring::EvAwdLayout::DualMotorAwd),
             road_condition: req.road_condition.unwrap_or(
                 atlas_simulation_core::ev_torque_vectoring::RoadSurfaceCondition::DryAsphalt,
             ),
@@ -8359,7 +8359,10 @@ namespace AtlasCAD.Unity
             target_controller_bandwidth_rad_s: req.target_controller_bandwidth_rad_s.unwrap_or(65.0),
             disturbance_amplitude_mm: req.disturbance_amplitude_mm.unwrap_or(2.50),
         };
-        let res = atlas_simulation_core::maglev_guideway_suspension::solve_maglev_guideway_suspension(&prob)
+        let res =
+            atlas_simulation_core::maglev_guideway_suspension::solve_maglev_guideway_suspension(
+                &prob,
+            )
             .map_err(StudioError::BadRequest)?;
         serde_json::to_value(&res).map_err(|e| StudioError::Json(e.to_string()))
     }
@@ -13003,10 +13006,7 @@ namespace AtlasCAD.Unity
                     .get("riser_length_m")
                     .or_else(|| req.arguments.get("riser_total_length_m"))
                     .and_then(|v| v.as_f64());
-                let t = req
-                    .arguments
-                    .get("top_tension_kn")
-                    .and_then(|v| v.as_f64());
+                let t = req.arguments.get("top_tension_kn").and_then(|v| v.as_f64());
                 let v = req
                     .arguments
                     .get("surface_current_velocity_m_s")
@@ -13024,10 +13024,7 @@ namespace AtlasCAD.Unity
                     .get("column_diameter_mm")
                     .or_else(|| req.arguments.get("column_inner_diameter_mm"))
                     .and_then(|v| v.as_f64());
-                let h = req
-                    .arguments
-                    .get("bed_height_mm")
-                    .and_then(|v| v.as_f64());
+                let h = req.arguments.get("bed_height_mm").and_then(|v| v.as_f64());
                 let u = req
                     .arguments
                     .get("linear_velocity_cm_h")
@@ -13481,16 +13478,14 @@ namespace AtlasCAD.Unity
         let vis_enum = match visibility {
             Some("public") | Some("Public") => Some(atlas_asset_manager::AssetVisibility::Public),
             Some("team") | Some("Team") => Some(atlas_asset_manager::AssetVisibility::Team),
-            Some("private") | Some("Private") => Some(atlas_asset_manager::AssetVisibility::Private),
+            Some("private") | Some("Private") => {
+                Some(atlas_asset_manager::AssetVisibility::Private)
+            }
             _ => None,
         };
-        let assets = self.asset_registry.filter_assets(
-            user_id,
-            team_id,
-            vis_enum,
-            category,
-            search,
-        );
+        let assets = self
+            .asset_registry
+            .filter_assets(user_id, team_id, vis_enum, category, search);
         serde_json::to_value(&assets).map_err(|e| StudioError::Json(e.to_string()))
     }
 
@@ -13556,9 +13551,13 @@ namespace AtlasCAD.Unity
         .with_visibility(vis_enum)
         .with_author(atlas_asset_manager::AssetAuthor {
             user_id: req.author_id.unwrap_or_else(|| "usr_current".to_string()),
-            name: req.author_name.unwrap_or_else(|| "Current User".to_string()),
+            name: req
+                .author_name
+                .unwrap_or_else(|| "Current User".to_string()),
             email: "user@atlascad.internal".to_string(),
-            team_id: req.team_id.or_else(|| Some("team_aero_structures".to_string())),
+            team_id: req
+                .team_id
+                .or_else(|| Some("team_aero_structures".to_string())),
             avatar_color: "#6366f1".to_string(),
         })
         .with_tags(req.tags.unwrap_or_default());
@@ -13587,7 +13586,9 @@ namespace AtlasCAD.Unity
             user_id: req.user_id.unwrap_or_else(|| "usr_current".to_string()),
             name: req.user_name.unwrap_or_else(|| "Current User".to_string()),
             email: "user@atlascad.internal".to_string(),
-            team_id: req.team_id.or_else(|| Some("team_aero_structures".to_string())),
+            team_id: req
+                .team_id
+                .or_else(|| Some("team_aero_structures".to_string())),
             avatar_color: "#6366f1".to_string(),
         };
 
@@ -13632,9 +13633,9 @@ namespace AtlasCAD.Unity
             .ok_or(StudioError::NotFound)?;
         rec.downloads += 1;
 
-        let instance_name = req.instance_name.unwrap_or_else(|| {
-            format!("{}_inst", rec.name.replace(' ', "_").to_lowercase())
-        });
+        let instance_name = req
+            .instance_name
+            .unwrap_or_else(|| format!("{}_inst", rec.name.replace(' ', "_").to_lowercase()));
         let payload = serde_json::json!({
             "status": "Instantiated",
             "asset_id": asset_id,
@@ -13735,9 +13736,7 @@ namespace AtlasCAD.Unity
         let lock = EntityLock {
             entity_id: req.entity_id.clone(),
             holder_user_id: req.user_id.clone(),
-            holder_name: req
-                .user_name
-                .unwrap_or_else(|| "Collaborator".to_string()),
+            holder_name: req.user_name.unwrap_or_else(|| "Collaborator".to_string()),
             acquired_at: now,
             expires_at: now + duration,
         };
@@ -14179,11 +14178,7 @@ namespace AtlasCAD.Unity
             expires_at: Some(1732280000 + 365 * 86400),
             last_used_at: None,
             scopes: req.scopes.unwrap_or_else(|| {
-                vec![
-                    "cad:read".into(),
-                    "cad:mutate".into(),
-                    "export:all".into(),
-                ]
+                vec!["cad:read".into(), "cad:mutate".into(), "export:all".into()]
             }),
         };
         self.api_keys.push(key.clone());
@@ -14876,8 +14871,10 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
             let vis_param = query_text(&query, "visibility");
             let cat_param = query_text(&query, "category");
             let q_param = query_text(&query, "q").or_else(|| query_text(&query, "search"));
-            let user_param = query_text(&query, "user_id").unwrap_or_else(|| "usr_current".to_string());
-            let team_param = query_text(&query, "team_id").or_else(|| Some("team_aero_structures".to_string()));
+            let user_param =
+                query_text(&query, "user_id").unwrap_or_else(|| "usr_current".to_string());
+            let team_param =
+                query_text(&query, "team_id").or_else(|| Some("team_aero_structures".to_string()));
 
             if path == "/api/assets" {
                 match with_state(state, |state| {
@@ -14893,8 +14890,12 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
                     Err(error) => error_response(&error),
                 }
             } else {
-                let asset_id = path.trim_start_matches("/api/assets/").trim_end_matches('/');
-                match with_state(state, |state| state.get_asset_details(asset_id, &user_param, team_param.as_deref())) {
+                let asset_id = path
+                    .trim_start_matches("/api/assets/")
+                    .trim_end_matches('/');
+                match with_state(state, |state| {
+                    state.get_asset_details(asset_id, &user_param, team_param.as_deref())
+                }) {
                     Ok(payload) => json_response(200, payload),
                     Err(error) => error_response(&error),
                 }
@@ -14912,12 +14913,10 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
                 Err(error) => error_response(&error),
             }
         }
-        ("GET", "/api/auth/me") => {
-            match with_state(state, |state| state.auth_me_payload()) {
-                Ok(payload) => json_response(200, payload),
-                Err(error) => error_response(&error),
-            }
-        }
+        ("GET", "/api/auth/me") => match with_state(state, |state| state.auth_me_payload()) {
+            Ok(payload) => json_response(200, payload),
+            Err(error) => error_response(&error),
+        },
         ("GET", "/api/auth/sessions") => {
             match with_state(state, |state| state.auth_sessions_payload()) {
                 Ok(payload) => json_response(200, payload),
@@ -16955,9 +16954,7 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/energy/pumped_storage_hydro" => {
             match parse_body_or_default::<SimPumpedStorageRequest>(request) {
                 Ok(body) => {
-                    match with_state(state, |state| {
-                        state.sim_energy_pumped_storage_hydro(&body)
-                    }) {
+                    match with_state(state, |state| state.sim_energy_pumped_storage_hydro(&body)) {
                         Ok(payload) => json_response(200, payload),
                         Err(error) => error_response(&error),
                     }
@@ -17055,9 +17052,7 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
         "/api/sim/transport/maglev_suspension" => {
             match parse_body_or_default::<SimMaglevSuspensionRequest>(request) {
                 Ok(body) => {
-                    match with_state(state, |state| {
-                        state.sim_transport_maglev_suspension(&body)
-                    }) {
+                    match with_state(state, |state| state.sim_transport_maglev_suspension(&body)) {
                         Ok(payload) => json_response(200, payload),
                         Err(error) => error_response(&error),
                     }
@@ -22966,9 +22961,11 @@ struct SimSupersonicNozzleRequest {
     #[serde(default)]
     pub problem_id: Option<String>,
     #[serde(default)]
-    pub gas_medium: Option<atlas_simulation_core::supersonic_wind_tunnel_nozzle::SupersonicGasMedium>,
+    pub gas_medium:
+        Option<atlas_simulation_core::supersonic_wind_tunnel_nozzle::SupersonicGasMedium>,
     #[serde(default)]
-    pub contour_method: Option<atlas_simulation_core::supersonic_wind_tunnel_nozzle::NozzleContourMethod>,
+    pub contour_method:
+        Option<atlas_simulation_core::supersonic_wind_tunnel_nozzle::NozzleContourMethod>,
     #[serde(default)]
     pub stagnation_pressure_kpa: Option<f64>,
     #[serde(default)]
@@ -23062,7 +23059,8 @@ struct SimChromatographyColumnRequest {
     #[serde(default)]
     pub problem_id: Option<String>,
     #[serde(default)]
-    pub chromatography_mode: Option<atlas_simulation_core::chromatography_column::ChromatographyMode>,
+    pub chromatography_mode:
+        Option<atlas_simulation_core::chromatography_column::ChromatographyMode>,
     #[serde(default)]
     pub column_diameter_mm: Option<f64>,
     #[serde(default)]
@@ -23094,9 +23092,11 @@ struct SimMaglevSuspensionRequest {
     #[serde(default)]
     pub problem_id: Option<String>,
     #[serde(default)]
-    pub core_material: Option<atlas_simulation_core::maglev_guideway_suspension::MaglevCoreMaterial>,
+    pub core_material:
+        Option<atlas_simulation_core::maglev_guideway_suspension::MaglevCoreMaterial>,
     #[serde(default)]
-    pub disturbance_type: Option<atlas_simulation_core::maglev_guideway_suspension::GuidewayDisturbanceType>,
+    pub disturbance_type:
+        Option<atlas_simulation_core::maglev_guideway_suspension::GuidewayDisturbanceType>,
     #[serde(default)]
     pub mass_supported_per_magnet_kg: Option<f64>,
     #[serde(default)]

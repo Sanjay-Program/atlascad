@@ -322,7 +322,12 @@ impl RenderScene {
     }
 
     /// Render scene into an RGB image buffer (3 bytes per pixel)
-    pub fn render_image(&self, camera: &PerspectiveCamera, width: u32, height: u32) -> Result<Vec<u8>, RenderError> {
+    pub fn render_image(
+        &self,
+        camera: &PerspectiveCamera,
+        width: u32,
+        height: u32,
+    ) -> Result<Vec<u8>, RenderError> {
         if width == 0 || height == 0 {
             return Err(RenderError::InvalidDimensions(width, height));
         }

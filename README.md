@@ -123,7 +123,7 @@ flowchart TD
 
 ## 3. Repository Structure & Workspace Crates
 
-AtlasCAD is organized as an atomic Cargo workspace consisting of 43 modular Rust crates:
+AtlasCAD is organized as an atomic Cargo workspace consisting of 40 modular Rust crates:
 
 | Crate Path | Purpose & Responsibility |
 | :--- | :--- |
@@ -164,9 +164,13 @@ cd atlascad
 
 ### 4.2 One-Command Docker Compose
 ```bash
+export ATLAS_STUDIO_TOKEN="$(openssl rand -hex 32)"
 docker compose up -d
 ```
-*Starts AtlasCAD containerized with healthchecks and persistent storage mounted on `/data`.*
+*Starts AtlasCAD containerized with healthchecks and persistent storage mounted on `/data`. A token is
+mandatory (a studio listening on `0.0.0.0` refuses `/api` requests without one) and the port is
+published on `127.0.0.1` only. For a public, TLS-terminated deployment use the hardened stack in
+[`deploy/compose.yaml`](deploy/compose.yaml) with Caddy in front.*
 
 ### 4.3 Building from Source & CLI Usage
 

@@ -208,6 +208,7 @@ duplicated (a duplicate status page is a page that drifts):
 | `docs/integration/license-audit.md` | [license-audit.md](integration/license-audit.md) |
 | `docs/quality/baseline-builds.md` | [baseline-builds.md](quality/baseline-builds.md) |
 | `docs/quality/baseline-tests.md` | [baseline-tests.md](quality/baseline-tests.md) |
+| `docs/quality/atlas-usability-audit.md` | [atlas-usability-audit.md](quality/atlas-usability-audit.md) |
 | `docs/decisions/` (ADRs) | [`docs/architecture-decisions/`](architecture-decisions/) (existing convention) |
 | `engineering/reports/latest-integration-report.md` | generated |
 

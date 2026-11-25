@@ -2,6 +2,7 @@
 name = "atlas-render-core"
 version.workspace = true
 edition.workspace = true
+publish.workspace = true
 license-file.workspace = true
 rust-version.workspace = true
 description = "Atlas Render Core: software ray and path tracer, camera models, and BSDF shader evaluation"

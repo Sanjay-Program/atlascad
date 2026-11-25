@@ -105,7 +105,9 @@ pub struct GltfExporter;
 
 impl GltfExporter {
     pub fn mesh_to_gltf(mesh: &PolyMesh, mesh_name: &str) -> Result<String, InterchangeError> {
-        let trimesh = mesh.to_trimesh().map_err(|e| InterchangeError::ExportFailed(e.to_string()))?;
+        let trimesh = mesh
+            .to_trimesh()
+            .map_err(|e| InterchangeError::ExportFailed(e.to_string()))?;
 
         // Calculate min and max bounds for accessor
         let mut min = [f64::INFINITY; 3];
@@ -213,7 +215,8 @@ impl GltfExporter {
             ]
         });
 
-        serde_json::to_string_pretty(&gltf).map_err(|e| InterchangeError::Serialization(e.to_string()))
+        serde_json::to_string_pretty(&gltf)
+            .map_err(|e| InterchangeError::Serialization(e.to_string()))
     }
 }
 
@@ -225,10 +228,7 @@ impl GltfExporter {
 pub struct StepExporter;
 
 impl StepExporter {
-    pub fn mesh_to_step(
-        mesh: &PolyMesh,
-        model_name: &str,
-    ) -> Result<String, InterchangeError> {
+    pub fn mesh_to_step(mesh: &PolyMesh, model_name: &str) -> Result<String, InterchangeError> {
         let mut triangles = Vec::with_capacity(mesh.faces.len());
         for face in &mesh.faces {
             if face.len() < 3 {
@@ -247,8 +247,7 @@ impl StepExporter {
         };
         let bytes = cad_io::step_bytes(&contract, model_name)
             .map_err(|error| InterchangeError::ExportFailed(error.to_string()))?;
-        String::from_utf8(bytes)
-            .map_err(|error| InterchangeError::ExportFailed(error.to_string()))
+        String::from_utf8(bytes).map_err(|error| InterchangeError::ExportFailed(error.to_string()))
     }
 }
 
@@ -260,22 +259,33 @@ impl ThreeMfExporter {
         let mut out = String::new();
         out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         out.push_str("<model unit=\"millimeter\" xml:lang=\"en-US\" xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\">\n");
-        out.push_str(&format!("  <metadata name=\"Title\">{model_name}</metadata>\n"));
+        out.push_str(&format!(
+            "  <metadata name=\"Title\">{model_name}</metadata>\n"
+        ));
         out.push_str("  <metadata name=\"Application\">AtlasCAD Manufacturing Studio</metadata>\n");
         out.push_str("  <resources>\n");
         out.push_str("    <object id=\"1\" type=\"model\">\n");
         out.push_str("      <mesh>\n");
         out.push_str("        <vertices>\n");
         for p in &mesh.positions {
-            out.push_str(&format!("          <vertex x=\"{:.4}\" y=\"{:.4}\" z=\"{:.4}\" />\n", p[0], p[1], p[2]));
+            out.push_str(&format!(
+                "          <vertex x=\"{:.4}\" y=\"{:.4}\" z=\"{:.4}\" />\n",
+                p[0], p[1], p[2]
+            ));
         }
         out.push_str("        </vertices>\n");
         out.push_str("        <triangles>\n");
         for face in &mesh.faces {
             if face.len() >= 3 {
-                out.push_str(&format!("          <triangle v1=\"{}\" v2=\"{}\" v3=\"{}\" />\n", face[0], face[1], face[2]));
+                out.push_str(&format!(
+                    "          <triangle v1=\"{}\" v2=\"{}\" v3=\"{}\" />\n",
+                    face[0], face[1], face[2]
+                ));
                 if face.len() == 4 {
-                    out.push_str(&format!("          <triangle v1=\"{}\" v2=\"{}\" v3=\"{}\" />\n", face[0], face[2], face[3]));
+                    out.push_str(&format!(
+                        "          <triangle v1=\"{}\" v2=\"{}\" v3=\"{}\" />\n",
+                        face[0], face[2], face[3]
+                    ));
                 }
             }
         }

@@ -12,6 +12,10 @@ ignore = []
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
+# Every workspace crate depends on its siblings by path alone, which the wildcard lint reports as
+# `version = "*"`. Those are not the risk the lint exists for (a dependency that can silently jump
+# to any published version), so they are exempt; external wildcards stay denied.
+allow-wildcard-paths = true
 highlight = "all"
 
 # The licence policy's banned_crates list is duplicated here on purpose: `cargo-deny` is the second

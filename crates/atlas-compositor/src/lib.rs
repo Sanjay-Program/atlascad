@@ -81,7 +81,11 @@ pub fn blend_pixels(base: Rgba, over: Rgba, mode: BlendMode, opacity: f64) -> Rg
                     1.0 - 2.0 * (1.0 - b) * (1.0 - o)
                 }
             };
-            [blend_ch(base[0], over[0]), blend_ch(base[1], over[1]), blend_ch(base[2], over[2])]
+            [
+                blend_ch(base[0], over[0]),
+                blend_ch(base[1], over[1]),
+                blend_ch(base[2], over[2]),
+            ]
         }
     };
 
@@ -96,7 +100,12 @@ pub fn blend_pixels(base: Rgba, over: Rgba, mode: BlendMode, opacity: f64) -> Rg
     let g = (blend_rgb[1] * alpha_o + base[1] * alpha_b * (1.0 - alpha_o)) * inv_out_a;
     let b = (blend_rgb[2] * alpha_o + base[2] * alpha_b * (1.0 - alpha_o)) * inv_out_a;
 
-    [r.clamp(0.0, 1.0), g.clamp(0.0, 1.0), b.clamp(0.0, 1.0), out_a.clamp(0.0, 1.0)]
+    [
+        r.clamp(0.0, 1.0),
+        g.clamp(0.0, 1.0),
+        b.clamp(0.0, 1.0),
+        out_a.clamp(0.0, 1.0),
+    ]
 }
 
 /// DaVinci Resolve-class 3-way color grade adjustments
@@ -184,7 +193,11 @@ impl CubeLut3D {
                 continue;
             }
             if line.starts_with("TITLE") {
-                title = line.replace("TITLE", "").replace('"', "").trim().to_string();
+                title = line
+                    .replace("TITLE", "")
+                    .replace('"', "")
+                    .trim()
+                    .to_string();
             } else if line.starts_with("LUT_3D_SIZE") {
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if parts.len() >= 2 {

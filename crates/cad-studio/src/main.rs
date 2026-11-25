@@ -45,15 +45,14 @@ fn run() -> Result<(), String> {
                 file = Some(PathBuf::from(value));
             }
             "--listen" => {
-                let value = arguments
-                    .next()
-                    .ok_or_else(|| "`--listen` needs an address or port (e.g. 127.0.0.1:8080 or 8080)".to_string())?;
+                let value = arguments.next().ok_or_else(|| {
+                    "`--listen` needs an address or port (e.g. 127.0.0.1:8080 or 8080)".to_string()
+                })?;
                 if let Some((ip_str, port_str)) = value.split_once(':') {
-                    bind = Some(
-                        ip_str
-                            .parse::<IpAddr>()
-                            .map_err(|_| format!("`--listen {value}` has an invalid IP address"))?,
-                    );
+                    bind =
+                        Some(ip_str.parse::<IpAddr>().map_err(|_| {
+                            format!("`--listen {value}` has an invalid IP address")
+                        })?);
                     let p = port_str
                         .parse::<u16>()
                         .map_err(|_| format!("`--listen {value}` has an invalid port number"))?;
@@ -150,15 +149,14 @@ fn run() -> Result<(), String> {
         }
     }
 
-    // Check environment variables for SaaS / Cloud container deployments:
-    if port == DEFAULT_PORT {
-        if let Ok(val) = std::env::var("PORT").or_else(|_| std::env::var("ATLAS_PORT")) {
-            if let Ok(p) = val.trim().parse::<u16>() {
-                if p > 0 {
-                    port = p;
-                }
-            }
-        }
+    // Environment fallbacks for container / hosted deployments. Each variable is only consulted
+    // when the matching flag was absent, so an explicit flag always wins over the environment.
+    if port == DEFAULT_PORT
+        && let Ok(val) = std::env::var("PORT").or_else(|_| std::env::var("ATLAS_PORT"))
+        && let Ok(p) = val.trim().parse::<u16>()
+        && p > 0
+    {
+        port = p;
     }
 
     if bind.is_none() {
@@ -171,38 +169,34 @@ fn run() -> Result<(), String> {
                 if let Ok(ip) = ip_str.parse::<IpAddr>() {
                     bind = Some(ip);
                 }
-                if let Ok(p) = port_str.parse::<u16>() {
-                    if p > 0 {
-                        port = p;
-                    }
-                }
-            } else if let Ok(p) = val.trim().parse::<u16>() {
-                if p > 0 {
+                if let Ok(p) = port_str.parse::<u16>()
+                    && p > 0
+                {
                     port = p;
                 }
+            } else if let Ok(p) = val.trim().parse::<u16>()
+                && p > 0
+            {
+                port = p;
             } else if let Ok(ip) = val.trim().parse::<IpAddr>() {
                 bind = Some(ip);
             }
         }
     }
 
-    if advertise.is_none() {
-        if let Ok(val) =
+    if advertise.is_none()
+        && let Ok(val) =
             std::env::var("STUDIO_PUBLIC_HOST").or_else(|_| std::env::var("ATLAS_PUBLIC_HOST"))
-        {
-            if !val.trim().is_empty() {
-                advertise = Some(val.trim().to_string());
-            }
-        }
+        && !val.trim().is_empty()
+    {
+        advertise = Some(val.trim().to_string());
     }
 
-    if file.is_none() {
-        if let Ok(val) = std::env::var("ATLAS_PROJECT").or_else(|_| std::env::var("PROJECT_FILE"))
-        {
-            if !val.trim().is_empty() {
-                file = Some(PathBuf::from(val.trim()));
-            }
-        }
+    if file.is_none()
+        && let Ok(val) = std::env::var("ATLAS_PROJECT").or_else(|_| std::env::var("PROJECT_FILE"))
+        && !val.trim().is_empty()
+    {
+        file = Some(PathBuf::from(val.trim()));
     }
 
     let is_default_fallback = file.is_none();
@@ -342,7 +336,9 @@ fn open_browser(url: &str) {
     }
     #[cfg(target_os = "windows")]
     {
-        let _ = std::process::Command::new("cmd").args(["/C", "start", url]).spawn();
+        let _ = std::process::Command::new("cmd")
+            .args(["/C", "start", url])
+            .spawn();
     }
 }
 
@@ -379,17 +375,29 @@ fn usage() {
     println!();
     println!("USAGE:");
     println!("  cad-studio [--open] [--file PATH] [--port PORT] [--listen [IP:]PORT] [--share]");
-    println!("  cad-studio --new PATH [--name NAME] [--size X,Y,Z] [--port PORT] [--listen [IP:]PORT]");
+    println!(
+        "  cad-studio --new PATH [--name NAME] [--size X,Y,Z] [--port PORT] [--listen [IP:]PORT]"
+    );
     println!();
     println!("OPTIONS:");
     println!("  --open                 Automatically open the studio in the default web browser");
-    println!("  --file, --project PATH Open an existing engineering project (default: workspace.atlas)");
-    println!("  --new [PATH]           Create a new project file (optionally with --name and --size)");
+    println!(
+        "  --file, --project PATH Open an existing engineering project (default: workspace.atlas)"
+    );
+    println!(
+        "  --new [PATH]           Create a new project file (optionally with --name and --size)"
+    );
     println!("  --listen [IP:]PORT     Bind address and port (e.g. 127.0.0.1:8080 or 8080)");
     println!("  --port PORT            Set port (default: 7519, or $PORT / $ATLAS_PORT)");
-    println!("  --host IP              Set bind IP address (default: 127.0.0.1, or $HOST / $ATLAS_HOST)");
-    println!("  --share                Bind 0.0.0.0 with secure token for LAN / remote collaboration");
-    println!("  --advertise HOST       Set public hostname in generated share link ($STUDIO_PUBLIC_HOST)");
+    println!(
+        "  --host IP              Set bind IP address (default: 127.0.0.1, or $HOST / $ATLAS_HOST)"
+    );
+    println!(
+        "  --share                Bind 0.0.0.0 with secure token for LAN / remote collaboration"
+    );
+    println!(
+        "  --advertise HOST       Set public hostname in generated share link ($STUDIO_PUBLIC_HOST)"
+    );
     println!("  --token TOKEN          Specify security token ($ATLAS_STUDIO_TOKEN)");
     println!("  --token-file PATH      Load security token from file");
     println!("  --help, -h             Print this help guide");

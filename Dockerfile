@@ -1,21 +1,32 @@
-# Multi-stage production build for AtlasCAD Engineering Workstation
-# Stage 1: Build the standalone binary
-FROM rust:1.80-slim-bookworm AS builder
+# Multi-stage production build for the AtlasCAD Engineering Workstation.
+#
+# Build context: the repository root. For a smaller context, use deploy/build-image.sh, which
+# compiles on the host and ships only the binary + entrypoint (see deploy/Dockerfile).
+#
+#   docker build -t atlascad:0.1.0 .
+#
+# The builder tag must match rust-toolchain.toml: this workspace is edition 2024 with
+# `rust-version = "1.90"`, so an older image cannot compile it.
+FROM rust:1.95.0-slim-bookworm AS builder
 
 WORKDIR /build
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
-    libssl-dev \
     ca-certificates \
-    curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY . .
+# Copy only the build inputs. `apps/solidcraft/vendor` is required because the workspace patches
+# truck-* to those vendored crates ([patch.crates-io] in Cargo.toml). Copying the whole repository
+# instead pulls the reference checkouts and their build directories into the context.
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+COPY crates ./crates
+COPY apps/solidcraft/vendor ./apps/solidcraft/vendor
 
-RUN cargo build --release -p cad-studio
+# `--locked` keeps the image on the committed Cargo.lock instead of drifting during a build.
+RUN cargo build --release --locked -p cad-studio
 
-# Stage 2: Minimal, secure runtime container
+# Stage 2: minimal, secure runtime container
 FROM debian:bookworm-slim AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

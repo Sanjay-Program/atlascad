@@ -503,7 +503,7 @@ were measured, fixed and re-run, and `deploy/validate.sh` is now a step of `./sc
 
 | Check | Command | Result |
 | --- | --- | --- |
-| static assets | `deploy/validate.sh` | **PASS** — 16 shell scripts parse, both compose files interpolate, both Caddyfiles pass `caddy validate` (skipped cleanly when neither a caddy binary nor a cached image exists) |
+| static assets | `deploy/validate.sh` | **PASS** — 17 shell scripts parse, all three compose files interpolate (the root quickstart one also has to refuse to start without `ATLAS_STUDIO_TOKEN`), the root image copies explicit build inputs and every asset a crate embeds with `include_bytes!` survives `.dockerignore`, both Caddyfiles pass `caddy validate` (skipped cleanly when neither a caddy binary nor a cached image exists) |
 | hosted proofline | `deploy/smoke.sh` | **PASS** — fresh 10 × 10 × 5 document on a new volume, HTTP and TLS liveness, 401/200, token absent from `Config.Env` and readable by uid 10001, HSTS + `no-store`, 31 browser assertions, teardown |
 | advanced interaction drive | `deploy/smoke.sh --advanced` | **PASS** — 126 assertions in 18 steps through Caddy at `https://localhost:8443`: real pointer drags, wheel zoom, every panel, keyboard shortcuts, drawn profiles, downloads parsed (STL volume, DXF, `%PDF`), 21 screenshots, zero console or failed-request errors |
 | start · backup · restore | `deploy/up.sh`, `deploy/backup.sh`, `deploy/restore.sh` | **PASS** — stack healthy after preflight, volume archived with a checksum, volume wiped, archive restored, and `/api/state` came back byte-identical (1475 bytes, `proof`, 1 feature, 500.0 mm³) |

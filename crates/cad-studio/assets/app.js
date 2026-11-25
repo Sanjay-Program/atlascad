@@ -104,6 +104,14 @@
     return token && token.length >= 16 ? token : null;
   })();
 
+  // Auth routes are token-protected in a shared session exactly like the rest of /api, so they need
+  // the same header: a bare fetch() here 401s on page load and logs a console error.
+  async function authFetch(path, options = {}) {
+    const headers = new Headers(options.headers || {});
+    if (shareToken) headers.set("x-atlas-token", shareToken);
+    return fetch(path, { ...options, headers });
+  }
+
   async function api(path, options = {}) {
     const headers = new Headers(options.headers || {});
     if (shareToken) headers.set("x-atlas-token", shareToken);
@@ -14138,7 +14146,7 @@ ${gcodeSample}`;
 
   async function syncAuthMe() {
     try {
-      const res = await fetch("/api/auth/me");
+      const res = await authFetch("/api/auth/me");
       if (res.ok) {
         const data = await res.json();
         if (data.user) {
@@ -14189,7 +14197,7 @@ ${gcodeSample}`;
 
   async function loadApiKeys() {
     try {
-      const res = await fetch("/api/auth/api-keys");
+      const res = await authFetch("/api/auth/api-keys");
       if (res.ok) {
         const data = await res.json();
         AtlasAuth.apiKeys = data.api_keys || [];
@@ -14222,7 +14230,7 @@ ${gcodeSample}`;
       btn.addEventListener("click", async () => {
         const id = btn.dataset.keyId;
         try {
-          const res = await fetch("/api/auth/api-keys/revoke", {
+          const res = await authFetch("/api/auth/api-keys/revoke", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ id }),
@@ -14262,7 +14270,7 @@ ${gcodeSample}`;
 
     byId("accountLogoutBtn")?.addEventListener("click", async () => {
       try {
-        await fetch("/api/auth/logout", { method: "POST", headers: { "Content-Type": "application/json" } });
+        await authFetch("/api/auth/logout", { method: "POST", headers: { "Content-Type": "application/json" } });
         AtlasAuth.currentUser = {
           user_id: "usr_guest",
           name: "Guest Engineer",
@@ -14288,7 +14296,7 @@ ${gcodeSample}`;
       if (!select) return;
       const teamId = select.value;
       try {
-        const res = await fetch("/api/auth/switch-team", {
+        const res = await authFetch("/api/auth/switch-team", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ team_id: teamId }),
@@ -14359,7 +14367,7 @@ ${gcodeSample}`;
       card.addEventListener("click", async () => {
         const uid = card.dataset.user;
         try {
-          const res = await fetch("/api/auth/login", {
+          const res = await authFetch("/api/auth/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ user_id: uid }),
@@ -14381,12 +14389,19 @@ ${gcodeSample}`;
       });
     });
 
+    // The reset link is an affordance only (no mail server is wired up), so it reports instead of
+    // navigating. It is bound here rather than with an inline onclick, which the CSP forbids.
+    byId("authForgotPasswordLink")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      toast("Password reset link sent to registered email");
+    });
+
     byId("authSignInPanel")?.addEventListener("submit", async (e) => {
       e.preventDefault();
       const email = byId("authEmailInput")?.value;
       const password = byId("authPasswordInput")?.value;
       try {
-        const res = await fetch("/api/auth/login", {
+        const res = await authFetch("/api/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
@@ -14410,7 +14425,7 @@ ${gcodeSample}`;
       btn.addEventListener("click", async () => {
         const provider = btn.dataset.provider;
         try {
-          const res = await fetch("/api/auth/login", {
+          const res = await authFetch("/api/auth/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ sso_provider: provider }),
@@ -14438,7 +14453,7 @@ ${gcodeSample}`;
       const role = byId("regRoleSelect")?.value;
       const team_id = byId("regTeamSelect")?.value;
       try {
-        const res = await fetch("/api/auth/register", {
+        const res = await authFetch("/api/auth/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name, email, role, team_id }),

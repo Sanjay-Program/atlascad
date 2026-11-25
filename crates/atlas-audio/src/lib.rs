@@ -63,7 +63,13 @@ pub struct BiquadFilter {
 }
 
 impl BiquadFilter {
-    pub fn new(filter_type: BiquadFilterType, freq_hz: f64, q: f64, gain_db: f64, sample_rate: u32) -> Self {
+    pub fn new(
+        filter_type: BiquadFilterType,
+        freq_hz: f64,
+        q: f64,
+        gain_db: f64,
+        sample_rate: u32,
+    ) -> Self {
         let mut filter = Self {
             filter_type,
             freq_hz,
@@ -168,7 +174,13 @@ pub struct DynamicCompressor {
 }
 
 impl DynamicCompressor {
-    pub fn new(threshold_db: f64, ratio: f64, attack_ms: f64, release_ms: f64, makeup_db: f64) -> Self {
+    pub fn new(
+        threshold_db: f64,
+        ratio: f64,
+        attack_ms: f64,
+        release_ms: f64,
+        makeup_db: f64,
+    ) -> Self {
         Self {
             threshold_db,
             ratio: ratio.max(1.0),

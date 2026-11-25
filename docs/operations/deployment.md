@@ -30,6 +30,14 @@ deploy/build-image.sh            # release binary + image
 deploy/build-image.sh --smoke    # ... and prove it serves before shipping
 ```
 
+The builder links the binary against musl (`x86_64-unknown-linux-musl`), so the image runs whatever
+the host's glibc is: a host build carries the builder's libc requirement into `debian:bookworm-slim`
+(2.36) and dies on a newer host with `version \`GLIBC_2.39' not found`. Install the target once:
+
+```sh
+rustup target add x86_64-unknown-linux-musl
+```
+
 `--smoke` starts the image, waits for the container's own healthcheck, then checks four things over
 HTTP: liveness without a token (200), the document without a token (401), the document with the
 token (200), and a plotted PDF (`%PDF-1.4`). It prints the document file inside the volume and tears

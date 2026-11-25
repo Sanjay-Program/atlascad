@@ -112,7 +112,12 @@ pub fn quat_normalize(q: Quat) -> Quat {
         quat_identity()
     } else {
         let inv_len = 1.0 / len_sq.sqrt();
-        [q[0] * inv_len, q[1] * inv_len, q[2] * inv_len, q[3] * inv_len]
+        [
+            q[0] * inv_len,
+            q[1] * inv_len,
+            q[2] * inv_len,
+            q[3] * inv_len,
+        ]
     }
 }
 
@@ -175,10 +180,7 @@ pub fn quat_rotate_vec(q: Quat, v: Vec3) -> Vec3 {
 
 pub fn mat4_identity() -> Mat4 {
     [
-        1.0, 0.0, 0.0, 0.0,
-        0.0, 1.0, 0.0, 0.0,
-        0.0, 0.0, 1.0, 0.0,
-        0.0, 0.0, 0.0, 1.0,
+        1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
     ]
 }
 
@@ -300,9 +302,7 @@ impl Armature {
             let parent_idx = self.bones[i].parent_idx;
             let local = self.bones[i].local_matrix();
             let world = match parent_idx {
-                Some(p_idx) if p_idx < i => {
-                    mat4_multiply(&self.bones[p_idx].world_matrix, &local)
-                }
+                Some(p_idx) if p_idx < i => mat4_multiply(&self.bones[p_idx].world_matrix, &local),
                 _ => local,
             };
             self.bones[i].world_matrix = world;
@@ -327,15 +327,30 @@ impl Armature {
         target: Vec3,
         pole: Vec3,
     ) -> Result<(), AnimationError> {
-        if root_idx >= self.bones.len() || mid_idx >= self.bones.len() || end_idx >= self.bones.len() {
+        if root_idx >= self.bones.len()
+            || mid_idx >= self.bones.len()
+            || end_idx >= self.bones.len()
+        {
             return Err(AnimationError::BoneNotFound("Invalid bone index".into()));
         }
 
         self.compute_fk();
 
-        let a = [self.bones[root_idx].world_matrix[3], self.bones[root_idx].world_matrix[7], self.bones[root_idx].world_matrix[11]];
-        let b = [self.bones[mid_idx].world_matrix[3], self.bones[mid_idx].world_matrix[7], self.bones[mid_idx].world_matrix[11]];
-        let c = [self.bones[end_idx].world_matrix[3], self.bones[end_idx].world_matrix[7], self.bones[end_idx].world_matrix[11]];
+        let a = [
+            self.bones[root_idx].world_matrix[3],
+            self.bones[root_idx].world_matrix[7],
+            self.bones[root_idx].world_matrix[11],
+        ];
+        let b = [
+            self.bones[mid_idx].world_matrix[3],
+            self.bones[mid_idx].world_matrix[7],
+            self.bones[mid_idx].world_matrix[11],
+        ];
+        let c = [
+            self.bones[end_idx].world_matrix[3],
+            self.bones[end_idx].world_matrix[7],
+            self.bones[end_idx].world_matrix[11],
+        ];
 
         let l1 = dist(a, b);
         let l2 = dist(b, c);
@@ -357,7 +372,11 @@ impl Armature {
 
         // Adjust mid bone local position based on computed angles
         self.bones[mid_idx].local_pos = [l1, 0.0, 0.0];
-        self.bones[end_idx].local_pos = [l2 * cos_beta, l2 * (1.0 - cos_beta * cos_beta).max(0.0).sqrt(), 0.0];
+        self.bones[end_idx].local_pos = [
+            l2 * cos_beta,
+            l2 * (1.0 - cos_beta * cos_beta).max(0.0).sqrt(),
+            0.0,
+        ];
 
         // Apply orientation to root
         let quat_align = quat_from_two_vectors([1.0, 0.0, 0.0], dir_target);
@@ -449,9 +468,15 @@ fn quat_from_two_vectors(u: Vec3, v: Vec3) -> Quat {
 
 fn invert_affine_mat4(m: &Mat4) -> Mat4 {
     // Inverse of [R | T] is [R^T | -R^T * T] assuming orthogonal rotation
-    let r00 = m[0]; let r01 = m[4]; let r02 = m[8];
-    let r10 = m[1]; let r11 = m[5]; let r12 = m[9];
-    let r20 = m[2]; let r21 = m[6]; let r22 = m[10];
+    let r00 = m[0];
+    let r01 = m[4];
+    let r02 = m[8];
+    let r10 = m[1];
+    let r11 = m[5];
+    let r12 = m[9];
+    let r20 = m[2];
+    let r21 = m[6];
+    let r22 = m[10];
 
     let tx = m[3];
     let ty = m[7];
@@ -462,10 +487,7 @@ fn invert_affine_mat4(m: &Mat4) -> Mat4 {
     let inv_tz = -(r20 * tx + r21 * ty + r22 * tz);
 
     [
-        r00, r01, r02, inv_tx,
-        r10, r11, r12, inv_ty,
-        r20, r21, r22, inv_tz,
-        0.0, 0.0, 0.0, 1.0,
+        r00, r01, r02, inv_tx, r10, r11, r12, inv_ty, r20, r21, r22, inv_tz, 0.0, 0.0, 0.0, 1.0,
     ]
 }
 

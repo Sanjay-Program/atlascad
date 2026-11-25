@@ -161,6 +161,10 @@ deploy/build-cam-image.sh            # release atlas + atlas-cam:<version>
 deploy/build-cam-image.sh --smoke    # ... and run the contract end to end
 ```
 
+The builder links the job binary against musl (`x86_64-unknown-linux-musl`), so the image runs
+regardless of the host's glibc; install the target once with
+`rustup target add x86_64-unknown-linux-musl`.
+
 The hardening flags below are the shape the smoke test exercises, not a suggestion:
 
 ```sh

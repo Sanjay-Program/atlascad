@@ -1,0 +1,13 @@
+# Build outputs, VCS data and generated media are never inputs to the image. The recursive patterns
+# matter: the vendored app trees carry their own target/ and node_modules/ directories.
+**/target/
+**/node_modules/
+**/.git/
+dist/
+artifacts/
+deploy/backups/
+**/.freebuff/
+secrets/
+
+# Media under crates/cad-studio/assets must NOT be excluded: lib.rs embeds the flight video and its
+# poster with include_bytes!, so a `**/*.mp4` rule breaks the build.

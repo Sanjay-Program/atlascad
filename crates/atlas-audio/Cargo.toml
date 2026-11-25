@@ -2,6 +2,7 @@
 name = "atlas-audio"
 version.workspace = true
 edition.workspace = true
+publish.workspace = true
 license-file.workspace = true
 rust-version.workspace = true
 description = "Atlas Audio: Fairlight-class multi-track audio mixing, parametric EQ, dynamic compression and brickwall limiting"

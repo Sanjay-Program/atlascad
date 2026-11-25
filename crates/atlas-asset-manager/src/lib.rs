@@ -573,7 +573,11 @@ mod tests {
     fn test_asset_storage_and_cad_invalidation() {
         let mut registry = AssetRegistry::new();
 
-        let mut mesh_asset = AssetRecord::new("fuselage_mesh", "Fuselage High-Res", AssetKind::CreativeMesh);
+        let mut mesh_asset = AssetRecord::new(
+            "fuselage_mesh",
+            "Fuselage High-Res",
+            AssetKind::CreativeMesh,
+        );
         mesh_asset.upstream_cad_id = Some("cad_body_loft_01".to_string());
 
         let store_res = registry.store_asset(mesh_asset, b"VERTICES:12345,FACES:24680".to_vec());
@@ -594,7 +598,8 @@ mod tests {
         assert_eq!(stale_list[0].id, "fuselage_mesh");
 
         // Rebuild regenerates data and marks clean
-        let rebuild_res = registry.mark_rebuilt("fuselage_mesh", b"VERTICES:12400,FACES:24800".to_vec());
+        let rebuild_res =
+            registry.mark_rebuilt("fuselage_mesh", b"VERTICES:12400,FACES:24800".to_vec());
         assert!(rebuild_res.is_ok());
 
         assert_eq!(registry.list_stale_assets().len(), 0);
@@ -608,18 +613,30 @@ mod tests {
         // 1. Unauthenticated or public viewer sees public assets, but NOT team or private
         let public_view = registry.filter_assets("usr_guest", None, None, None, None);
         assert!(!public_view.is_empty());
-        assert!(public_view.iter().all(|a| a.visibility == AssetVisibility::Public));
+        assert!(
+            public_view
+                .iter()
+                .all(|a| a.visibility == AssetVisibility::Public)
+        );
 
         // 2. Team member sees Public + their Team's assets, but NOT another user's private assets
-        let team_view = registry.filter_assets("usr_other", Some("team_aero_structures"), None, None, None);
-        let has_team_bracket = team_view.iter().any(|a| a.id == "ast_team_internal_bracket");
-        let has_private_nozzle = team_view.iter().any(|a| a.id == "ast_private_stealth_nozzle");
+        let team_view =
+            registry.filter_assets("usr_other", Some("team_aero_structures"), None, None, None);
+        let has_team_bracket = team_view
+            .iter()
+            .any(|a| a.id == "ast_team_internal_bracket");
+        let has_private_nozzle = team_view
+            .iter()
+            .any(|a| a.id == "ast_private_stealth_nozzle");
         assert!(has_team_bracket);
         assert!(!has_private_nozzle);
 
         // 3. Asset Owner sees Public + Team + their own Private assets
-        let owner_view = registry.filter_assets("usr_sanjay", Some("team_aero_structures"), None, None, None);
-        let owner_has_private = owner_view.iter().any(|a| a.id == "ast_private_stealth_nozzle");
+        let owner_view =
+            registry.filter_assets("usr_sanjay", Some("team_aero_structures"), None, None, None);
+        let owner_has_private = owner_view
+            .iter()
+            .any(|a| a.id == "ast_private_stealth_nozzle");
         assert!(owner_has_private);
 
         // 4. Forking public asset works for another user
@@ -630,7 +647,12 @@ mod tests {
             team_id: Some("team_robotics".into()),
             avatar_color: "#ec4899".into(),
         };
-        let fork_res = registry.fork_asset("ast_motor_nema23", "ast_elena_nema23_custom", caller.clone(), AssetVisibility::Private);
+        let fork_res = registry.fork_asset(
+            "ast_motor_nema23",
+            "ast_elena_nema23_custom",
+            caller.clone(),
+            AssetVisibility::Private,
+        );
         assert!(fork_res.is_ok());
 
         let maybe_forked = registry.get_record("ast_elena_nema23_custom");
@@ -642,7 +664,12 @@ mod tests {
         }
 
         // 5. Trying to fork another user's private asset fails with AccessDenied
-        let illegal_fork = registry.fork_asset("ast_private_stealth_nozzle", "ast_stolen_nozzle", caller, AssetVisibility::Private);
+        let illegal_fork = registry.fork_asset(
+            "ast_private_stealth_nozzle",
+            "ast_stolen_nozzle",
+            caller,
+            AssetVisibility::Private,
+        );
         assert!(matches!(illegal_fork, Err(AssetError::AccessDenied(_))));
     }
 }

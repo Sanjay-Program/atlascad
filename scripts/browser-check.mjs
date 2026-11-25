@@ -478,6 +478,29 @@ try {
     `the boss volume is ${boss.volume}, expected about 597 mm³`
   );
 
+  // Layout regression: the workspace grid's implicit column used to size itself to the toolbars'
+  // min-content width (~2700px). That pushed the right-hand inspector and the model past the edge of
+  // a 1280-1920px screen, where the shell's overflow:hidden clipped them with no way to scroll to
+  // them.
+  const layout = await evaluate(`(() => {
+    const canvas = document.querySelector('canvas').getBoundingClientRect();
+    const topbar = document.querySelector('.topbar').getBoundingClientRect();
+    return {
+      viewport: innerWidth,
+      topbarRight: Math.round(topbar.right),
+      canvasRight: Math.round(canvas.right),
+      canvasWidth: Math.round(canvas.width),
+    };
+  })()`);
+  check(
+    layout.topbarRight <= layout.viewport + 1,
+    `the top bar ends at ${layout.topbarRight}px in a ${layout.viewport}px viewport`
+  );
+  check(
+    layout.canvasRight <= layout.viewport + 1 && layout.canvasWidth >= 300,
+    `the 3D viewport is clipped: ${layout.canvasWidth}px wide ending at ${layout.canvasRight}px in ${layout.viewport}px`
+  );
+
   check(consoleErrors.length === 0, `console errors: ${consoleErrors.join(' | ')}`);
 
   console.log(`==> browser check passed (${passed} assertions)`);

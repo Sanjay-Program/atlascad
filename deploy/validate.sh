@@ -51,6 +51,66 @@ else
     unset STUDIO_PUBLIC_HOST STUDIO_TOKEN_FILE
 fi
 
+echo "==> root quickstart compose"
+if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
+    note "skipped: the docker compose plugin is not installed"
+else
+    # The quickstart file must interpolate with a token, and must refuse to start without one:
+    # an empty token here means an unauthenticated editor, so that is a failure, not a warning.
+    if ATLAS_STUDIO_TOKEN=0123456789abcdef0123456789abcdef \
+        docker compose -f docker-compose.yml config --quiet >/dev/null 2>&1; then
+        note "ok   docker-compose.yml (with ATLAS_STUDIO_TOKEN)"
+    else
+        bad "docker-compose.yml (docker compose config with ATLAS_STUDIO_TOKEN set)"
+        ATLAS_STUDIO_TOKEN=0123456789abcdef0123456789abcdef \
+            docker compose -f docker-compose.yml config --quiet 2>&1 | sed 's/^/         /'
+    fi
+    if ATLAS_STUDIO_TOKEN= docker compose -f docker-compose.yml config --quiet >/dev/null 2>&1; then
+        bad "docker-compose.yml starts without ATLAS_STUDIO_TOKEN (open, unauthenticated studio)"
+    else
+        note "ok   docker-compose.yml refuses to start without a token"
+    fi
+fi
+
+echo "==> image build inputs"
+# A `COPY . .` drags the reference checkouts (tens of GB) into the build context, and a media rule
+# in .dockerignore silently removes an asset that lib.rs embeds with include_bytes!, which only
+# fails once the whole dependency graph has compiled. Both are cheap to rule out here.
+if grep -qE '^[[:space:]]*COPY[[:space:]]+(\.|\./)[[:space:]]' Dockerfile; then
+    bad "Dockerfile copies the whole repository; copy explicit build inputs instead"
+else
+    note "ok   Dockerfile copies explicit build inputs"
+fi
+missing=0
+found=0
+while IFS=$'\t' read -r file asset; do
+    [ -n "$asset" ] || continue
+    found=$((found + 1))
+    case "$asset" in
+        /*) continue ;;
+    esac
+    target="$(dirname "$file")/$asset"
+    if [ ! -e "$target" ]; then
+        bad "embedded asset missing: $target (from $file)"
+        missing=1
+        continue
+    fi
+    rel="$(realpath --relative-to="$root" "$target" 2>/dev/null || printf '%s' "$target")"
+    # Treat .dockerignore as git's global excludes file: the syntax is compatible, so this catches a
+    # media rule that would strip an embedded asset from the build context before cargo reads it.
+    if printf '%s\n' "$rel" |
+        git -c core.excludesFile="$root/.dockerignore" check-ignore --no-index --stdin >/dev/null 2>&1; then
+        bad "excluded by .dockerignore: $rel"
+        missing=1
+    fi
+done < <(grep -rHo --include=*.rs -E 'include_(str|bytes)!\("[^"]+"\)' crates \
+    | awk -F: '{ file = $1; if (match($0, /"[^"]+"/)) print file "\t" substr($0, RSTART + 1, RLENGTH - 2) }')
+if [ "$found" -eq 0 ]; then
+    bad "no include_bytes!/include_str! paths found; the asset scan is not working"
+elif [ "$missing" -eq 0 ]; then
+    note "ok   $found embedded assets exist and survive .dockerignore"
+fi
+
 echo "==> Caddyfile syntax"
 caddy_output="$(mktemp)"
 # 0 = valid, 1 = invalid (output in $caddy_output), 2 = no caddy available to check with.

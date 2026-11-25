@@ -770,9 +770,17 @@ mod tests {
     #[test]
     fn test_creative_workflow_templates() {
         let templates = WorkflowRegistry::list_templates();
-        assert!(templates.iter().any(|t| t.id == "cad_to_product_commercial"));
+        assert!(
+            templates
+                .iter()
+                .any(|t| t.id == "cad_to_product_commercial")
+        );
         assert!(templates.iter().any(|t| t.id == "cad_to_interactive_twin"));
-        assert!(templates.iter().any(|t| t.id == "engineering_to_vfx_master"));
+        assert!(
+            templates
+                .iter()
+                .any(|t| t.id == "engineering_to_vfx_master")
+        );
 
         let comm_graph = WorkflowRegistry::instantiate_template("cad_to_product_commercial");
         assert!(comm_graph.is_ok());

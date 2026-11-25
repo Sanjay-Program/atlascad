@@ -1,5 +1,5 @@
-use crate::mesh::PolyMesh;
 use crate::CreativeError;
+use crate::mesh::PolyMesh;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,8 +99,9 @@ impl GeometryGraph {
                                 p[1] + fnorm[1] * distance,
                                 p[2] + fnorm[2] * distance,
                             ];
-                            let new_v_idx = u32::try_from(new_positions.len())
-                                .map_err(|_| CreativeError::GeometryNode("too many vertices".into()))?;
+                            let new_v_idx = u32::try_from(new_positions.len()).map_err(|_| {
+                                CreativeError::GeometryNode("too many vertices".into())
+                            })?;
                             new_positions.push(new_p);
                             extruded_v_indices.push(new_v_idx);
                         }

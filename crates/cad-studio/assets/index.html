@@ -5541,7 +5541,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
       <p style="font-size:12px; color:var(--atlas-text-dim); margin-top:0; margin-bottom:14px;">
         Share certified parametric parts, assemblies, or materials with your engineering team or the public AtlasCAD ecosystem.
       </p>
-      <form id="publishAssetForm" onsubmit="return false;" style="display:flex; flex-direction:column; gap:12px;">
+      <form id="publishAssetForm" style="display:flex; flex-direction:column; gap:12px;">
         <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px;">
           <div>
             <label for="publishAssetName" style="display:block; font-size:11px; margin-bottom:4px; font-weight:600;">Asset Name</label>
@@ -5968,7 +5968,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center; font-size:11.5px;">
           <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" checked id="authRememberCheckbox"> Keep session active (30 days)</label>
-          <a href="#" style="color:var(--atlas-accent); text-decoration:none;" onclick="alert('Password reset link sent to registered email'); return false;">Forgot password?</a>
+          <a href="#" id="authForgotPasswordLink" style="color:var(--atlas-accent); text-decoration:none;">Forgot password?</a>
         </div>
         <button type="submit" class="button primary" style="width:100%; margin-top:4px;">Sign In to Enterprise Workspace</button>
       </form>

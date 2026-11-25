@@ -134,7 +134,10 @@ impl EngineeringOrchestrator {
 
     /// Dispatches actual physical solvers, CAD generators, CAM toolpaths, or export bridges.
     #[must_use]
-    pub fn execute_task_payload(&self, task: &crate::task_graph::EngineeringTask) -> serde_json::Value {
+    pub fn execute_task_payload(
+        &self,
+        task: &crate::task_graph::EngineeringTask,
+    ) -> serde_json::Value {
         match task.command_id.as_str() {
             "sim.hypersonic.plasma" => {
                 let res = atlas_simulation_core::hypersonic::plasma::evaluate_plasma_sheath(
@@ -206,9 +209,10 @@ impl EngineeringOrchestrator {
                 })
             }
             "sim.hypersonic.flutter" => {
-                let res = atlas_simulation_core::hypersonic::trajectory::evaluate_hypersonic_flutter(
-                    73.5, 11.0, 0.80, 0.0035, 2272.0, 480.0, 0.15, 6080.0, 0.0132, 3333.3,
-                );
+                let res =
+                    atlas_simulation_core::hypersonic::trajectory::evaluate_hypersonic_flutter(
+                        73.5, 11.0, 0.80, 0.0035, 2272.0, 480.0, 0.15, 6080.0, 0.0132, 3333.3,
+                    );
                 serde_json::json!({
                     "status": "Success",
                     "task_id": task.id,
@@ -320,7 +324,10 @@ impl EngineeringOrchestrator {
     }
 
     /// Executes all tasks in the active task graph topologically until completion or unapproved gates.
-    pub fn execute_all(&mut self, auto_approve_sensitive: bool) -> Result<WorkflowExecutionSummary, OrchestratorError> {
+    pub fn execute_all(
+        &mut self,
+        auto_approve_sensitive: bool,
+    ) -> Result<WorkflowExecutionSummary, OrchestratorError> {
         let mut loop_count = 0;
         let max_loops = 50;
 

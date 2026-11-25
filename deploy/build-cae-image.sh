@@ -43,8 +43,16 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-echo "==> building the release atlas binary"
-cargo build --release --locked -p cad-cli
+# Static musl, for the same reason as deploy/build-image.sh: a host build carries the builder's
+# glibc requirement into the image and dies on a base with an older libc.
+target="${ATLAS_RUST_TARGET:-x86_64-unknown-linux-musl}"
+if ! rustup target list --installed 2>/dev/null | grep -qx "$target"; then
+    echo "build-cae-image.sh: the $target Rust target is not installed; run: rustup target add $target" >&2
+    exit 1
+fi
+
+echo "==> building the release atlas binary ($target)"
+cargo build --release --locked -p cad-cli --target "$target"
 
 # The docker context is these two files and nothing else. Handing docker the repository root would
 # send it `target/`, `.git/` and every saved document on this machine.
@@ -53,7 +61,7 @@ work=""
 results=""
 cleanup() { rm -rf "$context" "$work" "$results"; }
 trap cleanup EXIT
-cp target/release/atlas "$context/atlas"
+cp "target/$target/release/atlas" "$context/atlas"
 cp deploy/cae-entrypoint.sh "$context/cae-entrypoint.sh"
 
 echo "==> building $tag"

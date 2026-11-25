@@ -2,6 +2,7 @@
 name = "atlas-compositor"
 version.workspace = true
 edition.workspace = true
+publish.workspace = true
 license-file.workspace = true
 rust-version.workspace = true
 description = "Atlas Compositor: node-based VFX compositing, DaVinci 3-way color grading, and 3D LUT evaluation"

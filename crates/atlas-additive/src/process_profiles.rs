@@ -159,7 +159,8 @@ pub fn evaluate_additive_process(
             let target_cd = t_layer * 1.35;
 
             // Required exposure energy E = Ec * exp(Cd / Dp)
-            let req_energy_mj_cm2 = sla.critical_exposure_ec_mj_cm2 * (target_cd / sla.penetration_depth_dp_mm).exp();
+            let req_energy_mj_cm2 =
+                sla.critical_exposure_ec_mj_cm2 * (target_cd / sla.penetration_depth_dp_mm).exp();
 
             // Exposure time t_exp [s] = (E [mJ/cm^2]) / (I [mW/cm^2])
             let t_exp_s = (req_energy_mj_cm2 / sla.light_irradiance_mw_cm2).max(0.5);
@@ -174,7 +175,8 @@ pub fn evaluate_additive_process(
             // Base layers (first 5 layers have extended exposure)
             let base_layers = 5.min(layers);
             let normal_layers = layers.saturating_sub(base_layers);
-            let total_build_s = (base_layers as f64) * (t_exp_s * sla.base_exposure_multiplier + t_lift_s)
+            let total_build_s = (base_layers as f64)
+                * (t_exp_s * sla.base_exposure_multiplier + t_lift_s)
                 + (normal_layers as f64) * total_per_layer_s;
 
             let build_hours = total_build_s / 3600.0;
@@ -191,10 +193,27 @@ pub fn evaluate_additive_process(
             };
 
             let notes = vec![
-                format!("Vat Photopolymerization: {} ({:.1} µm layers)", sla.resin_name, t_layer * 1000.0),
-                format!("Jacobs Working Curve: Ec = {:.1} mJ/cm², Dp = {:.3} mm, Target Cure Depth = {:.3} mm", sla.critical_exposure_ec_mj_cm2, sla.penetration_depth_dp_mm, target_cd),
-                format!("Exposure Duration: {:.2} s per layer ({:.2} s for base layers at {:.1} mW/cm²)", t_exp_s, t_exp_s * sla.base_exposure_multiplier, sla.light_irradiance_mw_cm2),
-                format!("Build Velocity: {:.1} mm/hr, Total Duration = {:.2} hours ({} layers)", prob.part_height_mm / build_hours.max(0.01), build_hours, layers),
+                format!(
+                    "Vat Photopolymerization: {} ({:.1} µm layers)",
+                    sla.resin_name,
+                    t_layer * 1000.0
+                ),
+                format!(
+                    "Jacobs Working Curve: Ec = {:.1} mJ/cm², Dp = {:.3} mm, Target Cure Depth = {:.3} mm",
+                    sla.critical_exposure_ec_mj_cm2, sla.penetration_depth_dp_mm, target_cd
+                ),
+                format!(
+                    "Exposure Duration: {:.2} s per layer ({:.2} s for base layers at {:.1} mW/cm²)",
+                    t_exp_s,
+                    t_exp_s * sla.base_exposure_multiplier,
+                    sla.light_irradiance_mw_cm2
+                ),
+                format!(
+                    "Build Velocity: {:.1} mm/hr, Total Duration = {:.2} hours ({} layers)",
+                    prob.part_height_mm / build_hours.max(0.01),
+                    build_hours,
+                    layers
+                ),
                 format!("Resin Consumption: {:.1} g (${:.2} USD)", mass_g, cost),
             ];
 
@@ -246,10 +265,22 @@ pub fn evaluate_additive_process(
 
             let notes = vec![
                 format!("Metal Laser Powder Bed Fusion: {}", slm.alloy_name),
-                format!("Laser Beam Power: {:.0} W at {:.0} mm/s (Hatch = {:.3} mm, Layer = {:.3} mm)", p, v, h, t),
-                format!("Volumetric Energy Density (VED): {:.2} J/mm³ [{}]", ved, regime),
-                format!("Layer Cycle: {:.1}s scan + {:.1}s recoat = {:.1}s total ({} layers)", laser_scan_time_s, recoater_time_s, layer_time_s, layers),
-                format!("Build Duration: {:.2} hours, Metal Mass = {:.1} g (${:.2} USD)", build_hours, mass_g, cost),
+                format!(
+                    "Laser Beam Power: {:.0} W at {:.0} mm/s (Hatch = {:.3} mm, Layer = {:.3} mm)",
+                    p, v, h, t
+                ),
+                format!(
+                    "Volumetric Energy Density (VED): {:.2} J/mm³ [{}]",
+                    ved, regime
+                ),
+                format!(
+                    "Layer Cycle: {:.1}s scan + {:.1}s recoat = {:.1}s total ({} layers)",
+                    laser_scan_time_s, recoater_time_s, layer_time_s, layers
+                ),
+                format!(
+                    "Build Duration: {:.2} hours, Metal Mass = {:.1} g (${:.2} USD)",
+                    build_hours, mass_g, cost
+                ),
             ];
 
             Ok(AdditiveProcessResult {
@@ -284,7 +315,10 @@ pub fn evaluate_additive_process(
 
             let notes = vec![
                 format!("FDM/FFF Thermoplastic Slicing (Layer = {:.3} mm)", t),
-                format!("Estimated Build Duration: {:.2} hours ({} layers)", build_hours, layers),
+                format!(
+                    "Estimated Build Duration: {:.2} hours ({} layers)",
+                    build_hours, layers
+                ),
                 format!("Filament Consumption: {:.1} g (${:.2} USD)", mass_g, cost),
             ];
 
@@ -315,7 +349,10 @@ pub fn evaluate_additive_process(
 
             let notes = vec![
                 format!("SLS Nylon PA12 Sintering (Layer = {:.3} mm)", t),
-                format!("Build Duration: {:.2} hours ({} layers)", build_hours, layers),
+                format!(
+                    "Build Duration: {:.2} hours ({} layers)",
+                    build_hours, layers
+                ),
                 format!("Powder Sintered: {:.1} g (${:.2} USD)", mass_g, cost),
             ];
 

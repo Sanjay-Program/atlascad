@@ -73,7 +73,8 @@ fn cube() -> Mesh {
 }
 
 #[test]
-fn a_step_file_is_read_and_written_back_as_measured_stl() -> Result<(), Box<dyn std::error::Error>> {
+fn a_step_file_is_read_and_written_back_as_measured_stl() -> Result<(), Box<dyn std::error::Error>>
+{
     let dir = TempDir::new()?;
     let source = dir.path().join("cube.stp");
     let stl = dir.path().join("cube.stl");
@@ -117,7 +118,8 @@ fn a_step_file_is_read_and_written_back_as_measured_stl() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn a_file_that_is_not_step_exits_two_and_writes_nothing() -> Result<(), Box<dyn std::error::Error>> {
+fn a_file_that_is_not_step_exits_two_and_writes_nothing() -> Result<(), Box<dyn std::error::Error>>
+{
     let dir = TempDir::new()?;
     let source = dir.path().join("fake.stp");
     let stl = dir.path().join("should-not-exist.stl");
