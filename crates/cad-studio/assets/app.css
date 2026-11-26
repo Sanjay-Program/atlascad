@@ -14,7 +14,8 @@
   --atlas-text: #f8fafc;
   --atlas-text-secondary: #cbd5e1;
   --atlas-text-muted: #94a3b8;
-  --atlas-text-dim: #64748b;
+  /* #64748b measured 3.8:1 on the #0d1527 panel; #94a3b8 clears 4.5:1. */
+  --atlas-text-dim: #94a3b8;
   --atlas-accent: #3b82f6;
   --atlas-accent-hover: #2563eb;
   --atlas-accent-secondary: #06b6d4;
@@ -8352,4 +8353,176 @@ textarea:focus-visible,
   width: 140px;
   accent-color: #3b82f6;
   cursor: pointer;
+}
+
+/* ============================================================================
+   CONTRAST REMEDIATION — measured by scripts/contrast-audit.mjs (WCAG 2.1 AA)
+   ----------------------------------------------------------------------------
+   Two classes of real failures in the rendered light theme:
+   (1) always-dark floating chrome (quick-action dock, camera strip, layout strip,
+       style badges) used theme text colours, which are dark in the light theme;
+   (2) accent text that is bright enough on a dark background but not on a light
+       surface. The literals below are chosen to clear 4.5:1 for normal text
+       against the measured backgrounds; do not replace them with theme tokens
+       that revert to the brighter values.
+   ============================================================================ */
+
+/* (1) Dark chrome: use light text regardless of the active theme. */
+.quick-action-dock .dock-btn {
+  color: #e2e8f0;
+}
+
+.quick-action-dock .dock-btn:hover {
+  color: #ffffff;
+}
+
+.quick-action-dock .dock-btn.active {
+  color: #dbeafe;
+  background: rgba(37, 99, 235, 0.35);
+}
+
+.cam-preset-btn {
+  color: #e2e8f0;
+}
+
+.cam-preset-btn.active {
+  color: #ffffff;
+}
+
+.layout-tab,
+#tabAddLayout {
+  color: #e2e8f0;
+}
+
+.layout-tab.active {
+  color: #ffffff;
+}
+
+/* The active sheet tab keeps a light surface inside the dark strip in the light theme, so it
+   needs dark ink; the dark theme keeps the light ink from the rule above. */
+[data-theme="light"] .autocad-layout-bar .layout-tab.active {
+  color: #0f172a;
+}
+
+.style-item,
+.viewport-style-badge .style-item {
+  color: #f8fafc;
+}
+
+/* (2) Accent text on light surfaces. */
+[data-theme="light"] .tool-solid-accent {
+  color: #0e7490 !important;
+  border-color: #0e7490 !important;
+  background: rgba(14, 116, 144, 0.12) !important;
+}
+
+[data-theme="light"] #osnapToggleBtn,
+[data-theme="light"] #polarToggleBtn {
+  color: #047857 !important;
+}
+
+[data-theme="light"] .axis-gizmo button.axis-x {
+  color: #b91c1c;
+}
+
+[data-theme="light"] .axis-gizmo button.axis-y {
+  color: #047857;
+}
+
+[data-theme="light"] .axis-gizmo button.axis-z {
+  color: #1d4ed8;
+}
+
+[data-theme="light"] .presence-count-badge {
+  color: #15803d;
+}
+
+[data-theme="dark"] .presence-count-badge {
+  color: #4ade80;
+}
+
+/* White initials on the mid-tone avatar colours measured 2.5:1; black ink
+   clears 4.5:1 on every avatar colour in use (the tightest is indigo at 4.7). */
+.presence-avatar {
+  color: #000000;
+}
+
+.quick-action-dock .dock-btn.primary {
+  background: #1d4ed8;
+  color: #ffffff;
+}
+
+/* White on the default #3b82f6 accent measured 3.68:1. */
+.skip-link {
+  background: #1d4ed8;
+}
+
+[data-theme="light"] .wb-brand-logo {
+  color: #047857;
+}
+
+[data-theme="dark"] .wb-brand-logo {
+  color: #34d399;
+}
+
+.brand-tagline {
+  color: #047857;
+}
+
+.plan-tier {
+  color: var(--atlas-accent);
+}
+
+[data-theme="dark"] .brand-tagline {
+  color: #34d399;
+}
+
+[data-theme="light"] .tree-item .tree-badge {
+  color: #475569;
+}
+
+[data-theme="light"] .tree-item .tree-badge.built {
+  color: #15803d;
+}
+
+[data-theme="light"] #topbarJobsText {
+  color: #0e7490;
+}
+
+[data-theme="dark"] #topbarJobsText {
+  color: #22d3ee;
+}
+
+[data-theme="light"] #gridBtn {
+  color: #1d4ed8;
+}
+
+[data-theme="light"] .compass-label {
+  color: #475569;
+}
+
+[data-theme="dark"] .compass-label {
+  color: #94a3b8;
+}
+
+[data-theme="light"] .badge,
+[data-theme="light"] .status-badge.active {
+  color: #1d4ed8;
+}
+
+/* Accent text on dark panels measured 4.1-4.5:1; the lighter blue clears 4.5:1. */
+/* The amber "Unsaved changes" text measured 3.04:1 on the light surface.
+   Amber 700 clears it; the dark theme keeps the brighter warning token. */
+[data-theme="light"] .save-status-indicator.dirty .save-text {
+  color: #b45309;
+}
+
+[data-theme="dark"] .badge,
+[data-theme="dark"] .status-badge.active,
+[data-theme="dark"] #topbarUserRole,
+[data-theme="dark"] .ribbon-tab.active,
+[data-theme="dark"] .command-prompt-label,
+[data-theme="dark"] button.link,
+[data-theme="dark"] .plan-tier {
+  color: #93c5fd;
 }

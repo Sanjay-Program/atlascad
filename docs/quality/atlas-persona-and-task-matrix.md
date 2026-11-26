@@ -26,7 +26,7 @@ the capability is absent or blocked; **not driven** — entry points exist, beha
 | 10 | DaVinci Resolve user | organise media, hand off | EDL/FCPXML/LUT/OpenUSD writers tested; **Resolve not driven** |
 | 11 | AI automation user | goal → plan → approve → verify | 44 agent registrations, DAG, approval gates, MCP; task inputs are fixed case parameters |
 | 12 | Expert power user | palette, shortcuts, saved layouts | command palette and shortcuts exist; layout persistence not verified |
-| 13 | Accessibility-focused user | keyboard, names, contrast, motion | skip link, focusable canvas, dialogs, reduced-motion blocks; **191/191 controls named (audited), contrast unmeasured** |
+| 13 | Accessibility-focused user | keyboard, names, contrast, motion | skip link, focusable canvas, dialogs, reduced-motion blocks; **191/191 controls named; 0 contrast failures in both themes (audited)** |
 | 14 | Low-resource Linux user | 8 GB RAM, integrated GPU | 9 MB server, 99 ms start, WebGL software rendering in CI; large models unmeasured |
 | 15 | Project manager / reviewer | revision, jobs, reports, approvals | revisions, `/api/report`, `/api/audit`, jobs, approval list; report UI not driven |
 

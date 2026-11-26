@@ -162,7 +162,7 @@ Status vocabulary: **verified** (exercised by a test or the live server in this 
 | **C — Data integrity** | **PASS for single-document scope** | atomic save, revisions, recovery, concurrency, stale-artifact propagation; command/health timestamps fixed |
 | **D — Security** | **PARTIAL** | token/origin/CSP/body caps/non-root image are real; login is now labelled demo-only and refused on shared instances; advisories unscanned |
 | **E — Engineering validity** | **PARTIAL** | analytical solvers and CAE/CAM tests pass; fabricated engine output removed; no independent solver benchmark and no external adapter |
-| **F — UX / accessibility** | **PARTIAL** | clipping and commit-button reachability fixed and guarded; 0 of 191 controls unnamed; contrast unmeasured |
+| **F — UX / accessibility** | **PASS for the audited page** | clipping and commit-button reachability fixed and guarded; 191/191 controls named; both themes report 0 WCAG AA contrast failures on 334 rendered text elements |
 | **G — Performance / reliability** | **PARTIAL** | small and 10k-triangle models measured (3.89 ms state, 59 MB RSS); browser frame time and long-session behaviour unmeasured |
 | **H — Operations** | **PARTIAL** | deployment assets validate; images were built and smoke-tested on 2026-11-25, not rebuilt today; CI has not run on a runner |
 | **I — Documentation** | **PARTIAL** | README badges corrected; several historical documents still describe an older product |
@@ -210,7 +210,7 @@ Prior browser measurement (2026-11-25, cited, not re-run): 814 ms first load, 5,
 | PR-010 | P2 | AI workflows use fixed parameters, not the live document | Bind task inputs to the model revision |
 | PR-011 | P2 | CI has never executed on a runner | Run the workflow once and record it |
 | PR-012 | P2, fixed | Browser “run all” sent `auto_approve: true` silently | Button titles state the bypass and each run asks for confirmation |
-| PR-013 | P3 | Contrast not measured | Run axe-core and record failing pairs |
+| PR-013 | P3, fixed | Contrast not measured | Rendered-DOM audit: 0 failing pairs in light and dark; enforced in the simulation |
 | PR-014 | P3 | Historical docs (`feature-matrix.md`, `production-readiness.md`) describe older capabilities | Add dated banners; rewrite at the next milestone |
 
 ---

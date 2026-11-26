@@ -21,7 +21,7 @@ numeric priority.
 | PR-010 | P2 | AI | Workflow tasks call analytical solvers with fixed parameters, not the active document revision | **open** | Task inputs bound to document revision and recorded in provenance |
 | PR-011 | P2 | Delivery | CI config exists but has not run on a runner | **open** | One green runner execution linked from the release record |
 | PR-012 | P2 | UX / safety | Browser “run all” sends `auto_approve: true` without saying it bypasses review | **fixed, tested by inspection** | Button titles state the bypass and each entry point asks for confirmation before running |
-| PR-013 | P3 | Accessibility | Contrast ratios not measured (CSS sampler contradicted the rendered page) | **open** | axe-core/Lighthouse run recorded with failing pairs |
+| PR-013 | P3 | Accessibility | Contrast ratios not measured (a CSS sampler had contradicted the rendered page) | **fixed, measured** | Rendered-DOM audit (`scripts/contrast-audit.mjs`) samples 334 text elements in each theme; both light and dark report 0 failing pairs and run in `simulate.sh` |
 | PR-014 | P3 | Documentation | `production-readiness.md` and `feature-matrix.md` still describe an older capability set | **partially addressed** | Dated banners added; rewrite scheduled |
 | PR-015 | P3 | Data | Seeded demo users/assets/history carry 2023 timestamps | **accepted** | Seed data is labelled; no runtime record uses a constant |
 

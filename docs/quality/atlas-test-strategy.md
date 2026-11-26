@@ -19,6 +19,7 @@ provenance, approvals) have explicit tests rather than being implied by happy pa
 | Live simulation | real release binaries, HTTP/CLI/share, `kill -9` | `./scripts/simulate.sh` | 56 |
 | Browser checks | embedded assets boot, layout, commit-button reachability, tree, downloads, shared session | `node scripts/browser-check.mjs` (inside simulate) | 30 loopback + 34 shared |
 | DOM accessibility | every form control has a programmatic name | `node scripts/a11y-audit.mjs` (inside simulate) | 191 controls, 0 unnamed |
+| Contrast | rendered text vs resolved background, WCAG AA, both themes | `node scripts/contrast-audit.mjs` (inside simulate) | 334 elements, 0 failing pairs per theme |
 | Large-model performance | import, state, STL and RSS on a 10k-triangle fixture | `python3 scripts/benchmark-large-model.py` | 10,092 triangles, exit 0 on count match |
 | Deployment validation | shell syntax, compose interpolation, Dockerfile inputs, Caddyfile | `./deploy/validate.sh` | 17 scripts, 2 composes, 2 Caddyfiles |
 | Supply chain | licence policy, deterministic SBOM | `atlas-eng licences`, `atlas-eng sbom` | 112 packages/components |
@@ -52,7 +53,7 @@ the old tests encoded the defect.
 | Gap | Consequence | Proposed test |
 | --- | --- | --- |
 | No fuzzing of STEP/DXF/3MF parsers | malformed input risk is reviewed, not fuzzed | `cargo-fuzz` targets with size/count budgets |
-| No axe-core/Lighthouse run | contrast still unmeasured (names are now audited) | axe-core in `browser-check.mjs` |
+| Contrast checked by a custom CDP audit rather than axe-core | covers text colour vs resolved background; not icons, focus rings or non-text contrast | add axe-core for the remaining rules |
 | Large-model browser behaviour unmeasured | frame time for a 10k model unknown | drive `benchmark-large-model.py`'s fixture in `browser-check.mjs` and sample frame times |
 | No external-engine contract test | adapters absent; cannot verify | contract test per adapter (input file → output parse → provenance) |
 | No Windows/macOS run | platform support unclaimed | CI matrix when those hosts exist |

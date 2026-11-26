@@ -135,7 +135,7 @@ Only the tasks below were actually executed. Everything else is `not tested`; no
 | Layout width vs viewport, before fix | 2 668 px in 1 280/1 366/1 600/1 920 px viewports | `automated` |
 | Layout width vs viewport, after fix | 1 222 / 1 308 / 1 542 / 1 862 px, all fit | `automated` |
 | Task time, wrong turns, success rate, confidence, SUS | | **not measured** (no participants) |
-| Contrast ratios | | **not measured** — see `UX-004` |
+| Contrast ratios | **0 failing pairs in light and dark** (334 text elements sampled per theme) | `automated` (2026-11-26) |
 
 ## 6. Findings
 
@@ -202,13 +202,22 @@ Only the tasks below were actually executed. Everything else is `not tested`; no
 - **Status:** fixed and verified: `node scripts/a11y-audit.mjs` reports **191 controls, 0 unnamed**
   and exits non-zero otherwise. The audit runs in `scripts/simulate.sh`.
 
-### UX-004 — Contrast not reliably measured (P3, open, measurement gap)
+### UX-004 — Contrast not reliably measured (P3, **fixed 2026-11-26**)
 
 - **Evidence:** `not measured`. A CSS-derived sampler produced ratios that contradicted the rendered
   screenshot (it reported dark-on-dark where the screenshot shows light-on-dark text), so the numbers
   are discarded rather than reported.
 - **Recommendation:** run axe-core or Lighthouse against the running app and record the actual
   failing pairs; do not hand-compute contrast from tokens.
+- **Fix:** `scripts/contrast-audit.mjs` measures the *rendered* DOM through CDP: it resolves each
+  text element's effective background by walking to the first opaque ancestor, skips gradients
+  rather than guessing, and applies the WCAG thresholds (4.5:1 normal, 3:1 large).
+- **Result:** the first run found 51 failing pairs in the light theme (bright cyan/green accents on
+  pale surfaces, and dark-theme text colours on always-dark floating chrome). After the palette
+  fixes: **0 failing pairs in light and 0 in dark**, 334 text elements sampled per theme. Two
+  state-dependent pairs ("Unsaved changes", the delete link) were only reachable during the live
+  simulation and are fixed as well.
+- **Status:** fixed; both theme audits run in `scripts/simulate.sh`.
 
 ### UX-005 — WebGL readback warnings (P3, open, hypothesis)
 
@@ -247,9 +256,10 @@ visual adjacency only. Confirmed.
 ## 8. Accessibility findings
 
 Keyboard: the skip link is first, the canvas is focusable (`tabindex="0"`) with a descriptive label,
-and dialogs use native `<dialog>`/`role="dialog"` (`automated`). Screen reader: blocked by `UX-003`
-for 84 controls. Contrast: `not measured` (`UX-004`). Reduced motion: two `prefers-reduced-motion`
-blocks exist in `app.css` (`code-inspection`); their coverage was not verified per animation.
+and dialogs use native `<dialog>`/`role="dialog"` (`automated`). Screen reader: all 191 controls
+have a programmatic name (`UX-003`, fixed). Contrast: 0 failing pairs in either theme (`UX-004`,
+fixed). Reduced motion: two `prefers-reduced-motion` blocks exist in `app.css` (`code-inspection`);
+their coverage was not verified per animation.
 Text scaling and magnification were not tested.
 
 ## 9. Performance findings
@@ -273,7 +283,7 @@ correctly. Their routes and UI entry points exist; behaviour is unverified. Repo
 | UX-001 | All | Shell layout | 5 | 2 | 5 | **P1** | Explicit grid column + scrollable toolbars | S | — | Fits 1280–1920 px | **fixed / retested** |
 | UX-002 | A, B | Create panel | 4 | 2 | 4 | **P2** | Sticky commit footer | S | — | Button visible at 720 px | **fixed / retested** |
 | UX-003 | K | Forms | 4 | 3 | 5 | **P2** | Name every control | M | — | 0 unnamed controls | **fixed / retested** |
-| UX-004 | K | Contrast | 3 | 2 | 1 | P3 | Run axe/Lighthouse, fix pairs | S | tooling | Ratios recorded | open |
+| UX-004 | K | Contrast | 3 | 2 | 1 | P3 | Rendered-DOM audit + palette fixes | S | — | 0 failing pairs in both themes | **fixed / retested** |
 | UX-005 | L | Viewport | 2 | 3 | 2 | P3 | Profile readback path | M | GPU profiling | Frame times recorded | open (hypothesis) |
 | UX-006 | A | Onboarding | 3 | 2 | 2 | P3 | Verify first-run tour is reachable from Help | S | — | Tour opens from menu and first run | open |
 
@@ -320,15 +330,15 @@ Subsequent fixes (2026-11-26, same codebase):
   verified visually only.
 - Toolbars now scroll horizontally; their right-most controls are reachable but not visible at
   1280 px, which is a discoverability trade-off (`heuristic`).
-- `UX-002`/`UX-003` are fixed and guarded by scripted checks; the audit is still not a statement
-  that AtlasCAD is easy to use, and `UX-004` (contrast) remains unmeasured.
+- `UX-002`/`UX-003`/`UX-004` are fixed and guarded by scripted checks; the audit is still not a
+  statement that AtlasCAD is easy to use, and text scaling/magnification remain untested.
 - Simulation, CAM, handoff and AI flows were not exercised, so nothing is claimed about them.
 
 ## 15. Follow-up plan
 
 1. `UX-002` is fixed and retested at 720 px height (see §12).
 2. `UX-003` is fixed; `scripts/a11y-audit.mjs` now fails on any unnamed control.
-3. Add axe-core to `scripts/browser-check.mjs` so contrast is checked automatically as well.
+3. `UX-004` is fixed by `scripts/contrast-audit.mjs`, which runs for both themes in the simulation.
 4. Drive T8–T15 (simulation, CAM, handoffs, AI approvals) with the same scripted approach and record
    real outcomes before making any claim about them.
 5. Only then consider a broader design pass; no evidence in this audit supports a redesign.
