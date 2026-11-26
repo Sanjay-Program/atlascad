@@ -13151,7 +13151,31 @@ namespace AtlasCAD.Unity
         }))
     }
 
+    /// Bind the orchestrator to the live document: its revision and the facts an inspection task
+    /// may report. Called before every execution path so no result is detached from the model.
+    fn bind_orchestrator_document(&mut self) {
+        let revision = self.project.revision.get();
+        self.orchestrator.bind_document_revision(revision);
+        self.orchestrator
+            .context
+            .facts
+            .insert("document_revision".into(), revision.to_string());
+        self.orchestrator
+            .context
+            .facts
+            .insert("project_name".into(), self.project.name.clone());
+        self.orchestrator.context.facts.insert(
+            "feature_count".into(),
+            self.project.features().len().to_string(),
+        );
+        self.orchestrator.context.facts.insert(
+            "import_count".into(),
+            self.project.imports().len().to_string(),
+        );
+    }
+
     fn step_orchestrator(&mut self) -> Result<serde_json::Value, StudioError> {
+        self.bind_orchestrator_document();
         let summary = self
             .orchestrator
             .execute_step()
@@ -13204,17 +13228,28 @@ namespace AtlasCAD.Unity
 
         // Approval is opt-in: an absent field must never authorise a sensitive task.
         let auto = req.auto_approve.unwrap_or(false);
+        self.bind_orchestrator_document();
+        let revision = self.project.revision.get();
         let summary = self
             .orchestrator
             .execute_all(auto)
             .map_err(|e| StudioError::BadRequest(e.to_string()))?;
 
         Ok(serde_json::json!({
-            "status": "Completed",
+            // Derived from the tasks, never hardcoded: a workflow with unavailable steps is not
+            // "Completed".
+            "status": summary.execution_status,
             "workflow_id": req.workflow_id,
             "summary": summary,
             "tasks": self.orchestrator.active_graph.tasks,
             "execution_log": self.orchestrator.execution_log,
+            "provenance": {
+                "document_revision": revision,
+                "input_source": "fixed_case_parameters",
+                "note": "Analytical solvers run on fixed case parameters; the result records the \
+                         document revision it is bound to, but task inputs are not yet derived from \
+                         the live model geometry."
+            }
         }))
     }
 

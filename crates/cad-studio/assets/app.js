@@ -10761,39 +10761,44 @@ ${gcodeSample}`;
         });
 
         if (pBar) pBar.style.width = "100%";
-        if (pPercent) pPercent.textContent = "100% (Completed)";
+        const runCompleted = res.status === "Completed";
+        if (pPercent) pPercent.textContent = runCompleted ? "100% (Completed)" : `${res.summary.completed_tasks}/${res.summary.total_tasks} (${res.status})`;
 
         const statusBadge = byId("agentStatusBadge");
         if (statusBadge) {
-          statusBadge.textContent = `${res.summary.completed_tasks} / ${res.summary.total_tasks} Tasks Verified`;
-          statusBadge.style.color = "#10b981";
+          statusBadge.textContent = `${res.summary.completed_tasks} / ${res.summary.total_tasks} Tasks Completed`;
+          statusBadge.style.color = runCompleted ? "#10b981" : "#f59e0b";
         }
 
         const consoleOut = byId("agentConsoleOutput");
         if (consoleOut) {
-          consoleOut.textContent = `[Autonomous Generative Runner] Executed ${wfId} to completion.\n` +
-            `Total Tasks: ${res.summary.total_tasks} | Completed: ${res.summary.completed_tasks} | Status: ${res.status}\n\n` +
+          consoleOut.textContent = `[Generative Runner] ${wfId}: ${res.status}\n` +
+            `Total: ${res.summary.total_tasks} | Completed: ${res.summary.completed_tasks} | Failed/unavailable: ${res.summary.failed_tasks}\n\n` +
             (res.execution_log || []).join("\n");
         }
 
+        // Render each task's real status; an unavailable step must not be shown as completed.
         const taskList = byId("agentTaskGraphList");
-        if (taskList && res.execution_log) {
+        if (taskList && res.tasks) {
           taskList.innerHTML = "";
-          res.execution_log.forEach((logLine, idx) => {
+          Object.values(res.tasks).forEach((task) => {
+            const failed = task.status === "failed" || task.status === "cancelled";
+            const done = task.status === "completed";
+            const colour = failed ? "#ef4444" : done ? "#10b981" : "#f59e0b";
             const row = document.createElement("div");
             row.style.display = "flex";
             row.style.justifyContent = "space-between";
             row.style.alignItems = "center";
             row.style.padding = "4px 8px";
-            row.style.background = "rgba(16, 185, 129, 0.08)";
+            row.style.background = `rgba(0, 0, 0, 0.18)`;
             row.style.borderRadius = "3px";
-            row.style.borderLeft = "3px solid #10b981";
-            row.innerHTML = `<span>Task ${idx + 1}: ${logLine.slice(0, 45)}...</span><span class="wb-status-badge" style="background:rgba(16,185,129,0.2);color:#10b981;font-size:9px;">Completed</span>`;
+            row.style.borderLeft = `3px solid ${colour}`;
+            row.innerHTML = `<span>${task.name || task.id}${task.error ? ` — ${task.error}` : ""}</span><span class="wb-status-badge" style="color:${colour};font-size:9px;">${task.status}</span>`;
             taskList.appendChild(row);
           });
         }
 
-        toast(`Autonomous Workflow Completed: ${res.summary.completed_tasks} Tasks`);
+        toast(`Workflow ${res.status}: ${res.summary.completed_tasks}/${res.summary.total_tasks} completed, ${res.summary.failed_tasks} unavailable`);
       } catch (err) {
         if (pPercent) pPercent.textContent = "Failed";
         toast(`Autonomous execution failed: ${err.message}`, true);
@@ -11215,12 +11220,12 @@ ${gcodeSample}`;
         });
         const out = byId("realtimeConsoleOutput");
         if (out) {
-          out.textContent = `[Autonomous Master Workflow Complete] Status: ${res.status}\n` +
-            `Executed: ${res.summary.completed_tasks} / ${res.summary.total_tasks} Tasks Topologically Completed\n` +
-            `Tasks: t1_mission_req → t2_waverider_cad → t3_aero_plasma → t4_scramjet_cycle → t5_regen_cooling → t6_uhtc_structural → t7_avionics_qins → t8_mfg_toolpaths → t9_digital_twin → t10_media_master → t11_as9100_cert\n` +
-            `Certification: AS9100 Rev D & FAA Part 25 Pass (Cryptographic SHA-256 Verified)`;
+          out.textContent = `[Master Workflow] Status: ${res.status}\n` +
+            `Completed: ${res.summary.completed_tasks} / ${res.summary.total_tasks} | Failed/unavailable: ${res.summary.failed_tasks}\n` +
+            `Document revision: ${res.provenance?.document_revision ?? "unknown"} | Inputs: fixed case parameters\n\n` +
+            (res.execution_log || []).join("\n");
         }
-        toast(`Autonomous Workflow: All 11 tasks executed & verified!`);
+        toast(`Master workflow ${res.status}: ${res.summary.completed_tasks}/${res.summary.total_tasks} completed`);
       } catch (err) {
         toast(`Workflow error: ${err.message}`, true);
       }
@@ -11292,11 +11297,11 @@ ${gcodeSample}`;
         });
         const out = byId("aeroConsoleOutput");
         if (out) {
-          out.textContent = `[Autonomous Master DAG Finished]\n` +
-            `Status: ${res.status} | Completed: ${res.summary.completed_tasks} / ${res.summary.total_tasks} Tasks\n` +
+          out.textContent = `[Master DAG]\n` +
+            `Status: ${res.status} | Completed: ${res.summary.completed_tasks} / ${res.summary.total_tasks} | Failed/unavailable: ${res.summary.failed_tasks}\n` +
             (res.execution_log || []).slice(-8).join("\n");
         }
-        toast("Autonomous Master DAG Complete: 11 Tasks Verified");
+        toast(`Master DAG ${res.status}: ${res.summary.completed_tasks}/${res.summary.total_tasks} completed`);
       } catch (err) {
         toast(`DAG error: ${err.message}`, true);
       }

@@ -57,7 +57,7 @@ own fields instead of a 2023 constant and the command name.
 | --- | --- | --- | --- |
 | Formatting | `cargo fmt --all --check` | pass | gate step |
 | Lints | `cargo clippy --offline --workspace --all-targets -- -D warnings` | pass, 0 warnings | gate step |
-| Workspace tests | `cargo test --offline --workspace -j 2` | **878 passed, 0 failed, 116 suites** | gate + count |
+| Workspace tests | `cargo test --offline --workspace -j 2` | **879 passed, 0 failed, 116 suites** | gate + count |
 | HTTP integration | `cargo test -p cad-studio --test http_api` | **48 passed** | test |
 | Analytic kernel corpus | `cargo run -p cad-kernel-truck --example corpus` | 11 fixtures: 9 pass, 2 recorded known-failures, **0 regressions** | gate |
 | Engineering manifests | `atlas-eng validate` | 0 errors, 0 warnings across 14 files | gate |
@@ -125,6 +125,29 @@ wrongly. See [`../kernel-comparison.md`](../kernel-comparison.md).
 - **Remaining risk:** seeded demo records (users, assets, older history) still carry 2023 constants;
   they are seed data, not runtime records, and are labelled as such below.
 
+### PR-016 (P0) — Agent workflow payloads fabricated manufacturing and certification evidence
+
+- **Evidence:** code and live API. Tasks that had no implementation returned plausible-looking JSON:
+  a waverider B-Rep with invented dimensions, `toolpath_count: 68`, `gcode_lines: 8920`,
+  `status: "ReadyForMachine"`, a Unity twin with 16 telemetry channels, a DaVinci timeline marked
+  `"MasterRendered"`, and an `eco.submit` result claiming `compliance_score: 1.0` with
+  `evidence_hash: "sha256_as9100_mach11_certified"` and `"CertifiedApproved"`. The default arm
+  returned `accuracy_percent: 99.98`, and every task was marked complete with a fixed 15 ms
+  duration. The browser printed “AS9100 Rev D & FAA Part 25 Pass (Cryptographic SHA-256 Verified)”.
+- **Impact:** the product asserted a certification and machine-ready toolpaths that never existed.
+  This is the same defect class as PR-001 and is more severe because it names a safety standard.
+- **Fix:** unimplemented commands, including `cad.solid.*`, `cam.*`, `export.*`, `eco.submit` and any
+  unregistered command, return `status: "Unavailable"` with `output: null` and a reason. The task is
+  marked failed, downstream tasks stay pending, the run status is derived from the tasks (never
+  hardcoded “Completed”), and the UI shows completed/failed counts and removes the certificate claim.
+  Durations are measured with `Instant`; auto-approval timestamps use the real clock.
+- **What still runs for real:** `project.inspect` reports document facts bound by the server, and the
+  hypersonic analytical solvers (`sim.hypersonic.*`) return computed values. The master template now
+  reports **2 completed / 1 failed / 8 pending**, not 11/11.
+- **Regression tests:** `test_master_workflow_refuses_unimplemented_steps`,
+  `gated_command_requires_approval_unless_auto_approved`, and the HTTP assertions in
+  `multidisciplinary_simulation_apis` / `agent_workflows_never_auto_approve_or_fabricate`.
+
 ---
 
 ## 5. Feature inventory (by domain)
@@ -147,7 +170,7 @@ Status vocabulary: **verified** (exercised by a test or the live server in this 
 | Local sharing: token gate, origin/host checks, TLS via proxy | **verified** | 21 share assertions, browser shared session, Caddy smoke previously |
 | Identity/RBAC/SSO/API keys | **explicitly demo-only** | `/api/auth/login` is an identity switch, not authentication. The response now states `credential_verified: false` / `authentication: "demo-identity"` with a notice; the UI shows a demo banner; SSO requests and all logins on `--share` instances are refused with `501` instead of fabricating a session. RBAC remains data, not a boundary |
 | External engines (CalculiX, OpenFOAM, ngspice, pandapower, …) | **absent / now refusing** | 24 registry entries, 24 guides, no adapter; 501 as of PR-001 |
-| AI agent workflows | **partial** | 44 specialist registrations, DAG execution, approval gates, MCP; task payloads call real analytical solvers with **fixed case parameters**, not the active document |
+| AI agent workflows | **partial but honest** | 44 specialist registrations, DAG execution, approval gates, MCP; real analytical solvers run on fixed case parameters, unimplemented steps are refused, and results record the bound document revision |
 | Blender / Unity / Resolve handoffs | **partial** | export routes and file writers tested; no host application imported the output |
 | Physical machine/printer execution | **absent** | no device transport exists; correctly not claimed |
 
@@ -157,11 +180,11 @@ Status vocabulary: **verified** (exercised by a test or the live server in this 
 
 | Gate | Status | Basis |
 | --- | --- | --- |
-| **A — Build** | **PASS** | fmt, clippy `-D warnings`, 878 tests, release build |
+| **A — Build** | **PASS** | fmt, clippy `-D warnings`, 879 tests, release build |
 | **B — Functional** | **PASS for tested core; PARTIAL overall** | CAD, drafting, export and recovery are exercised end to end; CAM/CAE/simulation UI journeys were not hand-driven in this pass |
 | **C — Data integrity** | **PASS for single-document scope** | atomic save, revisions, recovery, concurrency, stale-artifact propagation; command/health timestamps fixed |
 | **D — Security** | **PARTIAL** | token/origin/CSP/body caps/non-root image are real; login is now labelled demo-only and refused on shared instances; advisories unscanned |
-| **E — Engineering validity** | **PARTIAL** | analytical solvers and CAE/CAM tests pass; fabricated engine output removed; no independent solver benchmark and no external adapter |
+| **E — Engineering validity** | **PARTIAL** | analytical solvers and CAE/CAM tests pass; fabricated engine **and workflow** output removed; no independent solver benchmark and no external adapter |
 | **F — UX / accessibility** | **PASS for the audited page** | clipping and commit-button reachability fixed and guarded; 191/191 controls named; both themes report 0 WCAG AA contrast failures on 334 rendered text elements |
 | **G — Performance / reliability** | **PARTIAL** | small and 10k-triangle models measured (3.89 ms state, 59 MB RSS); browser frame time and long-session behaviour unmeasured |
 | **H — Operations** | **PARTIAL** | deployment assets validate; images were built and smoke-tested on 2026-11-25, not rebuilt today; CI has not run on a runner |
@@ -207,7 +230,8 @@ Prior browser measurement (2026-11-25, cited, not re-run): 814 ms first load, 5,
 | PR-007 | P2, fixed | Primary commit button was below the fold at 720 px | Sticky footer; `browser-check.mjs` asserts visibility at 720 px |
 | PR-008 | P2 | External engine adapters absent | Refusal is correct; implement adapters or remove the run UI |
 | PR-009 | P2, measured | Large-model performance unmeasured | 10,092-triangle fixture measured; frame time still unmeasured |
-| PR-010 | P2 | AI workflows use fixed parameters, not the live document | Bind task inputs to the model revision |
+| PR-010 | P2, partial | AI workflows use fixed parameters, not the live document | Results now carry `document_revision` and `input_source`; geometry-derived inputs remain future work |
+| PR-016 | **P0, fixed** | Workflow payloads fabricated toolpaths, media/digital-twin state and an AS9100 certificate | Unimplemented commands return `Unavailable`; tasks fail; status is derived; certificate claim removed |
 | PR-011 | P2 | CI has never executed on a runner | Run the workflow once and record it |
 | PR-012 | P2, fixed | Browser “run all” sent `auto_approve: true` silently | Button titles state the bypass and each run asks for confirmation |
 | PR-013 | P3, fixed | Contrast not measured | Rendered-DOM audit: 0 failing pairs in light and dark; enforced in the simulation |

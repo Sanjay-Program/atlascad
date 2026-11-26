@@ -3810,12 +3810,13 @@ fn engine_discovery_guides_and_benchmark_api() -> Result<(), Box<dyn std::error:
 }
 
 #[test]
-fn agent_workflows_require_approval_by_default() -> Result<(), Box<dyn std::error::Error>> {
+fn agent_workflows_never_auto_approve_or_fabricate() -> Result<(), Box<dyn std::error::Error>> {
     let (_dir, _path, handle) = fixture("workflow_approval_default", [10.0, 10.0, 5.0])?;
     let addr = handle.addr();
 
-    // Omitting auto_approve must not authorise sensitive tasks: `cad_to_cnc` emits G-code, which
-    // is gated, so the workflow has to stop and leave an approval pending.
+    // `cad_to_cnc` starts with a CAM task that has no adapter, so the run must stop before the
+    // gated G-code step and must not report completion. The gate itself is covered directly by
+    // `gated_command_requires_approval_unless_auto_approved` in atlas-agent-orchestrator.
     let response = post(
         addr,
         "/api/agents/workflows/run_all",
@@ -3823,14 +3824,17 @@ fn agent_workflows_require_approval_by_default() -> Result<(), Box<dyn std::erro
     )?;
     assert_eq!(response.status, 200);
     let payload = json(&response)?;
-    let pending = payload["summary"]["pending_approvals"]
-        .as_u64()
-        .ok_or("pending_approvals")?;
-    assert!(
-        pending > 0,
-        "a workflow must stop at its approval gate when auto_approve is absent"
-    );
     assert_ne!(payload["summary"]["execution_status"], "Completed");
+    let tasks = payload["tasks"].as_object().ok_or("tasks object")?;
+    for task in tasks.values() {
+        if task["command_id"] == "cam.gcode.emit" {
+            assert_ne!(
+                task["status"], "completed",
+                "a gated G-code task must not complete without approval"
+            );
+            assert!(task.get("result").is_none());
+        }
+    }
 
     Ok(())
 }
@@ -4783,9 +4787,23 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(run_all_resp.status, 200);
     let run_all_json = json(&run_all_resp)?;
-    assert_eq!(run_all_json["status"], "Completed");
-    assert_eq!(run_all_json["summary"]["completed_tasks"], 11);
-    assert_eq!(run_all_json["summary"]["execution_status"], "Completed");
+    // The workflow must not claim success when adapters are missing: the real inspection and
+    // analytical solve complete, the CAD step is refused, and everything downstream stays pending.
+    assert_eq!(run_all_json["status"], "Failed");
+    assert_eq!(run_all_json["summary"]["completed_tasks"], 2);
+    assert_eq!(run_all_json["summary"]["failed_tasks"], 1);
+    assert_eq!(run_all_json["summary"]["execution_status"], "Failed");
+    assert_eq!(
+        run_all_json["provenance"]["input_source"],
+        "fixed_case_parameters"
+    );
+    assert!(run_all_json["provenance"]["document_revision"].is_u64());
+    // No fabricated certification, toolpath or media claim in any task result.
+    let tasks = run_all_json["tasks"].as_object().ok_or("tasks object")?;
+    let serialized = serde_json::to_string(tasks)?;
+    assert!(!serialized.contains("CertifiedApproved"));
+    assert!(!serialized.contains("ReadyForMachine"));
+    assert!(!serialized.contains("MasterRendered"));
 
     // 45. Multi-Disciplinary Workbenches HTML & Navigation Verification
     let index_resp = get(addr, "/")?;

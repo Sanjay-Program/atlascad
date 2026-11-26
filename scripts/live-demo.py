@@ -1057,10 +1057,11 @@ def run_live_demo() -> None:
             "workflow_id": "hypersonic_full_vehicle_master",
             "auto_approve": True,
         })
-        check(wf_all.get("status") == "Completed", "Master autonomous workflow status is Completed")
-        check(wf_all.get("summary", {}).get("completed_tasks") == 11, "All 11 tasks executed in DAG")
-        check(wf_all.get("summary", {}).get("failed_tasks") == 0, "Zero failed tasks in master workflow")
-        print(f"  ✓ 12.13 Autonomous Closed-Loop Master Workflow: Executed all 11 stages with zero mocks & certified compliance")
+        check(wf_all.get("status") == "Failed", "Master workflow does not claim success when adapters are missing")
+        check(wf_all.get("summary", {}).get("completed_tasks") == 2, "The real inspection and analytical solve completed")
+        check(wf_all.get("summary", {}).get("failed_tasks") >= 1, "Unimplemented CAD step is refused, not fabricated")
+        check(wf_all.get("provenance", {}).get("input_source") == "fixed_case_parameters", "Workflow provenance records fixed case inputs")
+        print(f"  ✓ 12.13 Master Workflow Honesty: 2/11 tasks ran, unimplemented steps refused, no fabricated certification")
 
         print("\n" + "-" * 78)
         print("  DEMO 13: HYPERSONIC 12,000 KM/H MULTI-PHYSICS AIRCRAFT SIMULATION")

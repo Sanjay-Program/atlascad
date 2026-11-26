@@ -13,7 +13,7 @@
 | Clean release build | **PASS** | `cargo build --release -p cad-studio -p cad-cli` |
 | Formatting | **PASS** | `cargo fmt --all --check` |
 | Clippy, warnings denied | **PASS** | `cargo clippy --workspace --all-targets -- -D warnings` |
-| Workspace tests | **PASS** | 878 passed, 0 failed, 116 suites |
+| Workspace tests | **PASS** | 879 passed, 0 failed, 116 suites |
 | HTTP integration tests | **PASS** | 48 passed |
 | Analytic kernel corpus | **PASS with 2 recorded known-failures** | 9 ok, 0 regressions |
 | Exhaustive product check | **PASS** | `full-check.py`, 1,206 assertions |
@@ -69,7 +69,7 @@
 
 | Item | Status |
 | --- | --- |
-| README test counts match the tree | **FIXED** (878 workspace / 48 HTTP) |
+| README test counts match the tree | **FIXED** (879 workspace / 48 HTTP) |
 | Current readiness audit | **PASS** — this document set |
 | Historical docs clearly marked | **PARTIAL** — banners added to the 2026-10-29 readiness and feature matrix |
 | API documentation matches implemented routes | **PARTIAL** — 317 path literals; documented subset is accurate, not exhaustive |

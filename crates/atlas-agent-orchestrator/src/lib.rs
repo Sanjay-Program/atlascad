@@ -188,37 +188,86 @@ mod tests {
     }
 
     #[test]
-    fn test_hypersonic_master_workflow_closed_loop_execution() -> Result<(), OrchestratorError> {
+    fn gated_command_requires_approval_unless_auto_approved() -> Result<(), OrchestratorError> {
+        // A graph consisting of one sensitive action must stop at the gate when auto-approval was
+        // not requested. This is the safety property, tested independently of which templates
+        // currently have reachable upstream tasks.
+        let mut orch = EngineeringOrchestrator::new("Gate_Test");
+        let mut graph = TaskGraph::new();
+        graph.add_task(EngineeringTask::new(
+            "t_emit",
+            "Emit CNC Program G-Code",
+            "cnc_machinist",
+            "cam.gcode.emit",
+        ))?;
+        orch.load_task_graph(graph)?;
+
+        let blocked = orch.execute_all(false)?;
+        assert_eq!(blocked.completed_tasks, 0);
+        assert_eq!(blocked.pending_approvals, 1);
+        assert_eq!(blocked.execution_status, "WaitingApproval");
+        assert!(orch.pending_approvals.contains_key("appr_t_emit"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_master_workflow_refuses_unimplemented_steps() -> Result<(), OrchestratorError> {
         let mut orch = EngineeringOrchestrator::new("Hypersonic_Mach11_Flagship");
+        orch.bind_document_revision(7);
+        orch.context
+            .facts
+            .insert("feature_count".into(), "2".into());
         let graph = WorkflowRegistry::instantiate_template("hypersonic_full_vehicle_master")?;
         assert_eq!(graph.len(), 11);
 
         orch.load_task_graph(graph)?;
         let summary = orch.execute_all(true)?;
 
+        // The inspection and the analytical hypersonic solve are real; the CAD step has no
+        // adapter, so it is refused and everything downstream of it stays pending. The workflow
+        // must never report itself as completed in that state.
         assert_eq!(summary.total_tasks, 11);
-        assert_eq!(summary.completed_tasks, 11);
-        assert_eq!(summary.failed_tasks, 0);
-        assert_eq!(summary.execution_status, "Completed");
+        assert_eq!(summary.completed_tasks, 2);
+        assert_eq!(summary.failed_tasks, 1);
+        assert_eq!(summary.execution_status, "Failed");
 
-        // Verify task output artifacts
-        let plasma_task = orch
+        let inspect_task = orch
             .active_graph
-            .get_task("t3_aero_plasma")
-            .ok_or_else(|| OrchestratorError::TaskNotFound("t3_aero_plasma missing".into()))?;
-        assert!(plasma_task.result.is_some());
+            .get_task("t1_mission_req")
+            .ok_or_else(|| OrchestratorError::TaskNotFound("t1_mission_req missing".into()))?;
+        let inspect = inspect_task
+            .result
+            .as_ref()
+            .ok_or_else(|| OrchestratorError::TaskNotFound("inspection result missing".into()))?;
+        assert_eq!(inspect["document_revision"], 7);
+        assert_eq!(inspect["inspection"]["facts"]["feature_count"], "2");
 
-        let scramjet_task = orch
+        let cad_task = orch
             .active_graph
-            .get_task("t4_scramjet_cycle")
-            .ok_or_else(|| OrchestratorError::TaskNotFound("t4_scramjet_cycle missing".into()))?;
-        assert!(scramjet_task.result.is_some());
+            .get_task("t2_waverider_cad")
+            .ok_or_else(|| OrchestratorError::TaskNotFound("t2_waverider_cad missing".into()))?;
+        assert_eq!(cad_task.status, TaskStatus::Failed);
+        assert!(cad_task.result.is_none());
+        assert!(
+            cad_task
+                .error
+                .as_deref()
+                .is_some_and(|error| error.contains("no CAD"))
+        );
 
         let cert_task = orch
             .active_graph
             .get_task("t11_as9100_cert")
             .ok_or_else(|| OrchestratorError::TaskNotFound("t11_as9100_cert missing".into()))?;
-        assert!(cert_task.result.is_some());
+        assert_eq!(cert_task.status, TaskStatus::Pending);
+        assert!(cert_task.result.is_none());
+
+        // No fabricated certificate or machine-ready claim may appear anywhere in the graph.
+        let serialized = serde_json::to_string(&orch.active_graph)
+            .map_err(|error| OrchestratorError::Internal(error.to_string()))?;
+        assert!(!serialized.contains("CertifiedApproved"));
+        assert!(!serialized.contains("ReadyForMachine"));
 
         Ok(())
     }

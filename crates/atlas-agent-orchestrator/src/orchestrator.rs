@@ -25,6 +25,10 @@ pub struct EngineeringOrchestrator {
     pub context: ProjectContext,
     pub pending_approvals: BTreeMap<String, ApprovalRequest>,
     pub execution_log: Vec<String>,
+    /// Document revision the current run is bound to. Every task result records it so a result
+    /// can never be mistaken for one computed against a different model state.
+    #[serde(default)]
+    pub document_revision: Option<u64>,
 }
 
 impl Default for EngineeringOrchestrator {
@@ -42,7 +46,21 @@ impl EngineeringOrchestrator {
             context: ProjectContext::new(project_name),
             pending_approvals: BTreeMap::new(),
             execution_log: Vec::new(),
+            document_revision: None,
         }
+    }
+
+    /// Bind subsequent runs to a document revision. Results record the revision they were
+    /// computed against alongside their input source.
+    pub fn bind_document_revision(&mut self, revision: u64) {
+        self.document_revision = Some(revision);
+    }
+
+    fn now_epoch_secs() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_secs())
+            .unwrap_or(0)
     }
 
     pub fn load_task_graph(&mut self, graph: TaskGraph) -> Result<(), OrchestratorError> {
@@ -116,20 +134,60 @@ impl EngineeringOrchestrator {
                 agent_mut.status = AgentStatus::Working;
             }
 
-            // Execute real domain solver or verified engineering workflow
-            let execution_result = self.execute_task_payload(&task);
+            // Execute the registered analytical solver. The elapsed time is measured, not invented,
+            // and nothing is marked complete when the command has no implementation in this build.
+            let started = std::time::Instant::now();
+            let mut execution_result = self.execute_task_payload(&task);
+            let duration_ms = started.elapsed().as_millis() as u64;
 
-            self.active_graph
-                .mark_completed(&task_id, execution_result, 15)?;
+            if let Some(object) = execution_result.as_object_mut() {
+                object.insert(
+                    "document_revision".into(),
+                    serde_json::json!(self.document_revision),
+                );
+                object.insert(
+                    "input_source".into(),
+                    serde_json::json!("fixed_case_parameters"),
+                );
+            }
+
+            let unavailable = execution_result
+                .get("status")
+                .and_then(|status| status.as_str())
+                == Some("Unavailable");
+
+            if unavailable {
+                let reason = execution_result
+                    .get("error")
+                    .and_then(|error| error.as_str())
+                    .unwrap_or("no implementation in this build")
+                    .to_string();
+                self.active_graph.mark_failed(&task_id, reason.clone())?;
+                self.log(format!("Task '{task_id}' unavailable: {reason}"));
+            } else {
+                self.active_graph
+                    .mark_completed(&task_id, execution_result, duration_ms)?;
+                self.log(format!("Task '{task_id}' completed in {duration_ms} ms"));
+            }
 
             if let Some(agent_mut) = self.registry.get_mut(&task.assigned_agent) {
                 agent_mut.status = AgentStatus::Idle;
             }
-
-            self.log(format!("Task '{task_id}' successfully completed"));
         }
 
         Ok(self.summary())
+    }
+
+    /// A refused task: no fabricated numbers, and a reason the caller can show.
+    fn unavailable(task: &crate::task_graph::EngineeringTask, reason: &str) -> serde_json::Value {
+        serde_json::json!({
+            "status": "Unavailable",
+            "task_id": task.id,
+            "command": task.command_id,
+            "agent": task.assigned_agent,
+            "output": serde_json::Value::Null,
+            "error": reason,
+        })
     }
 
     /// Dispatches actual physical solvers, CAD generators, CAM toolpaths, or export bridges.
@@ -139,6 +197,21 @@ impl EngineeringOrchestrator {
         task: &crate::task_graph::EngineeringTask,
     ) -> serde_json::Value {
         match task.command_id.as_str() {
+            "project.inspect" => {
+                // Real document facts, bound by the caller before execution. Nothing here is
+                // invented: when no facts were bound the map is empty and that is visible.
+                serde_json::json!({
+                    "status": "Success",
+                    "task_id": task.id,
+                    "command": task.command_id,
+                    "agent": task.assigned_agent,
+                    "inspection": {
+                        "project_name": self.context.project_name,
+                        "document_revision": self.document_revision,
+                        "facts": self.context.facts,
+                    }
+                })
+            }
             "sim.hypersonic.plasma" => {
                 let res = atlas_simulation_core::hypersonic::plasma::evaluate_plasma_sheath(
                     11.0, 32000.0, 228.65, 0.0132, 0.05,
@@ -233,93 +306,25 @@ impl EngineeringOrchestrator {
                     "maneuver_6dof": res,
                 })
             }
-            "cad.solid.extrude" | "cad.solid.box" => {
-                serde_json::json!({
-                    "status": "Success",
-                    "task_id": task.id,
-                    "command": task.command_id,
-                    "agent": task.assigned_agent,
-                    "geometry": {
-                        "brep_type": "HypersonicWaveriderHull",
-                        "length_m": 38.0,
-                        "span_m": 16.5,
-                        "volume_m3": 182.4,
-                        "surface_area_m2": 448.2,
-                        "facets": 5840
-                    }
-                })
-            }
-            "cam.toolpaths.generate" | "cam.gcode.emit" => {
-                serde_json::json!({
-                    "status": "Success",
-                    "task_id": task.id,
-                    "command": task.command_id,
-                    "agent": task.assigned_agent,
-                    "manufacturing": {
-                        "process": "5-Axis CNC Milling & SLM Additive",
-                        "toolpath_count": 68,
-                        "cycle_time_s": 142.5,
-                        "gcode_lines": 8920,
-                        "status": "ReadyForMachine"
-                    }
-                })
-            }
-            "export.unity.engine" => {
-                serde_json::json!({
-                    "status": "Success",
-                    "task_id": task.id,
-                    "command": task.command_id,
-                    "agent": task.assigned_agent,
-                    "digital_twin": {
-                        "package": "com.atlascad.unity",
-                        "version": "1.0.0",
-                        "telemetry_channels": 16,
-                        "mesh_format": "glTF 2.0 PBR",
-                        "status": "Bound"
-                    }
-                })
-            }
-            "export.davinci.resolve" => {
-                serde_json::json!({
-                    "status": "Success",
-                    "task_id": task.id,
-                    "command": task.command_id,
-                    "agent": task.assigned_agent,
-                    "media_presentation": {
-                        "timeline_tracks": 4,
-                        "lut_3d": "Ironbow_Aerothermal_33x33x33",
-                        "format": "FCPXML 1.10 / CMX 3600 EDL",
-                        "status": "MasterRendered"
-                    }
-                })
-            }
-            "eco.submit" => {
-                serde_json::json!({
-                    "status": "Success",
-                    "task_id": task.id,
-                    "command": task.command_id,
-                    "agent": task.assigned_agent,
-                    "certification": {
-                        "standard": "AS9100 Rev D / FAA Part 25 Hypersonic",
-                        "compliance_score": 1.0,
-                        "evidence_hash": "sha256_as9100_mach11_certified",
-                        "status": "CertifiedApproved"
-                    }
-                })
-            }
-            _ => {
-                serde_json::json!({
-                    "status": "Success",
-                    "task_id": task.id,
-                    "command": task.command_id,
-                    "agent": task.assigned_agent,
-                    "metrics": {
-                        "duration_ms": 15,
-                        "convergence": 1.0,
-                        "accuracy_percent": 99.98
-                    }
-                })
-            }
+            // These commands have no implementation wired into the orchestrator. Returning a
+            // plausible geometry, toolpath count, rendered-master state or certificate hash would
+            // be a fabricated engineering claim, so the task is refused instead.
+            "cad.solid.extrude"
+            | "cad.solid.box"
+            | "cam.toolpaths.generate"
+            | "cam.gcode.emit"
+            | "export.unity.engine"
+            | "export.davinci.resolve"
+            | "eco.submit" => Self::unavailable(
+                task,
+                "no CAD/CAM/export/certification adapter is wired into the agent orchestrator in this \
+                 build; use the corresponding API endpoint, or implement the adapter",
+            ),
+            _ => Self::unavailable(
+                task,
+                "no implementation is registered for this command in this build; no result was \
+                 produced",
+            ),
         }
     }
 
@@ -355,7 +360,7 @@ impl EngineeringOrchestrator {
                             true,
                             "Chief_Autonomous_Engineer",
                             Some("Autonomous verified workflow approval gate passed".into()),
-                            1000 + loop_count as u64,
+                            Self::now_epoch_secs(),
                         )?;
                     }
                     continue;
