@@ -1,5 +1,19 @@
 # Security Review
 
+> **Current status (2026-11-26).** Re-verified controls: CSP with `script-src 'self'`,
+> `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`,
+> constant-time token comparison, Origin/Host checks, request body and media-type caps, token from
+> environment or file, non-root container, and no inline script handlers in the page.
+>
+> New findings: `/api/auth/login` selects a seeded identity by `user_id`/email with **no credential
+> check** (PR-004). It is now explicitly labelled a demo identity (`credential_verified: false`,
+> `authentication: "demo-identity"`, UI banner), SSO provider sign-in returns `501`, and login on a
+> `--share` instance returns `501`; it is still not an authentication boundary; engine endpoints fabricated
+> solver results and now return `501 unavailable` (PR-001, fixed); workflows auto-approved sensitive
+> tasks by default and now require opt-in (PR-002, fixed); command audit timestamps and hashes were
+> constants and are now real (PR-003, fixed); advisory scanning is still unrun (PR-005, blocked).
+> See [`quality/ATLASCAD_PRODUCTION_READINESS_AUDIT.md`](quality/ATLASCAD_PRODUCTION_READINESS_AUDIT.md).
+
 **Date:** 2026-10-21, Atlas Studio section added 2026-10-25 · **Scope:** the eleven repositories in
 this workspace plus the platform crates (`cad-contract`, `cad-kernel-truck`, `cad-document`, `cad-io`,
 `cad-studio`, and the agent/engineering crates).

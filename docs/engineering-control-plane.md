@@ -209,6 +209,13 @@ duplicated (a duplicate status page is a page that drifts):
 | `docs/quality/baseline-builds.md` | [baseline-builds.md](quality/baseline-builds.md) |
 | `docs/quality/baseline-tests.md` | [baseline-tests.md](quality/baseline-tests.md) |
 | `docs/quality/atlas-usability-audit.md` | [atlas-usability-audit.md](quality/atlas-usability-audit.md) |
+| `docs/quality/ATLASCAD_PRODUCTION_READINESS_AUDIT.md` | [ATLASCAD_PRODUCTION_READINESS_AUDIT.md](quality/ATLASCAD_PRODUCTION_READINESS_AUDIT.md) (current; supersedes `production-readiness.md`) |
+| `docs/quality/ATLASCAD_USER_PERSONA_AND_TASK_MATRIX.md` | [atlas-persona-and-task-matrix.md](quality/atlas-persona-and-task-matrix.md) |
+| `docs/quality/ATLASCAD_TEST_STRATEGY.md` | [atlas-test-strategy.md](quality/atlas-test-strategy.md) |
+| `docs/quality/ATLASCAD_PERFORMANCE_AND_RELIABILITY.md` | [atlas-performance-and-reliability.md](quality/atlas-performance-and-reliability.md) |
+| `docs/quality/ATLASCAD_RELEASE_READINESS_CHECKLIST.md` | [atlas-release-readiness-checklist.md](quality/atlas-release-readiness-checklist.md) |
+| `docs/quality/ATLASCAD_PREMIUM_VALUE_EVIDENCE.md` | [atlas-premium-value-evidence.md](quality/atlas-premium-value-evidence.md) |
+| `docs/quality/ATLASCAD_REMEDIATION_BACKLOG.md` | [atlas-remediation-backlog.md](quality/atlas-remediation-backlog.md) |
 | `docs/decisions/` (ADRs) | [`docs/architecture-decisions/`](architecture-decisions/) (existing convention) |
 | `engineering/reports/latest-integration-report.md` | generated |
 

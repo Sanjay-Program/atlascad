@@ -1,5 +1,11 @@
 # Production-readiness assessment
 
+> **Historical (2026-10-29).** For current status see
+> [`ATLASCAD_PRODUCTION_READINESS_AUDIT.md`](ATLASCAD_PRODUCTION_READINESS_AUDIT.md) (2026-11-26).
+> Several statements here no longer describe the tree: STEP import/export, a drafting editor with
+> PDF/DXF, token-gated sharing, recovery and named revisions now exist, and the suite is 878 tests,
+> not 309. The geometry and interoperability findings remain the historical record for that date.
+
 **Date:** 2026-10-29 · **Scope:** the deployable artifacts in this repository — the root workspace
 (the `cad-studio` server, the `atlas` CLI, `atlas-eng`, and the libraries they link) — measured on
 this host against what a paying professional customer expects at a **$10,000–$50,000 per seat per

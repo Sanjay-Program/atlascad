@@ -1,5 +1,10 @@
 # Feature Matrix
 
+> **Historical review (2026-10-30).** Current verified status is in
+> [`quality/ATLASCAD_PRODUCTION_READINESS_AUDIT.md`](quality/ATLASCAD_PRODUCTION_READINESS_AUDIT.md)
+> (2026-11-26). Rows below that say STEP, drawings or authentication are absent predate those
+> capabilities; the status vocabulary and evidence discipline still apply.
+
 **Status vocabulary — used strictly:**
 
 | Status | Meaning |

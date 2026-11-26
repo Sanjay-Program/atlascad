@@ -1,6 +1,6 @@
 # AtlasCAD usability audit
 
-**Date:** 2026-11-25 · **Scope:** the shipped Studio (`cad-studio` server + embedded web UI in
+**Date:** 2026-11-25; **updated:** 2026-11-26 (`UX-002` and `UX-003` fixed) · **Scope:** the shipped Studio (`cad-studio` server + embedded web UI in
 `crates/cad-studio/assets/`) and the workflows it exposes. **Method:** agent-led heuristic
 walkthrough of the running application plus automated DOM/geometry measurement. **There were no
 human participants.** No quotes, task times, success rates or participant counts are reported
@@ -41,15 +41,14 @@ which is every laptop and most desktops:
 
 That is fixed in this audit, with a regression test that fails if it returns.
 
-Two further issues are reported and **not** fixed, because fixing them well needs per-control work
-rather than a global change:
+Two further issues were reported here and have since been fixed, each with a regression check:
 
-1. The primary commit buttons in the Create panel sit below the fold on a 720 px-tall screen
+1. The primary commit button in the Create panel sat below the fold on a 720 px-tall screen
    (`automated`): `Add extrude` at y=685 with the panel's visible area ending at ~676, inside a
-   1 221 px scroll region. A first-time user can enter a depth and never see the button that
-   commits it.
-2. 84 of 191 form controls have no programmatic name — no `aria-label`, `aria-labelledby`,
-   `label[for]` or `title` (`automated`). A screen-reader user hears the control type only.
+   1 221 px scroll region. It now sits in a sticky footer; `scripts/browser-check.mjs` asserts it
+   is inside the panel's visible box at 1280×720 both at the top of the panel and after scrolling.
+2. 59 of 191 form controls had no programmatic name (`automated`). All 191 now have one, and
+   `scripts/a11y-audit.mjs` fails when any control in the document lacks a name.
 
 ## 2. Repository and application inventory
 
@@ -76,8 +75,8 @@ front-end framework and no client-side router; state comes from `/api/state`.
 | Handoffs | Unity/DaVinci/Blender controls | Export actions exist in the top bar | Yes | Not driven in this audit |
 
 Routes: 316 distinct `/api/...` paths. Dialogs: 17 `role="dialog"`. Tests: `http_api.rs`,
-`cli_token.rs`, plus `scripts/simulate.sh` (56 HTTP/CLI + 29 loopback browser + 33 shared-session
-browser assertions) and `scripts/full-check.py` (1 206 assertions).
+`cli_token.rs`, plus `scripts/simulate.sh` (56 HTTP/CLI + 30 loopback browser + 34 shared-session
+browser assertions, and a DOM accessibility audit) and `scripts/full-check.py` (1 206 assertions).
 
 ## 3. Personas and coverage
 
@@ -131,7 +130,7 @@ Only the tasks below were actually executed. Everything else is `not tested`; no
 | Console errors | 0 (4 headless WebGL driver warnings only) | `automated` |
 | DOM nodes | 5 827 | `automated` |
 | Buttons | 639, of which 0 lack an accessible name | `automated` |
-| Form controls | 191, of which 84 lack a programmatic name | `automated` |
+| Form controls | 191, of which 0 lack a programmatic name | `automated` (2026-11-26 re-audit) |
 | Server resident memory | 47 MB | `automated` (`ps` RSS) |
 | Layout width vs viewport, before fix | 2 668 px in 1 280/1 366/1 600/1 920 px viewports | `automated` |
 | Layout width vs viewport, after fix | 1 222 / 1 308 / 1 542 / 1 862 px, all fit | `automated` |
@@ -162,7 +161,7 @@ Only the tasks below were actually executed. Everything else is `not tested`; no
 - **Regression test:** two assertions in `scripts/browser-check.mjs`.
 - **Status:** fixed, retested.
 
-### UX-002 — Primary commit action below the fold (P2, open)
+### UX-002 — Primary commit action below the fold (P2, **fixed 2026-11-26**)
 
 - **Evidence:** `automated` — `#addFeatureBtn` top 685 px, `.panel-left` bottom ~676 px,
   `scrollHeight` 1 221 px vs `clientHeight` 536 px.
@@ -178,8 +177,13 @@ Only the tasks below were actually executed. Everything else is `not tested`; no
   its own background), keeping the rest scrollable. `effort S`.
 - **Acceptance:** at 720 px height the commit button is inside the panel's visible box for every
   feature type, and stays visible while the panel is scrolled.
+- **Fix:** the commit control and its hint moved into `.section-commit-footer`, outside the
+  `overflow:hidden` section body, which is what stops `position:sticky` from using the panel as its
+  scroll container. The footer is hidden with the section when it is collapsed.
+- **Status:** fixed and verified. `browser-check.mjs` measures the button at 1280×720 with the panel
+  at `scrollTop` 0 and 240; both must be inside the panel box (assertion count 29 → 30).
 
-### UX-003 — 84 form controls without a programmatic name (P2, open, accessibility)
+### UX-003 — Form controls without a programmatic name (P2, **fixed 2026-11-26**)
 
 - **Evidence:** `automated` DOM query over 191 non-hidden controls.
 - **Examples:** `importStepFile`, `importDxfFile`, `aiCopilotInput`, `osnapEnd`, `osnapMid`,
@@ -188,9 +192,15 @@ Only the tasks below were actually executed. Everything else is `not tested`; no
   unusable without sight.
 - **Root cause (confirmed):** controls rely on adjacent visual text; no association exists in the
   accessibility tree.
-- **Recommendation:** add `aria-label` (or a real `<label for>`) to each of the 84, starting with the
-  visible chrome (OSNAP toggles, import file inputs, AI prompt). `effort M`.
+- **Recommendation:** add `aria-label` (or a real `<label for>`) to each unnamed control, starting
+  with the visible chrome (OSNAP toggles, import file inputs, AI prompt). `effort M`.
 - **Acceptance:** a repeat of the audit query returns 0 controls without a name.
+- **Fix:** `aria-label` added to 59 controls across the CAE, CAM, BIM, ECAD, additive, sculpt/PBR,
+  media, robotics, BIM imports, project/asset filters, command line, palette, layers, AI prompt,
+  named views, engine search, enterprise job/ECO fields and drawing text. A LUT `<select>` that had
+  no id was given `id="mediaLutSelect"` so it could be named.
+- **Status:** fixed and verified: `node scripts/a11y-audit.mjs` reports **191 controls, 0 unnamed**
+  and exits non-zero otherwise. The audit runs in `scripts/simulate.sh`.
 
 ### UX-004 — Contrast not reliably measured (P3, open, measurement gap)
 
@@ -261,8 +271,8 @@ correctly. Their routes and UI entry points exist; behaviour is unverified. Repo
 | ID | Persona | Area | Impact | Difficulty | Confidence | Priority | Fix | Effort | Dependency | Acceptance | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | UX-001 | All | Shell layout | 5 | 2 | 5 | **P1** | Explicit grid column + scrollable toolbars | S | — | Fits 1280–1920 px | **fixed / retested** |
-| UX-002 | A, B | Create panel | 4 | 2 | 4 | **P2** | Sticky commit footer | S | — | Button visible at 720 px | open |
-| UX-003 | K | Forms | 4 | 3 | 5 | **P2** | Name all 84 controls | M | — | 0 unnamed controls | open |
+| UX-002 | A, B | Create panel | 4 | 2 | 4 | **P2** | Sticky commit footer | S | — | Button visible at 720 px | **fixed / retested** |
+| UX-003 | K | Forms | 4 | 3 | 5 | **P2** | Name every control | M | — | 0 unnamed controls | **fixed / retested** |
 | UX-004 | K | Contrast | 3 | 2 | 1 | P3 | Run axe/Lighthouse, fix pairs | S | tooling | Ratios recorded | open |
 | UX-005 | L | Viewport | 2 | 3 | 2 | P3 | Profile readback path | M | GPU profiling | Frame times recorded | open (hypothesis) |
 | UX-006 | A | Onboarding | 3 | 2 | 2 | P3 | Verify first-run tour is reachable from Help | S | — | Tour opens from menu and first run | open |
@@ -277,6 +287,17 @@ Priority = Impact × Difficulty × Confidence, triaged by hand where safety or b
 2. **`scripts/browser-check.mjs`** — two assertions that fail if the shell is wider than the viewport
    or the canvas is clipped (`UX-001` regression guard). Assertion counts rose from 27 to 29
    (loopback) and 31 to 33 (shared session).
+
+Subsequent fixes (2026-11-26, same codebase):
+
+3. **`crates/cad-studio/assets/index.html` / `app.css`** — the Create commit action moved into a
+   sticky footer (`.section-commit-footer`), hidden with the collapsed section (`UX-002`).
+4. **`crates/cad-studio/assets/index.html`** — `aria-label` on 59 controls; the unnamed LUT select
+   received `id="mediaLutSelect"` (`UX-003`).
+5. **`scripts/a11y-audit.mjs`** — new repeatable audit over every `input`/`select`/`textarea` in the
+   document, run from `scripts/simulate.sh`; exits 1 on any unnamed control.
+6. **`scripts/browser-check.mjs`** — one more assertion: at 1280×720 the commit button is inside the
+   panel's visible box both at `scrollTop` 0 and after scrolling (loopback count 29 → 30).
 
 ## 13. Before / after verification
 
@@ -299,14 +320,15 @@ Priority = Impact × Difficulty × Confidence, triaged by hand where safety or b
   verified visually only.
 - Toolbars now scroll horizontally; their right-most controls are reachable but not visible at
   1280 px, which is a discoverability trade-off (`heuristic`).
-- `UX-002`/`UX-003` remain open; the audit is not a statement that AtlasCAD is easy to use.
+- `UX-002`/`UX-003` are fixed and guarded by scripted checks; the audit is still not a statement
+  that AtlasCAD is easy to use, and `UX-004` (contrast) remains unmeasured.
 - Simulation, CAM, handoff and AI flows were not exercised, so nothing is claimed about them.
 
 ## 15. Follow-up plan
 
-1. `UX-002` sticky commit footer, then retest T1 at 720 px height.
-2. `UX-003` label the visible chrome first (OSNAP, import, AI prompt), rerun the audit query.
-3. Add axe-core to `scripts/browser-check.mjs` so contrast and names are checked automatically.
+1. `UX-002` is fixed and retested at 720 px height (see §12).
+2. `UX-003` is fixed; `scripts/a11y-audit.mjs` now fails on any unnamed control.
+3. Add axe-core to `scripts/browser-check.mjs` so contrast is checked automatically as well.
 4. Drive T8–T15 (simulation, CAM, handoffs, AI approvals) with the same scripted approach and record
    real outcomes before making any claim about them.
 5. Only then consider a broader design pass; no evidence in this audit supports a redesign.

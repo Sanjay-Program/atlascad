@@ -1,5 +1,10 @@
 # Engineering Validation
 
+> **Superseded for external engines (2026-11-26).** The engine registry no longer
+> synthesizes solver output: jobs and benchmarks return `501 unavailable` until a real
+> adapter exists. The analytical solver validation below remains valid. Current status:
+> [`ATLASCAD_PRODUCTION_READINESS_AUDIT.md`](ATLASCAD_PRODUCTION_READINESS_AUDIT.md).
+
 **As of:** 2026-11-03 · **Status:** Phase A, linear static CAE and its batch deployment job have
 executable evidence; the other engineering domains have none because they are not implemented.
 
