@@ -825,9 +825,9 @@
       <button id="saveBtn" class="button ghost" title="Save project (Ctrl+S)">Save</button>
       <button id="exportBtn" class="button ghost" title="Export binary STL">Export STL</button>
       <button id="importStepBtn" class="button ghost" title="Import a STEP part as a mesh body (up to 1 MiB)">Import STEP</button>
-      <input id="importStepFile" type="file" accept=".step,.stp,application/step,text/plain" hidden>
+      <input id="importStepFile" aria-label="Import STEP file" type="file" accept=".step,.stp,application/step,text/plain" hidden>
       <button id="importDxfBtn" class="button ghost" title="Import a DXF drawing (up to 1 MiB)">Import DXF</button>
-      <input id="importDxfFile" type="file" accept=".dxf,application/dxf,text/plain" hidden>
+      <input id="importDxfFile" aria-label="Import DXF file" type="file" accept=".dxf,application/dxf,text/plain" hidden>
       <button id="exportDxfBtn" class="button ghost" title="Download the plan drawing as DXF R12">Export DXF</button>
       <button id="exportStepBtn" class="button ghost" title="Export ISO 10303-21 STEP AP214 CAD Part">Export STEP</button>
       <button id="export3mfBtn" class="button ghost" title="Export ASTM/ISO 52915 3MF Additive Model">Export 3MF</button>
@@ -1461,9 +1461,14 @@
           <label for="newFeatureAngle">Angle</label>
           <input id="newFeatureAngle" type="number" min="1" max="360" step="1" value="360" aria-label="Revolve angle in degrees">
         </div>
-        <button id="addFeatureBtn" class="button wide">Add extrude</button>
-        <p class="hint" id="createHint">The first extrude starts the body; later extrudes join it.</p>
         </div><!-- end sectionCreateBody -->
+        <!-- The commit action lives outside the scrolling body so it can stay pinned to the bottom
+             edge of the panel on short screens; .section-body has overflow:hidden, which would
+             otherwise stop position:sticky from using the panel as its scroll container. -->
+        <div class="section-commit-footer">
+          <button id="addFeatureBtn" class="button wide">Add extrude</button>
+          <p class="hint" id="createHint">The first extrude starts the body; later extrudes join it.</p>
+        </div>
       </section>
 
       <section class="panel-section">
@@ -1706,7 +1711,7 @@
         </div>
 
         <form class="ai-copilot-input-form" id="aiCopilotForm">
-          <input type="text" id="aiCopilotInput" class="ai-copilot-input" placeholder="e.g. 'Extrude by 35mm with Aluminum 6061-T6' or 'Run modal vibration'…" autocomplete="off" />
+          <input type="text" id="aiCopilotInput" class="ai-copilot-input" aria-label="AI copilot prompt" placeholder="e.g. 'Extrude by 35mm with Aluminum 6061-T6' or 'Run modal vibration'…" autocomplete="off" />
           <button type="submit" class="ai-send-btn" id="aiCopilotSendBtn" title="Execute AI Engineering Action">
             <span>Execute</span> ↵
           </button>
@@ -2212,7 +2217,7 @@
                   <button type="button" class="button small primary" id="caeModalPlayBtn">
                     <svg class="atlas-icon" aria-hidden="true"><use href="#icon-play"/></svg> Animate
                   </button>
-                  <select id="caeModalModeSelect" class="cae-select small">
+                  <select id="caeModalModeSelect" class="cae-select small" aria-label="Mode shape to animate">
                     <option value="1">Mode 1 (Fundamental)</option>
                     <option value="2">Mode 2</option>
                     <option value="3">Mode 3</option>
@@ -2232,7 +2237,7 @@
                     <button type="button" class="seg-btn" data-axis="y">Y Cut</button>
                     <button type="button" class="seg-btn" data-axis="z">Z Cut</button>
                   </div>
-                  <input type="range" id="caeClipSlider" min="-50" max="50" step="1" value="0" class="cae-slider">
+                  <input type="range" id="caeClipSlider" aria-label="Section cutaway position" min="-50" max="50" step="1" value="0" class="cae-slider">
                 </div>
               </div>
             </div>
@@ -2597,7 +2602,7 @@
               <div class="wb-fixtures-box">
                 <div class="wb-fixture-row">
                   <span>Fixed Support Face:</span>
-                  <select id="caeSupportFaceSelect" class="wb-select compact">
+                  <select id="caeSupportFaceSelect" class="wb-select compact" aria-label="Fixed support face">
                     <option value="min_x" selected>Min-X Boundary Face</option>
                     <option value="max_x">Max-X Boundary Face</option>
                     <option value="min_z">Min-Z Bottom Face</option>
@@ -2605,11 +2610,11 @@
                 </div>
                 <div class="wb-fixture-row">
                   <span>Applied Force (Fz):</span>
-                  <input type="number" id="caeForceInput" value="-100.0" step="10" class="wb-input compact"> N
+                  <input type="number" id="caeForceInput" aria-label="Applied force Fz in newtons" value="-100.0" step="10" class="wb-input compact"> N
                 </div>
                 <div class="wb-fixture-row">
                   <span>Temperature Delta:</span>
-                  <input type="number" id="caeTempDeltaInput" value="50.0" step="5" class="wb-input compact"> K
+                  <input type="number" id="caeTempDeltaInput" aria-label="Temperature delta in kelvin" value="50.0" step="5" class="wb-input compact"> K
                 </div>
               </div>
             </div>
@@ -2618,15 +2623,15 @@
               <div class="wb-fixtures-box" id="caeStudyParamsBox">
                 <div class="wb-fixture-row">
                   <span id="caeParam1Label">Mach Number:</span>
-                  <input type="number" id="caeParam1Input" value="0.78" step="0.05" class="wb-input compact">
+                  <input type="number" id="caeParam1Input" aria-label="Load magnitude in newtons" value="0.78" step="0.05" class="wb-input compact">
                 </div>
                 <div class="wb-fixture-row">
                   <span id="caeParam2Label">Angle of Attack:</span>
-                  <input type="number" id="caeParam2Input" value="4.2" step="0.5" class="wb-input compact"> °
+                  <input type="number" id="caeParam2Input" aria-label="Target safety factor" value="4.2" step="0.5" class="wb-input compact"> °
                 </div>
                 <div class="wb-fixture-row">
                   <span id="caeParam3Label">True Airspeed:</span>
-                  <input type="number" id="caeParam3Input" value="230.0" step="10" class="wb-input compact"> m/s
+                  <input type="number" id="caeParam3Input" aria-label="Mesh refinement level" value="230.0" step="10" class="wb-input compact"> m/s
                 </div>
               </div>
             </div>
@@ -2737,19 +2742,19 @@
               <div class="wb-fixtures-box">
                 <div class="wb-fixture-row">
                   <span>Spindle Speed:</span>
-                  <input type="number" id="camSpindleRpmInput" value="6000" step="250" class="wb-input compact"> RPM
+                  <input type="number" id="camSpindleRpmInput" aria-label="Spindle speed in RPM" value="6000" step="250" class="wb-input compact"> RPM
                 </div>
                 <div class="wb-fixture-row">
                   <span>Cutting Feed:</span>
-                  <input type="number" id="camFeedrateInput" value="850" step="50" class="wb-input compact"> mm/min
+                  <input type="number" id="camFeedrateInput" aria-label="Cutting feedrate in millimetres per minute" value="850" step="50" class="wb-input compact"> mm/min
                 </div>
                 <div class="wb-fixture-row">
                   <span>Stepover (ae):</span>
-                  <input type="number" id="camStepoverInput" value="4.2" step="0.2" class="wb-input compact"> mm
+                  <input type="number" id="camStepoverInput" aria-label="Stepover ae in millimetres" value="4.2" step="0.2" class="wb-input compact"> mm
                 </div>
                 <div class="wb-fixture-row">
                   <span>Stepdown (ap):</span>
-                  <input type="number" id="camStepdownInput" value="1.0" step="0.2" class="wb-input compact"> mm
+                  <input type="number" id="camStepdownInput" aria-label="Stepdown ap in millimetres" value="1.0" step="0.2" class="wb-input compact"> mm
                 </div>
               </div>
             </div>
@@ -2762,11 +2767,11 @@
                 </div>
                 <div class="wb-fixture-row">
                   <span>XY Padding:</span>
-                  <input type="number" id="camStockPaddingXy" value="5.0" step="1.0" class="wb-input compact"> mm
+                  <input type="number" id="camStockPaddingXy" aria-label="Stock XY padding in millimetres" value="5.0" step="1.0" class="wb-input compact"> mm
                 </div>
                 <div class="wb-fixture-row">
                   <span>Z Top Stock:</span>
-                  <input type="number" id="camStockPaddingZ" value="2.0" step="0.5" class="wb-input compact"> mm
+                  <input type="number" id="camStockPaddingZ" aria-label="Stock Z top allowance in millimetres" value="2.0" step="0.5" class="wb-input compact"> mm
                 </div>
               </div>
             </div>
@@ -2798,7 +2803,7 @@
                 <span>G-Code Program Preview (<span id="camGcodeLineCount">0</span> lines)</span>
                 <span class="wb-gcode-mode">Work Coordinate G54 · Unit G21 Metric</span>
               </div>
-              <textarea class="wb-gcode-editor" id="camGcodeText" readonly placeholder="Click 'Generate Toolpaths' to compute toolpath trajectories and post-process G-code…"></textarea>
+              <textarea class="wb-gcode-editor" id="camGcodeText" aria-label="Generated G-code preview" readonly placeholder="Click 'Generate Toolpaths' to compute toolpath trajectories and post-process G-code…"></textarea>
             </div>
           </div>
         </div>
@@ -2837,7 +2842,7 @@
             <div class="wb-group">
               <label>Add Architectural Component</label>
               <div class="wb-bim-add-form">
-                <select id="bimAddElementType" class="wb-select">
+                <select id="bimAddElementType" class="wb-select" aria-label="BIM element type">
                   <option value="wall">IfcWall (Standard Cavity Wall)</option>
                   <option value="slab">IfcSlab (Reinforced Concrete Floor)</option>
                   <option value="column">IfcColumn (Structural Steel Column)</option>
@@ -2845,7 +2850,7 @@
                 </select>
                 <div class="wb-fixture-row" style="margin-top: 6px;">
                   <span>Thickness / Span:</span>
-                  <input type="number" id="bimElementParam" value="250.0" step="25" class="wb-input compact"> mm
+                  <input type="number" id="bimElementParam" aria-label="BIM element thickness or span in millimetres" value="250.0" step="25" class="wb-input compact"> mm
                 </div>
                 <button type="button" class="button primary small" id="bimAddElementBtn" style="margin-top: 8px;">+ Place Architectural Element</button>
               </div>
@@ -2905,7 +2910,7 @@
               <div class="wb-fixtures-box">
                 <div class="wb-fixture-row">
                   <span>Input Signal:</span>
-                  <select id="ecadSignalTypeSelect" class="wb-select compact">
+                  <select id="ecadSignalTypeSelect" class="wb-select compact" aria-label="Input signal waveform">
                     <option value="sine" selected>Sinusoidal AC Waveform</option>
                     <option value="square">Square Wave Pulse</option>
                     <option value="step">Step Transient Response</option>
@@ -2913,25 +2918,25 @@
                 </div>
                 <div class="wb-fixture-row">
                   <span>Input Frequency:</span>
-                  <input type="number" id="ecadFreqInput" value="1000" min="10" max="100000" step="100" class="wb-input compact"> Hz
+                  <input type="number" id="ecadFreqInput" aria-label="Input frequency in hertz" value="1000" min="10" max="100000" step="100" class="wb-input compact"> Hz
                 </div>
                 <div class="wb-fixture-row">
                   <span>Peak Amplitude:</span>
-                  <input type="number" id="ecadAmpInput" value="5.0" min="0.5" max="24.0" step="0.5" class="wb-input compact"> V
+                  <input type="number" id="ecadAmpInput" aria-label="Peak amplitude in volts" value="5.0" min="0.5" max="24.0" step="0.5" class="wb-input compact"> V
                 </div>
                 <div class="wb-fixture-row">
                   <span>Resistor R1:</span>
-                  <input type="number" id="ecadR1Input" value="10.0" min="1.0" max="100.0" step="1.0" class="wb-input compact"> kΩ
+                  <input type="number" id="ecadR1Input" aria-label="Resistor R1 in kilo-ohms" value="10.0" min="1.0" max="100.0" step="1.0" class="wb-input compact"> kΩ
                 </div>
                 <div class="wb-fixture-row">
                   <span>Capacitor C1:</span>
-                  <input type="number" id="ecadC1Input" value="100.0" min="10.0" max="1000.0" step="10.0" class="wb-input compact"> nF
+                  <input type="number" id="ecadC1Input" aria-label="Capacitor C1 in nanofarads" value="100.0" min="10.0" max="1000.0" step="10.0" class="wb-input compact"> nF
                 </div>
               </div>
             </div>
             <div class="wb-group">
               <label>Generated SPICE Netlist</label>
-              <textarea class="wb-gcode-editor" id="ecadNetlistText" style="height: 120px; font-size: 10px;" readonly>* AtlasCAD SPICE Simulation Netlist
+              <textarea class="wb-gcode-editor" id="ecadNetlistText" aria-label="Generated SPICE netlist" style="height: 120px; font-size: 10px;" readonly>* AtlasCAD SPICE Simulation Netlist
 V1 in 0 SIN(0 5.0 1000)
 R1 in out 10k
 C1 out 0 100n
@@ -3056,15 +3061,15 @@ C1 out 0 100n
               <div class="wb-fixtures-box">
                 <div class="wb-fixture-row">
                   <span>Nozzle Diameter:</span>
-                  <input type="number" id="additiveNozzleDia" value="0.40" step="0.1" class="wb-input compact"> mm
+                  <input type="number" id="additiveNozzleDia" aria-label="Nozzle diameter in millimetres" value="0.40" step="0.1" class="wb-input compact"> mm
                 </div>
                 <div class="wb-fixture-row">
                   <span>Line Width:</span>
-                  <input type="number" id="additiveLineWidth" value="0.44" step="0.02" class="wb-input compact"> mm
+                  <input type="number" id="additiveLineWidth" aria-label="Extrusion line width in millimetres" value="0.44" step="0.02" class="wb-input compact"> mm
                 </div>
                 <div class="wb-fixture-row">
                   <span>Print Speed:</span>
-                  <input type="number" id="additivePrintSpeed" value="60" step="5" class="wb-input compact"> mm/s
+                  <input type="number" id="additivePrintSpeed" aria-label="Print speed in millimetres per second" value="60" step="5" class="wb-input compact"> mm/s
                 </div>
               </div>
             </div>
@@ -3127,7 +3132,7 @@ C1 out 0 100n
           </div>
           <div class="wb-header-actions">
             <span class="wb-status-badge" id="agentStatusBadge">44 Specialists Online</span>
-            <button type="button" class="button primary small" id="agentRunAllBtn" style="background: #059669;" title="Execute entire multi-agent DAG to completion with live solver verification"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-play"/></svg> Run All Tasks</button>
+            <button type="button" class="button primary small" id="agentRunAllBtn" style="background: #059669;" title="Execute the entire multi-agent DAG, auto-approving sensitive steps (G-code emission, deletions) without human review. Asks for confirmation first."><svg class="atlas-icon" aria-hidden="true"><use href="#icon-play"/></svg> Run All Tasks</button>
             <button type="button" class="button primary small" id="agentRunOrchestrationBtn">▶ Execute Task Graph</button>
             <button type="button" class="button secondary small" id="agentStepBtn"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-step-next"/></svg> Single Step</button>
             <button type="button" class="button ghost small" id="agentClearLogBtn">Clear Log</button>
@@ -3179,11 +3184,11 @@ C1 out 0 100n
               <div class="wb-fixtures-box">
                 <div class="wb-fixture-row">
                   <span>Target Factor of Safety:</span>
-                  <input type="number" id="agentTargetFosInput" value="1.50" step="0.05" class="wb-input compact">
+                  <input type="number" id="agentTargetFosInput" aria-label="Target factor of safety" value="1.50" step="0.05" class="wb-input compact">
                 </div>
                 <div class="wb-fixture-row">
                   <span>Iteration Budget:</span>
-                  <input type="number" id="agentMaxIterInput" value="5" step="1" class="wb-input compact">
+                  <input type="number" id="agentMaxIterInput" aria-label="Optimization iteration budget" value="5" step="1" class="wb-input compact">
                 </div>
               </div>
               <button type="button" class="button primary small" id="agentRunOptimizeBtn" style="width: 100%; margin-top: 6px;"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-rotate"/></svg> Run Iterative Optimization Loop</button>
@@ -3312,11 +3317,11 @@ C1 out 0 100n
               <div style="display: flex; gap: 12px; margin-top: 10px;">
                 <div style="flex: 1;">
                   <label style="font-size: 11px; color: #a1a1aa;">Radius (m): <span id="sculptRadiusVal">0.5</span></label>
-                  <input type="range" id="sculptRadiusSlider" min="0.1" max="3.0" step="0.1" value="0.5" style="width: 100%;">
+                  <input type="range" id="sculptRadiusSlider" aria-label="Sculpt brush radius in metres" min="0.1" max="3.0" step="0.1" value="0.5" style="width: 100%;">
                 </div>
                 <div style="flex: 1;">
                   <label style="font-size: 11px; color: #a1a1aa;">Strength: <span id="sculptStrengthVal">0.35</span></label>
-                  <input type="range" id="sculptStrengthSlider" min="0.05" max="1.0" step="0.05" value="0.35" style="width: 100%;">
+                  <input type="range" id="sculptStrengthSlider" aria-label="Sculpt brush strength" min="0.05" max="1.0" step="0.05" value="0.35" style="width: 100%;">
                 </div>
               </div>
               <button type="button" class="button small primary" id="createSculptApplyBtn" style="margin-top: 8px; width: 100%;">Execute Sculpt Stroke</button>
@@ -3340,19 +3345,19 @@ C1 out 0 100n
               <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
                 <div>
                   <label style="font-size: 11px; color: #a1a1aa;">Base Color</label>
-                  <input type="color" id="pbrBaseColorPicker" value="#2a3b4c" style="width: 100%; height: 32px; border: none; cursor: pointer;">
+                  <input type="color" id="pbrBaseColorPicker" aria-label="Material base color" value="#2a3b4c" style="width: 100%; height: 32px; border: none; cursor: pointer;">
                 </div>
                 <div>
                   <label style="font-size: 11px; color: #a1a1aa;">Metallic (0.0 - 1.0): <span id="pbrMetallicVal">0.85</span></label>
-                  <input type="range" id="pbrMetallicSlider" min="0" max="1" step="0.05" value="0.85" style="width: 100%;">
+                  <input type="range" id="pbrMetallicSlider" aria-label="Metallic" min="0" max="1" step="0.05" value="0.85" style="width: 100%;">
                 </div>
                 <div>
                   <label style="font-size: 11px; color: #a1a1aa;">Roughness (0.0 - 1.0): <span id="pbrRoughnessVal">0.25</span></label>
-                  <input type="range" id="pbrRoughnessSlider" min="0" max="1" step="0.05" value="0.25" style="width: 100%;">
+                  <input type="range" id="pbrRoughnessSlider" aria-label="Roughness" min="0" max="1" step="0.05" value="0.25" style="width: 100%;">
                 </div>
                 <div>
                   <label style="font-size: 11px; color: #a1a1aa;">Clearcoat: <span id="pbrClearcoatVal">0.40</span></label>
-                  <input type="range" id="pbrClearcoatSlider" min="0" max="1" step="0.05" value="0.40" style="width: 100%;">
+                  <input type="range" id="pbrClearcoatSlider" aria-label="Clearcoat" min="0" max="1" step="0.05" value="0.40" style="width: 100%;">
                 </div>
                 <button type="button" class="button small primary" id="pbrExportMtlxBtn" style="margin-top: 6px;">Export MaterialX (.mtlx)</button>
               </div>
@@ -3466,7 +3471,7 @@ Ready for Catmull-Clark subdivision or brush displacement.</pre>
                 <button type="button" class="button small ghost" id="rtSolveFlutterBtn">Aeroelastic Flutter</button>
                 <button type="button" class="button small ghost" id="rtSolve6DofBtn">6-DOF BTT Turn</button>
                 <button type="button" class="button small ghost" id="rtSolveMagnetBtn">20K REBCO Magnet</button>
-                <button type="button" class="button small primary" id="rtRunMasterWorkflowBtn" style="background: linear-gradient(135deg, #f43f5e, #a855f7); color: white; border: none; font-weight: 600;">Autonomous Master Workflow</button>
+                <button type="button" class="button small primary" id="rtRunMasterWorkflowBtn" style="background: linear-gradient(135deg, #f43f5e, #a855f7); color: white; border: none; font-weight: 600;" title="Run the 11-task master workflow, auto-approving sensitive steps without human review. Asks for confirmation first.">Autonomous Master Workflow</button>
               </div>
             </div>
 
@@ -3546,11 +3551,11 @@ FPS Target: 60 fps | Spatial BVH Built | Telemetry Port Bound.</pre>
               <div style="display: flex; gap: 12px; margin-top: 10px;">
                 <div style="flex: 1;">
                   <label style="font-size: 11px; color: #a1a1aa;">Saturation: <span id="mediaSatVal">1.12</span></label>
-                  <input type="range" id="mediaSatSlider" min="0" max="2" step="0.05" value="1.12" style="width: 100%;">
+                  <input type="range" id="mediaSatSlider" aria-label="Color saturation" min="0" max="2" step="0.05" value="1.12" style="width: 100%;">
                 </div>
                 <div style="flex: 1;">
                   <label style="font-size: 11px; color: #a1a1aa;">3D LUT: <span style="color: #a855f7;">aerothermal.cube</span></label>
-                  <select style="width: 100%; font-size: 11px; background: #27272a; color: #fff; border: 1px solid rgba(255,255,255,0.1); border-radius: 3px; padding: 4px;">
+                  <select id="mediaLutSelect" aria-label="3D LUT" style="width: 100%; font-size: 11px; background: #27272a; color: #fff; border: 1px solid rgba(255,255,255,0.1); border-radius: 3px; padding: 4px;">
                     <option selected>hypersonic-aerothermal.cube (33x33x33)</option>
                     <option>film_rec709_kodak2383.cube</option>
                   </select>
@@ -3603,7 +3608,7 @@ FPS Target: 60 fps | Spatial BVH Built | Telemetry Port Bound.</pre>
           <div class="wb-header-actions">
             <span class="wb-status-badge" id="aeroStatusBadge">Mach 11 Flight Envelope Certified</span>
             <button type="button" class="button primary small" id="aeroRunSolveBtn">▶ Solve Hypersonic Flight</button>
-            <button type="button" class="button secondary small" id="aeroRunMasterDagBtn"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-aerospace"/></svg> Run Autonomous Master DAG</button>
+            <button type="button" class="button secondary small" id="aeroRunMasterDagBtn" title="Run the 11-task master DAG, auto-approving sensitive steps without human review. Asks for confirmation first."><svg class="atlas-icon" aria-hidden="true"><use href="#icon-aerospace"/></svg> Run Autonomous Master DAG</button>
           </div>
         </div>
         <div class="wb-body-split">
@@ -4078,9 +4083,9 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
             <div class="wb-group">
               <label>Target End-Effector (X, Y, Z) [m]</label>
               <div style="display: flex; gap: 4px;">
-                <input type="number" id="roboXInput" class="wb-input compact" value="0.65" step="0.05">
-                <input type="number" id="roboYInput" class="wb-input compact" value="0.25" step="0.05">
-                <input type="number" id="roboZInput" class="wb-input compact" value="0.45" step="0.05">
+                <input type="number" id="roboXInput" aria-label="Target end-effector X in metres" class="wb-input compact" value="0.65" step="0.05">
+                <input type="number" id="roboYInput" aria-label="Target end-effector Y in metres" class="wb-input compact" value="0.25" step="0.05">
+                <input type="number" id="roboZInput" aria-label="Target end-effector Z in metres" class="wb-input compact" value="0.45" step="0.05">
               </div>
             </div>
             <div class="wb-group">
@@ -4286,7 +4291,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
           <button type="button" class="snap-pill" data-snap="Tangent" title="Snap Tangent (TAN)">TAN</button>
           <button type="button" class="snap-pill" data-snap="Quadrant" title="Snap to Quadrant (QUA)">QUA</button>
         </div>
-        <input id="drawText" class="drawing-text-input" type="text" maxlength="512" placeholder="Text for the Text tool" autocomplete="off">
+        <input id="drawText" class="drawing-text-input" aria-label="Drawing text content" type="text" maxlength="512" placeholder="Text for the Text tool" autocomplete="off">
         <div class="field-row" id="polylineActions" hidden>
           <button type="button" id="polylineFinishBtn" class="button">Finish</button>
           <button type="button" id="polylineCloseBtn" class="button">Close</button>
@@ -4527,8 +4532,8 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
     </div>
 
     <div class="filter-bar">
-      <input type="text" id="projectsSearchInput" class="filter-input" placeholder="Search projects by name, tag or revision…" />
-      <select id="projectsDisciplineFilter" class="filter-select">
+      <input type="text" id="projectsSearchInput" aria-label="Search projects" class="filter-input" placeholder="Search projects by name, tag or revision…" />
+      <select id="projectsDisciplineFilter" aria-label="Filter projects by discipline" class="filter-select">
         <option value="all">All Disciplines</option>
         <option value="mechanical">Mechanical &amp; Drafting</option>
         <option value="simulation">Simulation &amp; Multiphysics</option>
@@ -4538,7 +4543,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
         <option value="robotics">Robotics</option>
         <option value="creative">Creative &amp; RealTime</option>
       </select>
-      <select id="projectsSortSelect" class="filter-select">
+      <select id="projectsSortSelect" aria-label="Sort projects" class="filter-select">
         <option value="recent">Recently Modified</option>
         <option value="name">Project Name (A-Z)</option>
         <option value="revision">Highest Revision</option>
@@ -4583,8 +4588,8 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
     </div>
 
     <div class="filter-bar">
-      <input type="text" id="assetsSearchInput" class="filter-input" placeholder="Search standard fasteners, gears, keys, materials…" />
-      <select id="assetsCategorySelect" class="filter-select">
+      <input type="text" id="assetsSearchInput" aria-label="Search standard components" class="filter-input" placeholder="Search standard fasteners, gears, keys, materials…" />
+      <select id="assetsCategorySelect" aria-label="Filter components by category" class="filter-select">
         <option value="all">All Categories</option>
         <option value="fastener">ISO/DIN Fasteners (Bolts, Screws, Nuts)</option>
         <option value="gear">Power Transmission (Spur &amp; Helical Gears)</option>
@@ -4905,7 +4910,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
     </div>
     <div class="command-input-row">
       <span class="command-prompt-label">Command:</span>
-      <input type="text" id="commandPromptInput" class="command-prompt-input" autocomplete="off" spellcheck="false" placeholder="Type a command (L, C, REC, EXT, CUT, JOIN, REV, DIM, FEA, HELP) or coordinates (10,20)" />
+      <input type="text" id="commandPromptInput" aria-label="Command line input" class="command-prompt-input" autocomplete="off" spellcheck="false" placeholder="Type a command (L, C, REC, EXT, CUT, JOIN, REV, DIM, FEA, HELP) or coordinates (10,20)" />
     </div>
     <div id="commandSuggestions" class="command-suggestions" hidden></div>
   </div>
@@ -4932,7 +4937,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
     <div class="palette-card" role="dialog" aria-modal="true" aria-label="Command palette">
       <div class="palette-input-wrap">
         <span class="palette-sigil" aria-hidden="true">⌘</span>
-        <input id="paletteInput" type="text" placeholder="Type a command or parameter…" autocomplete="off" spellcheck="false" aria-controls="paletteList" aria-autocomplete="list">
+        <input id="paletteInput" type="text" aria-label="Command palette search" placeholder="Type a command or parameter…" autocomplete="off" spellcheck="false" aria-controls="paletteList" aria-autocomplete="list">
         <kbd>Esc</kbd>
       </div>
       <ul id="paletteList" class="palette-list" role="listbox" aria-label="Commands"></ul>
@@ -5063,7 +5068,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
           <button type="button" class="button ghost small" id="lmPurgeUnusedBtn" title="Purge Unused Layers (PU)">Purge Unused</button>
         </div>
         <div class="layer-search-wrap">
-          <input type="text" id="lmSearchInput" class="layer-search-input" placeholder="Search layers…" autocomplete="off">
+          <input type="text" id="lmSearchInput" aria-label="Search layers" class="layer-search-input" placeholder="Search layers…" autocomplete="off">
         </div>
       </div>
       <div class="layer-table-wrap">
@@ -5131,7 +5136,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
         <button type="button" class="ai-pill" data-prompt="Generate 4-view orthographic drawing">4-view orthographic</button>
       </div>
       <div class="ai-input-wrap">
-        <textarea id="aiPromptInput" class="ai-prompt-input" rows="2" placeholder="e.g. Draw a 60x40 rectangle at origin and extrude to 15mm..."></textarea>
+        <textarea id="aiPromptInput" class="ai-prompt-input" aria-label="AI prompt" rows="2" placeholder="e.g. Draw a 60x40 rectangle at origin and extrude to 15mm..."></textarea>
         <button type="button" id="aiParseBtn" class="button primary">Plan Operation</button>
       </div>
       <div id="aiPlanCard" class="ai-plan-card" hidden>
@@ -5165,7 +5170,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
         <button type="button" class="link" id="namedViewsCloseBtn">close</button>
       </div>
       <div class="nv-add-row">
-        <input type="text" id="nvNameInput" class="nv-name-input" placeholder="View name (e.g. Iso Detail, Cavity Cut)…" maxlength="40">
+        <input type="text" id="nvNameInput" aria-label="Named view name" class="nv-name-input" placeholder="View name (e.g. Iso Detail, Cavity Cut)…" maxlength="40">
         <button type="button" id="nvSaveCurrentBtn" class="button small">Save Current View</button>
       </div>
       <ul id="namedViewsList" class="named-views-list"></ul>
@@ -5187,7 +5192,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
         AtlasCAD native orchestration layer integrating 24 verified open-source simulation, modeling, and scientific computing engines with process isolation and license compliance.
       </p>
       <div class="engine-filter-bar">
-        <input type="text" id="engineSearchInput" class="engine-search-input" placeholder="Search engines (e.g. OpenFOAM, CalculiX, ngspice, pandapower)…" maxlength="50">
+        <input type="text" id="engineSearchInput" aria-label="Search simulation engines" class="engine-search-input" placeholder="Search engines (e.g. OpenFOAM, CalculiX, ngspice, pandapower)…" maxlength="50">
         <select id="engineDisciplineFilter" class="engine-discipline-select" aria-label="Filter by discipline">
           <option value="all" selected>All Disciplines</option>
           <option value="mechanical">Mechanical & FEA</option>
@@ -5317,7 +5322,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
             <span>Total Dispatched: <strong id="entTotalJobsCount">0</strong></span>
           </div>
           <div class="ent-dispatch-form">
-            <select id="entJobEngineSelect" class="engine-discipline-select">
+            <select id="entJobEngineSelect" aria-label="Job engine" class="engine-discipline-select">
               <option value="calculix">CalculiX (FEA)</option>
               <option value="openfoam">OpenFOAM (CFD)</option>
               <option value="code_aster">Code_Aster (Thermo-Mech)</option>
@@ -5325,7 +5330,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
               <option value="ngspice">ngspice (Circuit SPICE)</option>
               <option value="pandapower">pandapower (Grid Flow)</option>
             </select>
-            <select id="entJobPrioritySelect" class="engine-discipline-select">
+            <select id="entJobPrioritySelect" aria-label="Job priority" class="engine-discipline-select">
               <option value="normal">Normal Priority</option>
               <option value="high">High Priority</option>
               <option value="critical">Critical HPC Priority</option>
@@ -5369,8 +5374,8 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
           <div class="ent-card">
             <h4>Submit Engineering Change Order (ECO)</h4>
             <form id="entEcoForm" class="ent-eco-form">
-              <input type="text" id="entEcoTitle" placeholder="ECO Title (e.g. Rib stiffener revision)" required maxlength="80">
-              <textarea id="entEcoDesc" placeholder="Engineering description and justification…" rows="2" required></textarea>
+              <input type="text" id="entEcoTitle" aria-label="Engineering change order title" placeholder="ECO Title (e.g. Rib stiffener revision)" required maxlength="80">
+              <textarea id="entEcoDesc" aria-label="Engineering change order description" placeholder="Engineering description and justification…" rows="2" required></textarea>
               <div class="ent-eco-form-actions">
                 <label><input type="checkbox" id="entEcoApproveImmediately" checked> Sign &amp; Approve as Chief Architect</label>
                 <button type="submit" class="button primary small">Submit ECO</button>
@@ -5792,7 +5797,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
           <button type="button" class="button small ghost asset-vis-tab" data-vis="private"><svg class="atlas-icon" aria-hidden="true" style="margin-right:4px;"><use href="#icon-lock"/></svg> My Private</button>
         </div>
         <div style="display:flex; gap:8px; flex:1; max-width:320px;">
-          <input type="search" id="assetSearchInput" class="input small" placeholder="Search standard components, bolts, motors..." style="width:100%;">
+          <input type="search" id="assetSearchInput" aria-label="Search standard components" class="input small" placeholder="Search standard components, bolts, motors..." style="width:100%;">
         </div>
       </div>
 
@@ -5897,6 +5902,9 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
       <button type="button" class="icon-button" id="closeAuthModalBtn">&times;</button>
     </div>
     <div class="dialog-body" style="padding:16px 20px;">
+      <div role="note" style="margin-bottom:14px; padding:9px 12px; border:1px solid #f59e0b; border-radius:6px; background:#f59e0b1a; color:var(--atlas-text); font-size:11.5px; line-height:1.45;">
+        <strong>Demo identity only.</strong> This build has no credential store and no identity provider adapter. Switching a role verifies no credential and grants no access boundary; do not expose this instance to an untrusted network.
+      </div>
       <!-- Tab Bar -->
       <div class="auth-tabs" style="display:flex; gap:6px; margin-bottom:16px; border-bottom:1px solid var(--atlas-border); padding-bottom:8px;">
         <button type="button" class="auth-tab-btn active" data-tab="quick-switch" id="authTabQuickSwitchBtn" style="padding:6px 12px; border-radius:4px; font-size:12px; font-weight:600; cursor:pointer; background:var(--atlas-accent); color:#000; border:none; display:flex; align-items:center; gap:6px;"><svg class="atlas-icon" aria-hidden="true" style="width:13px; height:13px;"><use href="#icon-lightning"/></svg> Quick Switch Role</button>
@@ -5907,7 +5915,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
 
       <!-- Quick Switch Panel -->
       <div id="authQuickSwitchPanel" class="auth-tab-panel active" style="display:flex; flex-direction:column; gap:10px;">
-        <p style="font-size:12px; color:var(--atlas-text-secondary); margin:0 0 6px 0;">Select an enterprise team member to test permissions, optimistic entity locks, and asset catalogs:</p>
+        <p style="font-size:12px; color:var(--atlas-text-secondary); margin:0 0 6px 0;">Switch the demo identity used by the UI to test permissions, optimistic entity locks, and asset catalogs. No credential is checked:</p>
         <div class="quick-user-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
           <!-- Sanjay -->
           <div class="quick-user-card" data-user="usr_sanjay" style="padding:10px; border:1px solid var(--atlas-border); border-radius:6px; cursor:pointer; background:var(--atlas-surface-1); transition:all 0.15s ease;">
@@ -5970,19 +5978,19 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
           <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" checked id="authRememberCheckbox"> Keep session active (30 days)</label>
           <a href="#" id="authForgotPasswordLink" style="color:var(--atlas-accent); text-decoration:none;">Forgot password?</a>
         </div>
-        <button type="submit" class="button primary" style="width:100%; margin-top:4px;">Sign In to Enterprise Workspace</button>
+        <button type="submit" class="button primary" style="width:100%; margin-top:4px;">Switch Demo Identity (no credential check)</button>
       </form>
 
       <!-- SSO Enterprise Panel -->
       <div id="authSsoPanel" class="auth-tab-panel" style="display:none; flex-direction:column; gap:12px;">
-        <p style="font-size:12px; color:var(--atlas-text-secondary); margin:0;">Authenticate via your organization's centralized identity provider (SAML 2.0 / OIDC):</p>
-        <button type="button" class="sso-auth-btn" data-provider="Okta / SAML 2.0" style="display:flex; align-items:center; justify-content:center; gap:10px; padding:10px; border:1px solid #007dc1; background:#007dc122; color:#fff; border-radius:6px; cursor:pointer; font-weight:600;">
+        <p style="font-size:12px; color:var(--atlas-text-secondary); margin:0;">Enterprise SSO is not configured in this build: there is no SAML 2.0 / OIDC adapter, so these controls are disabled and the login endpoint refuses provider sign-in.</p>
+        <button type="button" class="sso-auth-btn" data-provider="Okta / SAML 2.0" disabled style="display:flex; align-items:center; justify-content:center; gap:10px; padding:10px; border:1px solid #007dc1; background:#007dc122; color:#fff; border-radius:6px; cursor:pointer; font-weight:600;">
           <svg class="atlas-icon" aria-hidden="true" style="width:16px; height:16px; color:#007dc1;"><use href="#icon-okta"/></svg><span>Continue with Okta SSO</span>
         </button>
-        <button type="button" class="sso-auth-btn" data-provider="Azure Active Directory" style="display:flex; align-items:center; justify-content:center; gap:10px; padding:10px; border:1px solid #008ad7; background:#008ad722; color:#fff; border-radius:6px; cursor:pointer; font-weight:600;">
+        <button type="button" class="sso-auth-btn" data-provider="Azure Active Directory" disabled style="display:flex; align-items:center; justify-content:center; gap:10px; padding:10px; border:1px solid #008ad7; background:#008ad722; color:#fff; border-radius:6px; cursor:pointer; font-weight:600;">
           <svg class="atlas-icon" aria-hidden="true" style="width:16px; height:16px;"><use href="#icon-microsoft"/></svg><span>Continue with Microsoft Entra ID (Azure AD)</span>
         </button>
-        <button type="button" class="sso-auth-btn" data-provider="Google Workspace" style="display:flex; align-items:center; justify-content:center; gap:10px; padding:10px; border:1px solid #ea4335; background:#ea433522; color:#fff; border-radius:6px; cursor:pointer; font-weight:600;">
+        <button type="button" class="sso-auth-btn" data-provider="Google Workspace" disabled style="display:flex; align-items:center; justify-content:center; gap:10px; padding:10px; border:1px solid #ea4335; background:#ea433522; color:#fff; border-radius:6px; cursor:pointer; font-weight:600;">
           <svg class="atlas-icon" aria-hidden="true" style="width:16px; height:16px;"><use href="#icon-google"/></svg><span>Continue with Google Workspace</span>
         </button>
       </div>

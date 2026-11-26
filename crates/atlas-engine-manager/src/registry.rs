@@ -63,14 +63,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_engine_manager_orchestration() {
+    fn test_engine_manager_orchestration() -> Result<(), Box<dyn std::error::Error>> {
         let mgr = EngineManager::new();
         let engines = mgr.list_engines();
         assert_eq!(engines.len(), 24);
 
         let ccx_id = EngineId::new("calculix");
         let health = mgr.test_health(&ccx_id);
-        assert!(health.healthy);
+        // Registration is not availability: no adapter exists, so the engine is not healthy.
+        assert!(!health.healthy);
+        assert!(health.message.contains("No execution adapter"));
 
         let req = EngineJobRequest {
             job_id: "test-job-1".to_string(),
@@ -80,7 +82,14 @@ mod tests {
             parameters: serde_json::json!({}),
             timeout_seconds: 30,
         };
-        let res = mgr.execute_job(&req);
-        assert!(res.is_ok());
+        let error = match mgr.execute_job(&req) {
+            Ok(_) => return Err("a job without an adapter must fail".into()),
+            Err(error) => error,
+        };
+        assert!(
+            error.to_string().contains("no execution adapter"),
+            "{error}"
+        );
+        Ok(())
     }
 }

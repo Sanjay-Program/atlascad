@@ -10742,6 +10742,7 @@ ${gcodeSample}`;
 
     byId("agentStepBtn")?.addEventListener("click", stepOrchestrator);
     byId("agentRunAllBtn")?.addEventListener("click", async () => {
+      if (!window.confirm("Run the full workflow with automatic approval?\n\nSensitive steps such as G-code emission and deletions will run without human review. Choose Cancel to keep the approval gates.")) return;
       const wfSelect = byId("agentWorkflowSelect");
       const wfId = wfSelect?.value || "hypersonic_full_vehicle_master";
       toast(`Running full generative DAG: ${wfId}…`);
@@ -11204,6 +11205,7 @@ ${gcodeSample}`;
     });
 
     byId("rtRunMasterWorkflowBtn")?.addEventListener("click", async () => {
+      if (!window.confirm("Run the flagship master workflow with automatic approval?\n\nSensitive steps run without human review. Choose Cancel to keep the approval gates.")) return;
       try {
         toast("Initiating Autonomous Flagship Master Workflow (11 Tasks)...");
         const res = await api("/api/agents/workflows/run_all", {
@@ -11280,6 +11282,7 @@ ${gcodeSample}`;
     });
 
     byId("aeroRunMasterDagBtn")?.addEventListener("click", async () => {
+      if (!window.confirm("Run the flagship master DAG with automatic approval?\n\nSensitive steps run without human review. Choose Cancel to keep the approval gates.")) return;
       try {
         toast("Running Autonomous Flagship Master DAG (11 Tasks)...");
         const res = await api("/api/agents/workflows/run_all", {

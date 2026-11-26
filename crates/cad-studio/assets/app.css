@@ -2482,6 +2482,27 @@ kbd {
   display: none;
 }
 
+.collapsible-section.collapsed .section-commit-footer {
+  display: none;
+}
+
+/* The Create panel is long enough that its commit button fell below the fold on a 720 px screen.
+   Pinning it to the bottom of the panel keeps the primary action reachable at any panel scroll
+   position; the panel is the nearest scrolling ancestor because the footer is outside
+   .section-body. */
+.section-commit-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding-top: 8px;
+  background: var(--panel);
+  box-shadow: 0 -8px 12px -8px rgba(0, 0, 0, 0.55);
+}
+
+.section-commit-footer .hint {
+  margin: 6px 0 0;
+}
+
 .section-collapse-btn {
   background: none;
   border: none;

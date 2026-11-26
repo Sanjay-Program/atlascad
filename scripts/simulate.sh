@@ -81,6 +81,9 @@ curl -s -o /dev/null "http://127.0.0.1:$PORT/api/health" || {
 }
 
 node scripts/browser-check.mjs "http://127.0.0.1:$PORT"
+# Every form control in the document, including controls in workspaces that are hidden until the
+# user switches to them, must have a programmatic name.
+node scripts/a11y-audit.mjs "http://127.0.0.1:$PORT"
 
 # The shared page is a different security path: it loads without a token in the URL, then presents
 # one on every API call. It gets its own browser run rather than being assumed to work.

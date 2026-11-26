@@ -400,7 +400,9 @@ fn the_api_refuses_foreign_origins_media_types_and_oversized_bodies()
         &[
             ("Origin", &origin),
             ("Content-Type", "application/json"),
-            ("Content-Length", "2097152"),
+            // Twice the server's 16 MiB body cap; the declaration alone must be refused, without
+            // waiting for the body to arrive.
+            ("Content-Length", "33554432"),
         ],
         &[],
     )?;
@@ -3647,8 +3649,14 @@ fn engines_ecosystem_api() -> Result<(), Box<dyn std::error::Error>> {
     let health_resp = post(addr, "/api/engines/health", r#"{"engine_id": "calculix"}"#)?;
     assert_eq!(health_resp.status, 200);
     let h_data = json(&health_resp)?;
-    assert_eq!(h_data["status"], "healthy");
+    assert_eq!(h_data["status"], "unavailable");
     assert_eq!(h_data["engine_id"], "calculix");
+    assert!(
+        h_data["details"]
+            .as_str()
+            .ok_or("details")?
+            .contains("No execution adapter")
+    );
 
     // 3. POST /api/engines/health (unknown engine)
     let bad_health = post(
@@ -3658,45 +3666,22 @@ fn engines_ecosystem_api() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     assert_eq!(bad_health.status, 404);
 
-    // 4. POST /api/engines/run for FEA (CalculiX)
-    let fea_resp = post(
-        addr,
-        "/api/engines/run",
-        r#"{"engine_id": "calculix", "job_type": "static_fea"}"#,
-    )?;
-    assert_eq!(fea_resp.status, 200);
-    let fea_data = json(&fea_resp)?;
-    assert_eq!(fea_data["status"], "converged");
-    let peak_stress = fea_data["metrics"]["max_von_mises_mpa"]
-        .as_f64()
-        .ok_or("stress")?;
-    assert!(peak_stress > 0.0);
-
-    // 5. POST /api/engines/run for Power Flow (pandapower)
-    let power_resp = post(
-        addr,
-        "/api/engines/run",
-        r#"{"engine_id": "pandapower", "job_type": "ac_load_flow"}"#,
-    )?;
-    assert_eq!(power_resp.status, 200);
-    let power_data = json(&power_resp)?;
-    assert_eq!(power_data["status"], "converged");
-    let vm_pu = power_data["metrics"]["vm_pu_min"].as_f64().ok_or("vm_pu")?;
-    assert!(vm_pu > 0.9);
-
-    // 6. POST /api/engines/run for ECAD (ngspice)
-    let spice_resp = post(
-        addr,
-        "/api/engines/run",
-        r#"{"engine_id": "ngspice", "job_type": "transient_analysis"}"#,
-    )?;
-    assert_eq!(spice_resp.status, 200);
-    let spice_data = json(&spice_resp)?;
-    assert_eq!(spice_data["status"], "converged");
-    let v_peak = spice_data["metrics"]["v_out_peak_v"]
-        .as_f64()
-        .ok_or("v_peak")?;
-    assert!(v_peak > 0.0);
+    // 4-6. POST /api/engines/run refuses when no execution adapter is implemented. It must not
+    // return a synthesized stress, load-flow or transient result: an engineering result has to come
+    // from an engine that actually ran.
+    for (engine_id, job_type) in [
+        ("calculix", "static_fea"),
+        ("pandapower", "ac_load_flow"),
+        ("ngspice", "transient_analysis"),
+    ] {
+        let body = format!(r#"{{"engine_id": "{engine_id}", "job_type": "{job_type}"}}"#);
+        let refused = post(addr, "/api/engines/run", &body)?;
+        assert_eq!(refused.status, 501, "engine {engine_id} must refuse");
+        let error = json(&refused)?;
+        assert_eq!(error["error"]["kind"], "unavailable");
+        let message = error["error"]["message"].as_str().ok_or("message")?;
+        assert!(message.contains("no execution adapter"), "{message}");
+    }
 
     Ok(())
 }
@@ -3740,20 +3725,21 @@ fn dependency_graph_invalidation_api() -> Result<(), Box<dyn std::error::Error>>
     let count = active_plan["count"].as_u64().ok_or("count")?;
     assert!(count >= 6);
 
-    // 6. Running a solver (e.g. CalculiX FEA) marks fea-structural node Current
+    // 6. A refused engine job must not promote fea-structural to Current: no solver ran, so the
+    // engineering graph keeps the node stale.
     let fea_run = post(
         addr,
         "/api/engines/run",
         r#"{"engine_id": "calculix", "job_type": "static_fea"}"#,
     )?;
-    assert_eq!(fea_run.status, 200);
+    assert_eq!(fea_run.status, 501);
     let graph_after_fea = json(&request(addr, "GET", "/api/graph", &[], &[])?)?;
     let nodes = graph_after_fea["nodes"].as_array().ok_or("nodes array")?;
     let fea_node = nodes
         .iter()
         .find(|n| n["id"] == "fea-structural")
         .ok_or("fea node")?;
-    assert_eq!(fea_node["state"], "Current");
+    assert_ne!(fea_node["state"], "Current");
 
     // 7. Manual invalidation endpoint POST /api/graph/invalidate
     let manual_inv = post(
@@ -3809,18 +3795,42 @@ fn engine_discovery_guides_and_benchmark_api() -> Result<(), Box<dyn std::error:
         .ok_or("truck rep")?;
     assert_eq!(truck_rep["status"], "native");
 
-    // 3. POST /api/engines/benchmark: runs benchmark and returns verified accuracy
+    // 3. POST /api/engines/benchmark refuses rather than reporting an invented accuracy score.
     let bench_resp = post(
         addr,
         "/api/engines/benchmark",
         r#"{"engine_id": "openfoam"}"#,
     )?;
-    assert_eq!(bench_resp.status, 200);
+    assert_eq!(bench_resp.status, 501);
     let bench_data = json(&bench_resp)?;
-    assert_eq!(bench_data["benchmark_status"], "verified");
-    assert_eq!(bench_data["engine_id"], "openfoam");
-    let score = bench_data["accuracy_score"].as_f64().ok_or("score")?;
-    assert!(score > 0.99);
+    assert_eq!(bench_data["error"]["kind"], "unavailable");
+    assert!(bench_data.get("accuracy_score").is_none());
+
+    Ok(())
+}
+
+#[test]
+fn agent_workflows_require_approval_by_default() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("workflow_approval_default", [10.0, 10.0, 5.0])?;
+    let addr = handle.addr();
+
+    // Omitting auto_approve must not authorise sensitive tasks: `cad_to_cnc` emits G-code, which
+    // is gated, so the workflow has to stop and leave an approval pending.
+    let response = post(
+        addr,
+        "/api/agents/workflows/run_all",
+        r#"{"workflow_id": "cad_to_cnc"}"#,
+    )?;
+    assert_eq!(response.status, 200);
+    let payload = json(&response)?;
+    let pending = payload["summary"]["pending_approvals"]
+        .as_u64()
+        .ok_or("pending_approvals")?;
+    assert!(
+        pending > 0,
+        "a workflow must stop at its approval gate when auto_approve is absent"
+    );
+    assert_ne!(payload["summary"]["execution_status"], "Completed");
 
     Ok(())
 }
@@ -4649,6 +4659,22 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     )?;
     assert_eq!(cmd_deploy.status, 200);
     assert_eq!(json(&cmd_deploy)?["status"], "Success");
+
+    // The recorded command carries a real clock reading and a digest of its own fields, not the
+    // 2023 placeholder and command-name string every record used to share.
+    let history = json(&request(addr, "GET", "/api/commands/history", &[], &[])?)?;
+    let latest = history["history"]
+        .as_array()
+        .and_then(|records| records.first())
+        .ok_or("command history")?;
+    let recorded_at = latest["timestamp_epoch_ms"].as_u64().ok_or("timestamp")?;
+    assert!(
+        recorded_at > 1_700_000_000_000,
+        "timestamp must be a real clock reading, got {recorded_at}"
+    );
+    let audit_hash = latest["audit_hash"].as_str().ok_or("audit hash")?;
+    assert_eq!(audit_hash.len(), 22, "fnv1a_ plus 16 hex digits");
+    assert!(audit_hash.starts_with("fnv1a_"));
 
     // 36. Atlas Create: Catmull-Clark Subdivision API
     let subdiv_resp = post(
@@ -10352,6 +10378,25 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let elena_val = json(&switch_user_res)?;
     assert_eq!(elena_val["success"], true);
     assert_eq!(elena_val["user"]["user_id"], "usr_elena");
+    // The identity switch must not be mistaken for authentication: it verifies no credential and
+    // says so in the payload the UI renders.
+    assert_eq!(elena_val["credential_verified"], false);
+    assert_eq!(elena_val["authentication"], "demo-identity");
+    assert!(
+        elena_val["demo_notice"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("no credential")
+    );
+
+    // SSO has no adapter in this build, so the endpoint must refuse rather than invent a session.
+    let sso_res = post(
+        addr,
+        "/api/auth/login",
+        r#"{ "sso_provider": "Okta / SAML 2.0" }"#,
+    )?;
+    assert_eq!(sso_res.status, 501);
+    assert_eq!(json(&sso_res)?["error"]["kind"], "unavailable");
 
     // Switch active team
     let switch_team_res = post(
@@ -10402,6 +10447,8 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     let reg_val = json(&reg_res)?;
     assert_eq!(reg_val["success"], true);
     assert_eq!(reg_val["user"]["name"], "Dr. Hans Weber");
+    assert_eq!(reg_val["credential_verified"], false);
+    assert_eq!(reg_val["authentication"], "demo-identity");
 
     // Logout to guest
     let logout_res = post(addr, "/api/auth/logout", "{}")?;

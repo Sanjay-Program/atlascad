@@ -501,6 +501,42 @@ try {
     `the 3D viewport is clipped: ${layout.canvasWidth}px wide ending at ${layout.canvasRight}px in ${layout.viewport}px`
   );
 
+  // Commit-action reachability on a short laptop screen. The Create panel is ~1200px of controls;
+  // before the sticky footer the "Add extrude" button sat at y=685 in a 720px window, below the
+  // panel's visible edge, so a user could enter a depth and never find the action that commits it.
+  await send('Emulation.setDeviceMetricsOverride', {
+    width: 1280,
+    height: 720,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
+  await sleep(300);
+  const commitAt720 = await evaluate(`(() => {
+    const panel = document.querySelector('.panel-left');
+    const button = document.getElementById('addFeatureBtn');
+    panel.scrollTop = 0;
+    const panelBox = panel.getBoundingClientRect();
+    const buttonBox = button.getBoundingClientRect();
+    const visibleAtTop = buttonBox.top >= panelBox.top && buttonBox.bottom <= panelBox.bottom + 1;
+    panel.scrollTop = 240;
+    const scrolledBox = button.getBoundingClientRect();
+    const visibleScrolled = scrolledBox.top >= panelBox.top && scrolledBox.bottom <= panelBox.bottom + 1;
+    panel.scrollTop = 0;
+    return {
+      viewportHeight: innerHeight,
+      panelBottom: Math.round(panelBox.bottom),
+      buttonTop: Math.round(buttonBox.top),
+      buttonBottom: Math.round(buttonBox.bottom),
+      visibleAtTop,
+      visibleScrolled,
+    };
+  })()`);
+  check(
+    commitAt720.visibleAtTop && commitAt720.visibleScrolled,
+    `the commit button is not reachable at ${commitAt720.viewportHeight}px: ${JSON.stringify(commitAt720)}`
+  );
+  await send('Emulation.clearDeviceMetricsOverride');
+
   check(consoleErrors.length === 0, `console errors: ${consoleErrors.join(' | ')}`);
 
   console.log(`==> browser check passed (${passed} assertions)`);

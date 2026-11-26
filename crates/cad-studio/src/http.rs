@@ -14,8 +14,11 @@ use std::time::Duration;
 
 /// Largest request line plus headers. A browser sends well under 8 KiB.
 pub const MAX_HEADER_BYTES: usize = 16 * 1024;
-/// Largest JSON request body the studio accepts. Project files are not sent over HTTP.
-pub const MAX_BODY_BYTES: usize = 1024 * 1024;
+/// Largest JSON request body the studio accepts. Project files are not sent over HTTP, but a
+/// faceted STEP import is: a 10k-triangle part is about 4.7 MiB of STEP text, so a 1 MiB cap made
+/// every genuinely large model unimportable. 16 MiB admits roughly 33k triangles while still
+/// bounding the allocation for one request; the STEP reader applies its own entity/triangle caps.
+pub const MAX_BODY_BYTES: usize = 16 * 1024 * 1024;
 /// How long a client has to send its request.
 pub const READ_TIMEOUT: Duration = Duration::from_secs(5);
 /// How long a client has to accept the response.

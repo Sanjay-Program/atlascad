@@ -81,6 +81,9 @@ pub enum StudioError {
     Json(String),
     Io(String),
     BadRequest(String),
+    /// A capability exists in the API and UI but no adapter can perform it here. Refusing is the
+    /// only honest answer: reporting a synthetic success would be a fabricated engineering result.
+    Unavailable(String),
     Forbidden,
     /// Sharing is on and the request did not present the session token.
     Unauthorized,
@@ -106,6 +109,7 @@ impl std::fmt::Display for StudioError {
             StudioError::Json(message) => write!(f, "JSON: {message}"),
             StudioError::Io(message) => write!(f, "I/O: {message}"),
             StudioError::BadRequest(message) => write!(f, "{message}"),
+            StudioError::Unavailable(message) => write!(f, "{message}"),
             StudioError::Forbidden => f.write_str("request is not from this studio's origin"),
             StudioError::Unauthorized => {
                 f.write_str("this studio is shared; the request needs its access token")
@@ -188,6 +192,7 @@ impl StudioError {
             StudioError::MethodNotAllowed => 405,
             StudioError::PayloadTooLarge => 413,
             StudioError::UnsupportedMediaType => 415,
+            StudioError::Unavailable(_) => 501,
             StudioError::Kernel(_) => 422,
             StudioError::Project(error) => match error {
                 ProjectError::Invalid(_)
@@ -215,6 +220,7 @@ impl StudioError {
     fn kind(&self) -> &'static str {
         match self {
             StudioError::BadRequest(_) => "bad_request",
+            StudioError::Unavailable(_) => "unavailable",
             StudioError::Json(_) => "invalid_json",
             StudioError::Forbidden => "forbidden_origin",
             StudioError::Unauthorized => "unauthorized",
@@ -9318,6 +9324,7 @@ namespace AtlasCAD.Unity
             .caller_identity
             .clone()
             .unwrap_or_else(|| "chief_engineer".into());
+        let started = std::time::Instant::now();
         let schema = self
             .command_registry
             .validate_call(
@@ -13067,15 +13074,23 @@ namespace AtlasCAD.Unity
             }),
         };
 
+        let execution_time_ms = started.elapsed().as_millis() as u64;
+        let timestamp_epoch_ms = now_epoch_millis();
+        // The digest covers the record's own fields, so a changed argument, caller or time changes
+        // the hash. FNV-1a is a local integrity check, not a cryptographic signature.
+        let audit_material = format!(
+            "{}|{}|{}|{}|{}",
+            execution_id, req.command_id, caller, req.arguments, timestamp_epoch_ms
+        );
         let record = atlas_command_platform::ExecutedCommandRecord {
             execution_id: execution_id.clone(),
             command_id: req.command_id.clone(),
             caller_identity: caller,
             arguments: req.arguments.clone(),
             status: "Success".into(),
-            execution_time_ms: 12,
-            timestamp_epoch_ms: 1700000000,
-            audit_hash: format!("fnv1a_{}", req.command_id),
+            execution_time_ms,
+            timestamp_epoch_ms,
+            audit_hash: format!("fnv1a_{:016x}", fnv1a64(audit_material.as_bytes())),
         };
         self.command_registry.record_execution(record);
 
@@ -13085,7 +13100,7 @@ namespace AtlasCAD.Unity
             "status": "Success",
             "schema_version": schema.version,
             "output": output,
-            "execution_time_ms": 12,
+            "execution_time_ms": execution_time_ms,
         }))
     }
 
@@ -13187,7 +13202,8 @@ namespace AtlasCAD.Unity
             .load_task_graph(graph)
             .map_err(|e| StudioError::BadRequest(e.to_string()))?;
 
-        let auto = req.auto_approve.unwrap_or(true);
+        // Approval is opt-in: an absent field must never authorise a sensitive task.
+        let auto = req.auto_approve.unwrap_or(false);
         let summary = self
             .orchestrator
             .execute_all(auto)
@@ -13226,7 +13242,7 @@ namespace AtlasCAD.Unity
                 req.approve,
                 approver,
                 req.reason.clone(),
-                1700000000,
+                now_epoch_millis() / 1000,
             )
             .map_err(|e| StudioError::BadRequest(e.to_string()))?;
 
@@ -13932,6 +13948,24 @@ namespace AtlasCAD.Unity
     }
 
     fn auth_login(&mut self, req: LoginRequest) -> Result<serde_json::Value, StudioError> {
+        // This build ships a local demo identity, not an authentication boundary: there is no
+        // credential store and no IdP adapter. Refuse the paths that would otherwise look like
+        // real authentication instead of accepting a provider name and returning a session.
+        if let Some(provider) = req.sso_provider.as_deref() {
+            return Err(StudioError::Unavailable(format!(
+                "SSO via {provider} is not configured: this build has no identity provider adapter. \
+                 Sign-in is a local demo identity switch only."
+            )));
+        }
+        if self.share.is_some() {
+            return Err(StudioError::Unavailable(
+                "Credential verification is unavailable on a shared instance. This build carries a \
+                 local demo identity only; run it on loopback without --share, or place an \
+                 authenticating proxy in front of it."
+                    .to_string(),
+            ));
+        }
+
         let user = if let Some(uid) = req.user_id.as_deref().or(req.demo_user.as_deref()) {
             self.auth_users.get(uid).cloned()
         } else if let Some(email) = &req.email {
@@ -14028,7 +14062,12 @@ namespace AtlasCAD.Unity
             "success": true,
             "token": token,
             "user": user,
-            "message": format!("Authenticated as {} ({})", user.name, user.role),
+            "credential_verified": false,
+            "authentication": "demo-identity",
+            "demo_notice": "Local demo identity: no credential was verified. This session is a UI \
+                role switch, not an access boundary; do not expose this instance to an untrusted \
+                network.",
+            "message": format!("Switched demo identity to {} ({})", user.name, user.role),
         }))
         .map_err(|e| StudioError::Json(e.to_string()))
     }
@@ -14088,7 +14127,11 @@ namespace AtlasCAD.Unity
             "success": true,
             "token": token,
             "user": new_user,
-            "message": "Enterprise Account Created Successfully",
+            "credential_verified": false,
+            "authentication": "demo-identity",
+            "demo_notice": "Local demo identity: this member record has no verified credential and \
+                grants no access boundary.",
+            "message": "Demo member record created",
         }))
         .map_err(|e| StudioError::Json(e.to_string()))
     }
@@ -15467,11 +15510,11 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                 let report = registry.test_health(&engine_id);
                 let payload = serde_json::json!({
                     "engine_id": report.engine_id.as_str(),
-                    "status": if report.healthy { "healthy" } else { "degraded" },
+                    "status": if report.healthy { "healthy" } else { "unavailable" },
                     "details": report.message,
                     "latency_ms": report.ping_ms,
                     "detected_version": report.detected_version,
-                    "timestamp": 1700000000u64,
+                    "timestamp": now_epoch_millis() / 1000,
                 });
                 json_response(200, payload)
             }
@@ -15510,11 +15553,18 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                         });
                     }
                 }
+                if !result.success {
+                    return error_response(&StudioError::Unavailable(
+                        result.error_message.unwrap_or_else(|| {
+                            "the engine adapter did not run; no result is reported".to_string()
+                        }),
+                    ));
+                }
                 let payload = serde_json::json!({
                     "job_id": result.job_id,
                     "engine_id": result.engine_id.as_str(),
                     "discipline": format!("{:?}", engine_info.discipline).to_lowercase(),
-                    "status": if result.success { "converged" } else { "failed" },
+                    "status": "completed",
                     "execution_time_ms": result.elapsed_ms,
                     "metrics": result.output,
                     "logs": result.warnings,
@@ -15540,11 +15590,22 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                     timeout_seconds: 30,
                 };
                 let result = registry.execute_job(&job_req);
+                if !result.success {
+                    return error_response(&StudioError::Unavailable(
+                        result.error_message.unwrap_or_else(|| {
+                            "no benchmark was run; no accuracy is reported".to_string()
+                        }),
+                    ));
+                }
                 let payload = serde_json::json!({
                     "engine_id": result.engine_id.as_str(),
-                    "benchmark_status": if result.success { "verified" } else { "failed" },
+                    "benchmark_status": "completed",
                     "execution_time_ms": result.elapsed_ms,
-                    "accuracy_score": 0.9998,
+                    "accuracy_score": result
+                        .output
+                        .get("accuracy_score")
+                        .cloned()
+                        .unwrap_or(serde_json::Value::Null),
                     "metrics": result.output,
                     "provenance_hash": result.provenance_hash,
                 });
@@ -18761,6 +18822,23 @@ fn sheet_from_query(path: &str, title: String) -> Result<cad_drafting::Sheet, St
     }
     sheet.validate()?;
     Ok(sheet)
+}
+
+/// Milliseconds since the Unix epoch, or 0 if the clock is before the epoch.
+fn now_epoch_millis() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_millis() as u64)
+}
+
+/// FNV-1a over a record's own fields, for a stable local integrity digest.
+fn fnv1a64(bytes: &[u8]) -> u64 {
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    hash
 }
 
 /// Compare without leaking the position of the first mismatch through an early return.

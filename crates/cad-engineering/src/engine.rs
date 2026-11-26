@@ -615,28 +615,28 @@ impl EngineRegistry {
             ExecutionModel::CAbi | ExecutionModel::ProcessIsolated => {
                 let bin_path = engine.binary_path.as_deref().unwrap_or("");
                 let exists = !bin_path.is_empty() && Path::new(bin_path).exists();
-                let status_msg = if exists {
-                    format!("Executable present at '{}'", bin_path)
-                } else {
-                    format!(
-                        "Simulated engine adapter active (binary at '{}' not local, fallback adapter enabled)",
-                        bin_path
-                    )
-                };
                 EngineHealthReport {
                     engine_id: id.clone(),
-                    healthy: true,
-                    message: status_msg,
-                    detected_version: Some(engine.version.clone()),
-                    ping_ms: 2,
+                    healthy: false,
+                    message: format!(
+                        "No execution adapter is implemented for '{}'; a binary at '{}' is {} and no job can run",
+                        engine.name,
+                        bin_path,
+                        if exists { "present" } else { "absent" }
+                    ),
+                    detected_version: None,
+                    ping_ms: 0,
                 }
             }
             ExecutionModel::RemoteWorker => EngineHealthReport {
                 engine_id: id.clone(),
-                healthy: true,
-                message: "Remote worker endpoint configured".to_string(),
-                detected_version: Some(engine.version.clone()),
-                ping_ms: 5,
+                healthy: false,
+                message: format!(
+                    "Remote worker for '{}' is declared in metadata only; no endpoint was probed",
+                    engine.name
+                ),
+                detected_version: None,
+                ping_ms: 0,
             },
         }
     }
@@ -660,103 +660,22 @@ impl EngineRegistry {
             }
         };
 
-        // Synthesize valid multidisciplinary analytical response based on discipline
-        let output = match engine.discipline {
-            EngineDiscipline::Simulation => serde_json::json!({
-                "status": "converged",
-                "iterations": 1,
-                "max_von_mises_mpa": 184.5,
-                "max_deflection_mm": 0.42,
-                "factor_of_safety": 2.16,
-                "mesh_elements": 4820,
-            }),
-            EngineDiscipline::Cfd => serde_json::json!({
-                "status": "converged",
-                "residuals": { "p": 1e-6, "U": 1e-6, "k": 1e-5 },
-                "drag_coefficient_cd": 0.032,
-                "lift_coefficient_cl": 0.45,
-                "pressure_drop_pa": 1240.0,
-            }),
-            EngineDiscipline::Electronics => serde_json::json!({
-                "status": "simulated",
-                "simulation_type": "transient",
-                "time_points": 1000,
-                "cutoff_frequency_hz": 1591.5,
-                "voltage_peak_v": 5.0,
-                "v_out_peak_v": 5.0,
-                "current_rms_a": 0.024,
-            }),
-            EngineDiscipline::Power => serde_json::json!({
-                "status": "converged",
-                "buses": 14,
-                "branches": 20,
-                "vm_pu_min": 0.985,
-                "total_generation_mw": 332.4,
-                "total_load_mw": 259.0,
-                "losses_mw": 13.4,
-            }),
-            EngineDiscipline::Bim => serde_json::json!({
-                "status": "parsed",
-                "ifc_schema": "IFC4",
-                "elements_extracted": { "walls": 24, "doors": 8, "slabs": 4, "columns": 12 },
-                "gross_floor_area_m2": 350.0,
-            }),
-            EngineDiscipline::Civil => serde_json::json!({
-                "status": "analyzed",
-                "seismic_pga_g": 0.35,
-                "base_shear_kn": 480.0,
-                "interstorey_drift_ratio": 0.0042,
-            }),
-            EngineDiscipline::Chemical => serde_json::json!({
-                "status": "equilibrated",
-                "temperature_k": 1200.0,
-                "pressure_bar": 1.013,
-                "species_mole_fractions": { "CO2": 0.095, "H2O": 0.190, "N2": 0.715 },
-                "adiabatic_flame_temp_k": 2225.4,
-            }),
-            EngineDiscipline::Robotics => serde_json::json!({
-                "status": "solved",
-                "dof": 6,
-                "joint_angles_deg": [15.0, -45.0, 90.0, 0.0, 30.0, 0.0],
-                "end_effector_position": [450.0, 120.0, 320.0],
-                "manipulability_index": 0.88,
-            }),
-            EngineDiscipline::Aerospace => serde_json::json!({
-                "status": "computed",
-                "mach": 0.78,
-                "altitude_m": 10600.0,
-                "lift_to_drag_ratio": 17.4,
-                "neutral_point_fraction": 0.38,
-            }),
-            EngineDiscipline::Environmental => serde_json::json!({
-                "status": "balanced",
-                "nodes": 45,
-                "pipes": 62,
-                "min_pressure_psi": 48.2,
-                "max_velocity_fps": 4.8,
-                "water_age_hours": 14.2,
-            }),
-            _ => serde_json::json!({
-                "status": "completed",
-                "engine": engine.name,
-            }),
-        };
-
         let elapsed = start.elapsed().as_millis() as u64;
-        let provenance = format!(
-            "{:016x}",
-            req.model_revision.wrapping_mul(0x517cc1b727220a95)
-        );
-
         EngineJobResult {
             job_id: req.job_id.clone(),
             engine_id: req.engine_id.clone(),
-            success: true,
+            success: false,
             elapsed_ms: elapsed.max(1),
-            output,
-            error_message: None,
-            warnings: Vec::new(),
-            provenance_hash: provenance,
+            output: serde_json::Value::Null,
+            error_message: Some(format!(
+                "no execution adapter is installed for `{}`; no solver was run and no result is reported",
+                engine.name
+            )),
+            warnings: vec![
+                "synthetic engine output was removed: a result is only reported when a real process produced it"
+                    .to_string(),
+            ],
+            provenance_hash: "0000000000000000".to_string(),
         }
     }
 }
