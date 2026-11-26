@@ -56,7 +56,7 @@ None of these is a substitute for assemblies, real authentication, or external s
 | Tier | Recommendation | Precondition |
 | --- | --- | --- |
 | Community / evaluation | free, source-available or binary | current state; label demo identity and absent engines clearly |
-| Professional (individual) | low-cost, one-time or small subscription | PR-005 advisory scan; identity is demo-only but not needed for local use; 10k-model numbers now measured (PR-009) |
+| Professional (individual) | low-cost, one-time or small subscription | advisory scan now green; identity is demo-only but not needed for local use; 10k-model numbers measured (PR-009) |
 | Team / enterprise | only after hosted identity, audit retention, support and SLA exist | PR-004, PR-005, PR-011, signed artifacts |
 
 **Do not price at $10,000/seat today.** The verified workflows support a credible low-cost local

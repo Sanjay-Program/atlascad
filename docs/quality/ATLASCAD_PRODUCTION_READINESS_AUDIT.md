@@ -183,7 +183,7 @@ Status vocabulary: **verified** (exercised by a test or the live server in this 
 | **A — Build** | **PASS** | fmt, clippy `-D warnings`, 879 tests, release build |
 | **B — Functional** | **PASS for tested core; PARTIAL overall** | CAD, drafting, export and recovery are exercised end to end; CAM/CAE/simulation UI journeys were not hand-driven in this pass |
 | **C — Data integrity** | **PASS for single-document scope** | atomic save, revisions, recovery, concurrency, stale-artifact propagation; command/health timestamps fixed |
-| **D — Security** | **PARTIAL** | token/origin/CSP/body caps/non-root image are real; login is now labelled demo-only and refused on shared instances; advisories unscanned |
+| **D — Security** | **PARTIAL** | token/origin/CSP/body caps/non-root image are real; login is labelled demo-only and refused on shared instances; advisory scan green |
 | **E — Engineering validity** | **PARTIAL** | analytical solvers and CAE/CAM tests pass; fabricated engine **and workflow** output removed; no independent solver benchmark and no external adapter |
 | **F — UX / accessibility** | **PASS for the audited page** | clipping and commit-button reachability fixed and guarded; 191/191 controls named; both themes report 0 WCAG AA contrast failures on 334 rendered text elements |
 | **G — Performance / reliability** | **PARTIAL** | small and 10k-triangle models measured (3.89 ms state, 59 MB RSS); browser frame time and long-session behaviour unmeasured |
@@ -225,7 +225,7 @@ Prior browser measurement (2026-11-25, cited, not re-run): 814 ms first load, 5,
 | ID | Severity | Issue | Next action |
 | --- | --- | --- | --- |
 | PR-004 | **P1, fixed (labelled demo)** | Login was identity selection with no credential check | Payload/UI now say `demo-identity`; SSO and shared-instance login return `501`. A real IdP remains future work |
-| PR-005 | **P1** | No advisory scan (`cargo-deny`/`cargo-audit` absent); CI workflow never run on a runner | Install/run in CI, publish the first advisory report |
+| PR-005 | **P1, fixed** | No advisory scan had been run | `cargo-deny 0.22.1` scanned the graph: advisories/bans/sources ok; CI advisories job green; report published |
 | PR-006 | P2, fixed | Form controls had no programmatic name | 191/191 named; `scripts/a11y-audit.mjs` enforces it |
 | PR-007 | P2, fixed | Primary commit button was below the fold at 720 px | Sticky footer; `browser-check.mjs` asserts visibility at 720 px |
 | PR-008 | P2 | External engine adapters absent | Refusal is correct; implement adapters or remove the run UI |

@@ -11,7 +11,8 @@
 > `--share` instance returns `501`; it is still not an authentication boundary; engine endpoints fabricated
 > solver results and now return `501 unavailable` (PR-001, fixed); workflows auto-approved sensitive
 > tasks by default and now require opt-in (PR-002, fixed); command audit timestamps and hashes were
-> constants and are now real (PR-003, fixed); advisory scanning is still unrun (PR-005, blocked).
+> constants and are now real (PR-003, fixed); the advisory scan now runs both locally and in CI and
+> reports advisories/bans/sources ok (PR-005, fixed — see `quality/advisory-report-2026-11-26.md`).
 > See [`quality/ATLASCAD_PRODUCTION_READINESS_AUDIT.md`](quality/ATLASCAD_PRODUCTION_READINESS_AUDIT.md).
 
 **Date:** 2026-10-21, Atlas Studio section added 2026-10-25 · **Scope:** the eleven repositories in

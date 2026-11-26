@@ -83,5 +83,6 @@
 non-loopback use.
 
 **Do not ship as:** hosted multi-user service, enterprise SSO platform, or a system that executes
-CalculiX/OpenFOAM/ngspice jobs. The identity layer is explicitly demo-only (PR-004), no advisory scan
-has run (PR-005), and no external engine adapter exists (PR-008).
+CalculiX/OpenFOAM/ngspice jobs. The identity layer is explicitly demo-only (PR-004), the advisory
+scan is green but CI has not yet been observed green (PR-005/PR-011), and no external engine
+adapter exists (PR-008).
