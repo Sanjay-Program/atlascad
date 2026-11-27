@@ -354,6 +354,23 @@ def run_live_demo() -> None:
             check(refused, "benchmark refuses without an installed solver (no fabricated accuracy)")
             print("  ✓ Engine Orchestration: 24 upstream solvers registered; CalculiX benchmark refused (501, no solver installed here)")
 
+        spice = None
+        spice_refused = False
+        try:
+            spice = http_request(port, "POST", "/api/engines/benchmark", body={"engine_id": "ngspice"})
+        except RuntimeError as err:
+            spice_refused = "501" in str(err) and "no solver was run" in str(err)
+        if spice:
+            metrics = spice.get("metrics", {})
+            check(spice.get("benchmark_status") == "completed", "ngspice benchmark completed")
+            check(metrics.get("max_error_percent", 100) < 0.1, f"ngspice RC step within 0.1% of 1 - exp(-t/RC) ({metrics.get('max_error_percent')}%)")
+            check(len(metrics.get("measured_volts", [])) == 6, "ngspice waveform compared at six probe times")
+            check(str(spice.get("provenance_hash", "")).startswith("fnv1a64-"), "ngspice provenance digest recorded")
+            print(f"  ✓ Engine Orchestration: real ngspice {metrics.get('solver_version')} transient solve, {metrics.get('timepoints')} timepoints, error {metrics.get('max_error_percent'):.4f}%, {spice.get('execution_time_ms')} ms")
+        else:
+            check(spice_refused, "ngspice benchmark refuses without an installed solver (no fabricated accuracy)")
+            print("  ✓ Engine Orchestration: ngspice benchmark refused (501, no solver installed here)")
+
         # ---------------------------------------------------------------------
         # DEMO 9: Engineering Dependency Graph
         # ---------------------------------------------------------------------

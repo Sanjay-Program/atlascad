@@ -47,7 +47,7 @@ own fields instead of a 2023 constant and the command name.
 | Node / Chrome | Node 24.10.0; Google Chrome 157.0.8103.78 |
 | Docker | available; images recorded on 2026-11-25, not rebuilt in this pass |
 | Advisory tools | `cargo-deny` and `cargo-audit` **absent**; no advisory scan was run |
-| External engines | CalculiX, OpenFOAM, ngspice, pandapower etc. are **not installed** (`/usr/bin/ccx` absent) |
+| External engines | CalculiX and ngspice were installed for adapter verification (`ATLAS_CCX`, `ATLAS_NGSPICE`; not on the default `PATH`). OpenFOAM, pandapower etc. remain **not installed** |
 
 ---
 
@@ -57,7 +57,7 @@ own fields instead of a 2023 constant and the command name.
 | --- | --- | --- | --- |
 | Formatting | `cargo fmt --all --check` | pass | gate step |
 | Lints | `cargo clippy --offline --workspace --all-targets -- -D warnings` | pass, 0 warnings | gate step |
-| Workspace tests | `cargo test --offline --workspace -j 2` | **882 passed, 0 failed, 116 suites** | gate + count |
+| Workspace tests | `cargo test --offline --workspace -j 2` | **886 passed, 0 failed, 116 suites** | gate + count |
 | HTTP integration | `cargo test -p cad-studio --test http_api` | **48 passed** | test |
 | Analytic kernel corpus | `cargo run -p cad-kernel-truck --example corpus` | 11 fixtures: 9 pass, 2 recorded known-failures, **0 regressions** | gate |
 | Engineering manifests | `atlas-eng validate` | 0 errors, 0 warnings across 14 files | gate |
@@ -157,7 +157,7 @@ Status vocabulary: **verified** (exercised by a test or the live server in this 
 
 | Domain | Status | Evidence / limit |
 | --- | --- | --- |
-| Parametric solid modelling: sketch profiles, extrude (new/join/cut), revolve, planes, undo/redo, rebuild cache | **verified** | 48 HTTP tests, 1,206 assertions; analytic volumes |
+| Parametric solid modelling: sketch profiles, extrude (new/join/cut), revolve, planes, undo/redo, rebuild cache | **verified** | 51 HTTP tests, 1,206 full-check assertions; analytic volumes |
 | 2D drafting: entities, layers, blocks, arrays, trim/extend, constraints, DXF in/out, PDF sheet | **verified** | `cad-drafting` unit + HTTP tests; `pdftotext` extraction |
 | Interchange: STEP AP214 read/write, binary STL, 3MF, glTF, DXF, USD/EDL/FCPXML/LUT export | **verified for written bytes; not round-tripped in a third-party application** | `cad-io` and `atlas-interchange` tests; no external app was driven |
 | CAE: linear static FEA, modal, thermal, plus ~140 analytical engineering models | **verified analytically** | 213 simulation-core tests; cantilever/analytic comparisons. Not a general FEM suite and not independently benchmarked |
@@ -169,7 +169,8 @@ Status vocabulary: **verified** (exercised by a test or the live server in this 
 | Concurrency (same document, parallel writers) | **verified for the tested model** | 18 assertions; last-write-wins, no merge |
 | Local sharing: token gate, origin/host checks, TLS via proxy | **verified** | 21 share assertions, browser shared session, Caddy smoke previously |
 | Identity/RBAC/SSO/API keys | **explicitly demo-only** | `/api/auth/login` is an identity switch, not authentication. The response now states `credential_verified: false` / `authentication: "demo-identity"` with a notice; the UI shows a demo banner; SSO requests and all logins on `--share` instances are refused with `501` instead of fabricating a session. RBAC remains data, not a boundary |
-| External engines (CalculiX, OpenFOAM, ngspice, pandapower, …) | **absent / now refusing** | 24 registry entries, 24 guides, no adapter; 501 as of PR-001 |
+| External engines (OpenFOAM, pandapower, Elmer, Gmsh, …) | **absent / refusing** | 24 registry entries, 24 guides, no adapter for these; 501 as of PR-001 |
+| CalculiX FEA and ngspice circuit transient | **verified process adapters** | Real binaries run a deterministic benchmark whose output is parsed and compared with the closed-form answer (CalculiX 0.40% on `F L/(A E)`; ngspice 0.0101% on `1 - exp(-t/RC)`). See PR-008 |
 | AI agent workflows | **partial but honest** | 44 specialist registrations, DAG execution, approval gates, MCP; real analytical solvers run on fixed case parameters, unimplemented steps are refused, and results record the bound document revision |
 | Blender / Unity / Resolve handoffs | **partial** | export routes and file writers tested; no host application imported the output |
 | Physical machine/printer execution | **absent** | no device transport exists; correctly not claimed |
@@ -180,7 +181,7 @@ Status vocabulary: **verified** (exercised by a test or the live server in this 
 
 | Gate | Status | Basis |
 | --- | --- | --- |
-| **A — Build** | **PASS** | fmt, clippy `-D warnings`, 882 tests, release build |
+| **A — Build** | **PASS** | fmt, clippy `-D warnings`, 886 tests, release build |
 | **B — Functional** | **PASS for tested core; PARTIAL overall** | CAD, drafting, export and recovery are exercised end to end; CAM/CAE/simulation UI journeys were not hand-driven in this pass |
 | **C — Data integrity** | **PASS for single-document scope** | atomic save, revisions, recovery, concurrency, stale-artifact propagation; command/health timestamps fixed |
 | **D — Security** | **PARTIAL** | token/origin/CSP/body caps/non-root image are real; login is labelled demo-only and refused on shared instances; advisory scan green |

@@ -15812,26 +15812,10 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                 if registry.get(&engine_id).is_none() {
                     return error_response(&StudioError::NotFound);
                 }
-                // CalculiX has a real adapter: report the detected binary and version rather than
-                // the registry's static "no adapter" message.
-                if engine_id.as_str() == "calculix"
-                    && let Some(executable) = atlas_engine_manager::calculix::discover_executable()
-                {
-                    let version = atlas_engine_manager::calculix::probe_version().ok();
-                    return json_response(
-                        200,
-                        serde_json::json!({
-                            "engine_id": "calculix",
-                            "status": "healthy",
-                            "details": format!(
-                                "CalculiX `ccx` process adapter available at {}",
-                                executable.display()
-                            ),
-                            "latency_ms": 1,
-                            "detected_version": version,
-                            "timestamp": now_epoch_millis() / 1000,
-                        }),
-                    );
+                // CalculiX and ngspice have real adapters: report the detected binary and
+                // version rather than the registry's static "no adapter" message.
+                if let Some(payload) = real_adapter_health(engine_id.as_str()) {
+                    return json_response(200, payload);
                 }
                 let report = registry.test_health(&engine_id);
                 let payload = serde_json::json!({
@@ -15934,6 +15918,35 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                         }
                         Err(message) => error_response(&StudioError::Unavailable(format!(
                             "CalculiX adapter did not produce a verified benchmark: {message}"
+                        ))),
+                    };
+                }
+                // The ngspice adapter runs a deterministic RC step response and parses the
+                // waveform ngspice wrote. Without the binary this falls through to the refusal.
+                if engine_id.as_str() == "ngspice"
+                    && atlas_engine_manager::ngspice::discover_executable().is_some()
+                {
+                    let timeout = std::time::Duration::from_secs(
+                        body.timeout_seconds.unwrap_or(30).clamp(5, 120),
+                    );
+                    return match atlas_engine_manager::ngspice::run_rc_step_benchmark(timeout) {
+                        Ok(benchmark) => {
+                            let metrics =
+                                serde_json::to_value(&benchmark).unwrap_or(serde_json::Value::Null);
+                            json_response(
+                                200,
+                                serde_json::json!({
+                                    "engine_id": "ngspice",
+                                    "benchmark_status": "completed",
+                                    "execution_time_ms": benchmark.elapsed_ms,
+                                    "accuracy_score": benchmark.accuracy_score,
+                                    "metrics": metrics,
+                                    "provenance_hash": benchmark.provenance_hash,
+                                }),
+                            )
+                        }
+                        Err(message) => error_response(&StudioError::Unavailable(format!(
+                            "ngspice adapter did not produce a verified benchmark: {message}"
                         ))),
                     };
                 }
@@ -19178,6 +19191,34 @@ fn sheet_from_query(path: &str, title: String) -> Result<cad_drafting::Sheet, St
     }
     sheet.validate()?;
     Ok(sheet)
+}
+
+/// Health payload for an engine that has a real process adapter and an installed binary.
+///
+/// Returns `None` when the engine has no adapter or its executable is absent, so the caller falls
+/// back to the registry's refusal instead of claiming a solver that cannot run.
+fn real_adapter_health(engine_id: &str) -> Option<serde_json::Value> {
+    let (executable, version, label) = match engine_id {
+        "calculix" => (
+            atlas_engine_manager::calculix::discover_executable()?,
+            atlas_engine_manager::calculix::probe_version().ok(),
+            "CalculiX `ccx`",
+        ),
+        "ngspice" => (
+            atlas_engine_manager::ngspice::discover_executable()?,
+            atlas_engine_manager::ngspice::probe_version().ok(),
+            "ngspice",
+        ),
+        _ => return None,
+    };
+    Some(serde_json::json!({
+        "engine_id": engine_id,
+        "status": "healthy",
+        "details": format!("{label} process adapter available at {}", executable.display()),
+        "latency_ms": 1,
+        "detected_version": version,
+        "timestamp": now_unix_secs(),
+    }))
 }
 
 /// Whole seconds since the Unix epoch, or 0 if the clock is before the epoch.

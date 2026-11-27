@@ -1,43 +1,52 @@
-# AtlasCAD Integration Progress & Status Registry
+# Engine Integration Status Registry
 
-## Overview
-This registry tracks the progression of each open-source engineering engine across the 13 formal integration milestones from DISCOVERED to PRODUCTION_READY.
+Status is recorded against what was actually executed. The previous version of this registry marked
+21 external engines `ADAPTED` with every gate `PASS`; no adapter or solver run backed those rows, so
+they have been replaced with the measured state below.
 
----
+## Status vocabulary
 
-## 1. Engine Progress Matrix
+| Status | Meaning |
+| --- | --- |
+| **VERIFIED (built-in)** | AtlasCAD's own code runs the case and a workspace test or the live demo asserts the result. |
+| **BENCHMARK ADAPTER** | A real installed binary is executed for a deterministic benchmark through `/api/engines/benchmark` and `/api/engines/health`; the solver's own output is parsed. General job execution does not exist, so `/api/engines/run` refuses with `501`. |
+| **NOT IMPLEMENTED** | Registry entry and installation guide only. No binary is invoked; `/api/engines/run` and `/api/engines/benchmark` return `501` with "no solver was run". |
 
-| Engine | Discipline | Current Status | Gate A (Acquisition) | Gate B (Adapter) | Gate C (AtlasCAD UI) | Gate D (Validation) | Gate E (Production) |
-| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
-| **truck** | Mechanical CAD | **PRODUCTION_READY** | PASS | PASS | PASS | PASS | PASS |
-| **Built-in CAE** | Structural FEA | **PRODUCTION_READY** | PASS | PASS | PASS | PASS | PASS |
-| **Built-in CAM** | CNC Manufacturing| **PRODUCTION_READY** | PASS | PASS | PASS | PASS | PASS |
-| **Open CASCADE (OCCT)**| CAD Geometry/STEP | **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **Gmsh** | 3D Meshing | **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **CalculiX** | Advanced FEA | **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **OpenFOAM** | CFD Fluid Dynamics| **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **SU2** | Aerodynamics | **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **IfcOpenShell** | Architecture / BIM| **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **OpenSees** | Civil / Seismic | **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **EnergyPlus** | Building Energy | **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **ngspice** | Electronics / ECAD | **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **KiCad CLI** | PCB Design | **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **pandapower** | Power Systems | **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **OpenDSS** | Power Distribution| **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **Cantera** | Chemical Kinetics | **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **DWSIM** | Process Flowsheet | **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **RDKit** | Molecular Chem | **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **OpenVSP** | Aerospace Design | **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **JSBSim** | Flight Dynamics | **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **MuJoCo** | Robotics Dynamics | **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **EPANET** | Water Hydraulics | **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **EPA SWMM** | Stormwater Hydro | **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
-| **MODFLOW** | Groundwater | **ADAPTED** | PASS | PASS | PASS | PASS | In Progress |
+## Registry (24 engines)
 
----
+| Engine | Discipline | Execution adapter | `/api/engines/run` | Evidence |
+| --- | --- | --- | --- | --- |
+| `truck` | Mechanical CAD / geometry kernel | **VERIFIED (built-in)** | n/a (crate API) | Workspace tests; parametric rebuild and export checks |
+| Built-in CAE (`cad-cae`) | Linear static, modal, steady thermal | **VERIFIED (built-in)** | n/a (crate API) | Analytic comparisons in `cad-cae` tests and the live demo |
+| Built-in CAM (`cad-cam`) | 3-axis toolpaths, G-code | **VERIFIED (built-in)** | n/a (crate API) | `cad-cam` tests; live-demo toolpath and G-code assertions |
+| `calculix` | Structural FEA | **BENCHMARK ADAPTER** (`atlas-engine-manager::calculix`) | Refuses (`501`) | Real `ccx` 2.23 axial-tension run, 0.404% vs `F L/(A E)`; see [`ENGINE_BENCHMARKS.md`](../validation/ENGINE_BENCHMARKS.md) |
+| `ngspice` | Electronics / SPICE | **BENCHMARK ADAPTER** (`atlas-engine-manager::ngspice`) | Refuses (`501`) | Real `ngspice` 41 RC step transient, 0.0101% vs `1 − exp(−t/RC)` |
+| `openfoam` | CFD | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `su2` | Aerodynamics | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `gmsh` | Meshing | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `ifcopenshell` | BIM | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `opensees` | Civil / seismic | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `energyplus` | Building energy | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `kicad` | PCB | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `pandapower` | Power systems | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `opendss` | Distribution | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `cantera` | Chemical kinetics | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `dwsim` | Process flowsheet | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `rdkit` | Molecular chemistry | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `openvsp` | Aerospace design | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `jsbsim` | Flight dynamics | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `mujoco` | Robotics dynamics | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `epanet` | Water hydraulics | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `epaswmm` | Stormwater | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `modflow` | Groundwater | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `occt` | STEP interchange | **NOT IMPLEMENTED** | Refuses (`501`) | STEP read/write is handled by `cad-io`, not by OCCT |
 
-## 2. Milestone Summary
-- **Total Engines Tracked**: 24 engines across 11 engineering disciplines.
-- **Production Ready Core**: Pure-Rust B-Rep CAD (`truck`), Built-in Multiphysics CAE (linear static, modal, thermal), Built-in 3-Axis CNC CAM.
-- **Adapted & Integrated Layer**: 21 external engines with typed adapters, workspace ribbons, Engine Manager UI, and validation cases.
-- **Zero Placeholder Policy**: Every adapter executes real data conversions, parameter validation, and result generation.
+## Summary
+
+- **3** built-in engines verified by tests.
+- **2** external engines with a real, benchmarked process adapter (CalculiX, ngspice).
+- **19** registry entries with no execution adapter; they refuse instead of returning a result.
+
+Adding an engine means implementing a process adapter that runs the real binary and parses its
+output, then verifying it against a closed-form or published reference. Registering a row in the
+engine list is not integration.

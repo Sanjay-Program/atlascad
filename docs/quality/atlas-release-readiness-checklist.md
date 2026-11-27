@@ -13,7 +13,7 @@
 | Clean release build | **PASS** | `cargo build --release -p cad-studio -p cad-cli` |
 | Formatting | **PASS** | `cargo fmt --all --check` |
 | Clippy, warnings denied | **PASS** | `cargo clippy --workspace --all-targets -- -D warnings` |
-| Workspace tests | **PASS** | 882 passed, 0 failed, 116 suites |
+| Workspace tests | **PASS** | 886 passed, 0 failed, 116 suites |
 | HTTP integration tests | **PASS** | 48 passed |
 | Analytic kernel corpus | **PASS with 2 recorded known-failures** | 9 ok, 0 regressions |
 | Exhaustive product check | **PASS** | `full-check.py`, 1,206 assertions |
@@ -69,7 +69,7 @@
 
 | Item | Status |
 | --- | --- |
-| README test counts match the tree | **FIXED** (882 workspace / 49 HTTP) |
+| README test counts match the tree | **FIXED** (886 workspace / 51 HTTP) |
 | Current readiness audit | **PASS** — this document set |
 | Historical docs clearly marked | **PARTIAL** — banners added to the 2026-10-29 readiness and feature matrix |
 | API documentation matches implemented routes | **PARTIAL** — 317 path literals; documented subset is accurate, not exhaustive |
@@ -83,5 +83,5 @@
 non-loopback use.
 
 **Do not ship as:** hosted multi-user service, enterprise SSO platform, or a system that executes
-CalculiX/OpenFOAM/ngspice jobs. The identity layer is explicitly demo-only (PR-004), the advisory
-scan and CI are green (PR-005/PR-011), and no external engine adapter exists (PR-008).
+OpenFOAM/Elmer/Gmsh jobs. The identity layer is explicitly demo-only (PR-004), the advisory scan
+and CI are green (PR-005/PR-011), and only CalculiX and ngspice have process adapters (PR-008).

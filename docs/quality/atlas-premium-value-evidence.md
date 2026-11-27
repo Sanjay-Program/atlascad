@@ -11,7 +11,7 @@ invented ROI and no claim that a commercial product has been replaced.
 
 | Customer job | Current alternative | AtlasCAD capability | Verified workflow | Measured benefit | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- | --- |
-| Model a parametric part | Inventor / SolidWorks / Onshape | profiles, extrude/join/cut/revolve, parameters, history, undo | create box → sketch → extrude → cut → save → reopen | 0.97 ms state read; 9 MB RSS; exact analytic volumes | 48 HTTP tests, 1,206 assertions | no constraints, fillets, shells, patterns, assemblies |
+| Model a parametric part | Inventor / SolidWorks / Onshape | profiles, extrude/join/cut/revolve, parameters, history, undo | create box → sketch → extrude → cut → save → reopen | 0.97 ms state read; 9 MB RSS; exact analytic volumes | 51 HTTP tests, 1,206 full-check assertions | no constraints, fillets, shells, patterns, assemblies |
 | Produce a drawing and PDF | AutoCAD / DraftSight | 2D editor, layers, DXF R12, titled PDF sheet | draw → dimension → DXF out → PDF plot | PDF text extracted; DXF re-read by the same reader | drafting tests, `pdftotext` | one plan view; no projected/section views, GD&T, sheet sets |
 | Exchange geometry | STEP-centric PLM/CAM | STEP AP214 and STL write, STEP read as mesh body | export STEP → re-read → volume check | cube round-trip 500 mm³ | `cad-io` tests | faceted BREP; no analytic surfaces/assemblies; no IGES |
 | Check a static design | ANSYS / Abaqus | linear-static FEA, modal, thermal | cantilever solve | analytic cantilever comparison | 213 simulation tests | no general mesher, contact, nonlinear, solver choice |
@@ -33,7 +33,7 @@ invented ROI and no claim that a commercial product has been replaced.
    single document file with no database.
 3. **Breadth of analytical engineering models.** 140 analytical solvers with 213 unit tests, exposed
    through a single local API.
-4. **Test density in critical logic.** 882 workspace tests, an 11-fixture analytic corpus, and a
+4. **Test density in critical logic.** 886 workspace tests, an 11-fixture analytic corpus, and a
    1,206-assertion product harness.
 
 None of these is a substitute for assemblies, real authentication, or external solver adapters.

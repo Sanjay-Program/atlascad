@@ -10,6 +10,7 @@ pub mod configuration;
 pub mod discovery;
 pub mod health;
 pub mod installation;
+pub mod ngspice;
 pub mod registry;
 pub mod versioning;
 

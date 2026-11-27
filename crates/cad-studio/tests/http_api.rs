@@ -3607,6 +3607,82 @@ fn engine_benchmark_runs_a_real_solver_or_refuses() -> Result<(), Box<dyn std::e
 }
 
 #[test]
+fn engine_benchmark_runs_ngspice_or_refuses() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("engine_benchmark_ngspice", [20.0, 20.0, 10.0])?;
+    let response = post(
+        handle.addr(),
+        "/api/engines/benchmark",
+        r#"{"engine_id":"ngspice"}"#,
+    )?;
+    // With ngspice installed the endpoint must return a measured waveform; without it, a refusal.
+    if response.status == 200 {
+        let data = json(&response)?;
+        assert_eq!(data["benchmark_status"], "completed");
+        let metrics = data["metrics"].as_object().ok_or("metrics")?;
+        let error = metrics["max_error_percent"]
+            .as_f64()
+            .ok_or("max_error_percent")?;
+        assert!(
+            error < 0.1,
+            "ngspice deviates from 1 - exp(-t/RC) by {error}%"
+        );
+        let probes = metrics["probe_times_ms"]
+            .as_array()
+            .ok_or("probe_times_ms")?;
+        assert_eq!(probes.len(), 6);
+        assert!(
+            !metrics["solver_version"]
+                .as_str()
+                .unwrap_or_default()
+                .is_empty(),
+            "the solver version must come from the binary"
+        );
+        assert!(
+            data["provenance_hash"]
+                .as_str()
+                .ok_or("provenance")?
+                .starts_with("fnv1a64-")
+        );
+    } else {
+        assert_eq!(response.status, 501);
+        let body = String::from_utf8_lossy(&response.body).to_lowercase();
+        assert!(body.contains("no solver was run"), "{body}");
+    }
+    Ok(())
+}
+
+#[test]
+fn ngspice_health_reports_the_installed_binary_or_refuses() -> Result<(), Box<dyn std::error::Error>>
+{
+    let (_dir, _path, handle) = fixture("engine_health_ngspice", [20.0, 20.0, 10.0])?;
+    let response = post(
+        handle.addr(),
+        "/api/engines/health",
+        r#"{"engine_id":"ngspice"}"#,
+    )?;
+    assert_eq!(response.status, 200);
+    let data = json(&response)?;
+    assert_eq!(data["engine_id"], "ngspice");
+    match data["status"].as_str() {
+        Some("healthy") => assert!(
+            !data["detected_version"]
+                .as_str()
+                .unwrap_or_default()
+                .is_empty(),
+            "a healthy ngspice must report the version it detected"
+        ),
+        Some("unavailable") => assert!(
+            data["details"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("No execution adapter")
+        ),
+        other => return Err(format!("unexpected health status {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
 fn mass_properties_interference_and_bom_api() -> Result<(), Box<dyn std::error::Error>> {
     let (_dir, _path, handle) = fixture("mass_prop_test", [20.0, 20.0, 10.0])?;
     let addr = handle.addr();
@@ -3681,14 +3757,25 @@ fn engines_ecosystem_api() -> Result<(), Box<dyn std::error::Error>> {
     let health_resp = post(addr, "/api/engines/health", r#"{"engine_id": "calculix"}"#)?;
     assert_eq!(health_resp.status, 200);
     let h_data = json(&health_resp)?;
-    assert_eq!(h_data["status"], "unavailable");
     assert_eq!(h_data["engine_id"], "calculix");
-    assert!(
-        h_data["details"]
-            .as_str()
-            .ok_or("details")?
-            .contains("No execution adapter")
-    );
+    // With ccx installed (ATLAS_CCX or PATH) the adapter reports the detected binary; otherwise
+    // the registry's refusal is reported. Both are honest, so accept either state.
+    match h_data["status"].as_str() {
+        Some("healthy") => assert!(
+            !h_data["detected_version"]
+                .as_str()
+                .unwrap_or_default()
+                .is_empty(),
+            "a healthy CalculiX must report the version it detected"
+        ),
+        Some("unavailable") => assert!(
+            h_data["details"]
+                .as_str()
+                .ok_or("details")?
+                .contains("No execution adapter")
+        ),
+        other => return Err(format!("unexpected CalculiX health status {other:?}").into()),
+    }
 
     // 3. POST /api/engines/health (unknown engine)
     let bad_health = post(
