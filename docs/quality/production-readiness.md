@@ -135,7 +135,7 @@ faces, and the error discipline is real. Neither is the problem.
 | Signed installers, update channel | **Partial**: a checksummed tarball is built and re-verified by extraction; there is no installer, code signing, notarisation or update channel | `./scripts/package.sh`, `docs/operations/release-process.md` §6 |
 | Licence management / billing | **Absent**: `cad-entitlements` is local policy, no provider | `docs/feature-matrix.md` |
 | Authentication, tenancy, audit log | **Absent**: loopback only, origin checks, no token | `docs/security-review.md` S-4 |
-| SBOM, advisory scanning, CI gate | **Partial**: the gate, licence policy and deterministic SBOM are delivered and pass locally; CI config and `deny.toml` are added but have never run on a runner, and advisories are not scanned on this host | §5, `docs/operations/release-process.md` |
+| SBOM, advisory scanning, CI gate | **Delivered**: gate, licence policy and deterministic SBOM pass; the CI pipeline is green on a runner and `cargo-deny` reports advisories/bans/sources ok (2026-11-27) | §5, `docs/operations/release-process.md` |
 | Support SLA, documentation, training | **Absent** | — |
 | Vendor viability, trademark, commercial terms | **Draft only**: `COMMERCIAL-LICENSE.md` is not a grant; no trademark search | `COMMERCIAL-LICENSE.md` |
 
@@ -282,8 +282,7 @@ engineer with this repository's existing discipline.
 ### P0 — Trustworthy delivery (2–4 weeks)
 
 1. **Delivered:** the gate (fmt, clippy `-D warnings`, tests, corpus, manifests, licence policy, SBOM,
-   live simulation) and a verified bundle. **Outstanding:** the CI workflow has not run on a runner,
-   and advisories are not scanned on this host.
+   live simulation), a verified bundle, a green CI pipeline and a green advisory scan.
 2. **Partial:** deterministic tarball with checksums and smoke tests. **Outstanding:** installers for
    Linux/macOS/Windows, code signing, notarisation, a versioned update channel.
 3. **Partial:** crash recovery for unsaved edits and unreadable files is delivered. **Outstanding:**

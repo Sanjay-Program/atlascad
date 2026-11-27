@@ -1,6 +1,7 @@
 # AtlasCAD: Next-Generation Autonomous Engineering & Cloud-Native CAD Ecosystem
 
-[![Rust CI/CD](https://img.shields.io/badge/Rust-1.94%2B-orange.svg?logo=rust)](https://www.rust-lang.org/)
+[![CI](https://github.com/Sanjay-Program/atlascad/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Sanjay-Program/atlascad/actions/workflows/ci.yml)
+[![Rust](https://img.shields.io/badge/Rust-1.94%2B-orange.svg?logo=rust)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/License-Proprietary%20%2F%20Commercial-blue.svg)](LICENSE)
 [![Safety](https://img.shields.io/badge/Unsafe%20Code-FORBIDDEN-brightgreen.svg)](#security-and-safety)
 [![Tests Passing](https://img.shields.io/badge/Tests-879%20Passed%20(100%25)-success.svg)](#testing-and-verification)
