@@ -4362,7 +4362,7 @@
       const response = await fetch("/api/deploy/status", { headers });
       if (!response.ok) throw new Error(`Status check failed: ${response.status}`);
       const data = await response.json();
-      log(`Deployment Status: ${data.status.toUpperCase()} | Engines: ${data.simulation_engines.total_engines} | Compliance: ${data.compliance.quality_management}`);
+      log(`Deployment Status: ${data.status.toUpperCase()} | Analytical domains: ${data.simulation_engines.total_engines} | Traceability: ${data.compliance.quality_management}`);
       toast(`Deployment Status: ${data.status.toUpperCase()} (${data.simulation_engines.total_engines} simulation engines configured)`);
     } catch (err) {
       toast(err.message, true);

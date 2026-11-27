@@ -1349,9 +1349,10 @@ def run_live_demo() -> None:
         deploy_status = http_request(port, "GET", "/api/deploy/status")
         check(deploy_status.get("status") == "healthy", "System deployment status reports 'healthy'")
         check(deploy_status.get("deployment_mode") == "containerized_and_standalone", "Deployment mode supports containerized and standalone")
-        check(deploy_status.get("simulation_engines", {}).get("total_engines") == 27, "All 27 multi-physics engines discovered and online")
-        check(deploy_status.get("compliance", {}).get("quality_management") == "AS9100 Rev D & ISO 9001:2015", "Compliance verifies AS9100 Rev D / ISO 9001:2015")
-        print(f"  ✓ 14.4 System Deployment Telemetry: 27 Multi-Physics Engines Online, Docker/Caddy stack healthy, AS9100/ISO 9001 certified")
+        check(deploy_status.get("simulation_engines", {}).get("total_engines") == 27, "27 analytical domains reported")
+        check(deploy_status.get("simulation_engines", {}).get("status") == "analytical_domains_available", "Engine status does not claim convergence")
+        check("no certification" in deploy_status.get("compliance", {}).get("quality_management", ""), "Compliance field states it is not a certification")
+        print(f"  ✓ 14.4 System Deployment Telemetry: 27 analytical domains available, Docker/Caddy stack healthy, traceability only (not certified)")
 
         # 14.5 Command Platform Execution of Export & Deploy Commands
         cmd_dv = http_request(port, "POST", "/api/commands/execute", body={

@@ -30,6 +30,7 @@ numeric priority.
 | PR-019 | **P1** | Auditability | Audit, job, ECO, comment, session and presence records used fixed 2023 timestamps, including `1700000000` in the compliance report | **fixed** | One `now_unix_secs()` clock is used at every runtime site; 41 constants removed, no runtime record uses a literal |
 | PR-020 | P1 | Integrity | Optimizer revisions invented a rising `compliance_score` and `sha256-rev-NNN` “evidence” and set `evidence_verified: true` | **fixed, tested** | Score is 0.0 (not assessed), the digest is FNV-1a over the record fields, status is `fos_target_satisfied_analytical`, `evidence_verified` is false |
 | PR-021 | P2 | Honesty | UI, CLI, MCP tools and agent descriptions still claimed certification: “ISO 9001 [Compliant]”, “100% MATHEMATICAL GUARANTEE”, “Certified Alloy”, “certified AS9100 dossier” | **fixed** | Copy now says traceability/self-assessed where that is what happens; asset and material libraries describe typical properties |
+| PR-022 | P2 | Honesty | `/api/deploy/status` advertised ready “calculix_and_openfoam” workers, `all_engines_converged`, NIST/DO-178C compliance and enforced bearer auth on every request | **fixed, tested** | Workers say `built_in_voxel_fea` / `built_in_toolpath_planner`, engine status is `analytical_domains_available`, compliance says traceability-only/not assessed, and auth is described as share-mode only; `http_api` asserts the new values |
 
 ## Order of work
 

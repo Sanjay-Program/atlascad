@@ -3677,13 +3677,13 @@ namespace AtlasCAD.Unity
                 "mcp_server": { "status": "listening", "protocol": "2024-11-05", "registered_tools": 17 },
                 "job_queue": { "status": "active", "enqueued_jobs": jobs_count, "hpc_workers": 4 },
                 "reverse_proxy": { "status": "configured", "provider": "caddy", "tls": "auto" },
-                "cae_worker": { "status": "ready", "engine": "calculix_and_openfoam" },
-                "cam_worker": { "status": "ready", "engine": "opencam_and_slicing" }
+                "cae_worker": { "status": "analytical", "engine": "built_in_voxel_fea" },
+                "cam_worker": { "status": "ready", "engine": "built_in_toolpath_planner" }
             },
             "simulation_engines": {
                 "total_engines": 27,
                 "active_engines": 27,
-                "status": "all_engines_converged",
+                "status": "analytical_domains_available",
                 "domains": [
                     "linear_static_fea", "timoshenko_beams", "elastoplasticity_ramberg_osgood",
                     "rainflow_fatigue", "composite_clt_tsai_wu", "darcy_weisbach_cfd",
@@ -3704,10 +3704,10 @@ namespace AtlasCAD.Unity
                 "binary_stl": { "status": "available", "standard": "ANSI_IEEE" }
             },
             "compliance": {
-                "quality_management": "AS9100 Rev D & ISO 9001:2015",
-                "security_controls": "NIST SP 800-171 Rev 2",
-                "software_safety": "DO-178C Level A",
-                "token_authentication": "enforced_bearer_token"
+                "quality_management": "traceability checks only; no certification",
+                "security_controls": "not assessed",
+                "software_safety": "no certification claimed",
+                "token_authentication": "share mode requires a bearer token"
             }
         }))
     }

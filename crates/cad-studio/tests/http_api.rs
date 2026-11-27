@@ -4651,7 +4651,11 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(total_engines, 27);
     assert_eq!(
         deploy_json["compliance"]["quality_management"],
-        "AS9100 Rev D & ISO 9001:2015"
+        "traceability checks only; no certification"
+    );
+    assert_eq!(
+        deploy_json["simulation_engines"]["status"],
+        "analytical_domains_available"
     );
 
     // 35. Execute Commands via Command Platform

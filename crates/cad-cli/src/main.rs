@@ -2488,7 +2488,7 @@ fn cmd_commands(arguments: &[String]) -> Result<i32, CliError> {
                     "status": "healthy",
                     "version": env!("CARGO_PKG_VERSION"),
                     "deployment_mode": "containerized_and_standalone",
-                    "engines_active": 27,
+                    "engines_registered": 24,
                     "audit_trail": "local FNV-1a chain only; not a certification"
                 }),
                 _ => serde_json::json!({
