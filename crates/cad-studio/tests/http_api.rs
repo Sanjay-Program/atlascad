@@ -4813,6 +4813,19 @@ fn multidisciplinary_simulation_apis() -> Result<(), Box<dyn std::error::Error>>
         "fixed_case_parameters"
     );
     assert!(run_all_json["provenance"]["document_revision"].is_u64());
+    // Measured geometry is recorded, but no solver input is passed off as derived from it.
+    let geometry = run_all_json["provenance"]["geometry_facts"]
+        .as_object()
+        .ok_or("geometry facts")?;
+    assert!(geometry.contains_key("mesh_volume_mm3"));
+    assert!(geometry.contains_key("characteristic_length_mm"));
+    assert!(geometry.contains_key("triangle_count"));
+    assert!(
+        run_all_json["provenance"]["note"]
+            .as_str()
+            .ok_or("note")?
+            .contains("geometry-to-solver adapter")
+    );
     // No fabricated certification, toolpath or media claim in any task result.
     let tasks = run_all_json["tasks"].as_object().ok_or("tasks object")?;
     let serialized = serde_json::to_string(tasks)?;

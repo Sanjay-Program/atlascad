@@ -11232,7 +11232,7 @@ ${gcodeSample}`;
         if (out) {
           out.textContent = `[Master Workflow] Status: ${res.status}\n` +
             `Completed: ${res.summary.completed_tasks} / ${res.summary.total_tasks} | Failed/unavailable: ${res.summary.failed_tasks}\n` +
-            `Document revision: ${res.provenance?.document_revision ?? "unknown"} | Inputs: fixed case parameters\n\n` +
+            `Document revision: ${res.provenance?.document_revision ?? "unknown"} | Inputs: fixed 38 m reference case (not document geometry)\n\n` +
             (res.execution_log || []).join("\n");
         }
         toast(`Master workflow ${res.status}: ${res.summary.completed_tasks}/${res.summary.total_tasks} completed`);

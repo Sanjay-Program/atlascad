@@ -13401,6 +13401,40 @@ namespace AtlasCAD.Unity
             "import_count".into(),
             self.project.imports().len().to_string(),
         );
+
+        // Measured geometry for the inspection task. These are facts about the live mesh, not
+        // case parameters; the analytical solvers still run their fixed reference case because no
+        // geometry-to-solver adapter exists yet.
+        let mut geometry = Vec::new();
+        if let Ok(rebuild) = self.rebuild()
+            && let Some(mesh) = &rebuild.mesh
+        {
+            geometry.push((
+                "mesh_volume_mm3".to_string(),
+                format!("{:.3}", mesh.signed_volume().abs()),
+            ));
+            geometry.push((
+                "triangle_count".to_string(),
+                mesh.triangle_count().to_string(),
+            ));
+            if let Some(bounds) = mesh.bounding_box() {
+                let extents = [
+                    bounds.max[0] - bounds.min[0],
+                    bounds.max[1] - bounds.min[1],
+                    bounds.max[2] - bounds.min[2],
+                ];
+                for (axis, value) in ["x", "y", "z"].iter().zip(extents) {
+                    geometry.push((format!("bounds_{axis}_mm"), format!("{value:.3}")));
+                }
+                geometry.push((
+                    "characteristic_length_mm".to_string(),
+                    format!("{:.3}", extents.into_iter().fold(0.0_f64, f64::max)),
+                ));
+            }
+        }
+        for (key, value) in geometry {
+            self.orchestrator.context.facts.insert(key, value);
+        }
     }
 
     fn step_orchestrator(&mut self) -> Result<serde_json::Value, StudioError> {
@@ -13475,9 +13509,16 @@ namespace AtlasCAD.Unity
             "provenance": {
                 "document_revision": revision,
                 "input_source": "fixed_case_parameters",
-                "note": "Analytical solvers run on fixed case parameters; the result records the \
-                         document revision it is bound to, but task inputs are not yet derived from \
-                         the live model geometry."
+                "geometry_facts": self.orchestrator.context.facts.iter()
+                    .filter(|(key, _)| *key == "mesh_volume_mm3" || *key == "triangle_count"
+                        || key.starts_with("bounds_") || *key == "characteristic_length_mm")
+                    .map(|(key, value)| (key.clone(), value.clone()))
+                    .collect::<std::collections::BTreeMap<_, _>>(),
+                "note": "The inspection task reports measured geometry. The hypersonic \
+                         analytical tasks are a fixed 38 m reference vehicle: substituting a \
+                         document's bounding box for an aircraft case would be invalid without a \
+                         geometry-to-solver adapter, which this build does not have. No task input \
+                         is presented as derived from the model when it is not."
             }
         }))
     }
