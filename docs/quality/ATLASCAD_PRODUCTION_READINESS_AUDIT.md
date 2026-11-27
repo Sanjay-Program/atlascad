@@ -187,7 +187,7 @@ Status vocabulary: **verified** (exercised by a test or the live server in this 
 | **E — Engineering validity** | **PARTIAL** | analytical solvers and CAE/CAM tests pass; fabricated engine **and workflow** output removed; no independent solver benchmark and no external adapter |
 | **F — UX / accessibility** | **PASS for the audited page** | clipping and commit-button reachability fixed and guarded; 191/191 controls named; both themes report 0 WCAG AA contrast failures on 334 rendered text elements |
 | **G — Performance / reliability** | **PARTIAL** | small and 10k-triangle models measured (3.89 ms state, 59 MB RSS); browser frame time and long-session behaviour unmeasured |
-| **H — Operations** | **PARTIAL** | deployment assets validate; images were built and smoke-tested on 2026-11-25, not rebuilt today; CI has not run on a runner |
+| **H — Operations** | **PASS for the pipeline** | deployment assets validate; CI is green end to end on `441fb73` (gate, package, CAM image smoke, advisories); studio/CAE images were last built 2026-11-25 |
 | **I — Documentation** | **PARTIAL** | README badges corrected; several historical documents still describe an older product |
 
 No gate is marked passed without a command or observation in §3.
@@ -232,7 +232,7 @@ Prior browser measurement (2026-11-25, cited, not re-run): 814 ms first load, 5,
 | PR-009 | P2, measured | Large-model performance unmeasured | 10,092-triangle fixture measured; frame time still unmeasured |
 | PR-010 | P2, partial | AI workflows use fixed parameters, not the live document | Results now carry `document_revision` and `input_source`; geometry-derived inputs remain future work |
 | PR-016 | **P0, fixed** | Workflow payloads fabricated toolpaths, media/digital-twin state and an AS9100 certificate | Unimplemented commands return `Unavailable`; tasks fail; status is derived; certificate claim removed |
-| PR-011 | P2 | CI has never executed on a runner | Run the workflow once and record it |
+| PR-011 | P2, fixed | CI had never executed on a runner | Green run on `441fb73`: gate+package, CAM image smoke and advisories all succeeded ([run](https://github.com/Sanjay-Program/atlascad/actions/runs/45947034951)) |
 | PR-012 | P2, fixed | Browser “run all” sent `auto_approve: true` silently | Button titles state the bypass and each run asks for confirmation |
 | PR-013 | P3, fixed | Contrast not measured | Rendered-DOM audit: 0 failing pairs in light and dark; enforced in the simulation |
 | PR-014 | P3 | Historical docs (`feature-matrix.md`, `production-readiness.md`) describe older capabilities | Add dated banners; rewrite at the next milestone |

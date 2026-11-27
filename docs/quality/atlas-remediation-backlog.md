@@ -20,7 +20,7 @@ numeric priority.
 | PR-009 | P2 | Performance | No 10k-face benchmark, memory ceiling or frame-time data; a 1 MiB body cap also made such imports impossible over HTTP | **measured / cap fixed** | `scripts/benchmark-large-model.py`: 10,092 triangles import in 225 ms, `/api/state` 3.89 ms / 1,028,148 bytes, STL 1.4 ms, RSS 59,020 KB. Frame time still unmeasured |
 | PR-010 | P2 | AI | Workflow tasks call analytical solvers with fixed parameters, not the active document revision | **partially fixed** | Every task result and the workflow response now record `document_revision` and `input_source: "fixed_case_parameters"`; deriving inputs from model geometry is still open |
 | PR-016 | **P0** | Engineering integrity | Workflow task payloads invented toolpath counts, cycle times, a “MasterRendered” media state, a Unity binding and a fabricated AS9100 certificate hash (`CertifiedApproved`) | **fixed, tested** | Unimplemented commands return `Unavailable` with no output; the task is marked failed; the workflow status is derived and never says “Completed”; UI no longer claims certification |
-| PR-011 | P2 | Delivery | CI was never observed on a runner; the first runs failed because `gate.sh` forced `--offline` on a cold cache | **in progress** | Gate made cache-aware for CI; awaiting the first green run and linking it |
+| PR-011 | P2 | Delivery | CI was never observed on a runner; the first runs failed because `gate.sh` forced `--offline` on a cold cache and the CAM smoke used a non-existent host binary | **fixed, CI green** | [`run 45947034951`](https://github.com/Sanjay-Program/atlascad/actions/runs/45947034951): gate+package, CAM image smoke and advisories all succeeded on `441fb73` |
 | PR-012 | P2 | UX / safety | Browser “run all” sends `auto_approve: true` without saying it bypasses review | **fixed, tested by inspection** | Button titles state the bypass and each entry point asks for confirmation before running |
 | PR-013 | P3 | Accessibility | Contrast ratios not measured (a CSS sampler had contradicted the rendered page) | **fixed, measured** | Rendered-DOM audit (`scripts/contrast-audit.mjs`) samples 334 text elements in each theme; both light and dark report 0 failing pairs and run in `simulate.sh` |
 | PR-014 | P3 | Documentation | `production-readiness.md` and `feature-matrix.md` still describe an older capability set | **partially addressed** | Dated banners added; rewrite scheduled |
@@ -30,8 +30,8 @@ numeric priority.
 
 1. **PR-004** — closed by labelling: the identity switch is demo-only, SSO is refused, and shared
    instances refuse login. A real IdP is the remaining work before hosted multi-user use.
-2. **PR-005** — an unscanned dependency graph is an unknown risk, not a passed gate (blocked on
-   tooling in this environment).
+2. **PR-005 / PR-011** — the advisory scan and the full CI pipeline are both green; keep them green
+   as dependencies change.
 3. **PR-009** — measured at 10k triangles; capture browser frame time next.
 4. **PR-006 / PR-007 / PR-012** — closed with scripted or inspected checks.
 5. **PR-008 / PR-010** — adapter and provenance work; refusal is the correct interim state.

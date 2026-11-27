@@ -33,7 +33,7 @@
 | SBOM generation | **PASS (dry run)** | CycloneDX 1.5, 112 components |
 | Advisory scan | **BLOCKED** | `cargo-deny`/`cargo-audit` absent; no scan run |
 | Real authentication | **FAIL for hosted scope** | login selects a seeded identity without a credential |
-| CI executed on a runner | **NOT DONE** | workflow exists; never run on a runner |
+| CI executed on a runner | **PASS** | green on `441fb73`: gate, package, CAM image smoke, advisories ([run](https://github.com/Sanjay-Program/atlascad/actions/runs/45947034951)) |
 
 ## 3. Data integrity
 
@@ -84,5 +84,4 @@ non-loopback use.
 
 **Do not ship as:** hosted multi-user service, enterprise SSO platform, or a system that executes
 CalculiX/OpenFOAM/ngspice jobs. The identity layer is explicitly demo-only (PR-004), the advisory
-scan is green but CI has not yet been observed green (PR-005/PR-011), and no external engine
-adapter exists (PR-008).
+scan and CI are green (PR-005/PR-011), and no external engine adapter exists (PR-008).
