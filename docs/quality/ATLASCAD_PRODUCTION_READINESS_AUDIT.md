@@ -235,7 +235,7 @@ Prior browser measurement (2026-11-25, cited, not re-run): 814 ms first load, 5,
 | PR-011 | P2, fixed | CI had never executed on a runner | Green run on `441fb73`: gate+package, CAM image smoke and advisories all succeeded ([run](https://github.com/Sanjay-Program/atlascad/actions/runs/45947034951)) |
 | PR-012 | P2, fixed | Browser “run all” sent `auto_approve: true` silently | Button titles state the bypass and each run asks for confirmation |
 | PR-013 | P3, fixed | Contrast not measured | Rendered-DOM audit: 0 failing pairs in light and dark; enforced in the simulation |
-| PR-014 | P3 | Historical docs (`feature-matrix.md`, `production-readiness.md`) describe older capabilities | Add dated banners; rewrite at the next milestone |
+| PR-014 | P3, fixed | Historical docs described older capabilities | `feature-matrix.md` rewritten from verified evidence; `production-readiness.md` kept as a dated historical record |
 | PR-017 | **P0, fixed** | `/api/report` invented a released certification package (mass, CalculiX pass, sign-offs, standards) | Now a `DRAFT_NOT_RELEASED` report from measured mesh volume with unassessed mass, no BOM, no signatures; asserted in `http_api` |
 | PR-018 | **P0, fixed** | Suite reported `AllPassed` and hid failed domains | Derived `Completed`/`Partial`, failed domains listed, standards labelled as formula basis only |
 | PR-019 | P1, fixed | Runtime audit/job/ECO/auth timestamps were 2023 constants | All 41 literals replaced by the real clock |

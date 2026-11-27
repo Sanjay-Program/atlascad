@@ -1,193 +1,76 @@
 # Feature Matrix
 
-> **Historical review (2026-10-30).** Current verified status is in
-> [`quality/ATLASCAD_PRODUCTION_READINESS_AUDIT.md`](quality/ATLASCAD_PRODUCTION_READINESS_AUDIT.md)
-> (2026-11-26). Rows below that say STEP, drawings or authentication are absent predate those
-> capabilities; the status vocabulary and evidence discipline still apply.
+> **Current (2026-11-27).** This replaces the historical 2026-10-30 review, which described an older
+> tree (`apps/`, `kernels/`) that is not part of the deployable product. Status is claimed only where
+> a test, benchmark or script exercises the capability on this host; the evidence column names it.
+> The authoritative readiness assessment is
+> [`quality/ATLASCAD_PRODUCTION_READINESS_AUDIT.md`](quality/ATLASCAD_PRODUCTION_READINESS_AUDIT.md).
 
 **Status vocabulary — used strictly:**
 
 | Status | Meaning |
 |---|---|
-| **Shipped** | Implemented in an application in this workspace, with tests in that repository (verified by reading; the full suites were not executed here — see `docs/build-and-test.md`). |
-| **Shipped (verified here)** | Implemented **and** exercised on this machine by the new adapter's tests/benchmarks. |
-| **Partial** | Implemented for a subset, or implemented with a measured defect. |
-| **Planned** | Designed, not implemented. |
-| **Absent** | Not implemented anywhere in this workspace. |
-| **Blocked** | Cannot proceed without a decision, a missing repository, or unavailable tooling. |
+| **Verified** | Exercised by a test, benchmark or script in this repository; the evidence path is named. |
+| **Partial** | Works for a subset, or works with a measured limitation stated in the note. |
+| **Absent** | Not implemented. |
+| **Refused** | The endpoint exists but returns `Unavailable` instead of inventing a result. |
 
-No row claims AutoCAD/SolidWorks parity. Where a competitor comparison would be needed, the row says
-so instead.
+No row claims parity with AutoCAD, SolidWorks, Inventor or Onshape. No row claims a certification.
 
 ---
 
-## 1. 2D drafting — CADCraft
+## Modelling and exchange
 
-Source of truth: `apps/cadcraft/README.md` "What works today" table plus the crate list. Statuses are
-**Shipped** unless noted.
-
-| Capability | Status | Note |
+| Capability | Status | Note and evidence |
 |---|---|---|
-| Lines, polylines (arcs, widths), circles, arcs, rectangles, polygons, ellipses, splines, points, xlines/rays, donut | Shipped | `LINE, PLINE, CIRCLE, ARC, RECTANG, POLYGON, ELLIPSE, SPLINE, POINT, XLINE, RAY, DONUT` |
-| Text / MTEXT with TrueType, single-stroke font, RTL | Shipped | `cadcraft-fonts`, `harfrust`, `unicode-bidi` |
-| Layers, linetypes, lineweights, ACI + true colour | Shipped | Layer Properties Manager, isolate/freeze/lock/match |
-| Object snaps (13 kinds), polar tracking, ortho, grid snap | Shipped | includes deferred tangent/perpendicular |
-| Modify: erase, move, copy, rotate, scale, mirror, stretch, offset, trim, extend, fillet, chamfer, break, join, explode, array, draw order, overkill | Shipped | |
-| Dimensions (all DIM*), dimension styles, associative dimensions, multileaders, tables | Shipped | |
-| Hatch with islands, gradients, pattern library | Shipped | pick-point boundaries |
-| Blocks, attributes, nested blocks | Shipped | |
-| Paper space, viewports, page setups, plot, export PDF | Shipped | |
-| Constraints (geometric + dimensional), expressions, AUTOCONSTRAIN, conflict detection | Shipped | `cadcraft-constraints`, 4 283 LOC |
-| Undo/redo | Shipped | copy-on-write `EntityStore` snapshots (design read; not benchmarked) |
-| Grips (stretch/move/rotate/scale/mirror) | Shipped | |
-| DXF import (R12–2018 ASCII+binary) / export (R2000) | Shipped | round-trip coverage in tests; not re-run here |
-| DWG import/export | Shipped | via `acadrust` (MPL-2.0), *"used unmodified"* |
-| SVG/PNG export | Shipped | |
-| MCP server + JSON control channel + CLI | Shipped | loopback control port |
-| **Native DWG compatibility claim** | **Not verified** | No representative DWG corpus was tested here. Do not claim native DWG support publicly without one. |
-| 3D modelling | **Absent** | CADCraft is a 2D drafting application; `cadcraft-geom` has `Vec3`/`Mat4` for transforms only, no B-rep. |
+| Parametric solid history | **Verified** | Sketch-based extrude/cut/revolve, per-feature rebuild cache, rollback of a failed edit, undo/redo; workspace tests and `scripts/simulate.sh` assert analytic volumes |
+| STEP import | **Verified** | 10,092-triangle STEP imports in 638 ms (`scripts/benchmark-large-model.py`) |
+| Export: STEP, STL, 3MF, DXF, PDF | **Verified** | `scripts/live-demo.py` DEMO 2/4 generates and checks each file; release-gate validation re-reads them |
+| 2D drafting editor | **Verified** | Entity, layer, constraint, dimension and paper-space routes; DXF/PDF output checked in the live demo |
+| Sheet metal, fasteners, gears, springs | **Verified** | Analytical generators behind `/api/cad/*`; covered by workspace tests |
+| Assemblies, mates, large-part hierarchy | **Absent** | One document, one body; `PR-014`/audit scope notes |
 
-## 2. 3D modelling — SolidCraft
+## Analysis, CAM and simulation
 
-| Capability | Status | Note |
+| Capability | Status | Note and evidence |
 |---|---|---|
-| Sketch + constraint solver | Shipped | `crates/sketch`, 23 681 LOC |
-| Parametric timeline, feature history, incremental rebuild | Shipped | only changed features recompute |
-| Extrude, revolve, sweep, loft, fillet, chamfer, shell, draft, holes, threads, patterns, mirror, split, combine | Shipped | in SolidCraft's kernel/engine; **not** in the new adapter beyond extrude and revolve (full turn or capped partial angle) |
-| Assemblies, joints, motion, interference, mass properties | Shipped | |
-| Sheet metal (flanges, hems, fold/unfold, flat patterns) | Shipped | |
-| STEP, IGES, 3MF, STL, OBJ, glTF, URDF | Shipped | via `crates/io` + patched `truck-stepio` |
-| STEP import of legacy encodings (GBK, Shift_JIS) | Shipped | `chardetng` + `encoding_rs` |
-| Desktop app, web app, headless CLI, MCP server | Shipped | all run the same command registry |
-| Correctness oracle over reference parts | Shipped (claim) | *"75 of 76 public reference parts match their analytic or FreeCAD-computed volume, area, centre of mass and bounding box"* — **read from README, not re-run** |
-| WASM build | **Unverified** | `wasm32-unknown-unknown` target and `wasm-pack` not installed here; no build attempted |
+| Linear static, modal, steady thermal | **Verified** | `/api/cae/*`; the live demo reports 384 elements, 5.57 MPa, 8,198 Hz and a thermal solution |
+| CAM toolpaths, G-code, multi-axis | **Verified** | Toolpath totals, G-code line count and 4/5-axis moves checked in `scripts/live-demo.py` |
+| Analytical simulation library | **Verified** | 30 domains behind `/api/sim/multiphysics_suite`; status is derived from the responses and lists any failed domain |
+| Analysis standards | **Partial** | Each formula names its basis (e.g. ASME B31, ICRP-103) but this is a formula reference, not an audit or certification |
+| External solvers (CalculiX, OpenFOAM, ngspice, Elmer, Gmsh) | **Refused** | No adapter and no engine installed; `/api/engines/benchmark` returns 501 with "no solver was run". See `PR-008` |
+| Regulatory certification / sign-off | **Absent** | `/api/report` returns a `DRAFT_NOT_RELEASED` report with measured volume and unassessed mass; no sign-offs are created |
 
-## 3. The shared contract — what this milestone added
+## Agents and automation
 
-Verified on this machine (2026-10-22).
-
-| Capability | Status | Evidence |
+| Capability | Status | Note and evidence |
 |---|---|---|
-| Unit system with exact conversions + DXF `INSUNITS` both ways | **Shipped (verified here)** | `cad-contract` tests |
-| Stable `EntityId`/`DocumentId` with zero-rejection and hex/JSON round trip | **Shipped (verified here)** | tests |
-| Validated `Tolerance` (rejects NaN, ≤0, units mistakes) | **Shipped (verified here)** | tests |
-| Capability discovery (`CapabilitySet`, `KernelInfo`) | **Shipped (verified here)** | tests; adapter advertises 4 of 19 |
-| Kernel error taxonomy + `is_retryable` + `ErrorKind` | **Shipped (verified here)** | tests |
-| `Mesh` interchange with `validate`, `open_edges`, `is_closed`, `signed_volume`, `surface_area`, `Aabb3` | **Shipped (verified here)** | tests incl. cube/open-patch/NaN/out-of-range |
-| Versioned `DocumentHeader` with v0→v1→v2 migrations and refusal of newer schemas | **Shipped (verified here)** | tests: migration log, newer-schema refusal, corrupt file |
-| Monotonic `Revision` with explicit overflow | **Shipped (verified here)** | test |
-| `Kernel` trait: extrude, boolean, tessellate, release, volume, bbox | **Shipped (verified here)** | mock-kernel tests + truck adapter |
-| Truck adapter: extrude | **Shipped (verified here)** | 148 753 boxes/s, exact volume |
-| Truck adapter: boolean union | **Shipped (verified here)** | 1120 mm³ ± 0.004; a face-to-face join fuses into one watertight solid (1999.900 mm³ / 1000.000 mm²) |
-| Truck adapter: boolean intersection | **Shipped (verified here)** | 40 mm³ |
-| Truck adapter: boolean **difference** | **Shipped (verified here)** | coplanar, piercing and contained cuts pass the analytic corpus at the adapter; the document requires the cut tool to clear the body's top face and refuses one that stops below it rather than accepting the raw boolean's wrong solid (measured: contained 0.776 vs 499.215 mm³, interior-plane 62.117 vs 737.17 mm³); it also refuses a cut when the kernel does not advertise `BooleanDifference` |
-| Truck adapter: boolean **chains** (3+ operands) | **Shipped (verified here)** | a nine-box union chain completes; a boolean that panics or returns no result at the configured tolerance is retried at 3e-2 and 1e-1 mm, and `boolean_escalations()` reports it. Measured 5000.136 mm³ vs analytic 5000 (0.003 % high); a five-hole cut chain is unchanged at every rung |
-| Coplanar-face booleans without a workaround | **Partial** | fails; a ~1e-4 mm tool nudge makes them work (100/100 unions needed it) |
-| Panic containment | **Shipped (verified here)** | real panic converted to `Internal` |
-| Cancellation / timeouts | **Shipped (verified here)** | `Budget` with a deadline and a cancellation token on every operation; timeout, cancellation and "the instance survives" are tested (`t-cad-kernel-truck`) |
-| Analytic boolean correctness corpus | **Shipped (verified here)** | 11 fixtures with a pass/fail table and an exit-code regression gate (`t-cad-kernel-truck-corpus`): 9 ok, 2 recorded known failures (large-coordinate intersection, now refused beyond ±1e5 mm, and the raw coplanar cut), 0 regressions, 0 unexpected passes. Both coplanar-free cut fixtures are exact (delta 0); tangent contact is promoted to must-pass after the inward retry fused it. |
-| WASM target for the contract/adapter | **Absent / unverified** | no WASM build performed |
-| STL read/write shared by CLI and app | **Shipped (verified here)** | `cad-io`: binary STL byte writer and validating reader, round-trip and malformed-input tests; not part of the `Kernel` trait |
-| STEP AP214 faceted BREP through the contract | **Shipped (verified here)** | `cad-io::step_bytes` writes ISO 10303-21 `CONFIG_CONTROL_DESIGN` with product structure, SI units and one planar `ADVANCED_FACE` per triangle — `MANIFOLD_SOLID_BREP` when the welded mesh is watertight, `SHELL_BASED_SURFACE_MODEL` when it is not; `read_step` parses the same subset back to a millimetre mesh and names a dangling reference instead of dropping it. Studio `/api/export/step`, `atlas step-import` (which prints the measured result and can write STL) and `atlas-interchange` use it. Tests: writer structure and reference integrity, cube round-trip (500 mm³), open patch, degenerate facets, units, escaped names, malformed input; the studio HTTP test re-reads the downloaded file. Analytic surfaces and assemblies are not read |
-| Fillet/chamfer through the contract | **Planned** | present in SolidCraft's kernel, not in the contract |
-| Document payload model (entities/features) | **Partial (verified here)** | `cad-document` stores an ordered sketch/feature graph (rectangle/circle/polygon/polyline/sector profiles; extrude with new-body/join/cut; revolve with an angle), named parameters, revision, and bounded undo history; no general entity graph or constraints |
-| Undo/redo through the contract | **Planned** | each app has its own; no shared transaction type yet |
+| Task graphs, workflow templates, approvals | **Verified** | 16 templates; approval is opt-in and gated commands raise an approval request (`http_api` tests) |
+| Honest refusal of unimplemented steps | **Verified** | CAD/CAM/export steps without adapters return `Unavailable`, mark the task failed and derive the workflow status; no fabricated toolpath, media or certificate payloads |
+| Workflow provenance | **Verified** | Every task records `document_revision`; inspection reports measured volume, bounds and characteristic length. Solver inputs remain a fixed 38 m reference case (PR-010) |
+| Iterative optimisation | **Partial** | Deterministic analytical mass/stress loop; `evidence_verified` is false and no compliance score is claimed |
+| Geometry-to-solver binding | **Absent** | Requires the adapters in PR-008; the response states that inputs are not model-derived |
 
-## 3b. The agent platform — what this milestone added
+## Platform, security and delivery
 
-| Capability | Status | Evidence |
+| Capability | Status | Note and evidence |
 |---|---|---|
-| Versioned agent contract: identity, metadata, capabilities, I/O schemas, budgets, error taxonomy | **Shipped (verified here)** | `cad-agent-api`, 13 tests (`t-cad-agent-api`) |
-| Agent lifecycle: `discovered → registered → ready`, with refusal to activate an agent whose contract tests failed | **Shipped (verified here)** | `cad-agent-runtime`, 16 tests (`t-cad-agent-runtime`) |
-| Capability-based permissions: effective grant = declaration ∩ owner decision; `shell`/`secrets` owner-gated | **Shipped (verified here)** | runtime tests + the geometry agent's own grant test |
-| Budget enforcement from outside the agent: call count, output size, wall clock | **Shipped (verified here)** | runtime tests; the agent cannot widen its own budget |
-| Strict JSON Schema subset with refusal of unenforced keywords | **Shipped (verified here)** | `schema.rs`; `type`, `enum`, `required`, `properties`, `items`, `minItems`, `maxItems`, `minLength`, `maxLength`, `minimum`, `maximum` |
-| Agent quarantine on panic | **Shipped (verified here)** | runtime test |
-| First real agent: extrude, boolean, tessellate, volume, bounding box, release | **Shipped (verified here)** | `cad-agent-geometry`, 24 tests (`t-cad-agent-geometry`) |
-| Bounded, confined file read inside an agent workspace | **Shipped (verified here)** | single path component, no separators, no `..`, symlink-resolved path must stay inside the workspace, 1 MiB cap |
-| Import/export agent | **Planned** | declared, not implemented (`agents.json`, `implemented: false`) |
-| Design-rule-check agent | **Planned** | declared, not implemented |
-| Natural-language-to-CAD agent | **Planned** | declared, not implemented; needs a model provider and a credential policy |
-| Scheduled or isolated agent execution | **Absent** | the registry is synchronous and in-process; process isolation for third-party agents is recorded as the strategy, not implemented |
-| Agents in either desktop application | **Absent** | neither app depends on the runtime yet |
+| Identity and sessions | **Partial / demo only** | Login switches a local demo identity; `credential_verified` is false, SSO is refused, and shared instances refuse login (PR-004) |
+| Token-gated sharing | **Verified** | Share mode binds `0.0.0.0` only with a token; 4 share assertions in `simulate.sh` |
+| Audit trail | **Verified** | Double-round FNV-1a tamper-evident chain with integrity verification; exposed as traceability, not compliance |
+| Collaboration presence, locks, comments | **Partial** | In-memory optimistic leases and comments; no CRDT merge or durable multi-user history |
+| Persistence and recovery | **Partial** | Save/reopen, autosave recovery snapshot; named revision history is absent |
+| Accessibility and contrast | **Verified** | 191/191 controls named; rendered-DOM contrast 0 failures in light and dark (`simulate.sh`) |
+| Large-model performance | **Verified** | 10,092 triangles: import 638 ms, `/api/state` 9.3 ms, STL 3.3 ms, RSS 59 MB; headless frame sample 59.4 fps (SwiftShader) |
+| Deterministic packaging, SBOM, CI | **Verified** | `scripts/package.sh`, licence policy, SBOM, advisories; CI green on `b4e342d` |
+| Licensing, billing, entitlement provider | **Absent** | `cad-entitlements` is local policy only |
+| Installer, code signing, update channel | **Absent** | Checksummed tarball only |
 
-## 3c. Atlas Studio — the local application added 2026-10-25, extended 2026-10-29
+---
 
-Verified on this machine by `cargo test -p cad-studio` (HTTP integration tests) and by exercising the
-running app in a browser at 392 px and full width; the multi-feature workflow is recorded in
-`docs/quality/m11-feature-graph.md`.
+## What would change a status
 
-| Capability | Status | Evidence / limit |
-|---|---|---|
-| Local project create/open/save as versioned `.zcad` JSON | **Shipped (verified here)** | `Project::save`/`load`, CLI `--new`/`--file`, API `/api/save`; save is atomic via a temporary file |
-| Rectangle, circle, regular-polygon, drawn-polyline and arc-sector sketch profiles | **Shipped (verified here)** | profile switch API and UI; polygon sides 3–256; a drawn loop is 3–256 points and is validated (finite, no repeated consecutive point, non-zero area) before it reaches the kernel; a sector is one arc of its diameter circle (start/sweep in degrees, sweep strictly between 0 and 360) tessellated at the circle's chord tolerance scaled to the swept fraction, then validated by the same gate |
-| Named parameters (width, height, depth) with re-evaluation | **Shipped (verified here)** | dependency-aware parameter map; 0.1–10,000 mm bounds; invalid values rejected with a typed error; an edit rebuilds every dependent feature |
-| Ordered feature graph: multiple sketches, extrudes and revolves with stable IDs | **Shipped (verified here)** | `.zcad` schema 11; a feature may only reference an earlier sketch; schema-1…10 migration on load |
-| Incremental rebuild (`BuildCache`) | **Shipped (verified here)** | the body after each feature prefix is cached by resolved inputs; an unchanged request does no kernel work and an edit re-runs only the features that read it. Session-scoped, never persisted; a shared parameter still invalidates every feature that reads it (`docs/performance-baseline.md` §9) |
-| Extrude as `new_body`, `join` (union) or `cut` (difference) | **Shipped (verified here)** | cut through `Kernel::boolean(Difference)`; refused with a stated reason if the kernel does not advertise it; a plate minus a coplanar tool measures the analytic cut volume; the same capability gate and failure reporting the join uses |
-| Sketch plane height and extrude direction | **Shipped (verified here)** | a sketch carries a plane height in document units and an extrude sweeps up or down from it; a blind pocket on plane 3 removes its analytic 2 mm depth, a through-hole swept down from plane 5 is exact, and a boss joined on the same plane is exact, all over HTTP against the real kernel with watertight exports. A kernel without `Transform` refuses a raised plane with a stated reason. Horizontal planes only; the plane is part of the rebuild-cache key (`docs/performance-baseline.md` §11) |
-| Revolve about a sketch axis, full turn or partial | **Shipped (verified here)** | `Kernel::revolve` through truck's `rsweep`; a rectangle on the axis measures the analytic cylinder (150.796 mm³) and an offset rectangle the analytic annulus (113.097 mm³), both watertight; a 90° turn of an offset rectangle measures the analytic quarter annulus (2356.194 mm³) and a 180° turn on the axis the analytic half cylinder (785.398 mm³), both watertight; the angle is stored in `.zcad` schema 11 (schema-10 files default to a full turn); an unknown axis, an angle outside 0–360° and a profile crossing the axis are refused with a reason; save/reopen and STL export covered over HTTP |
-| Feature tree and selection | **Shipped (verified here)** | ordered sketch + feature rows with operation, depth and `built`/`failed`/`pending` status; click to select, properties follow selection |
-| Feature failure reporting | **Shipped (verified here)** | the failing feature is named with the kernel message, the last good mesh stays renderable, and export is refused while the history does not rebuild |
-| 3D viewport: orbit, zoom, pan, fit, front/top/right views | **Shipped (verified here)** | WebGL 1, per-face highlight; frame/grid/wireframe toggles |
-| Face picking and inspection | **Shipped (verified here)** | ray-cast against the tessellation; hit point, normal, and Z readout in the status bar |
-| Undo / redo | **Shipped (verified here)** | bounded snapshot history in the document; UI buttons, shortcuts, and palette commands |
-| Crash recovery for unsaved edits | **Shipped (verified here)** | `<file>.recovery` snapshot written atomically after every edit; restored on start when it belongs to the current file version, with a banner and a discard action; a corrupt snapshot is ignored and a truncated project file falls back to the snapshot or, with no snapshot, to the previous good `<file>.backup`; `kill -9` measured before and after |
-| Named revisions / version history | **Shipped (verified here)** | `.zcad` schema 11 stores up to 32 named, timestamped copies of the editable history; restore by ID is one undo away and survives save/reopen; delete does not touch geometry; Revisions panel and palette commands; no diff, branch, merge or cloud copy |
-| Command palette | **Shipped (verified here)** | project, sketch, view, parameter, theme, and help commands; disabled commands are visibly disabled, not fake |
-| STL export | **Shipped (verified here)** | `/api/export/stl` through `cad-io`, validated mesh before writing |
-| Drawing editor and DXF export | **Shipped (verified here)** | `/api/draft` returns the plan built from the sketch (layers, entities, bounds, total length) and `/api/export/dxf` writes DXF R12. The panel draws the plan as SVG and edits it: Line, Circle, Poly, Point, Dim and Text tools post to `/api/draft/entity`; delete, undo/redo, layer creation and layer on/lock are separate routes; `/api/draft/save` writes `<stem>.zdraft` beside the project and the panel then reports `source: file`, after which the model no longer overwrites it. Every route is behind the same token gate (401 without it in a shared studio). Drafting never calls the kernel, so a failed feature leaves the drawing intact. One plan view per project; the editor is click-based with no snapping, grips or trimming |
-| Text and linear dimensions | **Shipped (verified here)** | `Text` and `Dimension` entities with validation (`MAX_TEXT_CHARS`, positive text height, two distinct dimension points), rendered in the page and on the sheet, written to DXF (a dimension exploded into extension lines, a dimension line, two ticks and a `TEXT` value) and read back as that geometry. No rotation, no radius/diameter/angular dimensions, no dimension style; imported `DIMENSION` records are still skipped and counted |
-| Sheet plot to PDF | **Shipped (verified here)** | `Sheet` covers A4, A3, A2, A1, A0 and Letter, portrait or landscape, an explicit scale (1:2 is `2`) or a standard `fit` that never enlarges; it refuses a scale that does not fit and names the smallest standard scale that does. The page has a frame, a title block (title, number, revision, author, date, scale, unit, paper, entity count) and overall dimensions. `to_pdf` writes uncompressed PDF 1.4 with base-14 Helvetica: `pdftotext` extracts every field and `pdftoppm` renders it. One page per plot, no PDF/A, no sheet set |
-| DXF import into a drawing | **Shipped (verified here)** | `cad-drafting`'s reader (CLI `atlas dxf-import`): layer table with ACI colour, off and locked state, `$INSUNITS`, LINE/CIRCLE/ARC/POINT/POLYLINE/LWPOLYLINE; TEXT/MTEXT/DIMENSION/HATCH/blocks/splines are counted in an import report rather than dropped silently; a malformed file fails naming the offending group. Exposed in the studio as `POST /api/draft/import` and through the viewport drop handler and **Import DXF** control: the drawing becomes `source: imported`, the model stops regenerating it, and the import report names every skipped kind. The studio's JSON body cap limits an import to 1 MiB (the CLI has no such cap). No real vendor-file corpus |
-| Deployable shapes: container image, hardened systemd unit, TLS proxy | **Shipped (verified here)** | the image is built by `deploy/build-image.sh` and smoke-tested by `--smoke` (healthy, `/api/health` without a token, anonymous `/api/state` 401, tokenised 200, a plotted PDF); the unit passes `systemd-analyze verify`; the proxy shape was run against the release binary with a real `Host` and an `https://` Origin. One document per process, one token, no accounts, no revocation without restart, no in-process TLS, no audit trail, unsigned image — `docs/operations/deployment.md` |
-| Public liveness route | **Shipped (verified here)** | `GET /api/health` is the only `/api/` route a shared studio answers without a token; it returns `ok` and the version and names nothing about the document |
-| Sharing one live session on the local network | **Shipped (verified here)** | `--share`/`--host` binds the LAN interface with a generated or supplied 128-bit token; every `/api/*` call must present it (`X-Atlas-Token` or `?token=`), the page offers the link under **Share**, and the token is compared without an early-exit. Covered by HTTP tests (401 without/with a wrong token, query and header forms, a token-bearing edit) and a headless-browser run of a shared page; no account, no concurrent merge — whoever writes last wins |
-| Light/dark theme, responsive drawers, keyboard help | **Shipped (verified here)** | persisted theme choice; inspectors accessible below 980 px |
-| Diagnostics log and typed API errors | **Shipped (verified here)** | request failures carry codes (`invalid_request`, `invalid_parameter`, `not_found`, `export_failure`, …) |
-| Sketch constraints, dimensions, arcs/splines | **Absent** | Stage A remainder (drawing entities already support arcs; sketch profiles do not) |
-| Drawing sheets beyond a single titled page: multiple layouts, projected/section/detail views, GD&T, BOM, sheet sets, batch plot | **Absent** | one plan view on one titled page exists; everything that turns it into a drawing set does not |
-| Sweep, loft, arbitrary-axis revolve, fillet, chamfer, shell, patterns | **Absent** | extrude, cut and revolve (full turn or partial, about a sketch axis) are implemented and verified; the others are later milestones |
-| Multiple bodies / assemblies | **Absent** | a second `new_body` is refused by design; Stage B |
-| STL/STEP/IGES/DXF import | **Partial (STEP and DXF wired)** | `POST /api/import/step` adds a STEP part to the `.zcad` document as a named mesh body (schema 11), merged into the built geometry, measured, exported and undoable; `POST /api/draft/import` loads a DXF drawing; `atlas step-import` validates a file and writes STL. Imported bodies are meshes, not parametric features: no fillet, boolean or sketch edit applies to them. STL/IGES/3MF/OBJ import into the 3D model is absent. The studio JSON body cap limits an upload to 1 MiB |
-| Drawings, mass-property UI, materials | **Absent** | later milestones |
-| Native file dialogs / document picker | **Absent** | save is explicit and the project path is a command-line argument; unsaved edits are snapshotted and recovered automatically |
-| Accounts, cloud sync, telemetry | **Absent** | no outbound network call; `--share` serves one session on the local network behind a token and stops when the process stops |
-| Native desktop shell | **Absent** | see ADR-0008 |
-
-## 4. Platform capabilities (brief §16–§19)
-
-| Capability | Status | Note |
-|---|---|---|
-| AI assistant over structured CAD commands | **Shipped** (both apps) | SolidCraft has an in-app agent chat + ACP support; CADCraft has an MCP server. Both are command-typed, not code execution. |
-| MCP server | **Shipped** (both) | SolidCraft: `solidcraft-cli mcp`; CADCraft: `cadcraft-cli mcp` |
-| Collaboration (Yrs/Yjs, multi-user) | **Absent** | correctly deferred; single-user persistence is not stable yet |
-| SaaS backend (auth, Postgres, object storage, billing) | **Absent** | no server crate exists in either app; no cloud dependency added |
-| Multi-tenant isolation / RBAC / audit logs | **Absent** | |
-| Rate limiting on expensive operations | **Absent** | |
-| WASM/browser build | **Unverified** | web apps exist in source (`solidcraft-web`), not built here |
-| Native packaging (MSI, DMG, AppImage, Snap, winget, Flatpak) | **Shipped** (source + CI configs) | `packaging/` + workflows present; not executed here |
-| CI | **Shipped** (source) | CADCraft: 5 workflows; SolidCraft: 13 workflows |
-| Benchmarks in CI | **Absent** | the harness in this repo is manual |
-| Dependency/advisory gates in CI | **Absent / partial** | SolidCraft has `deny.toml`; CADCraft has none; no advisory scan was run here |
-
-## 5. What must not be claimed publicly today
-
-1. **"Native DWG compatibility."** Untested against representative files.
-2. **"AutoCAD/SolidWorks parity."** No comparative benchmark exists; the brief forbids the claim.
-3. **"Runs in the browser."** The source and CI suggest it; no WASM build was performed here.
-4. **"AI can model anything."** The command surface is bounded; failure modes and limits were not
-   characterised.
-5. **"Booleans work."** Union, intersection and (now) difference do; boolean chains complete through a
-   documented tolerance escalation (3e-2 mm), at a measured 0.003 % volume cost. Face-to-face joins
-   fuse into one watertight solid via a 1e-3 mm inward retry, and contained unions complete. The
-   corpus still records two failures — booleans beyond ±1e5 mm are refused, and the raw coplanar cut
-   fails.
-6. **"Zero dependencies on native code."** True for truck, false for `acadrust`-based DWG or anything
-   OCCT-based.
-7. **"The agent platform is production-ready."** One agent exists and runs; there is no scheduler,
-   no persistence of registrations, no process isolation for third-party code, and no second agent to
-   show that the contract is not accidentally geometry-specific.
-8. **"Atlas Studio is a CAD product."** It is a verified single-feature local workflow: one sketch,
-   one extrusion, parameters, undo, save, and STL export. It has no constraints, booleans, drawings,
-   assemblies, collaboration, or cloud services, and its browser shell is not a native desktop app.
+1. PR-008: an engine adapter that executes and validates real output (or removal of the run UI).
+2. PR-010: a document-geometry adapter that feeds the solvers, with the bound inputs recorded.
+3. PR-004: a real identity provider before any hosted multi-user deployment.
+4. Assembly support and durable collaboration history.
