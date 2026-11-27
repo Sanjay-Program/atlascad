@@ -89,7 +89,7 @@ chmod 0755 "$work"
 chmod 0777 "$results" "$refused_results" "$record_results"
 
 printf '==> a known part: 20 x 20 x 12 mm block in a 40 x 30 x 20 mm stock\n'
-target/release/atlas box --size 20,20,12 --out "$work/part.stl" >/dev/null
+target/$target/release/atlas box --size 20,20,12 --out "$work/part.stl" >/dev/null
 
 cat >"$work/job.json" <<'JSON'
 {
@@ -183,7 +183,7 @@ inputs_after="$(sha256sum "$work/job.json" "$work/part.stl" | cut -d' ' -f1 | tr
 }
 
 printf '==> the container records the program against a design revision\n'
-target/release/atlas project new --file "$work/bracket.zcad" --name "container bracket" --size 40,30,20 >/dev/null
+target/$target/release/atlas project new --file "$work/bracket.zcad" --name "container bracket" --size 40,30,20 >/dev/null
 project_before="$(sha256sum "$work/bracket.zcad" | cut -d' ' -f1)"
 status=0
 docker run --rm \
@@ -205,7 +205,7 @@ docker run --rm \
     echo "smoke failed: the recorded project was not published" >&2
     exit 1
 }
-target/release/atlas artifacts check --project "$record_results/project.zcad" >/dev/null 2>"$work/record-check.stderr" || {
+target/$target/release/atlas artifacts check --project "$record_results/project.zcad" >/dev/null 2>"$work/record-check.stderr" || {
     echo "smoke failed: the recorded toolpath does not pass the release gate; stderr:" >&2
     cat "$work/record-check.stderr" >&2
     exit 1
@@ -234,7 +234,7 @@ docker run --rm \
 }
 
 printf '==> a holder collision is refused and publishes nothing\n'
-target/release/atlas box --size 20,20,19 --out "$work/island.stl" >/dev/null
+target/$target/release/atlas box --size 20,20,19 --out "$work/island.stl" >/dev/null
 python3 - "$work/job.json" "$work/collision.json" <<'PY'
 import json
 import sys
