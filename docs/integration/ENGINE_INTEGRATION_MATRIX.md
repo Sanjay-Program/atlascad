@@ -1,5 +1,10 @@
 # AtlasCAD — Engine Integration Matrix
 
+
+> **Status correction (2026-11-27).** The execution models and formats below are the researched
+> upstream capabilities, not wired adapters. Only CalculiX and ngspice execute (benchmark scope).
+> See [`../ecosystem/INTEGRATION_PROGRESS.md`](../ecosystem/INTEGRATION_PROGRESS.md).
+
 | Engine ID | Discipline | Upstream Version | Execution Model | Input Formats | Output Formats | Capabilities |
 |:---|:---|:---|:---|:---|:---|:---|
 | `truck` | Mechanical / CAD | `0.6.0` | InProcess | Native Rust structs | TriMesh, STEP | B-Rep solid modeling, booleans, sweeps |

@@ -41,7 +41,7 @@ This audit establishes the baseline of the active codebase as of November 2026.
 | **3D B-Rep Modeling** | **PRODUCTION_READY** | Exact analytic topology via patched truck: Extrude (Join/Cut/New), Revolve, Cut, Hole, Boss. |
 | **Document Transactions** | **PRODUCTION_READY** | ACID document transactions, crash journal recovery (`part.zcad.recovery`), unlimited undo/redo. |
 | **Engineering Simulation**| **PRODUCTION_READY** | Built-in linear FEA (Von Mises), modal dynamic frequencies, steady-state thermal, and CNC CAM toolpaths. |
-| **Engine Ecosystem** | **PRODUCTION_READY** | 24 verified upstream engines registered with process isolation, license compliance, and health monitoring. |
+| **Engine Ecosystem** | **Partial** | 24 registry entries and installation guides; only CalculiX and ngspice have real process adapters, and both are benchmark-scoped. The other 22 refuse with `501`. |
 | **Discipline Ribbon UX** | **PRODUCTION_READY** | Context-sensitive ribbons for 14 engineering disciplines (Mechanical, BIM, ECAD, Power, Chemical, Robotics, Aero, Environmental). |
 | **Viewport & HUDs** | **PRODUCTION_READY** | WebGL 3D canvas, Autodesk ViewCube, Floating NavBar, Feature HUD, 3D Measurement HUD, and Result Viewer HUD with scalar heatmaps. |
 | **AutoCAD CLI & Dynamic** | **PRODUCTION_READY** | Real-time command prompt autocomplete, dynamic coordinate input tooltip (`DYNMODE`), and 50+ command aliases. |

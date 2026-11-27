@@ -2,6 +2,11 @@
 
 ## 1. Overview & Integration Objectives
 
+
+> **Status correction (2026-11-27).** This plan lists intended integrations, not delivered ones.
+> Only CalculiX and ngspice have execution adapters (benchmark scope); all other external engines
+> refuse with `501`. See [`../ecosystem/INTEGRATION_PROGRESS.md`](../ecosystem/INTEGRATION_PROGRESS.md).
+
 The objective is to integrate verified, world-class open-source engineering engines into AtlasCAD without creating an unmanageable monolithic binary or violating open-source software licenses.
 
 AtlasCAD serves as the primary native workstation application; external tools are orchestrated via clean, typed Rust adapter boundaries, structured input generators, asynchronous runners, and telemetry result parsers.
@@ -54,18 +59,18 @@ The initial integration batch targets the most critical engineering workflows:
 
 | Engine | Discipline | Upstream Pinned Version | Integration Path | Status |
 |:---|:---|:---|:---|:---|
-| **truck** | 3D CAD B-Rep | `0.6.0` (pinned) | Pure Rust dependency | **PRODUCTION_READY** |
-| **CalculiX** | Structural FEA | `2.21` | Process-isolated CLI (`ccx`) | **ADAPTED** |
-| **Gmsh** | Mesh Generation | `4.13.1` | Process-isolated CLI | **ADAPTED** |
-| **OpenFOAM** | CFD Fluid Dynamics | `v11` | Case generator & subprocess | **ADAPTED** |
-| **SU2** | Aerodynamics | `8.0.1` | Config generator & CLI | **ADAPTED** |
-| **ngspice** | ECAD / SPICE | `ngspice-43` | C ABI / CLI runner | **ADAPTED** |
-| **pandapower**| Electrical Grid | `2.14.11` | Python IPC bridge | **ADAPTED** |
-| **IfcOpenShell** | OpenBIM (IFC) | `0.7.0` | CLI parser & serializer | **ADAPTED** |
-| **MuJoCo** | Robotics Physics | `3.1.5` | C API wrapper | **ADAPTED** |
-| **EnergyPlus**| Building Energy | `24.1.0` | IDF generator & CLI | **ADAPTED** |
-| **OpenVSP** | Aircraft Design | `3.38.0` | VSP3 script generator & CLI | **ADAPTED** |
-| **EPANET** | Water Hydraulics | `2.2.0` | C ABI (`libepanet2`) | **ADAPTED** |
+| **truck** | 3D CAD B-Rep | `0.6.0` (pinned) | Pure Rust dependency | **BUILT-IN / TESTED** |
+| **CalculiX** | Structural FEA | `2.21` | Process-isolated CLI (`ccx`) | **BENCHMARK ADAPTER** |
+| **Gmsh** | Mesh Generation | `4.13.1` | Process-isolated CLI | **NO ADAPTER** |
+| **OpenFOAM** | CFD Fluid Dynamics | `v11` | Case generator & subprocess | **NO ADAPTER** |
+| **SU2** | Aerodynamics | `8.0.1` | Config generator & CLI | **NO ADAPTER** |
+| **ngspice** | ECAD / SPICE | `ngspice-43` | C ABI / CLI runner | **BENCHMARK ADAPTER** |
+| **pandapower**| Electrical Grid | `2.14.11` | Python IPC bridge | **NO ADAPTER** |
+| **IfcOpenShell** | OpenBIM (IFC) | `0.7.0` | CLI parser & serializer | **NO ADAPTER** |
+| **MuJoCo** | Robotics Physics | `3.1.5` | C API wrapper | **NO ADAPTER** |
+| **EnergyPlus**| Building Energy | `24.1.0` | IDF generator & CLI | **NO ADAPTER** |
+| **OpenVSP** | Aircraft Design | `3.38.0` | VSP3 script generator & CLI | **NO ADAPTER** |
+| **EPANET** | Water Hydraulics | `2.2.0` | C ABI (`libepanet2`) | **NO ADAPTER** |
 
 ---
 
