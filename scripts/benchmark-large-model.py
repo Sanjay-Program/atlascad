@@ -19,6 +19,7 @@ does not match the generated count.
 import argparse
 import json
 import os
+import shutil
 import statistics
 import subprocess
 import sys
@@ -28,6 +29,31 @@ import urllib.error
 import urllib.request
 
 ORIGIN = "http://127.0.0.1:{port}"
+
+
+def sample_frames(url, seconds):
+    """Ask the headless-Chrome sampler for frame times; a missing browser is a recorded skip."""
+    node = shutil.which("node")
+    if not node:
+        return {"skipped": "node is not installed"}
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frame-sample.mjs")
+    try:
+        run = subprocess.run(
+            [node, script, url, "--seconds", str(seconds), "--json"],
+            capture_output=True,
+            text=True,
+            timeout=seconds + 90,
+        )
+    except subprocess.TimeoutExpired:
+        return {"skipped": "frame sampler timed out"}
+    output = run.stdout.strip()
+    if run.returncode != 0 or not output.startswith("{"):
+        detail = (run.stderr or output or "no output").strip().replace("\n", " ")[:200]
+        return {"skipped": detail}
+    try:
+        return json.loads(output)
+    except json.JSONDecodeError as error:
+        return {"skipped": f"unparseable sampler output: {error}"}
 
 
 def free_port():
@@ -254,6 +280,12 @@ def main():
     parser.add_argument("--binary", default=None)
     parser.add_argument("--grid", type=int, default=29)
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--frames-seconds",
+        type=float,
+        default=5.0,
+        help="headless frame-sampling window; 0 disables it",
+    )
     args = parser.parse_args()
 
     if args.grid < 1:
@@ -308,6 +340,12 @@ def main():
             imported_triangles = stl_triangles - base_triangles
             rss_loaded = studio.rss_kb()
 
+            frame_sample = (
+                sample_frames(studio.base, args.frames_seconds)
+                if args.frames_seconds > 0
+                else {"skipped": "disabled by --frames-seconds 0"}
+            )
+
             result = {
                 "fixture": f"100 mm box surface, {args.grid}x{args.grid} quads per face",
                 "generated_triangles": expected,
@@ -323,6 +361,7 @@ def main():
                 "rss_idle_kb": rss_idle,
                 "rss_loaded_kb": rss_loaded,
                 "binary": args.binary,
+                "frame_sample": frame_sample,
             }
             if args.json:
                 print(json.dumps(result, indent=2))
