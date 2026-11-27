@@ -33,7 +33,7 @@ invented ROI and no claim that a commercial product has been replaced.
    single document file with no database.
 3. **Breadth of analytical engineering models.** 140 analytical solvers with 213 unit tests, exposed
    through a single local API.
-4. **Test density in critical logic.** 879 workspace tests, an 11-fixture analytic corpus, and a
+4. **Test density in critical logic.** 882 workspace tests, an 11-fixture analytic corpus, and a
    1,206-assertion product harness.
 
 None of these is a substitute for assemblies, real authentication, or external solver adapters.

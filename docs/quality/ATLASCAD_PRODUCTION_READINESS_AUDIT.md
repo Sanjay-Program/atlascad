@@ -57,7 +57,7 @@ own fields instead of a 2023 constant and the command name.
 | --- | --- | --- | --- |
 | Formatting | `cargo fmt --all --check` | pass | gate step |
 | Lints | `cargo clippy --offline --workspace --all-targets -- -D warnings` | pass, 0 warnings | gate step |
-| Workspace tests | `cargo test --offline --workspace -j 2` | **879 passed, 0 failed, 116 suites** | gate + count |
+| Workspace tests | `cargo test --offline --workspace -j 2` | **882 passed, 0 failed, 116 suites** | gate + count |
 | HTTP integration | `cargo test -p cad-studio --test http_api` | **48 passed** | test |
 | Analytic kernel corpus | `cargo run -p cad-kernel-truck --example corpus` | 11 fixtures: 9 pass, 2 recorded known-failures, **0 regressions** | gate |
 | Engineering manifests | `atlas-eng validate` | 0 errors, 0 warnings across 14 files | gate |
@@ -180,7 +180,7 @@ Status vocabulary: **verified** (exercised by a test or the live server in this 
 
 | Gate | Status | Basis |
 | --- | --- | --- |
-| **A — Build** | **PASS** | fmt, clippy `-D warnings`, 879 tests, release build |
+| **A — Build** | **PASS** | fmt, clippy `-D warnings`, 882 tests, release build |
 | **B — Functional** | **PASS for tested core; PARTIAL overall** | CAD, drafting, export and recovery are exercised end to end; CAM/CAE/simulation UI journeys were not hand-driven in this pass |
 | **C — Data integrity** | **PASS for single-document scope** | atomic save, revisions, recovery, concurrency, stale-artifact propagation; command/health timestamps fixed |
 | **D — Security** | **PARTIAL** | token/origin/CSP/body caps/non-root image are real; login is labelled demo-only and refused on shared instances; advisory scan green |

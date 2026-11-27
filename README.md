@@ -4,7 +4,7 @@
 [![Rust](https://img.shields.io/badge/Rust-1.94%2B-orange.svg?logo=rust)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/License-Proprietary%20%2F%20Commercial-blue.svg)](LICENSE)
 [![Safety](https://img.shields.io/badge/Unsafe%20Code-FORBIDDEN-brightgreen.svg)](#security-and-safety)
-[![Tests Passing](https://img.shields.io/badge/Tests-879%20Passed%20(100%25)-success.svg)](#testing-and-verification)
+[![Tests Passing](https://img.shields.io/badge/Tests-882%20Passed%20(100%25)-success.svg)](#testing-and-verification)
 [![Assertions](https://img.shields.io/badge/Assertions-1%2C206%20Verified-success.svg)](#testing-and-verification)
 
 AtlasCAD is a modern, high-performance, local-first engineering workspace built in memory-safe Rust with WebGL 2.0 visualization. It unites parametric 3D B-Rep CAD, precision 2D drafting, multiphysics engineering simulation (FEA, thermal, modal, chemical reacting flows), 3-axis CNC CAM, an interactive 6-DOF aerodynamic flight physics simulator, a content-addressed multi-tier asset store, and real-time multi-user collaboration.
@@ -236,7 +236,7 @@ The `cad-studio` binary exposes a comprehensive, self-documenting HTTP REST API:
 AtlasCAD enforces the highest standards of software verification and safety:
 
 - **`#![forbid(unsafe_code)]`**: Unsafe code is forbidden across all platform crates.
-- **Comprehensive Test Suite**: 879 workspace tests passing (116 suites), including 48 out of 48 HTTP integration tests in `crates/cad-studio/tests/http_api.rs`.
+- **Comprehensive Test Suite**: 882 workspace tests passing (116 suites), including 49 out of 49 HTTP integration tests in `crates/cad-studio/tests/http_api.rs`.
 - **Exhaustive Verification Script**: `python3 scripts/full-check.py` validates **1,206 assertions** across sketch profiles, Boolean operations, drafting, FEA simulation, CAM toolpaths, audit chains, asset store permissions, and collaboration locks.
 - **Zero Clippy Warnings**: Maintained under `cargo clippy --workspace --all-targets --all-features -- -D warnings`.
 
