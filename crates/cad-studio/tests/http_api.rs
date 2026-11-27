@@ -3575,6 +3575,38 @@ fn drafting_autocad_advanced_endpoints() -> Result<(), Box<dyn std::error::Error
 }
 
 #[test]
+fn engine_benchmark_runs_a_real_solver_or_refuses() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("engine_benchmark", [20.0, 20.0, 10.0])?;
+    let response = post(
+        handle.addr(),
+        "/api/engines/benchmark",
+        r#"{"engine_id":"calculix"}"#,
+    )?;
+    // With ccx installed the endpoint must return a measured solve; without it, a refusal. It
+    // must never return an invented accuracy score.
+    if response.status == 200 {
+        let data = json(&response)?;
+        assert_eq!(data["benchmark_status"], "completed");
+        let metrics = data["metrics"].as_object().ok_or("metrics")?;
+        assert_eq!(metrics["nodes"], 45);
+        assert_eq!(metrics["elements"], 16);
+        let error = metrics["error_percent"].as_f64().ok_or("error_percent")?;
+        assert!(error < 1.0, "solver deviates from theory by {error}%");
+        assert!(
+            data["provenance_hash"]
+                .as_str()
+                .ok_or("provenance")?
+                .starts_with("fnv1a64-")
+        );
+    } else {
+        assert_eq!(response.status, 501);
+        let body = String::from_utf8_lossy(&response.body).to_lowercase();
+        assert!(body.contains("no solver was run"), "{body}");
+    }
+    Ok(())
+}
+
+#[test]
 fn mass_properties_interference_and_bom_api() -> Result<(), Box<dyn std::error::Error>> {
     let (_dir, _path, handle) = fixture("mass_prop_test", [20.0, 20.0, 10.0])?;
     let addr = handle.addr();

@@ -15812,6 +15812,27 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                 if registry.get(&engine_id).is_none() {
                     return error_response(&StudioError::NotFound);
                 }
+                // CalculiX has a real adapter: report the detected binary and version rather than
+                // the registry's static "no adapter" message.
+                if engine_id.as_str() == "calculix"
+                    && let Some(executable) = atlas_engine_manager::calculix::discover_executable()
+                {
+                    let version = atlas_engine_manager::calculix::probe_version().ok();
+                    return json_response(
+                        200,
+                        serde_json::json!({
+                            "engine_id": "calculix",
+                            "status": "healthy",
+                            "details": format!(
+                                "CalculiX `ccx` process adapter available at {}",
+                                executable.display()
+                            ),
+                            "latency_ms": 1,
+                            "detected_version": version,
+                            "timestamp": now_epoch_millis() / 1000,
+                        }),
+                    );
+                }
                 let report = registry.test_health(&engine_id);
                 let payload = serde_json::json!({
                     "engine_id": report.engine_id.as_str(),
@@ -15885,6 +15906,36 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                 let engine_id = cad_engineering::engine::EngineId::new(body.engine_id);
                 if registry.get(&engine_id).is_none() {
                     return error_response(&StudioError::NotFound);
+                }
+                // A real `ccx` adapter runs a deterministic tension-bar benchmark and parses the
+                // solver's own output. Without the binary this falls through to the refusal.
+                if engine_id.as_str() == "calculix"
+                    && atlas_engine_manager::calculix::discover_executable().is_some()
+                {
+                    let timeout = std::time::Duration::from_secs(
+                        body.timeout_seconds.unwrap_or(30).clamp(5, 120),
+                    );
+                    return match atlas_engine_manager::calculix::run_tension_bar_benchmark(timeout)
+                    {
+                        Ok(benchmark) => {
+                            let metrics =
+                                serde_json::to_value(&benchmark).unwrap_or(serde_json::Value::Null);
+                            json_response(
+                                200,
+                                serde_json::json!({
+                                    "engine_id": "calculix",
+                                    "benchmark_status": "completed",
+                                    "execution_time_ms": benchmark.elapsed_ms,
+                                    "accuracy_score": benchmark.accuracy_score,
+                                    "metrics": metrics,
+                                    "provenance_hash": benchmark.provenance_hash,
+                                }),
+                            )
+                        }
+                        Err(message) => error_response(&StudioError::Unavailable(format!(
+                            "CalculiX adapter did not produce a verified benchmark: {message}"
+                        ))),
+                    };
                 }
                 let job_req = cad_engineering::engine::EngineJobRequest {
                     job_id: body.job_id.unwrap_or_else(|| "benchmark-1".to_string()),

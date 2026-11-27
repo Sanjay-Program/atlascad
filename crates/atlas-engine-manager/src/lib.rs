@@ -4,6 +4,7 @@
 //! and job dispatching across 24 specialist open-source engineering engines.
 
 pub mod adapters;
+pub mod calculix;
 pub mod capability;
 pub mod configuration;
 pub mod discovery;

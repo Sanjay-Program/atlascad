@@ -338,13 +338,21 @@ def run_live_demo() -> None:
         print("\n[DEMO 8] Upstream Solvers Discovery & Honest Refusal")
         disc = http_request(port, "GET", "/api/engines/discovery")
         check(disc["count"] == 24, "All 24 open-source canonical engines registered")
+        bench = None
         refused = False
         try:
-            http_request(port, "POST", "/api/engines/benchmark", body={"engine_id": "calculix"})
+            bench = http_request(port, "POST", "/api/engines/benchmark", body={"engine_id": "calculix"})
         except RuntimeError as err:
             refused = "501" in str(err) and "no solver was run" in str(err)
-        check(refused, "benchmark refuses without an installed adapter (no fabricated accuracy)")
-        print("  ✓ Engine Orchestration: 24 upstream solvers registered; CalculiX benchmark refused (501, no adapter installed)")
+        if bench:
+            metrics = bench.get("metrics", {})
+            check(bench.get("benchmark_status") == "completed", "CalculiX benchmark completed")
+            check(metrics.get("error_percent", 100) < 1.0, f"CalculiX tip extension within 1% of F L/(A E) ({metrics.get('error_percent')}%)")
+            check(str(bench.get("provenance_hash", "")).startswith("fnv1a64-"), "Benchmark provenance digest recorded")
+            print(f"  ✓ Engine Orchestration: real CalculiX {metrics.get('solver_version')} solve, {metrics.get('nodes')} nodes, error {metrics.get('error_percent'):.3f}%, {bench.get('execution_time_ms')} ms")
+        else:
+            check(refused, "benchmark refuses without an installed solver (no fabricated accuracy)")
+            print("  ✓ Engine Orchestration: 24 upstream solvers registered; CalculiX benchmark refused (501, no solver installed here)")
 
         # ---------------------------------------------------------------------
         # DEMO 9: Engineering Dependency Graph

@@ -38,7 +38,8 @@ No row claims parity with AutoCAD, SolidWorks, Inventor or Onshape. No row claim
 | CAM toolpaths, G-code, multi-axis | **Verified** | Toolpath totals, G-code line count and 4/5-axis moves checked in `scripts/live-demo.py` |
 | Analytical simulation library | **Verified** | 30 domains behind `/api/sim/multiphysics_suite`; status is derived from the responses and lists any failed domain |
 | Analysis standards | **Partial** | Each formula names its basis (e.g. ASME B31, ICRP-103) but this is a formula reference, not an audit or certification |
-| External solvers (CalculiX, OpenFOAM, ngspice, Elmer, Gmsh) | **Refused** | No adapter and no engine installed; `/api/engines/benchmark` returns 501 with "no solver was run". See `PR-008` |
+| CalculiX (`ccx`) FEA | **Partial / verified** | Real process adapter: writes a tension-bar deck, runs `ccx`, parses displacements and compares with `F L/(A E)` (0.40% error on 2.23). `/api/engines/health` and `/api/engines/benchmark` use it; absent `ccx` returns 501 |
+| OpenFOAM, ngspice, Elmer, Gmsh, other engines | **Refused** | No adapter; `/api/engines/*` returns 501 with "no solver was run". See `PR-008` |
 | Regulatory certification / sign-off | **Absent** | `/api/report` returns a `DRAFT_NOT_RELEASED` report with measured volume and unassessed mass; no sign-offs are created |
 
 ## Agents and automation

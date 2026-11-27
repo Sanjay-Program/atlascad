@@ -228,7 +228,7 @@ Prior browser measurement (2026-11-25, cited, not re-run): 814 ms first load, 5,
 | PR-005 | **P1, fixed** | No advisory scan had been run | `cargo-deny 0.22.1` scanned the graph: advisories/bans/sources ok; CI advisories job green; report published |
 | PR-006 | P2, fixed | Form controls had no programmatic name | 191/191 named; `scripts/a11y-audit.mjs` enforces it |
 | PR-007 | P2, fixed | Primary commit button was below the fold at 720 px | Sticky footer; `browser-check.mjs` asserts visibility at 720 px |
-| PR-008 | P2 | External engine adapters absent | Refusal is correct; implement adapters or remove the run UI |
+| PR-008 | P2, partial | External engine adapters were absent | CalculiX adapter now runs and verifies a real solve (0.40% vs theory, version 2.23); the other engines still refuse with 501 |
 | PR-009 | P2, measured | Large-model performance unmeasured | 10,092-triangle fixture: import 638 ms, `/api/state` 9.3 ms, STL 3.3 ms, RSS 59 MB; headless frame sample 59.4 fps (p50 16.7 ms) on SwiftShader |
 | PR-010 | P2, partial | AI workflows use fixed parameters, not the live document | Results carry `document_revision`; measured volume/bounds/characteristic length are reported, but solvers remain a fixed reference case until a geometry adapter exists |
 | PR-016 | **P0, fixed** | Workflow payloads fabricated toolpaths, media/digital-twin state and an AS9100 certificate | Unimplemented commands return `Unavailable`; tasks fail; status is derived; certificate claim removed |
