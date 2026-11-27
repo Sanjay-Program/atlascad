@@ -46,7 +46,7 @@ flowchart TD
         AeroSim["6-DOF Supersonic Aerodynamics Simulator (US Atmosphere 1976)"]
         AssetMgr["Multi-Tier Content-Addressable Asset Store (atlas-asset-manager)"]
         Collab["Real-Time Presence & 3D Spatial Comments Engine"]
-        Audit["Cryptographic Audit Trail ISO 9001 / AS9100 (atlas-audit)"]
+        Audit["Tamper-evident audit trail and traceability checks (atlas-audit)"]
     end
     
     Router --> CoreEngine
@@ -77,7 +77,7 @@ flowchart TD
   1. *Public Community Marketplace*: Open standard components (fasteners, bearings, motors, materials) accessible to all.
   2. *Team & Organization Catalog*: Scoped to verified members of an engineering team (`caller.team_id == asset.author.team_id`).
   3. *Private Confidential Assets*: Strictly restricted to the creator (`caller.user_id == asset.author.user_id`) with encryption and access tokens.
-- **Content-Addressable Storage**: SHA-256 and FNV-1a content hashing guarantees revision immutability and provenance.
+- **Content-Addressable Storage**: content hashes record revision digests and provenance; FNV-1a is an integrity digest, not a signature.
 - **Parametric Variables Schema**: Components expose configurable variables (length, diameter, pitch, material) so consumers instantiate tailored variants without breaking upstream definitions.
 - **1-Click Forking & Linked Dependencies**: Fork public/team assets into private catalogs, or instantiate components into active assemblies with automatic dependency invalidation.
 - **Pre-Populated Engineering Catalog**: Includes Supersonic Waverider airframe, Titanium Socket Head Cap Screws (ISO 4762), Deep Groove Ball Bearings (ISO 6205), Carbon Fiber / PEEK composites, NEMA 23 stepper motors, and Planetary Gearboxes (10:1).
@@ -100,7 +100,7 @@ flowchart TD
   2. *Supersonic De Laval Rocket Nozzle (CFD)*: Compressible gas dynamic flow with exit Mach number, pressure drop, and shock diamonds.
   3. *Aircraft Cantilever Wing Modal Resonance*: 5 dynamic bending & torsional natural frequencies with live harmonic sinusoidal oscillation.
   4. *Transient Thermal Dissipation*: Steady-state and transient heat sink temperature distribution ($25^\circ\text{C} \to 95^\circ\text{C}$).
-  5. *Linear Static Beam Stress (FEA)*: Peak von Mises stress, tip deflection, and certified ASTM yield Factor of Safety ($FoS$).
+  5. *Linear Static Beam Stress (FEA)*: Peak von Mises stress, tip deflection, and Factor of Safety against typical handbook yield ($FoS$).
   6. *EV 400V Battery Pack Thermal Safety*: Thevenin electrochemical heat generation, forced convective cooling, and thermal runaway prevention.
 - **1-Click Parametric 3D Asset Insertion & Publishing**:
   - *Procedural 3D Mesh Engine*: Instant vertex/triangle generation for ISO socket bolts, ball bearings, modular aluminum extrusions, involute spur gears, NEMA stepper motors, and waverider airframes.
@@ -141,7 +141,7 @@ AtlasCAD is organized as an atomic Cargo workspace consisting of 40 modular Rust
 | `crates/atlas-asset-manager` | Multi-tier content-addressable asset registry, permissions, parametric schemas, and component forking. |
 | `crates/atlas-dependency-graph` | Engineering provenance graph with transitive staleness detection. |
 | `crates/atlas-simulation-core` | Advanced simulation solvers: modal vibration, steady-state thermal, and bolted fastener joints. |
-| `crates/atlas-audit` | Immutable cryptographic audit chain compliant with ISO 9001, AS9100, and 21 CFR Part 11. |
+| `crates/atlas-audit` | Tamper-evident audit chain that supports local traceability checks against ISO 9001, AS9100 and 21 CFR Part 11 criteria; it issues no certification. |
 | `crates/atlas-job-queue` | HPC priority scheduler and asynchronous simulation queue. |
 | `crates/atlas-organization` | Multi-tenant organization workspace, role-based access control (RBAC), and Engineering Change Orders (ECO). |
 | `crates/atlas-additive` | Slicing engine, layer hatch generation, support structures, and ASTM 52915 3MF packaging. |
