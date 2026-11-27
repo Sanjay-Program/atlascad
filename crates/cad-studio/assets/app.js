@@ -8897,18 +8897,15 @@ ${gcodeSample}`;
 
       case "additive":
         if (layoutSheet) layoutSheet.hidden = true;
-        const addV = byId("additiveWorkbenchView");
-        if (addV) addV.hidden = false;
+        // The manufacturing workspace maps to the CAM view, so switch the workspace first and
+        // then reveal the additive view; the previous order hid this workbench immediately.
+        switchRibbonTab("simulate");
+        switchEngineeringWorkspace("manufacturing");
+        showWorkbench("additiveWorkbenchView");
         if (cachedSlicedModel) {
           const idx = parseInt(byId("additiveLayerScrubber")?.value || "0", 10);
           renderSliceLayers(cachedSlicedModel, idx, true);
         }
-        switchRibbonTab("simulate");
-        switchEngineeringWorkspace("manufacturing");
-        toast("Activated: 3D Slicing & Additive Manufacturing Studio");
-        break;
-        switchRibbonTab("simulate");
-        switchEngineeringWorkspace("manufacturing");
         toast("Activated: 3D Slicing & Additive Manufacturing Studio");
         break;
 

@@ -371,7 +371,10 @@ try {
   logStep('Slicing 3D solid model with TPMS Gyroid Infill...');
   await setInputValue('#additiveInfillPattern', 'gyroid');
   await clickSelector('#additiveSliceBtn', 'Slice 3D Solid');
-  await sleep(500);
+  await waitFor(
+    'document.getElementById("additivePrintTimeVal")?.textContent !== "—"',
+    'Additive print duration populated'
+  );
   const printTime = await evaluate('document.getElementById("additivePrintTimeVal")?.textContent || "—"');
   const layers = await evaluate('document.getElementById("additiveTotalLayersVal")?.textContent || "—"');
   check(printTime !== '—', `Additive print duration calculated (${printTime})`);
@@ -441,7 +444,7 @@ try {
 
   const revisionRows = await evaluate('document.querySelectorAll("#agentRevisionTable tbody tr").length');
   check(revisionRows >= 3, `Design revision history populated (${revisionRows} revisions)`);
-  console.log(`    ✓ Closed-Loop Optimization: ${revisionRows} verified revisions populated with evidence hashes`);
+  console.log(`    ✓ Closed-Loop Optimization: ${revisionRows} analytical revisions populated with content digests`);
   await takeScreenshot('10-agent-console-optimized');
 
   // --- Step 9: Return to 3D CAD Viewport & Validate Zero Console Errors ---

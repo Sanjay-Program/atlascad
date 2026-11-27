@@ -537,6 +537,19 @@ try {
   );
   await send('Emulation.clearDeviceMetricsOverride');
 
+  // Switching workbenches must reveal that workbench's view. The additive tab used to be
+  // overwritten by the CAM view because the manufacturing workspace was applied afterwards.
+  await evaluate('document.querySelector(\'.wb-tab[data-workbench="additive"]\').click()');
+  await sleep(300);
+  const additiveVisible = await evaluate('!document.getElementById("additiveWorkbenchView").hidden');
+  const camHidden = await evaluate('document.getElementById("camWorkbenchView").hidden');
+  check(
+    additiveVisible && camHidden,
+    `the additive workbench shows its own view (additive=${additiveVisible}, camHidden=${camHidden})`
+  );
+  await evaluate('document.querySelector(\'.wb-tab[data-workbench="cad3d"]\').click()');
+  await sleep(200);
+
   check(consoleErrors.length === 0, `console errors: ${consoleErrors.join(' | ')}`);
 
   console.log(`==> browser check passed (${passed} assertions)`);
