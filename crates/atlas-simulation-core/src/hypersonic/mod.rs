@@ -458,7 +458,7 @@ pub fn solve_hypersonic_airplane(
             stagnation_temp_k, q_stag_mw_m2, t_wall_c, thermal_margin_c
         ),
         format!(
-            "Structure: Total Stress = {:.1} MPa -> Factor of Safety = {:.2} (AS9100 / FAA Pass)",
+            "Structure: Total Stress = {:.1} MPa -> Factor of Safety = {:.2} (FoS criterion ≥ 1.50)",
             total_von_mises_mpa, structural_fos
         ),
         format!(
@@ -500,7 +500,7 @@ pub fn solve_hypersonic_airplane(
             global_range_km, flight_time_hours, prob.fuel_mass_kg
         ),
         format!(
-            "Aeroelastic Stability: Panel Flutter FoS = {:.2} (q_crit = {:.1} kPa vs q_op = {:.1} kPa, f1 = {:.0} Hz, AS9100 Pass)",
+            "Aeroelastic Stability: Panel Flutter FoS = {:.2} (q_crit = {:.1} kPa vs q_op = {:.1} kPa, f1 = {:.0} Hz, FoS criterion)",
             flutter_res.flutter_factor_of_safety,
             flutter_res.critical_flutter_dynamic_pressure_kpa,
             dynamic_press_kpa,

@@ -46,7 +46,7 @@ impl ModelProvider for DeterministicEngineeringPlanner {
 
     fn generate_plan(&self, prompt: &str) -> Result<String, OrchestratorError> {
         Ok(format!(
-            "Synthesized deterministic engineering task decomposition for request: '{prompt}' with certified safety factor FoS >= 1.50."
+            "Synthesized deterministic engineering task decomposition for request: '{prompt}' with a target safety factor FoS >= 1.50 (target only; not solver-verified)."
         ))
     }
 }

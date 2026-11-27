@@ -14,20 +14,26 @@ pub struct MassPropertiesSummary {
     pub principal_moments_g_mm2: [f64; 3],
     pub bounding_box_min_mm: [f64; 3],
     pub bounding_box_max_mm: [f64; 3],
+    /// False when mass, centre of gravity and principal moments were not computed. Those fields
+    /// are then zeros and must not be read as measurements.
+    pub assessed: bool,
 }
 
 impl MassPropertiesSummary {
-    pub fn standard_bracket() -> Self {
+    /// Nothing measured: no mesh, no material density.
+    #[must_use]
+    pub fn empty() -> Self {
         Self {
-            volume_mm3: 500.0,
-            surface_area_mm2: 400.0,
-            mass_kg: 0.00135,
-            material_name: "Aluminium 6061-T6".to_string(),
-            density_kg_m3: 2700.0,
-            center_of_gravity_mm: [5.0, 5.0, 2.5],
-            principal_moments_g_mm2: [14.06, 14.06, 22.50],
-            bounding_box_min_mm: [0.0, 0.0, 0.0],
-            bounding_box_max_mm: [10.0, 10.0, 5.0],
+            volume_mm3: 0.0,
+            surface_area_mm2: 0.0,
+            mass_kg: 0.0,
+            material_name: "Unassigned".to_string(),
+            density_kg_m3: 0.0,
+            center_of_gravity_mm: [0.0; 3],
+            principal_moments_g_mm2: [0.0; 3],
+            bounding_box_min_mm: [0.0; 3],
+            bounding_box_max_mm: [0.0; 3],
+            assessed: false,
         }
     }
 }

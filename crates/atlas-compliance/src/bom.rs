@@ -23,23 +23,14 @@ pub struct BomSummary {
 }
 
 impl BomSummary {
-    pub fn standard_single_part(mass_kg: f64, material: &str) -> Self {
-        let line = BomLineItem {
-            part_number: "ATL-PRT-001".to_string(),
-            description: "Machined Structural Bracket".to_string(),
-            material: material.to_string(),
-            quantity: 1,
-            unit_mass_kg: mass_kg,
-            extended_mass_kg: mass_kg,
-            unit_cost_usd: 48.50,
-            extended_cost_usd: 48.50,
-        };
-
+    /// No declared parts and no priced procurement.
+    #[must_use]
+    pub fn empty() -> Self {
         Self {
-            items: vec![line],
-            total_parts_count: 1,
-            total_mass_kg: mass_kg,
-            total_estimated_cost_usd: 48.50,
+            items: Vec::new(),
+            total_parts_count: 0,
+            total_mass_kg: 0.0,
+            total_estimated_cost_usd: 0.0,
         }
     }
 }

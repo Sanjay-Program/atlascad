@@ -317,7 +317,11 @@ impl EngineeringPipeline {
         Ok(graph)
     }
 
-    /// Step 7 & 8: Closed-Loop Iterative Engineering Optimization.
+    /// Step 7 & 8: closed-loop mass shaving against a constant analytical stress model.
+    ///
+    /// This is a deterministic estimate for a 6061-T6 coupon, not a solver run: the stress model is
+    /// `stress × 1.05` per iteration and compliance is never audited. The returned records say so
+    /// instead of claiming a verified certification.
     #[must_use]
     pub fn execute_iterative_loop(
         context: &mut ProjectContext,
@@ -347,15 +351,19 @@ impl EngineeringPipeline {
             current_stress = new_stress;
             current_fos = new_fos;
 
+            let evidence = format!(
+                "rev={i};mass_g={current_mass:.6};stress_mpa={current_stress:.6};fos={current_fos:.6}"
+            );
             context.add_revision(crate::memory::DesignRevisionRecord {
                 revision_index: i,
                 solid_volume_mm3: (current_mass / 2.7) * 1000.0,
                 mass_grams: current_mass,
                 peak_stress_mpa: current_stress,
                 factor_of_safety: current_fos,
-                compliance_score: 34.2 + (i as f64) * 1.5,
-                status: "Pass (FoS Satisfied)".into(),
-                evidence_hash: format!("sha256-rev-{i:03}"),
+                // No compliance audit ran for this revision.
+                compliance_score: 0.0,
+                status: "fos_target_satisfied_analytical".into(),
+                evidence_hash: format!("fnv1a64-{:016x}", fnv1a64(evidence.as_bytes())),
             });
         }
 
@@ -368,8 +376,18 @@ impl EngineeringPipeline {
             mass_reduction_percent: mass_reduction,
             final_peak_stress_mpa: current_stress,
             final_factor_of_safety: current_fos,
-            convergence_status: "Optimal Converged within FoS Constraints".into(),
-            evidence_verified: true,
+            convergence_status: "Analytical loop finished; not solver-verified".into(),
+            evidence_verified: false,
         }
     }
+}
+
+/// FNV-1a over a revision record's own fields: a content digest, not a signature.
+fn fnv1a64(bytes: &[u8]) -> u64 {
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    hash
 }

@@ -16,6 +16,21 @@ pub struct StructuralAssessment {
 }
 
 impl StructuralAssessment {
+    /// No solver has run: every field is zero and the status says so.
+    #[must_use]
+    pub fn not_assessed() -> Self {
+        Self {
+            max_von_mises_mpa: 0.0,
+            max_displacement_mm: 0.0,
+            yield_strength_mpa: 0.0,
+            ultimate_strength_mpa: 0.0,
+            factor_of_safety: 0.0,
+            required_min_fos: 0.0,
+            compliance_status: "NOT_ASSESSED".to_string(),
+            solver_provenance: "none — no structural solver was run".to_string(),
+        }
+    }
+
     pub fn assess(
         max_von_mises_mpa: f64,
         max_displacement_mm: f64,

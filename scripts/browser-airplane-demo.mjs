@@ -332,17 +332,18 @@ try {
   check(hyperRange.includes('Range:'), `Global hypersonic range evaluated (${hyperRange})`);
   console.log(`    ✓ Hypersonic 12,000 km/h Aircraft Solved: ${hyperMach}, ${hyperTwall}, ${hyperFos}, ${hyperRange}`);
 
-  // 3i. Master 27-Domain Multiphysics Suite Execution
-  logStep('Executing 27-Domain Enterprise Multiphysics Suite (#caeRunAllSuiteBtn)...');
-  await clickSelector('#caeRunAllSuiteBtn', 'Run 27-Domain Suite');
+  // 3i. Analytical Multiphysics Suite Execution
+  logStep('Executing the analytical multiphysics suite (#caeRunAllSuiteBtn)...');
+  await clickSelector('#caeRunAllSuiteBtn', 'Run analytical suite');
   await sleep(500);
   const suiteBadge = await evaluate('document.getElementById("caeStatusBadge").textContent');
-  check(suiteBadge.includes('27/27 Verified Pass'), `Multiphysics suite status badge verified (${suiteBadge})`);
+  check(/30\/30 Completed/.test(suiteBadge), `Multiphysics suite completion badge shown (${suiteBadge})`);
   const suiteLog = await evaluate('document.getElementById("caeConsoleOutput").textContent');
-  check(suiteLog.includes('27-DOMAIN AUDIT DOSSIER'), 'Console contains 27-domain audit dossier');
-  check(suiteLog.includes('AS9100 Rev D'), 'Console verifies AS9100 Rev D aerospace compliance');
-  check(suiteLog.includes('ICRP-103'), 'Console verifies ICRP-103 nuclear radiation compliance');
-  console.log('    ✓ 27-Domain Multiphysics Suite: 27/27 Domains Verified, AS9100 & ICRP-103 compliant');
+  check(suiteLog.includes('ANALYTICAL MULTIPHYSICS SUITE'), 'Console names the analytical suite');
+  check(suiteLog.includes('ANALYSIS STANDARD BASIS'), 'Console labels the standards as a formula basis');
+  check(suiteLog.includes('not a certification'), 'Console states no certification is issued');
+  check(suiteLog.includes('ICRP-103'), 'Console lists the ICRP-103 formula basis');
+  console.log('    ✓ Analytical Multiphysics Suite: 30/30 domains completed, formula basis shown, no certification claimed');
 
   await takeScreenshot('05-cae-results-verified');
 

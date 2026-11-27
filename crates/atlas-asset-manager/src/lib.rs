@@ -519,7 +519,7 @@ impl AssetRegistry {
             ),
             (
                 AssetRecord::new("ast_team_internal_bracket", "Avionics Mounting Bracket MkIV", AssetKind::CadGeometry)
-                    .with_description("Company proprietary avionics bay shock-isolated CNC bracket certified for FAA DO-160G vibration profiles.")
+                    .with_description("Company proprietary avionics bay shock-isolated CNC bracket, described for a DO-160G-style vibration profile (not certified).")
                     .with_category("Aerospace")
                     .with_tags(vec!["bracket".into(), "avionics".into(), "internal".into(), "team".into()])
                     .with_visibility(AssetVisibility::Team)

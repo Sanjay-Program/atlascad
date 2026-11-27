@@ -509,8 +509,8 @@ pub fn create_default_agent_ecosystem() -> AgentRegistry {
         AgentManifest::new(
             "quality_assurance",
             "Quality Assurance & Regulatory Compliance Agent",
-            "Audit Trail & Standards Certifier",
-            "Maintains cryptographic FNV-1a audit chains, checks compliance against AS9100 / ISO 9001, and certifies release readiness.",
+            "Audit Trail & Standards Traceability",
+            "Maintains FNV-1a audit chains and reports traceability against AS9100 / ISO 9001 criteria. It does not certify release readiness.",
         )
         .with_permission(CommandPermission::ReadOnly)
         .with_tool("report.certification.generate")

@@ -1,4 +1,8 @@
-//! Production-grade engineering certification and compliance report.
+//! Engineering report export.
+//!
+//! A report is a *draft* until a structural solver has run and a named person has signed it. The
+//! constructor here therefore never invents mass properties, solver results, sign-offs or
+//! standards: it records what was measured on the current revision and leaves the rest empty.
 
 use crate::bom::BomSummary;
 use crate::mass_properties::MassPropertiesSummary;
@@ -6,7 +10,8 @@ use crate::sign_off::ApprovalSignOff;
 use crate::structural::StructuralAssessment;
 use serde::{Deserialize, Serialize};
 
-/// Comprehensive engineering certification package exportable for regulatory filing.
+/// Engineering report for one revision. It is not a certification unless every section was
+/// assessed and signed; [`EngineeringReport::draft`] never is.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EngineeringReport {
     pub report_id: String,
@@ -24,56 +29,32 @@ pub struct EngineeringReport {
 }
 
 impl EngineeringReport {
-    pub fn build_standard(
+    /// Build a draft for the given revision from measured geometry and nothing else.
+    ///
+    /// `mass` must come from the active mesh; the caller is responsible for marking it
+    /// `assessed: false` when no material density was available. There is no structural result
+    /// (no solver ran), no BOM (no parts are procured) and no sign-off (nobody approved it).
+    #[must_use]
+    pub fn draft(
         project_name: impl Into<String>,
         revision: u64,
         timestamp_unix: u64,
         organization: impl Into<String>,
+        mass: MassPropertiesSummary,
     ) -> Self {
-        let mass = MassPropertiesSummary::standard_bracket();
-        let structural =
-            StructuralAssessment::assess(175.0, 0.42, 276.0, 310.0, 1.5, "CalculiX-ccx-2.21");
-        let bom = BomSummary::standard_single_part(mass.mass_kg, &mass.material_name);
-
         Self {
-            report_id: format!("RPT-{}", timestamp_unix),
-            title: "AtlasCAD Engineering Certification & Compliance Package".to_string(),
+            report_id: format!("RPT-DRAFT-{revision}-{timestamp_unix}"),
+            title: "AtlasCAD Engineering Report (draft — not a certification)".to_string(),
             project_name: project_name.into(),
             revision,
             timestamp_unix,
             organization_name: organization.into(),
-            release_status: "RELEASED_FOR_PRODUCTION".to_string(),
+            release_status: "DRAFT_NOT_RELEASED".to_string(),
             mass_properties: mass,
-            structural,
-            bom,
-            sign_offs: vec![
-                crate::sign_off::ApprovalSignOff::new(
-                    crate::sign_off::SignOffRole::Designer,
-                    "Chief CAD Architect",
-                    "architect@atlascad.com",
-                    timestamp_unix,
-                    "APPROVED",
-                ),
-                crate::sign_off::ApprovalSignOff::new(
-                    crate::sign_off::SignOffRole::Reviewer,
-                    "Senior Structural Analyst",
-                    "cae_lead@atlascad.com",
-                    timestamp_unix,
-                    "VERIFIED_FEA_CONVERGENCE",
-                ),
-                crate::sign_off::ApprovalSignOff::new(
-                    crate::sign_off::SignOffRole::LeadEngineer,
-                    "VP of Engineering",
-                    "vp_eng@atlascad.com",
-                    timestamp_unix,
-                    "CERTIFIED_FOR_PRODUCTION",
-                ),
-            ],
-            standards_audited: vec![
-                "ISO-9001-2015".to_string(),
-                "AS9100-D".to_string(),
-                "FDA-21-CFR-PART-11".to_string(),
-            ],
+            structural: StructuralAssessment::not_assessed(),
+            bom: BomSummary::empty(),
+            sign_offs: Vec::new(),
+            standards_audited: Vec::new(),
         }
     }
 }

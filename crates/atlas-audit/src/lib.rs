@@ -1,7 +1,8 @@
 //! # atlas-audit
 //!
 //! Cryptographic, immutable, hash-chained engineering audit trail
-//! compliant with ISO 9001, AS9100, and FDA 21 CFR Part 11.
+//! supports traceability checks against ISO 9001, AS9100 and FDA 21 CFR Part 11 criteria. An intact
+//! chain is evidence of log integrity, not a certification.
 
 pub mod action;
 pub mod chain;

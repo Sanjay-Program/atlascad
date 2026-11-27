@@ -27,7 +27,7 @@ pub struct HypersonicTrajectoryResult {
     pub reserve_fuel_mass_kg: f64,
     /// Average specific range in km per kg of LH2 fuel
     pub specific_range_km_per_kg: f64,
-    /// Whether flight remains inside the certified hypersonic corridor
+    /// Whether the modelled flight remains inside the simulated hypersonic corridor
     pub is_corridor_compliant: bool,
     /// Corridor margin against upper dynamic pressure limit (90 kPa)
     pub dynamic_pressure_margin_kpa: f64,
@@ -126,7 +126,7 @@ pub struct HypersonicFlutterResult {
     pub natural_frequency_hz: f64,
     /// Aerodynamic damping ratio zeta_aero
     pub aerodynamic_damping_ratio: f64,
-    /// Whether flutter margin satisfies AS9100 / MIL-HDBK-516C (FoS >= 1.50)
+    /// Whether the flutter margin meets the stated FoS >= 1.50 criterion
     pub is_flutter_safe: bool,
 }
 

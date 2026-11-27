@@ -1132,7 +1132,7 @@
           <div class="ribbon-group-title">Enterprise $10k Suite</div>
           <div class="ribbon-buttons">
             <button type="button" class="ribbon-btn" id="rbEnterpriseAuditBtn" title="Cryptographic Immutable Audit Trail (AUDIT)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-shield"/></svg></span><span>Audit Trail</span></button>
-            <button type="button" class="ribbon-btn" id="rbEnterpriseReportBtn" title="Automated Regulatory Certification Dossier (CERT)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-bom"/></svg></span><span>Cert Report</span></button>
+            <button type="button" class="ribbon-btn" id="rbEnterpriseReportBtn" title="Draft engineering report — no certification is issued"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-bom"/></svg></span><span>Eng Report</span></button>
             <button type="button" class="ribbon-btn" id="rbEnterpriseJobsBtn" title="HPC Simulation Job Scheduler & Queue (JOBS)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-jobs"/></svg></span><span>HPC Queue</span></button>
             <button type="button" class="ribbon-btn" id="rbEnterpriseOrgBtn" title="Organization Quotas & Engineering Change Orders (ECO)"><span class="rb-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-collab"/></svg></span><span>Org & ECO</span></button>
           </div>
@@ -1705,7 +1705,7 @@
             <span class="ai-avatar"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-ai-copilot"/></svg></span>
             <div class="ai-msg-bubble">
               <strong>AI Engineering Agent online.</strong><br>
-              I can execute parametric 3D features, run finite element simulations, assign certified materials, or generate 2D orthographic shop floor drawings. Click a quick action above or describe your design requirement.
+              I can execute parametric 3D features, run finite element simulations, assign materials, or generate 2D orthographic shop floor drawings. Click a quick action above or describe your design requirement.
             </div>
           </div>
         </div>
@@ -3171,7 +3171,7 @@ C1 out 0 100n
                 <option value="pcb_to_si">High-Speed PCB to Controlled Impedance (IPC-2141)</option>
                 <option value="robot_to_kinematics">Robotic Manipulator to 6-DOF Trajectory</option>
                 <option value="ev_to_battery_thermal">EV Powertrain to Battery Thermal Runaway</option>
-                <option value="req_to_tech_docs">Requirements to Certified AS9100 Tech Docs</option>
+                <option value="req_to_tech_docs">Requirements to AS9100-style Tech Docs (self-assessed)</option>
                 <option value="subdiv_to_render">SubD Character Mesh to PBR Studio Render</option>
                 <option value="twin_to_interactive">Digital Twin to Unity Engine Physics</option>
                 <option value="edit_to_color_master">Multi-Track Edit to DaVinci 3D LUT Color Grade</option>
@@ -3606,7 +3606,7 @@ FPS Target: 60 fps | Spatial BVH Built | Telemetry Port Bound.</pre>
             </div>
           </div>
           <div class="wb-header-actions">
-            <span class="wb-status-badge" id="aeroStatusBadge">Mach 11 Flight Envelope Certified</span>
+            <span class="wb-status-badge" id="aeroStatusBadge">Mach 11 Envelope (simulation)</span>
             <button type="button" class="button primary small" id="aeroRunSolveBtn">▶ Solve Hypersonic Flight</button>
             <button type="button" class="button secondary small" id="aeroRunMasterDagBtn" title="Run the 11-task master DAG, auto-approving sensitive steps without human review. Asks for confirmation first."><svg class="atlas-icon" aria-hidden="true"><use href="#icon-aerospace"/></svg> Run Autonomous Master DAG</button>
           </div>
@@ -4575,7 +4575,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
     <div class="studio-view-header">
       <div class="studio-view-title">
         <h2>Assets &amp; Standard Hardware Catalog</h2>
-        <p>Parametric ISO/DIN fasteners, power transmission gears, springs, and certified engineering materials.</p>
+        <p>Parametric ISO/DIN fasteners, power transmission gears, springs, and engineering material data.</p>
       </div>
       <div class="studio-view-actions">
         <div class="view-mode-toggle" id="assetsViewModeToggle" role="radiogroup" aria-label="View Mode">
@@ -5260,13 +5260,11 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
             <span class="ent-status-icon"><svg class="atlas-icon" aria-hidden="true"><use href="#icon-shield"/></svg></span>
             <div>
               <strong>Cryptographic Chain Integrity: <span id="entChainStatusText">VERIFIED</span></strong>
-              <div class="ent-subtext">FNV-1a 128-bit cryptographic hash chain guaranteeing non-repudiation</div>
+              <div class="ent-subtext">FNV-1a tamper-evident audit chain (integrity only, not a signature)</div>
             </div>
           </div>
           <div class="ent-standards-pills" id="entStandardsPills">
-            <span class="badge compliant">ISO 9001:2015 [Compliant]</span>
-            <span class="badge compliant">AS9100-D [Compliant]</span>
-            <span class="badge compliant">FDA 21 CFR Part 11 [Compliant]</span>
+            <span class="badge">Traceability checked locally — not a certification</span>
           </div>
         </div>
         <div class="ent-table-container">
@@ -5286,11 +5284,11 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
         </div>
       </div>
 
-      <!-- TAB 2: CERT DOSSIER -->
+      <!-- TAB 2: DRAFT ENGINEERING REPORT -->
       <div class="enterprise-view" id="entViewReport" hidden>
         <div class="ent-report-container" id="entReportContainer">
           <div class="ent-report-toolbar">
-            <h3 id="entReportProjectTitle">Engineering Certification Dossier</h3>
+            <h3 id="entReportProjectTitle">Engineering Report (Draft — Not a Certification)</h3>
             <button type="button" class="button small" id="entPrintReportBtn">Print / Save PDF</button>
           </div>
           <div class="ent-report-grid">
@@ -5544,7 +5542,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
         <button type="button" class="icon-button" id="publishAssetCloseBtn">&times;</button>
       </div>
       <p style="font-size:12px; color:var(--atlas-text-dim); margin-top:0; margin-bottom:14px;">
-        Share certified parametric parts, assemblies, or materials with your engineering team or the public AtlasCAD ecosystem.
+        Share parametric parts, assemblies, or materials with your engineering team or the public AtlasCAD ecosystem.
       </p>
       <form id="publishAssetForm" style="display:flex; flex-direction:column; gap:12px;">
         <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px;">
@@ -5558,7 +5556,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
               <option value="Hardware">Hardware / Fasteners</option>
               <option value="Aerospace">Aerospace &amp; Defense</option>
               <option value="Robotics">Robotics &amp; Actuators</option>
-              <option value="Materials">Certified Materials</option>
+              <option value="Materials">Material Library</option>
               <option value="Structural">Structural Extrusions</option>
               <option value="Electronics">ECAD / Electronics</option>
             </select>
@@ -5582,7 +5580,7 @@ AISC 360 Structural Steel Code &amp; Rankine Earth Pressure verified.</pre>
 
         <div>
           <label for="publishAssetDesc" style="display:block; font-size:11px; margin-bottom:4px; font-weight:600;">Engineering Description &amp; Standard</label>
-          <textarea id="publishAssetDesc" class="filter-input" rows="3" style="width:100%; resize:vertical; font-family:inherit;" placeholder="Parametric socket head cap screw according to ISO 4762 with Grade 5 Ti-6Al-4V certified properties."></textarea>
+          <textarea id="publishAssetDesc" class="filter-input" rows="3" style="width:100%; resize:vertical; font-family:inherit;" placeholder="Parametric socket head cap screw according to ISO 4762 with Grade 5 Ti-6Al-4V typical properties."></textarea>
         </div>
 
         <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">

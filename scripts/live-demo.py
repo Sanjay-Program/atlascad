@@ -282,19 +282,24 @@ def run_live_demo() -> None:
         print("\n[DEMO 7] Enterprise SaaS Governance & ECO Hub")
         # 7.1 Cryptographic Audit Chain
         audit = http_request(port, "GET", "/api/audit")
-        check(audit["integrity_verified"] is True, "128-bit FNV-1a Cryptographic Chain Integrity Verified")
+        check(audit["integrity_verified"] is True, "FNV-1a audit chain integrity verified")
         check(audit["count"] >= 1, "Audit entries recorded")
         evals = audit["compliance_evaluations"]
-        check(len(evals) == 3, "3 standards evaluated (ISO 9001, AS9100, 21 CFR Part 11)")
-        print(f"  ✓ Cryptographic Audit Chain: {audit['count']} entries, Integrity 100% Guaranteed, Standards Compliant")
+        check(len(evals) == 3, "3 traceability checks evaluated (ISO 9001, AS9100, 21 CFR Part 11)")
+        check(all(e["status"] == "TRACEABILITY_CHAIN_VALID" for e in evals), "traceability status reported, not certification")
+        check(all("Not a certification" in e["assessment_scope"] for e in evals), "scope states no certification")
+        print(f"  ✓ Audit Chain: {audit['count']} entries, integrity verified, traceability only (not a certification)")
 
-        # 7.2 Regulatory Certification Package
+        # 7.2 Draft engineering report (measured geometry, no invented evidence)
         report = http_request(port, "GET", "/api/report")
-        check(report["mass_properties"]["mass_kg"] > 0.0, "Mass properties computed")
-        check(report["structural"]["factor_of_safety"] >= 1.5, "Structural Factor of Safety >= 1.5")
-        check(len(report["bom"]["items"]) >= 1, "BOM items present")
-        check(len(report["sign_offs"]) == 3, "3-tier digital sign-offs present")
-        print(f"  ✓ Certification Dossier: Mass = {report['mass_properties']['mass_kg']:.3f} kg, FoS = {report['structural']['factor_of_safety']:.2f}, 3 Approvals Certified")
+        check(report["release_status"] == "DRAFT_NOT_RELEASED", "report is a draft, not a release")
+        check(report["mass_properties"]["volume_mm3"] > 0.0, "Mesh volume measured")
+        check(report["mass_properties"]["assessed"] is False, "mass not claimed without a material density")
+        check(report["structural"]["compliance_status"] == "NOT_ASSESSED", "no structural result invented")
+        check(report["bom"]["items"] == [], "no BOM invented")
+        check(report["sign_offs"] == [], "no sign-off invented")
+        check("CERTIFIED" not in str(report), "draft contains no certification claim")
+        print(f"  ✓ Engineering Report (draft): Volume = {report['mass_properties']['volume_mm3']:.0f} mm³, mass/sign-offs not assessed")
 
         # 7.3 Multi-Tenant Enterprise Organization & Quotas
         org = http_request(port, "GET", "/api/org")
@@ -330,13 +335,16 @@ def run_live_demo() -> None:
         # ---------------------------------------------------------------------
         # DEMO 8: Upstream Engine Orchestration & Benchmarks
         # ---------------------------------------------------------------------
-        print("\n[DEMO 8] Upstream Solvers Orchestration & Verified Benchmarks")
+        print("\n[DEMO 8] Upstream Solvers Discovery & Honest Refusal")
         disc = http_request(port, "GET", "/api/engines/discovery")
         check(disc["count"] == 24, "All 24 open-source canonical engines registered")
-        bench = http_request(port, "POST", "/api/engines/benchmark", body={"engine_id": "calculix"})
-        check(bench["benchmark_status"] == "verified", "Benchmark verified")
-        check(bench["accuracy_score"] > 0.99, "Benchmark accuracy > 99%")
-        print(f"  ✓ Engine Orchestration: 24 Upstream Solvers Registered, CalculiX Benchmark Verified ({bench['accuracy_score']*100:.2f}% Accuracy)")
+        refused = False
+        try:
+            http_request(port, "POST", "/api/engines/benchmark", body={"engine_id": "calculix"})
+        except RuntimeError as err:
+            refused = "501" in str(err) and "no solver was run" in str(err)
+        check(refused, "benchmark refuses without an installed adapter (no fabricated accuracy)")
+        print("  ✓ Engine Orchestration: 24 upstream solvers registered; CalculiX benchmark refused (501, no adapter installed)")
 
         # ---------------------------------------------------------------------
         # DEMO 9: Engineering Dependency Graph
@@ -834,11 +842,11 @@ def run_live_demo() -> None:
         check(nuke["scalar_metrics"]["is_radiologically_safe"] == 1.0, "ICRP-103 radiation protection criteria satisfied")
         print(f"  ✓ 11.37 Nuclear Shielding: Shielded Dose = {d_shield:.2f} μSv/hr (Unshielded: {nuke['scalar_metrics']['unshielded_dose_rate_usv_hr']:.0f} μSv/hr), {mfp:.1f} mfp, FoS = {nuke['scalar_metrics']['dose_factor_of_safety']:.1f}x (ICRP Safe)")
 
-        # 11.38 Master Multiphysics Suite Evaluation (All 27 Domains)
+        # 11.38 Analytical Multiphysics Suite Evaluation (all configured domains)
         suite = http_request(port, "POST", "/api/sim/multiphysics_suite", body={})
-        check(suite["suite_status"] == "AllPassed", "27-domain multiphysics suite status AllPassed")
-        check(suite["domains_evaluated"] >= 27, f"At least 27 domains evaluated ({suite['domains_evaluated']})")
-        check(suite["tier"] == "Enterprise $10,000/mo SaaS Tier", "Enterprise $10k/mo tier verified")
+        check(suite["suite_status"] == "Completed", f"multiphysics suite completed ({suite['suite_status']})")
+        check(suite["failed_count"] == 0, f"no domain failed ({suite.get('failed_domains')})")
+        check(suite["domains_evaluated"] == suite["target_domains"], f"all {suite['target_domains']} domains evaluated ({suite['domains_evaluated']})")
         check("aerodynamics" in suite["domains"], "Suite contains Aerodynamics domain")
         check("coupled_fsi" in suite["domains"], "Suite contains Two-Way FSI domain")
         check("water_hammer" in suite["domains"], "Suite contains Water Hammer domain")
@@ -846,8 +854,9 @@ def run_live_demo() -> None:
         check("nuclear_shielding" in suite["domains"], "Suite contains Nuclear Shielding domain")
         check("rock_mechanics" in suite["domains"], "Suite contains Rock Mechanics domain")
         check("signal_integrity" in suite["domains"], "Suite contains PCB Signal Integrity domain")
-        check(suite["standards_compliance"]["aerospace"] == "AS9100 Rev D & FAA FAR 25", "Aerospace AS9100 standard verified")
-        print(f"  ✓ 11.38 Master Multiphysics Suite: Evaluated {suite['domains_evaluated']}/27 domains with 100% convergence across all aerospace, nuclear, automotive & mining standards")
+        check(suite["analysis_standards_basis"]["aerospace"].startswith("AS9100"), "Aerospace analysis basis names AS9100 criteria")
+        check("no certification" in suite["analysis_standards_note"].lower(), "suite states that no certification is implied")
+        print(f"  ✓ 11.38 Analytical Multiphysics Suite: {suite['domains_evaluated']}/{suite['target_domains']} domains completed, 0 failed (formula basis only, no certification)")
 
         # ---------------------------------------------------------------------
         # 12. AUTONOMOUS ENGINEERING AGENTS & COMMAND PLATFORM WORKBENCH
@@ -980,16 +989,19 @@ def run_live_demo() -> None:
         check(opt_res.get("completed_iterations") == 4, "Iterative loop completed 4 optimization cycles")
         check(opt_res.get("mass_reduction_percent", 0) > 20.0, "Mass reduced by >20% across design revisions")
         check(opt_res.get("final_factor_of_safety", 0) >= 1.5, "Final Factor of Safety satisfies constraint (>= 1.5)")
-        check(opt_res.get("evidence_verified") == True, "Numerical evidence cryptographically verified")
-        print(f"  ✓ 12.10 Iterative Optimization: Initial {opt_res['initial_mass_grams']:.0f}g -> Optimized {opt_res['optimized_mass_grams']:.0f}g (-{opt_res['mass_reduction_percent']:.1f}%), FoS = {opt_res['final_factor_of_safety']:.2f}")
+        check(opt_res.get("evidence_verified") is False, "no external verification is claimed")
+        check(opt_res.get("convergence_status", "").startswith("Analytical"), "status says the loop is analytical, not solver-verified")
+        check("not solver-verified" in opt_res.get("convergence_status", ""), "convergence status is explicit about verification scope")
+        print(f"  ✓ 12.10 Iterative Optimization (analytical): {opt_res['initial_mass_grams']:.0f}g -> {opt_res['optimized_mass_grams']:.0f}g (-{opt_res['mass_reduction_percent']:.1f}%), FoS = {opt_res['final_factor_of_safety']:.2f}, not solver-verified")
 
         # 12.11 Structured Project Memory & Revision Dossier
         memory = http_request(port, "GET", "/api/agents/memory")
         check("revisions" in memory, "Project memory contains revisions")
         check(len(memory["revisions"]) >= 4, f"Revision history contains verified cycles ({len(memory['revisions'])})")
         rev_last = memory["revisions"][-1]
-        check(rev_last["status"] == "Pass (FoS Satisfied)", "Latest revision satisfies safety criteria")
-        check(rev_last["evidence_hash"].startswith("sha256-rev-"), "Cryptographic evidence hash present")
+        check(rev_last["status"] == "fos_target_satisfied_analytical", "Latest revision records the analytical FoS check")
+        check(rev_last["compliance_score"] == 0.0, "No compliance score invented")
+        check(rev_last["evidence_hash"].startswith("fnv1a64-"), "Revision digest is a content hash, not a certificate")
         print(f"  ✓ 12.11 Project Memory: {len(memory['revisions'])} design revisions logged with SHA-256 evidence trail")
 
         # 12.12 Model Context Protocol (MCP JSON-RPC 2.0) Interface
@@ -5115,7 +5127,8 @@ def run_live_demo() -> None:
 
         print("\n" + "=" * 78)
         print(f"  LIVE DEMO COMPLETE: {passed} ANALYTIC & FUNCTIONAL ASSERTIONS PASSED")
-        print("  ALL 8 WORKBENCHES & ALL 11 SUBSYSTEMS ARE 100% OPERATIONAL & PRODUCTION-READY")
+        print("  Every workbench answered; external solvers, certification and the remaining gaps are")
+        print("  recorded in docs/quality/atlas-remediation-backlog.md. No certification is implied.")
         print("=" * 78)
 
     finally:

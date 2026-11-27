@@ -1,7 +1,8 @@
 //! # atlas-compliance
 //!
-//! Production-grade engineering certification reports, mass properties validation,
-//! structural allowable criteria, and regulatory sign-offs.
+//! Draft engineering reports, measured mass properties, structural allowable criteria and
+//! approval sign-offs. A report is never a certification unless a solver ran and named people
+//! signed it; the draft constructor leaves those sections empty.
 
 pub mod bom;
 pub mod mass_properties;

@@ -678,7 +678,7 @@ struct StudioState {
     artifacts_changed: bool,
     /// Engineering dependency graph tracking provenance and downstream invalidation.
     dependency_graph: atlas_dependency_graph::graph::DependencyGraph,
-    /// Cryptographic immutable audit trail for ISO 9001 / AS9100 / 21 CFR Part 11.
+    /// Tamper-evident FNV-1a audit trail used for local traceability checks, not a certification.
     audit_chain: atlas_audit::chain::AuditChain,
     /// Enterprise simulation job queue and priority scheduler.
     job_queue: atlas_job_queue::queue::JobQueueManager,
@@ -716,7 +716,7 @@ impl StudioState {
         let saved_revision = project.revision.get();
         let mut audit_chain = atlas_audit::chain::AuditChain::new();
         audit_chain.record(
-            1700000000,
+            now_unix_secs(),
             "system",
             atlas_audit::action::AuditAction::ProjectCreated,
             "Project",
@@ -734,7 +734,7 @@ impl StudioState {
                 cursor_pos: [0.0, 4.0, 1.2],
                 active_tool: "3D Extrude".to_string(),
                 selected_entity: Some("body_fuselage_01".to_string()),
-                last_heartbeat: 1732280000,
+                last_heartbeat: now_unix_secs(),
             },
         );
         collab_presence.insert(
@@ -747,7 +747,7 @@ impl StudioState {
                 cursor_pos: [-1.4, -5.0, 0.2],
                 active_tool: "FEA Stress Inspector".to_string(),
                 selected_entity: Some("wing_spar_left".to_string()),
-                last_heartbeat: 1732280000,
+                last_heartbeat: now_unix_secs(),
             },
         );
         collab_presence.insert(
@@ -760,7 +760,7 @@ impl StudioState {
                 cursor_pos: [0.0, 9.0, 0.2],
                 active_tool: "Supersonic Wave Drag".to_string(),
                 selected_entity: Some("nose_cone_radome".to_string()),
-                last_heartbeat: 1732280000,
+                last_heartbeat: now_unix_secs(),
             },
         );
 
@@ -774,7 +774,7 @@ impl StudioState {
                 author_color: "#10b981".to_string(),
                 text: "Under Mach 1.58 +4.2G bank maneuvers, peak von Mises stress reaches 478 MPa. Ensure Ti-6Al-4V fastener preload is verified.".to_string(),
                 status: "Open".to_string(),
-                created_at: 1732280000,
+                created_at: now_unix_secs(),
                 replies: vec![
                     CommentReply {
                         id: "rep_01".to_string(),
@@ -831,7 +831,7 @@ impl StudioState {
                 ],
                 mfa_enabled: true,
                 sso_provider: Some("Enterprise SAML 2.0 / Okta".into()),
-                created_at: 1732280000,
+                created_at: now_unix_secs(),
             },
         );
         auth_users.insert(
@@ -862,7 +862,7 @@ impl StudioState {
                 ],
                 mfa_enabled: true,
                 sso_provider: Some("Azure Active Directory".into()),
-                created_at: 1732280000,
+                created_at: now_unix_secs(),
             },
         );
         auth_users.insert(
@@ -891,7 +891,7 @@ impl StudioState {
                 ],
                 mfa_enabled: false,
                 sso_provider: Some("Google Workspace".into()),
-                created_at: 1732280000,
+                created_at: now_unix_secs(),
             },
         );
         auth_users.insert(
@@ -918,7 +918,7 @@ impl StudioState {
                 ],
                 mfa_enabled: true,
                 sso_provider: Some("Enterprise SAML 2.0".into()),
-                created_at: 1732280000,
+                created_at: now_unix_secs(),
             },
         );
 
@@ -928,8 +928,8 @@ impl StudioState {
             AuthSession {
                 token: "atlas_sess_usr_sanjay".to_string(),
                 user_id: "usr_sanjay".to_string(),
-                created_at: 1732280000,
-                expires_at: 1732280000 + 720 * 3600,
+                created_at: now_unix_secs(),
+                expires_at: now_unix_secs() + 720 * 3600,
                 ip_address: "127.0.0.1".to_string(),
                 user_agent: "AtlasCAD Studio Web Client".to_string(),
             },
@@ -940,8 +940,8 @@ impl StudioState {
             name: "Headless CI/CD & Python SDK Runner".to_string(),
             token: "atlas_pat_live_7c4e99f120ab582".to_string(),
             user_id: "usr_sanjay".to_string(),
-            created_at: 1732280000,
-            expires_at: Some(1732280000 + 365 * 86400),
+            created_at: now_unix_secs(),
+            expires_at: Some(now_unix_secs() + 365 * 86400),
             last_used_at: Some(1732280100),
             scopes: vec![
                 "cad:read".into(),
@@ -1222,7 +1222,7 @@ impl StudioState {
         self.invalidate_geometry("Parametric CAD model modified");
         // Record tamper-evident audit entry
         self.audit_chain.record(
-            1700000000,
+            now_unix_secs(),
             "engineer@atlascad.com",
             atlas_audit::action::AuditAction::FeatureMutated,
             "ParametricModel",
@@ -1345,10 +1345,10 @@ impl StudioState {
 
     fn audit_payload(&self) -> serde_json::Value {
         let is_valid = self.audit_chain.verify_integrity().is_ok();
-        let evals = atlas_audit::standards::ComplianceEvaluator::evaluate_compliance(
+        let evals = atlas_audit::standards::ComplianceEvaluator::evaluate_traceability(
             self.audit_chain.len(),
             is_valid,
-            1700000000,
+            now_unix_secs(),
         );
         serde_json::json!({
             "entries": self.audit_chain.entries(),
@@ -1358,14 +1358,35 @@ impl StudioState {
         })
     }
 
-    fn compliance_report_payload(&self) -> serde_json::Value {
-        let rpt = atlas_compliance::report::EngineeringReport::build_standard(
+    /// A draft report for the current revision: measured geometry, no invented evidence.
+    ///
+    /// Mass needs a material density, and no structural solver is configured, so both are marked
+    /// unassessed rather than filled with a "standard bracket" placeholder.
+    fn compliance_report_payload(&mut self) -> Result<serde_json::Value, StudioError> {
+        let mesh = self.rebuild()?.mesh;
+        let mass = match &mesh {
+            Some(mesh) => atlas_compliance::mass_properties::MassPropertiesSummary {
+                volume_mm3: mesh.signed_volume().abs(),
+                surface_area_mm2: mesh.surface_area(),
+                mass_kg: 0.0,
+                material_name: "Unassigned".to_string(),
+                density_kg_m3: 0.0,
+                center_of_gravity_mm: [0.0; 3],
+                principal_moments_g_mm2: [0.0; 3],
+                bounding_box_min_mm: mesh.bounding_box().map_or([0.0; 3], |b| b.min),
+                bounding_box_max_mm: mesh.bounding_box().map_or([0.0; 3], |b| b.max),
+                assessed: false,
+            },
+            None => atlas_compliance::mass_properties::MassPropertiesSummary::empty(),
+        };
+        let rpt = atlas_compliance::report::EngineeringReport::draft(
             &self.project.name,
             self.project.revision.get(),
-            1700000000,
+            now_unix_secs(),
             &self.organization.name,
+            mass,
         );
-        serde_json::to_value(&rpt).unwrap_or_else(|_| serde_json::json!({}))
+        serde_json::to_value(&rpt).map_err(|e| StudioError::Json(e.to_string()))
     }
 
     fn organization_payload(&self) -> serde_json::Value {
@@ -1396,7 +1417,7 @@ impl StudioState {
             &req.job_type,
             priority,
             "active_engineer@atlascad.com",
-            1700000000,
+            now_unix_secs(),
             req.parameters
                 .clone()
                 .unwrap_or_else(|| serde_json::json!({})),
@@ -1406,7 +1427,7 @@ impl StudioState {
 
         // Record in audit chain
         self.audit_chain.record(
-            1700000000,
+            now_unix_secs(),
             "active_engineer@atlascad.com",
             atlas_audit::action::AuditAction::SimulationDispatched,
             "SimulationJob",
@@ -1437,13 +1458,13 @@ impl StudioState {
             &req.description,
             "chief_architect@atlascad.com",
             self.project.revision.get(),
-            1700000000,
+            now_unix_secs(),
         );
 
         if req.approve.unwrap_or(false) {
             eco.approve("chief_architect@atlascad.com");
             self.audit_chain.record(
-                1700000000,
+                now_unix_secs(),
                 "chief_architect@atlascad.com",
                 atlas_audit::action::AuditAction::EcoApproved,
                 "EngineeringChangeOrder",
@@ -1452,7 +1473,7 @@ impl StudioState {
             );
         } else {
             self.audit_chain.record(
-                1700000000,
+                now_unix_secs(),
                 "engineer@atlascad.com",
                 atlas_audit::action::AuditAction::EcoInitiated,
                 "EngineeringChangeOrder",
@@ -3290,7 +3311,7 @@ def Xform "HypersonicAirframe" (
         let client_cs = r#"// ============================================================================
 // AtlasCAD Digital Twin - Unity Real-Time Telemetry Client
 // Copyright (c) 2026 AtlasCAD Engineering Systems
-// AS9100 Rev D & DO-178C Level A Telemetry Transport Layer
+// Telemetry transport layer (no DO-178C certification is claimed)
 // ============================================================================
 
 using System;
@@ -9039,113 +9060,321 @@ namespace AtlasCAD.Unity
 
     fn sim_multiphysics_suite(&mut self) -> Result<serde_json::Value, StudioError> {
         let mut domains = serde_json::Map::new();
+        let mut failures = serde_json::Map::new();
 
-        if let Ok(v) = self.sim_buckling(&Default::default()) {
-            domains.insert("buckling".into(), v);
+        match self.sim_buckling(&Default::default()) {
+            Ok(v) => {
+                domains.insert("buckling".into(), v);
+            }
+            Err(error) => {
+                failures.insert("buckling".into(), serde_json::json!(error.to_string()));
+            }
         }
-        if let Ok(v) = self.sim_elastoplasticity(&Default::default()) {
-            domains.insert("elastoplasticity".into(), v);
+        match self.sim_elastoplasticity(&Default::default()) {
+            Ok(v) => {
+                domains.insert("elastoplasticity".into(), v);
+            }
+            Err(error) => {
+                failures.insert(
+                    "elastoplasticity".into(),
+                    serde_json::json!(error.to_string()),
+                );
+            }
         }
-        if let Ok(v) = self.sim_rainflow(&Default::default()) {
-            domains.insert("fatigue_rainflow".into(), v);
+        match self.sim_rainflow(&Default::default()) {
+            Ok(v) => {
+                domains.insert("fatigue_rainflow".into(), v);
+            }
+            Err(error) => {
+                failures.insert(
+                    "fatigue_rainflow".into(),
+                    serde_json::json!(error.to_string()),
+                );
+            }
         }
-        if let Ok(v) = self.sim_composite_failure(&Default::default()) {
-            domains.insert("composite_failure".into(), v);
+        match self.sim_composite_failure(&Default::default()) {
+            Ok(v) => {
+                domains.insert("composite_failure".into(), v);
+            }
+            Err(error) => {
+                failures.insert(
+                    "composite_failure".into(),
+                    serde_json::json!(error.to_string()),
+                );
+            }
         }
-        if let Ok(v) = self.sim_cfd(&Default::default()) {
-            domains.insert("cfd_hydraulics".into(), v);
+        match self.sim_cfd(&Default::default()) {
+            Ok(v) => {
+                domains.insert("cfd_hydraulics".into(), v);
+            }
+            Err(error) => {
+                failures.insert(
+                    "cfd_hydraulics".into(),
+                    serde_json::json!(error.to_string()),
+                );
+            }
         }
-        if let Ok(v) = self.sim_water_hammer(&Default::default()) {
-            domains.insert("water_hammer".into(), v);
+        match self.sim_water_hammer(&Default::default()) {
+            Ok(v) => {
+                domains.insert("water_hammer".into(), v);
+            }
+            Err(error) => {
+                failures.insert("water_hammer".into(), serde_json::json!(error.to_string()));
+            }
         }
-        if let Ok(v) = self.sim_cavitation(&Default::default()) {
-            domains.insert("cavitation".into(), v);
+        match self.sim_cavitation(&Default::default()) {
+            Ok(v) => {
+                domains.insert("cavitation".into(), v);
+            }
+            Err(error) => {
+                failures.insert("cavitation".into(), serde_json::json!(error.to_string()));
+            }
         }
-        if let Ok(v) = self.sim_fsi(&Default::default()) {
-            domains.insert("coupled_fsi".into(), v);
+        match self.sim_fsi(&Default::default()) {
+            Ok(v) => {
+                domains.insert("coupled_fsi".into(), v);
+            }
+            Err(error) => {
+                failures.insert("coupled_fsi".into(), serde_json::json!(error.to_string()));
+            }
         }
-        if let Ok(v) = self.sim_aerodynamics(&Default::default()) {
-            domains.insert("aerodynamics".into(), v);
+        match self.sim_aerodynamics(&Default::default()) {
+            Ok(v) => {
+                domains.insert("aerodynamics".into(), v);
+            }
+            Err(error) => {
+                failures.insert("aerodynamics".into(), serde_json::json!(error.to_string()));
+            }
         }
-        if let Ok(v) = self.sim_aeroelasticity(&Default::default()) {
-            domains.insert("aeroelasticity".into(), v);
+        match self.sim_aeroelasticity(&Default::default()) {
+            Ok(v) => {
+                domains.insert("aeroelasticity".into(), v);
+            }
+            Err(error) => {
+                failures.insert(
+                    "aeroelasticity".into(),
+                    serde_json::json!(error.to_string()),
+                );
+            }
         }
-        if let Ok(v) = self.sim_shock_response(&Default::default()) {
-            domains.insert("shock_response".into(), v);
+        match self.sim_shock_response(&Default::default()) {
+            Ok(v) => {
+                domains.insert("shock_response".into(), v);
+            }
+            Err(error) => {
+                failures.insert(
+                    "shock_response".into(),
+                    serde_json::json!(error.to_string()),
+                );
+            }
         }
-        if let Ok(v) = self.sim_heat_exchanger(&Default::default()) {
-            domains.insert("heat_exchanger".into(), v);
+        match self.sim_heat_exchanger(&Default::default()) {
+            Ok(v) => {
+                domains.insert("heat_exchanger".into(), v);
+            }
+            Err(error) => {
+                failures.insert(
+                    "heat_exchanger".into(),
+                    serde_json::json!(error.to_string()),
+                );
+            }
         }
-        if let Ok(v) = self.sim_thermal_stress(&Default::default()) {
-            domains.insert("thermal_stress".into(), v);
+        match self.sim_thermal_stress(&Default::default()) {
+            Ok(v) => {
+                domains.insert("thermal_stress".into(), v);
+            }
+            Err(error) => {
+                failures.insert(
+                    "thermal_stress".into(),
+                    serde_json::json!(error.to_string()),
+                );
+            }
         }
-        if let Ok(v) = self.sim_chemical(&Default::default()) {
-            domains.insert("chemical_vle".into(), v);
+        match self.sim_chemical(&Default::default()) {
+            Ok(v) => {
+                domains.insert("chemical_vle".into(), v);
+            }
+            Err(error) => {
+                failures.insert("chemical_vle".into(), serde_json::json!(error.to_string()));
+            }
         }
-        if let Ok(v) = self.sim_molecular(&Default::default()) {
-            domains.insert("molecular_dynamics".into(), v);
+        match self.sim_molecular(&Default::default()) {
+            Ok(v) => {
+                domains.insert("molecular_dynamics".into(), v);
+            }
+            Err(error) => {
+                failures.insert(
+                    "molecular_dynamics".into(),
+                    serde_json::json!(error.to_string()),
+                );
+            }
         }
-        if let Ok(v) = self.sim_robotics(&Default::default()) {
-            domains.insert("robotics_kinematics".into(), v);
+        match self.sim_robotics(&Default::default()) {
+            Ok(v) => {
+                domains.insert("robotics_kinematics".into(), v);
+            }
+            Err(error) => {
+                failures.insert(
+                    "robotics_kinematics".into(),
+                    serde_json::json!(error.to_string()),
+                );
+            }
         }
-        if let Ok(v) = self.sim_robotics_trajectory(&Default::default()) {
-            domains.insert("motion_trajectory".into(), v);
+        match self.sim_robotics_trajectory(&Default::default()) {
+            Ok(v) => {
+                domains.insert("motion_trajectory".into(), v);
+            }
+            Err(error) => {
+                failures.insert(
+                    "motion_trajectory".into(),
+                    serde_json::json!(error.to_string()),
+                );
+            }
         }
-        if let Ok(v) = self.sim_powerflow(&Default::default()) {
-            domains.insert("power_flow".into(), v);
+        match self.sim_powerflow(&Default::default()) {
+            Ok(v) => {
+                domains.insert("power_flow".into(), v);
+            }
+            Err(error) => {
+                failures.insert("power_flow".into(), serde_json::json!(error.to_string()));
+            }
         }
-        if let Ok(v) = self.sim_signal_integrity(&Default::default()) {
-            domains.insert("signal_integrity".into(), v);
+        match self.sim_signal_integrity(&Default::default()) {
+            Ok(v) => {
+                domains.insert("signal_integrity".into(), v);
+            }
+            Err(error) => {
+                failures.insert(
+                    "signal_integrity".into(),
+                    serde_json::json!(error.to_string()),
+                );
+            }
         }
-        if let Ok(v) = self.sim_biomedical(&Default::default()) {
-            domains.insert("biomedical".into(), v);
+        match self.sim_biomedical(&Default::default()) {
+            Ok(v) => {
+                domains.insert("biomedical".into(), v);
+            }
+            Err(error) => {
+                failures.insert("biomedical".into(), serde_json::json!(error.to_string()));
+            }
         }
-        if let Ok(v) = self.sim_marine(&Default::default()) {
-            domains.insert("marine".into(), v);
+        match self.sim_marine(&Default::default()) {
+            Ok(v) => {
+                domains.insert("marine".into(), v);
+            }
+            Err(error) => {
+                failures.insert("marine".into(), serde_json::json!(error.to_string()));
+            }
         }
-        if let Ok(v) = self.sim_building_physics(&Default::default()) {
-            domains.insert("building_physics".into(), v);
+        match self.sim_building_physics(&Default::default()) {
+            Ok(v) => {
+                domains.insert("building_physics".into(), v);
+            }
+            Err(error) => {
+                failures.insert(
+                    "building_physics".into(),
+                    serde_json::json!(error.to_string()),
+                );
+            }
         }
-        if let Ok(v) = self.sim_solar(&Default::default()) {
-            domains.insert("solar_pv".into(), v);
+        match self.sim_solar(&Default::default()) {
+            Ok(v) => {
+                domains.insert("solar_pv".into(), v);
+            }
+            Err(error) => {
+                failures.insert("solar_pv".into(), serde_json::json!(error.to_string()));
+            }
         }
-        if let Ok(v) = self.sim_battery_ev(&Default::default()) {
-            domains.insert("battery_ev".into(), v);
+        match self.sim_battery_ev(&Default::default()) {
+            Ok(v) => {
+                domains.insert("battery_ev".into(), v);
+            }
+            Err(error) => {
+                failures.insert("battery_ev".into(), serde_json::json!(error.to_string()));
+            }
         }
-        if let Ok(v) = self.sim_vehicle_dynamics(&Default::default()) {
-            domains.insert("vehicle_dynamics".into(), v);
+        match self.sim_vehicle_dynamics(&Default::default()) {
+            Ok(v) => {
+                domains.insert("vehicle_dynamics".into(), v);
+            }
+            Err(error) => {
+                failures.insert(
+                    "vehicle_dynamics".into(),
+                    serde_json::json!(error.to_string()),
+                );
+            }
         }
-        if let Ok(v) = self.sim_rock_mechanics(&Default::default()) {
-            domains.insert("rock_mechanics".into(), v);
+        match self.sim_rock_mechanics(&Default::default()) {
+            Ok(v) => {
+                domains.insert("rock_mechanics".into(), v);
+            }
+            Err(error) => {
+                failures.insert(
+                    "rock_mechanics".into(),
+                    serde_json::json!(error.to_string()),
+                );
+            }
         }
-        if let Ok(v) = self.sim_nuclear_shielding(&Default::default()) {
-            domains.insert("nuclear_shielding".into(), v);
+        match self.sim_nuclear_shielding(&Default::default()) {
+            Ok(v) => {
+                domains.insert("nuclear_shielding".into(), v);
+            }
+            Err(error) => {
+                failures.insert(
+                    "nuclear_shielding".into(),
+                    serde_json::json!(error.to_string()),
+                );
+            }
         }
-        if let Ok(v) = self.sim_environmental(&Default::default()) {
-            domains.insert("environmental".into(), v);
+        match self.sim_environmental(&Default::default()) {
+            Ok(v) => {
+                domains.insert("environmental".into(), v);
+            }
+            Err(error) => {
+                failures.insert("environmental".into(), serde_json::json!(error.to_string()));
+            }
         }
-        if let Ok(v) = self.sim_geotechnical(&Default::default()) {
-            domains.insert("geotechnical".into(), v);
+        match self.sim_geotechnical(&Default::default()) {
+            Ok(v) => {
+                domains.insert("geotechnical".into(), v);
+            }
+            Err(error) => {
+                failures.insert("geotechnical".into(), serde_json::json!(error.to_string()));
+            }
         }
-        if let Ok(v) = self.sim_generative(&Default::default()) {
-            domains.insert("generative".into(), v);
+        match self.sim_generative(&Default::default()) {
+            Ok(v) => {
+                domains.insert("generative".into(), v);
+            }
+            Err(error) => {
+                failures.insert("generative".into(), serde_json::json!(error.to_string()));
+            }
         }
 
         let total_count = domains.len();
+        let failed_count = failures.len();
+        let target_domains = 30;
         let payload = serde_json::json!({
-            "suite_status": "AllPassed",
-            "tier": "Enterprise $10,000/mo SaaS Tier",
+            "suite_status": if failed_count == 0 {
+                "Completed"
+            } else {
+                "Partial"
+            },
             "domains_evaluated": total_count,
-            "target_domains": 27,
-            "standards_compliance": {
-                "aerospace": "AS9100 Rev D & FAA FAR 25",
-                "quality_management": "ISO 9001:2015",
+            "failed_domains": failures,
+            "failed_count": failed_count,
+            "target_domains": target_domains,
+            "analysis_standards_basis": {
+                "aerospace": "AS9100 Rev D & FAA FAR 25 criteria",
+                "quality_management": "ISO 9001:2015 traceability criteria",
                 "pressure_vessel": "ASME BPVC Section VIII & B31.3",
                 "radiation_protection": "ICRP-103 & 10 CFR Part 20",
                 "automotive_safety": "ISO 26262 & UN ECE R100",
                 "electronics_pcb": "IPC-2141 & IEEE 802.3",
                 "mining_geotechnical": "ISRM & Bieniawski RMR89"
             },
+            "analysis_standards_note": "Formula basis only. These are the criteria the analytical \
+                models reference; no certification, accreditation or regulatory approval is implied.",
             "domains": domains,
         });
         Ok(payload)
@@ -13590,7 +13819,7 @@ namespace AtlasCAD.Unity
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_millis())
-                .unwrap_or(1732280000)
+                .unwrap_or_else(|_| u128::from(now_epoch_millis()))
         );
         let mut rec = atlas_asset_manager::AssetRecord::new(
             asset_id.clone(),
@@ -13655,7 +13884,7 @@ namespace AtlasCAD.Unity
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_secs())
-                .unwrap_or(1732280000)
+                .unwrap_or(now_unix_secs())
         );
         let stored_id = self
             .asset_registry
@@ -13699,7 +13928,7 @@ namespace AtlasCAD.Unity
     }
 
     fn collab_presence_payload(&self) -> Result<serde_json::Value, StudioError> {
-        let now = 1732280000;
+        let now = now_unix_secs();
         let active_users: Vec<&CollabUser> = self.collab_presence.values().collect();
         let active_locks: Vec<&EntityLock> = self.entity_locks.values().collect();
 
@@ -13720,7 +13949,7 @@ namespace AtlasCAD.Unity
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
-            .unwrap_or(1732280000);
+            .unwrap_or(now_unix_secs());
         let user = self
             .collab_presence
             .entry(req.user_id.clone())
@@ -13769,7 +13998,7 @@ namespace AtlasCAD.Unity
         &mut self,
         req: AcquireLockRequest,
     ) -> Result<serde_json::Value, StudioError> {
-        let now = 1732280000;
+        let now = now_unix_secs();
         let duration = req.duration_sec.unwrap_or(30);
 
         if let Some(existing) = self.entity_locks.get(&req.entity_id)
@@ -13825,13 +14054,13 @@ namespace AtlasCAD.Unity
         &mut self,
         req: CreateCommentRequest,
     ) -> Result<serde_json::Value, StudioError> {
-        let now = 1732280000;
+        let now = now_unix_secs();
         let comment_id = format!(
             "cmt_{}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_millis())
-                .unwrap_or(1732280000)
+                .unwrap_or_else(|_| u128::from(now_epoch_millis()))
         );
         let comment = CollabComment {
             id: comment_id,
@@ -13856,7 +14085,7 @@ namespace AtlasCAD.Unity
         comment_id: &str,
         req: ReplyCommentRequest,
     ) -> Result<serde_json::Value, StudioError> {
-        let now = 1732280000;
+        let now = now_unix_secs();
         let cmt = self
             .collab_comments
             .iter_mut()
@@ -13916,7 +14145,7 @@ namespace AtlasCAD.Unity
             ],
             mfa_enabled: false,
             sso_provider: None,
-            created_at: 1732280000,
+            created_at: now_unix_secs(),
         };
 
         let active_user = self
@@ -13967,14 +14196,14 @@ namespace AtlasCAD.Unity
                 "license_key": "ATLAS-ENT-2026-X889-K992-FLIGHT",
                 "seats_allocated": 4,
                 "seats_total": 10,
-                "status": "Active (Compliant)",
+                "status": "Active",
                 "renewal_date": "2027-11-22",
                 "features": [
                     "Unlimited 6-DOF Waverider Physics Sim",
                     "Truck Kernel B-Rep Exact Solid Modeler",
                     "Multi-tier Asset Store (Public, Team, Private)",
                     "Real-Time Optimistic Entity Leases & 3D Spatial Reviews",
-                    "ISO 9001 / AS9100 Merkle Audit Chain",
+                    "FNV-1a tamper-evident audit chain",
                     "Headless Batch CLI & Python SDK API Keys"
                 ]
             }
@@ -14050,7 +14279,7 @@ namespace AtlasCAD.Unity
                     ],
                     mfa_enabled: false,
                     sso_provider: req.sso_provider,
-                    created_at: 1732280000,
+                    created_at: now_unix_secs(),
                 };
                 self.auth_users.insert(user_id, new_user.clone());
                 new_user
@@ -14064,15 +14293,15 @@ namespace AtlasCAD.Unity
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_secs())
-                .unwrap_or(1732280000)
+                .unwrap_or(now_unix_secs())
         );
         self.auth_sessions.insert(
             token.clone(),
             AuthSession {
                 token: token.clone(),
                 user_id: user.user_id.clone(),
-                created_at: 1732280000,
-                expires_at: 1732280000 + 720 * 3600,
+                created_at: now_unix_secs(),
+                expires_at: now_unix_secs() + 720 * 3600,
                 ip_address: "127.0.0.1".to_string(),
                 user_agent: "AtlasCAD Studio Web Client".to_string(),
             },
@@ -14089,7 +14318,7 @@ namespace AtlasCAD.Unity
                 cursor_pos: [0.0, 0.0, 0.0],
                 active_tool: "3D Workspace".to_string(),
                 selected_entity: None,
-                last_heartbeat: 1732280000,
+                last_heartbeat: now_unix_secs(),
             },
         );
 
@@ -14113,7 +14342,7 @@ namespace AtlasCAD.Unity
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_millis())
-                .unwrap_or(1732280000)
+                .unwrap_or_else(|_| u128::from(now_epoch_millis()))
         );
         let role = req.role.unwrap_or_else(|| "Design Engineer".to_string());
         let team_id = req
@@ -14151,7 +14380,7 @@ namespace AtlasCAD.Unity
             ],
             mfa_enabled: false,
             sso_provider: None,
-            created_at: 1732280000,
+            created_at: now_unix_secs(),
         };
 
         self.auth_users.insert(user_id.clone(), new_user.clone());
@@ -14238,22 +14467,22 @@ namespace AtlasCAD.Unity
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_millis())
-                .unwrap_or(1732280000)
+                .unwrap_or_else(|_| u128::from(now_epoch_millis()))
         );
         let token = format!(
             "atlas_pat_{:016x}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_nanos())
-                .unwrap_or(1732280000)
+                .unwrap_or_else(|_| u128::from(now_epoch_millis()) * 1_000_000)
         );
         let key = ApiKeyRecord {
             id,
             name: req.name,
             token: token.clone(),
             user_id: self.active_user_id.clone(),
-            created_at: 1732280000,
-            expires_at: Some(1732280000 + 365 * 86400),
+            created_at: now_unix_secs(),
+            expires_at: Some(now_unix_secs() + 365 * 86400),
             last_used_at: None,
             scopes: req.scopes.unwrap_or_else(|| {
                 vec!["cad:read".into(), "cad:mutate".into(), "export:all".into()]
@@ -14881,7 +15110,7 @@ fn route(state: &Arc<Mutex<StudioState>>, request: &http::Request, port: u16) ->
             Err(error) => error_response(&error),
         },
         ("GET", "/api/report") => {
-            match with_state(state, |state| Ok(state.compliance_report_payload())) {
+            match with_state(state, |state| state.compliance_report_payload()) {
                 Ok(payload) => json_response(200, payload),
                 Err(error) => error_response(&error),
             }
@@ -18857,6 +19086,11 @@ fn sheet_from_query(path: &str, title: String) -> Result<cad_drafting::Sheet, St
     }
     sheet.validate()?;
     Ok(sheet)
+}
+
+/// Whole seconds since the Unix epoch, or 0 if the clock is before the epoch.
+fn now_unix_secs() -> u64 {
+    now_epoch_millis() / 1000
 }
 
 /// Milliseconds since the Unix epoch, or 0 if the clock is before the epoch.

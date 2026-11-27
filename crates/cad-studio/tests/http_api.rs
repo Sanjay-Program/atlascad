@@ -3856,23 +3856,38 @@ fn enterprise_saas_audit_report_and_jobs_api() -> Result<(), Box<dyn std::error:
         .ok_or("evals")?;
     assert_eq!(evals.len(), 3);
 
-    // 2. GET /api/report: verify engineering compliance certification package
+    // 2. GET /api/report: a draft with measured geometry and no invented evidence.
     let rep_resp = request(addr, "GET", "/api/report", &[], &[])?;
     assert_eq!(rep_resp.status, 200);
     let rep_data = json(&rep_resp)?;
+    assert_eq!(rep_data["release_status"], "DRAFT_NOT_RELEASED");
     assert!(
-        rep_data["mass_properties"]["mass_kg"]
+        rep_data["mass_properties"]["volume_mm3"]
             .as_f64()
-            .ok_or("mass")?
+            .ok_or("volume")?
             > 0.0
     );
-    assert_eq!(rep_data["mass_properties"]["density_kg_m3"], 2700.0);
-    let fos = rep_data["structural"]["factor_of_safety"]
-        .as_f64()
-        .ok_or("fos")?;
-    assert!(fos >= 1.5);
-    assert!(!rep_data["bom"]["items"].as_array().ok_or("bom")?.is_empty());
-    assert_eq!(rep_data["sign_offs"].as_array().ok_or("signoffs")?.len(), 3);
+    assert_eq!(rep_data["mass_properties"]["assessed"], false);
+    assert_eq!(rep_data["structural"]["compliance_status"], "NOT_ASSESSED");
+    assert!(rep_data["bom"]["items"].as_array().ok_or("bom")?.is_empty());
+    assert!(
+        rep_data["sign_offs"]
+            .as_array()
+            .ok_or("signoffs")?
+            .is_empty()
+    );
+    let serialized = serde_json::to_string(&rep_data)?;
+    assert!(!serialized.contains("CERTIFIED_FOR_PRODUCTION"));
+    assert!(!serialized.contains("CalculiX"));
+    for evaluation in evals {
+        assert_eq!(evaluation["status"], "TRACEABILITY_CHAIN_VALID");
+        assert!(
+            evaluation["assessment_scope"]
+                .as_str()
+                .ok_or("scope")?
+                .contains("Not a certification")
+        );
+    }
 
     // 3. GET /api/org: verify enterprise organization quotas and role-based permissions
     let org_resp = request(addr, "GET", "/api/org", &[], &[])?;

@@ -157,7 +157,7 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
         CommandSchema::new(
             "materials.assign",
             "Assign Engineering Material",
-            "Applies certified physical material properties to a solid or part.",
+            "Applies typical handbook material properties to a solid or part (not a certified database).",
             CommandCategory::Materials,
         )
         .with_permission(CommandPermission::ProjectEdit)
@@ -423,8 +423,9 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), C
     registry.register(
         CommandSchema::new(
             "report.certification.generate",
-            "Generate AS9100 / ISO 9001 Certification Dossier",
-            "Produces cryptographically signed engineering compliance report with 3-tier approvals.",
+            "Generate engineering report (draft)",
+            "Produces a draft report from measured geometry. It issues no certification, runs no \
+             structural solver and creates no approvals.",
             CommandCategory::Reporting,
         )
         .with_permission(CommandPermission::ReadOnly),

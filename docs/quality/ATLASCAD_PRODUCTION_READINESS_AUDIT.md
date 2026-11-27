@@ -236,6 +236,11 @@ Prior browser measurement (2026-11-25, cited, not re-run): 814 ms first load, 5,
 | PR-012 | P2, fixed | Browser “run all” sent `auto_approve: true` silently | Button titles state the bypass and each run asks for confirmation |
 | PR-013 | P3, fixed | Contrast not measured | Rendered-DOM audit: 0 failing pairs in light and dark; enforced in the simulation |
 | PR-014 | P3 | Historical docs (`feature-matrix.md`, `production-readiness.md`) describe older capabilities | Add dated banners; rewrite at the next milestone |
+| PR-017 | **P0, fixed** | `/api/report` invented a released certification package (mass, CalculiX pass, sign-offs, standards) | Now a `DRAFT_NOT_RELEASED` report from measured mesh volume with unassessed mass, no BOM, no signatures; asserted in `http_api` |
+| PR-018 | **P0, fixed** | Suite reported `AllPassed` and hid failed domains | Derived `Completed`/`Partial`, failed domains listed, standards labelled as formula basis only |
+| PR-019 | P1, fixed | Runtime audit/job/ECO/auth timestamps were 2023 constants | All 41 literals replaced by the real clock |
+| PR-020 | P1, fixed | Optimizer revisions fabricated compliance scores and evidence hashes | Score 0.0, FNV-1a content digest, `evidence_verified: false` |
+| PR-021 | P2, fixed | Residual certification wording in UI/CLI/MCP/agents | Rewritten as traceability/self-assessed/typical properties |
 
 ---
 

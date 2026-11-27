@@ -111,7 +111,7 @@ impl WorkflowRegistry {
             WorkflowTemplateInfo {
                 id: "req_to_tech_docs".into(),
                 name: "Requirements to Certified Technical Documentation".into(),
-                description: "Extracts CAD drawing sheets, DXF CAD layers, bills of materials, and compiles an AS9100 Rev D audit dossier.".into(),
+                description: "Extracts CAD drawing sheets, DXF CAD layers and bills of materials into a self-assessed evidence package; it does not certify AS9100.".into(),
                 category: "Documentation".into(),
                 required_agents: vec!["technical_writer".into(), "quality_assurance".into(), "cost_planner".into()],
                 task_count: 4,
@@ -163,7 +163,7 @@ impl WorkflowRegistry {
             WorkflowTemplateInfo {
                 id: "hypersonic_full_vehicle_master".into(),
                 name: "12,000 km/h Hypersonic Aircraft Master Autonomous Workflow".into(),
-                description: "Closed-loop autonomous generative engineering for Mach 11 waverider: synthesizes B-Rep geometry, solves plasma aerothermodynamics, supercritical cryo-cooling, scramjet propulsion, 270V avionics, 5-axis CNC toolpaths, and AS9100 compliance.".into(),
+                description: "Closed-loop generative engineering for a Mach 11 waverider: analytical plasma aerothermodynamics, cryo-cooling, scramjet cycle, avionics power budget and toolpath planning. No AS9100 certification or solver verification is produced.".into(),
                 category: "Hypersonic & Aerospace".into(),
                 required_agents: vec![
                     "chief_engineer".into(),
@@ -484,7 +484,7 @@ impl WorkflowRegistry {
                 graph.add_task(
                     EngineeringTask::new(
                         "t2_audit",
-                        "Compile AS9100 Dossier",
+                        "Compile evidence package (self-assessed)",
                         "quality_assurance",
                         "report.certification.generate",
                     )
@@ -744,7 +744,7 @@ impl WorkflowRegistry {
                 graph.add_task(
                     EngineeringTask::new(
                         "t11_as9100_cert",
-                        "Emit Cryptographic AS9100 / FAA Certification Dossier",
+                        "Assemble compliance evidence package (self-assessed, not certified)",
                         "quality_assurance",
                         "eco.submit",
                     )

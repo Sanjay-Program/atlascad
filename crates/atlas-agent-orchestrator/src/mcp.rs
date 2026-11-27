@@ -88,7 +88,7 @@ impl McpServer {
             },
             McpToolDefinition {
                 name: "atlas_material_assign".into(),
-                description: "Assign certified engineering material properties to active part".into(),
+                description: "Assign typical handbook material properties to the active part (not a certified database)".into(),
                 input_schema: serde_json::json!({
                     "type": "object",
                     "properties": {
@@ -165,7 +165,7 @@ impl McpServer {
             },
             McpToolDefinition {
                 name: "atlas_report_generate".into(),
-                description: "Generate certified AS9100 / ISO 9001 compliance audit dossier".into(),
+                description: "Generate a draft engineering report with local traceability checks (no certification)".into(),
                 input_schema: serde_json::json!({ "type": "object" }),
             },
             McpToolDefinition {

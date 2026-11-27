@@ -2489,7 +2489,7 @@ fn cmd_commands(arguments: &[String]) -> Result<i32, CliError> {
                     "version": env!("CARGO_PKG_VERSION"),
                     "deployment_mode": "containerized_and_standalone",
                     "engines_active": 27,
-                    "compliance": "AS9100 Rev D / ISO 9001:2015"
+                    "audit_trail": "local FNV-1a chain only; not a certification"
                 }),
                 _ => serde_json::json!({
                     "status": "Executed",

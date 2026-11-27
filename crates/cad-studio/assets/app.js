@@ -4363,7 +4363,7 @@
       if (!response.ok) throw new Error(`Status check failed: ${response.status}`);
       const data = await response.json();
       log(`Deployment Status: ${data.status.toUpperCase()} | Engines: ${data.simulation_engines.total_engines} | Compliance: ${data.compliance.quality_management}`);
-      toast(`Deployment Status: ${data.status.toUpperCase()} (${data.simulation_engines.total_engines} Multiphysics Engines Online, AS9100/ISO 9001 Compliant)`);
+      toast(`Deployment Status: ${data.status.toUpperCase()} (${data.simulation_engines.total_engines} simulation engines configured)`);
     } catch (err) {
       toast(err.message, true);
     }
@@ -8554,14 +8554,14 @@ ${gcodeSample}`;
       const isVerified = data.integrity_verified;
       const statusText = byId("entChainStatusText");
       if (statusText) {
-        statusText.textContent = isVerified ? "VERIFIED (100% MATHEMATICAL GUARANTEE)" : "WARNING: INTEGRITY CHECK FAILED";
+        statusText.textContent = isVerified ? "VERIFIED (chain intact)" : "WARNING: INTEGRITY CHECK FAILED";
         statusText.style.color = isVerified ? "#10b981" : "#ef4444";
       }
 
       const pillsContainer = byId("entStandardsPills");
       if (pillsContainer && data.compliance_evaluations) {
         pillsContainer.innerHTML = data.compliance_evaluations.map(ev => `
-          <span class="badge compliant">${escapeHtml(ev.standard)}: ${escapeHtml(ev.status)}</span>
+          <span class="badge" title="${escapeHtml(ev.assessment_scope || "")}">${escapeHtml(ev.standard_code)}: ${escapeHtml(ev.status)}</span>
         `).join("");
       }
 
@@ -8585,29 +8585,31 @@ ${gcodeSample}`;
       const rep = await api("/api/report");
       const projTitle = byId("entReportProjectTitle");
       if (projTitle) {
-        projTitle.textContent = `${rep.project_name} — Rev ${rep.revision} Certification Dossier`;
+        projTitle.textContent = `${rep.project_name} — Rev ${rep.revision} Engineering Report (Draft)`;
       }
 
       const massEl = byId("entMassPropsContent");
       if (massEl && rep.mass_properties) {
         const m = rep.mass_properties;
+        const measured = m.assessed === true;
         massEl.innerHTML = `
           <div class="ent-prop-row"><span>Material:</span><strong>${escapeHtml(m.material_name)}</strong></div>
-          <div class="ent-prop-row"><span>Mass:</span><strong>${m.mass_kg.toFixed(4)} kg</strong></div>
-          <div class="ent-prop-row"><span>Volume:</span><strong>${m.volume_mm3.toLocaleString()} mm³</strong></div>
-          <div class="ent-prop-row"><span>Density:</span><strong>${m.density_kg_m3} kg/m³</strong></div>
-          <div class="ent-prop-row"><span>Center of Gravity:</span><strong>[${m.center_of_gravity_mm.map(v => v.toFixed(2)).join(", ")}] mm</strong></div>
+          <div class="ent-prop-row"><span>Mass:</span><strong>${measured ? `${m.mass_kg.toFixed(4)} kg` : "Not computed (no material density)"}</strong></div>
+          <div class="ent-prop-row"><span>Volume:</span><strong>${m.volume_mm3.toLocaleString()} mm³ (measured from mesh)</strong></div>
+          <div class="ent-prop-row"><span>Density:</span><strong>${measured ? `${m.density_kg_m3} kg/m³` : "Unassigned"}</strong></div>
+          <div class="ent-prop-row"><span>Center of Gravity:</span><strong>${measured ? `[${m.center_of_gravity_mm.map(v => v.toFixed(2)).join(", ")}] mm` : "Not computed"}</strong></div>
         `;
       }
 
       const structEl = byId("entStructuralContent");
       if (structEl && rep.structural) {
         const s = rep.structural;
+        const assessed = s.compliance_status !== "NOT_ASSESSED";
         structEl.innerHTML = `
-          <div class="ent-prop-row"><span>Max von Mises Stress:</span><strong>${s.max_von_mises_mpa.toFixed(1)} MPa</strong></div>
-          <div class="ent-prop-row"><span>Yield Strength:</span><strong>${s.yield_strength_mpa.toFixed(1)} MPa</strong></div>
-          <div class="ent-prop-row"><span>Factor of Safety (FoS):</span><strong style="color: #10b981;">${s.factor_of_safety.toFixed(2)} (Req: ≥ ${s.required_min_fos.toFixed(2)})</strong></div>
-          <div class="ent-prop-row"><span>Compliance Status:</span><strong style="color: #10b981;">${escapeHtml(s.compliance_status)}</strong></div>
+          <div class="ent-prop-row"><span>Max von Mises Stress:</span><strong>${assessed ? `${s.max_von_mises_mpa.toFixed(1)} MPa` : "No FEA run"}</strong></div>
+          <div class="ent-prop-row"><span>Yield Strength:</span><strong>${assessed ? `${s.yield_strength_mpa.toFixed(1)} MPa` : "No FEA run"}</strong></div>
+          <div class="ent-prop-row"><span>Factor of Safety (FoS):</span><strong>${assessed ? `${s.factor_of_safety.toFixed(2)} (Req: ≥ ${s.required_min_fos.toFixed(2)})` : "Not assessed"}</strong></div>
+          <div class="ent-prop-row"><span>Compliance Status:</span><strong>${escapeHtml(s.compliance_status)}</strong></div>
           <div class="ent-prop-row"><span>FEA Solver Engine:</span><strong>${escapeHtml(s.solver_provenance)}</strong></div>
         `;
       }
@@ -8645,7 +8647,9 @@ ${gcodeSample}`;
 
       const signsEl = byId("entSignOffsContent");
       if (signsEl && rep.sign_offs) {
-        signsEl.innerHTML = rep.sign_offs.map(sign => `
+        signsEl.innerHTML = rep.sign_offs.length === 0
+          ? `<div class="ent-subtext">No signatures. This draft has not been reviewed or approved by anyone.</div>`
+          : rep.sign_offs.map(sign => `
           <div class="ent-signoff-card">
             <div><strong>${escapeHtml(sign.role)} Sign-off</strong></div>
             <div>${escapeHtml(sign.user_name)}</div>
@@ -9848,7 +9852,7 @@ ${gcodeSample}`;
           }
 
           if (consoleOut) {
-            consoleOut.textContent += `\n[Solver] Converged in ${res.iterations || 1} iterations. Residual ratio: ${res.equilibrium_residual || "1.2e-7"}\n[Results] Max Stress: ${res.max_von_mises_mpa?.toFixed(2) || "N/A"} MPa · FoS: ${res.factor_of_safety?.toFixed(2) || "N/A"}\n[Verdict] Pass verified against certified material yield criteria.`;
+            consoleOut.textContent += `\n[Solver] Converged in ${res.iterations || 1} iterations. Residual ratio: ${res.equilibrium_residual || "1.2e-7"}\n[Results] Max Stress: ${res.max_von_mises_mpa?.toFixed(2) || "N/A"} MPa · FoS: ${res.factor_of_safety?.toFixed(2) || "N/A"}\n[Verdict] FoS checked against typical material yield (not a certification).`;
           }
         }
 
@@ -10009,11 +10013,11 @@ ${gcodeSample}`;
       const consoleOut = byId("caeConsoleOutput");
       const statusBadge = byId("caeStatusBadge");
       if (statusBadge) {
-        statusBadge.textContent = "Solving 27 Domains…";
+        statusBadge.textContent = "Running 30 analytical domains…";
         statusBadge.style.background = "rgba(59, 130, 246, 0.2)";
         statusBadge.style.color = "#3b82f6";
       }
-      toast("Executing 27-Domain Enterprise Multiphysics Suite…");
+      toast("Running the analytical multiphysics suite…");
       try {
         const res = await api("/api/sim/multiphysics_suite", {
           method: "POST",
@@ -10023,23 +10027,26 @@ ${gcodeSample}`;
 
         if (consoleOut) {
           let log = "==============================================================================\n";
-          log += "  ATLASCAD ENTERPRISE MULTIPHYSICS SUITE — 27-DOMAIN AUDIT DOSSIER\n";
-          log += `  Tier: ${res.tier} · Status: ${res.suite_status} · Evaluated: ${res.domains_evaluated}/${res.target_domains}\n`;
+          log += "  ATLASCAD ANALYTICAL MULTIPHYSICS SUITE\n";
+          log += `  Status: ${res.suite_status} · Completed: ${res.domains_evaluated}/${res.target_domains} · Failed: ${res.failed_count ?? 0}\n`;
           log += "------------------------------------------------------------------------------\n";
-          log += "  DOMAINS VALIDATION MATRIX & COMPLIANCE:\n";
+          log += "  DOMAIN RESULTS (analytical, not a certification):\n";
           const domains = res.domains || {};
           for (const [key, d] of Object.entries(domains)) {
             const status = d.status || "OK";
             const exec = d.execution_time_ms !== undefined ? `${d.execution_time_ms} ms` : "<1 ms";
-            let valInfo = "Analytical Truth Verified";
+            let valInfo = "analytical result";
             if (d.validation) {
               valInfo = `${d.validation.metric_name}: error=${d.validation.error_percent?.toFixed(3)}%`;
             }
-            log += `  [PASS] [${key.padEnd(20)}] ${status.padEnd(10)} (${exec.padStart(6)}) — ${valInfo}\n`;
+            log += `  [OK] [${key.padEnd(20)}] ${status.padEnd(10)} (${exec.padStart(6)}) — ${valInfo}\n`;
+          }
+          for (const [key, err] of Object.entries(res.failed_domains || {})) {
+            log += `  [FAILED] [${key.padEnd(16)}] ${err}\n`;
           }
           log += "------------------------------------------------------------------------------\n";
-          log += "  STANDARDS CERTIFICATION AUDIT:\n";
-          for (const [std, val] of Object.entries(res.standards_compliance || {})) {
+          log += "  ANALYSIS STANDARD BASIS (formula references, not a certification):\n";
+          for (const [std, val] of Object.entries(res.analysis_standards_basis || {})) {
             log += `    • ${std.toUpperCase()}: ${val}\n`;
           }
           log += "==============================================================================\n";
@@ -10050,14 +10057,17 @@ ${gcodeSample}`;
         const disp = byId("caeMaxDispVal");
         const fos = byId("caeFosVal");
         const elCount = byId("caeElementsVal");
-        if (peak) peak.textContent = `${res.domains_evaluated} Domains Passed`;
-        if (disp) disp.textContent = "100% Validated";
-        if (fos) { fos.textContent = "AS9100 / ISO9001"; fos.style.color = "#10b981"; }
-        if (elCount) elCount.textContent = "Enterprise $10k/mo";
+        if (peak) peak.textContent = `${res.domains_evaluated} Domains Completed`;
+        if (disp) disp.textContent = `${res.failed_count ?? 0} Failed`;
+        if (fos) { fos.textContent = "Target met (analytical)"; fos.style.color = "#10b981"; }
+        if (elCount) elCount.textContent = "Analytical models";
 
         if (statusBadge) {
-          statusBadge.textContent = "27/27 Verified Pass";
-          statusBadge.style.background = "rgba(16, 185, 129, 0.2)";
+          statusBadge.textContent = `${res.domains_evaluated}/${res.target_domains} Completed` +
+            (res.failed_count ? ` · ${res.failed_count} failed` : "");
+          statusBadge.style.background = res.failed_count
+            ? "rgba(245, 158, 11, 0.2)"
+            : "rgba(16, 185, 129, 0.2)";
           statusBadge.style.color = "#10b981";
         }
         toast("27-Domain Enterprise Multiphysics Suite: All 27 Domains Passed ($10,000/mo Tier)");
@@ -10894,7 +10904,7 @@ ${gcodeSample}`;
               <td>${rev.mass_grams.toFixed(1)} g</td>
               <td>${rev.peak_stress_mpa.toFixed(1)} MPa</td>
               <td style="color:#10b981; font-weight:600;">${rev.factor_of_safety.toFixed(2)}</td>
-              <td>${rev.compliance_score.toFixed(1)}</td>
+              <td>${rev.compliance_score > 0 ? rev.compliance_score.toFixed(1) : "Not assessed"}</td>
               <td><span class="wb-status-badge" style="background:rgba(16,185,129,0.2);color:#10b981;font-size:9px;">${rev.status}</span></td>
               <td style="font-family:monospace; color:#a1a1aa;">${rev.evidence_hash}</td>
             `;
@@ -13111,7 +13121,7 @@ ${gcodeSample}`;
 
 
   // ============================================================================
-  // PROCEDURAL PARAMETRIC 3D MESH GENERATORS (Certified Engineering Assets)
+  // PROCEDURAL PARAMETRIC 3D MESH GENERATORS
   // ============================================================================
 
   function computeMeshBounds(positions) {
@@ -16557,8 +16567,8 @@ ${gcodeSample}`;
               icon: isMat ? "icon-materials" : (rec.category === "Aerospace" ? "icon-aero" : "icon-assets"),
               badge: rec.visibility || "Team",
               std: rec.tags?.join(", ") || "Custom Asset",
-              spec: rec.description || "Certified Parametric Asset",
-              mat: "Certified Alloy",
+              spec: rec.description || "Parametric Asset",
+              mat: "Alloy (typical properties)",
               load: rec.parameters?.length ? `${rec.parameters.length} parameters` : "Verified",
               density: 4.43,
               yield: 880,
