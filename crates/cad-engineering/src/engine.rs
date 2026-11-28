@@ -343,13 +343,14 @@ impl EngineRegistry {
             id: EngineId::new("opensees"),
             name: "OpenSees Structural Framework".to_string(),
             discipline: EngineDiscipline::Civil,
-            version: "3.6.0".to_string(),
+            version: "3.8.0.0".to_string(),
             license: "BSD-style (Permissive)".to_string(),
             license_tier: LicenseTier::TierAPermissive,
             execution_model: ExecutionModel::ProcessIsolated,
             capabilities: vec![EngineCapability::FeaStatic],
             available: true,
-            binary_path: Some("/usr/bin/OpenSees".to_string()),
+            // The OpenSeesPy library adapter runs in a separate interpreter; there is no binary.
+            binary_path: None,
             description: "Earthquake engineering, non-linear structural frame analysis, and seismic response simulation.".to_string(),
         });
 
@@ -408,13 +409,15 @@ impl EngineRegistry {
             id: EngineId::new("pandapower"),
             name: "pandapower Electric Grid Engine".to_string(),
             discipline: EngineDiscipline::Power,
-            version: "2.14.11".to_string(),
+            version: "3.2.1".to_string(),
             license: "BSD-3-Clause".to_string(),
             license_tier: LicenseTier::TierAPermissive,
             execution_model: ExecutionModel::ProcessIsolated,
             capabilities: vec![EngineCapability::PowerFlow],
             available: true,
-            binary_path: Some("/usr/bin/pandapower".to_string()),
+            // A Python library: the adapter runs it in a separate interpreter, so there is no
+            // executable at a fixed path.
+            binary_path: None,
             description: "Balanced 3-phase AC power flow, short-circuit, and state estimation for transmission & distribution grids.".to_string(),
         });
 
@@ -438,10 +441,11 @@ impl EngineRegistry {
             id: EngineId::new("cantera"),
             name: "Cantera Chemical Kinetics".to_string(),
             discipline: EngineDiscipline::Chemical,
-            version: "3.0.0".to_string(),
+            version: "3.2.0".to_string(),
             license: "BSD-3-Clause".to_string(),
             license_tier: LicenseTier::TierAPermissive,
-            execution_model: ExecutionModel::InProcess,
+            // A Python library, driven by atlas-engine-manager::cantera in a separate interpreter.
+            execution_model: ExecutionModel::ProcessIsolated,
             capabilities: vec![EngineCapability::ChemicalKinetics],
             available: true,
             binary_path: None,
@@ -518,7 +522,8 @@ impl EngineRegistry {
             version: "3.1.5".to_string(),
             license: "Apache-2.0".to_string(),
             license_tier: LicenseTier::TierAPermissive,
-            execution_model: ExecutionModel::InProcess,
+            // MuJoCo is a Python library, not an AtlasCAD in-process integrator.
+            execution_model: ExecutionModel::ProcessIsolated,
             capabilities: vec![EngineCapability::RobotKinematics],
             available: true,
             binary_path: None,
@@ -533,7 +538,8 @@ impl EngineRegistry {
             version: "2.2.0".to_string(),
             license: "Public Domain / CC0".to_string(),
             license_tier: LicenseTier::TierAPermissive,
-            execution_model: ExecutionModel::InProcess,
+            // EPANET is an external library/toolkit, not an AtlasCAD in-process solver.
+            execution_model: ExecutionModel::ProcessIsolated,
             capabilities: vec![EngineCapability::WaterHydraulics],
             available: true,
             binary_path: None,
@@ -548,7 +554,8 @@ impl EngineRegistry {
             version: "5.2.4".to_string(),
             license: "Public Domain / CC0".to_string(),
             license_tier: LicenseTier::TierAPermissive,
-            execution_model: ExecutionModel::InProcess,
+            // EPA SWMM is an external library/toolkit, not an AtlasCAD in-process solver.
+            execution_model: ExecutionModel::ProcessIsolated,
             capabilities: vec![EngineCapability::UrbanRunoff],
             available: true,
             binary_path: None,
@@ -676,6 +683,48 @@ impl EngineRegistry {
                     .to_string(),
             ],
             provenance_hash: "0000000000000000".to_string(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Only AtlasCAD's own kernels may claim in-process execution. An external engine marked
+    /// in-process used to make `test_health` report it healthy while no adapter could run it.
+    #[test]
+    fn only_atlascad_own_engines_execute_in_process() {
+        let registry = EngineRegistry::new();
+        let mut in_process: Vec<String> = registry
+            .list()
+            .into_iter()
+            .filter(|engine| engine.execution_model == ExecutionModel::InProcess)
+            .map(|engine| engine.id.as_str().to_string())
+            .collect();
+        in_process.sort();
+        assert_eq!(in_process, vec!["cad-cae", "cad-cam", "truck"]);
+    }
+
+    /// Registration is not availability: a library engine with no imported module is unhealthy.
+    #[test]
+    fn a_library_engine_without_an_adapter_is_not_healthy() {
+        let registry = EngineRegistry::new();
+        for id in [
+            "cantera",
+            "pandapower",
+            "opensees",
+            "mujoco",
+            "epanet",
+            "swmm",
+        ] {
+            let report = registry.test_health(&EngineId::new(id));
+            assert!(!report.healthy, "{id} must not report healthy");
+            assert!(
+                report.message.contains("No execution adapter"),
+                "{id}: {}",
+                report.message
+            );
         }
     }
 }

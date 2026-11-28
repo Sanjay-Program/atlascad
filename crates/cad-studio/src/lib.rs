@@ -16163,6 +16163,35 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                         ))),
                     };
                 }
+                // The OpenSees adapter solves a cantilever and checks the tip displacement against
+                // P L³/(3 E I). Without the module this falls through to the refusal.
+                if engine_id.as_str() == "opensees"
+                    && atlas_engine_manager::opensees::available().is_some()
+                {
+                    let timeout = std::time::Duration::from_secs(
+                        body.timeout_seconds.unwrap_or(60).clamp(5, 180),
+                    );
+                    return match atlas_engine_manager::opensees::run_cantilever_benchmark(timeout) {
+                        Ok(benchmark) => {
+                            let metrics =
+                                serde_json::to_value(&benchmark).unwrap_or(serde_json::Value::Null);
+                            json_response(
+                                200,
+                                serde_json::json!({
+                                    "engine_id": "opensees",
+                                    "benchmark_status": "completed",
+                                    "execution_time_ms": benchmark.elapsed_ms,
+                                    "accuracy_score": benchmark.accuracy_score,
+                                    "metrics": metrics,
+                                    "provenance_hash": benchmark.provenance_hash,
+                                }),
+                            )
+                        }
+                        Err(message) => error_response(&StudioError::Unavailable(format!(
+                            "OpenSees adapter did not produce a verified benchmark: {message}"
+                        ))),
+                    };
+                }
                 let job_req = cad_engineering::engine::EngineJobRequest {
                     job_id: body.job_id.unwrap_or_else(|| "benchmark-1".to_string()),
                     engine_id: engine_id.clone(),
@@ -19434,6 +19463,10 @@ fn real_adapter_health(engine_id: &str) -> Option<serde_json::Value> {
         "cantera" => {
             let (executable, version) = atlas_engine_manager::cantera::available()?;
             (executable, Some(version), "Cantera")
+        }
+        "opensees" => {
+            let (executable, version) = atlas_engine_manager::opensees::available()?;
+            (executable, Some(version), "OpenSeesPy")
         }
         _ => return None,
     };

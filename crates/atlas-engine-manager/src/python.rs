@@ -69,8 +69,18 @@ pub(crate) fn run_json(
 }
 
 /// Version reported by an importable module, or an error naming the module.
+///
+/// The package metadata is preferred because some distributions (OpenSeesPy) do not expose
+/// `__version__`; the module attribute is the fallback.
 pub(crate) fn module_version(module: &str, timeout: Duration) -> Result<String, String> {
-    let code = format!("import {module} as m\nprint(getattr(m, '__version__', 'unknown'))");
+    let code = format!(
+        "import importlib.metadata as md\n\
+         import {module}\n\
+         try:\n\
+         \x20   print(md.version('{module}'))\n\
+         except md.PackageNotFoundError:\n\
+         \x20   print(getattr({module}, '__version__', 'unknown'))"
+    );
     let stdout = run_code(&code, timeout)
         .map_err(|error| format!("`{module}` is not importable: {error}"))?;
     let version = stdout.trim().to_string();

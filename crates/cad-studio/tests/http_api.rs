@@ -3874,9 +3874,8 @@ fn calculix_solves_the_active_document_on_its_gmsh_mesh() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn pandapower_and_cantera_run_a_verified_benchmark_or_refuse()
--> Result<(), Box<dyn std::error::Error>> {
-    for engine_id in ["pandapower", "cantera"] {
+fn library_engines_run_a_verified_benchmark_or_refuse() -> Result<(), Box<dyn std::error::Error>> {
+    for engine_id in ["pandapower", "cantera", "opensees"] {
         let (_dir, _path, handle) = fixture(&format!("engine_{engine_id}"), [20.0, 20.0, 10.0])?;
         let health = post(
             handle.addr(),

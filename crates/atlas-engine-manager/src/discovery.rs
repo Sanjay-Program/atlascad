@@ -9,7 +9,9 @@ use std::path::{Path, PathBuf};
 pub struct EngineDiscoveryReport {
     pub engine_id: String,
     pub name: String,
-    pub status: String, // "native", "installed", "source_acquired", "available"
+    /// "native", "installed", "source_acquired" or "not_installed". A registered engine that
+    /// nothing can run is `not_installed`, never "available".
+    pub status: String,
     pub executable_path: Option<String>,
     pub source_path: Option<String>,
     pub guide: Option<InstallationGuide>,
@@ -50,6 +52,17 @@ impl EngineDiscovery {
         None
     }
 
+    /// Interpreter for a Python-library engine whose adapter can import its module.
+    fn library_interpreter(engine_id: &str) -> Option<PathBuf> {
+        let (python, _version) = match engine_id {
+            "pandapower" => crate::pandapower::available()?,
+            "cantera" => crate::cantera::available()?,
+            "opensees" => crate::opensees::available()?,
+            _ => return None,
+        };
+        Some(python)
+    }
+
     /// Discover installation, local source, and adapter readiness for all 24 engines.
     pub fn discover_all() -> Vec<EngineDiscoveryReport> {
         let guides = InstallationGuide::all();
@@ -72,7 +85,20 @@ impl EngineDiscovery {
                 continue;
             }
 
-            // 2. Check for binary on system
+            // 2. Library engines are installed when their module imports from ATLAS_PYTHON.
+            if let Some(python) = Self::library_interpreter(&engine_id) {
+                reports.push(EngineDiscoveryReport {
+                    engine_id,
+                    name,
+                    status: "installed".to_string(),
+                    executable_path: Some(python.display().to_string()),
+                    source_path: None,
+                    guide: Some(guide),
+                });
+                continue;
+            }
+
+            // 3. Check for binary on system
             let exe_name = match engine_id.as_str() {
                 "calculix" => "ccx",
                 "gmsh" => "gmsh",
@@ -91,7 +117,7 @@ impl EngineDiscovery {
 
             let exe_path = Self::find_executable(exe_name);
 
-            // 3. Check for downloaded source directory in third_party/sources/<engine_id>
+            // 4. Check for downloaded source directory in third_party/sources/<engine_id>
             let source_dir = Path::new("third_party/sources").join(&engine_id);
             let has_source = source_dir.exists() && source_dir.is_dir();
 
@@ -107,7 +133,7 @@ impl EngineDiscovery {
                     None,
                     Some(source_dir.display().to_string()),
                 ),
-                (None, false) => ("available".to_string(), None, None),
+                (None, false) => ("not_installed".to_string(), None, None),
             };
 
             reports.push(EngineDiscoveryReport {

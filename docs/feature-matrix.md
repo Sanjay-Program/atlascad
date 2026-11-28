@@ -45,7 +45,8 @@ No row claims parity with AutoCAD, SolidWorks, Inventor or Onshape. No row claim
 | Document → mesh → solve | **Verified** | `/api/engines/solve-document` runs the same Gmsh mesh through CalculiX: the 40×30×10 block under 2 MPa shows 2,400.0 N applied over the 1,200 mm² top face and 2,400.000018 N of clamped reaction (7.5 × 10⁻⁷ % residual), 1.0793 × 10⁻⁴ mm maximum axial displacement on 6,369 tetrahedra |
 | pandapower power flow | **Partial / verified** | Python-library adapter: solves a two-bus network (1 pu slack, 0.1 + j0.1 pu line, 1 pu constant-power load) and matches the exact quadratic root, 0.8798668869081245 vs 0.8798668869081243 pu (2.5 × 10⁻¹⁴ %), 5 iterations on 3.2.1 |
 | Cantera thermochemistry | **Partial / verified** | Python-library adapter: computes the methane lower heating value from GRI-Mech 3.0 species enthalpies, 802.557 kJ/mol against the standard 802.3 kJ/mol (0.032 %), Mayer and ideal-gas residuals zero to machine precision, and the adiabatic flame temperature 2,224.6 K on 3.2.0 |
-| OpenFOAM, Elmer, SU2, other engines | **Refused** | 16 registry entries have no adapter; `/api/engines/*` returns 501 with "no solver was run". See `PR-008` |
+| OpenSees cantilever statics | **Partial / verified** | Python-library adapter: 10 elasticBeamColumn elements, 1 N tip load on a 1,000 × 10 × 10 mm steel cantilever, tip 1.9047619047612312 mm against `P L³/(3 E I)` = 1.9047619047619047 mm (3.5 × 10⁻¹³ relative) on OpenSeesPy 3.8.0.0 |
+| OpenFOAM, Elmer, SU2, other engines | **Refused** | 15 registry entries have no adapter; `/api/engines/*` returns 501 with "no solver was run". See `PR-008` |
 | Regulatory certification / sign-off | **Absent** | `/api/report` returns a `DRAFT_NOT_RELEASED` report with measured volume and unassessed mass; no sign-offs are created |
 
 ## Agents and automation

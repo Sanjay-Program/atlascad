@@ -463,6 +463,23 @@ def run_live_demo() -> None:
             check(chem_refused, "Cantera benchmark refuses without the module (no fabricated thermochemistry)")
             print("  ✓ Engine Orchestration: Cantera benchmark refused (501, module not installed here)")
 
+        frame = None
+        frame_refused = False
+        try:
+            frame = http_request(port, "POST", "/api/engines/benchmark", body={"engine_id": "opensees"})
+        except RuntimeError as err:
+            frame_refused = "501" in str(err) and "no solver was run" in str(err)
+        if frame:
+            metrics = frame.get("metrics", {})
+            check(frame.get("benchmark_status") == "completed", "OpenSees benchmark completed")
+            check(metrics.get("error_percent", 100) < 0.01, f"cantilever tip within 0.01% of P L^3/(3EI) ({metrics.get('error_percent')}%)")
+            check(metrics.get("elements", 0) == 10, "OpenSees ran the ten-element cantilever")
+            check(str(frame.get("provenance_hash", "")).startswith("fnv1a64-"), "OpenSees provenance digest recorded")
+            print(f"  ✓ Engine Orchestration: real OpenSeesPy {metrics.get('solver_version')} static analysis, tip {metrics.get('tip_displacement_mm')} mm vs beam theory {metrics.get('analytic_displacement_mm')} mm, {frame.get('execution_time_ms')} ms")
+        else:
+            check(frame_refused, "OpenSees benchmark refuses without the module (no fabricated deflection)")
+            print("  ✓ Engine Orchestration: OpenSees benchmark refused (501, module not installed here)")
+
         # ---------------------------------------------------------------------
         # DEMO 9: Engineering Dependency Graph
         # ---------------------------------------------------------------------

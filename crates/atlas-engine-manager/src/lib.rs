@@ -3,10 +3,10 @@
 //! Unified multi-engine orchestration, discovery, health testing, resource ceilings,
 //! and job dispatching across 24 specialist open-source engineering engines.
 //!
-//! Five engines have real, process-isolated adapters that run an installed solver and parse its
-//! own output: CalculiX (and the document solve built on the Gmsh mesh), ngspice, Gmsh,
-//! pandapower and Cantera. The rest are registered and refuse execution, which is what the HTTP
-//! layer reports.
+//! Six engines have real adapters that run an installed solver and parse its own output, in a
+//! separate process: CalculiX (and the document solve built on the Gmsh mesh), ngspice, Gmsh,
+//! pandapower, Cantera and OpenSees. The rest are registered and refuse execution, which is what
+//! the HTTP layer reports.
 
 pub mod adapters;
 pub mod calculix;
@@ -18,6 +18,7 @@ pub mod gmsh;
 pub mod health;
 pub mod installation;
 pub mod ngspice;
+pub mod opensees;
 pub mod pandapower;
 mod process;
 pub mod python;

@@ -25,8 +25,9 @@ curl -s -X POST http://127.0.0.1:7781/api/engines/benchmark \
 
 The adapter writes the deck/netlist/script into a temporary directory, runs the real solver with a
 timeout, parses the solver's own output and compares it with the closed-form answer. CalculiX,
-ngspice and Gmsh are run as processes; pandapower and Cantera are libraries, so their adapters run
-a fixed script in the separate interpreter named by `ATLAS_PYTHON` and parse the JSON it prints.
+ngspice and Gmsh are run as processes; pandapower, Cantera and OpenSees are libraries, so their
+adapters run a fixed script in the separate interpreter named by `ATLAS_PYTHON` and parse the JSON
+it prints.
 When the solver or module is absent the endpoint returns `501` with "no solver was run"; it never
 synthesises a score.
 
@@ -41,6 +42,7 @@ synthesises a score.
 | CalculiX `ccx` | 2.23 | Active document solved through `/api/engines/solve-document`: the 6,369-tetrahedron mesh above, 2 MPa on its 1,200 mm² top face, base clamped | 2,400.000018 N clamped reaction for 2,400.0 N applied (7.5 × 10⁻⁷ % residual), maximum axial displacement 1.0793 × 10⁻⁴ mm | Uniaxial `P L / E` for the free bar = 9.5238 × 10⁻⁵ mm | 13.3 % (see note) | 181 ms | `fnv1a64-240e2a2746434c89` |
 | pandapower | 3.2.1 | Two-bus network: 1 pu slack, 1 km line 0.1 + j0.1 Ω/km, 1 MW constant-power load on a 1 MVA / 1 kV base | Receiving bus 0.8798668869081245 pu in 5 Newton iterations, 0.1292 MW line loss | High-voltage root of `|V|² = Re(V) − R P`, `Im(V) = −X P`: 0.8798668869081243 pu | 2.5 × 10⁻¹⁴ % | 985 ms | `fnv1a64-6001a60b63b81aa2` |
 | Cantera | 3.2.0 | GRI-Mech 3.0: CH₄ + 2 O₂ → CO₂ + 2 H₂O(g) at 298.15 K; stoichiometric CH₄/air equilibrium at 1 atm | LHV 802.557 kJ/mol CH₄; flame temperature 2,224.6 K; `|cp − cv − R| / R` and `|ρ − pM/(RT)| / ρ` both 0.0 | Standard LHV of methane 802.3 kJ/mol | 0.032 % | 261 ms | `fnv1a64-b59124b2db7db41d` |
+| OpenSeesPy | 3.8.0.0 | Cantilever, 1,000 mm × 10 × 10 mm, E = 210 GPa, 10 elasticBeamColumn elements, 1 N tip load | Tip displacement 1.9047619047612312 mm | `P L³ / (3 E I)` = 1.9047619047619047 mm | 3.5 × 10⁻¹³ relative | 161 ms | `fnv1a64-02f7c5625f8f5cba` |
 
 Notes:
 
@@ -58,14 +60,16 @@ Notes:
   solver is compared with it, not with its own previous output.
 - The Cantera reference is the standard enthalpy of combustion of methane, not a Cantera run. The
   flame temperature is reported as computed and carries no accuracy claim.
+- The OpenSees case is a linear-elastic beam under a tip point load, which the element formulation
+  represents exactly; the deviation is solver round-off, not a discretisation study.
 - Wall times are single runs on a shared 8-core host and are indicative only.
 - `provenance_hash` is FNV-1a over the deck/netlist plus the solver's output file. It is a content
   digest for reproducing a run, not a signature or a certification.
 
 ## Not measured
 
-No benchmark exists for OpenFOAM, Elmer, SU2, OpenSees, EnergyPlus, KiCad, OpenDSS, DWSIM, RDKit,
-OpenVSP, JSBSim, MuJoCo, EPANET, EPASWMM, MODFLOW or OCCT: those 16 registry entries have no
+No benchmark exists for OpenFOAM, Elmer, SU2, EnergyPlus, KiCad, OpenDSS, DWSIM, RDKit, OpenVSP,
+JSBSim, MuJoCo, EPANET, EPASWMM, MODFLOW or OCCT: those 15 registry entries have no
 execution adapter under `/api/engines/*`, so the endpoint refuses with `501`. Memory ceilings and
 hardware-GPU frame times are also unmeasured; the headless frame-time figure on SwiftShader is
 recorded in PR-009 of the remediation backlog instead.
