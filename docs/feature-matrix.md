@@ -49,7 +49,8 @@ No row claims parity with AutoCAD, SolidWorks, Inventor or Onshape. No row claim
 | RDKit molecular properties | **Partial / verified** | Python-library adapter: benzene from SMILES gives C₆H₆, 78.046950192 Da against 78.0469501914 Da from exact atomic masses (7.7 × 10⁻¹⁰ %) and 78.114 g/mol against the standard atomic weights (1.8 × 10⁻¹⁴ %) on 2026.9.2 |
 | MuJoCo free fall | **Partial / verified** | Python-library adapter: a 1 kg mass dropped from 10 m for 100,000 steps at 10 µs reaches 5.094950949999747 m against `z₀ − ½ g t²` = 5.095 m (9.6 × 10⁻⁴ %) on 4.0.1 |
 | EPANET pipe hydraulics | **Partial / verified** | Python-library adapter through WNTR: a 1 km × 300 mm pipe at C = 100 gives a 97.10618591308594 m junction head against Hazen-Williams 97.10614270189 m (4.4 × 10⁻⁵ %) on 1.5.0 |
-| OpenFOAM, SU2, IfcOpenShell, other engines | **Refused** | 12 registry entries have no adapter; `/api/engines/*` returns 501 with "no solver was run". See `PR-008` |
+| IfcOpenShell wall geometry | **Partial / verified** | Python-library adapter: an IFC4 wall 2 × 3 × 0.2 m is built through the API, re-read through `ifcopenshell.geom` and its 12 triangles enclose 1.2000000000000002 m³ against the analytic 1.2 m³ on 0.9.0.post1 |
+| OpenFOAM, SU2, EnergyPlus, other engines | **Refused** | 11 registry entries have no adapter; `/api/engines/*` returns 501 with "no solver was run". See `PR-008` |
 | Regulatory certification / sign-off | **Absent** | `/api/report` returns a `DRAFT_NOT_RELEASED` report with measured volume and unassessed mass; no sign-offs are created |
 
 ## Agents and automation

@@ -485,6 +485,7 @@ def run_live_demo() -> None:
             "rdkit": ("exact_mass_error_percent", 1e-6),
             "mujoco": ("error_percent", 1e-2),
             "epanet": ("error_percent", 1e-3),
+            "ifcopenshell": ("error_percent", 1e-6),
         }
         for engine_id, (error_key, tolerance) in library_engines.items():
             result = None

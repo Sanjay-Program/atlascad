@@ -9,7 +9,7 @@ they have been replaced with the measured state below.
 | Status | Meaning |
 | --- | --- |
 | **VERIFIED (built-in)** | AtlasCAD's own code runs the case and a workspace test or the live demo asserts the result. |
-| **BENCHMARK ADAPTER** | A real installed solver is executed for a deterministic benchmark through `/api/engines/benchmark` and `/api/engines/health`; the solver's own output is parsed. That is the binary itself for CalculiX, ngspice and Gmsh, and a separate interpreter running the pandapower, Cantera, OpenSees, RDKit, MuJoCo or EPANET library for those six. General job execution does not exist, so `/api/engines/run` refuses with `501`. |
+| **BENCHMARK ADAPTER** | A real installed solver is executed for a deterministic benchmark through `/api/engines/benchmark` and `/api/engines/health`; the solver's own output is parsed. That is the binary itself for CalculiX, ngspice and Gmsh, and a separate interpreter running the pandapower, Cantera, OpenSees, RDKit, MuJoCo, EPANET or IfcOpenShell library for those seven. General job execution does not exist, so `/api/engines/run` refuses with `501`. |
 | **NOT IMPLEMENTED** | Registry entry and installation guide only. No binary is invoked; `/api/engines/run` and `/api/engines/benchmark` return `501` with "no solver was run". |
 
 ## Registry (24 engines)
@@ -24,7 +24,7 @@ they have been replaced with the measured state below.
 | `gmsh` | Meshing | **BENCHMARK ADAPTER + document meshing** (`atlas-engine-manager::gmsh`) | Refuses (`501`) | Real `gmsh` 4.15.2: cube benchmark 726 tetrahedra at 1000 mm³, and `/api/engines/mesh-document` meshes the active model (6,369 tetrahedra, 12,000 mm³ within 3e-14%); the same mesh is handed to CalculiX by `/api/engines/solve-document` |
 | `openfoam` | CFD | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
 | `su2` | Aerodynamics | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
-| `ifcopenshell` | BIM | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `ifcopenshell` | BIM | **BENCHMARK ADAPTER** (`atlas-engine-manager::ifcopenshell`) | Refuses (`501`) | Real IfcOpenShell 0.9.0.post1: IFC4 wall 2 × 3 × 0.2 m re-meshed to 1.2000000000000002 m³ against the analytic 1.2 m³ |
 | `opensees` | Civil / seismic | **BENCHMARK ADAPTER** (`atlas-engine-manager::opensees`) | Refuses (`501`) | Real OpenSeesPy 3.8.0.0 cantilever, tip 1.9047619047612312 mm vs `P L³/(3 E I)` 1.9047619047619047 mm |
 | `energyplus` | Building energy | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
 | `kicad` | PCB | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
@@ -44,10 +44,10 @@ they have been replaced with the measured state below.
 ## Summary
 
 - **3** built-in engines verified by tests.
-- **9** external engines with a real, benchmarked adapter (CalculiX, ngspice, Gmsh, pandapower,
-  Cantera, OpenSees, RDKit, MuJoCo, EPANET); six of them are library adapters driven through a
-  separate Python interpreter.
-- **12** registry entries with no execution adapter; they refuse instead of returning a result.
+- **10** external engines with a real, benchmarked adapter (CalculiX, ngspice, Gmsh, pandapower,
+  Cantera, OpenSees, RDKit, MuJoCo, EPANET, IfcOpenShell); seven of them are library adapters driven
+  through a separate Python interpreter.
+- **11** registry entries with no execution adapter; they refuse instead of returning a result.
 
 Adding an engine means implementing a process adapter that runs the real binary and parses its
 output, then verifying it against a closed-form or published reference. Registering a row in the

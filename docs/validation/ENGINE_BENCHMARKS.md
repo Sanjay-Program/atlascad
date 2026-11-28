@@ -25,9 +25,9 @@ curl -s -X POST http://127.0.0.1:7781/api/engines/benchmark \
 
 The adapter writes the deck/netlist/script into a temporary directory, runs the real solver with a
 timeout, parses the solver's own output and compares it with the closed-form answer. CalculiX,
-ngspice and Gmsh are run as processes; pandapower, Cantera, OpenSees, RDKit, MuJoCo and EPANET are
-libraries, so their adapters run a fixed script in the separate interpreter named by `ATLAS_PYTHON`
-and parse the JSON it prints.
+ngspice and Gmsh are run as processes; pandapower, Cantera, OpenSees, RDKit, MuJoCo, EPANET and
+IfcOpenShell are libraries, so their adapters run a fixed script in the separate interpreter named
+by `ATLAS_PYTHON` and parse the JSON it prints.
 When the solver or module is absent the endpoint returns `501` with "no solver was run"; it never
 synthesises a score.
 
@@ -46,6 +46,7 @@ synthesises a score.
 | RDKit | 2026.9.2 | Benzene from SMILES `c1ccccc1`: formula, monoisotopic mass and average molecular weight | C₆H₆, 78.046950192 Da, 78.114 g/mol | Exact masses of ¹²C and ¹H (78.0469501914 Da); standard atomic weights (78.114 g/mol) | 7.7 × 10⁻¹⁰ % and 1.8 × 10⁻¹⁴ % | 261 ms | `fnv1a64-362c3084ea8bf05f` |
 | MuJoCo | 4.0.1 | 1 kg point mass dropped from 10 m, 100,000 steps at 10 µs | Height after 1 s: 5.094950949999747 m | `z₀ − ½ g t²` = 5.095 m | 9.6 × 10⁻⁴ % (the integrator's truncation error) | 424 ms | `fnv1a64-77cd23226526a177` |
 | EPANET via WNTR | 1.5.0 | 1 km × 300 mm pipe at C = 100 between a 100 m reservoir and a 0.05 m³/s junction demand | Junction head 97.10618591308594 m, flow 0.05000000074505806 m³/s | Hazen-Williams head loss with EPANET's SI coefficient (10.667, exponents 1.852/4.871): 97.10614270189 m | 4.4 × 10⁻⁵ % | 1,145 ms | `fnv1a64-f110245f506efa0f` |
+| IfcOpenShell | 0.9.0.post1 | IFC4 wall 2 × 3 × 0.2 m built through the API, re-read through `ifcopenshell.geom` | 1.2000000000000002 m³ from 8 vertices and 12 triangles | `length × height × thickness` = 1.2 m³ | 0.0 % (identical float) | 423 ms | `fnv1a64-f896a20ed70abaad` |
 
 Notes:
 
@@ -71,8 +72,8 @@ Notes:
 
 ## Not measured
 
-No benchmark exists for OpenFOAM, SU2, IfcOpenShell, EnergyPlus, KiCad, OpenDSS, DWSIM, OpenVSP,
-JSBSim, SWMM, MODFLOW or OCCT: those 12 registry entries have no execution adapter under
-`/api/engines/*`, so the endpoint refuses with `501`. Memory ceilings and hardware-GPU frame times
+No benchmark exists for OpenFOAM, SU2, EnergyPlus, KiCad, OpenDSS, DWSIM, OpenVSP, JSBSim, SWMM,
+MODFLOW or OCCT: those 11 registry entries have no execution adapter under `/api/engines/*`, so the
+endpoint refuses with `501`. Memory ceilings and hardware-GPU frame times
 are also unmeasured; the headless frame-time figure on SwiftShader is recorded in PR-009 of the
 remediation backlog instead.

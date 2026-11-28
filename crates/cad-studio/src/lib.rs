@@ -16251,6 +16251,26 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                         ),
                     );
                 }
+                if engine_id.as_str() == "ifcopenshell"
+                    && atlas_engine_manager::ifcopenshell::available().is_some()
+                {
+                    let timeout = std::time::Duration::from_secs(
+                        body.timeout_seconds.unwrap_or(90).clamp(5, 240),
+                    );
+                    return adapter_benchmark_response(
+                        "ifcopenshell",
+                        atlas_engine_manager::ifcopenshell::run_wall_volume_benchmark(timeout).map(
+                            |b| {
+                                (
+                                    serde_json::to_value(&b).unwrap_or(serde_json::Value::Null),
+                                    b.elapsed_ms,
+                                    b.accuracy_score,
+                                    b.provenance_hash,
+                                )
+                            },
+                        ),
+                    );
+                }
                 let job_req = cad_engineering::engine::EngineJobRequest {
                     job_id: body.job_id.unwrap_or_else(|| "benchmark-1".to_string()),
                     engine_id: engine_id.clone(),
@@ -19538,6 +19558,10 @@ fn real_adapter_health(engine_id: &str) -> Option<serde_json::Value> {
         "epanet" => {
             let (executable, version) = atlas_engine_manager::epanet::available()?;
             (executable, Some(version), "EPANET via WNTR")
+        }
+        "ifcopenshell" => {
+            let (executable, version) = atlas_engine_manager::ifcopenshell::available()?;
+            (executable, Some(version), "IfcOpenShell")
         }
         _ => return None,
     };

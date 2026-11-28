@@ -3882,6 +3882,7 @@ fn library_engines_run_a_verified_benchmark_or_refuse() -> Result<(), Box<dyn st
         "rdkit",
         "mujoco",
         "epanet",
+        "ifcopenshell",
     ] {
         let (_dir, _path, handle) = fixture(&format!("engine_{engine_id}"), [20.0, 20.0, 10.0])?;
         let health = post(
