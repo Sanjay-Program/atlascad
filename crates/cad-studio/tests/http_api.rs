@@ -3874,6 +3874,61 @@ fn calculix_solves_the_active_document_on_its_gmsh_mesh() -> Result<(), Box<dyn 
 }
 
 #[test]
+fn calculix_solves_steady_conduction_on_the_document_mesh() -> Result<(), Box<dyn std::error::Error>>
+{
+    let (_dir, _path, handle) = fixture("thermal_document", [20.0, 20.0, 10.0])?;
+    let response = post(
+        handle.addr(),
+        "/api/engines/thermal-document",
+        r#"{"delta_c":100.0}"#,
+    )?;
+    if response.status == 200 {
+        let data = json(&response)?;
+        assert_eq!(data["engine_id"], "calculix");
+        assert_eq!(data["analysis"], "steady_heat_transfer");
+        let mesh = data["mesh"].as_object().ok_or("mesh")?;
+        assert!(mesh["tetrahedra"].as_u64().ok_or("tetrahedra")? > 0);
+        let metrics = data["metrics"].as_object().ok_or("metrics")?;
+        assert_eq!(metrics["cold_face_c"], 0.0);
+        assert_eq!(metrics["hot_face_c"], 100.0);
+        // The fixture is a 20 x 20 x 10 mm steel block: 0.05 W/(mm·K) over 400 mm² and 100 K
+        // across 10 mm conducts 200 W.
+        let reference = metrics["prismatic_reference_heat_w"]
+            .as_f64()
+            .ok_or("prismatic_reference_heat_w")?;
+        assert!(
+            (reference - 200.0).abs() / 200.0 < 0.02,
+            "reference {reference} W is not k A dT / L"
+        );
+        let conducted = metrics["conducted_heat_w"]
+            .as_f64()
+            .ok_or("conducted_heat_w")?;
+        assert!(
+            (conducted - reference).abs() / reference < 0.01,
+            "the cold face conducts {conducted} W against {reference} W"
+        );
+        // A prismatic body has a linear profile, which linear tetrahedra reproduce exactly.
+        let residual = metrics["linear_profile_residual_percent"]
+            .as_f64()
+            .ok_or("linear_profile_residual_percent")?;
+        assert!(residual < 1e-6, "profile residual {residual}%");
+        assert!(metrics["min_temperature_c"].as_f64().ok_or("min")?.abs() < 1e-6);
+        assert!((metrics["max_temperature_c"].as_f64().ok_or("max")? - 100.0).abs() < 1e-6);
+        assert!(
+            data["provenance_hash"]
+                .as_str()
+                .ok_or("provenance")?
+                .starts_with("fnv1a64-")
+        );
+    } else {
+        assert_eq!(response.status, 501);
+        let body = String::from_utf8_lossy(&response.body).to_lowercase();
+        assert!(body.contains("calculix") || body.contains("gmsh"), "{body}");
+    }
+    Ok(())
+}
+
+#[test]
 fn library_engines_run_a_verified_benchmark_or_refuse() -> Result<(), Box<dyn std::error::Error>> {
     for engine_id in [
         "pandapower",

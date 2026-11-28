@@ -2889,6 +2889,60 @@ impl StudioState {
         }))
     }
 
+    /// Run steady heat conduction through the active document's own mesh with CalculiX.
+    fn thermal_document(
+        &mut self,
+        timeout: std::time::Duration,
+        delta_c: f64,
+    ) -> Result<serde_json::Value, StudioError> {
+        if self.project.features().is_empty() && self.project.imports().is_empty() {
+            return Err(StudioError::BadRequest(
+                "this project has no solid to analyse".into(),
+            ));
+        }
+        let build = self
+            .project
+            .build_with_cache(&mut self.kernel, &mut self.cache)?;
+        if let Some(failure) = build.failed {
+            return Err(StudioError::BadRequest(format!(
+                "feature {} cannot be rebuilt, so the thermal solve would not match the model: {}",
+                failure.id, failure.message
+            )));
+        }
+        let mesh = build.mesh.ok_or_else(|| {
+            StudioError::BadRequest("this project has no solid to analyse".into())
+        })?;
+        let document_volume_mm3 = mesh.signed_volume().abs();
+        let stl = cad_io::stl_bytes(&mesh)?;
+        let (mesh_report, geometry) = atlas_engine_manager::gmsh::mesh_document_with_geometry(
+            &stl,
+            document_volume_mm3,
+            timeout,
+        )
+        .map_err(StudioError::Unavailable)?;
+        let thermal = atlas_engine_manager::calculix::run_document_thermal(
+            &geometry.coordinates,
+            &geometry.tetrahedra,
+            delta_c,
+            timeout,
+        )
+        .map_err(StudioError::Unavailable)?;
+        let combined = format!(
+            "{}|{}",
+            mesh_report.provenance_hash, thermal.provenance_hash
+        );
+        Ok(serde_json::json!({
+            "engine_id": "calculix",
+            "status": "completed",
+            "analysis": "steady_heat_transfer",
+            "document": self.project.name,
+            "mesh_engine": "gmsh",
+            "mesh": mesh_report,
+            "metrics": thermal,
+            "provenance_hash": format!("fnv1a64-{:016x}", fnv1a64(combined.as_bytes())),
+        }))
+    }
+
     fn step(&mut self) -> Result<(Vec<u8>, String), StudioError> {
         if self.project.features().is_empty() && self.project.imports().is_empty() {
             return Err(StudioError::BadRequest(
@@ -16005,6 +16059,21 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                 Err(error) => error_response(&error),
             }
         }
+        "/api/engines/thermal-document" => {
+            match parse_body_or_default::<ThermalDocumentRequest>(request) {
+                Ok(body) => {
+                    let timeout = std::time::Duration::from_secs(
+                        body.timeout_seconds.unwrap_or(120).clamp(5, 300),
+                    );
+                    let delta = body.delta_c.unwrap_or(100.0).clamp(1e-3, 5_000.0);
+                    match with_state(state, |state| state.thermal_document(timeout, delta)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
+                Err(error) => error_response(&error),
+            }
+        }
         "/api/engines/benchmark" => match parse_body::<EngineRunRequest>(request) {
             Ok(body) => {
                 let registry = cad_engineering::engine::EngineRegistry::new();
@@ -19888,6 +19957,16 @@ struct EngineHealthRequest {
 struct MeshDocumentRequest {
     #[serde(default)]
     timeout_seconds: Option<u64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ThermalDocumentRequest {
+    #[serde(default)]
+    timeout_seconds: Option<u64>,
+    /// Temperature difference across the model in kelvin. Defaults to 100 K.
+    #[serde(default)]
+    delta_c: Option<f64>,
 }
 
 #[derive(Debug, Default, Deserialize)]

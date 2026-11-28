@@ -487,6 +487,220 @@ fn run_in_workdir_named(
     Ok(())
 }
 
+/// Verified result of a steady heat-conduction solve on a document's mesh.
+#[derive(Debug, Clone, Serialize)]
+pub struct DocumentThermal {
+    pub solver_version: String,
+    pub executable: String,
+    pub nodes: usize,
+    pub elements: usize,
+    /// Temperature imposed on the lowest face, in °C.
+    pub cold_face_c: f64,
+    /// Temperature imposed on the highest face, in °C.
+    pub hot_face_c: f64,
+    pub loaded_area_mm2: f64,
+    /// Heat conducted into the cold face, from the solver's own reaction flux, in W.
+    pub conducted_heat_w: f64,
+    /// `k A ΔT / L` for the prismatic case, in W.
+    pub prismatic_reference_heat_w: f64,
+    /// `|conducted - reference| / reference` in percent.
+    pub reference_error_percent: f64,
+    pub min_temperature_c: f64,
+    pub max_temperature_c: f64,
+    /// Largest deviation of the solved field from the linear through-thickness profile, as a
+    /// percentage of the applied difference. Zero for a prismatic body; a shape effect otherwise.
+    pub linear_profile_residual_percent: f64,
+    pub elapsed_ms: u64,
+    /// FNV-1a over the deck and the solver's own output.
+    pub provenance_hash: String,
+}
+
+/// Thermal conductivity of the benchmark material in W/(mm·K): 50 W/(m·K) steel.
+const THERMAL_CONDUCTIVITY_W_PER_MM_K: f64 = 0.05;
+
+/// Solve steady heat conduction through a document's tetrahedral mesh.
+///
+/// The lowest face is held at 0 °C and the highest at `delta_c`, with the sides insulated. The
+/// conducted heat is the solver's reaction flux at the cold face, and it is compared with
+/// `k A ΔT / L` for the prismatic case. The through-thickness profile is also checked, which linear
+/// tetrahedra reproduce exactly for a body of constant cross-section.
+pub fn run_document_thermal(
+    coordinates: &[[f64; 3]],
+    tetrahedra: &[[usize; 4]],
+    delta_c: f64,
+    timeout: Duration,
+) -> Result<DocumentThermal, String> {
+    if !delta_c.is_finite() || delta_c <= 0.0 {
+        return Err("the temperature difference must be positive".to_string());
+    }
+    if tetrahedra.is_empty() {
+        return Err("the mesh has no tetrahedra to solve".to_string());
+    }
+    if tetrahedra.len() > MAX_SOLVE_TETS {
+        return Err(format!(
+            "the mesh has {} tetrahedra, above the {} this adapter will submit",
+            tetrahedra.len(),
+            MAX_SOLVE_TETS
+        ));
+    }
+    let executable = discover_executable()
+        .ok_or("CalculiX `ccx` is not installed: put ccx on PATH or set ATLAS_CCX")?;
+    let version = solver_version(&executable, timeout)?;
+    let patch = classify_document_nodes(coordinates, tetrahedra)?;
+
+    let min_z = coordinates
+        .iter()
+        .map(|c| c[2])
+        .fold(f64::INFINITY, f64::min);
+    let max_z = coordinates
+        .iter()
+        .map(|c| c[2])
+        .fold(f64::NEG_INFINITY, f64::max);
+    let height = max_z - min_z;
+    if height <= 0.0 {
+        return Err("the model has no height to conduct through".to_string());
+    }
+    let hot: Vec<u32> = {
+        let mut ids: Vec<u32> = patch.loaded.keys().copied().collect();
+        ids.sort_unstable();
+        ids
+    };
+    let deck = thermal_deck(coordinates, tetrahedra, &hot, &patch.fixed, delta_c);
+
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_nanos());
+    let workdir = env::temp_dir().join(format!("atlas-ccx-heat-{}-{unique}", std::process::id()));
+    fs::create_dir_all(&workdir)
+        .map_err(|error| format!("cannot create the solver workdir: {error}"))?;
+    let started = Instant::now();
+    let result = run_in_workdir_named(&executable, &workdir, "heat", &deck, timeout);
+    let elapsed_ms = started.elapsed().as_millis() as u64;
+    let dat = result.and_then(|()| {
+        fs::read_to_string(workdir.join("heat.dat"))
+            .map_err(|error| format!("CalculiX produced no heat.dat: {error}"))
+    })?;
+    let output = dat.as_bytes().to_vec();
+    let _ = fs::remove_dir_all(&workdir);
+
+    let temperatures = parse_nodal_scalar(&dat, "temperatures")
+        .ok_or("CalculiX printed no temperature table for the document mesh")?;
+    let reactions = parse_nodal_scalar(&dat, "heat generation")
+        .ok_or("CalculiX printed no reaction flux for the cold face")?;
+
+    let min_temperature_c = temperatures
+        .iter()
+        .map(|(_, t)| *t)
+        .fold(f64::INFINITY, f64::min);
+    let max_temperature_c = temperatures
+        .iter()
+        .map(|(_, t)| *t)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let mut linear_residual = 0.0_f64;
+    for (node, temperature) in &temperatures {
+        let z = coordinates[*node as usize - 1][2];
+        let expected = delta_c * (z - min_z) / height;
+        linear_residual = linear_residual.max((temperature - expected).abs());
+    }
+    let conducted_heat_w = reactions.iter().map(|(_, flux)| flux).sum::<f64>().abs();
+    let prismatic_reference_heat_w =
+        THERMAL_CONDUCTIVITY_W_PER_MM_K * patch.loaded_area_mm2 * delta_c / height;
+    let reference_error_percent = if prismatic_reference_heat_w > 0.0 {
+        (conducted_heat_w - prismatic_reference_heat_w).abs() / prismatic_reference_heat_w * 100.0
+    } else {
+        0.0
+    };
+
+    Ok(DocumentThermal {
+        solver_version: version,
+        executable: executable.display().to_string(),
+        nodes: coordinates.len(),
+        elements: tetrahedra.len(),
+        cold_face_c: 0.0,
+        hot_face_c: delta_c,
+        loaded_area_mm2: patch.loaded_area_mm2,
+        conducted_heat_w,
+        prismatic_reference_heat_w,
+        reference_error_percent,
+        min_temperature_c,
+        max_temperature_c,
+        linear_profile_residual_percent: linear_residual / delta_c * 100.0,
+        elapsed_ms: elapsed_ms.max(1),
+        provenance_hash: provenance(&[deck.as_bytes(), output.as_slice()]),
+    })
+}
+
+fn thermal_deck(
+    coordinates: &[[f64; 3]],
+    tetrahedra: &[[usize; 4]],
+    hot: &[u32],
+    cold: &[u32],
+    delta_c: f64,
+) -> String {
+    let mut deck =
+        String::from("*HEADING\nAtlasCAD CalculiX document thermal solve\n*NODE, NSET=NALL\n");
+    for (index, [x, y, z]) in coordinates.iter().enumerate() {
+        deck.push_str(&format!("{},{x:.9},{y:.9},{z:.9}\n", index + 1));
+    }
+    deck.push_str("*ELEMENT, TYPE=C3D4, ELSET=EALL\n");
+    for (index, tet) in tetrahedra.iter().enumerate() {
+        deck.push_str(&format!(
+            "{},{},{},{},{}\n",
+            index + 1,
+            tet[0] + 1,
+            tet[1] + 1,
+            tet[2] + 1,
+            tet[3] + 1
+        ));
+    }
+    let cold_ids: Vec<String> = cold.iter().map(ToString::to_string).collect();
+    deck.push_str("*NSET, NSET=COLD\n");
+    push_ids(&mut deck, &cold_ids);
+    let hot_ids: Vec<String> = hot.iter().map(ToString::to_string).collect();
+    deck.push_str("*NSET, NSET=HOT\n");
+    push_ids(&mut deck, &hot_ids);
+    deck.push_str(&format!(
+        "*MATERIAL, NAME=STEEL\n*CONDUCTIVITY\n{THERMAL_CONDUCTIVITY_W_PER_MM_K}\n\
+         *SOLID SECTION, ELSET=EALL, MATERIAL=STEEL\n\
+         *STEP\n*HEAT TRANSFER, STEADY STATE\n*BOUNDARY\nCOLD,11,11,0.0\nHOT,11,11,{delta_c}\n\
+         *NODE PRINT, NSET=COLD\nRFL\n*NODE PRINT, NSET=NALL\nNT\n*END STEP\n"
+    ));
+    deck
+}
+
+/// Parse a one-value-per-node `*NODE PRINT` table such as `temperatures` or `heat generation`.
+fn parse_nodal_scalar(dat: &str, header: &str) -> Option<Vec<(u32, f64)>> {
+    let mut in_table = false;
+    let mut rows = Vec::new();
+    for line in dat.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with(header) {
+            in_table = true;
+            continue;
+        }
+        if !in_table {
+            continue;
+        }
+        if trimmed.is_empty() {
+            if rows.is_empty() {
+                continue;
+            }
+            break;
+        }
+        let columns: Vec<&str> = trimmed
+            .split_whitespace()
+            .map(|column| column.trim_end_matches(','))
+            .collect();
+        if columns.len() < 2 {
+            continue;
+        }
+        if let (Ok(node), Ok(value)) = (columns[0].parse::<u32>(), columns[1].parse::<f64>()) {
+            rows.push((node, value));
+        }
+    }
+    (!rows.is_empty()).then_some(rows)
+}
+
 /// Parse one `(fx,fy,fz)`-shaped `*NODE PRINT` table: `displacements` or `forces`.
 fn parse_nodal_table(dat: &str, header: &str) -> Option<Vec<(u32, [f64; 3])>> {
     let mut in_table = false;
@@ -718,6 +932,28 @@ mod tests {
         // The corner of both top triangles carries a third of each: 2.0 * 1/3 N downwards.
         assert!(deck.contains("5,3,-0.666666667"), "{deck}");
         Ok(())
+    }
+
+    #[test]
+    fn thermal_tables_are_parsed() -> Result<(), Box<dyn std::error::Error>> {
+        let dat = "\n heat generation for set COLD and time  0.1000000E+01\n\n\
+                   1 -1.25E+02\n2 -1.25E+02\n\n\
+                   \n temperatures for set NALL and time  0.1000000E+01\n\n\
+                   1 0.0\n2 1.0E+02\n\n";
+        let flux = parse_nodal_scalar(dat, "heat generation").ok_or("flux")?;
+        assert_eq!(flux.len(), 2);
+        let total: f64 = flux.iter().map(|(_, v)| v).sum();
+        assert!((total + 250.0).abs() < 1e-12, "{total}");
+        let temperatures = parse_nodal_scalar(dat, "temperatures").ok_or("temperatures")?;
+        assert_eq!(temperatures[1], (2, 100.0));
+        Ok(())
+    }
+
+    #[test]
+    fn prismatic_heat_reference_is_k_a_delta_over_length() {
+        // 50 W/(m·K) over 400 mm² and 100 K across 10 mm is 200 W.
+        let reference = THERMAL_CONDUCTIVITY_W_PER_MM_K * 400.0 * 100.0 / 10.0;
+        assert!((reference - 200.0).abs() < 1e-12);
     }
 
     #[test]

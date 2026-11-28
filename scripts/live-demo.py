@@ -429,6 +429,26 @@ def run_live_demo() -> None:
             check(solve_refused, "document FEA refuses without CalculiX and Gmsh (no invented field)")
             print("  ✓ Document FEA: refused (501, no solver installed here)")
 
+        thermal = None
+        thermal_refused = False
+        try:
+            thermal = http_request(port, "POST", "/api/engines/thermal-document", body={"delta_c": 100.0})
+        except RuntimeError as err:
+            thermal_refused = "501" in str(err) and (
+                "calculix" in str(err).lower() or "gmsh" in str(err).lower()
+            )
+        if thermal:
+            metrics = thermal.get("metrics", {})
+            check(thermal.get("analysis") == "steady_heat_transfer", "active document solved for steady conduction")
+            check(metrics.get("reference_error_percent", 100) < 1.0, f"conducted heat within 1% of k A dT / L ({metrics.get('reference_error_percent')}%)")
+            profile = metrics.get("linear_profile_residual_percent", 100)
+            check(profile < 1e-3, f"through-thickness profile is linear to solver precision ({profile:.2e}%)")
+            check(str(thermal.get("provenance_hash", "")).startswith("fnv1a64-"), "thermal provenance digest recorded")
+            print(f"  ✓ Document Thermal: '{thermal.get('document')}' conducted {metrics.get('conducted_heat_w'):.1f} W against {metrics.get('prismatic_reference_heat_w'):.1f} W reference across {metrics.get('elements')} tetrahedra, {metrics.get('elapsed_ms')} ms")
+        else:
+            check(thermal_refused, "document thermal refuses without CalculiX and Gmsh (no invented field)")
+            print("  ✓ Document Thermal: refused (501, no solver installed here)")
+
         power = None
         power_refused = False
         try:
