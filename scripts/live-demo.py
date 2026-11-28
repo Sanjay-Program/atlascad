@@ -388,6 +388,25 @@ def run_live_demo() -> None:
             check(mesh_refused, "Gmsh benchmark refuses without an installed solver (no fabricated mesh)")
             print("  ✓ Engine Orchestration: Gmsh benchmark refused (501, no solver installed here)")
 
+        doc_mesh = None
+        doc_mesh_refused = False
+        try:
+            doc_mesh = http_request(port, "POST", "/api/engines/mesh-document", body={})
+        except RuntimeError as err:
+            doc_mesh_refused = "501" in str(err) and "gmsh" in str(err).lower()
+        if doc_mesh:
+            metrics = doc_mesh.get("metrics", {})
+            document_volume = metrics.get("document_volume_mm3", 0.0)
+            mesh_volume = metrics.get("mesh_volume_mm3", 0.0)
+            check(doc_mesh.get("engine_id") == "gmsh", "active document meshed by Gmsh")
+            check(metrics.get("tetrahedra", 0) > 0, "document mesh contains tetrahedra")
+            check(document_volume > 0 and abs(mesh_volume - document_volume) / document_volume < 0.01, f"mesh volume {mesh_volume} matches the model volume {document_volume}")
+            check(str(doc_mesh.get("provenance_hash", "")).startswith("fnv1a64-"), "document mesh provenance digest recorded")
+            print(f"  ✓ Engine Orchestration: document '{doc_mesh.get('document')}' meshed by Gmsh {metrics.get('solver_version')}: {metrics.get('tetrahedra')} tetrahedra, volume {mesh_volume} mm3 vs {document_volume} mm3, {doc_mesh.get('metrics', {}).get('elapsed_ms')} ms")
+        else:
+            check(doc_mesh_refused, "document meshing refuses without gmsh (no fabricated mesh)")
+            print("  ✓ Engine Orchestration: document meshing refused (501, no gmsh installed here)")
+
         # ---------------------------------------------------------------------
         # DEMO 9: Engineering Dependency Graph
         # ---------------------------------------------------------------------

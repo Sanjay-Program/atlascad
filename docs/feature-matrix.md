@@ -41,6 +41,7 @@ No row claims parity with AutoCAD, SolidWorks, Inventor or Onshape. No row claim
 | CalculiX (`ccx`) FEA | **Partial / verified** | Real process adapter: writes a tension-bar deck, runs `ccx`, parses displacements and compares with `F L/(A E)` (0.40% error on 2.23). `/api/engines/health` and `/api/engines/benchmark` use it; absent `ccx` returns 501 |
 | ngspice circuit transient | **Partial / verified** | Real process adapter: writes an RC step netlist, runs `ngspice -b`, parses the waveform and compares it with `1 - exp(-t/RC)` (0.0101% max deviation on 41, 526 timepoints). `/api/engines/health` and `/api/engines/benchmark` use it; absent `ngspice` returns 501 |
 | Gmsh meshing | **Partial / verified** | Real process adapter: writes a cube `.geo`, runs `gmsh -nt 1 -3`, parses MSH 2.2 and sums tetrahedron volumes (999.9999999999983 of 1000 mm³ on 4.15.2, 726 tetrahedra). Meshing only; no mesh-quality study |
+| Document → volume mesh | **Verified** | `/api/engines/mesh-document` exports the active model's STL, subdivides it and meshes it with Gmsh: a 40×30×10 model gives 6,369 tetrahedra whose volume matches 12,000 mm³ to 3 × 10⁻¹⁴ % in 502 ms. No solver consumes the mesh yet |
 | OpenFOAM, Elmer, SU2, other engines | **Refused** | No adapter; `/api/engines/*` returns 501 with "no solver was run". See `PR-008` |
 | Regulatory certification / sign-off | **Absent** | `/api/report` returns a `DRAFT_NOT_RELEASED` report with measured volume and unassessed mass; no sign-offs are created |
 

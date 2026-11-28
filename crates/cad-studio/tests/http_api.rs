@@ -3758,6 +3758,46 @@ fn gmsh_health_reports_the_installed_binary_or_refuses() -> Result<(), Box<dyn s
 }
 
 #[test]
+fn gmsh_meshes_the_active_document() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("mesh_document", [20.0, 20.0, 10.0])?;
+    let response = post(handle.addr(), "/api/engines/mesh-document", "{}")?;
+    // With gmsh installed the model itself is meshed and the enclosed volume is compared with the
+    // document volume; without it, the request is refused rather than synthesised.
+    if response.status == 200 {
+        let data = json(&response)?;
+        assert_eq!(data["engine_id"], "gmsh");
+        assert_eq!(data["status"], "completed");
+        let metrics = data["metrics"].as_object().ok_or("metrics")?;
+        let document_volume = metrics["document_volume_mm3"]
+            .as_f64()
+            .ok_or("document_volume_mm3")?;
+        assert!(document_volume > 0.0);
+        let mesh_volume = metrics["mesh_volume_mm3"]
+            .as_f64()
+            .ok_or("mesh_volume_mm3")?;
+        assert!(
+            (mesh_volume - document_volume).abs() / document_volume < 0.01,
+            "meshed volume {mesh_volume} differs from the document volume {document_volume}"
+        );
+        assert!(
+            metrics["tetrahedra"].as_u64().ok_or("tetrahedra")? > 0,
+            "the mesh must contain tetrahedra"
+        );
+        assert!(
+            data["provenance_hash"]
+                .as_str()
+                .ok_or("provenance")?
+                .starts_with("fnv1a64-")
+        );
+    } else {
+        assert_eq!(response.status, 501);
+        let body = String::from_utf8_lossy(&response.body).to_lowercase();
+        assert!(body.contains("gmsh"), "{body}");
+    }
+    Ok(())
+}
+
+#[test]
 fn mass_properties_interference_and_bom_api() -> Result<(), Box<dyn std::error::Error>> {
     let (_dir, _path, handle) = fixture("mass_prop_test", [20.0, 20.0, 10.0])?;
     let addr = handle.addr();

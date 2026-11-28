@@ -2797,6 +2797,43 @@ impl StudioState {
         Ok((bytes, export_name(&self.project.name)))
     }
 
+    /// Mesh the active document through the Gmsh adapter and compare volumes.
+    fn mesh_document(
+        &mut self,
+        timeout: std::time::Duration,
+    ) -> Result<serde_json::Value, StudioError> {
+        if self.project.features().is_empty() && self.project.imports().is_empty() {
+            return Err(StudioError::BadRequest(
+                "this project has no solid to mesh".into(),
+            ));
+        }
+        let build = self
+            .project
+            .build_with_cache(&mut self.kernel, &mut self.cache)?;
+        if let Some(failure) = build.failed {
+            return Err(StudioError::BadRequest(format!(
+                "feature {} cannot be rebuilt, so the mesh would not match the model: {}",
+                failure.id, failure.message
+            )));
+        }
+        let mesh = build
+            .mesh
+            .ok_or_else(|| StudioError::BadRequest("this project has no solid to mesh".into()))?;
+        let document_volume_mm3 = mesh.signed_volume().abs();
+        let stl = cad_io::stl_bytes(&mesh)?;
+        let result =
+            atlas_engine_manager::gmsh::run_document_mesh(&stl, document_volume_mm3, timeout)
+                .map_err(StudioError::Unavailable)?;
+        let provenance_hash = result.provenance_hash.clone();
+        Ok(serde_json::json!({
+            "engine_id": "gmsh",
+            "status": "completed",
+            "document": self.project.name,
+            "metrics": result,
+            "provenance_hash": provenance_hash,
+        }))
+    }
+
     fn step(&mut self) -> Result<(Vec<u8>, String), StudioError> {
         if self.project.features().is_empty() && self.project.imports().is_empty() {
             return Err(StudioError::BadRequest(
@@ -15884,6 +15921,19 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             }
             Err(error) => error_response(&error),
         },
+        "/api/engines/mesh-document" => match parse_body_or_default::<MeshDocumentRequest>(request)
+        {
+            Ok(body) => {
+                let timeout = std::time::Duration::from_secs(
+                    body.timeout_seconds.unwrap_or(60).clamp(5, 300),
+                );
+                match with_state(state, |state| state.mesh_document(timeout)) {
+                    Ok(payload) => json_response(200, payload),
+                    Err(error) => error_response(&error),
+                }
+            }
+            Err(error) => error_response(&error),
+        },
         "/api/engines/benchmark" => match parse_body::<EngineRunRequest>(request) {
             Ok(body) => {
                 let registry = cad_engineering::engine::EngineRegistry::new();
@@ -19538,6 +19588,13 @@ pub fn default_project(name: &str, size: [f64; 3]) -> Result<Project, StudioErro
 #[serde(deny_unknown_fields)]
 struct EngineHealthRequest {
     engine_id: String,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MeshDocumentRequest {
+    #[serde(default)]
+    timeout_seconds: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]

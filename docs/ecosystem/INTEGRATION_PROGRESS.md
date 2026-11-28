@@ -21,7 +21,7 @@ they have been replaced with the measured state below.
 | Built-in CAM (`cad-cam`) | 3-axis toolpaths, G-code | **VERIFIED (built-in)** | n/a (crate API) | `cad-cam` tests; live-demo toolpath and G-code assertions |
 | `calculix` | Structural FEA | **BENCHMARK ADAPTER** (`atlas-engine-manager::calculix`) | Refuses (`501`) | Real `ccx` 2.23 axial-tension run, 0.404% vs `F L/(A E)`; see [`ENGINE_BENCHMARKS.md`](../validation/ENGINE_BENCHMARKS.md) |
 | `ngspice` | Electronics / SPICE | **BENCHMARK ADAPTER** (`atlas-engine-manager::ngspice`) | Refuses (`501`) | Real `ngspice` 41 RC step transient, 0.0101% vs `1 − exp(−t/RC)` |
-| `gmsh` | Meshing | **BENCHMARK ADAPTER** (`atlas-engine-manager::gmsh`) | Refuses (`501`) | Real `gmsh` 4.15.2 cube mesh: 726 tetrahedra, volume 999.9999999999983 of 1000 mm³ |
+| `gmsh` | Meshing | **BENCHMARK ADAPTER + document meshing** (`atlas-engine-manager::gmsh`) | Refuses (`501`) | Real `gmsh` 4.15.2: cube benchmark 726 tetrahedra at 1000 mm³, and `/api/engines/mesh-document` meshes the active model (6,369 tetrahedra, 12,000 mm³ within 3e-14%) |
 | `openfoam` | CFD | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
 | `su2` | Aerodynamics | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
 | `ifcopenshell` | BIM | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |

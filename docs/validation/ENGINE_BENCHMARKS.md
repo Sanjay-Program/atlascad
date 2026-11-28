@@ -32,6 +32,7 @@ binary is absent the endpoint returns `501` with "no solver was run"; it never s
 | CalculiX `ccx` | 2.23 | Uniaxial tension bar, 100 × 10 × 10 mm, E = 210 GPa, ν = 0.3, 100 N; 45 nodes, 16 C3D8 | Axial extension 0.0004742666 mm | `F L / (A E)` = 0.0004761905 mm | 0.404 % | 40–60 ms | `fnv1a64-6221fbfc274608d5` |
 | ngspice | 41 | RC low-pass step, R = 1 kΩ, C = 1 µF, 1 V step; 526 timepoints, probes at 0.1/0.5/1/2/3/5 ms | 0.095153 V at 0.1 ms … 0.993262 V at 5 ms | `1 − exp(−t/RC)`, τ = 1 ms | 0.0101 % max | 20 ms | `fnv1a64-0e0692edd2cc5a45` |
 | Gmsh | 4.15.2 | 10 × 10 × 10 mm cube, element size 2–4 mm, one thread, MSH 2.2 | 234 nodes, 1,190 elements, 726 tetrahedra summing to 999.9999999999983 mm³ | Cube volume 1,000 mm³ | 1.7 × 10⁻¹³ % | 100 ms | `fnv1a64-31b1646a103d6bad` |
+| Gmsh | 4.15.2 | Active document meshed through `/api/engines/mesh-document`: 40 × 30 × 10 mm block, 3,072 subdivided surface triangles, target 3.33 mm | 1,875 nodes, 9,441 elements, 6,369 tetrahedra summing to 12,000.000000000004 mm³ | Document volume 12,000 mm³ | 3.0 × 10⁻¹⁴ % | 502 ms | `fnv1a64-d6cb0adcaf63b24e` |
 
 Notes:
 
