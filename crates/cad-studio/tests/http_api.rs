@@ -3683,6 +3683,81 @@ fn ngspice_health_reports_the_installed_binary_or_refuses() -> Result<(), Box<dy
 }
 
 #[test]
+fn engine_benchmark_runs_gmsh_or_refuses() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("engine_benchmark_gmsh", [20.0, 20.0, 10.0])?;
+    let response = post(
+        handle.addr(),
+        "/api/engines/benchmark",
+        r#"{"engine_id":"gmsh"}"#,
+    )?;
+    // With gmsh installed the endpoint must return a measured mesh; without it, a refusal.
+    if response.status == 200 {
+        let data = json(&response)?;
+        assert_eq!(data["benchmark_status"], "completed");
+        let metrics = data["metrics"].as_object().ok_or("metrics")?;
+        let error = metrics["volume_error_percent"]
+            .as_f64()
+            .ok_or("volume_error_percent")?;
+        assert!(
+            error < 0.01,
+            "meshed volume differs from the cube by {error}%"
+        );
+        assert!(
+            metrics["tetrahedra"].as_u64().ok_or("tetrahedra")? > 0,
+            "the mesh must contain tetrahedra"
+        );
+        assert!(
+            !metrics["solver_version"]
+                .as_str()
+                .unwrap_or_default()
+                .is_empty(),
+            "the solver version must come from the binary"
+        );
+        assert!(
+            data["provenance_hash"]
+                .as_str()
+                .ok_or("provenance")?
+                .starts_with("fnv1a64-")
+        );
+    } else {
+        assert_eq!(response.status, 501);
+        let body = String::from_utf8_lossy(&response.body).to_lowercase();
+        assert!(body.contains("no solver was run"), "{body}");
+    }
+    Ok(())
+}
+
+#[test]
+fn gmsh_health_reports_the_installed_binary_or_refuses() -> Result<(), Box<dyn std::error::Error>> {
+    let (_dir, _path, handle) = fixture("engine_health_gmsh", [20.0, 20.0, 10.0])?;
+    let response = post(
+        handle.addr(),
+        "/api/engines/health",
+        r#"{"engine_id":"gmsh"}"#,
+    )?;
+    assert_eq!(response.status, 200);
+    let data = json(&response)?;
+    assert_eq!(data["engine_id"], "gmsh");
+    match data["status"].as_str() {
+        Some("healthy") => assert!(
+            !data["detected_version"]
+                .as_str()
+                .unwrap_or_default()
+                .is_empty(),
+            "a healthy Gmsh must report the version it detected"
+        ),
+        Some("unavailable") => assert!(
+            data["details"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("No execution adapter")
+        ),
+        other => return Err(format!("unexpected health status {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
 fn mass_properties_interference_and_bom_api() -> Result<(), Box<dyn std::error::Error>> {
     let (_dir, _path, handle) = fixture("mass_prop_test", [20.0, 20.0, 10.0])?;
     let addr = handle.addr();

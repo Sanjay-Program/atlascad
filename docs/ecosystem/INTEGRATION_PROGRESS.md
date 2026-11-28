@@ -21,9 +21,9 @@ they have been replaced with the measured state below.
 | Built-in CAM (`cad-cam`) | 3-axis toolpaths, G-code | **VERIFIED (built-in)** | n/a (crate API) | `cad-cam` tests; live-demo toolpath and G-code assertions |
 | `calculix` | Structural FEA | **BENCHMARK ADAPTER** (`atlas-engine-manager::calculix`) | Refuses (`501`) | Real `ccx` 2.23 axial-tension run, 0.404% vs `F L/(A E)`; see [`ENGINE_BENCHMARKS.md`](../validation/ENGINE_BENCHMARKS.md) |
 | `ngspice` | Electronics / SPICE | **BENCHMARK ADAPTER** (`atlas-engine-manager::ngspice`) | Refuses (`501`) | Real `ngspice` 41 RC step transient, 0.0101% vs `1 − exp(−t/RC)` |
+| `gmsh` | Meshing | **BENCHMARK ADAPTER** (`atlas-engine-manager::gmsh`) | Refuses (`501`) | Real `gmsh` 4.15.2 cube mesh: 726 tetrahedra, volume 999.9999999999983 of 1000 mm³ |
 | `openfoam` | CFD | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
 | `su2` | Aerodynamics | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
-| `gmsh` | Meshing | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
 | `ifcopenshell` | BIM | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
 | `opensees` | Civil / seismic | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
 | `energyplus` | Building energy | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
@@ -44,8 +44,8 @@ they have been replaced with the measured state below.
 ## Summary
 
 - **3** built-in engines verified by tests.
-- **2** external engines with a real, benchmarked process adapter (CalculiX, ngspice).
-- **19** registry entries with no execution adapter; they refuse instead of returning a result.
+- **3** external engines with a real, benchmarked process adapter (CalculiX, ngspice, Gmsh).
+- **18** registry entries with no execution adapter; they refuse instead of returning a result.
 
 Adding an engine means implementing a process adapter that runs the real binary and parses its
 output, then verifying it against a closed-form or published reference. Registering a row in the

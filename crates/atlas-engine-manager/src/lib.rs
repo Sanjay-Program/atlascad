@@ -8,9 +8,11 @@ pub mod calculix;
 pub mod capability;
 pub mod configuration;
 pub mod discovery;
+pub mod gmsh;
 pub mod health;
 pub mod installation;
 pub mod ngspice;
+mod process;
 pub mod registry;
 pub mod versioning;
 

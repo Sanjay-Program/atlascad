@@ -371,6 +371,23 @@ def run_live_demo() -> None:
             check(spice_refused, "ngspice benchmark refuses without an installed solver (no fabricated accuracy)")
             print("  ✓ Engine Orchestration: ngspice benchmark refused (501, no solver installed here)")
 
+        mesh = None
+        mesh_refused = False
+        try:
+            mesh = http_request(port, "POST", "/api/engines/benchmark", body={"engine_id": "gmsh"})
+        except RuntimeError as err:
+            mesh_refused = "501" in str(err) and "no solver was run" in str(err)
+        if mesh:
+            metrics = mesh.get("metrics", {})
+            check(mesh.get("benchmark_status") == "completed", "Gmsh benchmark completed")
+            check(metrics.get("volume_error_percent", 100) < 0.01, f"Gmsh cube volume within 0.01% of 1000 mm3 ({metrics.get('volume_error_percent')}%)")
+            check(metrics.get("tetrahedra", 0) > 0, "Gmsh wrote tetrahedra")
+            check(str(mesh.get("provenance_hash", "")).startswith("fnv1a64-"), "Gmsh provenance digest recorded")
+            print(f"  ✓ Engine Orchestration: real Gmsh {metrics.get('solver_version')} mesh, {metrics.get('nodes')} nodes, {metrics.get('tetrahedra')} tetrahedra, volume {metrics.get('mesh_volume_mm3')} mm3, {mesh.get('execution_time_ms')} ms")
+        else:
+            check(mesh_refused, "Gmsh benchmark refuses without an installed solver (no fabricated mesh)")
+            print("  ✓ Engine Orchestration: Gmsh benchmark refused (501, no solver installed here)")
+
         # ---------------------------------------------------------------------
         # DEMO 9: Engineering Dependency Graph
         # ---------------------------------------------------------------------

@@ -11,11 +11,12 @@
 //! installation on Linux is available from conda-forge (`micromamba install -c conda-forge
 //! ngspice`) or from the distribution package manager.
 
+use crate::process::{output_with_timeout, provenance};
 use serde::Serialize;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-use std::process::{Command, Output, Stdio};
+use std::process::Command;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 /// Bench circuit: a 1 V step through a 1 kOhm / 1 uF low-pass filter, so `tau` is 1 ms.
@@ -124,10 +125,7 @@ pub fn run_rc_step_benchmark(timeout: Duration) -> Result<NgspiceBenchmark, Stri
         .zip(&analytic_volts)
         .map(|(measured, analytic)| (measured - analytic).abs() / analytic * 100.0)
         .fold(0.0_f64, f64::max);
-    let provenance_hash = format!(
-        "fnv1a64-{:016x}",
-        fnv1a64(&[netlist.as_bytes(), output.as_slice()].concat())
-    );
+    let provenance_hash = provenance(&[netlist.as_bytes(), output.as_slice()]);
 
     Ok(NgspiceBenchmark {
         solver_version: version,
@@ -184,31 +182,6 @@ fn solver_version(executable: &PathBuf, timeout: Duration) -> Result<String, Str
         .filter(|token| !token.is_empty())
         .ok_or_else(|| format!("cannot read the ngspice version from: {}", text.trim()))?;
     Ok(version)
-}
-
-fn output_with_timeout(mut command: Command, timeout: Duration) -> Result<Output, String> {
-    let mut child = command
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| format!("cannot start ngspice: {error}"))?;
-    let started = Instant::now();
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => {
-                return child
-                    .wait_with_output()
-                    .map_err(|error| format!("cannot read ngspice output: {error}"));
-            }
-            Ok(None) if started.elapsed() >= timeout => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(format!("ngspice exceeded {} s", timeout.as_secs()));
-            }
-            Ok(None) => std::thread::sleep(Duration::from_millis(20)),
-            Err(error) => return Err(format!("cannot wait for ngspice: {error}")),
-        }
-    }
 }
 
 /// Parse `wrdata` output: a `time v(out)` header followed by two numeric columns. Frames are
@@ -269,15 +242,6 @@ fn rc_netlist() -> String {
         MAX_STEP_S * 1e6,
         STOP_TIME_S * 1e3
     )
-}
-
-fn fnv1a64(bytes: &[u8]) -> u64 {
-    let mut hash = 0xcbf2_9ce4_8422_2325u64;
-    for byte in bytes {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
-    }
-    hash
 }
 
 #[cfg(test)]

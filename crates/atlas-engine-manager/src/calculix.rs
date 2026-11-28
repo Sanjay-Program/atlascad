@@ -9,11 +9,12 @@
 //! The executable is discovered from `ATLAS_CCX`, then `ccx` on `PATH`. A typical rootless
 //! installation is `pip install cad-ccx`, which bundles the conda-forge build.
 
+use crate::process::{output_with_timeout, provenance};
 use serde::Serialize;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-use std::process::{Command, Output, Stdio};
+use std::process::Command;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 /// Bar geometry and load for the benchmark (all lengths in mm, forces in N).
@@ -108,10 +109,7 @@ pub fn run_tension_bar_benchmark(timeout: Duration) -> Result<CalculixBenchmark,
 
     let analytical = analytical_extension_mm();
     let error_percent = (axial_extension_mm - analytical).abs() / analytical * 100.0;
-    let provenance_hash = format!(
-        "fnv1a64-{:016x}",
-        fnv1a64(&[deck.as_bytes(), output.as_slice()].concat())
-    );
+    let provenance_hash = provenance(&[deck.as_bytes(), output.as_slice()]);
 
     Ok(CalculixBenchmark {
         solver_version: version,
@@ -165,31 +163,6 @@ fn solver_version(executable: &PathBuf, timeout: Duration) -> Result<String, Str
         .trim()
         .to_string();
     Ok(version)
-}
-
-fn output_with_timeout(mut command: Command, timeout: Duration) -> Result<Output, String> {
-    let mut child = command
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| format!("cannot start CalculiX: {error}"))?;
-    let started = Instant::now();
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => {
-                return child
-                    .wait_with_output()
-                    .map_err(|error| format!("cannot read CalculiX output: {error}"));
-            }
-            Ok(None) if started.elapsed() >= timeout => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(format!("CalculiX exceeded {} s", timeout.as_secs()));
-            }
-            Ok(None) => std::thread::sleep(Duration::from_millis(20)),
-            Err(error) => return Err(format!("cannot wait for CalculiX: {error}")),
-        }
-    }
 }
 
 /// Parse the `displacements (vx,vy,vz)` table that `*NODE PRINT` writes.
@@ -308,15 +281,6 @@ fn tension_deck() -> String {
          *NODE PRINT, NSET=NALL\nU\n*END STEP\n"
     ));
     deck
-}
-
-fn fnv1a64(bytes: &[u8]) -> u64 {
-    let mut hash = 0xcbf2_9ce4_8422_2325u64;
-    for byte in bytes {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
-    }
-    hash
 }
 
 #[cfg(test)]

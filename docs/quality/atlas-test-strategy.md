@@ -11,7 +11,7 @@ provenance, approvals) have explicit tests rather than being implied by happy pa
 
 | Layer | What it proves | Command | Current size |
 | --- | --- | --- | --- |
-| Unit tests | units, geometry math, parsers, state machines | `cargo test --workspace` | part of 886 |
+| Unit tests | units, geometry math, parsers, state machines | `cargo test --workspace` | part of 890 |
 | Crate integration tests | document lifecycle, drafting, CAE, CAM, agents | same | 116 suites total |
 | HTTP integration | routes, validation, auth boundary, exports, recovery | `cargo test -p cad-studio --test http_api` | 48 |
 | Analytic kernel corpus | exact volumes/areas against analytic answers, with recorded known-failures | `cargo run -p cad-kernel-truck --example corpus` | 11 fixtures |
