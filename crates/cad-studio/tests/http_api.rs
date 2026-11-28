@@ -3798,6 +3798,143 @@ fn gmsh_meshes_the_active_document() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
+fn calculix_solves_the_active_document_on_its_gmsh_mesh() -> Result<(), Box<dyn std::error::Error>>
+{
+    let (_dir, _path, handle) = fixture("solve_document", [20.0, 20.0, 10.0])?;
+    let response = post(
+        handle.addr(),
+        "/api/engines/solve-document",
+        r#"{"pressure_mpa":2.0}"#,
+    )?;
+    // With Gmsh and CalculiX installed the model itself is meshed and solved; without either
+    // binary the request is refused rather than answered with a plausible-looking field.
+    if response.status == 200 {
+        let data = json(&response)?;
+        assert_eq!(data["engine_id"], "calculix");
+        assert_eq!(data["mesh_engine"], "gmsh");
+        assert_eq!(data["status"], "completed");
+        let mesh = data["mesh"].as_object().ok_or("mesh")?;
+        assert!(
+            mesh["tetrahedra"].as_u64().ok_or("tetrahedra")? > 0,
+            "the solve must run on meshed tetrahedra"
+        );
+        let metrics = data["metrics"].as_object().ok_or("metrics")?;
+        // The fixture is a 20 x 20 x 10 mm box, so the 2 MPa load on its 400 mm^2 top face is 800 N.
+        let area = metrics["loaded_area_mm2"]
+            .as_f64()
+            .ok_or("loaded_area_mm2")?;
+        assert!(
+            (area - 400.0).abs() / 400.0 < 0.01,
+            "loaded area {area} mm^2 is not the box top face"
+        );
+        let applied = metrics["applied_force_n"]
+            .as_f64()
+            .ok_or("applied_force_n")?;
+        assert!(
+            (applied - 800.0).abs() / 800.0 < 0.01,
+            "applied force {applied} N is not pressure x area"
+        );
+        let residual = metrics["equilibrium_error_percent"]
+            .as_f64()
+            .ok_or("equilibrium_error_percent")?;
+        assert!(
+            residual < 1.0,
+            "the reactions miss the applied load by {residual}%"
+        );
+        // A prismatic bar in uniform compression extends by P L / E; linear tets represent that
+        // state exactly, so the solved axial displacement must reproduce it. The vector maximum
+        // is larger because it also contains Poisson contraction.
+        let expected = 2.0 * 10.0 / 210_000.0;
+        let measured = metrics["max_axial_displacement_mm"]
+            .as_f64()
+            .ok_or("max_axial_displacement_mm")?;
+        assert!(
+            metrics["max_displacement_mm"]
+                .as_f64()
+                .ok_or("max_displacement_mm")?
+                >= measured - 1e-12
+        );
+        assert!(
+            (measured - expected).abs() / expected < 0.05,
+            "solved displacement {measured} mm differs from P L / E ({expected} mm) by {:?}%",
+            (measured - expected).abs() / expected * 100.0
+        );
+        assert!(
+            data["provenance_hash"]
+                .as_str()
+                .ok_or("provenance")?
+                .starts_with("fnv1a64-")
+        );
+    } else {
+        assert_eq!(response.status, 501);
+        let body = String::from_utf8_lossy(&response.body).to_lowercase();
+        assert!(body.contains("calculix") || body.contains("gmsh"), "{body}");
+    }
+    Ok(())
+}
+
+#[test]
+fn pandapower_and_cantera_run_a_verified_benchmark_or_refuse()
+-> Result<(), Box<dyn std::error::Error>> {
+    for engine_id in ["pandapower", "cantera"] {
+        let (_dir, _path, handle) = fixture(&format!("engine_{engine_id}"), [20.0, 20.0, 10.0])?;
+        let health = post(
+            handle.addr(),
+            "/api/engines/health",
+            &format!(r#"{{"engine_id":"{engine_id}"}}"#),
+        )?;
+        assert_eq!(health.status, 200);
+        let health = json(&health)?;
+        assert_eq!(health["engine_id"], engine_id);
+        let available = match health["status"].as_str() {
+            Some("healthy") => {
+                assert!(
+                    !health["detected_version"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .is_empty(),
+                    "a healthy {engine_id} must report the version it detected"
+                );
+                true
+            }
+            Some("unavailable") => {
+                assert!(
+                    health["details"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .contains("No execution adapter")
+                );
+                false
+            }
+            other => return Err(format!("unexpected health status {other:?}").into()),
+        };
+
+        let response = post(
+            handle.addr(),
+            "/api/engines/benchmark",
+            &format!(r#"{{"engine_id":"{engine_id}"}}"#),
+        )?;
+        if available {
+            assert_eq!(response.status, 200);
+            let data = json(&response)?;
+            assert_eq!(data["benchmark_status"], "completed");
+            assert!(data["metrics"].is_object(), "metrics");
+            assert!(
+                data["provenance_hash"]
+                    .as_str()
+                    .ok_or("provenance")?
+                    .starts_with("fnv1a64-")
+            );
+        } else {
+            assert_eq!(response.status, 501);
+            let body = String::from_utf8_lossy(&response.body).to_lowercase();
+            assert!(body.contains("no solver was run"), "{body}");
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn mass_properties_interference_and_bom_api() -> Result<(), Box<dyn std::error::Error>> {
     let (_dir, _path, handle) = fixture("mass_prop_test", [20.0, 20.0, 10.0])?;
     let addr = handle.addr();

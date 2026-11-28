@@ -11,6 +11,7 @@
 
 use crate::process::{output_with_timeout, provenance};
 use serde::Serialize;
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -125,6 +126,39 @@ pub fn run_tension_bar_benchmark(timeout: Duration) -> Result<CalculixBenchmark,
     })
 }
 
+/// Upper bound on the tetrahedra this adapter will submit in one deck.
+///
+/// Well beyond any document the studio meshes at its default element size, but it stops a
+/// pathological model from generating a deck the solver would grind on for minutes.
+const MAX_SOLVE_TETS: usize = 400_000;
+
+/// Verified result of solving a document's own tetrahedral mesh.
+#[derive(Debug, Clone, Serialize)]
+pub struct DocumentSolve {
+    pub solver_version: String,
+    pub executable: String,
+    pub nodes: usize,
+    pub elements: usize,
+    /// Pressure applied normal to the highest face, in N/mm^2 (MPa).
+    pub pressure_mpa: f64,
+    /// Area of the boundary faces lying on the highest plane, from the solved mesh itself.
+    pub loaded_area_mm2: f64,
+    /// `pressure_mpa * loaded_area_mm2`.
+    pub applied_force_n: f64,
+    pub max_displacement_mm: f64,
+    /// Largest `|uz|`: the quantity comparable with `P L / E` on a prismatic body. The vector
+    /// maximum above also contains Poisson contraction, so it is reported separately.
+    pub max_axial_displacement_mm: f64,
+    pub mean_loaded_displacement_mm: f64,
+    /// Magnitude of the summed vertical reaction at the clamped face.
+    pub reaction_force_n: f64,
+    /// `|reaction - applied| / applied` in percent: the solved equilibrium residual.
+    pub equilibrium_error_percent: f64,
+    pub elapsed_ms: u64,
+    /// FNV-1a over the deck and the solver's own output.
+    pub provenance_hash: String,
+}
+
 struct Displacements {
     values: Vec<f64>,
 }
@@ -165,13 +199,301 @@ fn solver_version(executable: &PathBuf, timeout: Duration) -> Result<String, Str
     Ok(version)
 }
 
-/// Parse the `displacements (vx,vy,vz)` table that `*NODE PRINT` writes.
-fn parse_displacements(dat: &str) -> Option<Displacements> {
+/// Solve a document's tetrahedral volume mesh under a uniform pressure on its highest face.
+///
+/// The mesh is the one Gmsh produced for the document, so this runs on the model's own geometry
+/// rather than a reference part. The clamp is the lowest plane of the mesh and the load is the
+/// consistent nodal force of `pressure_mpa` over the boundary triangles lying on the highest
+/// plane, so the total applied force is `pressure * area` exactly. Linear tets represent a
+/// uniform stress state exactly, which is why the prismatic case reproduces `P L / E`; on a
+/// general shape the reported numbers are what the solver computed, not a closed-form guess.
+///
+/// Equilibrium is checked against the solver's own reactions: the summed vertical reaction at
+/// the clamp must balance the applied force, and the residual is returned.
+pub fn run_document_solve(
+    coordinates: &[[f64; 3]],
+    tetrahedra: &[[usize; 4]],
+    pressure_mpa: f64,
+    timeout: Duration,
+) -> Result<DocumentSolve, String> {
+    if !pressure_mpa.is_finite() || pressure_mpa <= 0.0 {
+        return Err("the pressure must be a positive number of N/mm^2".to_string());
+    }
+    if tetrahedra.is_empty() {
+        return Err("the mesh has no tetrahedra to solve".to_string());
+    }
+    if tetrahedra.len() > MAX_SOLVE_TETS {
+        return Err(format!(
+            "the mesh has {} tetrahedra, above the {} this adapter will submit",
+            tetrahedra.len(),
+            MAX_SOLVE_TETS
+        ));
+    }
+    if coordinates.is_empty() {
+        return Err("the mesh has no nodes to solve".to_string());
+    }
+    let executable = discover_executable()
+        .ok_or("CalculiX `ccx` is not installed: put ccx on PATH or set ATLAS_CCX")?;
+    let version = solver_version(&executable, timeout)?;
+
+    let patch = classify_document_nodes(coordinates, tetrahedra)?;
+    let applied_force_n = pressure_mpa * patch.loaded_area_mm2;
+    if applied_force_n <= 0.0 {
+        return Err("the loaded face has no area".to_string());
+    }
+    let deck = document_deck(
+        coordinates,
+        tetrahedra,
+        &patch.loaded,
+        &patch.fixed,
+        pressure_mpa,
+    );
+
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_nanos());
+    let workdir = env::temp_dir().join(format!("atlas-ccx-doc-{}-{unique}", std::process::id()));
+    fs::create_dir_all(&workdir)
+        .map_err(|error| format!("cannot create the solver workdir: {error}"))?;
+
+    let started = Instant::now();
+    let result = run_in_workdir_named(&executable, &workdir, "part", &deck, timeout);
+    let elapsed_ms = started.elapsed().as_millis() as u64;
+    let parsed = result.and_then(|()| {
+        let dat = fs::read_to_string(workdir.join("part.dat"))
+            .map_err(|error| format!("CalculiX produced no part.dat: {error}"))?;
+        Ok(dat)
+    });
+    let dat = parsed?;
+    let output = dat.as_bytes();
+    let _ = fs::remove_dir_all(&workdir);
+
+    let displacements = parse_nodal_table(&dat, "displacements")
+        .ok_or("CalculiX printed no displacement table for the document mesh")?;
+    let reactions = parse_nodal_table(&dat, "forces")
+        .ok_or("CalculiX printed no reaction-force table for the clamped face")?;
+
+    let mut max_displacement_mm = 0.0_f64;
+    let mut max_axial_displacement_mm = 0.0_f64;
+    for (_, [ux, uy, uz]) in &displacements {
+        max_displacement_mm = max_displacement_mm.max(ux.hypot(*uy).hypot(*uz));
+        max_axial_displacement_mm = max_axial_displacement_mm.max(uz.abs());
+    }
+    let loaded_ids: std::collections::HashSet<u32> = patch.loaded.keys().copied().collect();
+    let mut loaded_sum = 0.0_f64;
+    let mut loaded_count = 0usize;
+    for (node, [_, _, uz]) in &displacements {
+        if loaded_ids.contains(node) {
+            loaded_sum += uz.abs();
+            loaded_count += 1;
+        }
+    }
+    let mean_loaded_displacement_mm = if loaded_count == 0 {
+        0.0
+    } else {
+        loaded_sum / loaded_count as f64
+    };
+    let reaction_force_n = reactions
+        .iter()
+        .map(|(_, [_, _, fz])| fz)
+        .sum::<f64>()
+        .abs();
+    let equilibrium_error_percent =
+        (reaction_force_n - applied_force_n).abs() / applied_force_n * 100.0;
+
+    Ok(DocumentSolve {
+        solver_version: version,
+        executable: executable.display().to_string(),
+        nodes: coordinates.len(),
+        elements: tetrahedra.len(),
+        pressure_mpa,
+        loaded_area_mm2: patch.loaded_area_mm2,
+        applied_force_n,
+        max_displacement_mm,
+        max_axial_displacement_mm,
+        mean_loaded_displacement_mm,
+        reaction_force_n,
+        equilibrium_error_percent,
+        elapsed_ms: elapsed_ms.max(1),
+        provenance_hash: provenance(&[deck.as_bytes(), output]),
+    })
+}
+
+/// Split the mesh into clamped nodes, loaded nodes with their consistent load weights, and the
+/// loaded area.
+///
+/// Boundary faces are the triangles used by exactly one tetrahedron. The loaded face is the set of
+/// those lying on the mesh's highest plane; a face contributes a third of its area to each of its
+/// nodes, which is the consistent nodal load for a uniform pressure on a linear triangle.
+/// The clamp and the loaded patch derived from a document's tetrahedral mesh.
+struct DocumentPatch {
+    /// Loaded node id (1-based) to its consistent load weight in mm².
+    loaded: HashMap<u32, f64>,
+    /// Clamped node ids (1-based).
+    fixed: Vec<u32>,
+    loaded_area_mm2: f64,
+}
+
+fn classify_document_nodes(
+    coordinates: &[[f64; 3]],
+    tetrahedra: &[[usize; 4]],
+) -> Result<DocumentPatch, String> {
+    let max_z = coordinates
+        .iter()
+        .map(|c| c[2])
+        .fold(f64::NEG_INFINITY, f64::max);
+    let min_z = coordinates
+        .iter()
+        .map(|c| c[2])
+        .fold(f64::INFINITY, f64::min);
+    let extent = (max_z - min_z).abs().max(1.0);
+    let tolerance = extent * 1e-6;
+
+    let mut counts: HashMap<[usize; 3], usize> = HashMap::new();
+    for tet in tetrahedra {
+        for face in [[0usize, 1, 2], [0, 1, 3], [0, 2, 3], [1, 2, 3]] {
+            let mut key = [tet[face[0]], tet[face[1]], tet[face[2]]];
+            key.sort_unstable();
+            *counts.entry(key).or_insert(0) += 1;
+        }
+    }
+
+    let mut weights: HashMap<u32, f64> = HashMap::new();
+    let mut loaded_area_mm2 = 0.0_f64;
+    for (face, count) in &counts {
+        if *count != 1 {
+            continue;
+        }
+        let corners = face.map(|index| coordinates[index]);
+        if !corners.iter().all(|c| (c[2] - max_z).abs() <= tolerance) {
+            continue;
+        }
+        let area = triangle_area(corners);
+        if area <= 0.0 {
+            continue;
+        }
+        loaded_area_mm2 += area;
+        for index in face {
+            *weights.entry((*index + 1) as u32).or_insert(0.0) += area / 3.0;
+        }
+    }
+
+    let fixed: Vec<u32> = coordinates
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| (c[2] - min_z).abs() <= tolerance)
+        .map(|(index, _)| (index + 1) as u32)
+        .collect();
+
+    if weights.is_empty() {
+        return Err(
+            "no boundary face lies on the highest plane, so there is nothing to load".to_string(),
+        );
+    }
+    if fixed.is_empty() {
+        return Err("no node lies on the lowest plane, so the model cannot be clamped".to_string());
+    }
+    if fixed.len() == coordinates.len() {
+        return Err("the model is a flat sheet: every node lies on the clamped plane".to_string());
+    }
+    if (max_z - min_z).abs() <= tolerance {
+        return Err("the model has no height to compress".to_string());
+    }
+    Ok(DocumentPatch {
+        loaded: weights,
+        fixed,
+        loaded_area_mm2,
+    })
+}
+
+fn triangle_area(corners: [[f64; 3]; 3]) -> f64 {
+    let [a, b, c] = corners;
+    let ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    let ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    let cross = [
+        ab[1] * ac[2] - ab[2] * ac[1],
+        ab[2] * ac[0] - ab[0] * ac[2],
+        ab[0] * ac[1] - ab[1] * ac[0],
+    ];
+    cross[0].hypot(cross[1]).hypot(cross[2]) / 2.0
+}
+
+fn document_deck(
+    coordinates: &[[f64; 3]],
+    tetrahedra: &[[usize; 4]],
+    loaded: &HashMap<u32, f64>,
+    fixed: &[u32],
+    pressure_mpa: f64,
+) -> String {
+    let mut deck = String::from("*HEADING\nAtlasCAD CalculiX document solve\n*NODE, NSET=NALL\n");
+    for (index, [x, y, z]) in coordinates.iter().enumerate() {
+        deck.push_str(&format!("{},{x:.9},{y:.9},{z:.9}\n", index + 1));
+    }
+    deck.push_str("*ELEMENT, TYPE=C3D4, ELSET=EALL\n");
+    for (index, tet) in tetrahedra.iter().enumerate() {
+        deck.push_str(&format!(
+            "{},{},{},{},{}\n",
+            index + 1,
+            tet[0] + 1,
+            tet[1] + 1,
+            tet[2] + 1,
+            tet[3] + 1
+        ));
+    }
+
+    let fixed_ids: Vec<String> = fixed.iter().map(ToString::to_string).collect();
+    deck.push_str("*NSET, NSET=FIXED\n");
+    push_ids(&mut deck, &fixed_ids);
+    let mut loaded_ids: Vec<u32> = loaded.keys().copied().collect();
+    loaded_ids.sort_unstable();
+    let loaded_strings: Vec<String> = loaded_ids.iter().map(ToString::to_string).collect();
+    deck.push_str("*NSET, NSET=LOADED\n");
+    push_ids(&mut deck, &loaded_strings);
+
+    deck.push_str(&format!(
+        "*BOUNDARY\nFIXED,1,3,0.0\n\
+         *MATERIAL, NAME=STEEL\n*ELASTIC\n{YOUNGS_MODULUS_MPA:.1},{POISSON}\n\
+         *SOLID SECTION, ELSET=EALL, MATERIAL=STEEL\n1.0\n\
+         *STEP\n*STATIC\n*CLOAD\n"
+    ));
+    for node in loaded_ids {
+        let force = pressure_mpa * loaded[&node];
+        deck.push_str(&format!("{node},3,{:.9}\n", -force));
+    }
+    deck.push_str("*NODE PRINT, NSET=LOADED\nU\n*NODE PRINT, NSET=FIXED\nRF\n*END STEP\n");
+    deck
+}
+
+fn run_in_workdir_named(
+    executable: &PathBuf,
+    workdir: &PathBuf,
+    stem: &str,
+    deck: &str,
+    timeout: Duration,
+) -> Result<(), String> {
+    fs::write(workdir.join(format!("{stem}.inp")), deck)
+        .map_err(|error| format!("cannot write the solver deck: {error}"))?;
+    let mut command = Command::new(executable);
+    command.arg(stem).current_dir(workdir);
+    let outcome = output_with_timeout(command, timeout)?;
+    if !outcome.status.success() {
+        return Err(format!(
+            "CalculiX failed with {}: {} | {}",
+            outcome.status,
+            String::from_utf8_lossy(&outcome.stderr).trim(),
+            String::from_utf8_lossy(&outcome.stdout).trim()
+        ));
+    }
+    Ok(())
+}
+
+/// Parse one `(fx,fy,fz)`-shaped `*NODE PRINT` table: `displacements` or `forces`.
+fn parse_nodal_table(dat: &str, header: &str) -> Option<Vec<(u32, [f64; 3])>> {
     let mut in_table = false;
-    let mut values = Vec::new();
+    let mut rows = Vec::new();
     for line in dat.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("displacements") {
+        if trimmed.starts_with(header) {
             in_table = true;
             continue;
         }
@@ -179,7 +501,7 @@ fn parse_displacements(dat: &str) -> Option<Displacements> {
             continue;
         }
         if trimmed.is_empty() {
-            if values.is_empty() {
+            if rows.is_empty() {
                 continue;
             }
             break;
@@ -191,11 +513,25 @@ fn parse_displacements(dat: &str) -> Option<Displacements> {
         if columns.len() < 4 {
             continue;
         }
-        if let (Ok(_node), Ok(vx)) = (columns[0].parse::<u32>(), columns[1].parse::<f64>()) {
-            values.push(vx);
+        let tree = (
+            columns[0].parse::<u32>(),
+            columns[1].parse::<f64>(),
+            columns[2].parse::<f64>(),
+        );
+        if let (Ok(node), Ok(first), Ok(second)) = tree {
+            let third = columns[3].parse::<f64>().ok()?;
+            rows.push((node, [first, second, third]));
         }
     }
-    (!values.is_empty()).then_some(Displacements { values })
+    (!rows.is_empty()).then_some(rows)
+}
+
+/// Parse the `displacements (vx,vy,vz)` table that `*NODE PRINT` writes.
+fn parse_displacements(dat: &str) -> Option<Displacements> {
+    let rows = parse_nodal_table(dat, "displacements")?;
+    Some(Displacements {
+        values: rows.into_iter().map(|(_, [vx, _, _])| vx).collect(),
+    })
 }
 
 fn parsed_node_count() -> usize {
@@ -317,6 +653,90 @@ mod tests {
         let parsed = parse_displacements(dat).ok_or("the CCX displacement table was not parsed")?;
         assert_eq!(parsed.values.len(), 2);
         assert!((parsed.values[0] - 0.19).abs() < 1e-9);
+        Ok(())
+    }
+
+    #[test]
+    fn reaction_table_is_parsed_alongside_displacements() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let dat = "\n displacements (vx,vy,vz) for set LOADED and time  0.1000000E+01\n\n\
+                   5, 1.0E-05, 0.0E+00, -4.7E-05\n\n\
+                   \n forces (fx,fy,fz) for set FIXED and time  0.1000000E+01\n\n\
+                   1, 0.0E+00, 0.0E+00, -2.0E+02\n\
+                   2, 0.0E+00, 0.0E+00, 2.0E+02\n\n";
+        let forces = parse_nodal_table(dat, "forces").ok_or("the reaction table was not parsed")?;
+        assert_eq!(forces.len(), 2);
+        assert_eq!(forces[0].0, 1);
+        let total: f64 = forces.iter().map(|(_, [_, _, fz])| fz).sum();
+        assert!(total.abs() < 1e-12, "reactions must cancel: {total}");
+        // The displacement table in the same file still parses through the shared reader.
+        let displacements = parse_nodal_table(dat, "displacements").ok_or("displacements")?;
+        assert_eq!(displacements[0].1[2], -4.7e-5);
+        Ok(())
+    }
+
+    /// The lexical face classification is what decides clamp and load, so check it on a cube whose
+    /// six-tet decomposition has a known top area.
+    #[test]
+    fn cube_mesh_top_face_becomes_the_loaded_patch() -> Result<(), Box<dyn std::error::Error>> {
+        let coordinates = vec![
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [1.0, 0.0, 1.0],
+            [1.0, 1.0, 1.0],
+            [0.0, 1.0, 1.0],
+        ];
+        let tetrahedra = vec![
+            [0, 1, 2, 6],
+            [0, 2, 3, 6],
+            [0, 3, 7, 6],
+            [0, 7, 4, 6],
+            [0, 4, 5, 6],
+            [0, 5, 1, 6],
+        ];
+        let patch =
+            classify_document_nodes(&coordinates, &tetrahedra).map_err(std::io::Error::other)?;
+        assert!(
+            (patch.loaded_area_mm2 - 1.0).abs() < 1e-12,
+            "top face area was {}, expected 1.0",
+            patch.loaded_area_mm2
+        );
+        let mut loaded_ids: Vec<u32> = patch.loaded.keys().copied().collect();
+        loaded_ids.sort_unstable();
+        assert_eq!(loaded_ids, vec![5, 6, 7, 8]);
+        let weight_total: f64 = patch.loaded.values().sum();
+        assert!((weight_total - 1.0).abs() < 1e-12);
+        assert_eq!(patch.fixed, vec![1, 2, 3, 4]);
+
+        let deck = document_deck(&coordinates, &tetrahedra, &patch.loaded, &patch.fixed, 2.0);
+        assert!(deck.contains("*ELEMENT, TYPE=C3D4, ELSET=EALL"));
+        assert!(deck.contains("*BOUNDARY\nFIXED,1,3,0.0"));
+        assert!(deck.contains("*NODE PRINT, NSET=FIXED\nRF"));
+        // The corner of both top triangles carries a third of each: 2.0 * 1/3 N downwards.
+        assert!(deck.contains("5,3,-0.666666667"), "{deck}");
+        Ok(())
+    }
+
+    #[test]
+    fn a_flat_or_inverted_mesh_is_refused() -> Result<(), Box<dyn std::error::Error>> {
+        let flat = vec![
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [1.0, 1.0, 0.0],
+        ];
+        let error = classify_document_nodes(&flat, &[[0, 1, 2, 3]])
+            .err()
+            .ok_or("a flat mesh must be refused")?;
+        assert!(
+            error.contains("nothing to load")
+                || error.contains("no height")
+                || error.contains("flat sheet"),
+            "{error}"
+        );
         Ok(())
     }
 }

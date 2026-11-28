@@ -2834,6 +2834,61 @@ impl StudioState {
         }))
     }
 
+    /// Mesh the active document with Gmsh, then solve that mesh with CalculiX.
+    ///
+    /// Unlike the fixed reference-case benchmark, this runs the user's own geometry: the tetrahedra
+    /// CalculiX receives are the ones Gmsh built from the document, and the load is a uniform
+    /// pressure on the highest face of that mesh. The returned equilibrium residual is the solver's
+    /// own reaction sum compared with the applied force, so it is a measured check, not a claim.
+    fn solve_document(
+        &mut self,
+        timeout: std::time::Duration,
+        pressure_mpa: f64,
+    ) -> Result<serde_json::Value, StudioError> {
+        if self.project.features().is_empty() && self.project.imports().is_empty() {
+            return Err(StudioError::BadRequest(
+                "this project has no solid to solve".into(),
+            ));
+        }
+        let build = self
+            .project
+            .build_with_cache(&mut self.kernel, &mut self.cache)?;
+        if let Some(failure) = build.failed {
+            return Err(StudioError::BadRequest(format!(
+                "feature {} cannot be rebuilt, so the solve would not match the model: {}",
+                failure.id, failure.message
+            )));
+        }
+        let mesh = build
+            .mesh
+            .ok_or_else(|| StudioError::BadRequest("this project has no solid to solve".into()))?;
+        let document_volume_mm3 = mesh.signed_volume().abs();
+        let stl = cad_io::stl_bytes(&mesh)?;
+        let (mesh_report, geometry) = atlas_engine_manager::gmsh::mesh_document_with_geometry(
+            &stl,
+            document_volume_mm3,
+            timeout,
+        )
+        .map_err(StudioError::Unavailable)?;
+        let solve = atlas_engine_manager::calculix::run_document_solve(
+            &geometry.coordinates,
+            &geometry.tetrahedra,
+            pressure_mpa,
+            timeout,
+        )
+        .map_err(StudioError::Unavailable)?;
+        let combined = format!("{}|{}", mesh_report.provenance_hash, solve.provenance_hash);
+        Ok(serde_json::json!({
+            "engine_id": "calculix",
+            "status": "completed",
+            "document": self.project.name,
+            "mesh_engine": "gmsh",
+            "mesh": mesh_report,
+            "metrics": solve,
+            "provenance_hash": format!("fnv1a64-{:016x}", fnv1a64(combined.as_bytes())),
+        }))
+    }
+
     fn step(&mut self) -> Result<(Vec<u8>, String), StudioError> {
         if self.project.features().is_empty() && self.project.imports().is_empty() {
             return Err(StudioError::BadRequest(
@@ -15849,8 +15904,9 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                 if registry.get(&engine_id).is_none() {
                     return error_response(&StudioError::NotFound);
                 }
-                // CalculiX and ngspice have real adapters: report the detected binary and
-                // version rather than the registry's static "no adapter" message.
+                // CalculiX, ngspice, Gmsh, pandapower and Cantera have real adapters: report the
+                // detected binary (or interpreter) and version rather than the registry's static
+                // "no adapter" message.
                 if let Some(payload) = real_adapter_health(engine_id.as_str()) {
                     return json_response(200, payload);
                 }
@@ -15934,6 +15990,21 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
             }
             Err(error) => error_response(&error),
         },
+        "/api/engines/solve-document" => {
+            match parse_body_or_default::<SolveDocumentRequest>(request) {
+                Ok(body) => {
+                    let timeout = std::time::Duration::from_secs(
+                        body.timeout_seconds.unwrap_or(120).clamp(5, 300),
+                    );
+                    let pressure = body.pressure_mpa.unwrap_or(1.0).clamp(1e-6, 1_000.0);
+                    match with_state(state, |state| state.solve_document(timeout, pressure)) {
+                        Ok(payload) => json_response(200, payload),
+                        Err(error) => error_response(&error),
+                    }
+                }
+                Err(error) => error_response(&error),
+            }
+        }
         "/api/engines/benchmark" => match parse_body::<EngineRunRequest>(request) {
             Ok(body) => {
                 let registry = cad_engineering::engine::EngineRegistry::new();
@@ -16026,6 +16097,69 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                         }
                         Err(message) => error_response(&StudioError::Unavailable(format!(
                             "Gmsh adapter did not produce a verified benchmark: {message}"
+                        ))),
+                    };
+                }
+                // The pandapower adapter solves a two-bus network and checks the voltage against
+                // the exact root of the constant-power equations. Without the module this falls
+                // through to the refusal.
+                if engine_id.as_str() == "pandapower"
+                    && atlas_engine_manager::pandapower::available().is_some()
+                {
+                    let timeout = std::time::Duration::from_secs(
+                        body.timeout_seconds.unwrap_or(60).clamp(5, 180),
+                    );
+                    return match atlas_engine_manager::pandapower::run_power_flow_benchmark(timeout)
+                    {
+                        Ok(benchmark) => {
+                            let metrics =
+                                serde_json::to_value(&benchmark).unwrap_or(serde_json::Value::Null);
+                            json_response(
+                                200,
+                                serde_json::json!({
+                                    "engine_id": "pandapower",
+                                    "benchmark_status": "completed",
+                                    "execution_time_ms": benchmark.elapsed_ms,
+                                    "accuracy_score": benchmark.accuracy_score,
+                                    "metrics": metrics,
+                                    "provenance_hash": benchmark.provenance_hash,
+                                }),
+                            )
+                        }
+                        Err(message) => error_response(&StudioError::Unavailable(format!(
+                            "pandapower adapter did not produce a verified benchmark: {message}"
+                        ))),
+                    };
+                }
+                // The Cantera adapter checks the mechanism against Mayer's relation, the ideal-gas
+                // law and the standard enthalpy of combustion of methane. Without the module this
+                // falls through to the refusal.
+                if engine_id.as_str() == "cantera"
+                    && atlas_engine_manager::cantera::available().is_some()
+                {
+                    let timeout = std::time::Duration::from_secs(
+                        body.timeout_seconds.unwrap_or(60).clamp(5, 180),
+                    );
+                    return match atlas_engine_manager::cantera::run_thermochemistry_benchmark(
+                        timeout,
+                    ) {
+                        Ok(benchmark) => {
+                            let metrics =
+                                serde_json::to_value(&benchmark).unwrap_or(serde_json::Value::Null);
+                            json_response(
+                                200,
+                                serde_json::json!({
+                                    "engine_id": "cantera",
+                                    "benchmark_status": "completed",
+                                    "execution_time_ms": benchmark.elapsed_ms,
+                                    "accuracy_score": benchmark.accuracy_score,
+                                    "metrics": metrics,
+                                    "provenance_hash": benchmark.provenance_hash,
+                                }),
+                            )
+                        }
+                        Err(message) => error_response(&StudioError::Unavailable(format!(
+                            "Cantera adapter did not produce a verified benchmark: {message}"
                         ))),
                     };
                 }
@@ -19293,6 +19427,14 @@ fn real_adapter_health(engine_id: &str) -> Option<serde_json::Value> {
             atlas_engine_manager::gmsh::probe_version().ok(),
             "Gmsh",
         ),
+        "pandapower" => {
+            let (executable, version) = atlas_engine_manager::pandapower::available()?;
+            (executable, Some(version), "pandapower")
+        }
+        "cantera" => {
+            let (executable, version) = atlas_engine_manager::cantera::available()?;
+            (executable, Some(version), "Cantera")
+        }
         _ => return None,
     };
     Some(serde_json::json!({
@@ -19595,6 +19737,16 @@ struct EngineHealthRequest {
 struct MeshDocumentRequest {
     #[serde(default)]
     timeout_seconds: Option<u64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SolveDocumentRequest {
+    #[serde(default)]
+    timeout_seconds: Option<u64>,
+    /// Pressure on the highest face in N/mm^2 (MPa). Defaults to 1 MPa.
+    #[serde(default)]
+    pressure_mpa: Option<f64>,
 }
 
 #[derive(Debug, Deserialize)]

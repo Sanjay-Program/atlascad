@@ -407,6 +407,62 @@ def run_live_demo() -> None:
             check(doc_mesh_refused, "document meshing refuses without gmsh (no fabricated mesh)")
             print("  ✓ Engine Orchestration: document meshing refused (501, no gmsh installed here)")
 
+        solve = None
+        solve_refused = False
+        try:
+            solve = http_request(port, "POST", "/api/engines/solve-document", body={"pressure_mpa": 2.0})
+        except RuntimeError as err:
+            solve_refused = "501" in str(err) and (
+                "calculix" in str(err).lower() or "gmsh" in str(err).lower()
+            )
+        if solve:
+            metrics = solve.get("metrics", {})
+            residual = metrics.get("equilibrium_error_percent", 100)
+            check(solve.get("engine_id") == "calculix", "active document solved by CalculiX")
+            check(solve.get("mesh_engine") == "gmsh", "the solve runs on the Gmsh mesh of the model")
+            check(metrics.get("elements", 0) > 0, "solve ran on the document's own tetrahedra")
+            check(residual < 1.0, f"the clamped reactions balance the applied load ({residual}%)")
+            check(metrics.get("max_axial_displacement_mm", 0) > 0, "the solver produced an axial displacement")
+            check(str(solve.get("provenance_hash", "")).startswith("fnv1a64-"), "solve provenance digest recorded")
+            print(f"  ✓ Document FEA: '{solve.get('document')}' solved by CalculiX {metrics.get('solver_version')} on {metrics.get('elements')} tetrahedra, {metrics.get('applied_force_n'):.1f} N applied, equilibrium residual {residual:.2e}%, max axial {metrics.get('max_axial_displacement_mm'):.3e} mm, {metrics.get('elapsed_ms')} ms")
+        else:
+            check(solve_refused, "document FEA refuses without CalculiX and Gmsh (no invented field)")
+            print("  ✓ Document FEA: refused (501, no solver installed here)")
+
+        power = None
+        power_refused = False
+        try:
+            power = http_request(port, "POST", "/api/engines/benchmark", body={"engine_id": "pandapower"})
+        except RuntimeError as err:
+            power_refused = "501" in str(err) and "no solver was run" in str(err)
+        if power:
+            metrics = power.get("metrics", {})
+            check(power.get("benchmark_status") == "completed", "pandapower benchmark completed")
+            check(metrics.get("error_percent", 100) < 1e-6, f"power flow within 1e-6% of the exact voltage root ({metrics.get('error_percent')}%)")
+            check(metrics.get("converged") is True, "pandapower converged")
+            check(str(power.get("provenance_hash", "")).startswith("fnv1a64-"), "pandapower provenance digest recorded")
+            print(f"  ✓ Engine Orchestration: real pandapower {metrics.get('solver_version')} power flow, {metrics.get('measured_vm_pu')} pu vs exact {metrics.get('analytic_vm_pu')} pu, {power.get('execution_time_ms')} ms")
+        else:
+            check(power_refused, "pandapower benchmark refuses without the module (no fabricated power flow)")
+            print("  ✓ Engine Orchestration: pandapower benchmark refused (501, module not installed here)")
+
+        chem = None
+        chem_refused = False
+        try:
+            chem = http_request(port, "POST", "/api/engines/benchmark", body={"engine_id": "cantera"})
+        except RuntimeError as err:
+            chem_refused = "501" in str(err) and "no solver was run" in str(err)
+        if chem:
+            metrics = chem.get("metrics", {})
+            check(chem.get("benchmark_status") == "completed", "Cantera benchmark completed")
+            check(metrics.get("lhv_error_percent", 100) < 0.2, f"mechanism LHV within 0.2% of the standard 802.3 kJ/mol ({metrics.get('lhv_error_percent')}%)")
+            check(2000 < metrics.get("flame_temperature_k", 0) < 2600, "adiabatic flame temperature is physical")
+            check(str(chem.get("provenance_hash", "")).startswith("fnv1a64-"), "Cantera provenance digest recorded")
+            print(f"  ✓ Engine Orchestration: real Cantera {metrics.get('solver_version')} thermochemistry, LHV {metrics.get('lhv_kj_per_mol'):.2f} kJ/mol, flame {metrics.get('flame_temperature_k'):.1f} K, {chem.get('execution_time_ms')} ms")
+        else:
+            check(chem_refused, "Cantera benchmark refuses without the module (no fabricated thermochemistry)")
+            print("  ✓ Engine Orchestration: Cantera benchmark refused (501, module not installed here)")
+
         # ---------------------------------------------------------------------
         # DEMO 9: Engineering Dependency Graph
         # ---------------------------------------------------------------------

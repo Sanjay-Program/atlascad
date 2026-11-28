@@ -69,7 +69,7 @@
 
 | Item | Status |
 | --- | --- |
-| README test counts match the tree | **FIXED** (893 workspace / 54 HTTP) |
+| README test counts match the tree | **FIXED** (903 workspace / 56 HTTP) |
 | Current readiness audit | **PASS** — this document set |
 | Historical docs clearly marked | **PARTIAL** — banners added to the 2026-10-29 readiness and feature matrix |
 | API documentation matches implemented routes | **PARTIAL** — 317 path literals; documented subset is accurate, not exhaustive |

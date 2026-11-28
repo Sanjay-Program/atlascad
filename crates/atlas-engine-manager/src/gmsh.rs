@@ -46,6 +46,15 @@ pub struct DocumentMesh {
     pub provenance_hash: String,
 }
 
+/// Tetrahedral volume mesh handed to a downstream solver.
+#[derive(Debug, Clone)]
+pub struct VolumeMesh {
+    /// Node coordinates in millimetres, indexed by the element connectivity below.
+    pub coordinates: Vec<[f64; 3]>,
+    /// Four node indices per tetrahedron, into `coordinates`.
+    pub tetrahedra: Vec<[usize; 4]>,
+}
+
 /// Verified result of one real `gmsh` run.
 #[derive(Debug, Clone, Serialize)]
 pub struct GmshBenchmark {
@@ -189,6 +198,18 @@ pub fn run_document_mesh(
     document_volume_mm3: f64,
     timeout: Duration,
 ) -> Result<DocumentMesh, String> {
+    mesh_document_with_geometry(stl, document_volume_mm3, timeout).map(|(summary, _)| summary)
+}
+
+/// Mesh a document and also return the elements, so a structural solver can run on them.
+///
+/// This is the same run as [`run_document_mesh`]; the returned [`VolumeMesh`] is exactly the
+/// tetrahedra whose summed volume was checked against the model volume.
+pub fn mesh_document_with_geometry(
+    stl: &[u8],
+    document_volume_mm3: f64,
+    timeout: Duration,
+) -> Result<(DocumentMesh, VolumeMesh), String> {
     if !document_volume_mm3.is_finite() || document_volume_mm3 <= 0.0 {
         return Err("the document has no positive volume to mesh".to_string());
     }
@@ -242,7 +263,7 @@ pub fn run_document_mesh(
     let volume_error_percent =
         (mesh_volume_mm3 - document_volume_mm3).abs() / document_volume_mm3 * 100.0;
 
-    Ok(DocumentMesh {
+    let summary = DocumentMesh {
         solver_version: version,
         executable: executable.display().to_string(),
         nodes: mesh.nodes,
@@ -256,7 +277,12 @@ pub fn run_document_mesh(
         elapsed_ms: elapsed_ms.max(1),
         provenance_hash: provenance(&[stl, output.as_slice()]),
         refined_triangles,
-    })
+    };
+    let geometry = VolumeMesh {
+        coordinates: mesh.coordinates,
+        tetrahedra: mesh.tetrahedra,
+    };
+    Ok((summary, geometry))
 }
 
 #[derive(Clone, Copy, Debug)]
