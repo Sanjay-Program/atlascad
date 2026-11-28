@@ -45,7 +45,7 @@ synthesises a score.
 | OpenSeesPy | 3.8.0.0 | Cantilever, 1,000 mm × 10 × 10 mm, E = 210 GPa, 10 elasticBeamColumn elements, 1 N tip load | Tip displacement 1.9047619047612312 mm | `P L³ / (3 E I)` = 1.9047619047619047 mm | 3.5 × 10⁻¹³ relative | 161 ms | `fnv1a64-02f7c5625f8f5cba` |
 | RDKit | 2026.9.2 | Benzene from SMILES `c1ccccc1`: formula, monoisotopic mass and average molecular weight | C₆H₆, 78.046950192 Da, 78.114 g/mol | Exact masses of ¹²C and ¹H (78.0469501914 Da); standard atomic weights (78.114 g/mol) | 7.7 × 10⁻¹⁰ % and 1.8 × 10⁻¹⁴ % | 261 ms | `fnv1a64-362c3084ea8bf05f` |
 | MuJoCo | 4.0.1 | 1 kg point mass dropped from 10 m, 100,000 steps at 10 µs | Height after 1 s: 5.094950949999747 m | `z₀ − ½ g t²` = 5.095 m | 9.6 × 10⁻⁴ % (the integrator's truncation error) | 424 ms | `fnv1a64-77cd23226526a177` |
-| EPANET via WNTR | 1.5.0 | 1 km × 300 mm pipe at C = 100 between a 100 m reservoir and a 0.05 m³/s junction demand | Junction head 97.10618591308594 m, flow 0.05000000074505806 m³/s | Hazen-Williams head loss with EPANET's SI coefficient (10.667, exponents 1.852/4.871): 97.10614270189 m | 4.4 × 10⁻⁵ % | 1,105 ms | `fnv1a64-ebc794b1ff6fac2f` |
+| EPANET via WNTR | 1.5.0 | 1 km × 300 mm pipe at C = 100 between a 100 m reservoir and a 0.05 m³/s junction demand | Junction head 97.10618591308594 m, flow 0.05000000074505806 m³/s | Hazen-Williams head loss with EPANET's SI coefficient (10.667, exponents 1.852/4.871): 97.10614270189 m | 4.4 × 10⁻⁵ % | 1,145 ms | `fnv1a64-f110245f506efa0f` |
 
 Notes:
 

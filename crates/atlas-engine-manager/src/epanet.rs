@@ -100,17 +100,22 @@ fn analytic_head_loss_m() -> f64 {
 
 fn benchmark_script() -> &'static str {
     r#"import json
+import os
+import tempfile
 import wntr
 
-network = wntr.network.WaterNetworkModel()
-network.add_reservoir("R1", base_head=100.0)
-network.add_junction("J1", base_demand=0.05, elevation=0.0)
-network.add_pipe("P1", "R1", "J1", length=1000.0, diameter=0.3, roughness=100.0)
-results = wntr.sim.EpanetSimulator(network).run_sim()
-print(json.dumps({
-    "junction_head_m": float(results.node["head"]["J1"].iloc[0]),
-    "flow_m3_s": float(results.link["flowrate"]["P1"].iloc[0]),
-}))
+# EPANET writes temp.inp/temp.rpt/temp.bin into the process directory, so run it in a scratch
+# directory that is removed afterwards instead of leaving files behind in the caller's tree.
+with tempfile.TemporaryDirectory() as workdir:
+    os.chdir(workdir)
+    network = wntr.network.WaterNetworkModel()
+    network.add_reservoir("R1", base_head=100.0)
+    network.add_junction("J1", base_demand=0.05, elevation=0.0)
+    network.add_pipe("P1", "R1", "J1", length=1000.0, diameter=0.3, roughness=100.0)
+    results = wntr.sim.EpanetSimulator(network).run_sim()
+    head = float(results.node["head"]["J1"].iloc[0])
+    flow = float(results.link["flowrate"]["P1"].iloc[0])
+print(json.dumps({"junction_head_m": head, "flow_m3_s": flow}))
 "#
 }
 

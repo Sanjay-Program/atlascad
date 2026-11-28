@@ -47,3 +47,8 @@ Thumbs.db
 # `apps/solidcraft/crates/ui-egui/src/update/install.rs`, so nothing here is needed to build.
 /secrets/
 *.key
+
+# EPANET/WNTR scratch files written by the WNTR simulator
+temp.inp
+temp.rpt
+temp.bin
