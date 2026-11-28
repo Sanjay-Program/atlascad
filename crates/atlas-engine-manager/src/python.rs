@@ -73,13 +73,25 @@ pub(crate) fn run_json(
 /// The package metadata is preferred because some distributions (OpenSeesPy) do not expose
 /// `__version__`; the module attribute is the fallback.
 pub(crate) fn module_version(module: &str, timeout: Duration) -> Result<String, String> {
+    module_version_or_attribute(module, "__version__", timeout)
+}
+
+/// Version reported by an importable module, falling back to `attribute`.
+///
+/// Some distributions carry no package metadata and no `__version__`, but do export the version
+/// under their own name: pythonocc-core ships `OCC.VERSION` and nothing importlib can read.
+pub(crate) fn module_version_or_attribute(
+    module: &str,
+    attribute: &str,
+    timeout: Duration,
+) -> Result<String, String> {
     let code = format!(
         "import importlib.metadata as md\n\
          import {module}\n\
          try:\n\
          \x20   print(md.version('{module}'))\n\
          except md.PackageNotFoundError:\n\
-         \x20   print(getattr({module}, '__version__', 'unknown'))"
+         \x20   print(getattr({module}, '{attribute}', 'unknown'))"
     );
     let stdout = run_code(&code, timeout)
         .map_err(|error| format!("`{module}` is not importable: {error}"))?;

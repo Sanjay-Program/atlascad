@@ -243,13 +243,15 @@ impl EngineRegistry {
             id: EngineId::new("occt"),
             name: "Open CASCADE Technology (OCCT)".to_string(),
             discipline: EngineDiscipline::Mechanical,
-            version: "7.8.0".to_string(),
+            version: "8.0.1".to_string(),
             license: "LGPL-2.1 with Exception".to_string(),
             license_tier: LicenseTier::TierBWeakCopyleft,
             execution_model: ExecutionModel::CAbi,
             capabilities: vec![EngineCapability::CadBrep],
             available: true,
-            binary_path: Some("/usr/lib/libTKBO.so".to_string()),
+            // A C++ library reached through its Python bindings: the adapter imports it, so there
+            // is no executable or shared object at a fixed path.
+            binary_path: None,
             description: "Industry-standard B-Rep surface modeling, STEP AP242, and IGES data exchange engine.".to_string(),
         });
 
@@ -332,7 +334,8 @@ impl EngineRegistry {
             execution_model: ExecutionModel::CAbi,
             capabilities: vec![EngineCapability::BimIfc],
             available: true,
-            binary_path: Some("/usr/bin/IfcConvert".to_string()),
+            // A Python/C++ toolkit: the adapter imports it in a separate interpreter.
+            binary_path: None,
             description:
                 "OpenBIM parser, geometry extractor, and serializer for IFC2x3 and IFC4 schemas."
                     .to_string(),
@@ -567,13 +570,13 @@ impl EngineRegistry {
             id: EngineId::new("modflow"),
             name: "MODFLOW 6 Groundwater Flow".to_string(),
             discipline: EngineDiscipline::Environmental,
-            version: "6.4.4".to_string(),
+            version: "6.8.1".to_string(),
             license: "Public Domain (USGS)".to_string(),
             license_tier: LicenseTier::TierAPermissive,
             execution_model: ExecutionModel::ProcessIsolated,
             capabilities: vec![EngineCapability::GroundwaterFlow],
             available: true,
-            binary_path: Some("/usr/bin/mf6".to_string()),
+            binary_path: None,
             description: "3D finite-difference groundwater flow, aquifer depletion, and subsurface hydraulic head modeling.".to_string(),
         });
     }

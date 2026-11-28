@@ -500,12 +500,14 @@ def run_live_demo() -> None:
             check(frame_refused, "OpenSees benchmark refuses without the module (no fabricated deflection)")
             print("  ✓ Engine Orchestration: OpenSees benchmark refused (501, module not installed here)")
 
-        # Three more library engines, each checked against its own reference value.
+        # Every remaining library engine, each checked against its own reference value.
         library_engines = {
             "rdkit": ("exact_mass_error_percent", 1e-6),
             "mujoco": ("error_percent", 1e-2),
             "epanet": ("error_percent", 1e-3),
             "ifcopenshell": ("error_percent", 1e-6),
+            "occt": ("error_percent", 1e-6),
+            "modflow": ("error_percent", 1e-6),
         }
         for engine_id, (error_key, tolerance) in library_engines.items():
             result = None

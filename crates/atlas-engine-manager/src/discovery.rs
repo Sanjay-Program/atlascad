@@ -58,19 +58,35 @@ impl EngineDiscovery {
             "pandapower" => crate::pandapower::available()?,
             "cantera" => crate::cantera::available()?,
             "opensees" => crate::opensees::available()?,
+            "rdkit" => crate::rdkit::available()?,
+            "mujoco" => crate::mujoco::available()?,
+            "epanet" => crate::epanet::available()?,
+            "ifcopenshell" => crate::ifcopenshell::available()?,
+            "occt" => crate::occt::available()?,
+            "modflow" => crate::modflow::available()?,
             _ => return None,
         };
         Some(python)
     }
 
-    /// Discover installation, local source, and adapter readiness for all 24 engines.
+    /// Discover installation, local source, and adapter readiness for every registered engine.
+    ///
+    /// The registry decides which engines exist: walking the installation guides instead dropped
+    /// SWMM and MODFLOW, which are registered but had no guide, and reported two guides for
+    /// engines nothing registers.
     pub fn discover_all() -> Vec<EngineDiscoveryReport> {
         let guides = InstallationGuide::all();
-        let mut reports = Vec::with_capacity(guides.len());
+        let mut engines = cad_engineering::engine::EngineRegistry::new().list();
+        engines.sort_by(|left, right| left.id.as_str().cmp(right.id.as_str()));
+        let mut reports = Vec::with_capacity(engines.len());
 
-        for guide in guides {
-            let engine_id = guide.engine_id.clone();
-            let name = guide.name.clone();
+        for engine in engines {
+            let engine_id = engine.id.as_str().to_string();
+            let name = engine.name.clone();
+            let guide = guides
+                .iter()
+                .find(|guide| guide.engine_id == engine_id)
+                .cloned();
 
             // 1. Check if native in-process
             if matches!(engine_id.as_str(), "truck" | "cad-cae" | "cad-cam") {
@@ -80,7 +96,7 @@ impl EngineDiscovery {
                     status: "native".to_string(),
                     executable_path: None,
                     source_path: None,
-                    guide: Some(guide),
+                    guide,
                 });
                 continue;
             }
@@ -93,7 +109,7 @@ impl EngineDiscovery {
                     status: "installed".to_string(),
                     executable_path: Some(python.display().to_string()),
                     source_path: None,
-                    guide: Some(guide),
+                    guide,
                 });
                 continue;
             }
@@ -110,8 +126,10 @@ impl EngineDiscovery {
                 "energyplus" => "energyplus",
                 "opensees" => "OpenSees",
                 "epanet" => "epanet",
+                "modflow" => "mf6",
                 "openvsp" => "vsp",
                 "solvespace" => "solvespace",
+                "swmm" => "swmm5",
                 other => other,
             };
 
@@ -142,10 +160,53 @@ impl EngineDiscovery {
                 status,
                 executable_path: exe_str,
                 source_path: src_str,
-                guide: Some(guide),
+                guide,
             });
         }
 
         reports
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Discovery must agree with the adapters. Four library engines were runnable while discovery
+    /// still reported them missing, because only the first three were wired into
+    /// `library_interpreter`.
+    #[test]
+    fn discovery_agrees_with_every_library_adapter() {
+        let probes: [(&str, bool); 9] = [
+            ("pandapower", crate::pandapower::available().is_some()),
+            ("cantera", crate::cantera::available().is_some()),
+            ("opensees", crate::opensees::available().is_some()),
+            ("rdkit", crate::rdkit::available().is_some()),
+            ("mujoco", crate::mujoco::available().is_some()),
+            ("epanet", crate::epanet::available().is_some()),
+            ("ifcopenshell", crate::ifcopenshell::available().is_some()),
+            ("occt", crate::occt::available().is_some()),
+            ("modflow", crate::modflow::available().is_some()),
+        ];
+        let reports = EngineDiscovery::discover_all();
+        for (engine_id, available) in probes {
+            let report = reports
+                .iter()
+                .find(|report| report.engine_id == engine_id)
+                .unwrap_or_else(|| panic!("{engine_id} has no discovery report"));
+            if available {
+                assert_eq!(
+                    report.status, "installed",
+                    "{engine_id} is importable but discovery says {}",
+                    report.status
+                );
+                assert!(report.executable_path.is_some(), "{engine_id}");
+            } else {
+                assert_ne!(
+                    report.status, "installed",
+                    "{engine_id} is not importable but discovery calls it installed"
+                );
+            }
+        }
     }
 }

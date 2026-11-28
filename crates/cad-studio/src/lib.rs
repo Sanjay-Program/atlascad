@@ -15958,9 +15958,8 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                 if registry.get(&engine_id).is_none() {
                     return error_response(&StudioError::NotFound);
                 }
-                // CalculiX, ngspice, Gmsh, pandapower and Cantera have real adapters: report the
-                // detected binary (or interpreter) and version rather than the registry's static
-                // "no adapter" message.
+                // Engines with a real adapter report the detected binary (or interpreter) and
+                // version rather than the registry's static "no adapter" message.
                 if let Some(payload) = real_adapter_health(engine_id.as_str()) {
                     return json_response(200, payload);
                 }
@@ -16329,6 +16328,43 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                     return adapter_benchmark_response(
                         "ifcopenshell",
                         atlas_engine_manager::ifcopenshell::run_wall_volume_benchmark(timeout).map(
+                            |b| {
+                                (
+                                    serde_json::to_value(&b).unwrap_or(serde_json::Value::Null),
+                                    b.elapsed_ms,
+                                    b.accuracy_score,
+                                    b.provenance_hash,
+                                )
+                            },
+                        ),
+                    );
+                }
+                if engine_id.as_str() == "occt" && atlas_engine_manager::occt::available().is_some()
+                {
+                    let timeout = std::time::Duration::from_secs(
+                        body.timeout_seconds.unwrap_or(90).clamp(5, 240),
+                    );
+                    return adapter_benchmark_response(
+                        "occt",
+                        atlas_engine_manager::occt::run_boolean_volume_benchmark(timeout).map(|b| {
+                            (
+                                serde_json::to_value(&b).unwrap_or(serde_json::Value::Null),
+                                b.elapsed_ms,
+                                b.accuracy_score,
+                                b.provenance_hash,
+                            )
+                        }),
+                    );
+                }
+                if engine_id.as_str() == "modflow"
+                    && atlas_engine_manager::modflow::available().is_some()
+                {
+                    let timeout = std::time::Duration::from_secs(
+                        body.timeout_seconds.unwrap_or(120).clamp(5, 300),
+                    );
+                    return adapter_benchmark_response(
+                        "modflow",
+                        atlas_engine_manager::modflow::run_confined_aquifer_benchmark(timeout).map(
                             |b| {
                                 (
                                     serde_json::to_value(&b).unwrap_or(serde_json::Value::Null),
@@ -19631,6 +19667,14 @@ fn real_adapter_health(engine_id: &str) -> Option<serde_json::Value> {
         "ifcopenshell" => {
             let (executable, version) = atlas_engine_manager::ifcopenshell::available()?;
             (executable, Some(version), "IfcOpenShell")
+        }
+        "occt" => {
+            let (executable, version) = atlas_engine_manager::occt::available()?;
+            (executable, Some(version), "OCCT via pythonocc-core")
+        }
+        "modflow" => {
+            let (executable, version) = atlas_engine_manager::modflow::available()?;
+            (executable, Some(version), "MODFLOW 6 via FloPy")
         }
         _ => return None,
     };
