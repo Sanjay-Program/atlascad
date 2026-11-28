@@ -46,7 +46,10 @@ No row claims parity with AutoCAD, SolidWorks, Inventor or Onshape. No row claim
 | pandapower power flow | **Partial / verified** | Python-library adapter: solves a two-bus network (1 pu slack, 0.1 + j0.1 pu line, 1 pu constant-power load) and matches the exact quadratic root, 0.8798668869081245 vs 0.8798668869081243 pu (2.5 × 10⁻¹⁴ %), 5 iterations on 3.2.1 |
 | Cantera thermochemistry | **Partial / verified** | Python-library adapter: computes the methane lower heating value from GRI-Mech 3.0 species enthalpies, 802.557 kJ/mol against the standard 802.3 kJ/mol (0.032 %), Mayer and ideal-gas residuals zero to machine precision, and the adiabatic flame temperature 2,224.6 K on 3.2.0 |
 | OpenSees cantilever statics | **Partial / verified** | Python-library adapter: 10 elasticBeamColumn elements, 1 N tip load on a 1,000 × 10 × 10 mm steel cantilever, tip 1.9047619047612312 mm against `P L³/(3 E I)` = 1.9047619047619047 mm (3.5 × 10⁻¹³ relative) on OpenSeesPy 3.8.0.0 |
-| OpenFOAM, Elmer, SU2, other engines | **Refused** | 15 registry entries have no adapter; `/api/engines/*` returns 501 with "no solver was run". See `PR-008` |
+| RDKit molecular properties | **Partial / verified** | Python-library adapter: benzene from SMILES gives C₆H₆, 78.046950192 Da against 78.0469501914 Da from exact atomic masses (7.7 × 10⁻¹⁰ %) and 78.114 g/mol against the standard atomic weights (1.8 × 10⁻¹⁴ %) on 2026.9.2 |
+| MuJoCo free fall | **Partial / verified** | Python-library adapter: a 1 kg mass dropped from 10 m for 100,000 steps at 10 µs reaches 5.094950949999747 m against `z₀ − ½ g t²` = 5.095 m (9.6 × 10⁻⁴ %) on 4.0.1 |
+| EPANET pipe hydraulics | **Partial / verified** | Python-library adapter through WNTR: a 1 km × 300 mm pipe at C = 100 gives a 97.10618591308594 m junction head against Hazen-Williams 97.10614270189 m (4.4 × 10⁻⁵ %) on 1.5.0 |
+| OpenFOAM, SU2, IfcOpenShell, other engines | **Refused** | 12 registry entries have no adapter; `/api/engines/*` returns 501 with "no solver was run". See `PR-008` |
 | Regulatory certification / sign-off | **Absent** | `/api/report` returns a `DRAFT_NOT_RELEASED` report with measured volume and unassessed mass; no sign-offs are created |
 
 ## Agents and automation

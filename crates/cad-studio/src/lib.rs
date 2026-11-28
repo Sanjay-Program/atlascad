@@ -16192,6 +16192,65 @@ fn post_route(state: &Arc<Mutex<StudioState>>, request: &http::Request) -> http:
                         ))),
                     };
                 }
+                // RDKit, MuJoCo and EPANET are library adapters with the same contract: run the
+                // real engine, parse its output, compare with an independent reference. Without
+                // the module each falls through to the refusal below.
+                if engine_id.as_str() == "rdkit"
+                    && atlas_engine_manager::rdkit::available().is_some()
+                {
+                    let timeout = std::time::Duration::from_secs(
+                        body.timeout_seconds.unwrap_or(60).clamp(5, 180),
+                    );
+                    return adapter_benchmark_response(
+                        "rdkit",
+                        atlas_engine_manager::rdkit::run_molecular_benchmark(timeout).map(|b| {
+                            (
+                                serde_json::to_value(&b).unwrap_or(serde_json::Value::Null),
+                                b.elapsed_ms,
+                                b.accuracy_score,
+                                b.provenance_hash,
+                            )
+                        }),
+                    );
+                }
+                if engine_id.as_str() == "mujoco"
+                    && atlas_engine_manager::mujoco::available().is_some()
+                {
+                    let timeout = std::time::Duration::from_secs(
+                        body.timeout_seconds.unwrap_or(60).clamp(5, 180),
+                    );
+                    return adapter_benchmark_response(
+                        "mujoco",
+                        atlas_engine_manager::mujoco::run_free_fall_benchmark(timeout).map(|b| {
+                            (
+                                serde_json::to_value(&b).unwrap_or(serde_json::Value::Null),
+                                b.elapsed_ms,
+                                b.accuracy_score,
+                                b.provenance_hash,
+                            )
+                        }),
+                    );
+                }
+                if engine_id.as_str() == "epanet"
+                    && atlas_engine_manager::epanet::available().is_some()
+                {
+                    let timeout = std::time::Duration::from_secs(
+                        body.timeout_seconds.unwrap_or(60).clamp(5, 180),
+                    );
+                    return adapter_benchmark_response(
+                        "epanet",
+                        atlas_engine_manager::epanet::run_pipe_network_benchmark(timeout).map(
+                            |b| {
+                                (
+                                    serde_json::to_value(&b).unwrap_or(serde_json::Value::Null),
+                                    b.elapsed_ms,
+                                    b.accuracy_score,
+                                    b.provenance_hash,
+                                )
+                            },
+                        ),
+                    );
+                }
                 let job_req = cad_engineering::engine::EngineJobRequest {
                     job_id: body.job_id.unwrap_or_else(|| "benchmark-1".to_string()),
                     engine_id: engine_id.clone(),
@@ -19468,6 +19527,18 @@ fn real_adapter_health(engine_id: &str) -> Option<serde_json::Value> {
             let (executable, version) = atlas_engine_manager::opensees::available()?;
             (executable, Some(version), "OpenSeesPy")
         }
+        "rdkit" => {
+            let (executable, version) = atlas_engine_manager::rdkit::available()?;
+            (executable, Some(version), "RDKit")
+        }
+        "mujoco" => {
+            let (executable, version) = atlas_engine_manager::mujoco::available()?;
+            (executable, Some(version), "MuJoCo")
+        }
+        "epanet" => {
+            let (executable, version) = atlas_engine_manager::epanet::available()?;
+            (executable, Some(version), "EPANET via WNTR")
+        }
         _ => return None,
     };
     Some(serde_json::json!({
@@ -19478,6 +19549,29 @@ fn real_adapter_health(engine_id: &str) -> Option<serde_json::Value> {
         "detected_version": version,
         "timestamp": now_unix_secs(),
     }))
+}
+
+/// Wrap one adapter benchmark result, or its error, as the benchmark response.
+fn adapter_benchmark_response(
+    engine_id: &'static str,
+    outcome: Result<(serde_json::Value, u64, f64, String), String>,
+) -> http::Response {
+    match outcome {
+        Ok((metrics, elapsed_ms, accuracy_score, provenance_hash)) => json_response(
+            200,
+            serde_json::json!({
+                "engine_id": engine_id,
+                "benchmark_status": "completed",
+                "execution_time_ms": elapsed_ms,
+                "accuracy_score": accuracy_score,
+                "metrics": metrics,
+                "provenance_hash": provenance_hash,
+            }),
+        ),
+        Err(message) => error_response(&StudioError::Unavailable(format!(
+            "{engine_id} adapter did not produce a verified benchmark: {message}"
+        ))),
+    }
 }
 
 /// Whole seconds since the Unix epoch, or 0 if the clock is before the epoch.

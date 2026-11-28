@@ -9,7 +9,7 @@ they have been replaced with the measured state below.
 | Status | Meaning |
 | --- | --- |
 | **VERIFIED (built-in)** | AtlasCAD's own code runs the case and a workspace test or the live demo asserts the result. |
-| **BENCHMARK ADAPTER** | A real installed solver is executed for a deterministic benchmark through `/api/engines/benchmark` and `/api/engines/health`; the solver's own output is parsed. That is the binary itself for CalculiX, ngspice and Gmsh, and a separate interpreter running the pandapower, Cantera or OpenSees library for those three. General job execution does not exist, so `/api/engines/run` refuses with `501`. |
+| **BENCHMARK ADAPTER** | A real installed solver is executed for a deterministic benchmark through `/api/engines/benchmark` and `/api/engines/health`; the solver's own output is parsed. That is the binary itself for CalculiX, ngspice and Gmsh, and a separate interpreter running the pandapower, Cantera, OpenSees, RDKit, MuJoCo or EPANET library for those six. General job execution does not exist, so `/api/engines/run` refuses with `501`. |
 | **NOT IMPLEMENTED** | Registry entry and installation guide only. No binary is invoked; `/api/engines/run` and `/api/engines/benchmark` return `501` with "no solver was run". |
 
 ## Registry (24 engines)
@@ -32,11 +32,11 @@ they have been replaced with the measured state below.
 | `opendss` | Distribution | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
 | `cantera` | Chemical kinetics | **BENCHMARK ADAPTER** (`atlas-engine-manager::cantera`) | Refuses (`501`) | Real Cantera 3.2.0 thermochemistry: methane LHV 802.557 kJ/mol vs the standard 802.3 (0.032 %), flame temperature 2,224.6 K |
 | `dwsim` | Process flowsheet | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
-| `rdkit` | Molecular chemistry | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `rdkit` | Molecular chemistry | **BENCHMARK ADAPTER** (`atlas-engine-manager::rdkit`) | Refuses (`501`) | Real RDKit 2026.9.2 benzene: C₆H₆, 78.046950192 Da vs 78.0469501914 Da from exact atomic masses |
 | `openvsp` | Aerospace design | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
 | `jsbsim` | Flight dynamics | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
-| `mujoco` | Robotics dynamics | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
-| `epanet` | Water hydraulics | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
+| `mujoco` | Robotics dynamics | **BENCHMARK ADAPTER** (`atlas-engine-manager::mujoco`) | Refuses (`501`) | Real MuJoCo 4.0.1 free fall: 5.094950949999747 m vs `z₀ − ½ g t²` 5.095 m (9.6e-4 %) |
+| `epanet` | Water hydraulics | **BENCHMARK ADAPTER** (`atlas-engine-manager::epanet`, through WNTR) | Refuses (`501`) | Real EPANET/WNTR 1.5.0 one-pipe network: head 97.10618591308594 m vs Hazen-Williams 97.10614270189 m (4.4e-5 %) |
 | `epaswmm` | Stormwater | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
 | `modflow` | Groundwater | **NOT IMPLEMENTED** | Refuses (`501`) | No binary, no adapter |
 | `occt` | STEP interchange | **NOT IMPLEMENTED** | Refuses (`501`) | STEP read/write is handled by `cad-io`, not by OCCT |
@@ -44,10 +44,10 @@ they have been replaced with the measured state below.
 ## Summary
 
 - **3** built-in engines verified by tests.
-- **6** external engines with a real, benchmarked adapter (CalculiX, ngspice, Gmsh, pandapower,
-  Cantera, OpenSees); three of them are library adapters driven through a separate Python
-  interpreter.
-- **15** registry entries with no execution adapter; they refuse instead of returning a result.
+- **9** external engines with a real, benchmarked adapter (CalculiX, ngspice, Gmsh, pandapower,
+  Cantera, OpenSees, RDKit, MuJoCo, EPANET); six of them are library adapters driven through a
+  separate Python interpreter.
+- **12** registry entries with no execution adapter; they refuse instead of returning a result.
 
 Adding an engine means implementing a process adapter that runs the real binary and parses its
 output, then verifying it against a closed-form or published reference. Registering a row in the

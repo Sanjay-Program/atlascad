@@ -480,6 +480,30 @@ def run_live_demo() -> None:
             check(frame_refused, "OpenSees benchmark refuses without the module (no fabricated deflection)")
             print("  ✓ Engine Orchestration: OpenSees benchmark refused (501, module not installed here)")
 
+        # Three more library engines, each checked against its own reference value.
+        library_engines = {
+            "rdkit": ("exact_mass_error_percent", 1e-6),
+            "mujoco": ("error_percent", 1e-2),
+            "epanet": ("error_percent", 1e-3),
+        }
+        for engine_id, (error_key, tolerance) in library_engines.items():
+            result = None
+            refused = False
+            try:
+                result = http_request(port, "POST", "/api/engines/benchmark", body={"engine_id": engine_id})
+            except RuntimeError as err:
+                refused = "501" in str(err) and "no solver was run" in str(err)
+            if result:
+                metrics = result.get("metrics", {})
+                error = metrics.get(error_key, 100)
+                check(result.get("benchmark_status") == "completed", f"{engine_id} benchmark completed")
+                check(error < tolerance, f"{engine_id} within its reference tolerance ({error}%)")
+                check(str(result.get("provenance_hash", "")).startswith("fnv1a64-"), f"{engine_id} provenance digest recorded")
+                print(f"  ✓ Engine Orchestration: real {engine_id} {metrics.get('solver_version')} benchmark, {error_key} {error:.3e}%, {result.get('execution_time_ms')} ms")
+            else:
+                check(refused, f"{engine_id} benchmark refuses without the module (no fabricated result)")
+                print(f"  ✓ Engine Orchestration: {engine_id} benchmark refused (501, module not installed here)")
+
         # ---------------------------------------------------------------------
         # DEMO 9: Engineering Dependency Graph
         # ---------------------------------------------------------------------
